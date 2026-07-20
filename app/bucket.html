@@ -26,6 +26,8 @@
     </div>
     <div class="row" style="margin-top:6px">
       <span id="closes" class="muted"></span>
+      <span class="spacer" style="flex:1"></span>
+      <a id="readerlink" href="#">read in browser</a>
     </div>
   </div>
 
@@ -137,6 +139,7 @@ $('upbtn').onclick = async () => {
 
 if (!secret) say('bad link', true);
 else {
+  $('readerlink').href = 'read.html?b=' + encodeURIComponent(secret);
   refresh();
   // Poll only while visible: a backgrounded laptop tab costs nothing, and
   // an immediate refresh on focus keeps the current round fresh exactly

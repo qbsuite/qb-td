@@ -29,7 +29,9 @@ const MAX_PACKET = 16 * 1024 * 1024;     // packet cap
 const MAX_BUNDLE = 32 * 1024 * 1024;     // combined stats blob cap
 const MAX_TOURNAMENTS_PER_USER = 20;
 const MAX_BUCKETS = 60;
-const MAX_FILES_PER_BUCKET = 300;
+// Sized for one shared bucket carrying a whole tournament (several mods on
+// one link, ~2 files per game, re-exports adding rows).
+const MAX_FILES_PER_BUCKET = 600;
 const MAX_NAME = 120;
 
 /* ---------- base64url + HMAC helpers (from sync/worker.js) ---------- */
@@ -186,17 +188,24 @@ function cleanName(s) {
   return String(s || '').trim().slice(0, MAX_NAME);
 }
 
-// Light server-side qbj sanity check; the dashboard does full engine
-// validation. Returns an error string or null.
-function validateQbj(text) {
+// The reader uploads ONE `.qbtd.json` per game: {qbj: <match>, game:
+// <MODAQ state>}. The game half holds the full packet text, so only the
+// extracted qbj half may ever reach the bundle or a public route.
+function extractMatch(text) {
   let obj;
-  try { obj = JSON.parse(text); } catch (e) { return 'not valid JSON'; }
-  if (obj && Array.isArray(obj.objects)) {
-    obj = obj.objects.find((o) => o && (o.match_teams || o.matchTeams)) || obj;
+  try { obj = JSON.parse(text); } catch (e) { return { error: 'not valid JSON' }; }
+  if (obj && obj.qbj && typeof obj.qbj === 'object') obj = obj.qbj;
+  let match = obj;
+  if (match && Array.isArray(match.objects)) {
+    match = match.objects.find((o) => o && (o.match_teams || o.matchTeams)) || match;
   }
-  const teams = obj && (obj.match_teams || obj.matchTeams);
-  if (!Array.isArray(teams) || teams.length !== 2) return 'no match with exactly two match_teams';
-  return null;
+  const teams = match && (match.match_teams || match.matchTeams);
+  if (!Array.isArray(teams) || teams.length !== 2) {
+    return { error: 'no match with exactly two match_teams' };
+  }
+  // qbj: what the bundle stores (an {objects} wrapper is kept as-is —
+  // the engine unwraps it — but a combined file contributes only .qbj).
+  return { error: null, qbj: obj };
 }
 
 /* ---------- combined stats bundle ----------
@@ -410,7 +419,7 @@ async function deleteFile(env, user, id, fileId) {
   if (!results.length) return err(env, 404, 'no such file');
   await env.DATA.delete(results[0].r2_key);
   await env.DB.prepare('DELETE FROM files WHERE id = ?1').bind(fileId).run();
-  if (results[0].kind === 'qbj' && !results[0].error) {
+  if ((results[0].kind === 'qbj' || results[0].kind === 'combined') && !results[0].error) {
     await updateBundle(env, id, (bundle) => {
       bundle.entries = bundle.entries.filter((e) => e.id !== fileId);
     });
@@ -439,7 +448,7 @@ async function putBundle(request, env, user, id) {
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, t.name AS tournament_name, ' +
-    't.current_round, t.roster_r2_key ' +
+    't.current_round, t.roster_r2_key, t.settings ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1'
   ).bind(secret).all();
   return results[0] || null;
@@ -466,12 +475,16 @@ async function bucketState(env, secret) {
       'SELECT COUNT(*) AS n FROM files WHERE bucket_id = ?1'
     ).bind(b.id).all(),
   ]);
+  let settings = {};
+  try { settings = JSON.parse(b.settings) || {}; } catch (e) { /* keep {} */ }
   return json(env, {
     tournament: b.tournament_name,
     room: b.room_name,
     current_round: b.current_round,
     closes: b.created + BUCKET_TTL,
     packet: packet.results[0] || null,
+    roster: !!b.roster_r2_key,
+    settings,
     uploads: uploads.results,
     upload_count: count.results[0].n,
   });
@@ -496,9 +509,15 @@ async function bucketUpload(request, url, env, secret) {
   if (buf.byteLength > MAX_UPLOAD) return err(env, 413, 'file too large');
 
   const isQbj = /\.qbj$/i.test(filename);
-  const kind = isQbj ? 'qbj' : /_game\.json$/i.test(filename) ? 'game' : 'other';
-  const text = isQbj ? new TextDecoder().decode(buf) : null;
-  const error = isQbj ? validateQbj(text) : null;
+  const isCombined = /\.qbtd\.json$/i.test(filename);
+  const kind = isQbj ? 'qbj' : isCombined ? 'combined' : /_game\.json$/i.test(filename) ? 'game' : 'other';
+  let error = null;
+  let qbjObj = null;
+  if (isQbj || isCombined) {
+    const parsed = extractMatch(new TextDecoder().decode(buf));
+    error = parsed.error;
+    qbjObj = parsed.qbj || null;
+  }
 
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
   await env.DATA.put(key, buf, { httpMetadata: { contentType: 'application/json' } });
@@ -508,11 +527,11 @@ async function bucketUpload(request, url, env, secret) {
   ).bind(b.tournament_id, b.id, round, kind, key, filename, buf.byteLength, error, Date.now()).run();
   const fileId = out.meta.last_row_id;
 
-  if (isQbj && !error) {
+  if (qbjObj && !error) {
     await updateBundle(env, b.tournament_id, (bundle) => {
       bundle.entries = bundle.entries.filter((e) => e.id !== fileId);
       bundle.entries.push({
-        id: fileId, round, room: b.room_name, filename, qbj: JSON.parse(text),
+        id: fileId, round, room: b.room_name, filename, qbj: qbjObj,
       });
     });
   }
@@ -532,6 +551,18 @@ async function bucketPacket(env, secret) {
   return blobResponse(env, obj, results[0].packet_name);
 }
 
+// The reader page (read.html) preloads the roster into its embedded MODAQ so
+// the mod only picks teams. Same credential + lifetime rules as the packet.
+async function bucketRoster(env, secret) {
+  const b = await getBucketRow(env, secret);
+  if (!b) return err(env, 404, 'bad link');
+  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  if (!b.roster_r2_key) return err(env, 404, 'no roster');
+  const obj = await env.DATA.get(b.roster_r2_key);
+  if (!obj) return err(env, 404, 'roster missing');
+  return blobResponse(env, obj, 'roster.qbj');
+}
+
 /* ---------- public stats API (/pub/*, publish-gated) ---------- */
 
 async function getPublishedTournament(env, slug) {
@@ -546,7 +577,7 @@ async function pubState(env, slug) {
   if (!t) return err(env, 404, 'not found');
   const [files, buckets] = await Promise.all([
     env.DB.prepare(
-      "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind = 'qbj' AND error IS NULL ORDER BY round, id"
+      "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
     env.DB.prepare(
       'SELECT id, room_name FROM buckets WHERE tournament_id = ?1'
@@ -579,12 +610,21 @@ async function pubQbj(env, slug, fileId) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
   const { results } = await env.DB.prepare(
-    "SELECT r2_key, filename FROM files WHERE id = ?1 AND tournament_id = ?2 AND kind = 'qbj'"
+    "SELECT r2_key, filename, kind FROM files WHERE id = ?1 AND tournament_id = ?2 AND kind IN ('qbj', 'combined')"
   ).bind(fileId, t.id).all();
   if (!results.length) return err(env, 404, 'no such file');
   const obj = await env.DATA.get(results[0].r2_key);
   if (!obj) return err(env, 404, 'file missing');
-  return blobResponse(env, obj, results[0].filename);
+  if (results[0].kind !== 'combined') return blobResponse(env, obj, results[0].filename);
+  // A combined file's game half carries the full packet text — the public
+  // route serves only the extracted qbj half.
+  const parsed = extractMatch(await obj.text());
+  if (parsed.error) return err(env, 404, 'file unreadable');
+  const headers = new Headers(corsHeaders(env));
+  headers.set('Content-Type', 'application/json');
+  headers.set('Content-Disposition',
+    `attachment; filename="${results[0].filename.replace(/\.qbtd\.json$/i, '.qbj').replace(/["\\\r\n]/g, '_')}"`);
+  return new Response(JSON.stringify(parsed.qbj), { status: 200, headers });
 }
 
 async function pubRoster(env, slug) {
@@ -618,6 +658,7 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1]);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1]);
 
     // Public stats routes — publish-gated inside.
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1]);

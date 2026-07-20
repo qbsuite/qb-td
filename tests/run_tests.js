@@ -4,9 +4,10 @@
 
 import assert from 'node:assert/strict';
 import { parseMatch, parseRoster, roundFromFilename } from '../app/engine/qbj.js';
-import { aggregate } from '../app/engine/stats.js';
+import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip } from '../app/engine/zip.js';
+import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -123,6 +124,12 @@ test('accepts camelCase spellings', () => {
   assert.equal(m.teams[0].points, 20);
 });
 
+test('unwraps a combined reader upload to its qbj half', () => {
+  const m = parseMatch({ qbj: M1, game: { cycles: [], packetText: 'secret' } });
+  assert.equal(m.round, 1);
+  assert.equal(m.teams[0].name, 'Alpha');
+});
+
 test('parses roster from whole-file tournament qbj', () => {
   const r = parseRoster(ROSTER);
   assert.equal(r.length, 3);
@@ -172,6 +179,38 @@ test('player leaderboard math', () => {
   const gil = players.find((p) => p.name === 'Gil');
   assert.equal(gil.points, 65);
   assert.equal(players[0].name, 'Gil');   // 65 pts in 20 tuh
+});
+
+test('re-uploaded games count once, latest upload wins', () => {
+  const first = parseMatch(M1);
+  first.fileId = 5;
+  // same round + teams, corrected score, uploaded later
+  const fixed = parseMatch(modaqMatch({
+    round: 1,
+    teamA: { name: 'Alpha', bonusPoints: 90, players: [
+      { name: 'Ann', counts: { 15: 2, 10: 2, '-5': 1 } },
+      { name: 'Abe', counts: { 10: 2 } },
+    ] },
+    teamB: { name: 'Beta', bonusPoints: 30, players: [
+      { name: 'Bob', counts: { 15: 1, 10: 2, '-5': 2 } },
+    ] },
+  }));
+  fixed.fileId = 9;
+  // upload order in the array shouldn't matter when file ids are present
+  const { teams, games } = aggregate([fixed, first]);
+  assert.equal(games.length, 1);
+  assert.equal(teams.find((t) => t.name === 'Alpha').points, 155); // 65 + 90
+  assert.equal(teams.find((t) => t.name === 'Alpha').gp, 1);
+});
+
+test('dedupe matches reversed team order but not other rounds', () => {
+  const a = parseMatch(M1);
+  const swapped = parseMatch({ ...M1, match_teams: [M1.match_teams[1], M1.match_teams[0]] });
+  assert.equal(aggregate([a, swapped]).games.length, 1);       // same pair, same round
+  assert.equal(aggregate([a, parseMatch(M2)]).games.length, 2); // different games
+  // no file ids at all: the later entry wins
+  const { teams } = aggregate([a, swapped]);
+  assert.equal(teams.find((t) => t.name === 'Alpha').points, 125);
 });
 
 test('unrostered names are flagged', () => {
@@ -293,6 +332,14 @@ test('derives roster from matches when none given', () => {
   assert.deepEqual(names, ['Alpha', 'Beta']);
 });
 
+test('.yft path drops superseded uploads via dedupeMatches', () => {
+  const first = parseMatch(M1); first.fileId = 5;
+  const again = parseMatch(M1); again.fileId = 9;
+  const y = buildYft({ name: 'X', matches: dedupeMatches([first, again, parseMatch(M2)]) });
+  const games = y.objects[0].phases[0].rounds.flatMap((r) => r.matches);
+  assert.equal(games.length, 2);
+});
+
 /* ---------- zip ---------- */
 
 console.log('zip');
@@ -311,6 +358,124 @@ test('store-only zip structure', () => {
   const cenOff = dv.getUint32(eocdPos + 16, true);
   assert.equal(cenOff + cenSize + 22, z.length);
   assert.equal(dv.getUint32(cenOff, true), 0x02014b50);       // central dir
+});
+
+/* ---------- read_core (read.html helpers) ---------- */
+
+console.log('read_core');
+
+test('normalizePacket accepts MODAQ packet JSON', () => {
+  const p = normalizePacket({ tossups: [{ question: 'Q', answer: 'A' }] }, 'Packet 3.json');
+  assert.equal(p.name, 'Packet 3.json');
+  assert.equal(p.tossups.length, 1);
+  const named = normalizePacket({ name: 'Round 3', tossups: [{ question: 'Q', answer: 'A' }],
+    bonuses: [{ leadin: 'L', parts: ['P'], answers: ['A'], values: [10] }] });
+  assert.equal(named.name, 'Round 3');
+  assert.equal(named.bonuses.length, 1);
+});
+
+test('normalizePacket rejects junk', () => {
+  assert.throws(() => normalizePacket({}), /no tossups/);
+  assert.throws(() => normalizePacket({ tossups: [] }), /no tossups/);
+  assert.throws(() => normalizePacket({ tossups: [{ question: 'Q' }] }), /tossup 1/);
+  assert.throws(() => normalizePacket({ tossups: [{ question: 'Q', answer: 'A' }], bonuses: 3 }), /bonuses/);
+});
+
+const REG_PLAYERS = [
+  { name: 'Ann', teamName: 'Alpha', isStarter: true },
+  { name: 'Abe', teamName: 'Alpha', isStarter: true },
+  { name: 'Bob', teamName: 'Beta', isStarter: true },
+  { name: 'Gil', teamName: 'Gamma', isStarter: true },
+];
+
+test('groupTeams keeps roster order', () => {
+  const teams = groupTeams(REG_PLAYERS);
+  assert.deepEqual(teams.map((t) => t.name), ['Alpha', 'Beta', 'Gamma']);
+  assert.equal(teams[0].players.length, 2);
+  assert.throws(() => groupTeams([]), /no teams/);
+});
+
+test('pickTeams returns both teams\' players, A first', () => {
+  const teams = groupTeams(REG_PLAYERS);
+  const picked = pickTeams(teams, 'Gamma', 'Alpha');
+  assert.deepEqual(picked.map((p) => p.name), ['Gil', 'Ann', 'Abe']);
+  assert.throws(() => pickTeams(teams, 'Alpha', 'Alpha'), /different/);
+  assert.throws(() => pickTeams(teams, 'Alpha', 'Delta'), /not in roster/);
+  assert.throws(() => pickTeams(teams, '', 'Alpha'), /both/);
+});
+
+test('matchFilenames follow the ModaQ convention', () => {
+  const f = matchFilenames(3, 'St. John\'s A', 'Beta');
+  assert.equal(f.combined, 'Round_3_St_John_s_A_Beta.qbtd.json');
+  assert.equal(f.qbj, 'Round_3_St_John_s_A_Beta.qbj');
+  assert.equal(f.game, 'Round_3_St_John_s_A_Beta_Game.json');
+  assert.equal(matchFilenames(1, '!!!', 'B').qbj, 'Round_1_Team_B.qbj');
+});
+
+test('combinedUpload packs stamped qbj + game state, surviving a bad store', () => {
+  const match = { tossups_read: 20, match_teams: [] };
+  const good = JSON.parse(combinedUpload(match, 5, JSON.stringify({ cycles: [] })));
+  assert.equal(good.qbj._round, 5);
+  assert.deepEqual(good.game, { cycles: [] });
+  const noStore = JSON.parse(combinedUpload(match, 5, null));
+  assert.equal(noStore.qbj._round, 5);
+  assert.equal(noStore.game, null);
+  assert.equal(JSON.parse(combinedUpload(match, 5, '{oops')).game, null);
+});
+
+test('withRound stamps _round without mutating', () => {
+  const m = { tossups_read: 20, match_teams: [] };
+  const stamped = withRound(m, 5);
+  assert.equal(stamped._round, 5);
+  assert.equal(m._round, undefined);
+});
+
+test('resolveGameFormat maps settings keys', () => {
+  const GameFormats = { ACFGameFormat: { a: 1 }, StandardPowersMACFGameFormat: { b: 1 }, PACEGameFormat: { c: 1 } };
+  assert.equal(resolveGameFormat('acf', GameFormats), GameFormats.ACFGameFormat);
+  assert.equal(resolveGameFormat('macf-powers', GameFormats), GameFormats.StandardPowersMACFGameFormat);
+  assert.equal(resolveGameFormat('pace', GameFormats), GameFormats.PACEGameFormat);
+  assert.equal(resolveGameFormat('', GameFormats), undefined);
+  assert.equal(resolveGameFormat('nonsense', GameFormats), undefined);
+});
+
+const META = { a: 'Alpha', b: 'Beta', round: 4, packet: 'P4.json', t: 'Open', room: 'R1', started: 1000 };
+
+test('parseMeta accepts complete records only', () => {
+  assert.deepEqual(parseMeta(JSON.stringify(META)), META);
+  assert.equal(parseMeta(null), null);
+  assert.equal(parseMeta('{oops'), null);
+  assert.equal(parseMeta(JSON.stringify({ ...META, b: '' })), null);
+  assert.equal(parseMeta(JSON.stringify({ ...META, round: 0 })), null);
+  assert.equal(parseMeta(JSON.stringify({ ...META, round: 'x' })), null);
+  assert.equal(parseMeta(JSON.stringify({ ...META, started: undefined })), null);
+});
+
+test('storeIntact requires parseable object JSON', () => {
+  assert.equal(storeIntact(JSON.stringify({ game: {} })), true);
+  assert.equal(storeIntact(null), false);
+  assert.equal(storeIntact('not json{'), false);
+  assert.equal(storeIntact('"just a string"'), false);
+});
+
+test('gameMetas lists this room newest-first, skipping mangled entries', () => {
+  const store = {
+    [metaKey('sec1', 'g1')]: JSON.stringify({ ...META, started: 1000 }),
+    [metaKey('sec1', 'g2')]: JSON.stringify({ ...META, a: 'Gamma', started: 3000 }),
+    [metaKey('sec1', 'g3')]: '{oops',                       // mangled — skipped
+    [metaKey('sec2', 'gx')]: JSON.stringify(META),          // another room
+    'qbtdToken': 'tok',
+  };
+  const metas = gameMetas(Object.keys(store), (k) => store[k], 'sec1');
+  assert.deepEqual(metas.map((m) => m.id), ['g2', 'g1']);
+  assert.equal(metas[0].a, 'Gamma');
+});
+
+test('staleGameKeys keeps the newest N games, both keys dropped', () => {
+  const metas = [3000, 2000, 1000].map((started, i) => ({ id: 'g' + i, ...META, started }));
+  assert.deepEqual(staleGameKeys(metas, 'sec1', 2),
+    [metaKey('sec1', 'g2'), gameKey('sec1', 'g2')]);
+  assert.deepEqual(staleGameKeys(metas, 'sec1', 8), []);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

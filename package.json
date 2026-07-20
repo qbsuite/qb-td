@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/run_tests.js"
+    "test": "node tests/run_tests.js",
+    "build:read": "esbuild app/js/read_main.js --bundle --minify --format=iife --outfile=app/js/read.bundle.js --define:process.env.NODE_ENV=\\\"production\\\" --log-level=warning"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "modaq": "^1.41.1"
   }
 }

@@ -126,6 +126,19 @@ ok('bad secret rejected', r.status === 404);
   ok('mod downloads packet', res.status === 200 && (await res.text()) === 'PDFBYTES');
 }
 
+// roster download through bucket (read.html preload path)
+{
+  const res = await fetch(`${BASE}/b/${secret}/roster`);
+  ok('mod downloads roster', res.status === 200 && (await res.text()).includes('Alpha'));
+}
+
+// tournament settings flow through to the bucket state
+r = await call('/api/tournaments/' + tid, { method: 'POST', json: { settings: { gameFormat: 'acf' } } });
+ok('set settings', r.status === 200);
+r = await call('/b/' + secret, {}, false);
+ok('bucket state carries settings + roster flag',
+  r.body.settings && r.body.settings.gameFormat === 'acf' && r.body.roster === true, r.body);
+
 // public gate: unpublished -> 404
 r = await call('/pub/' + slug, {}, false);
 ok('unpublished hidden', r.status === 404);
@@ -181,12 +194,40 @@ ok('bundle rebuild accepted', r.status === 200 && r.body.entries === 1, r.body);
 r = await call('/pub/' + slug + '/bundle', {}, false);
 ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
 
+// combined reader upload: one file carries qbj + game state; the game half
+// (full packet text) must never reach the bundle or a public route
+{
+  const q = JSON.parse(MATCH);
+  q._round = 3;
+  const combined = JSON.stringify({ qbj: q, game: { packetText: 'SECRETQUESTIONTEXT', cycles: [] } });
+  r = await call(`/b/${secret}/upload?round=3&name=Round_3_Alpha_Beta.qbtd.json`,
+    { method: 'POST', body: combined }, false);
+  ok('combined upload accepted', r.status === 200 && r.body.kind === 'combined' && r.body.error === null, r.body);
+  const cid = r.body.id;
+
+  r = await call('/pub/' + slug + '/bundle', {}, false);
+  const entry = r.body.entries.find((e) => e.id === cid);
+  ok('bundle stores only the qbj half',
+    entry && entry.qbj.tossups_read === 20 && !JSON.stringify(entry).includes('SECRETQUESTIONTEXT'), entry);
+
+  const res = await fetch(`${BASE}/pub/${slug}/qbj/${cid}`);
+  const text = await res.text();
+  ok('public route serves extracted qbj only',
+    res.status === 200 && JSON.parse(text).tossups_read === 20 && !text.includes('SECRETQUESTIONTEXT'));
+  ok('extracted download renamed to .qbj',
+    (res.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta.qbj'));
+
+  const broken = await call(`/b/${secret}/upload?round=3&name=bad.qbtd.json`,
+    { method: 'POST', body: '{"game": {}}' }, false);
+  ok('combined without a match flagged', broken.status === 200 && broken.body.error !== null, broken.body);
+}
+
 // bucket state carries lifetime info
 r = await call('/b/' + secret, {}, false);
 ok('bucket closes stamp ~48h out',
   r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
   r.body.closes);
-ok('bucket upload count', r.body.upload_count === 3, r.body.upload_count);
+ok('bucket upload count', r.body.upload_count === 5, r.body.upload_count);
 
 // expiry: backdate the bucket, every mod route dies with "room closed"
 execSync(
@@ -200,20 +241,22 @@ ok('expired bucket upload 410', r.status === 410);
 {
   const res = await fetch(`${BASE}/b/${secret}/packet`);
   ok('expired bucket packet 410', res.status === 410);
+  const rr = await fetch(`${BASE}/b/${secret}/roster`);
+  ok('expired bucket roster 410', rr.status === 410);
 }
 // the TO's own access is unaffected by room expiry
 r = await call('/api/tournaments/' + tid);
 ok('TO access survives expiry', r.status === 200);
 
 // admin detail reflects everything
-ok('admin detail', r.status === 200 && r.body.files.length === 3 && r.body.rounds.length === 1, r.body.files);
+ok('admin detail', r.status === 200 && r.body.files.length === 5 && r.body.rounds.length === 1, r.body.files);
 
 // file delete
 const delId = r.body.files.find((f) => f.filename === 'broken.qbj').id;
 r = await call(`/api/tournaments/${tid}/files/${delId}`, { method: 'DELETE' });
 ok('delete file', r.status === 200);
 r = await call('/api/tournaments/' + tid);
-ok('file gone', r.body.files.length === 2);
+ok('file gone', r.body.files.length === 4);
 
 // bucket delete kills the link
 r = await call(`/api/tournaments/${tid}/buckets/${r.body.buckets[0].id}`, { method: 'DELETE' });

@@ -2,11 +2,12 @@
 // rooms/packets/roster/uploads, compute stats, export .yft + qbj bundle.
 
 import { API, api, captureToken, token, clearToken, loginUrl, esc, fmtBytes, download } from './api.js';
-import { parseMatch, parseRoster } from '../engine/qbj.js';
-import { aggregate } from '../engine/stats.js';
+import { parseMatch, parseRoster, matchPayload } from '../engine/qbj.js';
+import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
+import { GAME_FORMAT_OPTIONS } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -23,6 +24,10 @@ function say(text, bad = false) {
 function bucketLink(secret) {
   return location.href.split(/[?#]/)[0].replace(/index\.html$/, '').replace(/\/$/, '')
     + '/bucket.html?b=' + secret;
+}
+function readLink(secret) {
+  return location.href.split(/[?#]/)[0].replace(/index\.html$/, '').replace(/\/$/, '')
+    + '/read.html?b=' + secret;
 }
 function statsLink(slug) {
   return location.href.split(/[?#]/)[0].replace(/index\.html$/, '').replace(/\/$/, '')
@@ -86,6 +91,8 @@ async function showDetail(id) {
   detail = await api('/api/tournaments/' + id);
   const { tournament: t, buckets, rounds, files } = detail;
   const roundPacket = Object.fromEntries(rounds.map((r) => [r.number, r]));
+  let settings = {};
+  try { settings = JSON.parse(t.settings) || {}; } catch (e) { /* keep {} */ }
 
   view.innerHTML = `
     <div class="row">
@@ -104,6 +111,13 @@ async function showDetail(id) {
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
       <button onclick="qtd.copy('${esc(statsLink(t.slug))}', 'stats link')">copy</button>
     </div>
+    <div class="row" style="margin-top:8px">
+      <label class="row">reader game format
+        <select id="gformat">${GAME_FORMAT_OPTIONS.map((o) =>
+          `<option value="${o.value}" ${o.value === (settings.gameFormat || '') ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+      </label>
+    </div>
 
     <h2>rooms</h2>
     ${buckets.map((b) => {
@@ -112,6 +126,8 @@ async function showDetail(id) {
       return `
       <div class="card row">
         <b>${esc(b.room_name)}</b>
+        <a class="mono" href="${esc(readLink(b.secret))}" target="_blank">reader link</a>
+        <button onclick="qtd.copy('${esc(readLink(b.secret))}', '${esc(b.room_name)} reader link')">copy</button>
         <a class="mono" href="${esc(bucketLink(b.secret))}" target="_blank">bucket link</a>
         <button onclick="qtd.copy('${esc(bucketLink(b.secret))}', '${esc(b.room_name)} link')">copy</button>
         <span class="spacer" style="flex:1"></span>
@@ -207,6 +223,16 @@ async function showDetail(id) {
       showDetail(id);
     } catch (e) { say(e.message, true); }
   };
+  $('gformat').onchange = async () => {
+    try {
+      const next = { ...settings };
+      if ($('gformat').value) next.gameFormat = $('gformat').value;
+      else delete next.gameFormat;
+      await api('/api/tournaments/' + t.id, { method: 'POST', json: { settings: next } });
+      settings = next;
+      say('game format saved');
+    } catch (e) { say(e.message, true); }
+  };
   $('pub').onchange = async () => {
     try {
       await api('/api/tournaments/' + t.id, { method: 'POST', json: { published: $('pub').checked } });
@@ -270,7 +296,7 @@ async function fetchOwnedBlob(tid, key) {
 async function computeStats(t, buckets, files) {
   const out = $('statsout');
   out.innerHTML = '<div class="muted">loading files...</div>';
-  const qbjFiles = files.filter((f) => f.kind === 'qbj' && !f.error);
+  const qbjFiles = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error);
   const errors = [];
 
   let roster = null;
@@ -284,12 +310,19 @@ async function computeStats(t, buckets, files) {
   for (const f of qbjFiles) {
     try {
       const text = await fetchOwnedBlob(t.id, f.r2_key);
-      const m = parseMatch(JSON.parse(text), { filename: f.filename });
+      // Combined reader uploads contribute only their qbj half downstream
+      // (the game half carries the full packet text).
+      const payload = matchPayload(JSON.parse(text));
+      const m = parseMatch(payload, { filename: f.filename });
       const room = buckets.find((b) => b.id === f.bucket_id);
       m.room = room ? room.room_name : '';
       m.fileId = f.id;
       matches.push(m);
-      raw.push({ id: f.id, round: m.round, room: m.room, filename: f.filename, text });
+      raw.push({
+        id: f.id, round: m.round, room: m.room,
+        filename: f.filename.replace(/\.qbtd\.json$/i, '.qbj'),
+        text: f.kind === 'combined' ? JSON.stringify(payload) : text,
+      });
     } catch (e) {
       errors.push(f.filename + ': ' + e.message);
     }
@@ -304,7 +337,7 @@ async function computeStats(t, buckets, files) {
   const agg = aggregate(matches, roster);
   renderStats(out, agg, errors);
 
-  const exportOpts = { name: t.name, matches, roster };
+  const exportOpts = { name: t.name, matches: dedupeMatches(matches), roster };
   $('dlyft').disabled = false;
   $('dlyft').onclick = () => {
     try { download(t.slug + '.yft', serializeYft(exportOpts), 'application/json'); }

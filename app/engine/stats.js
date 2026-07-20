@@ -9,6 +9,23 @@ function round2(x) {
   return Math.round(x * 100) / 100;
 }
 
+// A re-uploaded game (a mod re-exporting after a fix, or two mods covering
+// the same room) must not double-count: keep only the latest upload per
+// (round, team pair). "Latest" = higher fileId when both carry one (file
+// ids are upload-ordered), else the later entry in input order. Exported
+// so the .yft path applies the same rule; aggregate() applies it itself.
+export function dedupeMatches(matches) {
+  const byGame = new Map();
+  for (const m of matches) {
+    const key = m.round + '\n' + m.teams.map((t) => t.name).sort().join('\n');
+    const prev = byGame.get(key);
+    const older = prev && Number.isFinite(prev.fileId) && Number.isFinite(m.fileId)
+      && m.fileId < prev.fileId;
+    if (!older) byGame.set(key, m);
+  }
+  return [...byGame.values()];
+}
+
 /**
  * @param matches parsed matches; each may carry extra metadata (e.g.
  *   `room`, `fileId`) which is passed through to the per-round game list.
@@ -17,6 +34,7 @@ function round2(x) {
  * @returns {values, teams, players, games, errors}
  */
 export function aggregate(matches, roster = null) {
+  matches = dedupeMatches(matches);
   const teams = new Map();   // name -> team row
   const players = new Map(); // team + '\n' + name -> player row
   const valueSet = new Set();

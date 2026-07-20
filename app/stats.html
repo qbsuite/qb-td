@@ -52,6 +52,7 @@ async function fetchMatches(state, errors) {
       try {
         const m = parseMatch(entry.qbj, { filename: entry.filename });
         m.room = entry.room;
+        m.fileId = entry.id;
         matches.push(m);
       } catch (e) { errors.push(entry.filename + ': ' + e.message); }
     }
@@ -63,6 +64,7 @@ async function fetchMatches(state, errors) {
       const res = await pub('/pub/' + slug + '/qbj/' + f.id);
       const m = parseMatch(JSON.parse(await res.text()), { filename: f.filename });
       m.room = f.room;
+      m.fileId = f.id;
       matches.push(m);
     } catch (e) { errors.push(f.filename + ': ' + e.message); }
   }));

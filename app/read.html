@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>qb-td reader</title>
+<link rel="stylesheet" href="css/td.css">
+<style>
+  /* Page chrome collapses to one bar once MODAQ is mounted. */
+  .wrap.readerbar { padding: 10px 16px; max-width: none; }
+  .wrap.readerbar header { margin-bottom: 0; }
+  body.reading #picker, body.reading #packetrow, body.reading #resume { display: none; }
+  body.reading #msg { display: none; }
+  body:not(.reading) #game, body:not(.reading) #newgame { display: none; }
+  #modaq { min-height: 70vh; }
+</style>
+</head>
+<body>
+<div class="wrap readerbar">
+  <header>
+    <h1 id="tname" style="font-size:17px">qb-td</h1>
+    <span id="room" class="sub"></span>
+    <span id="game" class="sub"></span>
+    <span class="spacer"></span>
+    <a id="newgame" href="#">new game</a>
+    <a id="bucketlink" href="#">uploads</a>
+  </header>
+  <div id="msg"></div>
+  <div id="notfound" hidden>
+    <div class="card">
+      <p>This game link belongs to another device or its saved state was
+      cleared.</p>
+      <p style="margin-top:8px"><a id="roomlink" href="#">start a new game</a></p>
+    </div>
+  </div>
+  <div id="packetrow" class="row" style="margin:4px 0 10px">
+    <span class="muted" id="packetname"></span>
+  </div>
+  <div class="card" id="picker" hidden>
+    <div class="row">
+      <select id="teama"></select>
+      <span class="muted">vs</span>
+      <select id="teamb"></select>
+      <button id="start" class="primary">start</button>
+    </div>
+  </div>
+  <div id="resume" hidden>
+    <h2>in progress on this device</h2>
+    <div id="resumelist"></div>
+  </div>
+</div>
+<div id="modaq"></div>
+<script src="js/read.bundle.js" defer></script>
+</body>
+</html>

@@ -15,6 +15,26 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads that round's
   packet, uploads the game's `.qbj` + ModaQ game file.
+- **Moderator reader page** (`app/read.html?b=<secret>`, same link secret):
+  an embedded [MODAQ](https://github.com/alopezlago/MODAQ) preloaded with
+  the current round's packet, the tournament roster, and the TO's game
+  format — the mod picks two teams and reads. "Upload to qb-td" in MODAQ's
+  menu sends one `.qbtd.json` per game into the bucket — the match qbj plus
+  the full game state in a single file; no file downloads or uploads. The
+  dashboard and public routes split the qbj back out wherever a bare `.qbj`
+  is needed (stats, the zip export, public downloads) — the game half,
+  which contains the packet text, never leaves the TO side. Starting a game mints a per-game URL
+  (`&g=<id>`) with its own localStorage, so each game resumes only from
+  its own link (offline, zero requests), the room link always starts
+  fresh against the live round, and packet re-uploads or round changes
+  can never disturb a game in progress; the room link lists this
+  device's in-progress games. Any number of moderators can share one
+  link (game state is per-device), and stats + the `.yft` count only
+  the latest upload per round + team pair — a re-export corrects a
+  game instead of double-counting it. `.json` packets load directly; `.docx`
+  packets are parsed in the mod's browser by the public YAPP service
+  (the same one MODAQ's demo uses — docx question text transits
+  quizbowlreader.com).
 - **Public stats page** (`app/stats.html?t=<slug>`): standings, individual
   leaderboard, and round-by-round scores computed in the browser from the
   collected qbj files. Only exists while the TO has publish switched on;
@@ -35,7 +55,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Packets are only reachable through a bucket link, and only for the
   current round** — moderators can't pull future packets, and the public
   routes never serve packets (only match qbj + roster, and only while the
-  TO has publish switched on).
+  TO has publish switched on). Bucket links also serve the roster (the
+  reader page preloads it); rosters aren't question material.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
   that leaks into a crawler or an outbound click doesn't spread.
 - **Request economics** (Cloudflare free tier): the public stats page
@@ -43,7 +64,11 @@ Part of [qbsuite](https://qbsuite.github.io/).
   upload/delete, TO-rebuildable) instead of fetching every game file, and
   bucket pages poll only while visible, every 60 s. Stats data changes
   only when a file lands; clients compare the `version` stamp in
-  `/pub/:slug` and refetch only on change.
+  `/pub/:slug` and refetch only on change. The reader page never polls:
+  one state + packet + roster fetch at load, one upload per export click
+  (~4 Worker requests per game — fewer than the manual bucket-page flow),
+  and the 2 MB MODAQ bundle is a static asset on GitHub Pages, off
+  Cloudflare entirely.
 
 ## Layout
 
@@ -51,8 +76,12 @@ Part of [qbsuite](https://qbsuite.github.io/).
   page: `qbj.js` (parse ModaQ match qbj + roster), `stats.js` (standings +
   leaderboard), `yft.js` (`.yft` serialization, contract verified against
   YellowFruit 4.0.18 source), `zip.js` (store-only zip).
-- `app/` — the three static pages + `js/` page code. Deployable on any
-  static host; served at `qbsuite.github.io/qb-td/app/`.
+- `app/` — the four static pages + `js/` page code. Deployable on any
+  static host; served at `qbsuite.github.io/qb-td/app/`. The reader page
+  is `read.html` + `js/read.bundle.js`, a committed esbuild bundle of
+  MODAQ (rebuild with `npm run build:read` after editing
+  `js/read_main.js` / `js/read_core.js` or bumping the `modaq` dep;
+  `read_core.js` holds the pure, unit-tested helpers).
 - `worker/` — Cloudflare Worker (D1 metadata + R2 blobs + GitHub OAuth).
   Auth model: OAuth bearer for the TO API, unguessable bucket secret for
   moderator uploads, publish flag gating all public reads.

@@ -24,6 +24,15 @@ export function roundFromFilename(filename) {
   return m ? Number(m[1]) : null;
 }
 
+/** The qbj payload inside any accepted container. The reader uploads one
+    combined `.qbtd.json` per game — {qbj: <match>, game: <MODAQ state>} —
+    whose game half (full packet text) every stats/export consumer must
+    ignore; bare matches and {objects} wrappers pass through unchanged. */
+export function matchPayload(json) {
+  if (json && json.qbj && typeof json.qbj === 'object') return json.qbj;
+  return json;
+}
+
 /**
  * Parse one match qbj. Accepts the parsed JSON object (or a whole-file
  * {objects: [...]} wrapper containing a Match). Throws Error with a
@@ -34,7 +43,7 @@ export function roundFromFilename(filename) {
  *     {name, tossupsHeard, counts: [{value, n}]}]}]}
  */
 export function parseMatch(json, opts = {}) {
-  let obj = json;
+  let obj = matchPayload(json);
   if (obj && Array.isArray(obj.objects)) {
     obj = obj.objects.find((o) => o && (o.type === 'Match' || pick(o, 'match_teams', 'matchTeams')));
     if (!obj) throw new Error('No Match object found in file');
