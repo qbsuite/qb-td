@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qb-td</title>
+<link rel="stylesheet" href="css/td.css">
+</head>
+<body>
+<div class="wrap narrow">
+  <header>
+    <h1 id="tname">qb-td</h1>
+    <span class="spacer"></span>
+    <span id="room" class="sub"></span>
+  </header>
+  <div id="msg"></div>
+
+  <div class="card" id="roundcard" hidden>
+    <div class="row">
+      <b id="curround"></b>
+      <span class="spacer" style="flex:1"></span>
+      <button id="dlpacket" hidden>download packet</button>
+      <span id="nopacket" class="muted" hidden>no packet yet</span>
+    </div>
+  </div>
+
+  <h2>upload game files</h2>
+  <div class="card">
+    <div class="row">
+      <label>round <input id="upround" type="number" min="1" max="999" style="width:70px"></label>
+      <input id="upfiles" type="file" multiple accept=".qbj,.json">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="upbtn" class="primary">upload</button>
+      <span class="muted">the .qbj and the game file</span>
+    </div>
+  </div>
+
+  <h2>this room's uploads</h2>
+  <div id="uploads" class="tablewrap"></div>
+</div>
+<script type="module">
+import { pub, esc, fmtBytes, API } from './js/api.js';
+
+const $ = (id) => document.getElementById(id);
+const secret = new URLSearchParams(location.search).get('b') || '';
+let state = null;
+
+function say(text, bad = false) {
+  $('msg').textContent = text || '';
+  $('msg').className = bad ? 'bad' : '';
+}
+
+function render() {
+  document.title = state.tournament + ' - ' + state.room;
+  $('tname').textContent = state.tournament;
+  $('room').textContent = state.room;
+  $('roundcard').hidden = false;
+  $('curround').textContent = 'round ' + state.current_round;
+  $('dlpacket').hidden = !state.packet;
+  $('nopacket').hidden = !!state.packet;
+  if (!$('upround').value) $('upround').value = state.current_round;
+  $('uploads').innerHTML = state.uploads.length ? `<table>
+    <tr><th class="num">round</th><th>file</th><th class="num">size</th><th>status</th></tr>
+    ${state.uploads.map((u) => `<tr>
+      <td class="num">${u.round}</td>
+      <td>${esc(u.filename)}</td>
+      <td class="num">${fmtBytes(u.size)}</td>
+      <td>${u.error ? `<span class="bad">${esc(u.error)}</span>` : '<span class="ok">ok</span>'}</td>
+    </tr>`).join('')}
+  </table>` : '<div class="muted">none yet</div>';
+}
+
+async function refresh() {
+  try {
+    state = await pub('/b/' + secret);
+    render();
+  } catch (e) { say(e.message, true); }
+}
+
+$('dlpacket').onclick = async () => {
+  try {
+    const res = await pub('/b/' + secret + '/packet');
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = state.packet.packet_name || 'packet';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { say(e.message, true); }
+};
+
+$('upbtn').onclick = async () => {
+  const files = [...$('upfiles').files];
+  if (!files.length) { say('choose files', true); return; }
+  const round = Number($('upround').value);
+  $('upbtn').disabled = true;
+  try {
+    for (const f of files) {
+      say('uploading ' + f.name);
+      const out = await pub(`/b/${secret}/upload?round=${round}&name=${encodeURIComponent(f.name)}`,
+        { method: 'POST', body: f });
+      if (out.error) say(f.name + ': ' + out.error, true);
+    }
+    say('uploaded');
+    $('upfiles').value = '';
+    await refresh();
+  } catch (e) { say(e.message, true); }
+  $('upbtn').disabled = false;
+};
+
+if (!secret) say('bad link', true);
+else {
+  refresh();
+  setInterval(refresh, 30000); // live current-round without a socket
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Cloudflare Worker config for the qb-td backend.
+# Setup steps: ../README.md
+name = "qb-td"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "qb-td"
+database_id = "d57faef8-7c4b-45c6-9d13-7a7d9ca2d312"
+
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "qb-td-data"
+
+[vars]
+# Origin of the GitHub Pages site — used for CORS and redirect validation.
+ALLOWED_ORIGIN = "https://qbsuite.github.io"
+# From the GitHub OAuth app (Settings -> Developer settings -> OAuth Apps).
+GITHUB_CLIENT_ID = "REPLACE_WITH_OAUTH_APP_ID"
+
+# Secrets (never in this file) — set with `npx wrangler secret put <NAME>`:
+#   GITHUB_CLIENT_SECRET  — from the same OAuth app
+#   SESSION_SECRET        — random, e.g.: openssl rand -hex 32

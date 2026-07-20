@@ -1,0 +1,8 @@
+{
+  "name": "qb-td",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run_tests.js"
+  }
+}

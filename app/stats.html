@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stats</title>
+<link rel="stylesheet" href="css/td.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="tname">stats</h1>
+    <span class="spacer"></span>
+    <span id="round" class="sub"></span>
+    <button id="refresh">refresh</button>
+  </header>
+  <div id="msg"></div>
+  <div id="statsout"></div>
+</div>
+<script type="module">
+import { pub, esc } from './js/api.js';
+import { parseMatch, parseRoster } from './engine/qbj.js';
+import { aggregate } from './engine/stats.js';
+import { renderStats } from './js/statsview.js';
+
+const $ = (id) => document.getElementById(id);
+const slug = new URLSearchParams(location.search).get('t') || '';
+
+function say(text, bad = false) {
+  $('msg').textContent = text || '';
+  $('msg').className = bad ? 'bad' : '';
+}
+
+async function load() {
+  say('loading');
+  try {
+    const state = await pub('/pub/' + slug);
+    document.title = state.name + ' stats';
+    $('tname').textContent = state.name;
+    $('round').textContent = 'round ' + state.current_round;
+
+    let roster = null;
+    if (state.roster) {
+      try {
+        const res = await pub('/pub/' + slug + '/roster');
+        roster = parseRoster(JSON.parse(await res.text()));
+      } catch (e) { /* stats still render without it */ }
+    }
+
+    const errors = [];
+    const matches = [];
+    await Promise.all(state.files.map(async (f) => {
+      try {
+        const res = await pub('/pub/' + slug + '/qbj/' + f.id);
+        const m = parseMatch(JSON.parse(await res.text()), { filename: f.filename });
+        m.room = f.room;
+        matches.push(m);
+      } catch (e) { errors.push(f.filename + ': ' + e.message); }
+    }));
+
+    if (!matches.length) {
+      $('statsout').innerHTML = '<div class="muted">no games yet</div>';
+      say('');
+      return;
+    }
+    renderStats($('statsout'), aggregate(matches, roster), errors);
+    say('');
+  } catch (e) { say(e.message, true); }
+}
+
+$('refresh').onclick = load;
+if (!slug) say('bad link', true);
+else {
+  load();
+  setInterval(load, 120000);
+}
+</script>
+</body>
+</html>
