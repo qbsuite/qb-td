@@ -23,6 +23,28 @@ Part of [qbsuite](https://qbsuite.github.io/).
   the raw qbj files + roster (imports via YellowFruit's ModaQ game-file
   import). Both are generated client-side in the dashboard.
 
+## Room lifetime + question security
+
+- **Bucket links die 48 hours after creation.** The bucket page shows
+  "room open until ..." and the dashboard shows each room's close time;
+  after that every moderator route returns "room closed". A leaked link
+  stops serving packets and accepting uploads soon after the tournament.
+  The TO's own access to collected files (OAuth-gated) is unaffected.
+- **Bucket secrets are unguessable**: 20 chars from a 31-char alphabet
+  (~99 bits) via `crypto.getRandomValues`; wrong secrets 404 uniformly.
+- **Packets are only reachable through a bucket link, and only for the
+  current round** — moderators can't pull future packets, and the public
+  routes never serve packets (only match qbj + roster, and only while the
+  TO has publish switched on).
+- The bucket and admin pages carry `noindex` + `no-referrer` so a link
+  that leaks into a crawler or an outbound click doesn't spread.
+- **Request economics** (Cloudflare free tier): the public stats page
+  reads one materialized `combined.json` bundle (maintained on
+  upload/delete, TO-rebuildable) instead of fetching every game file, and
+  bucket pages poll only while visible, every 60 s. Stats data changes
+  only when a file lands; clients compare the `version` stamp in
+  `/pub/:slug` and refetch only on change.
+
 ## Layout
 
 - `app/engine/` — dependency-free JS engine, shared by dashboard and stats

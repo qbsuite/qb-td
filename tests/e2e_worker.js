@@ -8,6 +8,11 @@
 
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const WORKER_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'worker');
 
 const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
 const SECRET = 'devsecret';
@@ -141,8 +146,66 @@ ok('public lists only valid qbj', r.body.files.length === 1 && r.body.files[0].r
   ok('public roster download', rr.status === 200 && (await rr.text()).includes('Alpha'));
 }
 
-// admin detail reflects everything
+// combined stats bundle: built on upload, one entry per valid qbj
+r = await call('/pub/' + slug, {}, false);
+const v1 = r.body.version;
+ok('pub state has version', typeof v1 === 'string' && v1.includes(':'), v1);
+r = await call('/pub/' + slug + '/bundle', {}, false);
+ok('bundle served', r.status === 200 && r.body.entries.length === 1, r.body);
+ok('bundle entry carries room/round/qbj',
+  r.body.entries[0].room === 'Room 1' && r.body.entries[0].round === 1
+  && r.body.entries[0].qbj.tossups_read === 20, r.body.entries[0]);
+
+const MATCH2 = MATCH.replace('"_round": 1', '"_round": 2').replace('_round":1', '_round":2');
+r = await call(`/b/${secret}/upload?round=2&name=Round_2_Alpha_Beta.qbj`,
+  { method: 'POST', body: MATCH2 }, false);
+ok('second qbj uploads', r.status === 200 && r.body.error === null, r.body);
+const secondQbjId = r.body.id;
+
+r = await call('/pub/' + slug, {}, false);
+ok('version moves on upload', r.body.version !== v1, r.body.version);
+r = await call('/pub/' + slug + '/bundle', {}, false);
+ok('bundle grows', r.body.entries.length === 2, r.body.entries.length);
+
+r = await call(`/api/tournaments/${tid}/files/${secondQbjId}`, { method: 'DELETE' });
+ok('delete second qbj', r.status === 200);
+r = await call('/pub/' + slug + '/bundle', {}, false);
+ok('bundle shrinks on delete', r.body.entries.length === 1, r.body.entries.length);
+
+// TO bundle rebuild round-trip
+r = await call(`/api/tournaments/${tid}/bundle`, {
+  method: 'POST',
+  body: JSON.stringify({ entries: [{ id: 999, round: 1, room: 'Room 1', filename: 'x.qbj', qbj: JSON.parse(MATCH) }] }),
+});
+ok('bundle rebuild accepted', r.status === 200 && r.body.entries === 1, r.body);
+r = await call('/pub/' + slug + '/bundle', {}, false);
+ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
+
+// bucket state carries lifetime info
+r = await call('/b/' + secret, {}, false);
+ok('bucket closes stamp ~48h out',
+  r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
+  r.body.closes);
+ok('bucket upload count', r.body.upload_count === 3, r.body.upload_count);
+
+// expiry: backdate the bucket, every mod route dies with "room closed"
+execSync(
+  `npx wrangler d1 execute qb-td --local --command "UPDATE buckets SET created = 1 WHERE secret = '${secret}'"`,
+  { cwd: WORKER_DIR, stdio: 'ignore' },
+);
+r = await call('/b/' + secret, {}, false);
+ok('expired bucket state 410', r.status === 410 && r.body.error === 'room closed', r);
+r = await call(`/b/${secret}/upload?round=1&name=late.qbj`, { method: 'POST', body: MATCH }, false);
+ok('expired bucket upload 410', r.status === 410);
+{
+  const res = await fetch(`${BASE}/b/${secret}/packet`);
+  ok('expired bucket packet 410', res.status === 410);
+}
+// the TO's own access is unaffected by room expiry
 r = await call('/api/tournaments/' + tid);
+ok('TO access survives expiry', r.status === 200);
+
+// admin detail reflects everything
 ok('admin detail', r.status === 200 && r.body.files.length === 3 && r.body.rounds.length === 1, r.body.files);
 
 // file delete

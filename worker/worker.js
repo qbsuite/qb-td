@@ -19,8 +19,14 @@
 
 const TOKEN_TTL = 90 * 24 * 3600 * 1000; // session lifetime: 90 days
 const STATE_TTL = 10 * 60 * 1000;        // oauth state lifetime: 10 minutes
+// Bucket links die 48h after creation (question security: a leaked link
+// stops serving packets/uploads soon after the tournament). The TO's own
+// access to collected files is OAuth-side and unaffected.
+const BUCKET_TTL = 48 * 3600 * 1000;
+const BUCKET_LIST_LIMIT = 20;            // recent uploads shown to the mod
 const MAX_UPLOAD = 8 * 1024 * 1024;      // moderator file cap
 const MAX_PACKET = 16 * 1024 * 1024;     // packet cap
+const MAX_BUNDLE = 32 * 1024 * 1024;     // combined stats blob cap
 const MAX_TOURNAMENTS_PER_USER = 20;
 const MAX_BUCKETS = 60;
 const MAX_FILES_PER_BUCKET = 300;
@@ -191,6 +197,37 @@ function validateQbj(text) {
   const teams = obj && (obj.match_teams || obj.matchTeams);
   if (!Array.isArray(teams) || teams.length !== 2) return 'no match with exactly two match_teams';
   return null;
+}
+
+/* ---------- combined stats bundle ----------
+   t/<tid>/combined.json holds every valid match qbj (raw, with room/round
+   metadata) so the public stats page is 2 requests instead of one per
+   file. Maintained incrementally on upload/delete with R2 conditional
+   writes (retry on concurrent-writer conflict). Derived data: if it ever
+   drifts (e.g. writes exhausted retries), the TO dashboard's rebuild
+   button re-materializes it from the files themselves. */
+
+async function updateBundle(env, tid, mutate) {
+  const key = `t/${tid}/combined.json`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await env.DATA.get(key);
+    let bundle = { entries: [] };
+    if (cur) {
+      bundle = await cur.json().catch(() => ({ entries: [] }));
+      if (!Array.isArray(bundle.entries)) bundle = { entries: [] };
+    }
+    mutate(bundle);
+    const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
+    try {
+      const put = await env.DATA.put(key, JSON.stringify(bundle), {
+        httpMetadata: { contentType: 'application/json' },
+        onlyIf,
+      });
+      if (put) return true;
+    } catch (e) { /* precondition failed -> retry */ }
+  }
+  console.log('bundle update lost the retry race for tournament', tid);
+  return false;
 }
 
 async function getOwnedTournament(env, user, id) {
@@ -368,48 +405,82 @@ async function deleteFile(env, user, id, fileId) {
   const t = await getOwnedTournament(env, user, id);
   if (!t) return err(env, 404, 'not found');
   const { results } = await env.DB.prepare(
-    'SELECT r2_key FROM files WHERE id = ?1 AND tournament_id = ?2'
+    'SELECT r2_key, kind, error FROM files WHERE id = ?1 AND tournament_id = ?2'
   ).bind(fileId, id).all();
   if (!results.length) return err(env, 404, 'no such file');
   await env.DATA.delete(results[0].r2_key);
   await env.DB.prepare('DELETE FROM files WHERE id = ?1').bind(fileId).run();
+  if (results[0].kind === 'qbj' && !results[0].error) {
+    await updateBundle(env, id, (bundle) => {
+      bundle.entries = bundle.entries.filter((e) => e.id !== fileId);
+    });
+  }
   return json(env, { ok: true });
+}
+
+// Escape hatch for bundle drift: the dashboard re-materializes the bundle
+// from the files it already fetched and posts it whole.
+async function putBundle(request, env, user, id) {
+  const t = await getOwnedTournament(env, user, id);
+  if (!t) return err(env, 404, 'not found');
+  const body = await request.arrayBuffer();
+  if (body.byteLength > MAX_BUNDLE) return err(env, 413, 'bundle too large');
+  let parsed;
+  try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return err(env, 400, 'bad json'); }
+  if (!parsed || !Array.isArray(parsed.entries)) return err(env, 400, 'bad bundle');
+  await env.DATA.put(`t/${id}/combined.json`, body, {
+    httpMetadata: { contentType: 'application/json' },
+  });
+  return json(env, { entries: parsed.entries.length });
 }
 
 /* ---------- moderator bucket API (/b/*, secret-authed) ---------- */
 
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
-    'SELECT b.id, b.room_name, b.tournament_id, t.name AS tournament_name, ' +
+    'SELECT b.id, b.room_name, b.created, b.tournament_id, t.name AS tournament_name, ' +
     't.current_round, t.roster_r2_key ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1'
   ).bind(secret).all();
   return results[0] || null;
 }
 
+// 410 keeps "expired" distinct from "never existed" so the mod's page can
+// say "room closed" instead of "bad link".
+function bucketClosed(b) {
+  return Date.now() > b.created + BUCKET_TTL;
+}
+
 async function bucketState(env, secret) {
   const b = await getBucketRow(env, secret);
   if (!b) return err(env, 404, 'bad link');
-  const [packet, uploads] = await Promise.all([
+  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const [packet, uploads, count] = await Promise.all([
     env.DB.prepare(
       'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
     ).bind(b.tournament_id, b.current_round).all(),
     env.DB.prepare(
-      'SELECT id, round, kind, filename, size, error, created FROM files WHERE bucket_id = ?1 ORDER BY created DESC'
+      'SELECT id, round, kind, filename, size, error, created FROM files WHERE bucket_id = ?1 ORDER BY created DESC LIMIT ?2'
+    ).bind(b.id, BUCKET_LIST_LIMIT).all(),
+    env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM files WHERE bucket_id = ?1'
     ).bind(b.id).all(),
   ]);
   return json(env, {
     tournament: b.tournament_name,
     room: b.room_name,
     current_round: b.current_round,
+    closes: b.created + BUCKET_TTL,
     packet: packet.results[0] || null,
     uploads: uploads.results,
+    upload_count: count.results[0].n,
   });
 }
 
 async function bucketUpload(request, url, env, secret) {
   const b = await getBucketRow(env, secret);
   if (!b) return err(env, 404, 'bad link');
+  if (bucketClosed(b)) return err(env, 410, 'room closed');
 
   const { results } = await env.DB.prepare(
     'SELECT COUNT(*) AS n FROM files WHERE bucket_id = ?1'
@@ -426,8 +497,8 @@ async function bucketUpload(request, url, env, secret) {
 
   const isQbj = /\.qbj$/i.test(filename);
   const kind = isQbj ? 'qbj' : /_game\.json$/i.test(filename) ? 'game' : 'other';
-  let error = null;
-  if (isQbj) error = validateQbj(new TextDecoder().decode(buf));
+  const text = isQbj ? new TextDecoder().decode(buf) : null;
+  const error = isQbj ? validateQbj(text) : null;
 
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
   await env.DATA.put(key, buf, { httpMetadata: { contentType: 'application/json' } });
@@ -435,12 +506,23 @@ async function bucketUpload(request, url, env, secret) {
     'INSERT INTO files (tournament_id, bucket_id, round, kind, r2_key, filename, size, error, created) ' +
     'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)'
   ).bind(b.tournament_id, b.id, round, kind, key, filename, buf.byteLength, error, Date.now()).run();
-  return json(env, { id: out.meta.last_row_id, filename, round, kind, error });
+  const fileId = out.meta.last_row_id;
+
+  if (isQbj && !error) {
+    await updateBundle(env, b.tournament_id, (bundle) => {
+      bundle.entries = bundle.entries.filter((e) => e.id !== fileId);
+      bundle.entries.push({
+        id: fileId, round, room: b.room_name, filename, qbj: JSON.parse(text),
+      });
+    });
+  }
+  return json(env, { id: fileId, filename, round, kind, error });
 }
 
 async function bucketPacket(env, secret) {
   const b = await getBucketRow(env, secret);
   if (!b) return err(env, 404, 'bad link');
+  if (bucketClosed(b)) return err(env, 410, 'room closed');
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
   ).bind(b.tournament_id, b.current_round).all();
@@ -471,14 +553,26 @@ async function pubState(env, slug) {
     ).bind(t.id).all(),
   ]);
   const rooms = Object.fromEntries(buckets.results.map((b) => [b.id, b.room_name]));
+  const rows = files.results;
   return json(env, {
     name: t.name,
     current_round: t.current_round,
     roster: !!t.roster_r2_key,
-    files: files.results.map((f) => ({
+    // Stats only change when a file lands (or is deleted): clients compare
+    // this stamp and refetch the bundle only when it moves.
+    version: (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length,
+    files: rows.map((f) => ({
       id: f.id, round: f.round, filename: f.filename, room: rooms[f.bucket_id] || null,
     })),
   });
+}
+
+async function pubBundle(env, slug) {
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const obj = await env.DATA.get(`t/${t.id}/combined.json`);
+  if (!obj) return err(env, 404, 'no bundle');
+  return blobResponse(env, obj, null);
 }
 
 async function pubQbj(env, slug, fileId) {
@@ -527,6 +621,7 @@ export default {
 
     // Public stats routes — publish-gated inside.
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1]);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/bundle$/)) && method === 'GET') return pubBundle(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
 
@@ -563,6 +658,9 @@ export default {
     }
     if ((m = path.match(/^\/api\/tournaments\/(\d+)\/files\/(\d+)$/)) && method === 'DELETE') {
       return deleteFile(env, user, Number(m[1]), Number(m[2]));
+    }
+    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/bundle$/)) && method === 'POST') {
+      return putBundle(request, env, user, Number(m[1]));
     }
 
     return err(env, 404, 'not found');

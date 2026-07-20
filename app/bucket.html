@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
 <title>qb-td</title>
 <link rel="stylesheet" href="css/td.css">
 </head>
@@ -22,29 +24,36 @@
       <button id="dlpacket" hidden>download packet</button>
       <span id="nopacket" class="muted" hidden>no packet yet</span>
     </div>
-  </div>
-
-  <h2>upload game files</h2>
-  <div class="card">
-    <div class="row">
-      <label>round <input id="upround" type="number" min="1" max="999" style="width:70px"></label>
-      <input id="upfiles" type="file" multiple accept=".qbj,.json">
-    </div>
-    <div class="row" style="margin-top:8px">
-      <button id="upbtn" class="primary">upload</button>
-      <span class="muted">the .qbj and the game file</span>
+    <div class="row" style="margin-top:6px">
+      <span id="closes" class="muted"></span>
     </div>
   </div>
 
-  <h2>this room's uploads</h2>
-  <div id="uploads" class="tablewrap"></div>
+  <div id="uparea">
+    <h2>upload game files</h2>
+    <div class="card">
+      <div class="row">
+        <label>round <input id="upround" type="number" min="1" max="999" style="width:70px"></label>
+        <input id="upfiles" type="file" multiple accept=".qbj,.json">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="upbtn" class="primary">upload</button>
+        <span class="muted">the .qbj and the game file</span>
+      </div>
+    </div>
+
+    <h2>this room's uploads</h2>
+    <div id="uploads" class="tablewrap"></div>
+  </div>
 </div>
 <script type="module">
-import { pub, esc, fmtBytes, API } from './js/api.js';
+import { pub, esc, fmtBytes } from './js/api.js';
 
 const $ = (id) => document.getElementById(id);
 const secret = new URLSearchParams(location.search).get('b') || '';
+const POLL_MS = 60000; // only while the tab is visible
 let state = null;
+let closed = false;
 
 function say(text, bad = false) {
   $('msg').textContent = text || '';
@@ -57,10 +66,13 @@ function render() {
   $('room').textContent = state.room;
   $('roundcard').hidden = false;
   $('curround').textContent = 'round ' + state.current_round;
+  $('closes').textContent = 'room open until ' + new Date(state.closes).toLocaleString();
   $('dlpacket').hidden = !state.packet;
   $('nopacket').hidden = !!state.packet;
   if (!$('upround').value) $('upround').value = state.current_round;
-  $('uploads').innerHTML = state.uploads.length ? `<table>
+  const extra = state.upload_count > state.uploads.length
+    ? `<div class="muted" style="margin-top:6px">latest ${state.uploads.length} of ${state.upload_count}</div>` : '';
+  $('uploads').innerHTML = (state.uploads.length ? `<table>
     <tr><th class="num">round</th><th>file</th><th class="num">size</th><th>status</th></tr>
     ${state.uploads.map((u) => `<tr>
       <td class="num">${u.round}</td>
@@ -68,14 +80,25 @@ function render() {
       <td class="num">${fmtBytes(u.size)}</td>
       <td>${u.error ? `<span class="bad">${esc(u.error)}</span>` : '<span class="ok">ok</span>'}</td>
     </tr>`).join('')}
-  </table>` : '<div class="muted">none yet</div>';
+  </table>` : '<div class="muted">none yet</div>') + extra;
+}
+
+function showClosed() {
+  closed = true;
+  $('roundcard').hidden = true;
+  $('uparea').hidden = true;
+  say('room closed', true);
 }
 
 async function refresh() {
+  if (closed) return;
   try {
     state = await pub('/b/' + secret);
     render();
-  } catch (e) { say(e.message, true); }
+  } catch (e) {
+    if (e.message === 'room closed') showClosed();
+    else say(e.message, true);
+  }
 }
 
 $('dlpacket').onclick = async () => {
@@ -105,14 +128,23 @@ $('upbtn').onclick = async () => {
     say('uploaded');
     $('upfiles').value = '';
     await refresh();
-  } catch (e) { say(e.message, true); }
+  } catch (e) {
+    if (e.message === 'room closed') showClosed();
+    else say(e.message, true);
+  }
   $('upbtn').disabled = false;
 };
 
 if (!secret) say('bad link', true);
 else {
   refresh();
-  setInterval(refresh, 30000); // live current-round without a socket
+  // Poll only while visible: a backgrounded laptop tab costs nothing, and
+  // an immediate refresh on focus keeps the current round fresh exactly
+  // when the mod looks at the page.
+  setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, POLL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refresh();
+  });
 }
 </script>
 </body>

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <title>stats</title>
 <link rel="stylesheet" href="css/td.css">
 </head>
@@ -25,38 +26,64 @@ import { renderStats } from './js/statsview.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
+const CHECK_MS = 300000; // version check while visible; data changes only on upload
+let lastVersion = null;
 
 function say(text, bad = false) {
   $('msg').textContent = text || '';
   $('msg').className = bad ? 'bad' : '';
 }
 
-async function load() {
-  say('loading');
+async function fetchRoster(state) {
+  if (!state.roster) return null;
+  try {
+    const res = await pub('/pub/' + slug + '/roster');
+    return parseRoster(JSON.parse(await res.text()));
+  } catch (e) { return null; } // stats still render without it
+}
+
+// One request for all games; per-file fetch only if the bundle is missing.
+async function fetchMatches(state, errors) {
+  const matches = [];
+  try {
+    const res = await pub('/pub/' + slug + '/bundle');
+    const bundle = await res.json();
+    for (const entry of bundle.entries) {
+      try {
+        const m = parseMatch(entry.qbj, { filename: entry.filename });
+        m.room = entry.room;
+        matches.push(m);
+      } catch (e) { errors.push(entry.filename + ': ' + e.message); }
+    }
+    return matches;
+  } catch (e) { /* no bundle yet: fall through */ }
+
+  await Promise.all(state.files.map(async (f) => {
+    try {
+      const res = await pub('/pub/' + slug + '/qbj/' + f.id);
+      const m = parseMatch(JSON.parse(await res.text()), { filename: f.filename });
+      m.room = f.room;
+      matches.push(m);
+    } catch (e) { errors.push(f.filename + ': ' + e.message); }
+  }));
+  return matches;
+}
+
+async function load(force = false) {
   try {
     const state = await pub('/pub/' + slug);
     document.title = state.name + ' stats';
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;
+    if (!force && state.version === lastVersion) { say(''); return; }
 
-    let roster = null;
-    if (state.roster) {
-      try {
-        const res = await pub('/pub/' + slug + '/roster');
-        roster = parseRoster(JSON.parse(await res.text()));
-      } catch (e) { /* stats still render without it */ }
-    }
-
+    say('loading');
     const errors = [];
-    const matches = [];
-    await Promise.all(state.files.map(async (f) => {
-      try {
-        const res = await pub('/pub/' + slug + '/qbj/' + f.id);
-        const m = parseMatch(JSON.parse(await res.text()), { filename: f.filename });
-        m.room = f.room;
-        matches.push(m);
-      } catch (e) { errors.push(f.filename + ': ' + e.message); }
-    }));
+    const [roster, matches] = await Promise.all([
+      fetchRoster(state),
+      fetchMatches(state, errors),
+    ]);
+    lastVersion = state.version;
 
     if (!matches.length) {
       $('statsout').innerHTML = '<div class="muted">no games yet</div>';
@@ -68,11 +95,11 @@ async function load() {
   } catch (e) { say(e.message, true); }
 }
 
-$('refresh').onclick = load;
+$('refresh').onclick = () => load();
 if (!slug) say('bad link', true);
 else {
-  load();
-  setInterval(load, 120000);
+  load(true);
+  setInterval(() => { if (document.visibilityState === 'visible') load(); }, CHECK_MS);
 }
 </script>
 </body>

@@ -106,15 +106,22 @@ async function showDetail(id) {
     </div>
 
     <h2>rooms</h2>
-    ${buckets.map((b) => `
+    ${buckets.map((b) => {
+      const closes = b.created + 48 * 3600 * 1000;
+      const open = Date.now() < closes;
+      return `
       <div class="card row">
         <b>${esc(b.room_name)}</b>
         <a class="mono" href="${esc(bucketLink(b.secret))}" target="_blank">bucket link</a>
         <button onclick="qtd.copy('${esc(bucketLink(b.secret))}', '${esc(b.room_name)} link')">copy</button>
         <span class="spacer" style="flex:1"></span>
         <span class="muted">${files.filter((f) => f.bucket_id === b.id).length} files</span>
+        ${open
+          ? `<span class="muted">closes ${new Date(closes).toLocaleString()}</span>`
+          : '<span class="pill">closed</span>'}
         <button data-delbucket="${b.id}">remove</button>
-      </div>`).join('') || '<div class="muted">no rooms yet</div>'}
+      </div>`;
+    }).join('') || '<div class="muted">no rooms yet</div>'}
     <div class="row" style="margin-top:8px">
       <input id="roomname" placeholder="room name" size="18">
       <button id="addroom">add room</button>
@@ -170,6 +177,7 @@ async function showDetail(id) {
       <button id="calc" class="primary">compute stats</button>
       <button id="dlyft" disabled>download .yft</button>
       <button id="dlzip" disabled>download qbj bundle</button>
+      <button id="rebuild" disabled>rebuild stats data</button>
     </div>
     <div id="statsout" style="margin-top:12px"></div>`;
 
@@ -272,7 +280,7 @@ async function computeStats(t, buckets, files) {
   }
 
   const matches = [];
-  const raw = []; // for the bundle
+  const raw = []; // for the zip download and the served stats bundle
   for (const f of qbjFiles) {
     try {
       const text = await fetchOwnedBlob(t.id, f.r2_key);
@@ -281,7 +289,7 @@ async function computeStats(t, buckets, files) {
       m.room = room ? room.room_name : '';
       m.fileId = f.id;
       matches.push(m);
-      raw.push({ round: m.round, filename: f.filename, text });
+      raw.push({ id: f.id, round: m.round, room: m.room, filename: f.filename, text });
     } catch (e) {
       errors.push(f.filename + ': ' + e.message);
     }
@@ -310,6 +318,21 @@ async function computeStats(t, buckets, files) {
       catch (e) { /* bundle still useful without it */ }
     }
     download(t.slug + '-qbj.zip', makeZip(entries), 'application/zip');
+  };
+  $('rebuild').disabled = false;
+  $('rebuild').onclick = async () => {
+    try {
+      const bundle = {
+        entries: raw.map((r) => ({
+          id: r.id, round: r.round, room: r.room, filename: r.filename,
+          qbj: JSON.parse(r.text),
+        })),
+      };
+      const out = await api('/api/tournaments/' + t.id + '/bundle', {
+        method: 'POST', body: JSON.stringify(bundle),
+      });
+      say('stats data rebuilt (' + out.entries + ' games)');
+    } catch (e) { say(e.message, true); }
   };
 }
 
