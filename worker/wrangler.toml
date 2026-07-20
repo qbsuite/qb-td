@@ -14,11 +14,7 @@ binding = "DATA"
 bucket_name = "qb-td-data"
 
 [vars]
-# Origin of the GitHub Pages site — used for CORS and redirect validation.
+# Origin of the GitHub Pages site — used for CORS.
 ALLOWED_ORIGIN = "https://qbsuite.github.io"
-# From the GitHub OAuth app (Settings -> Developer settings -> OAuth Apps).
-GITHUB_CLIENT_ID = "REPLACE_WITH_OAUTH_APP_ID"
 
-# Secrets (never in this file) — set with `npx wrangler secret put <NAME>`:
-#   GITHUB_CLIENT_SECRET  — from the same OAuth app
-#   SESSION_SECRET        — random, e.g.: openssl rand -hex 32
+# No secrets: all access is via unguessable link secrets (see worker.js).

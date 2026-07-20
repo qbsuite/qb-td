@@ -1,52 +1,23 @@
-// api.js — Worker base URL, session token handling, fetch helpers shared
-// by the qb-td pages. Point a page at another backend with ?server=... or
-// localStorage qbtdServer (same convention as qb-moderator).
+// api.js — Worker base URL + fetch helper shared by the qb-td pages.
+// Point a page at another backend with ?server=... or localStorage
+// qbtdServer (same convention as qb-moderator). There is no login:
+// admin, bucket, and public routes are all keyed by link secrets.
 
 const qs = new URLSearchParams(location.search);
 export const API = qs.get('server') || localStorage.qbtdServer
   || 'https://qb-td.denisliu10.workers.dev';
 
-const TOKEN_KEY = 'qbtdToken';
-
-// The OAuth callback lands back on the page with #td=<token>.
-export function captureToken() {
-  const m = /[#&]td=([^&]+)/.exec(location.hash);
-  if (m) {
-    localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1]));
-    history.replaceState(null, '', location.pathname + location.search);
-  }
-  return localStorage.getItem(TOKEN_KEY);
-}
-export function token() { return localStorage.getItem(TOKEN_KEY); }
-export function clearToken() { localStorage.removeItem(TOKEN_KEY); }
-
-export function loginUrl() {
-  return API + '/auth/login?return=' + encodeURIComponent(location.href.split('#')[0]);
-}
-
-/** Authed JSON call to the admin API. Throws Error(message) on any failure. */
-export async function api(path, opts = {}) {
-  const headers = { ...(opts.headers || {}) };
-  const t = token();
-  if (t) headers.Authorization = 'Bearer ' + t;
-  if (opts.json !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    opts = { ...opts, body: JSON.stringify(opts.json) };
-  }
-  const res = await fetch(API + path, { ...opts, headers });
-  if (res.status === 401) { clearToken(); throw new Error('sign in required'); }
-  const ct = res.headers.get('Content-Type') || '';
-  if (!ct.includes('application/json')) {
-    if (!res.ok) throw new Error('request failed (' + res.status + ')');
-    return res;
-  }
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'request failed (' + res.status + ')');
-  return data;
-}
-
-/** Unauthed JSON call (bucket + public routes). */
+/** JSON call to any Worker route. Throws Error(message) on failure.
+    Pass opts.json to send a JSON body. Non-JSON responses (blobs) return
+    the raw Response. */
 export async function pub(path, opts = {}) {
+  if (opts.json !== undefined) {
+    opts = {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      body: JSON.stringify(opts.json),
+    };
+  }
   const res = await fetch(API + path, opts);
   const ct = res.headers.get('Content-Type') || '';
   if (!ct.includes('application/json')) {

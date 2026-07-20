@@ -75,6 +75,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   border-radius: 99px; padding: 1px 9px; color: var(--muted);
 }
 .pill.on { color: var(--ok); border-color: var(--ok); }
+.modalback {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 10;
+}
+.modal {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px; max-width: 480px; margin: 16px;
+}
+.modal .linkbox {
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  word-break: break-all; margin-bottom: 12px;
+}
 @media (max-width: 640px) {
   .wrap { padding: 18px 12px 48px; }
   button, .btn { padding: 10px 16px; }

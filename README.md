@@ -8,10 +8,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
 
 ## How it works
 
-- **TO dashboard** (`app/index.html`, GitHub sign-in): create a tournament,
-  add a bucket per room, hand each moderator their private link, upload
-  packets per round, set the live round, upload the roster qbj, download any
-  file, compute stats, export.
+- **TO dashboard** (`app/index.html`, no account): creating a tournament
+  mints an unguessable admin link — the only credential, shown once with a
+  save-this-link warning, remembered in that device's localStorage, and
+  dead 48 hours after creation. From it: add a bucket per room, hand each
+  moderator their private link, upload packets per round, set the live
+  round, upload the roster qbj, download any file, compute stats, export,
+  rotate the admin link if it leaks.
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads that round's
   packet, uploads the game's `.qbj` + ModaQ game file.
@@ -43,15 +46,21 @@ Part of [qbsuite](https://qbsuite.github.io/).
   the raw qbj files + roster (imports via YellowFruit's ModaQ game-file
   import). Both are generated client-side in the dashboard.
 
-## Room lifetime + question security
+## Link lifetime + question security
 
-- **Bucket links die 48 hours after creation.** The bucket page shows
+- **No accounts.** Admin, bucket, and reader access are all unguessable
+  link secrets: 20 chars from a 31-char alphabet (~99 bits) via
+  `crypto.getRandomValues`; wrong secrets 404 uniformly. Tournament
+  creation is open, rate-limited per IP.
+- **Admin links die 48 hours after tournament creation** (410 "tournament
+  closed"). A lost or leaked admin link can't be phished or abused after
+  the event; published stats stay up, and the public qbj + roster remain
+  importable into YellowFruit, so results outlive the link. A leak
+  mid-tournament is handled by the dashboard's "new admin link" button.
+- **Bucket links die 48 hours after room creation.** The bucket page shows
   "room open until ..." and the dashboard shows each room's close time;
   after that every moderator route returns "room closed". A leaked link
   stops serving packets and accepting uploads soon after the tournament.
-  The TO's own access to collected files (OAuth-gated) is unaffected.
-- **Bucket secrets are unguessable**: 20 chars from a 31-char alphabet
-  (~99 bits) via `crypto.getRandomValues`; wrong secrets 404 uniformly.
 - **Packets are only reachable through a bucket link, and only for the
   current round** — moderators can't pull future packets, and the public
   routes never serve packets (only match qbj + roster, and only while the
@@ -82,9 +91,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   MODAQ (rebuild with `npm run build:read` after editing
   `js/read_main.js` / `js/read_core.js` or bumping the `modaq` dep;
   `read_core.js` holds the pure, unit-tested helpers).
-- `worker/` — Cloudflare Worker (D1 metadata + R2 blobs + GitHub OAuth).
-  Auth model: OAuth bearer for the TO API, unguessable bucket secret for
-  moderator uploads, publish flag gating all public reads.
+- `worker/` — Cloudflare Worker (D1 metadata + R2 blobs). Auth model:
+  admin link secret for the TO API (48h lifetime), bucket secret for
+  moderator routes, publish flag gating all public reads. No secrets to
+  provision.
 - `tests/` — `run_tests.js` (engine unit tests), `e2e_worker.js` (full
   TO -> moderator -> public flow against `wrangler dev`).
 
@@ -94,7 +104,6 @@ Part of [qbsuite](https://qbsuite.github.io/).
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, zip
 
 cd worker
-printf 'SESSION_SECRET=devsecret\nGITHUB_CLIENT_SECRET=x\n' > .dev.vars
 npx wrangler d1 execute qb-td --local --file schema.sql
 npx wrangler dev --local --port 8799 &
 cd .. && node tests/e2e_worker.js
@@ -106,13 +115,8 @@ cd .. && node tests/e2e_worker.js
 2. `npx wrangler d1 create qb-td` — put the id in `wrangler.toml`
 3. `npx wrangler r2 bucket create qb-td-data`
 4. `npx wrangler d1 execute qb-td --remote --file schema.sql`
-5. Create a GitHub OAuth app (callback URL
-   `https://qb-td.<subdomain>.workers.dev/auth/callback`); put the client id
-   in `wrangler.toml`, then
-   `npx wrangler secret put GITHUB_CLIENT_SECRET`
-6. `openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET`
-7. `npx wrangler deploy`
-8. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
+5. `npx wrangler deploy`
+6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`.
 

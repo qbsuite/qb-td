@@ -1,13 +1,10 @@
 // e2e_worker.js — end-to-end smoke test against a locally running Worker:
-//   cd worker && npx wrangler dev --local --port 8799   (schema applied,
-//   .dev.vars with SESSION_SECRET=devsecret)
+//   cd worker && npx wrangler dev --local --port 8799   (schema applied)
 // then: node tests/e2e_worker.js
 //
-// Exercises the full TO -> moderator -> public flow with a token minted
-// with the dev secret (same HMAC format the Worker verifies).
+// Exercises the full TO -> moderator -> public flow. No login anywhere:
+// the admin link secret (minted at creation) is the TO's credential.
 
-import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -15,22 +12,9 @@ import path from 'node:path';
 const WORKER_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'worker');
 
 const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
-const SECRET = 'devsecret';
 
-function b64url(buf) {
-  return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function mintToken(payload) {
-  const body = b64url(JSON.stringify(payload));
-  const sig = createHmac('sha256', SECRET).update(body).digest();
-  return body + '.' + b64url(sig);
-}
-
-const token = mintToken({ u: 'gh:1', l: 'testuser', exp: Date.now() + 3600_000 });
-
-async function call(path, opts = {}, auth = true) {
+async function call(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
-  if (auth) headers.Authorization = 'Bearer ' + token;
   if (opts.json !== undefined) {
     headers['Content-Type'] = 'application/json';
     opts = { ...opts, body: JSON.stringify(opts.json) };
@@ -59,32 +43,36 @@ function ok(name, cond, extra) {
   else { console.error('FAIL', name, extra ?? ''); process.exitCode = 1; }
 }
 
-// unauthed admin is rejected
-let r = await call('/api/tournaments', {}, false);
-ok('admin requires auth', r.status === 401);
+// bad admin link is a uniform 404
+let r = await call('/a/abcdefghjkmnpqrstuvw');
+ok('bad admin link 404', r.status === 404);
 
-// user row must exist for the FK-ish flow (Worker creates it on OAuth;
-// mint path bypasses that, so nothing depends on users here)
-
-// create tournament
+// create tournament: open, returns the admin secret + expiry
 const slug = 'e2e-' + Math.random().toString(36).slice(2, 8);
 r = await call('/api/tournaments', { method: 'POST', json: { name: 'E2E Open', slug } });
-ok('create tournament', r.status === 200 && r.body.id > 0, r.body);
-const tid = r.body.id;
+ok('create tournament', r.status === 200 && r.body.id > 0 && r.body.admin_secret.length >= 10, r.body);
+ok('creation reports 48h expiry',
+  r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
+  r.body.closes);
+let A = '/a/' + r.body.admin_secret;
 
 r = await call('/api/tournaments', { method: 'POST', json: { name: 'dupe', slug } });
 ok('duplicate slug rejected', r.status === 409);
 
+// detail hides the secret and echoes expiry
+r = await call(A);
+ok('admin detail', r.status === 200 && r.body.tournament.slug === slug, r.body);
+ok('detail omits secrets', r.body.tournament.admin_secret === undefined && r.body.tournament.creator_ip === undefined);
+
 // bucket
-r = await call(`/api/tournaments/${tid}/buckets`, { method: 'POST', json: { room_name: 'Room 1' } });
+r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 1' } });
 ok('create bucket', r.status === 200 && r.body.secret.length >= 10, r.body);
 const secret = r.body.secret;
 
 // packet upload + roster
-r = await call(`/api/tournaments/${tid}/packet?round=1&name=Packet1.pdf`,
-  { method: 'POST', body: 'PDFBYTES' });
+r = await call(`${A}/packet?round=1&name=Packet1.pdf`, { method: 'POST', body: 'PDFBYTES' });
 ok('upload packet', r.status === 200, r.body);
-r = await call(`/api/tournaments/${tid}/roster?name=roster.qbj`, {
+r = await call(`${A}/roster?name=roster.qbj`, {
   method: 'POST',
   body: JSON.stringify({ objects: [{ type: 'Tournament', registrations: [
     { name: 'Alpha', teams: [{ name: 'Alpha', players: [{ name: 'Ann' }] }] },
@@ -93,31 +81,24 @@ r = await call(`/api/tournaments/${tid}/roster?name=roster.qbj`, {
 });
 ok('upload roster', r.status === 200, r.body);
 
-// another user can't see it
-const other = mintToken({ u: 'gh:2', l: 'other', exp: Date.now() + 3600_000 });
-{
-  const res = await fetch(`${BASE}/api/tournaments/${tid}`, { headers: { Authorization: 'Bearer ' + other } });
-  ok('cross-tenant read blocked', res.status === 404);
-}
-
 // moderator flow
-r = await call('/b/' + secret, {}, false);
+r = await call('/b/' + secret);
 ok('bucket state', r.status === 200 && r.body.room === 'Room 1' && r.body.current_round === 1, r.body);
 ok('bucket sees packet', r.body.packet && r.body.packet.packet_name === 'Packet1.pdf', r.body.packet);
 
 r = await call(`/b/${secret}/upload?round=1&name=Round_1_Alpha_Beta.qbj`,
-  { method: 'POST', body: MATCH }, false);
+  { method: 'POST', body: MATCH });
 ok('mod uploads qbj', r.status === 200 && r.body.kind === 'qbj' && r.body.error === null, r.body);
 
 r = await call(`/b/${secret}/upload?round=1&name=Round_1_Alpha_Beta_Game.json`,
-  { method: 'POST', body: '{"cycles":[]}' }, false);
+  { method: 'POST', body: '{"cycles":[]}' });
 ok('mod uploads game file', r.status === 200 && r.body.kind === 'game', r.body);
 
 r = await call(`/b/${secret}/upload?round=1&name=broken.qbj`,
-  { method: 'POST', body: 'not json' }, false);
+  { method: 'POST', body: 'not json' });
 ok('broken qbj flagged', r.status === 200 && r.body.error === 'not valid JSON', r.body);
 
-r = await call('/b/wrongsecret12345', {}, false);
+r = await call('/b/wrongsecret12345');
 ok('bad secret rejected', r.status === 404);
 
 // packet download through bucket
@@ -133,21 +114,21 @@ ok('bad secret rejected', r.status === 404);
 }
 
 // tournament settings flow through to the bucket state
-r = await call('/api/tournaments/' + tid, { method: 'POST', json: { settings: { gameFormat: 'acf' } } });
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf' } } });
 ok('set settings', r.status === 200);
-r = await call('/b/' + secret, {}, false);
+r = await call('/b/' + secret);
 ok('bucket state carries settings + roster flag',
   r.body.settings && r.body.settings.gameFormat === 'acf' && r.body.roster === true, r.body);
 
 // public gate: unpublished -> 404
-r = await call('/pub/' + slug, {}, false);
+r = await call('/pub/' + slug);
 ok('unpublished hidden', r.status === 404);
 
 // publish, then public state
-r = await call('/api/tournaments/' + tid, { method: 'POST', json: { published: true, current_round: 2 } });
+r = await call(A, { method: 'POST', json: { published: true, current_round: 2 } });
 ok('publish + set round', r.status === 200);
 
-r = await call('/pub/' + slug, {}, false);
+r = await call('/pub/' + slug);
 ok('public state', r.status === 200 && r.body.name === 'E2E Open' && r.body.current_round === 2, r.body);
 ok('public lists only valid qbj', r.body.files.length === 1 && r.body.files[0].room === 'Room 1', r.body.files);
 
@@ -160,10 +141,10 @@ ok('public lists only valid qbj', r.body.files.length === 1 && r.body.files[0].r
 }
 
 // combined stats bundle: built on upload, one entry per valid qbj
-r = await call('/pub/' + slug, {}, false);
+r = await call('/pub/' + slug);
 const v1 = r.body.version;
 ok('pub state has version', typeof v1 === 'string' && v1.includes(':'), v1);
-r = await call('/pub/' + slug + '/bundle', {}, false);
+r = await call('/pub/' + slug + '/bundle');
 ok('bundle served', r.status === 200 && r.body.entries.length === 1, r.body);
 ok('bundle entry carries room/round/qbj',
   r.body.entries[0].room === 'Room 1' && r.body.entries[0].round === 1
@@ -171,27 +152,27 @@ ok('bundle entry carries room/round/qbj',
 
 const MATCH2 = MATCH.replace('"_round": 1', '"_round": 2').replace('_round":1', '_round":2');
 r = await call(`/b/${secret}/upload?round=2&name=Round_2_Alpha_Beta.qbj`,
-  { method: 'POST', body: MATCH2 }, false);
+  { method: 'POST', body: MATCH2 });
 ok('second qbj uploads', r.status === 200 && r.body.error === null, r.body);
 const secondQbjId = r.body.id;
 
-r = await call('/pub/' + slug, {}, false);
+r = await call('/pub/' + slug);
 ok('version moves on upload', r.body.version !== v1, r.body.version);
-r = await call('/pub/' + slug + '/bundle', {}, false);
+r = await call('/pub/' + slug + '/bundle');
 ok('bundle grows', r.body.entries.length === 2, r.body.entries.length);
 
-r = await call(`/api/tournaments/${tid}/files/${secondQbjId}`, { method: 'DELETE' });
+r = await call(`${A}/files/${secondQbjId}`, { method: 'DELETE' });
 ok('delete second qbj', r.status === 200);
-r = await call('/pub/' + slug + '/bundle', {}, false);
+r = await call('/pub/' + slug + '/bundle');
 ok('bundle shrinks on delete', r.body.entries.length === 1, r.body.entries.length);
 
 // TO bundle rebuild round-trip
-r = await call(`/api/tournaments/${tid}/bundle`, {
+r = await call(`${A}/bundle`, {
   method: 'POST',
   body: JSON.stringify({ entries: [{ id: 999, round: 1, room: 'Room 1', filename: 'x.qbj', qbj: JSON.parse(MATCH) }] }),
 });
 ok('bundle rebuild accepted', r.status === 200 && r.body.entries === 1, r.body);
-r = await call('/pub/' + slug + '/bundle', {}, false);
+r = await call('/pub/' + slug + '/bundle');
 ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
 
 // combined reader upload: one file carries qbj + game state; the game half
@@ -201,11 +182,11 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
   q._round = 3;
   const combined = JSON.stringify({ qbj: q, game: { packetText: 'SECRETQUESTIONTEXT', cycles: [] } });
   r = await call(`/b/${secret}/upload?round=3&name=Round_3_Alpha_Beta.qbtd.json`,
-    { method: 'POST', body: combined }, false);
+    { method: 'POST', body: combined });
   ok('combined upload accepted', r.status === 200 && r.body.kind === 'combined' && r.body.error === null, r.body);
   const cid = r.body.id;
 
-  r = await call('/pub/' + slug + '/bundle', {}, false);
+  r = await call('/pub/' + slug + '/bundle');
   const entry = r.body.entries.find((e) => e.id === cid);
   ok('bundle stores only the qbj half',
     entry && entry.qbj.tossups_read === 20 && !JSON.stringify(entry).includes('SECRETQUESTIONTEXT'), entry);
@@ -218,25 +199,35 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
     (res.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta.qbj'));
 
   const broken = await call(`/b/${secret}/upload?round=3&name=bad.qbtd.json`,
-    { method: 'POST', body: '{"game": {}}' }, false);
+    { method: 'POST', body: '{"game": {}}' });
   ok('combined without a match flagged', broken.status === 200 && broken.body.error !== null, broken.body);
 }
 
+// rotate: old admin link dies, new one works
+r = await call(A + '/rotate', { method: 'POST' });
+ok('rotate mints a new secret', r.status === 200 && r.body.admin_secret.length >= 10, r.body);
+const oldA = A;
+A = '/a/' + r.body.admin_secret;
+r = await call(oldA);
+ok('old admin link dead after rotate', r.status === 404);
+r = await call(A);
+ok('new admin link works', r.status === 200 && r.body.tournament.slug === slug);
+
 // bucket state carries lifetime info
-r = await call('/b/' + secret, {}, false);
+r = await call('/b/' + secret);
 ok('bucket closes stamp ~48h out',
   r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
   r.body.closes);
 ok('bucket upload count', r.body.upload_count === 5, r.body.upload_count);
 
-// expiry: backdate the bucket, every mod route dies with "room closed"
+// bucket expiry: backdate the bucket, every mod route dies with "room closed"
 execSync(
   `npx wrangler d1 execute qb-td --local --command "UPDATE buckets SET created = 1 WHERE secret = '${secret}'"`,
   { cwd: WORKER_DIR, stdio: 'ignore' },
 );
-r = await call('/b/' + secret, {}, false);
+r = await call('/b/' + secret);
 ok('expired bucket state 410', r.status === 410 && r.body.error === 'room closed', r);
-r = await call(`/b/${secret}/upload?round=1&name=late.qbj`, { method: 'POST', body: MATCH }, false);
+r = await call(`/b/${secret}/upload?round=1&name=late.qbj`, { method: 'POST', body: MATCH });
 ok('expired bucket upload 410', r.status === 410);
 {
   const res = await fetch(`${BASE}/b/${secret}/packet`);
@@ -245,23 +236,36 @@ ok('expired bucket upload 410', r.status === 410);
   ok('expired bucket roster 410', rr.status === 410);
 }
 // the TO's own access is unaffected by room expiry
-r = await call('/api/tournaments/' + tid);
-ok('TO access survives expiry', r.status === 200);
+r = await call(A);
+ok('TO access survives room expiry', r.status === 200);
 
 // admin detail reflects everything
-ok('admin detail', r.status === 200 && r.body.files.length === 5 && r.body.rounds.length === 1, r.body.files);
+ok('admin detail files', r.status === 200 && r.body.files.length === 5 && r.body.rounds.length === 1, r.body.files);
 
 // file delete
 const delId = r.body.files.find((f) => f.filename === 'broken.qbj').id;
-r = await call(`/api/tournaments/${tid}/files/${delId}`, { method: 'DELETE' });
+r = await call(`${A}/files/${delId}`, { method: 'DELETE' });
 ok('delete file', r.status === 200);
-r = await call('/api/tournaments/' + tid);
+r = await call(A);
 ok('file gone', r.body.files.length === 4);
 
 // bucket delete kills the link
-r = await call(`/api/tournaments/${tid}/buckets/${r.body.buckets[0].id}`, { method: 'DELETE' });
+r = await call(`${A}/buckets/${r.body.buckets[0].id}`, { method: 'DELETE' });
 ok('delete bucket', r.status === 200);
-r = await call('/b/' + secret, {}, false);
+r = await call('/b/' + secret);
 ok('bucket link dead', r.status === 404);
+
+// admin expiry: backdate the tournament — admin routes die with 410,
+// published stats stay up
+execSync(
+  `npx wrangler d1 execute qb-td --local --command "UPDATE tournaments SET created = 1 WHERE slug = '${slug}'"`,
+  { cwd: WORKER_DIR, stdio: 'ignore' },
+);
+r = await call(A);
+ok('expired admin link 410', r.status === 410 && r.body.error === 'tournament closed', r);
+r = await call(A + '/rotate', { method: 'POST' });
+ok('expired admin cannot rotate', r.status === 410);
+r = await call('/pub/' + slug);
+ok('published stats survive admin expiry', r.status === 200 && r.body.name === 'E2E Open', r.body);
 
 console.log(passed + ' e2e checks passed' + (process.exitCode ? ' (with failures)' : ''));

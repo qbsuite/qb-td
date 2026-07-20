@@ -1,80 +1,41 @@
 // worker.js — qb-td backend (Cloudflare Worker + D1 + R2). Deploy/setup:
 // ../README.md.
 //
-// Three access levels, three route families:
-//   /api/*  — the TO's admin API. Requires a session minted by the GitHub
-//             OAuth flow (stateless HMAC bearer token, copied from
-//             library-of-stock sync/worker.js). Everything is scoped to the
-//             signed-in owner; there is no cross-tenant read.
-//   /b/*    — the moderator bucket API. No login: the unguessable bucket
-//             secret in the URL is the credential. Grants upload + packet
-//             download for that one room only.
+// No accounts anywhere. Three access levels, three route families, all
+// keyed by unguessable link secrets:
+//   /a/*    — the TO's admin API. The admin_secret minted at tournament
+//             creation is the only credential; it expires 48h after
+//             creation (ADMIN_TTL). Creation itself (POST
+//             /api/tournaments) is open, rate-limited per IP.
+//   /b/*    — the moderator bucket API. The bucket secret in the URL is
+//             the credential. Grants upload + packet download for that
+//             one room only.
 //   /pub/*  — the public stats API. No auth, but only serves tournaments
 //             the TO has published, and only match qbj + roster blobs —
-//             never packets, never admin metadata, never bucket secrets.
+//             never packets, never admin metadata, never secrets.
 //
 // Storage: metadata in D1 (schema.sql), blobs in R2 under t/<tid>/...
 // All blob reads stream through the Worker so the publish gate is enforced
 // in one place.
 
-const TOKEN_TTL = 90 * 24 * 3600 * 1000; // session lifetime: 90 days
-const STATE_TTL = 10 * 60 * 1000;        // oauth state lifetime: 10 minutes
-// Bucket links die 48h after creation (question security: a leaked link
-// stops serving packets/uploads soon after the tournament). The TO's own
-// access to collected files is OAuth-side and unaffected.
+// Admin and bucket links die 48h after their row's creation (question
+// security: a leaked link stops working soon after the tournament; a
+// forgotten one can't be phished later). Published stats stay up — the
+// publish flag, not the admin link, gates /pub.
+const ADMIN_TTL = 48 * 3600 * 1000;
 const BUCKET_TTL = 48 * 3600 * 1000;
+// Tournament creation is open; these are griefing backstops.
+const CREATE_PER_IP_DAY = 20;
+const CREATE_GLOBAL_DAY = 300;
 const BUCKET_LIST_LIMIT = 20;            // recent uploads shown to the mod
 const MAX_UPLOAD = 8 * 1024 * 1024;      // moderator file cap
 const MAX_PACKET = 16 * 1024 * 1024;     // packet cap
 const MAX_BUNDLE = 32 * 1024 * 1024;     // combined stats blob cap
-const MAX_TOURNAMENTS_PER_USER = 20;
 const MAX_BUCKETS = 60;
 // Sized for one shared bucket carrying a whole tournament (several mods on
 // one link, ~2 files per game, re-exports adding rows).
 const MAX_FILES_PER_BUCKET = 600;
 const MAX_NAME = 120;
-
-/* ---------- base64url + HMAC helpers (from sync/worker.js) ---------- */
-const enc = new TextEncoder();
-
-function b64url(bytes) {
-  let s = '';
-  for (const b of new Uint8Array(bytes)) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function b64urlToBytes(s) {
-  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-async function hmacKey(secret) {
-  return crypto.subtle.importKey('raw', enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
-}
-async function signToken(payload, secret) {
-  const body = b64url(enc.encode(JSON.stringify(payload)));
-  const sig = await crypto.subtle.sign('HMAC', await hmacKey(secret), enc.encode(body));
-  return body + '.' + b64url(sig);
-}
-async function verifyToken(token, secret) {
-  if (typeof token !== 'string') return null;
-  const dot = token.indexOf('.');
-  if (dot < 0) return null;
-  const body = token.slice(0, dot), sig = token.slice(dot + 1);
-  let ok = false;
-  try {
-    ok = await crypto.subtle.verify('HMAC', await hmacKey(secret),
-      b64urlToBytes(sig), enc.encode(body));
-  } catch (e) { return null; }
-  if (!ok) return null;
-  let payload;
-  try { payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(body))); }
-  catch (e) { return null; }
-  if (!payload || typeof payload.exp !== 'number' || payload.exp < Date.now()) return null;
-  return payload;
-}
 
 /* ---------- responses ---------- */
 function corsHeaders(env) {
@@ -101,75 +62,6 @@ function blobResponse(env, r2obj, filename) {
       `attachment; filename="${filename.replace(/["\\\r\n]/g, '_')}"`);
   }
   return new Response(r2obj.body, { status: 200, headers });
-}
-
-async function requireUser(request, env) {
-  const auth = request.headers.get('Authorization') || '';
-  if (!auth.startsWith('Bearer ')) return null;
-  return verifyToken(auth.slice(7), env.SESSION_SECRET);
-}
-
-/* ---------- oauth flow (from sync/worker.js) ---------- */
-async function authLogin(url, env) {
-  const ret = url.searchParams.get('return') || '';
-  if (!ret.startsWith(env.ALLOWED_ORIGIN)) {
-    return new Response('bad return url (must be on ' + env.ALLOWED_ORIGIN + ')', { status: 400 });
-  }
-  const state = await signToken({ r: ret, exp: Date.now() + STATE_TTL }, env.SESSION_SECRET);
-  const gh = new URL('https://github.com/login/oauth/authorize');
-  gh.searchParams.set('client_id', env.GITHUB_CLIENT_ID);
-  gh.searchParams.set('redirect_uri', url.origin + '/auth/callback');
-  gh.searchParams.set('state', state);
-  return Response.redirect(gh.toString(), 302);
-}
-
-// GitHub 5xxs transiently; a 5xx means the request wasn't processed, so
-// retrying is safe even for the one-shot code exchange.
-async function ghFetch(url, init) {
-  let res;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt) await new Promise(r => setTimeout(r, 400 * attempt));
-    res = await fetch(url, init);
-    if (res.status < 500) return res;
-  }
-  return res;
-}
-
-async function authCallback(url, env) {
-  const state = await verifyToken(url.searchParams.get('state') || '', env.SESSION_SECRET);
-  if (!state || !state.r) return new Response('bad or expired oauth state', { status: 400 });
-  const code = url.searchParams.get('code');
-  if (!code) return new Response('missing code', { status: 400 });
-
-  const tokenRes = await ghFetch('https://github.com/login/oauth/access_token', {
-    method: 'POST',
-    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'qb-td' },
-    body: JSON.stringify({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code }),
-  });
-  const tok = await tokenRes.json().catch(() => ({}));
-  if (!tok.access_token) {
-    console.log('token exchange failed:', tokenRes.status, tok.error || 'no error field', tok.error_description || '');
-    return new Response('github token exchange failed' + (tok.error ? ' (' + tok.error + ')' : ''), { status: 502 });
-  }
-
-  const userRes = await ghFetch('https://api.github.com/user', {
-    headers: { 'Authorization': 'Bearer ' + tok.access_token, 'Accept': 'application/vnd.github+json', 'User-Agent': 'qb-td' },
-  });
-  const gh = await userRes.json().catch(() => ({}));
-  if (!gh.id) {
-    console.log('user lookup failed:', userRes.status, gh.message || 'no message');
-    return new Response('github user lookup failed' + (gh.message ? ' (' + gh.message + ')' : ''), { status: 502 });
-  }
-
-  const uid = 'gh:' + gh.id;
-  const login = String(gh.login || uid);
-  await env.DB.prepare(
-    'INSERT INTO users (uid, login, created) VALUES (?1, ?2, ?3) ON CONFLICT(uid) DO UPDATE SET login = ?2'
-  ).bind(uid, login, Date.now()).run();
-
-  const session = await signToken({ u: uid, l: login, exp: Date.now() + TOKEN_TTL }, env.SESSION_SECRET);
-  // Fragment, not query: never hits server logs, and the client strips it.
-  return Response.redirect(state.r + '#td=' + session, 302);
 }
 
 /* ---------- misc helpers ---------- */
@@ -239,23 +131,21 @@ async function updateBundle(env, tid, mutate) {
   return false;
 }
 
-async function getOwnedTournament(env, user, id) {
+/* ---------- TO admin API (/a/*, admin-link-authed) ----------
+   The router resolves the admin secret and expiry once; every handler
+   receives the tournament row `t`. */
+
+async function getAdminTournament(env, secret) {
   const { results } = await env.DB.prepare(
-    'SELECT * FROM tournaments WHERE id = ?1 AND owner_uid = ?2'
-  ).bind(id, user.u).all();
+    'SELECT * FROM tournaments WHERE admin_secret = ?1'
+  ).bind(secret).all();
   return results[0] || null;
 }
-
-/* ---------- TO admin API (/api/*, OAuth-gated) ---------- */
-
-async function listTournaments(env, user) {
-  const { results } = await env.DB.prepare(
-    'SELECT id, slug, name, current_round, published, created FROM tournaments WHERE owner_uid = ?1 ORDER BY created DESC'
-  ).bind(user.u).all();
-  return json(env, { tournaments: results });
+function adminClosed(t) {
+  return Date.now() > t.created + ADMIN_TTL;
 }
 
-async function createTournament(request, env, user) {
+async function createTournament(request, env) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
   const slug = String(body.slug || '').trim().toLowerCase();
@@ -265,40 +155,57 @@ async function createTournament(request, env, user) {
   }
   if (!name) return err(env, 400, 'name required');
 
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const since = Date.now() - 24 * 3600 * 1000;
   const { results } = await env.DB.prepare(
-    'SELECT COUNT(*) AS n FROM tournaments WHERE owner_uid = ?1'
-  ).bind(user.u).all();
-  if (results[0].n >= MAX_TOURNAMENTS_PER_USER) return err(env, 403, 'tournament cap reached');
+    'SELECT SUM(creator_ip = ?1) AS mine, COUNT(*) AS all_ips FROM tournaments WHERE created > ?2'
+  ).bind(ip, since).all();
+  if ((results[0].mine || 0) >= CREATE_PER_IP_DAY || results[0].all_ips >= CREATE_GLOBAL_DAY) {
+    return err(env, 429, 'creation limit reached, try again tomorrow');
+  }
 
+  const adminSecret = randToken();
+  const created = Date.now();
   try {
     const out = await env.DB.prepare(
-      'INSERT INTO tournaments (slug, name, owner_uid, settings, created) VALUES (?1, ?2, ?3, ?4, ?5)'
-    ).bind(slug, name, user.u, JSON.stringify(body.settings || {}), Date.now()).run();
-    return json(env, { id: out.meta.last_row_id, slug });
+      'INSERT INTO tournaments (slug, name, admin_secret, creator_ip, settings, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+    ).bind(slug, name, adminSecret, ip, JSON.stringify(body.settings || {}), created).run();
+    return json(env, {
+      id: out.meta.last_row_id, slug, name,
+      admin_secret: adminSecret, closes: created + ADMIN_TTL,
+    });
   } catch (e) {
     return err(env, 409, 'slug already taken');
   }
 }
 
-async function getTournament(env, user, id) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+// A leaked admin link mid-tournament: mint a new secret, the old link dies.
+async function rotateAdmin(env, t) {
+  const adminSecret = randToken();
+  await env.DB.prepare(
+    'UPDATE tournaments SET admin_secret = ?2 WHERE id = ?1'
+  ).bind(t.id, adminSecret).run();
+  return json(env, { admin_secret: adminSecret });
+}
+
+async function getTournament(env, t) {
+  const id = t.id;
   const [buckets, rounds, files] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
   ]);
+  const { admin_secret, creator_ip, ...pub_t } = t;
   return json(env, {
-    tournament: t,
+    tournament: { ...pub_t, closes: t.created + ADMIN_TTL },
     buckets: buckets.results,
     rounds: rounds.results,
     files: files.results,
   });
 }
 
-async function updateTournament(request, env, user, id) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function updateTournament(request, env, t) {
+  const id = t.id;
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
 
@@ -331,9 +238,8 @@ async function updateTournament(request, env, user, id) {
   return json(env, { ok: true });
 }
 
-async function createBucket(request, env, user, id) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function createBucket(request, env, t) {
+  const id = t.id;
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
   const roomName = cleanName(body.room_name);
@@ -351,19 +257,16 @@ async function createBucket(request, env, user, id) {
   return json(env, { id: out.meta.last_row_id, room_name: roomName, secret });
 }
 
-async function deleteBucket(env, user, id, bucketId) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function deleteBucket(env, t, bucketId) {
   // Files already uploaded stay downloadable; only the mod's access dies.
   await env.DB.prepare(
     'DELETE FROM buckets WHERE id = ?1 AND tournament_id = ?2'
-  ).bind(bucketId, id).run();
+  ).bind(bucketId, t.id).run();
   return json(env, { ok: true });
 }
 
-async function uploadPacket(request, url, env, user, id) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function uploadPacket(request, url, env, t) {
+  const id = t.id;
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1 || round > 999) return err(env, 400, 'bad round');
   const filename = cleanFilename(url.searchParams.get('name'));
@@ -383,9 +286,8 @@ async function uploadPacket(request, url, env, user, id) {
   return json(env, { round, filename });
 }
 
-async function uploadRoster(request, url, env, user, id) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function uploadRoster(request, url, env, t) {
+  const id = t.id;
   const filename = cleanFilename(url.searchParams.get('name') || 'roster.qbj');
   const body = await request.arrayBuffer();
   if (!body.byteLength) return err(env, 400, 'empty body');
@@ -399,20 +301,17 @@ async function uploadRoster(request, url, env, user, id) {
   return json(env, { filename });
 }
 
-async function adminDownload(url, env, user, id) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function adminDownload(url, env, t) {
   const key = url.searchParams.get('key') || '';
   // Ownership boundary: only this tournament's prefix is reachable.
-  if (!key.startsWith(`t/${id}/`)) return err(env, 403, 'bad key');
+  if (!key.startsWith(`t/${t.id}/`)) return err(env, 403, 'bad key');
   const obj = await env.DATA.get(key);
   if (!obj) return err(env, 404, 'no such file');
   return blobResponse(env, obj, url.searchParams.get('dl') || key.split('/').pop());
 }
 
-async function deleteFile(env, user, id, fileId) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function deleteFile(env, t, fileId) {
+  const id = t.id;
   const { results } = await env.DB.prepare(
     'SELECT r2_key, kind, error FROM files WHERE id = ?1 AND tournament_id = ?2'
   ).bind(fileId, id).all();
@@ -429,9 +328,8 @@ async function deleteFile(env, user, id, fileId) {
 
 // Escape hatch for bundle drift: the dashboard re-materializes the bundle
 // from the files it already fetched and posts it whole.
-async function putBundle(request, env, user, id) {
-  const t = await getOwnedTournament(env, user, id);
-  if (!t) return err(env, 404, 'not found');
+async function putBundle(request, env, t) {
+  const id = t.id;
   const body = await request.arrayBuffer();
   if (body.byteLength > MAX_BUNDLE) return err(env, 413, 'bundle too large');
   let parsed;
@@ -647,11 +545,7 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
 
-    // OAuth endpoints are navigations (no auth header yet).
-    if (path === '/auth/login' && method === 'GET') return authLogin(url, env);
-    if (path === '/auth/callback' && method === 'GET') return authCallback(url, env);
-
-    if (path === '/') return new Response('qb-td: tournament hub backend. See /auth/login.', { status: 200 });
+    if (path === '/') return new Response('qb-td: tournament hub backend.', { status: 200 });
 
     // Moderator bucket routes — the secret is the credential.
     let m;
@@ -666,42 +560,27 @@ export default {
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
 
-    // Everything under /api and /auth/me requires a session.
-    const user = await requireUser(request, env);
-    if (!user) return err(env, 401, 'sign in required');
+    // Open (rate-limited) tournament creation; the response carries the
+    // admin secret, shown to the TO exactly once by the dashboard.
+    if (path === '/api/tournaments' && method === 'POST') return createTournament(request, env);
 
-    if (path === '/auth/me' && method === 'GET') {
-      return json(env, { uid: user.u, login: user.l, exp: user.exp });
-    }
-
-    if (path === '/api/tournaments' && method === 'GET') return listTournaments(env, user);
-    if (path === '/api/tournaments' && method === 'POST') return createTournament(request, env, user);
-
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)$/))) {
-      const id = Number(m[1]);
-      if (method === 'GET') return getTournament(env, user, id);
-      if (method === 'POST') return updateTournament(request, env, user, id);
-    }
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/buckets$/)) && method === 'POST') {
-      return createBucket(request, env, user, Number(m[1]));
-    }
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/buckets\/(\d+)$/)) && method === 'DELETE') {
-      return deleteBucket(env, user, Number(m[1]), Number(m[2]));
-    }
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/packet$/)) && method === 'POST') {
-      return uploadPacket(request, url, env, user, Number(m[1]));
-    }
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/roster$/)) && method === 'POST') {
-      return uploadRoster(request, url, env, user, Number(m[1]));
-    }
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/file$/)) && method === 'GET') {
-      return adminDownload(url, env, user, Number(m[1]));
-    }
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/files\/(\d+)$/)) && method === 'DELETE') {
-      return deleteFile(env, user, Number(m[1]), Number(m[2]));
-    }
-    if ((m = path.match(/^\/api\/tournaments\/(\d+)\/bundle$/)) && method === 'POST') {
-      return putBundle(request, env, user, Number(m[1]));
+    // Admin routes — the admin secret is the credential, and it expires.
+    if ((m = path.match(/^\/a\/([a-z0-9]{10,40})(\/.*)?$/))) {
+      const t = await getAdminTournament(env, m[1]);
+      if (!t) return err(env, 404, 'bad link');
+      if (adminClosed(t)) return err(env, 410, 'tournament closed');
+      const sub = m[2] || '';
+      let mm;
+      if (sub === '' && method === 'GET') return getTournament(env, t);
+      if (sub === '' && method === 'POST') return updateTournament(request, env, t);
+      if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
+      if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
+      if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
+      if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
+      if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
+      if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
+      if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
+      if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);
     }
 
     return err(env, 404, 'not found');

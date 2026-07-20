@@ -13,12 +13,23 @@
   <header>
     <h1>qb-td</h1>
     <span class="sub">tournament hub</span>
-    <span class="spacer"></span>
-    <span id="who" class="muted"></span>
-    <button id="authbtn"></button>
   </header>
   <div id="msg"></div>
   <div id="view"></div>
+</div>
+<div id="linkmodal" class="modalback" hidden>
+  <div class="modal">
+    <h2 style="margin-top:0">save this link</h2>
+    <div class="mono linkbox" id="modallink"></div>
+    <p>this link is the only way to manage the tournament. there is no
+    account and no recovery.</p>
+    <p>it stops working 48 hours after creation, on
+    <b id="modalcloses"></b>. export stats and files before then.</p>
+    <div class="row" style="margin-top:12px">
+      <button id="modalcopy" class="primary">copy link</button>
+      <button id="modalok">saved it</button>
+    </div>
+  </div>
 </div>
 <script type="module" src="js/admin.js"></script>
 </body>
