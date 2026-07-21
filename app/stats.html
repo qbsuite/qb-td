@@ -85,19 +85,23 @@ async function load(force = false) {
       fetchRoster(state),
       fetchMatches(state, errors),
     ]);
-    lastVersion = state.version;
 
     if (!matches.length) {
-      $('statsout').innerHTML = '<div class="muted">no games yet</div>';
+      // don't commit the version: a load that raced an upload or hit a
+      // transient failure must retry next check, not stick on this state
+      $('statsout').innerHTML = errors.length
+        ? errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')
+        : '<div class="muted">no games yet</div>';
       say('');
       return;
     }
+    lastVersion = state.version;
     renderStats($('statsout'), aggregate(matches, roster), errors);
     say('');
   } catch (e) { say(e.message, true); }
 }
 
-$('refresh').onclick = () => load();
+$('refresh').onclick = () => load(true);
 if (!slug) say('bad link', true);
 else {
   load(true);
