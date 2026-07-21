@@ -3,9 +3,12 @@
 // Contract verified against YellowFruit v4.0.18 source (ANadig/YellowFruit,
 // src/renderer/DataModel/): a .yft is {version: '2.1.1', objects:
 // [Tournament]} where the Tournament and its sub-objects mirror YF's own
-// toFileObject() output — camelCase built first, then converted with a port
-// of YF's camelCaseToSnakeCase (CaseConversion.ts) exactly like YF's writer
-// (TournamentManager.generateWholeFileObj). Load-bearing details:
+// toFileObject() output — camelCase built first, then key-renamed the same
+// way YF's writer does (CaseConversion.ts camelCaseToSnakeCase, called from
+// TournamentManager.generateWholeFileObj). This is an independent
+// implementation of the file format (YF is AGPL-3.0; no YF code is copied
+// here — see THIRD_PARTY_NOTICES.md); only the format facts below come from
+// reading YF's source. Load-bearing details:
 //   - YfData.YfVersion must be present and <= the reader's app version
 //     (FileParsing.parseYftTournament). We stamp 4.0.18: generated files
 //     need YF >= 4.0.18. Do not lower it — older stamps trigger YF's
@@ -19,8 +22,10 @@
 
 const YF_VERSION = '4.0.18';
 
-// Port of YF CaseConversion.ts camelCaseToSnakeCase (the fixed key list —
-// unlisted keys, including everything inside YfData, keep their spelling).
+// The fixed set of keys YF's CaseConversion.ts snake_cases — format facts
+// required for compatibility (the names follow the qbj tournament-schema
+// conventions). Unlisted keys, including everything inside YfData, keep
+// their spelling.
 const SNAKE = {
   shortName: 'short_name', tournamentSite: 'tournament_site',
   scoringRules: 'scoring_rules', startDate: 'start_date', endDate: 'end_date',

@@ -133,3 +133,8 @@ The generated `.yft` replicates YellowFruit's own serialization
 any change to `app/engine/yft.js`: generate a file from real ModaQ games,
 open it in YellowFruit, confirm no version/schema errors and that YF's
 report matches the stats page.
+
+## License
+
+MIT (see `LICENSE`). The embedded MODAQ reader and the YellowFruit
+file-format relationship are documented in `THIRD_PARTY_NOTICES.md`.
