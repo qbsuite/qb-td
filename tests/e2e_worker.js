@@ -203,6 +203,25 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
   ok('combined without a match flagged', broken.status === 200 && broken.body.error !== null, broken.body);
 }
 
+// filenames longer than the 100-char storage cap keep their suffix, so kind
+// detection still sees "_Game.json" / ".qbj" (real ModaQ names with two long
+// team names overflow the cap)
+{
+  const longTeams = 'They Will Just Let Anyone Edit Chicago Open These Days_I have no buzzer and I must neg scream';
+  r = await call(`/b/${secret}/upload?round=4&name=${encodeURIComponent(`Round_4_${longTeams}_Game.json`)}`,
+    { method: 'POST', body: '{"cycles":[]}' });
+  ok('long game filename keeps kind=game',
+    r.status === 200 && r.body.kind === 'game' && /_Game\.json$/.test(r.body.filename)
+    && r.body.filename.length <= 100, r.body);
+  const q = JSON.parse(MATCH);
+  q._round = 4;
+  r = await call(`/b/${secret}/upload?round=4&name=${encodeURIComponent(`Round_4_${longTeams} the second.qbj`)}`,
+    { method: 'POST', body: JSON.stringify(q) });
+  ok('long qbj filename keeps kind=qbj',
+    r.status === 200 && r.body.kind === 'qbj' && r.body.error === null
+    && /^Round_4_/.test(r.body.filename) && /\.qbj$/.test(r.body.filename), r.body);
+}
+
 // rotate: old admin link dies, new one works
 r = await call(A + '/rotate', { method: 'POST' });
 ok('rotate mints a new secret', r.status === 200 && r.body.admin_secret.length >= 10, r.body);
@@ -218,7 +237,7 @@ r = await call('/b/' + secret);
 ok('bucket closes stamp ~48h out',
   r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
   r.body.closes);
-ok('bucket upload count', r.body.upload_count === 5, r.body.upload_count);
+ok('bucket upload count', r.body.upload_count === 7, r.body.upload_count);
 
 // bucket expiry: backdate the bucket, every mod route dies with "room closed"
 execSync(
@@ -240,14 +259,14 @@ r = await call(A);
 ok('TO access survives room expiry', r.status === 200);
 
 // admin detail reflects everything
-ok('admin detail files', r.status === 200 && r.body.files.length === 5 && r.body.rounds.length === 1, r.body.files);
+ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 1, r.body.files);
 
 // file delete
 const delId = r.body.files.find((f) => f.filename === 'broken.qbj').id;
 r = await call(`${A}/files/${delId}`, { method: 'DELETE' });
 ok('delete file', r.status === 200);
 r = await call(A);
-ok('file gone', r.body.files.length === 4);
+ok('file gone', r.body.files.length === 6);
 
 // bucket delete kills the link
 r = await call(`${A}/buckets/${r.body.buckets[0].id}`, { method: 'DELETE' });

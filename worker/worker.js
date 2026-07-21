@@ -74,7 +74,14 @@ function randToken(len = 20) {
 }
 function cleanFilename(name) {
   const base = String(name || 'file').split(/[\\/]/).pop().replace(/[^\w.\- ()\[\]]/g, '_');
-  return base.slice(0, 100) || 'file';
+  if (base.length <= 100) return base || 'file';
+  // Long names keep their head, tail, and extension: kind detection and the
+  // .qbtd.json rename key off the suffix (".qbj", "_Game.json", ".qbtd.json").
+  const ext = (/(?:\.[A-Za-z0-9]{1,8}){1,2}$/.exec(base) || [''])[0];
+  const stem = base.slice(0, base.length - ext.length);
+  const keep = 100 - ext.length;
+  const head = Math.ceil(keep / 2);
+  return stem.slice(0, head) + stem.slice(stem.length - (keep - head)) + ext;
 }
 function cleanName(s) {
   return String(s || '').trim().slice(0, MAX_NAME);
