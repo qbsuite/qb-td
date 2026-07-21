@@ -13,7 +13,7 @@ import { makeZip, readZip } from '../app/engine/zip.js';
 // roster builder's output must satisfy it, since read.html feeds the
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
-import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -589,6 +589,22 @@ test('staleGameKeys keeps the newest N games, both keys dropped', () => {
   assert.deepEqual(staleGameKeys(metas, 'sec1', 2),
     [metaKey('sec1', 'g2'), gameKey('sec1', 'g2')]);
   assert.deepEqual(staleGameKeys(metas, 'sec1', 8), []);
+});
+
+test('roundRows merges packets with newest game per round, live flagged', () => {
+  const packets = [{ number: 1, packet_name: 'p1.json' }, { number: 2, packet_name: 'p2.json' }];
+  const metas = [ // newest-first, as gameMetas returns
+    { id: 'g9', round: 1, a: 'C', b: 'D', started: 3000 },
+    { id: 'g1', round: 1, a: 'A', b: 'B', started: 1000 },
+    { id: 'g5', round: 7, a: 'E', b: 'F', started: 2000 }, // no packet: row kept
+  ];
+  const rows = roundRows(packets, metas, 2);
+  assert.deepEqual(rows.map((r) => r.number), [1, 2, 7]);
+  assert.deepEqual(rows.map((r) => r.live), [false, true, false]);
+  assert.equal(rows[0].game.id, 'g9');                 // newest round-1 game wins
+  assert.equal(rows[1].game, null);
+  assert.deepEqual(rows[2], { number: 7, packet: null, live: false, game: { id: 'g5', a: 'E', b: 'F' } });
+  assert.deepEqual(roundRows([], [], 1), []);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

@@ -22,7 +22,7 @@ import { pub, esc } from './api.js';
 import {
   normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
-  staleGameKeys,
+  staleGameKeys, roundRows,
 } from './read_core.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
@@ -140,38 +140,50 @@ function mountModaq(id, meta, isNew) {
   ReactDOM.render(React.createElement(ModaqControl, props), $('modaq'));
 }
 
-/* ---------- team picker (bare-link path) ---------- */
+/* ---------- round + team picker (bare-link path) ---------- */
 
-function showResumable() {
-  const metas = gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), secret)
+let selectedRound = 0;
+
+function deviceMetas() {
+  return gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), secret)
     .filter((m) => storeIntact(localStorage.getItem(gameKey(secret, m.id))));
-  if (!metas.length) return;
-  $('resume').hidden = false;
-  $('resumelist').innerHTML = metas.map((m) =>
-    `<div class="row"><a href="${esc(gameLink(m.id))}">round ${m.round} · ${esc(m.a)} vs ${esc(m.b)}</a></div>`).join('');
 }
 
-function showPicker() {
-  const packets = state.packets || [];
-  const packetFor = (round) => packets.find((p) => p.number === round);
+// One row per round: a pill to pick it (green = the live round the TD set,
+// filled = selected), plus a continue button when this device already has
+// a game for it. Rounds with a game but no packet keep their continue.
+function renderRounds() {
+  const rows = roundRows(state.packets || [], deviceMetas(), state.current_round);
+  $('roundrows').innerHTML = rows.map((r) => `
+    <div class="row">
+      ${r.packet
+        ? `<a href="#" class="pill${r.live ? ' on' : ''}${r.number === selectedRound ? ' sel' : ''}"
+            data-round="${r.number}">round ${r.number}</a>`
+        : `<span class="pill muted">round ${r.number}</span>`}
+      ${r.game ? `<span class="muted">${esc(r.game.a)} vs ${esc(r.game.b)}</span>
+        <a class="btn" href="${esc(gameLink(r.game.id))}">continue</a>` : ''}
+    </div>`).join('');
+  const sel = rows.find((r) => r.number === selectedRound);
+  $('packetname').textContent = (sel && sel.packet) || '';
+}
+
+function showTeams() {
   const options = teams.map((t) => `<option>${esc(t.name)}</option>`).join('');
-  $('picker').hidden = false;
-  // team fields start empty; the round defaults to the live round
+  $('teamrow').hidden = false;
+  // team fields start empty
   $('teama').innerHTML = '<option value=""></option>' + options;
   $('teamb').innerHTML = '<option value=""></option>' + options;
-  $('round').innerHTML = packets.map((p) =>
-    `<option value="${p.number}"${p.number === state.current_round ? ' selected' : ''}>` +
-    `round ${p.number}${p.number === state.current_round ? ' · live' : ''}</option>`).join('');
-  $('round').onchange = () => {
-    const info = packetFor(Number($('round').value));
-    $('packetname').textContent = info ? info.packet_name : '';
-  };
   $('start').onclick = async () => {
     const a = $('teama').value, b = $('teamb').value;
-    const round = Number($('round').value);
-    const info = packetFor(round);
+    const round = selectedRound;
+    const info = (state.packets || []).find((p) => p.number === round);
     try { pickTeams(teams, a, b); } catch (e) { say(e.message, true); return; }
     if (!info) { say('no packet for round ' + round, true); return; }
+    const existing = deviceMetas().find((m) => m.round === round);
+    if (existing && !confirm(
+      `round ${round} already has a game on this device (${existing.a} vs ${existing.b}). start a new one?`)) {
+      return;
+    }
     $('start').disabled = true;
     try { packet = await fetchPacket(round, info.packet_name); }
     catch (e) { say(e.message, true); $('start').disabled = false; return; }
@@ -187,7 +199,6 @@ function showPicker() {
     localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
     history.replaceState(null, '', gameLink(id));
     $('picker').hidden = true;
-    $('resume').hidden = true;
     mountModaq(id, meta, true);
   };
 }
@@ -220,10 +231,23 @@ async function boot() {
     return;
   }
   setHeader(state.tournament, state.room, state.current_round, '');
-  showResumable();
 
+  // rounds + this device's games render even if the roster fails to load
   const packets = state.packets || [];
-  if (!packets.length) {
+  selectedRound = packets.some((p) => p.number === state.current_round)
+    ? state.current_round
+    : (packets.length ? packets[packets.length - 1].number : 0);
+  $('picker').hidden = false;
+  $('roundrows').onclick = (e) => {
+    const round = Number(e.target.dataset && e.target.dataset.round);
+    if (!round) return;
+    e.preventDefault();
+    selectedRound = round;
+    renderRounds();
+  };
+  renderRounds();
+
+  if (!packets.length && !deviceMetas().length) {
     say('no packets yet', true);
     return;
   }
@@ -234,11 +258,10 @@ async function boot() {
     return;
   }
   say('');
-  const live = packets.find((p) => p.number === state.current_round);
-  $('packetname').textContent = live ? live.packet_name : '';
-  showPicker();
-  // warm the cache for the common case (start on the live round)
-  if (live) fetchPacket(state.current_round, live.packet_name).then(() => say('')).catch(() => {});
+  showTeams();
+  // warm the cache for the common case (start on the default round)
+  const sel = packets.find((p) => p.number === selectedRound);
+  if (sel) fetchPacket(sel.number, sel.packet_name).then(() => say('')).catch(() => {});
 }
 
 boot();

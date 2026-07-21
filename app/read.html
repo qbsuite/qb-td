@@ -11,7 +11,9 @@
   /* Page chrome collapses to one bar once MODAQ is mounted. */
   .wrap.readerbar { padding: 10px 16px; max-width: none; }
   .wrap.readerbar header { margin-bottom: 0; }
-  body.reading #picker, body.reading #packetrow, body.reading #resume { display: none; }
+  body.reading #picker, body.reading #packetrow { display: none; }
+  #roundrows .row { margin: 4px 0; }
+  #roundrows .pill.sel { background: var(--hover-bg); border-color: currentColor; }
   body.reading #msg { display: none; }
   body:not(.reading) #game, body:not(.reading) #newgame { display: none; }
   #modaq { min-height: 70vh; }
@@ -39,17 +41,13 @@
     <span class="muted" id="packetname"></span>
   </div>
   <div class="card" id="picker" hidden>
-    <div class="row">
-      <select id="round"></select>
+    <div id="roundrows"></div>
+    <div class="row" id="teamrow" style="margin-top:10px" hidden>
       <select id="teama"></select>
       <span class="muted">vs</span>
       <select id="teamb"></select>
       <button id="start" class="primary">start</button>
     </div>
-  </div>
-  <div id="resume" hidden>
-    <h2>in progress on this device</h2>
-    <div id="resumelist"></div>
   </div>
 </div>
 <div id="modaq"></div>

@@ -136,3 +136,25 @@ export function gameMetas(allKeys, get, secret) {
 export function staleGameKeys(metas, secret, keep = 8) {
   return metas.slice(keep).flatMap((m) => [metaKey(secret, m.id), gameKey(secret, m.id)]);
 }
+
+/** One picker row per round, merging the reachable packets with this
+    device's in-progress games (metas newest-first; the newest game per
+    round wins). Rounds with a game but no packet still get a row so the
+    game stays reachable. Sorted by round number. */
+export function roundRows(packets, metas, currentRound) {
+  const byRound = new Map();
+  for (const p of packets || []) {
+    byRound.set(p.number, {
+      number: p.number, packet: p.packet_name, live: p.number === currentRound, game: null,
+    });
+  }
+  for (const m of metas || []) {
+    let row = byRound.get(m.round);
+    if (!row) {
+      row = { number: m.round, packet: null, live: m.round === currentRound, game: null };
+      byRound.set(m.round, row);
+    }
+    if (!row.game) row.game = { id: m.id, a: m.a, b: m.b };
+  }
+  return [...byRound.values()].sort((x, y) => x.number - y.number);
+}
