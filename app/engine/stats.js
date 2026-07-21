@@ -104,7 +104,9 @@ export function aggregate(matches, roster = null) {
     games.push({
       round: m.round,
       tossupsRead: m.tossupsRead,
-      teams: m.teams.map((t) => ({ name: t.name, points: t.points })),
+      // full parsed teams (players, counts, bonus) so views can render a
+      // per-game box score without going back to the raw qbj
+      teams: m.teams,
       room: m.room, fileId: m.fileId, packets: m.packets, notes: m.notes,
     });
   }
