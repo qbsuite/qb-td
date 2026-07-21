@@ -369,9 +369,9 @@ async function bucketState(env, secret) {
   const b = await getBucketRow(env, secret);
   if (!b) return err(env, 404, 'bad link');
   if (bucketClosed(b)) return err(env, 410, 'room closed');
-  const [packet, uploads, count] = await Promise.all([
+  const [rounds, uploads, count] = await Promise.all([
     env.DB.prepare(
-      'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
+      'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     ).bind(b.tournament_id, b.current_round).all(),
     env.DB.prepare(
       'SELECT id, round, kind, filename, size, error, created FROM files WHERE bucket_id = ?1 ORDER BY created DESC LIMIT ?2'
@@ -382,12 +382,14 @@ async function bucketState(env, secret) {
   ]);
   let settings = {};
   try { settings = JSON.parse(b.settings) || {}; } catch (e) { /* keep {} */ }
+  const packets = rounds.results;
   return json(env, {
     tournament: b.tournament_name,
     room: b.room_name,
     current_round: b.current_round,
     closes: b.created + BUCKET_TTL,
-    packet: packet.results[0] || null,
+    packet: packets.find((p) => p.number === b.current_round) || null,
+    packets,
     roster: !!b.roster_r2_key,
     settings,
     uploads: uploads.results,
@@ -443,14 +445,19 @@ async function bucketUpload(request, url, env, secret) {
   return json(env, { id: fileId, filename, round, kind, error });
 }
 
-async function bucketPacket(env, secret) {
+async function bucketPacket(env, secret, url) {
   const b = await getBucketRow(env, secret);
   if (!b) return err(env, 404, 'bad link');
   if (bucketClosed(b)) return err(env, 410, 'room closed');
+  // Played rounds stay readable (a room running behind still needs them);
+  // future rounds stay locked (question security).
+  let round = Number(url.searchParams.get('round'));
+  if (!Number.isInteger(round) || round < 1) round = b.current_round;
+  if (round > b.current_round) return err(env, 403, 'not the live round yet');
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
-  ).bind(b.tournament_id, b.current_round).all();
-  if (!results.length) return err(env, 404, 'no packet for the current round');
+  ).bind(b.tournament_id, round).all();
+  if (!results.length) return err(env, 404, 'no packet for round ' + round);
   const obj = await env.DATA.get(results[0].packet_r2_key);
   if (!obj) return err(env, 404, 'packet missing');
   return blobResponse(env, obj, results[0].packet_name);
@@ -558,7 +565,7 @@ export default {
     let m;
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1]);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1]);
 
     // Public stats routes — publish-gated inside.

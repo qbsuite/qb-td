@@ -128,6 +128,19 @@ ok('unpublished hidden', r.status === 404);
 r = await call(A, { method: 'POST', json: { published: true, current_round: 2 } });
 ok('publish + set round', r.status === 200);
 
+// played rounds stay downloadable after the round moves on; future rounds
+// stay locked; the bucket state lists every reachable round's packet
+r = await call('/b/' + secret);
+ok('bucket lists played-round packets',
+  r.body.packets.length === 1 && r.body.packets[0].number === 1
+  && r.body.current_round === 2, r.body.packets);
+{
+  const res = await fetch(`${BASE}/b/${secret}/packet?round=1`);
+  ok('past round packet still served', res.status === 200 && (await res.text()) === 'PDFBYTES');
+  const future = await fetch(`${BASE}/b/${secret}/packet?round=3`);
+  ok('future round packet locked', future.status === 403);
+}
+
 r = await call('/pub/' + slug);
 ok('public state', r.status === 200 && r.body.name === 'E2E Open' && r.body.current_round === 2, r.body);
 ok('public lists only valid qbj', r.body.files.length === 1 && r.body.files[0].room === 'Room 1', r.body.files);

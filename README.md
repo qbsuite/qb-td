@@ -20,12 +20,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   MODAQ-compatible roster.qbj) or upload an existing roster qbj, download
   any file, compute stats, export, rotate the admin link if it leaks.
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
-  mobile-first): shows the live current round, downloads that round's
-  packet, uploads the game's `.qbj` + ModaQ game file.
+  mobile-first): shows the live current round, downloads any played
+  round's packet (the live round is highlighted; future rounds stay
+  locked), uploads the game's `.qbj` + ModaQ game file.
 - **Moderator reader page** (`app/read.html?b=<secret>`, same link secret):
   an embedded [MODAQ](https://github.com/alopezlago/MODAQ) preloaded with
-  the current round's packet, the tournament roster, and the TO's game
-  format — the mod picks two teams and reads. "Upload to qb-td" in MODAQ's
+  a round's packet (the live round by default; played rounds stay
+  selectable for a room running behind), the tournament roster, and the
+  TO's game format — the mod picks the round and two teams and reads. "Upload to qb-td" in MODAQ's
   menu sends one `.qbtd.json` per game into the bucket — the match qbj plus
   the full game state in a single file; no file downloads or uploads. The
   dashboard and public routes split the qbj back out wherever a bare `.qbj`
@@ -65,10 +67,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   "room open until ..." and the dashboard shows each room's close time;
   after that every moderator route returns "room closed". A leaked link
   stops serving packets and accepting uploads soon after the tournament.
-- **Packets are only reachable through a bucket link, and only for the
-  current round** — moderators can't pull future packets, and the public
-  routes never serve packets (only match qbj + roster, and only while the
-  TO has publish switched on). Bucket links also serve the roster (the
+- **Packets are only reachable through a bucket link, and only for rounds
+  up to the live one** — moderators can't pull future packets, and the
+  public routes never serve packets (only match qbj + roster, and only
+  while the TO has publish switched on). Bucket links also serve the roster (the
   reader page preloads it); rosters aren't question material.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
   that leaks into a crawler or an outbound click doesn't spread.

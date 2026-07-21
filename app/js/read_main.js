@@ -1,7 +1,8 @@
 // read_main.js — source for read.bundle.js (npm run build:read). The
-// moderator reader page: an embedded MODAQ preloaded with the room's
-// current packet, the tournament roster, and the TO's game format, so the
-// mod only picks the two teams. The finished game uploads straight back to
+// moderator reader page: an embedded MODAQ preloaded with a round's packet
+// (the live round by default; played rounds stay selectable), the
+// tournament roster, and the TO's game format, so the mod only picks the
+// round and the two teams. The finished game uploads straight back to
 // the bucket via MODAQ's customExport — no file downloads or uploads.
 //
 // Every started game gets its own URL (?b=<secret>&g=<id>) and its own
@@ -53,21 +54,32 @@ function randId() {
 
 /* ---------- data loading (bare-link path) ---------- */
 
-async function fetchPacket() {
-  if (!state.packet) throw new Error('no packet for round ' + state.current_round + ' yet');
-  const name = state.packet.packet_name || '';
-  const res = await pub('/b/' + secret + '/packet');
+const packetCache = {}; // round -> Promise<normalized IPacket>
+
+function fetchPacket(round, name) {
+  if (!packetCache[round]) {
+    packetCache[round] = loadPacket(round, name)
+      .catch((e) => { delete packetCache[round]; throw e; });
+  }
+  return packetCache[round];
+}
+
+async function loadPacket(round, name) {
+  const res = await pub('/b/' + secret + '/packet?round=' + round);
   // pub() returns parsed JSON when the blob was stored with a JSON content
   // type, and the raw Response otherwise.
-  if (!(res instanceof Response)) return normalizePacket(res, name);
-  if (/\.json$/i.test(name)) return normalizePacket(JSON.parse(await res.text()), name);
-  if (/\.docx$/i.test(name)) {
+  let parsed;
+  if (!(res instanceof Response)) parsed = normalizePacket(res, name);
+  else if (/\.json$/i.test(name)) parsed = normalizePacket(JSON.parse(await res.text()), name);
+  else if (/\.docx$/i.test(name)) {
     say('parsing packet...');
     const yapp = await fetch(YAPP, { method: 'POST', body: await res.arrayBuffer(), mode: 'cors' });
     if (!yapp.ok) throw new Error('packet parser failed (' + yapp.status + ')');
-    return normalizePacket(await yapp.json(), name);
+    parsed = normalizePacket(await yapp.json(), name);
+  } else {
+    throw new Error('packet is ' + (name.split('.').pop() || 'unknown') + '; the reader needs .json or .docx');
   }
-  throw new Error('packet is ' + (name.split('.').pop() || 'unknown') + '; the reader needs .json or .docx');
+  return parsed;
 }
 
 async function fetchTeams() {
@@ -140,19 +152,36 @@ function showResumable() {
 }
 
 function showPicker() {
+  const packets = state.packets || [];
+  const packetFor = (round) => packets.find((p) => p.number === round);
   const options = teams.map((t) => `<option>${esc(t.name)}</option>`).join('');
   $('picker').hidden = false;
-  $('teama').innerHTML = '<option value="">team 1</option>' + options;
-  $('teamb').innerHTML = '<option value="">team 2</option>' + options;
-  $('start').onclick = () => {
+  // team fields start empty; the round defaults to the live round
+  $('teama').innerHTML = '<option value=""></option>' + options;
+  $('teamb').innerHTML = '<option value=""></option>' + options;
+  $('round').innerHTML = packets.map((p) =>
+    `<option value="${p.number}"${p.number === state.current_round ? ' selected' : ''}>` +
+    `round ${p.number}${p.number === state.current_round ? ' · live' : ''}</option>`).join('');
+  $('round').onchange = () => {
+    const info = packetFor(Number($('round').value));
+    $('packetname').textContent = info ? info.packet_name : '';
+  };
+  $('start').onclick = async () => {
     const a = $('teama').value, b = $('teamb').value;
+    const round = Number($('round').value);
+    const info = packetFor(round);
     try { pickTeams(teams, a, b); } catch (e) { say(e.message, true); return; }
+    if (!info) { say('no packet for round ' + round, true); return; }
+    $('start').disabled = true;
+    try { packet = await fetchPacket(round, info.packet_name); }
+    catch (e) { say(e.message, true); $('start').disabled = false; return; }
+    $('start').disabled = false;
     say('');
     const metas = gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), secret);
     for (const k of staleGameKeys(metas, secret, 7)) localStorage.removeItem(k);
     const id = randId();
     const meta = {
-      a, b, round: state.current_round, packet: state.packet.packet_name,
+      a, b, round, packet: info.packet_name,
       t: state.tournament, room: state.room, started: Date.now(),
     };
     localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
@@ -193,15 +222,23 @@ async function boot() {
   setHeader(state.tournament, state.room, state.current_round, '');
   showResumable();
 
+  const packets = state.packets || [];
+  if (!packets.length) {
+    say('no packets yet', true);
+    return;
+  }
   try {
-    [packet, teams] = await Promise.all([fetchPacket(), fetchTeams()]);
+    teams = await fetchTeams();
   } catch (e) {
     say(e.message, true);
     return;
   }
   say('');
-  $('packetname').textContent = packet.name || '';
+  const live = packets.find((p) => p.number === state.current_round);
+  $('packetname').textContent = live ? live.packet_name : '';
   showPicker();
+  // warm the cache for the common case (start on the live round)
+  if (live) fetchPacket(state.current_round, live.packet_name).then(() => say('')).catch(() => {});
 }
 
 boot();
