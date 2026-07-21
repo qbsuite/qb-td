@@ -1,5 +1,6 @@
-// zip.js — minimal store-only (no compression) ZIP writer, for the
-// qbj-bundle download. Dependency-free; works in browser and node.
+// zip.js — minimal ZIP support, dependency-free; works in browser and
+// node. makeZip is a store-only writer (the qbj-bundle download); readZip
+// reads store + deflate entries (the packet-zip upload).
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
@@ -88,6 +89,53 @@ export function makeZip(entries, date) {
   for (const b of [...locals, ...centrals, new Uint8Array(eocd.buffer)]) {
     out.set(b, pos);
     pos += b.length;
+  }
+  return out;
+}
+
+async function inflateRaw(raw) {
+  const ds = new DecompressionStream('deflate-raw');
+  const res = new Response(new Blob([raw]).stream().pipeThrough(ds));
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/**
+ * Read a zip made by any normal tool. Walks the central directory (so
+ * data-descriptor entries work), skips directory entries, supports store
+ * and deflate. No zip64 — fine for packet zips.
+ * @param bytes Uint8Array of the whole zip
+ * @returns Promise<[{name, data: Uint8Array}]>
+ */
+export async function readZip(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  // EOCD is at the end, pushed back by an optional comment (<= 64K)
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65535); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('not a zip file');
+  const count = dv.getUint16(eocd + 10, true);
+  let pos = dv.getUint32(eocd + 16, true);
+  const dec = new TextDecoder();
+  const out = [];
+  for (let n = 0; n < count; n++) {
+    if (dv.getUint32(pos, true) !== 0x02014b50) throw new Error('bad zip central directory');
+    const method = dv.getUint16(pos + 10, true);
+    const csize = dv.getUint32(pos + 20, true);
+    const nameLen = dv.getUint16(pos + 28, true);
+    const extraLen = dv.getUint16(pos + 30, true);
+    const commentLen = dv.getUint16(pos + 32, true);
+    const localOff = dv.getUint32(pos + 42, true);
+    const name = dec.decode(bytes.subarray(pos + 46, pos + 46 + nameLen));
+    pos += 46 + nameLen + extraLen + commentLen;
+    if (name.endsWith('/')) continue;
+    // the local header's own name/extra lengths position the data
+    const start = localOff + 30
+      + dv.getUint16(localOff + 26, true) + dv.getUint16(localOff + 28, true);
+    const raw = bytes.subarray(start, start + csize);
+    if (method === 0) out.push({ name, data: raw });
+    else if (method === 8) out.push({ name, data: await inflateRaw(raw) });
+    else throw new Error(name + ': unsupported zip compression method ' + method);
   }
   return out;
 }

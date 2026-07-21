@@ -12,9 +12,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   mints an unguessable admin link — the only credential, shown once with a
   save-this-link warning, remembered in that device's localStorage, and
   dead 48 hours after creation. From it: add a bucket per room, hand each
-  moderator their private link, upload packets per round, set the live
-  round, upload the roster qbj, download any file, compute stats, export,
-  rotate the admin link if it leaks.
+  moderator their private link, set the round count and the live round,
+  upload packets per round — one at a time, or a whole zip whose files are
+  dragged onto their round slots (filenames carrying a round number can be
+  auto-assigned) — create the roster in a text editor (one `Team: Player,
+  Player` line per team; downloadable, or saved as the tournament's
+  MODAQ-compatible roster.qbj) or upload an existing roster qbj, download
+  any file, compute stats, export, rotate the admin link if it leaks.
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads that round's
   packet, uploads the game's `.qbj` + ModaQ game file.

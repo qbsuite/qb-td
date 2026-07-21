@@ -24,6 +24,17 @@ export function roundFromFilename(filename) {
   return m ? Number(m[1]) : null;
 }
 
+/** Best-effort round guess for a packet filename: an explicit "round N",
+    else the file's only small number ("Packet 3.json", "03.docx" — but not
+    "2024 ACF Winter.json"). Null when there's no safe guess. */
+export function guessRound(filename) {
+  const byWord = roundFromFilename(filename);
+  if (byWord) return byWord;
+  const nums = (String(filename || '').match(/\d+/g) || [])
+    .map(Number).filter((n) => n >= 1 && n <= 99);
+  return nums.length === 1 ? nums[0] : null;
+}
+
 /** The qbj payload inside any accepted container. The reader uploads one
     combined `.qbtd.json` per game — {qbj: <match>, game: <MODAQ state>} —
     whose game half (full packet text) every stats/export consumer must
@@ -103,6 +114,52 @@ export function parseMatch(json, opts = {}) {
     packets: pick(obj, 'packets') || undefined,
     notes: pick(obj, 'notes') || undefined,
     teams,
+  };
+}
+
+/**
+ * Parse the roster editor's text format — one team per line,
+ * `Team Name: Player, Player, ...`. Returns [{name, players}].
+ * Throws with a line number on anything malformed.
+ */
+export function parseRosterLines(text) {
+  const teams = [];
+  const seen = new Set();
+  const lines = String(text || '').split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const at = line.indexOf(':');
+    if (at < 0) throw new Error(`line ${i + 1}: expected Team: Player, Player`);
+    const name = line.slice(0, at).trim();
+    const players = line.slice(at + 1).split(',').map((s) => s.trim()).filter(Boolean);
+    if (!name) throw new Error(`line ${i + 1}: no team name`);
+    if (!players.length) throw new Error(`line ${i + 1}: ${name} has no players`);
+    if (seen.has(name)) throw new Error(`line ${i + 1}: duplicate team ${name}`);
+    seen.add(name);
+    teams.push({ name, players });
+  }
+  if (!teams.length) throw new Error('no teams');
+  return teams;
+}
+
+/**
+ * Roster qbj from [{name, players}]: a serialized tournament with one
+ * registration per team — the shape MODAQ's parseQbjRegistration reads
+ * (each team needs >= 1 player), YellowFruit imports, and parseRoster
+ * round-trips.
+ */
+export function buildRosterQbj(tournamentName, teams) {
+  return {
+    version: '2.1.1',
+    objects: [{
+      type: 'Tournament',
+      name: tournamentName || 'Tournament',
+      registrations: teams.map((t) => ({
+        name: t.name,
+        teams: [{ name: t.name, players: t.players.map((p) => ({ name: p })) }],
+      })),
+    }],
   };
 }
 

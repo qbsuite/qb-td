@@ -3,10 +3,16 @@
 // structure. Run: node tests/run_tests.js
 
 import assert from 'node:assert/strict';
-import { parseMatch, parseRoster, roundFromFilename } from '../app/engine/qbj.js';
+import { createRequire } from 'node:module';
+import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
-import { makeZip } from '../app/engine/zip.js';
+import { makeZip, readZip } from '../app/engine/zip.js';
+
+// MODAQ's actual registration parser (CJS module inside the package) — the
+// roster builder's output must satisfy it, since read.html feeds the
+// roster straight into the embedded MODAQ.
+const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys } from '../app/js/read_core.js';
 
 let passed = 0;
@@ -139,6 +145,52 @@ test('parses roster from whole-file tournament qbj', () => {
 test('parses bare registrations list', () => {
   const r = parseRoster([{ name: 'X', teams: [{ name: 'X A', players: [{ name: 'P1' }] }] }]);
   assert.deepEqual(r, [{ name: 'X A', players: ['P1'] }]);
+});
+
+/* ---------- roster editor (create roster qbj) ---------- */
+
+console.log('roster editor');
+
+test('parseRosterLines parses Team: Player, Player lines', () => {
+  const teams = parseRosterLines('Alpha: Ann, Abe\n\n  Beta : Bob ,  ');
+  assert.deepEqual(teams, [
+    { name: 'Alpha', players: ['Ann', 'Abe'] },
+    { name: 'Beta', players: ['Bob'] },
+  ]);
+});
+
+test('parseRosterLines rejects junk with line numbers', () => {
+  assert.throws(() => parseRosterLines(''), /no teams/);
+  assert.throws(() => parseRosterLines('Alpha Ann Abe'), /line 1/);
+  assert.throws(() => parseRosterLines('Alpha:'), /line 1: Alpha has no players/);
+  assert.throws(() => parseRosterLines(': Ann'), /line 1: no team name/);
+  assert.throws(() => parseRosterLines('A: P1\nA: P2'), /line 2: duplicate team A/);
+});
+
+test('buildRosterQbj round-trips through parseRoster', () => {
+  const qbj = buildRosterQbj('Open', parseRosterLines('Alpha: Ann, Abe\nBeta: Bob'));
+  assert.equal(qbj.objects[0].name, 'Open');
+  assert.deepEqual(parseRoster(qbj), [
+    { name: 'Alpha', players: ['Ann', 'Abe'] },
+    { name: 'Beta', players: ['Bob'] },
+  ]);
+});
+
+test('guessRound reads packet-style filenames safely', () => {
+  assert.equal(guessRound('Round 4.docx'), 4);
+  assert.equal(guessRound('Packet 3.json'), 3);
+  assert.equal(guessRound('03.json'), 3);
+  assert.equal(guessRound('2024 ACF Winter Finals.json'), null);
+  assert.equal(guessRound('Packet 3 of 12.json'), null);
+  assert.equal(guessRound('editors.docx'), null);
+});
+
+test('buildRosterQbj output satisfies MODAQ parseRegistration', () => {
+  const qbj = buildRosterQbj('Open', parseRosterLines('Alpha: Ann, Abe\nBeta: Bob'));
+  const out = parseRegistration(JSON.stringify(qbj));
+  assert.equal(out.success, true, out.message);
+  assert.deepEqual(out.value.map((p) => p.teamName + '/' + p.name),
+    ['Alpha/Ann', 'Alpha/Abe', 'Beta/Bob']);
 });
 
 /* ---------- stats ---------- */
@@ -358,6 +410,67 @@ test('store-only zip structure', () => {
   const cenOff = dv.getUint32(eocdPos + 16, true);
   assert.equal(cenOff + cenSize + 22, z.length);
   assert.equal(dv.getUint32(cenOff, true), 0x02014b50);       // central dir
+});
+
+async function testA(name, fn) {
+  try { await fn(); passed++; console.log('  ok', name); }
+  catch (e) { console.error('FAIL', name, '\n   ', e.message); process.exitCode = 1; }
+}
+
+// A one-entry zip with a deflate (method 8) entry, as real zip tools emit.
+// crc is left 0 — readZip trusts central-directory sizes, not checksums.
+async function deflateZip(name, text) {
+  const cs = new CompressionStream('deflate-raw');
+  const data = new Uint8Array(await new Response(
+    new Blob([text]).stream().pipeThrough(cs)).arrayBuffer());
+  const enc = new TextEncoder();
+  const nameB = enc.encode(name);
+  const local = new DataView(new ArrayBuffer(30));
+  local.setUint32(0, 0x04034b50, true);
+  local.setUint16(8, 8, true);                 // deflate
+  local.setUint32(18, data.length, true);
+  local.setUint16(26, nameB.length, true);
+  const cen = new DataView(new ArrayBuffer(46));
+  cen.setUint32(0, 0x02014b50, true);
+  cen.setUint16(10, 8, true);
+  cen.setUint32(20, data.length, true);
+  cen.setUint16(28, nameB.length, true);
+  cen.setUint32(42, 0, true);
+  const cenOff = 30 + nameB.length + data.length;
+  const eocd = new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0, 0x06054b50, true);
+  eocd.setUint16(10, 1, true);
+  eocd.setUint32(12, 46 + nameB.length, true);
+  eocd.setUint32(16, cenOff, true);
+  const out = new Uint8Array(cenOff + 46 + nameB.length + 22);
+  let pos = 0;
+  for (const b of [new Uint8Array(local.buffer), nameB, data,
+    new Uint8Array(cen.buffer), nameB, new Uint8Array(eocd.buffer)]) {
+    out.set(b, pos); pos += b.length;
+  }
+  return out;
+}
+
+await testA('readZip round-trips makeZip (store), skipping directories', async () => {
+  const z = makeZip([
+    { name: 'packets/', data: '' },
+    { name: 'packets/Round 1.json', data: '{"x":1}' },
+    { name: 'packets/Round 2.json', data: '{"y":2}' },
+  ]);
+  const entries = await readZip(z);
+  assert.deepEqual(entries.map((e) => e.name), ['packets/Round 1.json', 'packets/Round 2.json']);
+  assert.equal(new TextDecoder().decode(entries[0].data), '{"x":1}');
+});
+
+await testA('readZip inflates deflate entries', async () => {
+  const text = JSON.stringify({ tossups: Array(30).fill({ question: 'Q', answer: 'A' }) });
+  const entries = await readZip(await deflateZip('Round 3.json', text));
+  assert.equal(entries.length, 1);
+  assert.equal(new TextDecoder().decode(entries[0].data), text);
+});
+
+await testA('readZip rejects non-zips', async () => {
+  await assert.rejects(() => readZip(new TextEncoder().encode('not a zip at all......')), /not a zip/);
 });
 
 /* ---------- read_core (read.html helpers) ---------- */

@@ -5,10 +5,11 @@
 // but the link itself is the source of truth.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
-import { parseMatch, parseRoster, matchPayload } from '../engine/qbj.js';
+import { parseMatch, parseRoster, matchPayload, parseRosterLines, buildRosterQbj,
+  guessRound } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
-import { makeZip } from '../engine/zip.js';
+import { makeZip, readZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { GAME_FORMAT_OPTIONS } from './read_core.js';
 
@@ -105,6 +106,12 @@ function showList() {
 
 /* ---------- tournament detail ---------- */
 
+// Survives showDetail re-renders (which happen after every action):
+// packets staged from a zip, and the roster editor's text + open state.
+let staged = [];       // [{name, data: Uint8Array, guess: round|null}]
+let rosterText = '';
+let rosterOpen = false;
+
 async function showDetail() {
   const a = '/a/' + adminSecret;
   let detail;
@@ -122,6 +129,12 @@ async function showDetail() {
     closes: t.closes, created: t.created });
   let settings = {};
   try { settings = JSON.parse(t.settings) || {}; } catch (e) { /* keep {} */ }
+
+  // One packet slot per round: the set round count, stretched to cover any
+  // packet already uploaded past it and the live round.
+  const totalRounds = Math.max(Number(settings.rounds) || 1, t.current_round,
+    ...rounds.map((r) => r.number));
+  const slots = Array.from({ length: totalRounds }, (_, i) => i + 1);
 
   view.innerHTML = `
     <div class="row">
@@ -176,13 +189,30 @@ async function showDetail() {
     </div>
 
     <h2>packets</h2>
-    ${rounds.map((r) => `
-      <div class="card row">
-        <b>round ${r.number}</b>
-        <span>${esc(r.packet_name)}</span>
+    <div class="row" style="margin-bottom:8px">
+      <label>rounds <input id="numrounds" type="number" min="1" max="999" value="${totalRounds}" style="width:70px"></label>
+      <button id="setrounds">set</button>
+      <span class="spacer" style="flex:1"></span>
+      <input id="zipfile" type="file" accept=".zip">
+      <button id="upzip">load packet zip</button>
+    </div>
+    ${staged.length ? `
+    <div class="row" style="margin-bottom:8px">
+      ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
+        s.guess ? ` <span class="muted">&rarr; ${s.guess}</span>` : ''}</span>`).join('')}
+      <button id="zipauto">assign by filename</button>
+      <button id="zipclear">clear</button>
+    </div>` : ''}
+    ${slots.map((k) => {
+      const r = rounds.find((x) => x.number === k);
+      return `
+      <div class="card row slot" data-round="${k}">
+        <b>round ${k}</b>
+        ${r ? `<span>${esc(r.packet_name)}</span>` : '<span class="muted">no packet</span>'}
         <span class="spacer" style="flex:1"></span>
-        <a href="${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}" download>download</a>
-      </div>`).join('') || '<div class="muted">no packets yet</div>'}
+        ${r ? `<a href="${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}" download>download</a>` : ''}
+      </div>`;
+    }).join('')}
     <div class="row" style="margin-top:8px">
       <label>round <input id="pround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
       <input id="pfile" type="file">
@@ -195,8 +225,18 @@ async function showDetail() {
         ? `<span>${esc(t.roster_name)}</span>
            <a href="${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}" download>download</a>`
         : '<span class="muted">none yet</span>'}
+      <span class="spacer" style="flex:1"></span>
       <input id="rfile" type="file" accept=".qbj,.json">
       <button id="uproster">upload roster qbj</button>
+      <button id="editroster">${t.roster_name ? 'edit roster' : 'create roster qbj'}</button>
+    </div>
+    <div id="rosteredit" ${rosterOpen ? '' : 'hidden'} style="margin-top:8px">
+      <textarea id="rostertext" rows="10" spellcheck="false"
+        placeholder="Team A: Alice, Bob&#10;Team B: Carol, Dan">${esc(rosterText)}</textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="rosterdl">download roster qbj</button>
+        <button id="rostersave" class="primary">save as tournament roster</button>
+      </div>
     </div>
 
     <h2>uploads</h2>
@@ -295,6 +335,72 @@ async function showDetail() {
       showDetail();
     } catch (e) { say(e.message, true); }
   };
+  $('setrounds').onclick = async () => {
+    const n = Number($('numrounds').value);
+    if (!Number.isInteger(n) || n < 1 || n > 999) { say('rounds must be 1-999', true); return; }
+    try {
+      settings = { ...settings, rounds: n };
+      await pub(a, { method: 'POST', json: { settings } });
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+
+  /* packet zip: stage in memory, drag each file onto its round slot */
+  const uploadStagedPacket = async (s, round) => {
+    const type = /\.json$/i.test(s.name) ? 'application/json'
+      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    await pub(`${a}/packet?round=${round}&name=${encodeURIComponent(s.name)}`,
+      { method: 'POST', body: new Blob([s.data], { type }) });
+  };
+  $('upzip').onclick = async () => {
+    const f = $('zipfile').files[0];
+    if (!f) { say('choose a zip', true); return; }
+    try {
+      const entries = await readZip(new Uint8Array(await f.arrayBuffer()));
+      staged = entries
+        .filter((e) => /\.(json|docx)$/i.test(e.name) && !/__MACOSX|\/\./.test('/' + e.name))
+        .map((e) => {
+          const name = e.name.split('/').pop();
+          return { name, data: e.data, guess: guessRound(name) };
+        });
+      if (!staged.length) { say('no .json or .docx files in the zip', true); return; }
+      say(staged.length + ' packets staged');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+  if ($('zipauto')) {
+    $('zipauto').onclick = async () => {
+      const remaining = [];
+      for (const s of staged) {
+        if (!s.guess) { remaining.push(s); continue; }
+        try { await uploadStagedPacket(s, s.guess); }
+        catch (e) { say(s.name + ': ' + e.message, true); remaining.push(s); }
+      }
+      staged = remaining;
+      showDetail();
+    };
+    $('zipclear').onclick = () => { staged = []; showDetail(); };
+    view.querySelectorAll('[data-chip]').forEach((c) => {
+      c.ondragstart = (e) => e.dataTransfer.setData('text/plain', c.dataset.chip);
+    });
+    view.querySelectorAll('.slot').forEach((slot) => {
+      slot.ondragover = (e) => { e.preventDefault(); slot.classList.add('dragover'); };
+      slot.ondragleave = () => slot.classList.remove('dragover');
+      slot.ondrop = async (e) => {
+        e.preventDefault();
+        slot.classList.remove('dragover');
+        const i = Number(e.dataTransfer.getData('text/plain'));
+        if (!staged[i]) return;
+        try {
+          await uploadStagedPacket(staged[i], Number(slot.dataset.round));
+          staged.splice(i, 1);
+          showDetail();
+        } catch (err) { say(err.message, true); }
+      };
+    });
+  }
+
+  /* roster: upload a qbj, or write one in the editor */
   $('uproster').onclick = async () => {
     const f = $('rfile').files[0];
     if (!f) { say('choose a file', true); return; }
@@ -303,6 +409,35 @@ async function showDetail() {
       parseRoster(JSON.parse(text)); // fail before uploading junk
       await pub(`${a}/roster?name=${encodeURIComponent(f.name)}`,
         { method: 'POST', body: text });
+      showDetail();
+    } catch (e) { say('roster: ' + e.message, true); }
+  };
+  $('rostertext').oninput = () => { rosterText = $('rostertext').value; };
+  $('editroster').onclick = async () => {
+    rosterOpen = $('rosteredit').hidden;
+    if (rosterOpen && !rosterText && t.roster_r2_key) {
+      try {
+        const teams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key));
+        rosterText = teams.map((tm) => tm.name + ': ' + tm.players.join(', ')).join('\n');
+        $('rostertext').value = rosterText;
+      } catch (e) { /* unparseable upload: start blank */ }
+    }
+    $('rosteredit').hidden = !rosterOpen;
+  };
+  $('rosterdl').onclick = () => {
+    try {
+      const teams = parseRosterLines($('rostertext').value);
+      download('roster.qbj', JSON.stringify(buildRosterQbj(t.name, teams), null, 2),
+        'application/json');
+    } catch (e) { say('roster: ' + e.message, true); }
+  };
+  $('rostersave').onclick = async () => {
+    try {
+      const teams = parseRosterLines($('rostertext').value);
+      await pub(`${a}/roster?name=roster.qbj`,
+        { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, teams), null, 2) });
+      rosterOpen = false;
+      say('roster saved');
       showDetail();
     } catch (e) { say('roster: ' + e.message, true); }
   };
