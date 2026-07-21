@@ -34,11 +34,14 @@ function say(text, bad = false) {
   $('msg').className = bad ? 'bad' : '';
 }
 
+// pub() returns parsed JSON when the blob was stored with a JSON content
+// type, and the raw Response otherwise — every /pub blob route can do either.
+const asJson = async (res) => (res instanceof Response ? JSON.parse(await res.text()) : res);
+
 async function fetchRoster(state) {
   if (!state.roster) return null;
   try {
-    const res = await pub('/pub/' + slug + '/roster');
-    return parseRoster(JSON.parse(await res.text()));
+    return parseRoster(await asJson(await pub('/pub/' + slug + '/roster')));
   } catch (e) { return null; } // stats still render without it
 }
 
@@ -46,8 +49,7 @@ async function fetchRoster(state) {
 async function fetchMatches(state, errors) {
   const matches = [];
   try {
-    const res = await pub('/pub/' + slug + '/bundle');
-    const bundle = await res.json();
+    const bundle = await asJson(await pub('/pub/' + slug + '/bundle'));
     for (const entry of bundle.entries) {
       try {
         const m = parseMatch(entry.qbj, { filename: entry.filename });
@@ -61,8 +63,8 @@ async function fetchMatches(state, errors) {
 
   await Promise.all(state.files.map(async (f) => {
     try {
-      const res = await pub('/pub/' + slug + '/qbj/' + f.id);
-      const m = parseMatch(JSON.parse(await res.text()), { filename: f.filename });
+      const m = parseMatch(await asJson(await pub('/pub/' + slug + '/qbj/' + f.id)),
+        { filename: f.filename });
       m.room = f.room;
       m.fileId = f.id;
       matches.push(m);

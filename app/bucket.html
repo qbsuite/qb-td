@@ -106,7 +106,10 @@ async function refresh() {
 $('dlpacket').onclick = async () => {
   try {
     const res = await pub('/b/' + secret + '/packet');
-    const blob = await res.blob();
+    // pub() parses JSON-typed blobs (e.g. .json packets); rewrap for download
+    const blob = res instanceof Response
+      ? await res.blob()
+      : new Blob([JSON.stringify(res)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = state.packet.packet_name || 'packet';
