@@ -114,11 +114,15 @@ ok('bad secret rejected', r.status === 404);
 }
 
 // tournament settings flow through to the bucket state
-r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf' } } });
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf',
+  formatOverrides: { pairTossupsBonuses: true, bonusesBounceBack: true } } } });
 ok('set settings', r.status === 200);
 r = await call('/b/' + secret);
 ok('bucket state carries settings + roster flag',
   r.body.settings && r.body.settings.gameFormat === 'acf' && r.body.roster === true, r.body);
+ok('bucket state carries format overrides',
+  r.body.settings.formatOverrides && r.body.settings.formatOverrides.pairTossupsBonuses === true,
+  r.body.settings);
 
 // public gate: unpublished -> 404
 r = await call('/pub/' + slug);
@@ -214,6 +218,27 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
   const broken = await call(`/b/${secret}/upload?round=3&name=bad.qbtd.json`,
     { method: 'POST', body: '{"game": {}}' });
   ok('combined without a match flagged', broken.status === 200 && broken.body.error !== null, broken.body);
+
+  // the TO downloads a combined upload as its two real files, not the wrapper
+  r = await call(A);
+  const cfile = r.body.files.find((f) => f.id === cid);
+  const fileUrl = (extra) => `${BASE}${A}/file?key=${encodeURIComponent(cfile.r2_key)}${extra}`;
+  const qres = await fetch(fileUrl('&part=qbj&dl=Round_3_Alpha_Beta.qbj'));
+  const qtext = await qres.text();
+  ok('admin part=qbj serves the bare match',
+    qres.status === 200 && JSON.parse(qtext).tossups_read === 20 && !qtext.includes('SECRETQUESTIONTEXT'));
+  ok('part=qbj named .qbj',
+    (qres.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta.qbj'));
+  const gres = await fetch(fileUrl('&part=game&dl=Round_3_Alpha_Beta_Game.json'));
+  const gtext = await gres.text();
+  ok('admin part=game serves the game state',
+    gres.status === 200 && JSON.parse(gtext).cycles.length === 0 && gtext.includes('SECRETQUESTIONTEXT'));
+  ok('part=game named _Game.json',
+    (gres.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta_Game.json'));
+  const noPart = await fetch(fileUrl('&dl=x.qbtd.json'));
+  ok('no part still serves the raw blob', noPart.status === 200 && (await noPart.text()).includes('"qbj"'));
+  const badPart = await fetch(`${BASE}${A}/file?key=${encodeURIComponent(cfile.r2_key.replace(/^t\/\d+/, 't/999999'))}&part=qbj`);
+  ok('part respects the ownership boundary', badPart.status === 403);
 }
 
 // filenames longer than the 100-char storage cap keep their suffix, so kind

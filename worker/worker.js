@@ -314,7 +314,20 @@ async function adminDownload(url, env, t) {
   if (!key.startsWith(`t/${t.id}/`)) return err(env, 403, 'bad key');
   const obj = await env.DATA.get(key);
   if (!obj) return err(env, 404, 'no such file');
-  return blobResponse(env, obj, url.searchParams.get('dl') || key.split('/').pop());
+  const dl = url.searchParams.get('dl') || key.split('/').pop();
+  const part = url.searchParams.get('part');
+  if (part !== 'qbj' && part !== 'game') return blobResponse(env, obj, dl);
+  // part=qbj|game splits a combined reader upload (.qbtd.json = {qbj,
+  // game}) into the file consumers actually use. Admin-only: the game
+  // half carries the packet text, which never leaves the TO side.
+  let parsed;
+  try { parsed = JSON.parse(await obj.text()); } catch (e) { return err(env, 400, 'not a combined file'); }
+  const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
+  if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
+  const headers = new Headers(corsHeaders(env));
+  headers.set('Content-Type', 'application/json');
+  headers.set('Content-Disposition', `attachment; filename="${dl.replace(/["\\\r\n]/g, '_')}"`);
+  return new Response(JSON.stringify(half), { status: 200, headers });
 }
 
 async function deleteFile(env, t, fileId) {

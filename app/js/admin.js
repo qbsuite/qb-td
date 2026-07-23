@@ -11,7 +11,8 @@ import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { makeZip, readZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
-import { GAME_FORMAT_OPTIONS } from './read_core.js';
+import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrides,
+  parsePowersText, powersText } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -111,6 +112,7 @@ function showList() {
 let staged = [];       // [{name, data: Uint8Array, guess: round|null}]
 let rosterText = '';
 let rosterOpen = false;
+let fmtOpen = false;   // game-format customize panel
 
 async function showDetail() {
   const a = '/a/' + adminSecret;
@@ -129,6 +131,7 @@ async function showDetail() {
     closes: t.closes, created: t.created });
   let settings = {};
   try { settings = JSON.parse(t.settings) || {}; } catch (e) { /* keep {} */ }
+  const fmt = effectiveFormat(settings); // prefills the customize panel
 
   // One packet slot per round: the set round count, stretched to cover any
   // packet already uploaded past it and the live round.
@@ -162,6 +165,28 @@ async function showDetail() {
           `<option value="${o.value}" ${o.value === (settings.gameFormat || '') ? 'selected' : ''}>${o.label}</option>`).join('')}
         </select>
       </label>
+      ${Object.keys(cleanOverrides(settings.formatOverrides)).length ? '<span class="pill">custom</span>' : ''}
+      <button id="fmtedit">customize</button>
+    </div>
+    <div id="fmtpanel" ${fmtOpen ? '' : 'hidden'} class="card" style="margin-top:8px">
+      <div class="row">
+        <label>tossups <input id="fmttossups" type="number" min="1" max="999" value="${fmt.regulationTossupCount}" style="width:64px"></label>
+        <label>neg <input id="fmtneg" type="number" min="-100" max="0" value="${fmt.negValue}" style="width:64px"></label>
+        <label>powers <input id="fmtpowers" placeholder="(*)=15" value="${esc(powersText(fmt.powers))}" size="16"></label>
+        <label>overtime tossups <input id="fmtot" type="number" min="1" max="99" value="${fmt.minimumOvertimeQuestionCount}" style="width:56px"></label>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label class="row"><input type="checkbox" id="fmtpaired" ${fmt.pairTossupsBonuses ? 'checked' : ''}> paired bonuses</label>
+        <label class="row"><input type="checkbox" id="fmtbounce" ${fmt.bonusesBounceBack ? 'checked' : ''}> bouncebacks</label>
+        <label class="row"><input type="checkbox" id="fmtotbonus" ${fmt.overtimeIncludesBonuses ? 'checked' : ''}> overtime bonuses</label>
+        <label>pronunciation marks
+          <input id="fmtpron1" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[0])}" size="4">
+          <input id="fmtpron2" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[1])}" size="4">
+        </label>
+        <span class="spacer" style="flex:1"></span>
+        <button id="fmtreset">reset to preset</button>
+        <button id="fmtsave" class="primary">save format</button>
+      </div>
     </div>
 
     <h2>rooms</h2>
@@ -244,6 +269,15 @@ async function showDetail() {
       <tr><th>room</th><th>round</th><th>file</th><th>kind</th><th class="num">size</th><th>status</th><th></th></tr>
       ${files.map((f) => {
         const room = buckets.find((b) => b.id === f.bucket_id);
+        // A combined reader upload downloads as its two real files — the
+        // match .qbj and the MODAQ game file — not the raw wrapper JSON.
+        const link = (params, label) =>
+          `<a href="${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}" download>${label}</a>`;
+        const base = f.filename.replace(/\.qbtd\.json$/i, '');
+        const links = f.kind === 'combined' && !f.error
+          ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
+            + link(`part=game&dl=${encodeURIComponent(base + '_Game.json')}`, 'game')
+          : link(`dl=${encodeURIComponent(f.filename)}`, 'download');
         return `<tr>
           <td>${esc(room ? room.room_name : '#' + f.bucket_id)}</td>
           <td class="num">${f.round}</td>
@@ -252,7 +286,7 @@ async function showDetail() {
           <td class="num">${fmtBytes(f.size)}</td>
           <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">ok</span>'}</td>
           <td class="row">
-            <a href="${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&dl=${encodeURIComponent(f.filename)}" download>download</a>
+            ${links}
             <button data-delfile="${f.id}">delete</button>
           </td>
         </tr>`;
@@ -286,14 +320,56 @@ async function showDetail() {
       showDetail();
     } catch (e) { say(e.message, true); }
   };
+  const saveSettings = async (next) => {
+    await pub(a, { method: 'POST', json: { settings: next } });
+    settings = next;
+  };
   $('gformat').onchange = async () => {
     try {
       const next = { ...settings };
       if ($('gformat').value) next.gameFormat = $('gformat').value;
       else delete next.gameFormat;
-      await pub(a, { method: 'POST', json: { settings: next } });
-      settings = next;
+      await saveSettings(next);
       say('game format saved');
+      showDetail(); // overrides sit on the new preset; refresh the panel
+    } catch (e) { say(e.message, true); }
+  };
+  $('fmtedit').onclick = () => {
+    fmtOpen = $('fmtpanel').hidden;
+    $('fmtpanel').hidden = !fmtOpen;
+  };
+  $('fmtsave').onclick = async () => {
+    try {
+      const p1 = $('fmtpron1').value.trim(), p2 = $('fmtpron2').value.trim();
+      if (!!p1 !== !!p2) { say('pronunciation marks: fill both or neither', true); return; }
+      const want = {
+        regulationTossupCount: Number($('fmttossups').value),
+        negValue: Number($('fmtneg').value),
+        powers: parsePowersText($('fmtpowers').value),
+        minimumOvertimeQuestionCount: Number($('fmtot').value),
+        pairTossupsBonuses: $('fmtpaired').checked,
+        bonusesBounceBack: $('fmtbounce').checked,
+        overtimeIncludesBonuses: $('fmtotbonus').checked,
+        pronunciationGuideMarkers: p1 ? [p1, p2] : null,
+      };
+      const ov = formatOverridesFrom(settings.gameFormat || '', want);
+      const bad = Object.keys(ov).filter((k) => !(k in cleanOverrides(ov)));
+      if (bad.length) { say('bad value: ' + bad.join(', '), true); return; }
+      const next = { ...settings };
+      if (Object.keys(ov).length) next.formatOverrides = ov;
+      else delete next.formatOverrides;
+      await saveSettings(next);
+      say('game format saved');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+  $('fmtreset').onclick = async () => {
+    try {
+      const next = { ...settings };
+      delete next.formatOverrides;
+      await saveSettings(next);
+      say('game format reset');
+      showDetail();
     } catch (e) { say(e.message, true); }
   };
   $('pub').onchange = async () => {
@@ -466,12 +542,15 @@ async function computeStats(a, t, buckets, files) {
   }
 
   const matches = [];
-  const raw = []; // for the zip download and the served stats bundle
+  const raw = [];   // qbj halves: the zip download + the served stats bundle
+  const games = []; // game halves of combined uploads, for the zip only
   for (const f of qbjFiles) {
     try {
       // Combined reader uploads contribute only their qbj half downstream
-      // (the game half carries the full packet text).
-      const payload = matchPayload(await fetchOwnedJson(a, f.r2_key));
+      // (the game half carries the full packet text; the TO's zip gets it
+      // as the separate MODAQ game file).
+      const full = await fetchOwnedJson(a, f.r2_key);
+      const payload = matchPayload(full);
       const m = parseMatch(payload, { filename: f.filename });
       const room = buckets.find((b) => b.id === f.bucket_id);
       m.room = room ? room.room_name : '';
@@ -482,6 +561,13 @@ async function computeStats(a, t, buckets, files) {
         filename: f.filename.replace(/\.qbtd\.json$/i, '.qbj'),
         text: JSON.stringify(payload),
       });
+      if (f.kind === 'combined' && full.game && typeof full.game === 'object') {
+        games.push({
+          round: m.round,
+          filename: f.filename.replace(/\.qbtd\.json$/i, '_Game.json'),
+          text: JSON.stringify(full.game),
+        });
+      }
     } catch (e) {
       errors.push(f.filename + ': ' + e.message);
     }
@@ -504,7 +590,24 @@ async function computeStats(a, t, buckets, files) {
   };
   $('dlzip').disabled = false;
   $('dlzip').onclick = async () => {
-    const entries = raw.map((r) => ({ name: `round-${r.round}/${r.filename}`, data: r.text }));
+    // Every game as its separated files: match .qbj + MODAQ game file.
+    // Files list newest-first, so first-wins dedupe keeps the latest
+    // upload of a re-exported game (same name twice would break the zip).
+    const seen = new Set();
+    const entries = [];
+    const add = (round, filename, data) => {
+      const name = `round-${round}/${filename}`;
+      if (seen.has(name)) return;
+      seen.add(name);
+      entries.push({ name, data });
+    };
+    for (const r of raw) add(r.round, r.filename, r.text);
+    for (const g of games) add(g.round, g.filename, g.text);
+    // game files uploaded separately through the bucket page
+    for (const f of files.filter((x) => x.kind === 'game')) {
+      try { add(f.round, f.filename, JSON.stringify(await fetchOwnedJson(a, f.r2_key))); }
+      catch (e) { /* bundle still useful without it */ }
+    }
     if (t.roster_r2_key) {
       try { entries.push({ name: 'roster.qbj', data: JSON.stringify(await fetchOwnedJson(a, t.roster_r2_key)) }); }
       catch (e) { /* bundle still useful without it */ }

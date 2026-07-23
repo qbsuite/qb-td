@@ -134,7 +134,7 @@ function mountModaq(id, meta, isNew) {
     props.packet = packet;
     props.packetName = meta.packet;
     props.players = pickTeams(teams, meta.a, meta.b);
-    const format = resolveGameFormat((state.settings || {}).gameFormat, GameFormats);
+    const format = resolveGameFormat(state.settings || {}, GameFormats);
     if (format) props.gameFormat = format;
   }
   ReactDOM.render(React.createElement(ModaqControl, props), $('modaq'));

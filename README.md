@@ -17,8 +17,12 @@ Part of [qbsuite](https://qbsuite.github.io/).
   dragged onto their round slots (filenames carrying a round number can be
   auto-assigned) — create the roster in a text editor (one `Team: Player,
   Player` line per team; downloadable, or saved as the tournament's
-  MODAQ-compatible roster.qbj) or upload an existing roster qbj, download
-  any file, compute stats, export, rotate the admin link if it leaks.
+  MODAQ-compatible roster.qbj) or upload an existing roster qbj, set the
+  reader game format — a MODAQ preset plus every customize-dialog field
+  (paired bonuses, bouncebacks, powers, neg value, overtime rules,
+  pronunciation marks), stored as overrides on the preset so it applies
+  to every room — download any file, compute stats, export, rotate the
+  admin link if it leaks.
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads any played
   round's packet (the live round is highlighted; future rounds stay
@@ -49,8 +53,11 @@ Part of [qbsuite](https://qbsuite.github.io/).
   collected qbj files. Only exists while the TO has publish switched on;
   fully decoupled from the admin side.
 - **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18) and a zip of
-  the raw qbj files + roster (imports via YellowFruit's ModaQ game-file
-  import). Both are generated client-side in the dashboard.
+  every game's separated files — the match `.qbj` (imports via YellowFruit's
+  ModaQ game-file import) and the MODAQ game file — plus the roster. Both
+  are generated client-side in the dashboard. Combined reader uploads are
+  never handed out raw: the dashboard's per-file downloads (Worker
+  `part=qbj|game`) and the zip both split them into those two real files.
 
 ## Link lifetime + question security
 

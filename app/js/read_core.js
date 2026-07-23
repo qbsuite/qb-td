@@ -68,6 +68,13 @@ export function withRound(match, round) {
   return { ...match, _round: round };
 }
 
+/* ---------- game format ----------
+   tournaments.settings: {gameFormat: preset key, formatOverrides: partial
+   IGameFormat}. The preset picks a MODAQ built-in; overrides layer the
+   TO's tweaks (paired bonuses, bouncebacks, powers, ...) on top of it —
+   the same fields MODAQ's own customize-format dialog edits, set once for
+   every room instead of per reader. */
+
 // tournaments.settings.gameFormat -> key into MODAQ's GameFormats export.
 // '' / unknown -> undefined (MODAQ's own default format).
 const FORMAT_KEYS = {
@@ -81,9 +88,122 @@ export const GAME_FORMAT_OPTIONS = [
   { value: 'macf-powers', label: 'mACF with powers' },
   { value: 'pace', label: 'PACE NSC' },
 ];
-export function resolveGameFormat(key, GameFormats) {
-  const prop = FORMAT_KEYS[key];
-  return prop ? GameFormats[prop] : undefined;
+
+// MODAQ's preset formats, mirrored so the dashboard (which doesn't bundle
+// MODAQ) can prefill and diff the customize panel. '' is UndefinedGameFormat,
+// what a reader gets when no format prop is passed. tests/run_tests.js
+// locks every entry against the installed modaq package.
+const COMMON = {
+  bonusesBounceBack: false, minimumOvertimeQuestionCount: 1,
+  overtimeIncludesBonuses: false, regulationTossupCount: 20,
+  timeoutsAllowed: 1, pronunciationGuideMarkers: ['("', '")'],
+  pairTossupsBonuses: false, version: '2024-03-20',
+};
+export const PRESET_FORMATS = {
+  '': { ...COMMON, displayName: 'Freeform format', negValue: -5,
+    powers: [{ marker: '(*)', points: 15 }], regulationTossupCount: 999, timeoutsAllowed: 999 },
+  'acf': { ...COMMON, displayName: 'ACF', negValue: -5, powers: [] },
+  'macf-powers': { ...COMMON, displayName: 'mACF with powers', negValue: -5,
+    powers: [{ marker: '(*)', points: 15 }] },
+  'pace': { ...COMMON, displayName: 'PACE', negValue: 0,
+    powers: [{ marker: '(*)', points: 20 }] },
+};
+
+// The IGameFormat fields a TO may override — exactly MODAQ's
+// customize-format dialog. pronunciationGuideMarkers: null means "none"
+// (undefined can't survive the settings JSON round trip).
+export const OVERRIDE_FIELDS = [
+  'regulationTossupCount', 'negValue', 'powers', 'minimumOvertimeQuestionCount',
+  'bonusesBounceBack', 'overtimeIncludesBonuses', 'pairTossupsBonuses',
+  'pronunciationGuideMarkers',
+];
+
+/** Drop unknown keys and wrong-typed values from stored overrides. */
+export function cleanOverrides(ov) {
+  if (!ov || typeof ov !== 'object') return {};
+  const out = {};
+  const int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+  if (int(ov.regulationTossupCount, 1, 999)) out.regulationTossupCount = ov.regulationTossupCount;
+  if (int(ov.negValue, -100, 0)) out.negValue = ov.negValue;
+  if (int(ov.minimumOvertimeQuestionCount, 1, 99)) out.minimumOvertimeQuestionCount = ov.minimumOvertimeQuestionCount;
+  for (const k of ['bonusesBounceBack', 'overtimeIncludesBonuses', 'pairTossupsBonuses']) {
+    if (typeof ov[k] === 'boolean') out[k] = ov[k];
+  }
+  if (Array.isArray(ov.powers) && ov.powers.every((p) =>
+    p && typeof p.marker === 'string' && p.marker && int(p.points, 1, 1000))) {
+    out.powers = [...ov.powers].sort((x, y) => y.points - x.points);
+  }
+  if (ov.pronunciationGuideMarkers === null) out.pronunciationGuideMarkers = null;
+  else if (Array.isArray(ov.pronunciationGuideMarkers)
+    && ov.pronunciationGuideMarkers.length === 2
+    && ov.pronunciationGuideMarkers.every((m) => typeof m === 'string' && m)) {
+    out.pronunciationGuideMarkers = ov.pronunciationGuideMarkers;
+  }
+  return out;
+}
+
+/** The full format a reader in this tournament plays under: preset base
+    plus any cleaned overrides. Always returns a complete IGameFormat. */
+export function effectiveFormat(settings) {
+  const s = settings || {};
+  const base = PRESET_FORMATS[s.gameFormat in PRESET_FORMATS ? s.gameFormat : ''];
+  const ov = cleanOverrides(s.formatOverrides);
+  if (!Object.keys(ov).length) return base;
+  const out = { ...base, ...ov, displayName: base.displayName + ' (custom)' };
+  if (out.pronunciationGuideMarkers === null) delete out.pronunciationGuideMarkers;
+  return out;
+}
+
+/** The gameFormat prop for MODAQ, or undefined for MODAQ's own default.
+    Accepts the settings object (or, legacy, a bare preset key). With no
+    overrides a preset resolves to MODAQ's own object when GameFormats is
+    supplied. */
+export function resolveGameFormat(settings, GameFormats) {
+  const s = typeof settings === 'string' ? { gameFormat: settings } : (settings || {});
+  const key = s.gameFormat in FORMAT_KEYS ? s.gameFormat : '';
+  const ov = cleanOverrides(s.formatOverrides);
+  if (!Object.keys(ov).length) {
+    if (!key) return undefined;
+    return (GameFormats && GameFormats[FORMAT_KEYS[key]]) || PRESET_FORMATS[key];
+  }
+  return effectiveFormat({ gameFormat: key, formatOverrides: ov });
+}
+
+/** Only the fields of `want` that differ from the preset — what the
+    dashboard stores as settings.formatOverrides. */
+export function formatOverridesFrom(presetKey, want) {
+  const base = PRESET_FORMATS[presetKey in PRESET_FORMATS ? presetKey : ''];
+  const ov = {};
+  for (const k of OVERRIDE_FIELDS) {
+    const baseVal = k === 'pronunciationGuideMarkers' ? (base[k] || null) : base[k];
+    if (want[k] !== undefined && JSON.stringify(want[k]) !== JSON.stringify(baseVal)) ov[k] = want[k];
+  }
+  return ov;
+}
+
+/** "marker=points, marker=points" -> IPowerMarker[] sorted by points
+    descending (MODAQ requires descending). '' -> no powers. Throws a
+    user-facing Error on junk. */
+export function parsePowersText(text) {
+  const chunks = String(text || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const powers = chunks.map((c) => {
+    const at = c.lastIndexOf('=');
+    const marker = at < 0 ? '' : c.slice(0, at).trim();
+    const points = Number(c.slice(at + 1).trim());
+    if (!marker || !Number.isInteger(points) || points < 1 || points > 1000) {
+      throw new Error('powers: use marker=points, like (*)=15');
+    }
+    return { marker, points };
+  });
+  if (new Set(powers.map((p) => p.marker)).size !== powers.length) {
+    throw new Error('powers: duplicate marker');
+  }
+  return powers.sort((x, y) => y.points - x.points);
+}
+
+/** Inverse of parsePowersText, for prefilling the dashboard field. */
+export function powersText(powers) {
+  return (powers || []).map((p) => p.marker + '=' + p.points).join(', ');
 }
 
 /* ---------- per-game storage ----------

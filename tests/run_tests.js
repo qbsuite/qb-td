@@ -13,7 +13,7 @@ import { makeZip, readZip } from '../app/engine/zip.js';
 // roster builder's output must satisfy it, since read.html feeds the
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
-import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -550,6 +550,85 @@ test('resolveGameFormat maps settings keys', () => {
   assert.equal(resolveGameFormat('pace', GameFormats), GameFormats.PACEGameFormat);
   assert.equal(resolveGameFormat('', GameFormats), undefined);
   assert.equal(resolveGameFormat('nonsense', GameFormats), undefined);
+  assert.equal(resolveGameFormat({ gameFormat: 'acf' }, GameFormats), GameFormats.ACFGameFormat);
+  assert.equal(resolveGameFormat({}, GameFormats), undefined);
+});
+
+test('PRESET_FORMATS mirror the installed MODAQ package', () => {
+  // The dashboard prefills/diffs against these copies while the reader gets
+  // MODAQ's real objects — a modaq bump that changes a preset must fail here.
+  const { GameFormats } = createRequire(import.meta.url)('modaq');
+  const pairs = [
+    ['', 'UndefinedGameFormat'], ['acf', 'ACFGameFormat'],
+    ['macf-powers', 'StandardPowersMACFGameFormat'], ['pace', 'PACEGameFormat'],
+  ];
+  for (const [key, prop] of pairs) {
+    const a = { ...PRESET_FORMATS[key] };
+    const b = { ...GameFormats[prop] };
+    for (const o of [a, b]) { o.powers = JSON.stringify(o.powers); o.pronunciationGuideMarkers = JSON.stringify(o.pronunciationGuideMarkers); }
+    assert.deepEqual(a, b, key || '(default)');
+  }
+});
+
+test('cleanOverrides keeps valid fields, drops junk', () => {
+  const ov = cleanOverrides({
+    pairTossupsBonuses: true, negValue: -5, regulationTossupCount: 24,
+    powers: [{ marker: '(*)', points: 15 }, { marker: '[+]', points: 20 }],
+    pronunciationGuideMarkers: null,
+    displayName: 'evil', version: 'evil',          // not overridable
+    minimumOvertimeQuestionCount: 0,               // out of range
+    bonusesBounceBack: 'yes',                      // wrong type
+  });
+  assert.deepEqual(Object.keys(ov).sort(),
+    ['negValue', 'pairTossupsBonuses', 'powers', 'pronunciationGuideMarkers', 'regulationTossupCount']);
+  assert.deepEqual(ov.powers.map((p) => p.points), [20, 15]); // descending
+  assert.deepEqual(cleanOverrides(null), {});
+  assert.deepEqual(cleanOverrides({ powers: [{ marker: '', points: 15 }] }), {});
+});
+
+test('effectiveFormat + resolveGameFormat layer overrides on the preset', () => {
+  const s = { gameFormat: 'acf', formatOverrides: { pairTossupsBonuses: true, bonusesBounceBack: true } };
+  const f = resolveGameFormat(s);
+  assert.equal(f.pairTossupsBonuses, true);
+  assert.equal(f.bonusesBounceBack, true);
+  assert.equal(f.negValue, -5);                     // from ACF
+  assert.equal(f.regulationTossupCount, 20);
+  assert.equal(f.displayName, 'ACF (custom)');
+  assert.equal(f.version, PRESET_FORMATS.acf.version);
+  assert.deepEqual(effectiveFormat(s), f);
+  // no preset: overrides sit on MODAQ's default (freeform) format
+  const d = resolveGameFormat({ formatOverrides: { negValue: 0 } });
+  assert.equal(d.negValue, 0);
+  assert.equal(d.regulationTossupCount, 999);
+  // pronunciation markers can be cleared outright
+  const noPron = resolveGameFormat({ gameFormat: 'pace', formatOverrides: { pronunciationGuideMarkers: null } });
+  assert.equal('pronunciationGuideMarkers' in noPron, false);
+  // junk-only overrides fall back to the plain preset object
+  const GameFormats = { ACFGameFormat: { a: 1 } };
+  assert.equal(resolveGameFormat({ gameFormat: 'acf', formatOverrides: { negValue: 'x' } }, GameFormats),
+    GameFormats.ACFGameFormat);
+});
+
+test('formatOverridesFrom stores only the diff vs the preset', () => {
+  const want = { ...PRESET_FORMATS.acf, pairTossupsBonuses: true, negValue: -5 };
+  assert.deepEqual(formatOverridesFrom('acf', want), { pairTossupsBonuses: true });
+  assert.deepEqual(formatOverridesFrom('acf', { ...PRESET_FORMATS.acf }), {});
+  // same values against a different preset ARE a diff
+  assert.deepEqual(formatOverridesFrom('pace', { ...PRESET_FORMATS.acf, pronunciationGuideMarkers: null }),
+    { negValue: -5, powers: [], pronunciationGuideMarkers: null });
+});
+
+test('parsePowersText round-trips and rejects junk', () => {
+  assert.deepEqual(parsePowersText('(*)=15'), [{ marker: '(*)', points: 15 }]);
+  assert.deepEqual(parsePowersText('(*)=15, [+]=20'),
+    [{ marker: '[+]', points: 20 }, { marker: '(*)', points: 15 }]); // descending
+  assert.deepEqual(parsePowersText(''), []);
+  assert.equal(powersText(parsePowersText('[+]=20, (*)=15')), '[+]=20, (*)=15');
+  assert.equal(powersText(PRESET_FORMATS.pace.powers), '(*)=20');
+  assert.throws(() => parsePowersText('(*)'), /marker=points/);
+  assert.throws(() => parsePowersText('=15'), /marker=points/);
+  assert.throws(() => parsePowersText('(*)=x'), /marker=points/);
+  assert.throws(() => parsePowersText('(*)=15, (*)=20'), /duplicate/);
 });
 
 const META = { a: 'Alpha', b: 'Beta', round: 4, packet: 'P4.json', t: 'Open', room: 'R1', started: 1000 };
