@@ -26,7 +26,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   admin link if it leaks. Layout: a status strip tracks the live round
   (packet up, games in vs scheduled, which rooms are still out) with
   one-click advance next to the free set-any-round control (advance
-  hides at the last planned round); below it two collapsible drawers —
+  hides at the last planned round); below it three collapsible drawers —
+  **broadcasts** (one line, up to 200 characters, addressed to the public
+  page and/or the rooms — every room, or a checked few — as a note or an
+  alert, with a mandatory expiry from 30 minutes to the tournament's own
+  close; a table of what's live, each removable, and the drawer's summary
+  carries the newest one so a collapsed drawer still answers "what did I
+  tell people?"),
   **tournament setup** (rooms as a table, packet rounds as a chip row
   that doubles as download links and zip-drag targets, roster, and the
   set-once settings: public page, game format, admin link; auto-open
@@ -47,7 +53,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads any played
   round's packet (the live round is highlighted; future rounds stay
-  locked), uploads the game's `.qbj` + ModaQ game file.
+  locked), uploads the game's `.qbj` + ModaQ game file, and carries the
+  TD's broadcasts for this room (alerts first, then newest first).
 - **Moderator reader page** (`app/read.html?b=<secret>`, same link secret):
   an embedded [MODAQ](https://github.com/alopezlago/MODAQ) preloaded with
   a round's packet (the live round by default; played rounds stay
@@ -65,7 +72,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   its own link (offline, zero requests), the room link always starts
   fresh against the live round, and packet re-uploads or round changes
   can never disturb a game in progress; the room link lists this
-  device's in-progress games. Any number of moderators can share one
+  device's in-progress games. The TD's newest broadcast sits on one quiet
+  strip above MODAQ, picked up when the room link loads and again from
+  every upload's response — the page still never polls. Any number of moderators can share one
   link (game state is per-device), and stats + the `.yft` count only
   the latest upload per round + team pair — a re-export corrects a
   game instead of double-counting it. `.json` packets load directly; `.docx`
@@ -73,7 +82,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (the same one MODAQ's demo uses — docx question text transits
   quizbowlreader.com).
 - **Public tournament page** (`app/t.html?t=<slug>`; `stats.html`
-  redirects): schedule + stats + buzzpoints tabs. The schedule tab
+  redirects): schedule + stats + buzzpoints tabs, under any broadcast the
+  TD addressed to the public page. The schedule tab
   renders the grid with played games' scores filled in from the
   collected qbj files (exact team-name match) and a per-team view
   behind a dropdown; the stats tab has standings, individual
@@ -140,7 +150,11 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Request economics** (Cloudflare free tier): the public page
   reads one materialized `combined.json` bundle (maintained on
   upload/delete, TO-rebuildable) instead of fetching every game file, and
-  bucket pages poll only while visible, every 60 s. Stats data changes
+  bucket pages poll only while visible, every 60 s. Broadcasts add no
+  requests at all: they live in a column on the tournament row and ride
+  out on those two state responses (so a room sees one within a minute,
+  the public page within five) plus the moderator upload response.
+  Stats data changes
   only when a file lands; clients compare the `version` stamp in
   `/pub/:slug` and refetch only on change. The schedule is one R2 blob
   (`t/<tid>/schedule.json`) with its own stamp in `/pub/:slug` (R2
@@ -161,7 +175,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
   summary), `yft.js` (`.yft`
   serialization, contract verified against YellowFruit 4.0.18 source),
   `zip.js` (store-only zip).
-- `app/` — the five static pages + `js/` page code. Deployable on any
+- `app/` — the five static pages + `js/` page code (`announce.js` renders
+  the TD's broadcasts on all three read surfaces). Deployable on any
   static host; served at `qbsuite.github.io/qb-td/app/`. The reader page
   is `read.html` + `js/read.bundle.js`, a committed esbuild bundle of
   MODAQ (rebuild with `npm run build:read` after editing
@@ -191,6 +206,9 @@ cd .. && node tests/e2e_worker.js
 2. `npx wrangler d1 create qb-td` — put the id in `wrangler.toml`
 3. `npx wrangler r2 bucket create qb-td-data`
 4. `npx wrangler d1 execute qb-td --remote --file schema.sql`
+   (a database created before broadcasts existed also needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-announce.sql`,
+   once — `schema.sql` is re-runnable and can't add a column)
 5. `npx wrangler deploy`
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by

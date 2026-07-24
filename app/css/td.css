@@ -67,6 +67,7 @@ textarea:focus { outline: none; border-color: var(--link); }
 .chip .muted { font-size: 12px; }
 .slot.dragover { border-color: var(--link); background: var(--hover-bg); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row[hidden] { display: none; } /* display:flex would otherwise beat [hidden] */
 .card {
   border: 1px solid var(--line); border-radius: 10px;
   padding: 12px 14px; margin-bottom: 8px;
@@ -113,6 +114,28 @@ table.box th:first-child {
   display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 10px;
 }
 .statusbar .big { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* TO broadcasts. Same card vocabulary as everything else, with the section
+   header treatment as the label, so they read as part of the page rather
+   than a bolted-on banner. */
+.ann { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+.ann .annlabel {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 3px;
+}
+.ann .annmeta { font-size: 12px; margin-top: 4px; }
+.ann.alert { border-color: var(--bad); }
+.ann.alert .annlabel { color: var(--bad); }
+/* reader page: one quiet strip, never a card — MODAQ owns that screen */
+.annstrip {
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  padding: 5px 16px; display: flex; gap: 10px; align-items: baseline; font-size: 13px;
+}
+.annstrip[hidden] { display: none; }
+.annstrip .k {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); flex: none;
+}
+.annstrip .k.bad { color: var(--bad); }
 details.drawer { border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
 details.drawer > summary {
   padding: 8px 14px; cursor: pointer;

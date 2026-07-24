@@ -15,6 +15,7 @@ import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrid
   parsePowersText, powersText } from './read_core.js';
 import { formatsFor, buildSchedule, validateSchedule, slotAt, setSlot, swapSlots,
   moveGame, addRound, removeRound, slotText, roundIntake } from '../engine/schedule.js';
+import { annLive, annTime } from './announce.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -118,6 +119,40 @@ let fmtOpen = false;   // game-format customize panel
 let uploadsOpen = null; // Set of expanded upload rounds; null = current round only
 let setupOpen = null;   // tournament-setup drawer; null = auto: open until set up
 let schedOpen = null;   // schedule drawer; null = open
+let annOpen = null;     // broadcasts drawer; null = auto: open when something is live
+// the composer, so a re-render mid-compose doesn't eat what was typed
+let annForm = { text: '', to: 'both', rooms: [], mins: '240', alert: false };
+
+/* ---------- broadcasts ----------
+   Short messages the TO sends to the public page and/or the moderator
+   rooms. The whole live list is written at once (POST /a/:secret with
+   `announce`), same idiom as settings; the Worker validates it and hands
+   each surface only the messages addressed to it. */
+
+const MAX_ANNOUNCE = 8; // worker.js MAX_ANNOUNCE
+const ANN_EXPIRY = [
+  ['30', '30 minutes'], ['60', '1 hour'], ['120', '2 hours'],
+  ['240', '4 hours'], ['480', '8 hours'], ['end', 'when the tournament closes'],
+];
+
+function annId() {
+  return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+}
+
+// Who a message went to. Unpublished tournaments grey the public pill out:
+// the message is stored and will appear the moment the page goes public.
+function annAudience(a, buckets, published) {
+  const parts = [];
+  if (a.pub) parts.push([published ? 'pill on' : 'pill', 'public']);
+  if (a.rooms === true) parts.push(['pill on', 'rooms']);
+  else if (Array.isArray(a.rooms)) {
+    for (const id of a.rooms) {
+      const b = buckets.find((x) => x.id === id);
+      parts.push(['pill on', b ? b.room_name : '#' + id]);
+    }
+  }
+  return parts.map(([cls, label]) => `<span class="${cls}">${esc(label)}</span>`).join(' ');
+}
 
 async function showDetail() {
   const a = '/a/' + adminSecret;
@@ -138,6 +173,9 @@ async function showDetail() {
   let settings = {};
   try { settings = JSON.parse(t.settings) || {}; } catch (e) { /* keep {} */ }
   const fmt = effectiveFormat(settings); // prefills the customize panel
+  // expired broadcasts are simply dropped: the next write prunes them for good
+  let live = [];
+  try { live = annLive(JSON.parse(t.announce || '[]')); } catch (e) { /* keep [] */ }
 
   // One packet slot per round: the set round count, stretched to cover any
   // packet already uploaded past it and the live round.
@@ -155,6 +193,7 @@ async function showDetail() {
 
   const openSetup = setupOpen === null ? !(t.roster_r2_key && buckets.length) : setupOpen;
   const openSched = schedOpen === null ? true : schedOpen;
+  const openAnn = annOpen === null ? !!live.length : annOpen;
 
   view.innerHTML = `
     <div class="row">
@@ -179,6 +218,64 @@ async function showDetail() {
       ${t.current_round < totalRounds
         ? `<button id="advround" class="primary">advance to round ${t.current_round + 1}</button>` : ''}
     </div>
+    <details class="drawer" id="anndrawer" ${openAnn ? 'open' : ''}>
+      <summary><span class="dtitle">broadcasts</span>
+        <span class="muted">${live.length
+          ? `${live.length} live &middot; ${esc(live[0].text)}`
+          : 'nothing live'}</span>
+      </summary>
+      <div class="inner">
+        <div class="row" style="margin-top:8px">
+          <input id="anntext" maxlength="200" style="flex:1;min-width:240px"
+            placeholder="a line for the rooms or the public page"
+            value="${esc(annForm.text)}">
+          <span class="muted mono" id="anncount">${annForm.text.length}/200</span>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label class="muted">to
+            <select id="annto">
+              <option value="both" ${annForm.to === 'both' ? 'selected' : ''}>public page + rooms</option>
+              <option value="pub" ${annForm.to === 'pub' ? 'selected' : ''}>public page only</option>
+              <option value="rooms" ${annForm.to === 'rooms' ? 'selected' : ''}>all rooms</option>
+              <option value="some" ${annForm.to === 'some' ? 'selected' : ''}>specific rooms&hellip;</option>
+            </select>
+          </label>
+          <label class="muted">expires
+            <select id="annmins">${ANN_EXPIRY.map(([v, label]) =>
+              `<option value="${v}" ${annForm.mins === v ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+          </label>
+          <label class="row"><input type="checkbox" id="annalert" ${annForm.alert ? 'checked' : ''}> alert</label>
+          <span class="spacer" style="flex:1"></span>
+          ${live.length >= MAX_ANNOUNCE
+            ? `<span class="muted">${MAX_ANNOUNCE} live is the maximum &mdash; remove one first</span>` : ''}
+          <button id="annsend" class="primary" ${live.length >= MAX_ANNOUNCE ? 'disabled' : ''}>send</button>
+        </div>
+        <div class="row" id="annrooms" ${annForm.to === 'some' ? '' : 'hidden'} style="margin-top:6px">
+          ${buckets.length ? buckets.map((b) => `
+            <label class="row"><input type="checkbox" data-annroom="${b.id}"
+              ${annForm.rooms.includes(b.id) ? 'checked' : ''}> ${esc(b.room_name)}</label>`).join('')
+            : '<span class="muted">no rooms yet</span>'}
+        </div>
+        <div class="row" style="margin-top:6px">
+          <span class="muted" style="font-size:13px">rooms see this within a minute; the public page within five${
+            t.published ? '' : '. the public page is off, so public broadcasts stay hidden until you turn it on'}</span>
+        </div>
+
+        <h2>live now</h2>
+        ${live.length ? `<div class="tablewrap"><table>
+          <tr><th>message</th><th>to</th><th class="num">sent</th><th class="num">expires</th><th></th></tr>
+          ${live.map((x) => `<tr>
+            <td>${x.level === 'alert' ? '<span class="pill warn">alert</span> ' : ''}${esc(x.text)}</td>
+            <td>${annAudience(x, buckets, t.published)}</td>
+            <td class="num">${esc(annTime(x.created))}</td>
+            <td class="num">${esc(annTime(x.expires))}</td>
+            <td class="num"><button class="small" data-delann="${esc(x.id)}">remove</button></td>
+          </tr>`).join('')}
+        </table></div>` : '<div class="muted">nothing live</div>'}
+      </div>
+    </details>
+
     <details class="drawer" id="setupdrawer" ${openSetup ? 'open' : ''}>
       <summary><span class="dtitle">tournament setup</span>
         <span class="muted">${buckets.length} room${buckets.length === 1 ? '' : 's'}
@@ -376,6 +473,61 @@ async function showDetail() {
   });
   $('setupdrawer').ontoggle = () => { setupOpen = $('setupdrawer').open; };
   $('scheddrawer').ontoggle = () => { schedOpen = $('scheddrawer').open; };
+  $('anndrawer').ontoggle = () => { annOpen = $('anndrawer').open; };
+
+  /* broadcasts: every write sends the whole live list, so removals and
+     expiries prune themselves */
+  const checkedRooms = () => [...view.querySelectorAll('[data-annroom]:checked')]
+    .map((c) => Number(c.dataset.annroom));
+  const saveAnnounce = (next) => pub(a, { method: 'POST', json: { announce: next } });
+  $('anntext').oninput = () => {
+    annForm.text = $('anntext').value;
+    $('anncount').textContent = annForm.text.length + '/200';
+  };
+  $('annto').onchange = () => {
+    annForm.to = $('annto').value;
+    $('annrooms').hidden = annForm.to !== 'some';
+  };
+  $('annmins').onchange = () => { annForm.mins = $('annmins').value; };
+  $('annalert').onchange = () => { annForm.alert = $('annalert').checked; };
+  view.querySelectorAll('[data-annroom]').forEach((c) => {
+    c.onchange = () => { annForm.rooms = checkedRooms(); };
+  });
+  $('annsend').onclick = async () => {
+    const text = $('anntext').value.trim();
+    if (!text) { say('type a message first', true); return; }
+    const to = $('annto').value;
+    const rooms = to === 'both' || to === 'rooms' ? true
+      : to === 'some' ? checkedRooms() : false;
+    if (Array.isArray(rooms) && !rooms.length) { say('pick at least one room', true); return; }
+    const now = Date.now();
+    const mins = $('annmins').value;
+    try {
+      await saveAnnounce([...live, {
+        id: annId(),
+        text,
+        level: $('annalert').checked ? 'alert' : 'note',
+        pub: to === 'both' || to === 'pub',
+        rooms,
+        created: now,
+        // 'end' is the tournament's own close, which the Worker clamps to anyway
+        expires: mins === 'end' ? t.closes : now + Number(mins) * 60000,
+      }]);
+      annForm = { text: '', to, rooms: Array.isArray(rooms) ? rooms : [], mins, alert: false };
+      annOpen = true;
+      say('broadcast sent');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+  view.querySelectorAll('[data-delann]').forEach((b) => {
+    b.onclick = async () => {
+      try {
+        await saveAnnounce(live.filter((x) => x.id !== b.dataset.delann));
+        say('broadcast removed');
+        showDetail();
+      } catch (e) { say(e.message, true); }
+    };
+  });
   $('rotate').onclick = async () => {
     if (!confirm('Mint a new admin link? The current link stops working.')) return;
     try {

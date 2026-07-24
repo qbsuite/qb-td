@@ -10,7 +10,9 @@
 // from this device, with zero network requests; the bare room link always
 // fetches fresh (state + packet + roster) and shows the team picker plus
 // any games in progress on this device. Uploads are the only other
-// traffic: two per export click. Nothing polls.
+// traffic: two per export click. Nothing polls — the TD's broadcasts ride
+// in on the room state and on each upload's response, which is the
+// between-rounds moment they're written for anyway.
 //
 // docx packets are parsed in the browser by the same YAPP service MODAQ's
 // own demo uses (CORS *); JSON packets load directly.
@@ -19,6 +21,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { ModaqControl, GameFormats, parseQbjRegistration } from 'modaq';
 import { pub, esc } from './api.js';
+import { annStrip } from './announce.js';
 import {
   normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
@@ -105,6 +108,13 @@ function setHeader(t, room, round, game) {
   $('newgame').href = roomLink();
 }
 
+// The newest message for this room, on one line above MODAQ. It survives
+// the mount (the page chrome above it collapses; this doesn't).
+function renderAnn(list) {
+  $('annstrip').innerHTML = annStrip(list);
+  $('annstrip').hidden = !$('annstrip').innerHTML;
+}
+
 function mountModaq(id, meta, isNew) {
   document.body.classList.add('reading');
   setHeader(meta.t, meta.room, meta.round, meta.a + ' vs ' + meta.b);
@@ -124,6 +134,7 @@ function mountModaq(id, meta, isNew) {
           const out = await pub(
             `/b/${secret}/upload?round=${meta.round}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body });
+          if (out && out.announce) renderAnn(out.announce);
           if (out && out.error) return { isError: true, status: name + ': ' + out.error };
           return { isError: false, status: 'uploaded ' + name };
         } catch (e) {
@@ -267,6 +278,7 @@ async function boot() {
     return;
   }
   setHeader(state.tournament, state.room, state.current_round, '');
+  renderAnn(state.announce);
   // schedule-less tournaments: this quietly 404s and nothing changes
   const schedP = pub('/b/' + secret + '/schedule').then((r) => r, () => null);
 

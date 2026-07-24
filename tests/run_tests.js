@@ -1172,4 +1172,29 @@ test('catPlayerLines filters + aggregates; catBreakdown nests subs', () => {
   assert.ok(catCompare('Trash', 'Zzz-unknown') < 0);
 });
 
+/* ---------- broadcasts ---------- */
+
+// announce.js is a browser view module (it pulls esc from api.js, which
+// reads location at import time), so it loads behind a shim. The ordering
+// rule inside it is pure, and mirrors the Worker's — the dashboard holds
+// the raw list and has to sort it the same way the read surfaces see it.
+globalThis.location = globalThis.location || { search: '' };
+globalThis.localStorage = globalThis.localStorage || {};
+const { annLive } = await import('../app/js/announce.js');
+
+test('annLive drops expired, alerts first then newest first', () => {
+  const now = 1_000_000;
+  const list = [
+    { id: 'old', level: 'note', created: now - 300, expires: now + 100 },
+    { id: 'dead', level: 'note', created: now - 100, expires: now - 1 },
+    { id: 'new', level: 'note', created: now - 200, expires: now + 100 },
+    { id: 'alert', level: 'alert', created: now - 400, expires: now + 100 },
+  ];
+  assert.deepEqual(annLive(list, now).map((a) => a.id), ['alert', 'new', 'old']);
+  assert.equal(list[0].id, 'old'); // input untouched
+  // no usable expiry means gone: broadcasts fail closed, same as the Worker
+  assert.deepEqual(annLive([{ id: 'x', level: 'note', created: 1 }], now), []);
+  assert.deepEqual(annLive(null, now), []);
+});
+
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

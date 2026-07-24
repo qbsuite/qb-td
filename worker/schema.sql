@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS tournaments (
   current_round INTEGER NOT NULL DEFAULT 1,
   published INTEGER NOT NULL DEFAULT 0,
   settings TEXT NOT NULL DEFAULT '{}', -- JSON: reader gameFormat etc.
+  -- JSON array of live broadcasts (worker.js cleanAnnounce). Its own column,
+  -- not a settings key: a long game-format override must not be able to
+  -- crowd out announcements, or the reverse.
+  announce TEXT NOT NULL DEFAULT '[]',
   roster_r2_key TEXT,                -- single roster qbj per tournament
   roster_name TEXT,
   created INTEGER NOT NULL

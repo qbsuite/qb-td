@@ -4,6 +4,7 @@
 // bundle / schedule blob only when their stamps move.
 
 import { pub, esc } from './api.js';
+import { annCards } from './announce.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
@@ -571,6 +572,9 @@ async function load(force = false) {
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;
+    // Broadcasts have no stamp of their own — they ride the state poll and
+    // must render before the no-change early return below.
+    $('ann').innerHTML = annCards(state.announce, 'announcement');
     $('tab-buzz').hidden = !state.buzz;
     $('tab-cats').hidden = !state.cats;
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);

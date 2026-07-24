@@ -16,6 +16,7 @@
     <span id="room" class="sub"></span>
   </header>
   <div id="msg"></div>
+  <div id="ann"></div>
 
   <div class="card" id="roundcard" hidden>
     <div class="row">
@@ -50,6 +51,7 @@
 </div>
 <script type="module">
 import { pub, esc, fmtBytes } from './js/api.js';
+import { annCards } from './js/announce.js';
 
 const $ = (id) => document.getElementById(id);
 const secret = new URLSearchParams(location.search).get('b') || '';
@@ -66,6 +68,7 @@ function render() {
   document.title = state.tournament + ' - ' + state.room;
   $('tname').textContent = state.tournament;
   $('room').textContent = state.room;
+  $('ann').innerHTML = annCards(state.announce, 'from the TD');
   $('roundcard').hidden = false;
   $('curround').textContent = 'round ' + state.current_round;
   $('closes').textContent = 'room open until ' + new Date(state.closes).toLocaleString();
@@ -90,6 +93,7 @@ function render() {
 
 function showClosed() {
   closed = true;
+  $('ann').innerHTML = '';
   $('roundcard').hidden = true;
   $('uparea').hidden = true;
   say('room closed', true);

@@ -209,6 +209,94 @@ ok('schedule stamp cleared', r.body.schedule === null, r.body.schedule);
 r = await call(A + '/schedule', { method: 'POST', json: SCHED });
 ok('schedule restored', r.status === 200);
 
+// broadcasts: one whole-list write on the tournament row, filtered per
+// audience on the way out. Who else received a message never reaches a
+// viewer, and nothing expired is ever served.
+const ANN_HOUR = 3600000;
+const annNow = Date.now();
+r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 2' } });
+ok('create second room', r.status === 200, r.body);
+const room2 = { id: r.body.id, secret: r.body.secret };
+r = await call(A);
+const room1Id = r.body.buckets[0].id;
+
+const ANN = [
+  { id: 'bpub', text: 'lunch 12:15-1:00, round 6 reads at 1:05', level: 'note',
+    pub: true, rooms: true, created: annNow - 60000, expires: annNow + ANN_HOUR },
+  { id: 'bone', text: 'send round 5 scores', level: 'alert',
+    pub: false, rooms: [room1Id], created: annNow, expires: annNow + ANN_HOUR },
+  { id: 'bgone', text: 'already over', level: 'note',
+    pub: true, rooms: true, created: annNow - ANN_HOUR, expires: annNow - 1 },
+];
+r = await call(A, { method: 'POST', json: { announce: ANN } });
+ok('set broadcasts', r.status === 200, r.body);
+
+r = await call('/pub/' + slug);
+ok('public page gets its broadcast',
+  r.body.announce.length === 1 && r.body.announce[0].id === 'bpub', r.body.announce);
+ok('public broadcast hides its audience',
+  r.body.announce[0].pub === undefined && r.body.announce[0].rooms === undefined,
+  r.body.announce[0]);
+
+r = await call('/b/' + secret);
+ok('targeted room gets both, alert first',
+  r.body.announce.map((x) => x.id).join(',') === 'bone,bpub', r.body.announce);
+r = await call('/b/' + room2.secret);
+ok('other room gets only the tournament-wide one',
+  r.body.announce.map((x) => x.id).join(',') === 'bpub', r.body.announce);
+ok('expired broadcast served to nobody',
+  !r.body.announce.some((x) => x.id === 'bgone'), r.body.announce);
+
+// the reader page never polls: its upload response carries them instead
+r = await call(`/b/${room2.secret}/upload?round=1&name=bcast.qbj`,
+  { method: 'POST', body: MATCH });
+ok('upload response carries broadcasts',
+  r.status === 200 && r.body.announce.length === 1 && r.body.announce[0].id === 'bpub',
+  r.body.announce);
+const annFileId = r.body.id;
+
+// validation
+r = await call(A, { method: 'POST', json: { announce: [
+  { text: 'no expiry', pub: true, rooms: true, created: annNow }] } });
+ok('broadcast without an expiry rejected', r.status === 400 && /expiry/.test(r.body.error), r.body);
+r = await call(A, { method: 'POST', json: { announce: [
+  { text: 'nobody', pub: false, rooms: false, created: annNow, expires: annNow + ANN_HOUR }] } });
+ok('broadcast without an audience rejected', r.status === 400, r.body);
+r = await call(A, { method: 'POST', json: { announce: [
+  { text: '   ', pub: true, rooms: true, created: annNow, expires: annNow + ANN_HOUR }] } });
+ok('empty broadcast rejected', r.status === 400, r.body);
+r = await call(A, { method: 'POST', json: { announce: 'nope' } });
+ok('non-array announce rejected', r.status === 400, r.body);
+r = await call(A, { method: 'POST', json: { announce: Array.from({ length: 9 }, (_, i) => (
+  { text: 'msg ' + i, pub: true, rooms: true, created: annNow, expires: annNow + ANN_HOUR })) } });
+ok('broadcast cap enforced', r.status === 400 && /8/.test(r.body.error), r.body);
+r = await call('/b/' + secret);
+ok('rejected writes leave the live list alone',
+  r.body.announce.map((x) => x.id).join(',') === 'bone,bpub', r.body.announce);
+
+// text is capped, and an expiry can never outlive the tournament itself
+r = await call(A, { method: 'POST', json: { announce: [
+  { id: 'blong', text: 'x'.repeat(300), pub: true, rooms: true,
+    created: annNow, expires: annNow + 90 * ANN_HOUR }] } });
+ok('overlong broadcast accepted', r.status === 200, r.body);
+r = await call(A);
+{
+  const stored = JSON.parse(r.body.tournament.announce)[0];
+  ok('broadcast text capped at 200', stored.text.length === 200, stored.text.length);
+  ok('broadcast expiry clamped to tournament close',
+    stored.expires === r.body.tournament.closes, [stored.expires, r.body.tournament.closes]);
+}
+
+// clear, and put the tournament back the way the rest of the run expects it
+r = await call(A, { method: 'POST', json: { announce: [] } });
+ok('broadcasts cleared', r.status === 200);
+r = await call('/pub/' + slug);
+ok('cleared broadcasts leave the public page empty', r.body.announce.length === 0, r.body.announce);
+r = await call(`${A}/files/${annFileId}`, { method: 'DELETE' });
+ok('broadcast test file removed', r.status === 200);
+r = await call(`${A}/buckets/${room2.id}`, { method: 'DELETE' });
+ok('second room removed', r.status === 200);
+
 // buzzpoints gate: settings.buzz drives the qpacket route; the public
 // state exposes only the mode + a salt-derived buzz_v, never salt/hash.
 // Password is the only mode, and rounds unlock only once every

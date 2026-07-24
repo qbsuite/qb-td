@@ -37,6 +37,9 @@ const MAX_BUCKETS = 60;
 // one link, ~2 files per game, re-exports adding rows).
 const MAX_FILES_PER_BUCKET = 600;
 const MAX_NAME = 120;
+const MAX_ANNOUNCE = 8;                  // live broadcasts per tournament
+const MAX_ANNOUNCE_TEXT = 200;
+const MAX_ANNOUNCE_JSON = 2048;
 
 /* ---------- responses ---------- */
 function corsHeaders(env) {
@@ -108,6 +111,82 @@ function extractMatch(text) {
   // qbj: what the bundle stores (an {objects} wrapper is kept as-is —
   // the engine unwraps it — but a combined file contributes only .qbj).
   return { error: null, qbj: obj };
+}
+
+/* ---------- broadcasts ----------
+   The TO's short messages to the public page and/or the moderator rooms.
+   They live as one JSON array on the tournament row so they ride along on
+   requests both surfaces already make (/pub/:slug, /b/:secret) — no new
+   route, no new blob, and nothing starts polling that wasn't already.
+
+   Every message carries an expiry, and it is not optional: the admin link
+   dies 48h after creation while the published page outlives it, so a
+   message with no end would strand "lunch at 12:15" on a finished
+   tournament with nobody left who can take it down. */
+
+// Whole-list write (POST /a/:secret with `announce`), same idiom as
+// settings. Returns {error} or {json} ready to bind.
+function cleanAnnounce(list, t) {
+  if (!Array.isArray(list)) return { error: 'bad announce' };
+  if (list.length > MAX_ANNOUNCE) return { error: `too many broadcasts (${MAX_ANNOUNCE} max)` };
+  const out = [];
+  for (const a of list) {
+    if (!a || typeof a !== 'object') return { error: 'bad broadcast' };
+    const text = String(a.text ?? '').trim().slice(0, MAX_ANNOUNCE_TEXT);
+    if (!text) return { error: 'broadcast text required' };
+    const toPub = !!a.pub;
+    let rooms = false;
+    if (a.rooms === true) rooms = true;
+    else if (Array.isArray(a.rooms)) {
+      rooms = [...new Set(a.rooms.map(Number).filter((n) => Number.isInteger(n)))]
+        .slice(0, MAX_BUCKETS);
+      if (!rooms.length) rooms = false;
+    }
+    if (!toPub && rooms === false) return { error: 'broadcast needs an audience' };
+    const created = Number.isInteger(a.created) ? a.created : Date.now();
+    const expires = Number(a.expires);
+    if (!Number.isInteger(expires)) return { error: 'broadcast needs an expiry' };
+    out.push({
+      id: /^[a-z0-9]{1,16}$/.test(String(a.id || '')) ? String(a.id) : randToken(6),
+      text,
+      level: a.level === 'alert' ? 'alert' : 'note',
+      pub: toPub,
+      rooms,
+      created,
+      // never past the tournament's own close
+      expires: Math.min(expires, t.created + ADMIN_TTL),
+    });
+  }
+  const json = JSON.stringify(out);
+  if (json.length > MAX_ANNOUNCE_JSON) return { error: 'broadcasts too large' };
+  return { error: null, json };
+}
+
+function parseAnnounce(row) {
+  let list;
+  try { list = JSON.parse(row.announce || '[]'); } catch (e) { return []; }
+  return Array.isArray(list) ? list.filter((a) => a && typeof a === 'object') : [];
+}
+
+// What a viewer gets: text and level, never the audience — a room has no
+// business learning that a message also went to the public page, or to
+// which other rooms. Alerts first, then newest first. A message with no
+// usable expiry is already gone (fail closed).
+function visibleAnnounce(list) {
+  const now = Date.now();
+  return list
+    .filter((a) => Number(a.expires) > now)
+    .map((a) => ({ id: a.id, text: a.text, level: a.level, created: a.created }))
+    .sort((x, y) => (x.level === y.level
+      ? y.created - x.created
+      : x.level === 'alert' ? -1 : 1));
+}
+function pubAnnounce(row) {
+  return visibleAnnounce(parseAnnounce(row).filter((a) => a.pub));
+}
+function roomAnnounce(row, bucketId) {
+  return visibleAnnounce(parseAnnounce(row).filter((a) =>
+    a.rooms === true || (Array.isArray(a.rooms) && a.rooms.includes(bucketId))));
 }
 
 /* ---------- combined stats bundle ----------
@@ -245,6 +324,11 @@ async function updateTournament(request, env, t) {
     const s = JSON.stringify(body.settings);
     if (s.length > 4096) return err(env, 400, 'settings too large');
     sets.push('settings = ?'); binds.push(s);
+  }
+  if (body.announce !== undefined) {
+    const cleaned = cleanAnnounce(body.announce, t);
+    if (cleaned.error) return err(env, 400, cleaned.error);
+    sets.push('announce = ?'); binds.push(cleaned.json);
   }
   if (!sets.length) return err(env, 400, 'nothing to update');
 
@@ -536,7 +620,7 @@ async function bucketSchedule(env, secret) {
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, t.name AS tournament_name, ' +
-    't.current_round, t.roster_r2_key, t.settings ' +
+    't.current_round, t.roster_r2_key, t.settings, t.announce ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1'
   ).bind(secret).all();
   return results[0] || null;
@@ -575,6 +659,7 @@ async function bucketState(env, secret) {
     packets,
     roster: !!b.roster_r2_key,
     settings,
+    announce: roomAnnounce(b, b.id),
     uploads: uploads.results,
     upload_count: count.results[0].n,
   });
@@ -625,7 +710,10 @@ async function bucketUpload(request, url, env, secret) {
       });
     });
   }
-  return json(env, { id: fileId, filename, round, kind, error });
+  // Broadcasts ride back on the upload response: it's how the reader page
+  // (which never polls) picks up new messages, at exactly the between-rounds
+  // moment they're written for.
+  return json(env, { id: fileId, filename, round, kind, error, announce: roomAnnounce(b, b.id) });
 }
 
 async function bucketPacket(env, secret, url) {
@@ -662,7 +750,7 @@ async function bucketRoster(env, secret) {
 
 async function getPublishedTournament(env, slug) {
   const { results } = await env.DB.prepare(
-    'SELECT id, slug, name, current_round, roster_r2_key, settings FROM tournaments WHERE slug = ?1 AND published = 1'
+    'SELECT id, slug, name, current_round, roster_r2_key, settings, announce FROM tournaments WHERE slug = ?1 AND published = 1'
   ).bind(slug).all();
   return results[0] || null;
 }
@@ -802,6 +890,8 @@ async function pubState(env, slug) {
     name: t.name,
     current_round: t.current_round,
     roster: !!t.roster_r2_key,
+    // TO broadcasts addressed to the public page; audience fields stay server-side
+    announce: pubAnnounce(t),
     // stamp for the schedule tab: refetch only when this moves
     schedule: schedObj ? schedObj.uploaded.getTime() : null,
     // buzzpoints tab: only the mode is public, never salt/hash; buzz_v
