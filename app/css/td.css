@@ -26,6 +26,7 @@ body {
   color: var(--fg);
   font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-wrap: anywhere;
 }
 .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 64px; }
 .wrap.narrow { max-width: 560px; }
@@ -74,7 +75,7 @@ textarea:focus { outline: none; border-color: var(--link); }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
 th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .muted { color: var(--muted); }
 .ok { color: var(--ok); }
 .bad { color: var(--bad); }
@@ -114,7 +115,7 @@ table.box th:first-child {
 .tab.active { color: var(--fg); border-bottom-color: var(--link); font-weight: 600; }
 .tab:hover { color: var(--fg); }
 .sched td { vertical-align: top; }
-.sched .g { white-space: nowrap; }
+.sched .g { min-width: 14ch; }
 .sched .score { font-size: 12px; font-variant-numeric: tabular-nums; }
 .sched .win { color: var(--ok); font-weight: 600; }
 .sched td.now, .sched th.now { background: var(--hover-bg); }
@@ -122,11 +123,14 @@ table.box th:first-child {
 .roundcell { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .slotchip {
   display: inline-block; border: 1px solid var(--line); border-radius: 99px;
-  padding: 1px 10px; margin: 1px 0; cursor: pointer; user-select: none; white-space: nowrap;
+  padding: 1px 10px; margin: 1px 0; cursor: pointer; user-select: none;
 }
 .slotchip:hover { background: var(--hover-bg); }
 .slotchip.sel { border-color: var(--link); color: var(--link); }
 .slotchip.ph { color: var(--muted); font-style: italic; }
+.gcell { display: flex; align-items: center; gap: 6px; }
+.gmove { color: var(--muted); cursor: pointer; user-select: none; padding: 2px 4px; }
+.gmove:hover, .gmove.sel { color: var(--link); }
 .q { max-width: 640px; margin: 4px 0 6px; }
 .bw { text-decoration: underline 2px; text-underline-offset: 3px; }
 .bw sup { font-size: 10px; font-weight: 700; }
