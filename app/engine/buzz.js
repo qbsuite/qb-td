@@ -8,7 +8,7 @@
 
 import { matchPayload } from './qbj.js';
 
-function unwrapMatch(json) {
+export function unwrapMatch(json) {
   let obj = matchPayload(json);
   if (obj && Array.isArray(obj.objects)) {
     obj = obj.objects.find((o) => o && (o.match_teams || o.matchTeams)) || obj;

@@ -251,6 +251,40 @@ ok('buzz public set', r.status === 200);
 r = await call('/pub/' + slug);
 ok('pub state buzz public', r.body.buzz === 'public');
 
+// category map: extracted from JSON packets at upload, text-free, public
+ok('no catmap yet', r.body.cats === null, r.body.cats);
+r = await call('/pub/' + slug + '/cats');
+ok('cats 404 before a categorized packet', r.status === 404);
+const CATPACKET = JSON.stringify({ tossups: [
+  { question: 'q1 text', answer: 'a1', category: 'Literature', subcategory: 'American Literature' },
+  { question: 'q2 text', answer: 'a2', category: 'Science', subcategory: 'Biology' },
+  { question: 'q3 text', answer: 'a3' },
+] });
+r = await call(`${A}/packet?round=2&name=Packet2.json`, { method: 'POST',
+  headers: { 'Content-Type': 'application/json' }, body: CATPACKET });
+ok('categorized packet uploads', r.status === 200, r.body);
+r = await call('/pub/' + slug);
+ok('pub state carries cats stamp', typeof r.body.cats === 'number' && r.body.cats > 0, r.body.cats);
+r = await call('/pub/' + slug + '/cats');
+ok('cats served, text-free',
+  r.status === 200 && r.body.rounds['2'].length === 3
+  && r.body.rounds['2'][0].c === 'Literature'
+  && r.body.rounds['2'][0].s === 'American Literature'
+  && r.body.rounds['2'][2] === null
+  && !JSON.stringify(r.body).includes('q1 text'), r.body);
+// replacement packet without categories clears the round's entry
+r = await call(`${A}/packet?round=2&name=Packet2.json`, { method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ tossups: [{ question: 'q', answer: 'a' }] }) });
+ok('uncategorized replacement uploads', r.status === 200);
+r = await call('/pub/' + slug + '/cats');
+ok('replacement clears the map (last categorized round gone -> 404)', r.status === 404, r.status);
+r = await call('/pub/' + slug);
+ok('cats stamp cleared with it', r.body.cats === null, r.body.cats);
+r = await call(`${A}/packet?round=2&name=Packet2.json`, { method: 'POST',
+  headers: { 'Content-Type': 'application/json' }, body: CATPACKET });
+ok('categorized packet restored', r.status === 200);
+
 r = await call('/pub/' + slug);   // the sections below read files off this
 
 {
@@ -403,7 +437,7 @@ r = await call(A);
 ok('TO access survives room expiry', r.status === 200);
 
 // admin detail reflects everything
-ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 1, r.body.files);
+ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 2, r.body.files);
 
 // file delete
 const delId = r.body.files.find((f) => f.filename === 'broken.qbj').id;

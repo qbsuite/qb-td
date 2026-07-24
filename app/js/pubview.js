@@ -9,6 +9,7 @@ import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion, mainAnswerHtml } from '../engine/buzz.js';
+import { categoryStats, catPlayerLines, catBreakdown, catCompare } from '../engine/cats.js';
 import { normalizePacket } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
@@ -24,8 +25,14 @@ let roster = null;
 let schedule = null;
 let tab = null;            // 'schedule' | 'stats' | 'buzz'
 let teamFilter = '';
-let rawEntries = [];       // {round, room, qbj} — buzz extraction reads these
+let rawEntries = [];       // {round, room, qbj} — buzz + category extraction read these
 let buzzView = null;       // selected round number, or 'summary'
+let catmap = null;         // text-free per-tossup categories from /pub/:slug/cats
+let lastCats;              // its stamp
+let catView = 'cat';       // 'cat' | 'player'
+let catSel = '';
+let catSubSel = '';
+let catPlayerSel = null;   // {team, player}
 const buzzPackets = {};    // round -> Promise<normalized packet>
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 const BUZZ_KEY = 'qbtdBuzzKey:' + slug;
@@ -415,6 +422,91 @@ function renderBuzz(box) {
   else renderBuzzRound($('buzzout'), buzzView);
 }
 
+/* ---------- categories tab ---------- */
+
+const CAT_HEAD = '<th class="num">heard</th><th class="num">15</th><th class="num">10</th>'
+  + '<th class="num">-5</th><th class="num">pts</th><th class="num">p/20h</th>';
+function lineCells(l) {
+  const p20 = l.heard ? (l.pts / l.heard * 20).toFixed(1) : '–';
+  return `<td class="num">${l.heard}</td><td class="num">${l.powers}</td><td class="num">${l.gets}</td>`
+    + `<td class="num">${l.negs}</td><td class="num">${l.pts}</td><td class="num">${p20}</td>`;
+}
+
+function renderByCategory(box, rows) {
+  const cats = [...new Set(rows.map((r) => r.cat))].sort(catCompare);
+  if (catSel && !cats.includes(catSel)) { catSel = ''; catSubSel = ''; }
+  const subs = catSel
+    ? [...new Set(rows.filter((r) => r.cat === catSel && r.sub).map((r) => r.sub))].sort() : [];
+  const lines = catPlayerLines(rows, catSel, catSubSel);
+  box.innerHTML = `
+    <div class="row" style="margin-bottom:8px">
+      ${['', ...cats].map((c) =>
+        `<a href="#" class="pill${catSel === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c) || 'all'}</a>`).join('')}
+    </div>
+    ${subs.length ? `<div class="row" style="margin-bottom:10px">
+      ${['', ...subs].map((s) =>
+        `<a href="#" class="pill${catSubSel === s ? ' on' : ''}" data-catsub="${esc(s)}">${esc(s) || 'all'}</a>`).join('')}
+    </div>` : ''}
+    <div class="tablewrap"><table>
+      <tr><th>player</th><th>team</th>${CAT_HEAD}</tr>
+      ${lines.map((l) =>
+        `<tr><td>${esc(l.player)}</td><td class="muted">${esc(l.team)}</td>${lineCells(l)}</tr>`).join('')}
+    </table></div>`;
+  box.querySelectorAll('[data-cat]').forEach((p) => {
+    p.onclick = (e) => { e.preventDefault(); catSel = p.dataset.cat; catSubSel = ''; render(); };
+  });
+  box.querySelectorAll('[data-catsub]').forEach((p) => {
+    p.onclick = (e) => { e.preventDefault(); catSubSel = p.dataset.catsub; render(); };
+  });
+}
+
+function renderByPlayer(box, rows) {
+  const players = [...new Map(rows.map((r) =>
+    [JSON.stringify([r.team, r.player]), { team: r.team, player: r.player }])).values()]
+    .sort((a, b) => a.team < b.team ? -1 : a.team > b.team ? 1 : a.player < b.player ? -1 : 1);
+  if (!catPlayerSel
+    || !players.some((p) => p.team === catPlayerSel.team && p.player === catPlayerSel.player)) {
+    catPlayerSel = players[0];
+  }
+  const bd = catBreakdown(rows, catPlayerSel.team, catPlayerSel.player);
+  box.innerHTML = `
+    <div style="margin-bottom:10px">
+      <select id="catplayersel">
+        ${players.map((p, i) => `<option value="${i}" ${p.team === catPlayerSel.team
+          && p.player === catPlayerSel.player ? 'selected' : ''}>${esc(p.player)} (${esc(p.team)})</option>`).join('')}
+      </select>
+    </div>
+    <div class="tablewrap"><table>
+      <tr><th>category</th>${CAT_HEAD}</tr>
+      ${bd.map(({ cat, line, subs }) =>
+        `<tr><td><b>${esc(cat)}</b></td>${lineCells(line)}</tr>`
+        + subs.map(({ sub, line: sl }) =>
+          `<tr class="muted"><td style="padding-left:28px">${esc(sub)}</td>${lineCells(sl)}</tr>`).join('')
+      ).join('')}
+    </table></div>`;
+  $('catplayersel').onchange = () => {
+    catPlayerSel = players[Number($('catplayersel').value)];
+    render();
+  };
+}
+
+function renderCats(box) {
+  if (!catmap) { box.innerHTML = '<div class="muted">no categories</div>'; return; }
+  const rows = categoryStats(rawEntries, catmap);
+  if (!rows.length) { box.innerHTML = '<div class="muted">no games yet</div>'; return; }
+  box.innerHTML = `
+    <div class="row" style="margin-bottom:10px">
+      <a href="#" class="pill${catView === 'cat' ? ' on' : ''}" data-catview="cat">by category</a>
+      <a href="#" class="pill${catView === 'player' ? ' on' : ''}" data-catview="player">by player</a>
+    </div>
+    <div id="catbody"></div>`;
+  box.querySelectorAll('[data-catview]').forEach((p) => {
+    p.onclick = (e) => { e.preventDefault(); catView = p.dataset.catview; render(); };
+  });
+  if (catView === 'cat') renderByCategory($('catbody'), rows);
+  else renderByPlayer($('catbody'), rows);
+}
+
 /* ---------- stats tab ---------- */
 
 function renderStatsTab(box) {
@@ -435,6 +527,7 @@ function render() {
   const box = $('out');
   if (tab === 'schedule') renderSchedule(box);
   else if (tab === 'buzz') renderBuzz(box);
+  else if (tab === 'cats') renderCats(box);
   else renderStatsTab(box);
 }
 
@@ -452,11 +545,14 @@ async function load(force = false) {
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;
     $('tab-buzz').hidden = !state.buzz;
+    $('tab-cats').hidden = !state.cats;
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);
+    if (tab === 'cats' && !state.cats) setTab('stats', false);
 
     const statsMoved = force || state.version !== lastVersion;
     const schedMoved = force || state.schedule !== lastSched;
-    if (!statsMoved && !schedMoved) { say(''); return; }
+    const catsMoved = force || state.cats !== lastCats;
+    if (!statsMoved && !schedMoved && !catsMoved) { say(''); return; }
     say('loading');
 
     const jobs = [];
@@ -479,11 +575,19 @@ async function load(force = false) {
         lastSched = state.schedule;
       })());
     }
+    if (catsMoved) {
+      jobs.push((async () => {
+        try { catmap = state.cats ? await asJson(await pub('/pub/' + slug + '/cats')) : null; }
+        catch (e) { catmap = null; }
+        lastCats = state.cats;
+      })());
+    }
     await Promise.all(jobs);
 
     if (tab === null) {
       const wanted = (location.hash || '').replace('#', '');
-      setTab(wanted === 'stats' || wanted === 'schedule' || (wanted === 'buzz' && state.buzz)
+      setTab(wanted === 'stats' || wanted === 'schedule'
+        || (wanted === 'buzz' && state.buzz) || (wanted === 'cats' && state.cats)
         ? wanted : schedule ? 'schedule' : 'stats', false);
     } else render();
     say('');

@@ -275,6 +275,62 @@ async function deleteBucket(env, t, bucketId) {
   return json(env, { ok: true });
 }
 
+/* Text-free per-tossup category map (t/<tid>/catmap.json, {rounds:
+   {"<n>": [{c, s} | null, ...]}}), extracted from qbreader-format JSON
+   packets at upload time. It powers the public categories tab without
+   exposing any question text; docx packets carry no category data, so
+   their rounds simply stay absent. Maintained with the same
+   conditional-write retry as the stats bundle. */
+
+function packetCategories(body, filename) {
+  if (!/\.json$/i.test(filename)) return null;
+  let parsed;
+  try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return null; }
+  if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) return null;
+  const cats = parsed.tossups.map((tu) =>
+    tu && typeof tu.category === 'string' && tu.category
+      ? { c: tu.category, s: typeof tu.subcategory === 'string' ? tu.subcategory : '' }
+      : null);
+  return cats.some(Boolean) ? cats : null;
+}
+
+async function updateCatmap(env, tid, round, cats) {
+  const key = `t/${tid}/catmap.json`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await env.DATA.get(key);
+    let map = { rounds: {} };
+    if (cur) {
+      map = await cur.json().catch(() => ({ rounds: {} }));
+      if (!map || typeof map.rounds !== 'object') map = { rounds: {} };
+    }
+    if (cats) map.rounds[String(round)] = cats;
+    else if (cur) delete map.rounds[String(round)]; // replacement without categories clears the round
+    else return; // nothing stored, nothing to clear
+    if (!Object.keys(map.rounds).length) {
+      // an empty map reads as "no categories": drop the blob so the tab hides
+      if (cur) await env.DATA.delete(key);
+      return;
+    }
+    const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
+    try {
+      const put = await env.DATA.put(key, JSON.stringify(map), {
+        httpMetadata: { contentType: 'application/json' },
+        onlyIf,
+      });
+      if (put) return;
+    } catch (e) { /* precondition failed -> retry */ }
+  }
+  console.log('catmap update lost the retry race for tournament', tid);
+}
+
+async function pubCats(env, slug) {
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const obj = await env.DATA.get(`t/${t.id}/catmap.json`);
+  if (!obj) return err(env, 404, 'no categories');
+  return blobResponse(env, obj, null, 60);
+}
+
 async function uploadPacket(request, url, env, t) {
   const id = t.id;
   const round = Number(url.searchParams.get('round'));
@@ -293,6 +349,7 @@ async function uploadPacket(request, url, env, t) {
     'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
     'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4'
   ).bind(id, round, key, filename).run();
+  await updateCatmap(env, id, round, packetCategories(body, filename));
   return json(env, { round, filename });
 }
 
@@ -614,7 +671,7 @@ async function pubQPacket(request, url, env, slug) {
 async function pubState(env, slug) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const [files, buckets, schedHead, packetRounds] = await Promise.all([
+  const [files, buckets, schedHead, packetRounds, catsHead] = await Promise.all([
     env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
@@ -625,6 +682,7 @@ async function pubState(env, slug) {
     env.DB.prepare(
       'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     ).bind(t.id, t.current_round).all(),
+    env.DATA.head(`t/${t.id}/catmap.json`),
   ]);
   const buzz = buzzConfig(t);
   const rooms = Object.fromEntries(buckets.results.map((b) => [b.id, b.room_name]));
@@ -638,6 +696,8 @@ async function pubState(env, slug) {
     // buzzpoints tab: only the mode is public, never salt/hash
     buzz: buzz ? buzz.mode : null,
     packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
+    // categories tab: refetch the (text-free) category map when this moves
+    cats: catsHead ? catsHead.uploaded.getTime() : null,
     // Stats only change when a file lands (or is deleted): clients compare
     // this stamp and refetch the bundle only when it moves.
     version: (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length,
@@ -713,6 +773,7 @@ export default {
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubQPacket(request, url, env, m[1]);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubCats(env, m[1]);
 
     // Open (rate-limited) tournament creation; the response carries the
     // admin secret, shown to the TO exactly once by the dashboard.

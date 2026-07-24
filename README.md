@@ -66,6 +66,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   collected qbj files (exact team-name match) and a per-team view
   behind a dropdown; the stats tab has standings, individual
   leaderboard, and round-by-round scores, all computed in the browser.
+  The categories tab (appears when any JSON packet carries qbreader
+  category metadata) shows per-player buzz results sliced by category
+  and subcategory — filter pills by category, or a by-player view with
+  each player's per-category breakdown; it reads a text-free category
+  map the Worker extracts from packets at upload (`/pub/:slug/cats` —
+  no question text, so it's public without the buzzpoints gate; docx
+  packets carry no categories).
   The buzzpoints tab (TO-enabled: off / password / public) lists each
   round's questions in packet order as collapsed answerlines (first
   answerline only, keeping the packet's bold/underline on the required
