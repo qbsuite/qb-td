@@ -153,19 +153,31 @@ export function buzzSummary(entries) {
 }
 
 /**
- * The main answer from a packet answerline: the underlined portion(s)
- * (packet convention for the required part), else the text before the
- * first [accept ...] / (prompt ...) clause. Tags stripped either way.
+ * The first main answerline as display HTML: everything before the
+ * first [accept ...] / (prompt ...) clause, with the packet's own
+ * bold/underline formatting kept (only b/strong/u/i/em survive — all
+ * other tags are dropped, all text is escaped, unclosed kept-tags are
+ * closed so nothing leaks into surrounding markup).
  */
-export function mainAnswer(html) {
-  const s = String(html || '');
-  const u = [...s.matchAll(/<u[^>]*>([\s\S]*?)<\/u>/gi)]
-    .map((m) => m[1].replace(/<[^>]*>/g, '').trim())
-    .filter(Boolean);
-  if (u.length) return u.join(' ').replace(/\s+/g, ' ');
-  const plain = s.replace(/<[^>]*>/g, '').replace(/^ANSWER:\s*/i, '');
-  const head = plain.split(/[[(]/)[0].replace(/\s+/g, ' ').trim();
-  return head || plain.replace(/\s+/g, ' ').trim();
+export function mainAnswerHtml(html) {
+  const s = String(html || '').replace(/^\s*ANSWER:\s*/i, '');
+  const cut = s.search(/[[(]/);
+  const head = (cut > 0 ? s.slice(0, cut) : s)
+    .replace(/<(\/?)(b|strong|u|i|em)\b[^>]*>/gi, '<$1$2>')  // drop tag attributes
+    .replace(/<(?!\/?(?:b|strong|u|i|em)>)[^>]*>/gi, ' ');   // drop other tags
+  const KEEP = /^<\/?(?:b|strong|u|i|em)>$/i;
+  const out = head.split(/(<\/?(?:b|strong|u|i|em)>)/gi)
+    .map((part) => KEEP.test(part) ? part.toLowerCase()
+      : part.replace(/&(?!(?:amp|lt|gt|quot|#\d+|#x[\da-f]+|nbsp);)/gi, '&amp;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+    .join('').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
+  // close anything the bracket cut left open
+  const open = [];
+  for (const m of out.matchAll(/<(\/?)(b|strong|u|i|em)>/g)) {
+    if (!m[1]) open.push(m[2]);
+    else if (open.lastIndexOf(m[2]) !== -1) open.splice(open.lastIndexOf(m[2]), 1);
+  }
+  return out + open.reverse().map((t) => '</' + t + '>').join('');
 }
 
 /**

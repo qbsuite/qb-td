@@ -24,9 +24,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   pronunciation marks), stored as overrides on the preset so it applies
   to every room — download any file, compute stats, export, rotate the
   admin link if it leaks. Once a roster exists, a **schedule creator**:
-  pick a format for the team/room count (full or double round robin;
-  2 pools with carryover crossover playoffs; 3-4 pools regrouping by
-  finish position — clean-room circle-method pairings), then edit freely
+  pick a format for the team/room count (full round robin; double,
+  triple, or quadruple RR for small fields; 2 pools with carryover
+  crossover playoffs; 3-4 pools regrouping by finish position —
+  clean-room circle-method pairings), then edit freely
   in a grid — click two slots to swap, assign any slot from a dropdown,
   add/remove rounds, rename rooms, and link each schedule room to a
   bucket. Playoff slots are placeholders ("A1" = pool A winner) filled
@@ -66,7 +67,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   behind a dropdown; the stats tab has standings, individual
   leaderboard, and round-by-round scores, all computed in the browser.
   The buzzpoints tab (TO-enabled: off / password / public) lists each
-  round's questions in packet order as collapsed answerlines — a tossup
+  round's questions in packet order as collapsed answerlines (first
+  answerline only, keeping the packet's bold/underline on the required
+  part) — a tossup
   expands to its text with every room's buzzed words underlined
   (MODAQ's `buzz_position.word_index` rides in every qbj), the bonus
   read with it expands to per-part conversion and each room's line —

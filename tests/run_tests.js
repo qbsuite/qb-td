@@ -9,7 +9,7 @@ import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
-import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswer } from '../app/engine/buzz.js';
+import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml } from '../app/engine/buzz.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -803,6 +803,28 @@ test('buildSchedule rr2: each pair exactly twice', () => {
   assert.deepEqual(validateSchedule(s, TEAMS8), []);
 });
 
+test('buildSchedule rr3/rr4: 4 teams in 2 rooms, each pair 3x/4x', () => {
+  for (const [key, times] of [['rr3', 3], ['rr4', 4]]) {
+    const s = buildSchedule(key, TEAMS8.slice(0, 4), ROOMS4.slice(0, 2));
+    const rounds = flatRounds(s);
+    assert.equal(rounds.length, 3 * times);
+    rounds.forEach((r, i) => assert.equal(r.round, i + 1));
+    const met = {};
+    for (const r of rounds) {
+      for (const g of r.games) {
+        const k = [g.a.team, g.b.team].sort().join(':');
+        met[k] = (met[k] || 0) + 1;
+      }
+    }
+    assert.equal(Object.keys(met).length, 6);
+    assert.deepEqual(new Set(Object.values(met)), new Set([times]));
+    assert.deepEqual(validateSchedule(s, TEAMS8), []);
+  }
+  const keys = formatsFor(4, 2).map((f) => f.key);
+  for (const k of ['rr', 'rr2', 'rr3', 'rr4']) assert.ok(keys.includes(k), k);
+  assert.ok(!allFormats(5).some((f) => f.key === 'rr4')); // capped at 4 teams
+});
+
 test('buildSchedule pools2: prelims by pool, crossover playoffs with placeholders', () => {
   const s = buildSchedule('pools2', TEAMS8, ROOMS4);
   assert.equal(s.phases.length, 2);
@@ -1017,13 +1039,21 @@ test('roundBonuses groups per packet bonus across rooms', () => {
     [['R1', 'Alpha', 20], ['R2', 'Gamma', 10]]);
 });
 
-test('mainAnswer prefers underlined text, else pre-bracket head', () => {
-  assert.equal(mainAnswer('Johannes <b><u>Brahms</u></b> [accept anything]'), 'Brahms');
-  assert.equal(mainAnswer('<u>The</u> <b><u>Golden Pot</u></b> [or Der goldne Topf]'), 'The Golden Pot');
-  assert.equal(mainAnswer('E. T. A. Hoffmann [accept Ernst] (prompt on H)'), 'E. T. A. Hoffmann');
-  assert.equal(mainAnswer('ANSWER: mitochondria'), 'mitochondria');
-  assert.equal(mainAnswer('[weird all-bracket line]'), '[weird all-bracket line]');
-  assert.equal(mainAnswer(''), '');
+test('mainAnswerHtml keeps the first answerline with its formatting', () => {
+  assert.equal(mainAnswerHtml('Johannes <b><u>Brahms</u></b> [accept anything]'),
+    'Johannes <b><u>Brahms</u></b>');
+  assert.equal(mainAnswerHtml('<u>The</u> <b><u>Golden Pot</u></b> [or <u>Der goldne Topf</u>]'),
+    '<u>The</u> <b><u>Golden Pot</u></b>');
+  assert.equal(mainAnswerHtml('E. T. A. Hoffmann [accept Ernst] (prompt on H)'),
+    'E. T. A. Hoffmann');
+  assert.equal(mainAnswerHtml('ANSWER: mitochondria'), 'mitochondria');
+  // a bracket that cuts inside a tag pair still yields balanced HTML
+  assert.equal(mainAnswerHtml('<b><u>red (prompt on scarlet)</u></b>'), '<b><u>red</u></b>');
+  // disallowed tags drop, text is escaped
+  assert.equal(mainAnswerHtml('<span class="x">a</span> <script>b</script> < 5 & six'),
+    'a b &lt; 5 &amp; six');
+  assert.equal(mainAnswerHtml('[weird all-bracket line]'), '[weird all-bracket line]');
+  assert.equal(mainAnswerHtml(''), '');
 });
 
 test('tokenizeQuestion strips tags and splits on whitespace', () => {

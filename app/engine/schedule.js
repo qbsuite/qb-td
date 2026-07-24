@@ -206,11 +206,15 @@ export function allFormats(nTeams) {
       desc: `${rrRounds} rounds, ${rrRooms} rooms` + (nTeams % 2 ? ', 1 bye per round' : ''),
     });
   }
-  if (nTeams <= 9) {
+  // repeated round robins for small fields (a 4-team, 2-room day is
+  // classically a triple or quadruple RR)
+  const REPEATS = [[2, 'double', 9], [3, 'triple', 6], [4, 'quadruple', 4]];
+  for (const [k, word, cap] of REPEATS) {
+    if (nTeams > cap) continue;
     out.push({
-      key: 'rr2', name: 'double round robin', teams: nTeams,
-      rounds: rrRounds * 2, roomsNeeded: rrRooms,
-      desc: `${rrRounds * 2} rounds, ${rrRooms} rooms` + (nTeams % 2 ? ', 1 bye per round' : ''),
+      key: 'rr' + k, name: word + ' round robin', teams: nTeams,
+      rounds: rrRounds * k, roomsNeeded: rrRooms,
+      desc: `${rrRounds * k} rounds, ${rrRooms} rooms` + (nTeams % 2 ? ', 1 bye per round' : ''),
     });
   }
   for (let k = 2; k <= 4; k++) {
@@ -264,13 +268,17 @@ export function buildSchedule(key, teams, rooms) {
   const phases = [];
   const all = teams.map((_, i) => i);
 
+  const repeat = /^rr([234])$/.exec(key);
   if (key === 'rr') {
     phases.push(rrPhase('Round robin', [all], rooms.length, 1, teamSlot));
-  } else if (key === 'rr2') {
-    const first = rrPhase('Round robin', [all], rooms.length, 1, teamSlot);
-    const second = rrPhase('Round robin (return)', [all], rooms.length,
-      first.rounds.length + 1, teamSlot);
-    phases.push(first, second);
+  } else if (repeat) {
+    const k = Number(repeat[1]);
+    let next = 1;
+    for (let i = 0; i < k; i++) {
+      const ph = rrPhase('Round robin ' + (i + 1), [all], rooms.length, next, teamSlot);
+      next += ph.rounds.length;
+      phases.push(ph);
+    }
   } else {
     const k = Number(key.slice(5));
     const sizes = poolSizes(teams.length, k);
@@ -405,7 +413,7 @@ export function validateSchedule(schedule, rosterNames) {
         const a = slotText(g.a);
         const b = slotText(g.b);
         if (!a || !b) continue;
-        const pairKey = a < b ? a + ' ' + b : b + ' ' + a;
+        const pairKey = JSON.stringify(a < b ? [a, b] : [b, a]);
         if (met.has(pairKey)) warnings.push('round ' + round.round + ': ' + a + ' v ' + b + ' again');
         met.add(pairKey);
       }
