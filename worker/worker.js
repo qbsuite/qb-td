@@ -414,8 +414,12 @@ async function bucketSchedule(env, secret) {
   if (!obj) return err(env, 404, 'no schedule');
   let schedule;
   try { schedule = await obj.json(); } catch (e) { return err(env, 404, 'no schedule'); }
-  const room = Array.isArray(schedule.rooms)
-    ? schedule.rooms.findIndex((r) => r && r.bucket === b.id) : -1;
+  const rooms = Array.isArray(schedule.rooms) ? schedule.rooms : [];
+  // bucket link first; fall back to a room-name match so schedules made
+  // before the rooms existed (or never hand-linked) still resolve
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  let room = rooms.findIndex((r) => r && r.bucket === b.id);
+  if (room === -1) room = rooms.findIndex((r) => r && norm(r.name) === norm(b.room_name));
   return json(env, { room: room === -1 ? null : room, schedule });
 }
 

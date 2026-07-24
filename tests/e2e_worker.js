@@ -154,6 +154,15 @@ r = await call('/b/' + secret + '/schedule');
 ok('bucket schedule resolves its room',
   r.status === 200 && r.body.room === 0
   && r.body.schedule.phases[0].rounds[0].games[0].a.team === 'Alpha', r.body);
+// no bucket link but a matching room name still resolves (schedules made
+// before the rooms existed)
+r = await call(A + '/schedule', { method: 'POST', json: { ...SCHED,
+  rooms: [{ name: ' room 1 ', bucket: null }, { name: 'Room 2', bucket: null }] } });
+ok('unlinked schedule saved', r.status === 200);
+r = await call('/b/' + secret + '/schedule');
+ok('bucket schedule falls back to name match', r.status === 200 && r.body.room === 0, r.body.room);
+r = await call(A + '/schedule', { method: 'POST', json: SCHED });
+ok('linked schedule restored', r.status === 200);
 r = await call('/pub/' + slug + '/schedule');
 ok('unpublished schedule hidden', r.status === 404);
 

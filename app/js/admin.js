@@ -655,6 +655,12 @@ async function renderSchedule(a, t, buckets) {
 
   /* -- editor -- */
   const warnings = validateSchedule(sched, schedTeams);
+  const normName = (x) => String(x || '').trim().toLowerCase();
+  for (const b of buckets) {
+    if (!sched.rooms.some((r) => r.bucket === b.id || normName(r.name) === normName(b.room_name))) {
+      warnings.push('room not on schedule: ' + b.room_name);
+    }
+  }
   const selSlot = schedSel ? slotAt(sched, schedSel) : undefined;
   box.innerHTML = `
     <h2>schedule</h2>
@@ -743,6 +749,15 @@ async function renderSchedule(a, t, buckets) {
   }
   $('schedsave').onclick = async () => {
     try {
+      // fill missing/stale room->bucket links by name so reader rooms
+      // resolve their schedule line without hand-linking
+      const norm = (x) => String(x || '').trim().toLowerCase();
+      for (const room of sched.rooms) {
+        if (room.bucket !== null && buckets.some((b) => b.id === room.bucket)) continue;
+        const hit = buckets.find((b) => norm(b.room_name) === norm(room.name)
+          && !sched.rooms.some((r2) => r2.bucket === b.id));
+        room.bucket = hit ? hit.id : null;
+      }
       await pub(a + '/schedule', { method: 'POST', json: sched });
       schedDirty = false;
       say('schedule saved');
