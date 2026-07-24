@@ -11,7 +11,9 @@
   /* Page chrome collapses to one bar once MODAQ is mounted. */
   .wrap.readerbar { padding: 10px 16px; max-width: none; }
   .wrap.readerbar header { margin-bottom: 0; }
-  body.reading #picker, body.reading #packetrow { display: none; }
+  body.reading #picker, body.reading #packetrow, body.reading #schedpanel { display: none; }
+  #schedrows td { padding: 2px 8px 2px 0; border-bottom: none; }
+  #schedrows tr.now td { background: var(--hover-bg); }
   #roundrows .row { margin: 4px 0; }
   #roundrows .pill.sel { background: var(--hover-bg); border-color: currentColor; }
   body.reading #msg { display: none; }
@@ -40,14 +42,19 @@
   <div id="packetrow" class="row" style="margin:4px 0 10px">
     <span class="muted" id="packetname"></span>
   </div>
-  <div class="card" id="picker" hidden>
-    <div id="schedrow" style="margin-bottom:6px" hidden></div>
-    <div id="roundrows"></div>
-    <div class="row" id="teamrow" style="margin-top:10px" hidden>
-      <select id="teama"></select>
-      <span class="muted">vs</span>
-      <select id="teamb"></select>
-      <button id="start" class="primary">start</button>
+  <div class="row" style="align-items:flex-start">
+    <div class="card" id="picker" style="flex:2;min-width:260px" hidden>
+      <div id="roundrows"></div>
+      <div class="row" id="teamrow" style="margin-top:10px" hidden>
+        <select id="teama"></select>
+        <span class="muted">vs</span>
+        <select id="teamb"></select>
+        <button id="start" class="primary">start</button>
+      </div>
+    </div>
+    <div class="card" id="schedpanel" style="flex:1;min-width:200px" hidden>
+      <div class="rhead" style="margin-top:0">schedule</div>
+      <table id="schedrows"></table>
     </div>
   </div>
 </div>

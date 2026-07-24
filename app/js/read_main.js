@@ -146,16 +146,18 @@ function mountModaq(id, meta, isNew) {
 
 /* ---------- schedule defaults (bare-link path) ---------- */
 
-// This room's line of the tournament schedule, current round highlighted.
-function renderSchedRow() {
+// This room's schedule in the side panel: one row per round, round
+// number leading, current round highlighted.
+function renderSchedPanel() {
   if (!sched || schedRoom === null) return;
   const rows = roomRounds(sched, schedRoom);
   if (!rows.length) return;
-  $('schedrow').hidden = false;
-  $('schedrow').innerHTML = rows.map((r) =>
-    `<span class="${r.round === state.current_round ? '' : 'muted'}">R${r.round} ` +
-    `${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}</span>`)
-    .join(' <span class="muted">·</span> ');
+  $('schedpanel').hidden = false;
+  $('schedrows').innerHTML = rows.map((r) => `
+    <tr${r.round === state.current_round ? ' class="now"' : ' class="muted"'}>
+      <td class="roundcell">${r.round}</td>
+      <td>${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}</td>
+    </tr>`).join('');
 }
 
 // Preselect the scheduled matchup for the selected round. Only fills
@@ -300,7 +302,7 @@ async function boot() {
   if (sr && sr.room !== null && sr.schedule) {
     sched = sr.schedule;
     schedRoom = sr.room;
-    renderSchedRow();
+    renderSchedPanel();
     applySchedDefault();
   }
   // warm the cache for the common case (start on the default round)
