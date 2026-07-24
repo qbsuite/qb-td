@@ -635,7 +635,7 @@ async function renderSchedule(a, t, buckets) {
       schedRoomsN = Math.max(1, Number($('schedrooms').value) || 1);
       rerender();
     };
-    if ($('schedgen')) $('schedgen').onclick = () => {
+    if ($('schedgen')) $('schedgen').onclick = async () => {
       const key = box.querySelector('input[name="schedfmt"]:checked').value;
       const rooms = [];
       for (let i = 0; i < schedRoomsN; i++) {
@@ -645,10 +645,19 @@ async function renderSchedule(a, t, buckets) {
       try {
         sched = buildSchedule(key, schedTeams, rooms);
         sched.format = key;
-        schedDirty = true;
         schedSel = null;
-        rerender();
-      } catch (e) { say(e.message, true); }
+      } catch (e) { say(e.message, true); return; }
+      // a generated schedule goes live right away — "save" is only for
+      // edits made after
+      try {
+        await pub(a + '/schedule', { method: 'POST', json: sched });
+        schedDirty = false;
+        say('schedule saved');
+      } catch (e) {
+        schedDirty = true;
+        say('not saved: ' + e.message, true);
+      }
+      rerender();
     };
     return;
   }
@@ -667,6 +676,7 @@ async function renderSchedule(a, t, buckets) {
     <div class="row" style="margin-bottom:6px">
       <span class="muted">${sched.phases.reduce((n, p) => n + p.rounds.length, 0)} rounds</span>
       <span class="spacer" style="flex:1"></span>
+      ${schedDirty ? '<span class="pill bad" style="color:var(--bad);border-color:var(--bad)">unsaved</span>' : ''}
       <button id="schedsave" class="primary" ${schedDirty ? '' : 'disabled'}>save</button>
       <button id="schedaddround">add round</button>
       <button id="schedrmround">remove last round</button>
