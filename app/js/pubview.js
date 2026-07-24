@@ -8,7 +8,7 @@ import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
-import { roundTossupBuzzes, buzzSummary, tokenizeQuestion } from '../engine/buzz.js';
+import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion } from '../engine/buzz.js';
 import { normalizePacket } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
@@ -273,9 +273,88 @@ function renderBuzzSummary(box) {
   </table></div>`;
 }
 
+function tossupHtml(tossup, buzzes, packet) {
+  const tu = packet && packet.tossups && packet.tossups[tossup - 1];
+  let qhtml = '';
+  if (tu) {
+    const words = tokenizeQuestion(tu.question);
+    const byPos = new Map();
+    buzzes.forEach((b, i) => {
+      const pos = Math.min(b.position, words.length - 1);
+      if (!byPos.has(pos)) byPos.set(pos, []);
+      byPos.get(pos).push({ i, b });
+    });
+    qhtml = '<div class="q">' + words.map((w, wi) => {
+      const hits = byPos.get(wi);
+      if (!hits) return esc(w);
+      const cls = buzzWordClass(hits.map((h) => h.b));
+      return `<span class="bw ${cls}">${esc(w)}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
+    }).join(' ') + '</div>';
+  }
+  const buzzChips = buzzes.map((b) => {
+    const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
+    return `<span class="${cls}">${b.position + 1}</span>`;
+  }).join(' ');
+  return `
+    <details class="qd">
+      <summary><span class="roundcell">T${tossup}</span>
+        ${tu ? esc(stripTags(tu.answer)) : '<span class="muted">(no packet text)</span>'}
+        <span class="qdmeta">${buzzChips}</span></summary>
+      <div class="qdbody">
+        ${qhtml}
+        <div class="buzzlist">
+          ${buzzes.map((b, i) => {
+            const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
+            return `<div><span class="${cls}">${i + 1} ${b.value > 0 ? '+' : ''}${b.value}</span>
+              ${esc(b.player)} (${esc(b.team)}) &middot; word ${b.position + 1}${b.room ? ' &middot; ' + esc(b.room) : ''}</div>`;
+          }).join('')}
+        </div>
+      </div>
+    </details>`;
+}
+
+function bonusHtml(bonus, results, packet) {
+  const bz = packet && Array.isArray(packet.bonuses) && packet.bonuses[bonus - 1];
+  const heard = results.length;
+  const nParts = Math.max(...results.map((r) => r.parts.length));
+  const conv = [];
+  for (let p = 0; p < nParts; p++) {
+    conv.push(results.filter((r) => r.parts[p] > 0).length);
+  }
+  const avg = results.reduce((n, r) => n + r.total, 0) / heard;
+  const answers = bz && Array.isArray(bz.answers) ? bz.answers : [];
+  const partsText = bz && Array.isArray(bz.parts) ? bz.parts : [];
+  return `
+    <details class="qd bonus">
+      <summary><span class="roundcell">B${bonus}</span>
+        ${answers.length
+          ? answers.map((a) => esc(stripTags(a))).join(' <span class="muted">/</span> ')
+          : '<span class="muted">(no packet text)</span>'}
+        <span class="qdmeta">${avg.toFixed(1)} avg &middot; ${conv.map((c) => c + '/' + heard).join(' ')}</span></summary>
+      <div class="qdbody">
+        ${bz && bz.leadin ? `<div class="q muted">${esc(stripTags(bz.leadin))}</div>` : ''}
+        ${conv.map((c, p) => `
+          <div class="q"><span class="${c ? 'ok' : 'bad'}">${c}/${heard}</span>
+            ${answers[p] ? `<b style="text-transform:none">${esc(stripTags(answers[p]))}</b>` : ''}
+            ${partsText[p] ? `<span class="muted">— ${esc(stripTags(partsText[p]))}</span>` : ''}</div>`).join('')}
+        <div class="buzzlist">
+          ${results.map((r) => `<div>
+            <span class="${r.total > 20 ? 'pow-t' : r.total > 0 ? 'ok' : 'muted'}">${r.total}</span>
+            ${r.team ? esc(r.team) : '<span class="muted">?</span>'}
+            &middot; ${r.parts.join(' ')}${r.bounceTotal ? ` &middot; +${r.bounceTotal} bounce` : ''}${r.room ? ' &middot; ' + esc(r.room) : ''}
+          </div>`).join('')}
+        </div>
+      </div>
+    </details>`;
+}
+
 async function renderBuzzRound(box, round) {
-  const rows = roundTossupBuzzes(rawEntries, round);
-  if (!rows.length) { box.innerHTML = '<div class="muted">no games this round</div>'; return; }
+  const tossups = roundTossupBuzzes(rawEntries, round);
+  const bonuses = roundBonuses(rawEntries, round);
+  if (!tossups.length && !bonuses.length) {
+    box.innerHTML = '<div class="muted">no games this round</div>';
+    return;
+  }
   box.innerHTML = '<div class="muted">loading packet</div>';
   let packet = null;
   try { packet = await fetchBuzzPacket(round); }
@@ -284,37 +363,18 @@ async function renderBuzzRound(box, round) {
       sessionStorage.removeItem(BUZZ_KEY);
       render();
       return;
-    } // packet unreadable: positions still render without text
+    } // packet unreadable: numbers still render without text
   }
   if (tab !== 'buzz' || buzzView !== round) return; // user moved on mid-fetch
-  box.innerHTML = rows.map(({ tossup, buzzes }) => {
-    const tu = packet && packet.tossups[tossup - 1];
-    let qhtml = '';
-    if (tu) {
-      const words = tokenizeQuestion(tu.question);
-      const byPos = new Map();
-      buzzes.forEach((b, i) => {
-        const pos = Math.min(b.position, words.length - 1);
-        if (!byPos.has(pos)) byPos.set(pos, []);
-        byPos.get(pos).push({ i, b });
-      });
-      qhtml = '<div class="q">' + words.map((w, wi) => {
-        const hits = byPos.get(wi);
-        if (!hits) return esc(w);
-        const cls = buzzWordClass(hits.map((h) => h.b));
-        return `<span class="bw ${cls}">${esc(w)}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
-      }).join(' ') + '</div>';
-    }
-    return `
-      <div class="rhead">Tossup ${tossup}${tu ? ` — <span style="text-transform:none">${esc(stripTags(tu.answer))}</span>` : ''}</div>
-      ${qhtml}
-      <div class="buzzlist">
-        ${buzzes.map((b, i) => {
-          const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
-          return `<div><span class="${cls}">${i + 1} ${b.value > 0 ? '+' : ''}${b.value}</span>
-            ${esc(b.player)} (${esc(b.team)}) &middot; word ${b.position + 1}${b.room ? ' &middot; ' + esc(b.room) : ''}</div>`;
-        }).join('')}
-      </div>`;
+  // interleave by packet position: tossup N, then the bonus N read with it
+  const tossupByNo = new Map(tossups.map((t) => [t.tossup, t]));
+  const bonusByNo = new Map(bonuses.map((b) => [b.bonus, b]));
+  const numbers = [...new Set([...tossupByNo.keys(), ...bonusByNo.keys()])].sort((a, b) => a - b);
+  box.innerHTML = numbers.map((n) => {
+    let html = '';
+    if (tossupByNo.has(n)) html += tossupHtml(n, tossupByNo.get(n).buzzes, packet);
+    if (bonusByNo.has(n)) html += bonusHtml(n, bonusByNo.get(n).results, packet);
+    return html;
   }).join('');
 }
 

@@ -9,7 +9,7 @@ import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
-import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion } from '../app/engine/buzz.js';
+import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses } from '../app/engine/buzz.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -973,6 +973,46 @@ test('buzzSummary tallies powers/gets/negs and correct-buzz positions', () => {
   assert.deepEqual({ negs: bob.negs, correct: bob.correct, avg: bob.avg, best: bob.best },
     { negs: 2, correct: 0, avg: null, best: null });
   assert.equal(rows[0].player, 'Ann'); // most correct first
+});
+
+test('matchBonuses reads controlled + bounceback parts and the controlling team', () => {
+  const qbj = { ...BUZZ_QBJ,
+    match_questions: [
+      { question_number: 1,
+        tossup_question: { type: 'tossup', question_number: 1 },
+        buzzes: [buzz('Beta', 'Bob', 8, -5), buzz('Alpha', 'Ann', 33, 15)],
+        bonus: { question: { parts: 3, type: 'bonus', question_number: 1 },
+          parts: [{ controlled_points: 10 }, { controlled_points: 0, bounceback_points: 10 },
+            { controlled_points: 10 }] } },
+      { question_number: 2,
+        tossup_question: { type: 'tossup', question_number: 2 },
+        buzzes: [] }, // dead tossup, no bonus
+    ] };
+  const rows = matchBonuses(qbj);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], { bonus: 1, team: 'Alpha',
+    parts: [10, 0, 10], bounce: [0, 10, 0], total: 20, bounceTotal: 10 });
+  assert.deepEqual(matchBonuses({ qbj }), rows); // combined wrapper unwraps
+  assert.deepEqual(matchBonuses({ tossups_read: 5 }), []);
+});
+
+test('roundBonuses groups per packet bonus across rooms', () => {
+  const mkQbj = (team, pts) => ({ ...BUZZ_QBJ,
+    match_questions: [{ question_number: 1,
+      tossup_question: { type: 'tossup', question_number: 1 },
+      buzzes: [buzz(team, 'P', 5, 10)],
+      bonus: { question: { parts: 3, type: 'bonus', question_number: 2 },
+        parts: pts.map((p) => ({ controlled_points: p })) } }] });
+  const entries = [
+    { round: 1, room: 'R1', qbj: mkQbj('Alpha', [10, 10, 0]) },
+    { round: 1, room: 'R2', qbj: mkQbj('Gamma', [0, 0, 10]) },
+    { round: 2, room: 'R1', qbj: mkQbj('Alpha', [10, 10, 10]) },
+  ];
+  const rows = roundBonuses(entries, 1);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].bonus, 2);
+  assert.deepEqual(rows[0].results.map((r) => [r.room, r.team, r.total]),
+    [['R1', 'Alpha', 20], ['R2', 'Gamma', 10]]);
 });
 
 test('tokenizeQuestion strips tags and splits on whitespace', () => {

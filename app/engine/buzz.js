@@ -68,6 +68,56 @@ export function roundTossupBuzzes(entries, round) {
 }
 
 /**
+ * Bonus results in one match qbj: [{bonus, team, parts, bounce, total,
+ * bounceTotal}]. bonus = the packet bonus number MODAQ assigned; team =
+ * the controlling team (from the cycle's correct buzz); parts = the
+ * controlled points per part; bounce = bounceback points per part (all
+ * zero unless the format bounces).
+ */
+export function matchBonuses(json) {
+  const match = unwrapMatch(json);
+  const questions = Array.isArray(match.match_questions) ? match.match_questions : [];
+  const out = [];
+  for (const mq of questions) {
+    const b = mq && mq.bonus;
+    if (!b || !Array.isArray(b.parts) || !b.parts.length) continue;
+    const bonus = b.question && b.question.question_number;
+    if (!Number.isInteger(bonus) || bonus < 1) continue;
+    const correct = Array.isArray(mq.buzzes)
+      ? mq.buzzes.find((x) => x && x.result && Number(x.result.value) > 0) : null;
+    const team = correct && correct.team && typeof correct.team.name === 'string'
+      ? correct.team.name.trim() : '';
+    const parts = b.parts.map((p) => Number(p && p.controlled_points) || 0);
+    const bounce = b.parts.map((p) => Number(p && p.bounceback_points) || 0);
+    out.push({
+      bonus, team, parts, bounce,
+      total: parts.reduce((n, x) => n + x, 0),
+      bounceTotal: bounce.reduce((n, x) => n + x, 0),
+    });
+  }
+  return out;
+}
+
+/**
+ * One round's bonus results across every room, grouped per packet
+ * bonus: [{bonus, results: [{room, team, parts, bounce, total,
+ * bounceTotal}]}] sorted by bonus number.
+ */
+export function roundBonuses(entries, round) {
+  const byBonus = new Map();
+  for (const e of entries) {
+    if (!e || e.round !== round) continue;
+    for (const r of matchBonuses(e.qbj)) {
+      if (!byBonus.has(r.bonus)) byBonus.set(r.bonus, []);
+      byBonus.get(r.bonus).push({ ...r, room: e.room || '' });
+    }
+  }
+  return [...byBonus.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([bonus, results]) => ({ bonus, results }));
+}
+
+/**
  * Per-player buzz table over every entry: powers (value > 10), gets
  * (0 < value <= 10), negs (value < 0), avg word position and earliest
  * word position over correct buzzes. Sorted most correct first, then

@@ -65,11 +65,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   collected qbj files (exact team-name match) and a per-team view
   behind a dropdown; the stats tab has standings, individual
   leaderboard, and round-by-round scores, all computed in the browser.
-  The buzzpoints tab (TO-enabled: off / password / public) shows every
-  room's buzzes per tossup — the buzzed word underlined in the question
-  text (MODAQ's `buzz_position.word_index` rides in every qbj) — plus a
-  per-player summary (15/10/neg counts, average and earliest correct
-  buzz). Question text comes from the round packets through a gated
+  The buzzpoints tab (TO-enabled: off / password / public) lists each
+  round's questions in packet order as collapsed answerlines — a tossup
+  expands to its text with every room's buzzed words underlined
+  (MODAQ's `buzz_position.word_index` rides in every qbj), the bonus
+  read with it expands to per-part conversion and each room's line —
+  plus a per-player summary (15/10/neg counts, average and earliest
+  correct buzz). Question text comes from the round packets through a gated
   route; the TO's password is hashed client-side (SHA-256 with a random
   salt) into `settings.buzz` — the Worker never sees or stores the
   password, and only the mode is ever public. Only exists while the TO
