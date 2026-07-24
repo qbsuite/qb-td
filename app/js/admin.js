@@ -198,7 +198,8 @@ async function showDetail() {
       <span class="spacer" style="flex:1"></span>
       <label>round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
       <button id="setround">set</button>
-      <button id="advround" class="primary">advance to round ${t.current_round + 1}</button>
+      ${t.current_round < totalRounds
+        ? `<button id="advround" class="primary">advance to round ${t.current_round + 1}</button>` : ''}
     </div>
     <div class="row">
       <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> public page</label>
