@@ -285,6 +285,42 @@ r = await call(`${A}/packet?round=2&name=Packet2.json`, { method: 'POST',
   headers: { 'Content-Type': 'application/json' }, body: CATPACKET });
 ok('categorized packet restored', r.status === 200);
 
+// ACF/YAPP metadata-string packets ("Cat - Sub, Author", author-first,
+// bare category) parse too
+r = await call(`${A}/packet?round=3&name=Packet3.json`, { method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ tossups: [
+    { question: 'q', answer: 'a', metadata: 'History - World, Khang Le' },
+    { question: 'q', answer: 'a', metadata: 'Khang Le, Literature - American' },
+    { question: 'q', answer: 'a', metadata: 'Math, Vikram Narasimhan' },
+    { question: 'q', answer: 'a', metadata: 'Just An Author' },
+  ] }) });
+ok('metadata packet uploads', r.status === 200, r.body);
+r = await call('/pub/' + slug + '/cats');
+ok('metadata categories parsed', r.status === 200
+  && r.body.rounds['3'][0].c === 'History' && r.body.rounds['3'][0].s === 'World'
+  && r.body.rounds['3'][1].c === 'Literature' && r.body.rounds['3'][1].s === 'American'
+  && r.body.rounds['3'][2].c === 'Math' && r.body.rounds['3'][2].s === ''
+  && r.body.rounds['3'][3] === null, r.body.rounds['3']);
+
+// backfill: wipe the map (as if the packets predate extraction), then a
+// dashboard load rebuilds it off the response path
+const tid = (await call(A)).body.tournament.id;
+execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/catmap.json --local`,
+  { cwd: WORKER_DIR, stdio: 'ignore' });
+r = await call('/pub/' + slug);
+ok('cats gone after wipe', r.body.cats === null, r.body.cats);
+await call(A); // triggers the waitUntil backfill
+let backfilled = null;
+for (let i = 0; i < 20 && backfilled === null; i++) {
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  backfilled = (await call('/pub/' + slug)).body.cats;
+}
+ok('dashboard load backfills the map', backfilled !== null, backfilled);
+r = await call('/pub/' + slug + '/cats');
+ok('backfilled map has both rounds', r.status === 200
+  && r.body.rounds['2'] && r.body.rounds['3'], r.body);
+
 r = await call('/pub/' + slug);   // the sections below read files off this
 
 {
@@ -437,7 +473,7 @@ r = await call(A);
 ok('TO access survives room expiry', r.status === 200);
 
 // admin detail reflects everything
-ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 2, r.body.files);
+ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 3, r.body.files);
 
 // file delete
 const delId = r.body.files.find((f) => f.filename === 'broken.qbj').id;

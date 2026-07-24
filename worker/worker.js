@@ -198,13 +198,19 @@ async function rotateAdmin(env, t) {
   return json(env, { admin_secret: adminSecret });
 }
 
-async function getTournament(env, t) {
+async function getTournament(env, t, ctx) {
   const id = t.id;
-  const [buckets, rounds, files] = await Promise.all([
+  const [buckets, rounds, files, catsHead] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
+    env.DATA.head(`t/${id}/catmap.json`),
   ]);
+  // packets from before category extraction existed: backfill once,
+  // off the response path
+  if (!catsHead && ctx && rounds.results.some((r) => /\.json$/i.test(r.packet_name))) {
+    ctx.waitUntil(rebuildCatmap(env, id));
+  }
   const { admin_secret, creator_ip, ...pub_t } = t;
   return json(env, {
     tournament: { ...pub_t, closes: t.created + ADMIN_TTL },
@@ -282,16 +288,61 @@ async function deleteBucket(env, t, bucketId) {
    their rounds simply stay absent. Maintained with the same
    conditional-write retry as the stats bundle. */
 
+// Primary categories we recognize inside ACF/YAPP metadata strings
+// ("History - World, Author" / "Author, History - World" / "Math, Author").
+const META_CATS = new Set(['literature', 'history', 'science', 'fine arts',
+  'religion', 'mythology', 'philosophy', 'social science', 'current events',
+  'geography', 'other academic', 'trash', 'math', 'pop culture']);
+
+function categoryFromMetadata(meta) {
+  if (typeof meta !== 'string' || !meta) return null;
+  let best = null;
+  for (const part of meta.split(',')) {
+    const chunk = part.trim();
+    const [head, ...rest] = chunk.split(/\s+-\s+/);
+    if (!META_CATS.has(head.trim().toLowerCase())) continue;
+    const cand = { c: head.trim(), s: rest.join(' - ').trim() };
+    // a "Cat - Sub" part beats a bare "Cat" part
+    if (!best || (cand.s && !best.s)) best = cand;
+  }
+  return best;
+}
+
 function packetCategories(body, filename) {
   if (!/\.json$/i.test(filename)) return null;
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return null; }
   if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) return null;
-  const cats = parsed.tossups.map((tu) =>
-    tu && typeof tu.category === 'string' && tu.category
-      ? { c: tu.category, s: typeof tu.subcategory === 'string' ? tu.subcategory : '' }
-      : null);
+  const cats = parsed.tossups.map((tu) => {
+    if (!tu) return null;
+    if (typeof tu.category === 'string' && tu.category) {
+      return { c: tu.category, s: typeof tu.subcategory === 'string' ? tu.subcategory : '' };
+    }
+    return categoryFromMetadata(tu.metadata);
+  });
   return cats.some(Boolean) ? cats : null;
+}
+
+// Backfill for packets uploaded before category extraction existed (or
+// before a parser understood their format): recompute the whole map
+// from the stored packets. Triggered from the dashboard load when the
+// map is missing; writes an empty {rounds:{}} marker when nothing has
+// categories so the attempt isn't repeated every load.
+async function rebuildCatmap(env, tid) {
+  const { results } = await env.DB.prepare(
+    'SELECT number, packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1'
+  ).bind(tid).all();
+  const map = { rounds: {} };
+  for (const row of results) {
+    if (!/\.json$/i.test(row.packet_name)) continue;
+    const obj = await env.DATA.get(row.packet_r2_key);
+    if (!obj) continue;
+    const cats = packetCategories(await obj.arrayBuffer(), row.packet_name);
+    if (cats) map.rounds[String(row.number)] = cats;
+  }
+  await env.DATA.put(`t/${tid}/catmap.json`, JSON.stringify(map), {
+    httpMetadata: { contentType: 'application/json' },
+  });
 }
 
 async function updateCatmap(env, tid, round, cats) {
@@ -682,8 +733,17 @@ async function pubState(env, slug) {
     env.DB.prepare(
       'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     ).bind(t.id, t.current_round).all(),
-    env.DATA.head(`t/${t.id}/catmap.json`),
+    env.DATA.get(`t/${t.id}/catmap.json`),
   ]);
+  // an empty map is a "checked, nothing found" backfill marker: the
+  // tab stays hidden
+  let catsStamp = null;
+  if (catsHead) {
+    const parsed = await catsHead.json().catch(() => null);
+    if (parsed && parsed.rounds && Object.keys(parsed.rounds).length) {
+      catsStamp = catsHead.uploaded.getTime();
+    }
+  }
   const buzz = buzzConfig(t);
   const rooms = Object.fromEntries(buckets.results.map((b) => [b.id, b.room_name]));
   const rows = files.results;
@@ -697,7 +757,7 @@ async function pubState(env, slug) {
     buzz: buzz ? buzz.mode : null,
     packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
     // categories tab: refetch the (text-free) category map when this moves
-    cats: catsHead ? catsHead.uploaded.getTime() : null,
+    cats: catsStamp,
     // Stats only change when a file lands (or is deleted): clients compare
     // this stamp and refetch the bundle only when it moves.
     version: (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length,
@@ -747,7 +807,7 @@ async function pubRoster(env, slug) {
 
 /* ---------- router ---------- */
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
@@ -786,7 +846,7 @@ export default {
       if (adminClosed(t)) return err(env, 410, 'tournament closed');
       const sub = m[2] || '';
       let mm;
-      if (sub === '' && method === 'GET') return getTournament(env, t);
+      if (sub === '' && method === 'GET') return getTournament(env, t, ctx);
       if (sub === '' && method === 'POST') return updateTournament(request, env, t);
       if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
       if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
