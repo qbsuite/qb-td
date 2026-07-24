@@ -219,9 +219,19 @@ function renderSchedule(box) {
 
 /* ---------- buzzpoints tab ---------- */
 
+// The stored password carries the server's buzz_v stamp: when the TD
+// sets a new password the stamp moves and the stale entry is dropped,
+// so viewers have to enter the new one.
+function buzzStored() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(BUZZ_KEY));
+    return s && typeof s.pw === 'string' ? s : null;
+  } catch (e) { return null; }
+}
+
 function buzzAuthHeaders() {
-  const pw = sessionStorage.getItem(BUZZ_KEY);
-  return state.buzz === 'password' && pw ? { Authorization: 'Buzz ' + pw } : {};
+  const s = buzzStored();
+  return state.buzz && s ? { Authorization: 'Buzz ' + s.pw } : {};
 }
 
 function fetchBuzzPacket(round) {
@@ -242,8 +252,9 @@ function fetchBuzzPacket(round) {
 
 async function tryBuzzKey(pw) {
   if (!pw) return;
-  sessionStorage.setItem(BUZZ_KEY, pw);
-  const probe = (state.packet_rounds || [])[0];
+  sessionStorage.setItem(BUZZ_KEY, JSON.stringify({ pw, v: state.buzz_v }));
+  const probe = (state.buzz_done || []).filter((n) =>
+    (state.packet_rounds || []).includes(n))[0];
   if (probe !== undefined) {
     try { await fetchBuzzPacket(probe); }
     catch (e) {
@@ -266,8 +277,14 @@ function buzzWordClass(hits) {
   return 'zero';
 }
 
+const buzzDoneSet = () => new Set(state.buzz_done || []);
+const buzzEntries = () => {
+  const done = buzzDoneSet();
+  return rawEntries.filter((e) => done.has(e.round));
+};
+
 function renderBuzzSummary(box) {
-  const rows = buzzSummary(rawEntries);
+  const rows = buzzSummary(buzzEntries());
   if (!rows.length) { box.innerHTML = '<div class="muted">no buzzes yet</div>'; return; }
   box.innerHTML = `<div class="tablewrap"><table>
     <tr><th>player</th><th>team</th><th class="num">15</th><th class="num">10</th>
@@ -358,6 +375,10 @@ function bonusHtml(bonus, results, packet) {
 }
 
 async function renderBuzzRound(box, round) {
+  if (!buzzDoneSet().has(round)) {
+    box.innerHTML = '<div class="muted">round in progress</div>';
+    return;
+  }
   const tossups = roundTossupBuzzes(rawEntries, round);
   const bonuses = roundBonuses(rawEntries, round);
   if (!tossups.length && !bonuses.length) {
@@ -389,7 +410,7 @@ async function renderBuzzRound(box, round) {
 
 function renderBuzz(box) {
   if (!state.buzz) { box.innerHTML = '<div class="muted">not enabled</div>'; return; }
-  if (state.buzz === 'password' && !sessionStorage.getItem(BUZZ_KEY)) {
+  if (!buzzStored()) {
     box.innerHTML = `<div class="row">
       <input id="buzzpw" type="password" placeholder="password">
       <button id="buzzgo" class="primary">view</button>
@@ -398,7 +419,9 @@ function renderBuzz(box) {
     $('buzzpw').onkeydown = (e) => { if (e.key === 'Enter') tryBuzzKey($('buzzpw').value); };
     return;
   }
-  const rounds = state.packet_rounds || [];
+  const done = buzzDoneSet();
+  const rounds = (state.packet_rounds || []).filter((n) => done.has(n));
+  const pending = (state.packet_rounds || []).filter((n) => !done.has(n));
   if (buzzView === null || (buzzView !== 'summary' && !rounds.includes(buzzView))) {
     buzzView = rounds.length ? rounds[rounds.length - 1] : 'summary';
   }
@@ -406,6 +429,8 @@ function renderBuzz(box) {
     <div class="row" style="margin-bottom:10px">
       ${rounds.map((n) =>
         `<a href="#" class="pill${buzzView === n ? ' on' : ''}" data-buzzround="${n}">round ${n}</a>`).join('')}
+      ${pending.map((n) =>
+        `<span class="pill muted">round ${n} in progress</span>`).join('')}
       <span style="flex:1"></span>
       <a href="#" class="pill${buzzView === 'summary' ? ' on' : ''}" data-buzzround="summary">summary</a>
     </div>
@@ -541,6 +566,8 @@ async function load(force = false) {
   try {
     const next = await pub('/pub/' + slug);
     state = next;
+    const storedPw = buzzStored();
+    if (storedPw && storedPw.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;

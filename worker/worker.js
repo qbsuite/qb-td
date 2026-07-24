@@ -668,18 +668,19 @@ async function getPublishedTournament(env, slug) {
 }
 
 /* ---------- buzzpoints gate ----------
-   The TD's dashboard stores settings.buzz = {mode: 'password'|'public',
-   salt, hash} (hash = SHA-256 hex of "salt:password", computed
-   client-side; the Worker never sees or stores the password itself).
-   Only the MODE is ever exposed publicly — salt + hash stay private so
-   the hash can't be cracked offline. The gated resource is packet text
-   for played rounds; buzz positions themselves ride in the public
-   stats bundle. */
+   The TD's dashboard stores settings.buzz = {mode: 'password', salt,
+   hash} (hash = SHA-256 hex of "salt:password", computed client-side;
+   the Worker never sees or stores the password itself). Password is
+   the ONLY mode: buzzpoints are off or gated, never open. Salt + hash
+   stay private so the hash can't be cracked offline; the public state
+   carries only the mode and buzz_v — a salt-derived stamp that moves
+   when the TD sets a new password, so viewers' cached passwords
+   invalidate. The gated resource is packet text; buzz positions
+   themselves ride in the public stats bundle. */
 
 function buzzConfig(t) {
   try {
     const b = (JSON.parse(t.settings) || {}).buzz;
-    if (b && b.mode === 'public') return b;
     if (b && b.mode === 'password' && typeof b.salt === 'string' && typeof b.hash === 'string') return b;
   } catch (e) { /* fall through */ }
   return null;
@@ -691,14 +692,45 @@ async function sha256Hex(text) {
 }
 
 async function buzzAllowed(request, b) {
-  if (b.mode === 'public') return true;
   const auth = request.headers.get('Authorization') || '';
   if (!/^Buzz /.test(auth)) return false;
   return (await sha256Hex(b.salt + ':' + auth.slice(5))) === b.hash;
 }
 
+// Scheduled games with both slots filled for a round; null when the
+// schedule doesn't cover it.
+function scheduledGames(sched, round) {
+  for (const ph of (sched && sched.phases) || []) {
+    for (const r of ph.rounds || []) {
+      if (r.round === round) return (r.games || []).filter((g) => g.a && g.b).length;
+    }
+  }
+  return null;
+}
+
+// A round is done when every scheduled game (every bucket room, without
+// a schedule) has a clean game file. Buzzpoints stay hidden for a round
+// until nobody is still playing it — a lagging room's teams must not
+// read the round's answers mid-game.
+async function roundDone(env, t, round) {
+  const [files, buckets] = await Promise.all([
+    env.DB.prepare(
+      "SELECT DISTINCT bucket_id FROM files WHERE tournament_id = ?1 AND round = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL"
+    ).bind(t.id, round).all(),
+    env.DB.prepare('SELECT COUNT(*) AS n FROM buckets WHERE tournament_id = ?1').bind(t.id).all(),
+  ]);
+  let expected = buckets.results[0].n;
+  const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
+  if (obj) {
+    const n = scheduledGames(await obj.json().catch(() => null), round);
+    if (n !== null) expected = n;
+  }
+  return files.results.length >= expected;
+}
+
 // Packet text for the buzzpoints tab: publish-gated, buzz-gated, and —
-// same question-security rule as the moderator route — played rounds only.
+// same question-security rule as the moderator route — played rounds
+// only, where played means every room has turned the round in.
 async function pubQPacket(request, url, env, slug) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
@@ -708,6 +740,7 @@ async function pubQPacket(request, url, env, slug) {
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) return err(env, 400, 'bad round');
   if (round > t.current_round) return err(env, 403, 'not the live round yet');
+  if (!(await roundDone(env, t, round))) return err(env, 403, 'round in progress');
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
   ).bind(t.id, round).all();
@@ -722,14 +755,14 @@ async function pubQPacket(request, url, env, slug) {
 async function pubState(env, slug) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const [files, buckets, schedHead, packetRounds, catsHead] = await Promise.all([
+  const [files, buckets, schedObj, packetRounds, catsHead] = await Promise.all([
     env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
     env.DB.prepare(
       'SELECT id, room_name FROM buckets WHERE tournament_id = ?1'
     ).bind(t.id).all(),
-    env.DATA.head(`t/${t.id}/schedule.json`),
+    env.DATA.get(`t/${t.id}/schedule.json`),
     env.DB.prepare(
       'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     ).bind(t.id, t.current_round).all(),
@@ -747,14 +780,35 @@ async function pubState(env, slug) {
   const buzz = buzzConfig(t);
   const rooms = Object.fromEntries(buckets.results.map((b) => [b.id, b.room_name]));
   const rows = files.results;
+  // rounds every room has turned in — the only rounds the buzz tab shows
+  let buzzDone = [];
+  let buzzV = null;
+  if (buzz) {
+    buzzV = (await sha256Hex('buzzv:' + buzz.salt)).slice(0, 12);
+    const sched = schedObj ? await schedObj.json().catch(() => null) : null;
+    const inByRound = new Map();
+    for (const f of rows) {
+      if (!inByRound.has(f.round)) inByRound.set(f.round, new Set());
+      inByRound.get(f.round).add(f.bucket_id);
+    }
+    const candidates = new Set([...inByRound.keys(), ...packetRounds.results.map((r) => r.number)]);
+    buzzDone = [...candidates].filter((rn) => {
+      const scheduled = scheduledGames(sched, rn);
+      const expected = scheduled !== null ? scheduled : buckets.results.length;
+      return (inByRound.get(rn) || new Set()).size >= expected;
+    }).sort((x, y) => x - y);
+  }
   return json(env, {
     name: t.name,
     current_round: t.current_round,
     roster: !!t.roster_r2_key,
     // stamp for the schedule tab: refetch only when this moves
-    schedule: schedHead ? schedHead.uploaded.getTime() : null,
-    // buzzpoints tab: only the mode is public, never salt/hash
+    schedule: schedObj ? schedObj.uploaded.getTime() : null,
+    // buzzpoints tab: only the mode is public, never salt/hash; buzz_v
+    // moves with the password so viewers re-enter it
     buzz: buzz ? buzz.mode : null,
+    buzz_v: buzzV,
+    buzz_done: buzzDone,
     packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
     // categories tab: refetch the (text-free) category map when this moves
     cats: catsStamp,

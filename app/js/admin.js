@@ -198,8 +198,7 @@ async function showDetail() {
       <span class="spacer" style="flex:1"></span>
       <label>round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
       <button id="setround">set</button>
-      ${t.current_round < totalRounds
-        ? `<button id="advround" class="primary">advance to round ${t.current_round + 1}</button>` : ''}
+      <button id="advround" class="primary">advance to round ${t.current_round + 1}</button>
     </div>
     <div class="row">
       <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> public page</label>
@@ -240,8 +239,7 @@ async function showDetail() {
       <label class="row">buzzpoints
         <select id="buzzmode">
           <option value="">off</option>
-          <option value="password" ${(settings.buzz || {}).mode === 'password' ? 'selected' : ''}>password</option>
-          <option value="public" ${(settings.buzz || {}).mode === 'public' ? 'selected' : ''}>public</option>
+          <option value="password" ${(settings.buzz || {}).mode === 'password' ? 'selected' : ''}>on (password)</option>
         </select>
       </label>
       ${(settings.buzz || {}).hash ? '<span class="pill on">password set</span>' : ''}
@@ -461,7 +459,6 @@ async function showDetail() {
     try {
       const next = { ...settings };
       if (!mode) delete next.buzz;
-      else if (mode === 'public') next.buzz = { mode: 'public' };
       else {
         // keep an existing password; otherwise wait for one to be set
         if (settings.buzz && settings.buzz.hash) {
@@ -474,7 +471,7 @@ async function showDetail() {
         }
       }
       await saveSettings(next);
-      say(mode ? 'buzzpoints ' + mode : 'buzzpoints off');
+      say(mode ? 'buzzpoints on' : 'buzzpoints off');
       showDetail();
     } catch (e) { say(e.message, true); }
   };

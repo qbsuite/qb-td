@@ -210,9 +210,12 @@ r = await call(A + '/schedule', { method: 'POST', json: SCHED });
 ok('schedule restored', r.status === 200);
 
 // buzzpoints gate: settings.buzz drives the qpacket route; the public
-// state exposes only the mode, never salt/hash
+// state exposes only the mode + a salt-derived buzz_v, never salt/hash.
+// Password is the only mode, and rounds unlock only once every
+// scheduled game is in.
 r = await call('/pub/' + slug);
-ok('buzz off by default', r.body.buzz === null && r.body.packet_rounds.length === 0, r.body.buzz);
+ok('buzz off by default', r.body.buzz === null && r.body.buzz_v === null
+  && r.body.packet_rounds.length === 0, r.body.buzz);
 {
   const res = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
   ok('qpacket 404 when buzz off', res.status === 404);
@@ -228,6 +231,12 @@ ok('pub state exposes only buzz mode',
   && !JSON.stringify(r.body).includes(buzzSalt), r.body.buzz);
 ok('packet rounds listed', r.body.packet_rounds.length === 1 && r.body.packet_rounds[0] === 1,
   r.body.packet_rounds);
+ok('buzz_v is a 12-hex stamp', /^[0-9a-f]{12}$/.test(r.body.buzz_v), r.body.buzz_v);
+const buzzV1 = r.body.buzz_v;
+// round 1: 1 scheduled game, 1 clean upload -> done. round 2: scheduled,
+// nothing in -> not listed.
+ok('buzz_done lists only finished rounds',
+  JSON.stringify(r.body.buzz_done) === '[1]', r.body.buzz_done);
 {
   const noauth = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
   ok('qpacket 401 without password', noauth.status === 401);
@@ -241,15 +250,36 @@ ok('packet rounds listed', r.body.packet_rounds.length === 1 && r.body.packet_ro
   const future = await fetch(`${BASE}/pub/${slug}/qpacket?round=9`,
     { headers: { Authorization: 'Buzz hunter2' } });
   ok('qpacket future round locked', future.status === 403);
+  const ongoing = await fetch(`${BASE}/pub/${slug}/qpacket?round=2`,
+    { headers: { Authorization: 'Buzz hunter2' } });
+  ok('qpacket ongoing round locked', ongoing.status === 403
+    && (await ongoing.json()).error === 'round in progress');
 }
+// new password (fresh salt) moves buzz_v and kills the old password
+const buzzHash2 = createHash('sha256').update('salt2:hunter3').digest('hex');
+r = await call(A, { method: 'POST', json: { settings: {
+  gameFormat: 'acf', buzz: { mode: 'password', salt: 'salt2', hash: buzzHash2 } } } });
+ok('buzz password rotated', r.status === 200);
+r = await call('/pub/' + slug);
+ok('buzz_v moves with the password', /^[0-9a-f]{12}$/.test(r.body.buzz_v)
+  && r.body.buzz_v !== buzzV1, r.body.buzz_v);
+{
+  const stale = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz hunter2' } });
+  ok('old password rejected after rotate', stale.status === 401);
+  const fresh = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz hunter3' } });
+  ok('new password accepted', fresh.status === 200);
+}
+// passwordless mode no longer exists: legacy 'public' reads as off
 r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: { mode: 'public' } } } });
-ok('buzz public set', r.status === 200);
+ok('legacy public settings write accepted', r.status === 200);
 {
   const open = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
-  ok('qpacket open when buzz public', open.status === 200 && (await open.text()) === 'PDFBYTES');
+  ok('qpacket 404 for legacy public mode', open.status === 404);
 }
 r = await call('/pub/' + slug);
-ok('pub state buzz public', r.body.buzz === 'public');
+ok('legacy public mode reads as off', r.body.buzz === null && r.body.buzz_v === null, r.body.buzz);
 
 // category map: extracted from JSON packets at upload, text-free, public
 ok('no catmap yet', r.body.cats === null, r.body.cats);

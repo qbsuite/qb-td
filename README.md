@@ -79,7 +79,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
   map the Worker extracts from packets at upload (`/pub/:slug/cats` —
   no question text, so it's public without the buzzpoints gate; docx
   packets carry no categories).
-  The buzzpoints tab (TO-enabled: off / password / public) lists each
+  The buzzpoints tab (TO-enabled, always password-gated — off or on,
+  never open) lists each
   round's questions in packet order as collapsed answerlines (first
   answerline only, keeping the packet's bold/underline on the required
   part) — a tossup
@@ -90,7 +91,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   correct buzz). Question text comes from the round packets through a gated
   route; the TO's password is hashed client-side (SHA-256 with a random
   salt) into `settings.buzz` — the Worker never sees or stores the
-  password, and only the mode is ever public. Only exists while the TO
+  password, and only the mode plus a salt-derived `buzz_v` stamp are
+  public (setting a new password moves the stamp, so viewers must enter
+  it again). A round's buzzpoints and packet text stay hidden — server-
+  gated for text, tab-wide for the view — until every room has turned
+  that round in (scheduled games when a schedule exists, one game per
+  room otherwise), so a lagging room's teams can't read answers
+  mid-round. Only exists while the TO
   has publish switched on; fully decoupled from the admin side.
 - **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18) and a zip of
   every game's separated files — the match `.qbj` (imports via YellowFruit's
