@@ -191,6 +191,20 @@ async function showDetail() {
       </div>
     </div>
 
+    <div class="row" style="margin-top:8px">
+      <label class="row">buzzpoints
+        <select id="buzzmode">
+          <option value="">off</option>
+          <option value="password" ${(settings.buzz || {}).mode === 'password' ? 'selected' : ''}>password</option>
+          <option value="public" ${(settings.buzz || {}).mode === 'public' ? 'selected' : ''}>public</option>
+        </select>
+      </label>
+      ${(settings.buzz || {}).hash ? '<span class="pill on">password set</span>' : ''}
+      <input id="buzzpw" type="password" placeholder="password" size="16"
+        ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>
+      <button id="buzzset" ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>set password</button>
+    </div>
+
     <h2>rooms</h2>
     ${buckets.map((b) => {
       const closes = b.created + 48 * 3600 * 1000;
@@ -373,6 +387,42 @@ async function showDetail() {
       delete next.formatOverrides;
       await saveSettings(next);
       say('game format reset');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+  $('buzzmode').onchange = async () => {
+    const mode = $('buzzmode').value;
+    try {
+      const next = { ...settings };
+      if (!mode) delete next.buzz;
+      else if (mode === 'public') next.buzz = { mode: 'public' };
+      else {
+        // keep an existing password; otherwise wait for one to be set
+        if (settings.buzz && settings.buzz.hash) {
+          next.buzz = { mode: 'password', salt: settings.buzz.salt, hash: settings.buzz.hash };
+        } else {
+          $('buzzpw').hidden = false;
+          $('buzzset').hidden = false;
+          say('set a password');
+          return;
+        }
+      }
+      await saveSettings(next);
+      say(mode ? 'buzzpoints ' + mode : 'buzzpoints off');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+  $('buzzset').onclick = async () => {
+    const pw = $('buzzpw').value;
+    if (!pw) { say('enter a password', true); return; }
+    try {
+      const salt = [...crypto.getRandomValues(new Uint8Array(12))]
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+      const digest = await crypto.subtle.digest('SHA-256',
+        new TextEncoder().encode(salt + ':' + pw));
+      const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+      await saveSettings({ ...settings, buzz: { mode: 'password', salt, hash } });
+      say('buzzpoints password set');
       showDetail();
     } catch (e) { say(e.message, true); }
   };

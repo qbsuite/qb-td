@@ -127,6 +127,22 @@ table.box th:first-child {
 .slotchip:hover { background: var(--hover-bg); }
 .slotchip.sel { border-color: var(--link); color: var(--link); }
 .slotchip.ph { color: var(--muted); font-style: italic; }
+.q { max-width: 640px; margin: 4px 0 6px; }
+.bw { text-decoration: underline 2px; text-underline-offset: 3px; }
+.bw sup { font-size: 10px; font-weight: 700; }
+.bw.pow { text-decoration-color: var(--link); }
+.bw.pow sup { color: var(--link); }
+.bw.get { text-decoration-color: var(--ok); }
+.bw.get sup { color: var(--ok); }
+.bw.neg { text-decoration-color: var(--bad); }
+.bw.neg sup { color: var(--bad); }
+.bw.zero { text-decoration-color: var(--muted); }
+.bw.zero sup { color: var(--muted); }
+.pow-t { color: var(--link); }
+.buzzlist { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.buzzlist .ok, .buzzlist .bad, .buzzlist .pow-t, .buzzlist .muted {
+  font-variant-numeric: tabular-nums; font-weight: 600;
+}
 .modalback {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
   display: flex; align-items: center; justify-content: center; z-index: 10;

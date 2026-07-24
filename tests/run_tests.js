@@ -9,6 +9,7 @@ import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
+import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion } from '../app/engine/buzz.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -892,6 +893,92 @@ test('gameForRoom + roomRounds + roomIndexForBucket', () => {
   const p = buildSchedule('pools2', TEAMS8, ROOMS4);
   const playoffRound = p.phases[1].rounds[0].round;
   assert.equal(gameForRoom(p, 0, playoffRound), null);
+});
+
+/* ---------- buzz extraction ---------- */
+
+const buzz = (team, player, position, value) => ({
+  buzz_position: { word_index: position },
+  player: { name: player },
+  team: { name: team },
+  result: { value },
+});
+const BUZZ_QBJ = {
+  tossups_read: 3,
+  match_teams: [],
+  match_questions: [
+    { question_number: 1,
+      tossup_question: { type: 'tossup', question_number: 1 },
+      buzzes: [buzz('Beta', 'Bob', 8, -5), buzz('Alpha', 'Ann', 33, 15)] },
+    { question_number: 2,
+      tossup_question: { type: 'tossup', question_number: 2 },
+      replacement_tossup_question: { type: 'tossup', question_number: 3 },
+      buzzes: [buzz('Alpha', 'Ann', 12, 10)] },
+    { question_number: 3,
+      tossup_question: { type: 'tossup', question_number: 4 },
+      buzzes: [] },
+    { question_number: 4,
+      tossup_question: { type: 'tossup', question_number: 5 },
+      buzzes: [ // malformed rows dropped
+        { player: { name: 'Ann' }, team: { name: 'Alpha' }, result: { value: 10 } },
+        buzz('Beta', 'Bea', 20, 0),
+      ] },
+  ],
+  _round: 1,
+};
+
+test('matchBuzzes maps cycles to packet tossups, sorts, drops junk', () => {
+  const rows = matchBuzzes(BUZZ_QBJ);
+  assert.deepEqual(rows.map((r) => r.tossup), [1, 3, 5]);
+  // replacement tossup wins over the thrown-out one
+  assert.equal(rows[1].tossup, 3);
+  assert.deepEqual(rows[0].buzzes.map((b) => b.player), ['Bob', 'Ann']); // by position
+  assert.deepEqual(rows[0].buzzes[1], { player: 'Ann', team: 'Alpha', position: 33, value: 15 });
+  assert.deepEqual(rows[2].buzzes.map((b) => b.player), ['Bea']); // missing position dropped
+  // wrapped forms unwrap
+  assert.equal(matchBuzzes({ qbj: BUZZ_QBJ }).length, 3);
+  assert.equal(matchBuzzes({ objects: [BUZZ_QBJ] }).length, 3);
+  assert.deepEqual(matchBuzzes({ tossups_read: 5 }), []);
+});
+
+test('roundTossupBuzzes merges rooms for one round', () => {
+  const other = { ...BUZZ_QBJ,
+    match_questions: [{ question_number: 1,
+      tossup_question: { type: 'tossup', question_number: 1 },
+      buzzes: [buzz('Gamma', 'Gil', 20, 10)] }] };
+  const entries = [
+    { round: 1, room: 'R1', qbj: BUZZ_QBJ },
+    { round: 1, room: 'R2', qbj: other },
+    { round: 2, room: 'R1', qbj: other },
+  ];
+  const rows = roundTossupBuzzes(entries, 1);
+  assert.deepEqual(rows.map((r) => r.tossup), [1, 3, 5]);
+  assert.deepEqual(rows[0].buzzes.map((b) => [b.player, b.room]),
+    [['Bob', 'R1'], ['Gil', 'R2'], ['Ann', 'R1']]);
+});
+
+test('buzzSummary tallies powers/gets/negs and correct-buzz positions', () => {
+  const entries = [
+    { round: 1, room: 'R1', qbj: BUZZ_QBJ },
+    { round: 2, room: 'R1', qbj: BUZZ_QBJ },
+  ];
+  const rows = buzzSummary(entries);
+  const ann = rows.find((r) => r.player === 'Ann');
+  assert.deepEqual(
+    { powers: ann.powers, gets: ann.gets, negs: ann.negs, correct: ann.correct },
+    { powers: 2, gets: 2, negs: 0, correct: 4 });
+  assert.equal(ann.avg, (33 + 12 + 33 + 12) / 4);
+  assert.equal(ann.best, 12);
+  const bob = rows.find((r) => r.player === 'Bob');
+  assert.deepEqual({ negs: bob.negs, correct: bob.correct, avg: bob.avg, best: bob.best },
+    { negs: 2, correct: 0, avg: null, best: null });
+  assert.equal(rows[0].player, 'Ann'); // most correct first
+});
+
+test('tokenizeQuestion strips tags and splits on whitespace', () => {
+  assert.deepEqual(tokenizeQuestion('For 10 points, name this <b>author</b> of&nbsp;<i>Faust</i>.'),
+    ['For', '10', 'points,', 'name', 'this', 'author', 'of', 'Faust', '.']);
+  assert.deepEqual(tokenizeQuestion(''), []);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

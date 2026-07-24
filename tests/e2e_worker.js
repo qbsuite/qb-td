@@ -6,6 +6,7 @@
 // the admin link secret (minted at creation) is the TO's credential.
 
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -198,6 +199,49 @@ r = await call('/pub/' + slug);
 ok('schedule stamp cleared', r.body.schedule === null, r.body.schedule);
 r = await call(A + '/schedule', { method: 'POST', json: SCHED });
 ok('schedule restored', r.status === 200);
+
+// buzzpoints gate: settings.buzz drives the qpacket route; the public
+// state exposes only the mode, never salt/hash
+r = await call('/pub/' + slug);
+ok('buzz off by default', r.body.buzz === null && r.body.packet_rounds.length === 0, r.body.buzz);
+{
+  const res = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
+  ok('qpacket 404 when buzz off', res.status === 404);
+}
+const buzzSalt = 'testsalt';
+const buzzHash = createHash('sha256').update(buzzSalt + ':hunter2').digest('hex');
+r = await call(A, { method: 'POST', json: { settings: {
+  gameFormat: 'acf', buzz: { mode: 'password', salt: buzzSalt, hash: buzzHash } } } });
+ok('buzz password set', r.status === 200);
+r = await call('/pub/' + slug);
+ok('pub state exposes only buzz mode',
+  r.body.buzz === 'password' && !JSON.stringify(r.body).includes(buzzHash)
+  && !JSON.stringify(r.body).includes(buzzSalt), r.body.buzz);
+ok('packet rounds listed', r.body.packet_rounds.length === 1 && r.body.packet_rounds[0] === 1,
+  r.body.packet_rounds);
+{
+  const noauth = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
+  ok('qpacket 401 without password', noauth.status === 401);
+  const wrong = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz wrong' } });
+  ok('qpacket 401 wrong password', wrong.status === 401);
+  const right = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz hunter2' } });
+  ok('qpacket serves packet with password', right.status === 200 && (await right.text()) === 'PDFBYTES');
+  ok('qpacket private cache', (right.headers.get('cache-control') || '').includes('private'));
+  const future = await fetch(`${BASE}/pub/${slug}/qpacket?round=9`,
+    { headers: { Authorization: 'Buzz hunter2' } });
+  ok('qpacket future round locked', future.status === 403);
+}
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: { mode: 'public' } } } });
+ok('buzz public set', r.status === 200);
+{
+  const open = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
+  ok('qpacket open when buzz public', open.status === 200 && (await open.text()) === 'PDFBYTES');
+}
+r = await call('/pub/' + slug);
+ok('pub state buzz public', r.body.buzz === 'public');
+
 r = await call('/pub/' + slug);   // the sections below read files off this
 
 {

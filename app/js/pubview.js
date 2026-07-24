@@ -8,6 +8,8 @@ import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
+import { roundTossupBuzzes, buzzSummary, tokenizeQuestion } from '../engine/buzz.js';
+import { normalizePacket } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
@@ -20,8 +22,13 @@ let matches = [];
 let statsErrors = [];
 let roster = null;
 let schedule = null;
-let tab = null;            // 'schedule' | 'stats'
+let tab = null;            // 'schedule' | 'stats' | 'buzz'
 let teamFilter = '';
+let rawEntries = [];       // {round, room, qbj} — buzz extraction reads these
+let buzzView = null;       // selected round number, or 'summary'
+const buzzPackets = {};    // round -> Promise<normalized packet>
+const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
+const BUZZ_KEY = 'qbtdBuzzKey:' + slug;
 
 function say(text, bad = false) {
   $('msg').textContent = text || '';
@@ -38,8 +45,11 @@ async function fetchRoster() {
 }
 
 // One request for all games; per-file fetch only if the bundle is missing.
+// The raw qbj rows are kept too — the buzzpoints tab reads
+// match_questions, which parseMatch drops.
 async function fetchMatches(errors) {
   const out = [];
+  const raw = [];
   try {
     const bundle = await asJson(await pub('/pub/' + slug + '/bundle'));
     for (const entry of bundle.entries) {
@@ -48,20 +58,24 @@ async function fetchMatches(errors) {
         m.room = entry.room;
         m.fileId = entry.id;
         out.push(m);
+        raw.push({ round: m.round, room: entry.room, qbj: entry.qbj });
       } catch (e) { errors.push(entry.filename + ': ' + e.message); }
     }
+    rawEntries = raw;
     return out;
   } catch (e) { /* no bundle yet: fall through */ }
 
   await Promise.all(state.files.map(async (f) => {
     try {
-      const m = parseMatch(await asJson(await pub('/pub/' + slug + '/qbj/' + f.id)),
-        { filename: f.filename });
+      const qbj = await asJson(await pub('/pub/' + slug + '/qbj/' + f.id));
+      const m = parseMatch(qbj, { filename: f.filename });
       m.room = f.room;
       m.fileId = f.id;
       out.push(m);
+      raw.push({ round: m.round, room: f.room, qbj });
     } catch (e) { errors.push(f.filename + ': ' + e.message); }
   }));
+  rawEntries = raw;
   return out;
 }
 
@@ -196,6 +210,149 @@ function renderSchedule(box) {
   else renderScheduleGrid($('schedout'));
 }
 
+/* ---------- buzzpoints tab ---------- */
+
+function buzzAuthHeaders() {
+  const pw = sessionStorage.getItem(BUZZ_KEY);
+  return state.buzz === 'password' && pw ? { Authorization: 'Buzz ' + pw } : {};
+}
+
+function fetchBuzzPacket(round) {
+  if (!buzzPackets[round]) {
+    buzzPackets[round] = (async () => {
+      const res = await pub('/pub/' + slug + '/qpacket?round=' + round,
+        { headers: buzzAuthHeaders() });
+      if (!(res instanceof Response)) return normalizePacket(res, 'round ' + round);
+      // non-JSON packet (docx): parse in-browser via the same public
+      // YAPP service the reader uses
+      const yapp = await fetch(YAPP, { method: 'POST', body: await res.arrayBuffer(), mode: 'cors' });
+      if (!yapp.ok) throw new Error('packet parser failed (' + yapp.status + ')');
+      return normalizePacket(await yapp.json(), 'round ' + round);
+    })().catch((e) => { delete buzzPackets[round]; throw e; });
+  }
+  return buzzPackets[round];
+}
+
+async function tryBuzzKey(pw) {
+  if (!pw) return;
+  sessionStorage.setItem(BUZZ_KEY, pw);
+  const probe = (state.packet_rounds || [])[0];
+  if (probe !== undefined) {
+    try { await fetchBuzzPacket(probe); }
+    catch (e) {
+      if (String(e.message).includes('bad password')) {
+        sessionStorage.removeItem(BUZZ_KEY);
+        say('bad password', true);
+        return;
+      } // other failures (no packet etc.): let the tab render what it can
+    }
+  }
+  say('');
+  render();
+}
+
+const stripTags = (s) => String(s || '').replace(/<[^>]*>/g, '');
+function buzzWordClass(hits) {
+  if (hits.some((b) => b.value > 10)) return 'pow';
+  if (hits.some((b) => b.value > 0)) return 'get';
+  if (hits.some((b) => b.value < 0)) return 'neg';
+  return 'zero';
+}
+
+function renderBuzzSummary(box) {
+  const rows = buzzSummary(rawEntries);
+  if (!rows.length) { box.innerHTML = '<div class="muted">no buzzes yet</div>'; return; }
+  box.innerHTML = `<div class="tablewrap"><table>
+    <tr><th>player</th><th>team</th><th class="num">15</th><th class="num">10</th>
+      <th class="num">neg</th><th class="num">avg buzz</th><th class="num">best</th></tr>
+    ${rows.map((p) => `<tr>
+      <td>${esc(p.player)}</td><td class="muted">${esc(p.team)}</td>
+      <td class="num">${p.powers}</td><td class="num">${p.gets}</td><td class="num">${p.negs}</td>
+      <td class="num">${p.avg === null ? '–' : (p.avg + 1).toFixed(1)}</td>
+      <td class="num">${p.best === null ? '–' : p.best + 1}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+async function renderBuzzRound(box, round) {
+  const rows = roundTossupBuzzes(rawEntries, round);
+  if (!rows.length) { box.innerHTML = '<div class="muted">no games this round</div>'; return; }
+  box.innerHTML = '<div class="muted">loading packet</div>';
+  let packet = null;
+  try { packet = await fetchBuzzPacket(round); }
+  catch (e) {
+    if (String(e.message).includes('bad password')) {
+      sessionStorage.removeItem(BUZZ_KEY);
+      render();
+      return;
+    } // packet unreadable: positions still render without text
+  }
+  if (tab !== 'buzz' || buzzView !== round) return; // user moved on mid-fetch
+  box.innerHTML = rows.map(({ tossup, buzzes }) => {
+    const tu = packet && packet.tossups[tossup - 1];
+    let qhtml = '';
+    if (tu) {
+      const words = tokenizeQuestion(tu.question);
+      const byPos = new Map();
+      buzzes.forEach((b, i) => {
+        const pos = Math.min(b.position, words.length - 1);
+        if (!byPos.has(pos)) byPos.set(pos, []);
+        byPos.get(pos).push({ i, b });
+      });
+      qhtml = '<div class="q">' + words.map((w, wi) => {
+        const hits = byPos.get(wi);
+        if (!hits) return esc(w);
+        const cls = buzzWordClass(hits.map((h) => h.b));
+        return `<span class="bw ${cls}">${esc(w)}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
+      }).join(' ') + '</div>';
+    }
+    return `
+      <div class="rhead">Tossup ${tossup}${tu ? ` — <span style="text-transform:none">${esc(stripTags(tu.answer))}</span>` : ''}</div>
+      ${qhtml}
+      <div class="buzzlist">
+        ${buzzes.map((b, i) => {
+          const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
+          return `<div><span class="${cls}">${i + 1} ${b.value > 0 ? '+' : ''}${b.value}</span>
+            ${esc(b.player)} (${esc(b.team)}) &middot; word ${b.position + 1}${b.room ? ' &middot; ' + esc(b.room) : ''}</div>`;
+        }).join('')}
+      </div>`;
+  }).join('');
+}
+
+function renderBuzz(box) {
+  if (!state.buzz) { box.innerHTML = '<div class="muted">not enabled</div>'; return; }
+  if (state.buzz === 'password' && !sessionStorage.getItem(BUZZ_KEY)) {
+    box.innerHTML = `<div class="row">
+      <input id="buzzpw" type="password" placeholder="password">
+      <button id="buzzgo" class="primary">view</button>
+    </div>`;
+    $('buzzgo').onclick = () => tryBuzzKey($('buzzpw').value);
+    $('buzzpw').onkeydown = (e) => { if (e.key === 'Enter') tryBuzzKey($('buzzpw').value); };
+    return;
+  }
+  const rounds = state.packet_rounds || [];
+  if (buzzView === null || (buzzView !== 'summary' && !rounds.includes(buzzView))) {
+    buzzView = rounds.length ? rounds[rounds.length - 1] : 'summary';
+  }
+  box.innerHTML = `
+    <div class="row" style="margin-bottom:10px">
+      ${rounds.map((n) =>
+        `<a href="#" class="pill${buzzView === n ? ' on' : ''}" data-buzzround="${n}">round ${n}</a>`).join('')}
+      <span style="flex:1"></span>
+      <a href="#" class="pill${buzzView === 'summary' ? ' on' : ''}" data-buzzround="summary">summary</a>
+    </div>
+    <div id="buzzout"></div>`;
+  box.querySelectorAll('[data-buzzround]').forEach((p) => {
+    p.onclick = (e) => {
+      e.preventDefault();
+      const v = p.dataset.buzzround;
+      buzzView = v === 'summary' ? 'summary' : Number(v);
+      render();
+    };
+  });
+  if (buzzView === 'summary') renderBuzzSummary($('buzzout'));
+  else renderBuzzRound($('buzzout'), buzzView);
+}
+
 /* ---------- stats tab ---------- */
 
 function renderStatsTab(box) {
@@ -215,6 +372,7 @@ function render() {
     b.classList.toggle('active', b.dataset.tab === tab));
   const box = $('out');
   if (tab === 'schedule') renderSchedule(box);
+  else if (tab === 'buzz') renderBuzz(box);
   else renderStatsTab(box);
 }
 
@@ -231,6 +389,8 @@ async function load(force = false) {
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;
+    $('tab-buzz').hidden = !state.buzz;
+    if (tab === 'buzz' && !state.buzz) setTab('stats', false);
 
     const statsMoved = force || state.version !== lastVersion;
     const schedMoved = force || state.schedule !== lastSched;
@@ -261,8 +421,8 @@ async function load(force = false) {
 
     if (tab === null) {
       const wanted = (location.hash || '').replace('#', '');
-      setTab(wanted === 'stats' || wanted === 'schedule' ? wanted
-        : schedule ? 'schedule' : 'stats', false);
+      setTab(wanted === 'stats' || wanted === 'schedule' || (wanted === 'buzz' && state.buzz)
+        ? wanted : schedule ? 'schedule' : 'stats', false);
     } else render();
     say('');
   } catch (e) { say(e.message, true); }

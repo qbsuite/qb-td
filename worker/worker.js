@@ -550,15 +550,67 @@ async function bucketRoster(env, secret) {
 
 async function getPublishedTournament(env, slug) {
   const { results } = await env.DB.prepare(
-    'SELECT id, slug, name, current_round, roster_r2_key FROM tournaments WHERE slug = ?1 AND published = 1'
+    'SELECT id, slug, name, current_round, roster_r2_key, settings FROM tournaments WHERE slug = ?1 AND published = 1'
   ).bind(slug).all();
   return results[0] || null;
+}
+
+/* ---------- buzzpoints gate ----------
+   The TD's dashboard stores settings.buzz = {mode: 'password'|'public',
+   salt, hash} (hash = SHA-256 hex of "salt:password", computed
+   client-side; the Worker never sees or stores the password itself).
+   Only the MODE is ever exposed publicly — salt + hash stay private so
+   the hash can't be cracked offline. The gated resource is packet text
+   for played rounds; buzz positions themselves ride in the public
+   stats bundle. */
+
+function buzzConfig(t) {
+  try {
+    const b = (JSON.parse(t.settings) || {}).buzz;
+    if (b && b.mode === 'public') return b;
+    if (b && b.mode === 'password' && typeof b.salt === 'string' && typeof b.hash === 'string') return b;
+  } catch (e) { /* fall through */ }
+  return null;
+}
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+async function buzzAllowed(request, b) {
+  if (b.mode === 'public') return true;
+  const auth = request.headers.get('Authorization') || '';
+  if (!/^Buzz /.test(auth)) return false;
+  return (await sha256Hex(b.salt + ':' + auth.slice(5))) === b.hash;
+}
+
+// Packet text for the buzzpoints tab: publish-gated, buzz-gated, and —
+// same question-security rule as the moderator route — played rounds only.
+async function pubQPacket(request, url, env, slug) {
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const b = buzzConfig(t);
+  if (!b) return err(env, 404, 'not found');
+  if (!(await buzzAllowed(request, b))) return err(env, 401, 'bad password');
+  const round = Number(url.searchParams.get('round'));
+  if (!Number.isInteger(round) || round < 1) return err(env, 400, 'bad round');
+  if (round > t.current_round) return err(env, 403, 'not the live round yet');
+  const { results } = await env.DB.prepare(
+    'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
+  ).bind(t.id, round).all();
+  if (!results.length) return err(env, 404, 'no packet for round ' + round);
+  const obj = await env.DATA.get(results[0].packet_r2_key);
+  if (!obj) return err(env, 404, 'packet missing');
+  const res = blobResponse(env, obj, results[0].packet_name);
+  res.headers.set('Cache-Control', 'private, max-age=60');
+  return res;
 }
 
 async function pubState(env, slug) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const [files, buckets, schedHead] = await Promise.all([
+  const [files, buckets, schedHead, packetRounds] = await Promise.all([
     env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
@@ -566,7 +618,11 @@ async function pubState(env, slug) {
       'SELECT id, room_name FROM buckets WHERE tournament_id = ?1'
     ).bind(t.id).all(),
     env.DATA.head(`t/${t.id}/schedule.json`),
+    env.DB.prepare(
+      'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
+    ).bind(t.id, t.current_round).all(),
   ]);
+  const buzz = buzzConfig(t);
   const rooms = Object.fromEntries(buckets.results.map((b) => [b.id, b.room_name]));
   const rows = files.results;
   return json(env, {
@@ -575,6 +631,9 @@ async function pubState(env, slug) {
     roster: !!t.roster_r2_key,
     // stamp for the schedule tab: refetch only when this moves
     schedule: schedHead ? schedHead.uploaded.getTime() : null,
+    // buzzpoints tab: only the mode is public, never salt/hash
+    buzz: buzz ? buzz.mode : null,
+    packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
     // Stats only change when a file lands (or is deleted): clients compare
     // this stamp and refetch the bundle only when it moves.
     version: (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length,
@@ -649,6 +708,7 @@ export default {
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubQPacket(request, url, env, m[1]);
 
     // Open (rate-limited) tournament creation; the response carries the
     // admin secret, shown to the TO exactly once by the dashboard.

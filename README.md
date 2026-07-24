@@ -60,12 +60,20 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (the same one MODAQ's demo uses — docx question text transits
   quizbowlreader.com).
 - **Public tournament page** (`app/t.html?t=<slug>`; `stats.html`
-  redirects): schedule + stats tabs. The schedule tab renders the grid
-  with played games' scores filled in from the collected qbj files
-  (exact team-name match) and a per-team view behind a dropdown; the
-  stats tab has standings, individual leaderboard, and round-by-round
-  scores, all computed in the browser. Only exists while the TO has
-  publish switched on; fully decoupled from the admin side.
+  redirects): schedule + stats + buzzpoints tabs. The schedule tab
+  renders the grid with played games' scores filled in from the
+  collected qbj files (exact team-name match) and a per-team view
+  behind a dropdown; the stats tab has standings, individual
+  leaderboard, and round-by-round scores, all computed in the browser.
+  The buzzpoints tab (TO-enabled: off / password / public) shows every
+  room's buzzes per tossup — the buzzed word underlined in the question
+  text (MODAQ's `buzz_position.word_index` rides in every qbj) — plus a
+  per-player summary (15/10/neg counts, average and earliest correct
+  buzz). Question text comes from the round packets through a gated
+  route; the TO's password is hashed client-side (SHA-256 with a random
+  salt) into `settings.buzz` — the Worker never sees or stores the
+  password, and only the mode is ever public. Only exists while the TO
+  has publish switched on; fully decoupled from the admin side.
 - **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18) and a zip of
   every game's separated files — the match `.qbj` (imports via YellowFruit's
   ModaQ game-file import) and the MODAQ game file — plus the roster. Both
@@ -91,7 +99,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Packets are only reachable through a bucket link, and only for rounds
   up to the live one** — moderators can't pull future packets, and the
   public routes never serve packets (only match qbj + roster, and only
-  while the TO has publish switched on). Bucket links also serve the roster (the
+  while the TO has publish switched on). The one exception is opt-in:
+  the buzzpoints packet route (`/pub/:slug/qpacket`), which the TO
+  explicitly enables (password-gated or public) and which serves played
+  rounds only, under the same future-round lock. Bucket links also serve the roster (the
   reader page preloads it); rosters aren't question material.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
   that leaks into a crawler or an outbound click doesn't spread.
@@ -114,7 +125,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - `app/engine/` — dependency-free JS engine, shared by dashboard and the
   public page: `qbj.js` (parse ModaQ match qbj + roster), `stats.js`
   (standings + leaderboard), `schedule.js` (round-robin/pool generation,
-  format catalog, editing helpers, room lookups), `yft.js` (`.yft`
+  format catalog, editing helpers, room lookups), `buzz.js` (per-buzz
+  extraction from match qbj, room-merged tossup buzzes, player buzz
+  summary), `yft.js` (`.yft`
   serialization, contract verified against YellowFruit 4.0.18 source),
   `zip.js` (store-only zip).
 - `app/` — the five static pages + `js/` page code. Deployable on any
