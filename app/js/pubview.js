@@ -295,20 +295,21 @@ function tossupHtml(tossup, buzzes, packet) {
     const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
     return `<span class="${cls}">${b.position + 1}</span>`;
   }).join(' ');
+  const dead = buzzes.some((b) => b.value > 0) ? '' : '<span class="bad">dead</span> ';
   return `
     <details class="qd">
       <summary><span class="roundcell">T${tossup}</span>
         ${tu ? esc(stripTags(tu.answer)) : '<span class="muted">(no packet text)</span>'}
-        <span class="qdmeta">${buzzChips}</span></summary>
+        <span class="qdmeta">${dead}${buzzChips}</span></summary>
       <div class="qdbody">
         ${qhtml}
-        <div class="buzzlist">
+        ${buzzes.length ? `<div class="buzzlist">
           ${buzzes.map((b, i) => {
             const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
             return `<div><span class="${cls}">${i + 1} ${b.value > 0 ? '+' : ''}${b.value}</span>
               ${esc(b.player)} (${esc(b.team)}) &middot; word ${b.position + 1}${b.room ? ' &middot; ' + esc(b.room) : ''}</div>`;
           }).join('')}
-        </div>
+        </div>` : '<div class="buzzlist">no buzzes</div>'}
       </div>
     </details>`;
 }

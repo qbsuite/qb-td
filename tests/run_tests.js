@@ -927,17 +927,18 @@ const BUZZ_QBJ = {
   _round: 1,
 };
 
-test('matchBuzzes maps cycles to packet tossups, sorts, drops junk', () => {
+test('matchBuzzes maps cycles to packet tossups, keeps dead ones, drops junk', () => {
   const rows = matchBuzzes(BUZZ_QBJ);
-  assert.deepEqual(rows.map((r) => r.tossup), [1, 3, 5]);
+  assert.deepEqual(rows.map((r) => r.tossup), [1, 3, 4, 5]);
   // replacement tossup wins over the thrown-out one
   assert.equal(rows[1].tossup, 3);
   assert.deepEqual(rows[0].buzzes.map((b) => b.player), ['Bob', 'Ann']); // by position
   assert.deepEqual(rows[0].buzzes[1], { player: 'Ann', team: 'Alpha', position: 33, value: 15 });
-  assert.deepEqual(rows[2].buzzes.map((b) => b.player), ['Bea']); // missing position dropped
+  assert.deepEqual(rows[2].buzzes, []); // dead in this room, still listed
+  assert.deepEqual(rows[3].buzzes.map((b) => b.player), ['Bea']); // missing position dropped
   // wrapped forms unwrap
-  assert.equal(matchBuzzes({ qbj: BUZZ_QBJ }).length, 3);
-  assert.equal(matchBuzzes({ objects: [BUZZ_QBJ] }).length, 3);
+  assert.equal(matchBuzzes({ qbj: BUZZ_QBJ }).length, 4);
+  assert.equal(matchBuzzes({ objects: [BUZZ_QBJ] }).length, 4);
   assert.deepEqual(matchBuzzes({ tossups_read: 5 }), []);
 });
 
@@ -952,9 +953,10 @@ test('roundTossupBuzzes merges rooms for one round', () => {
     { round: 2, room: 'R1', qbj: other },
   ];
   const rows = roundTossupBuzzes(entries, 1);
-  assert.deepEqual(rows.map((r) => r.tossup), [1, 3, 5]);
+  assert.deepEqual(rows.map((r) => r.tossup), [1, 3, 4, 5]);
   assert.deepEqual(rows[0].buzzes.map((b) => [b.player, b.room]),
     [['Bob', 'R1'], ['Gil', 'R2'], ['Ann', 'R1']]);
+  assert.deepEqual(rows[2], { tossup: 4, buzzes: [] }); // dead everywhere
 });
 
 test('buzzSummary tallies powers/gets/negs and correct-buzz positions', () => {

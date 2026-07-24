@@ -17,24 +17,24 @@ function unwrapMatch(json) {
 }
 
 /**
- * All buzzes in one match qbj (any accepted wrapping), grouped by the
- * PACKET tossup number (1-based; thrown-out tossups resolve to the
+ * All read tossups in one match qbj (any accepted wrapping), grouped by
+ * the PACKET tossup number (1-based; thrown-out tossups resolve to the
  * replacement actually played). [{tossup, buzzes: [{player, team,
- * position, value}]}] — cycles without buzzes are skipped, malformed
- * buzzes dropped.
+ * position, value}]}] — a cycle nobody buzzed on still appears (empty
+ * buzzes: it went dead in that room); malformed buzzes are dropped.
  */
 export function matchBuzzes(json) {
   const match = unwrapMatch(json);
   const questions = Array.isArray(match.match_questions) ? match.match_questions : [];
   const out = [];
   for (const mq of questions) {
-    if (!mq || !Array.isArray(mq.buzzes) || !mq.buzzes.length) continue;
+    if (!mq) continue;
     const tossup = (mq.replacement_tossup_question && mq.replacement_tossup_question.question_number)
       || (mq.tossup_question && mq.tossup_question.question_number)
       || mq.question_number;
     if (!Number.isInteger(tossup) || tossup < 1) continue;
     const buzzes = [];
-    for (const b of mq.buzzes) {
+    for (const b of (Array.isArray(mq.buzzes) ? mq.buzzes : [])) {
       const player = b && b.player && typeof b.player.name === 'string' ? b.player.name.trim() : '';
       const team = b && b.team && typeof b.team.name === 'string' ? b.team.name.trim() : '';
       const position = b && b.buzz_position ? b.buzz_position.word_index : undefined;
@@ -42,7 +42,7 @@ export function matchBuzzes(json) {
       if (!player || !Number.isInteger(position) || position < 0 || !Number.isFinite(value)) continue;
       buzzes.push({ player, team, position, value });
     }
-    if (buzzes.length) out.push({ tossup, buzzes: buzzes.sort((x, y) => x.position - y.position) });
+    out.push({ tossup, buzzes: buzzes.sort((x, y) => x.position - y.position) });
   }
   return out;
 }
