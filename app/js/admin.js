@@ -14,7 +14,7 @@ import { renderStats } from './statsview.js';
 import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrides,
   parsePowersText, powersText } from './read_core.js';
 import { formatsFor, buildSchedule, validateSchedule, slotAt, setSlot, swapSlots,
-  addRound, removeRound, slotText } from '../engine/schedule.js';
+  moveGame, addRound, removeRound, slotText } from '../engine/schedule.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -586,6 +586,7 @@ let sched = null;          // working schedule (or null: creator shown)
 let schedFetched = false;
 let schedTeams = null;     // roster team names, seed order
 let schedSel = null;       // selected slot ref for click-to-swap
+let schedGameSel = null;   // selected game ref {p, r, g} for room move
 let schedDirty = false;
 let schedRoomsOpen = false;
 let schedRoomsN = null;    // creator rooms input
@@ -646,6 +647,7 @@ async function renderSchedule(a, t, buckets) {
         sched = buildSchedule(key, schedTeams, rooms);
         sched.format = key;
         schedSel = null;
+        schedGameSel = null;
       } catch (e) { say(e.message, true); return; }
       // a generated schedule goes live right away — "save" is only for
       // edits made after
@@ -695,6 +697,15 @@ async function renderSchedule(a, t, buckets) {
       </select>
       <button id="schedunsel">cancel</button>
     </div>` : ''}
+    ${schedGameSel ? (() => {
+      const round = sched.phases[schedGameSel.p].rounds[schedGameSel.r];
+      const game = round.games[schedGameSel.g];
+      return `
+    <div class="row" style="margin:6px 0">
+      <span>moving ${esc(slotText(game.a) || '—')} v ${esc(slotText(game.b) || '—')} &middot; round ${round.round}</span>
+      <button id="schedgunsel">cancel</button>
+    </div>`;
+    })() : ''}
     <div id="schedroomspanel" ${schedRoomsOpen ? '' : 'hidden'} class="card" style="margin:6px 0">
       ${sched.rooms.map((r, i) => `
       <div class="row" style="margin:2px 0">
@@ -718,11 +729,21 @@ async function renderSchedule(a, t, buckets) {
           <td class="roundcell">${round.round}</td>
           ${sched.rooms.map((_, roomI) => {
             const g = round.games.findIndex((x) => x.room === roomI);
-            if (g === -1) return `<td><span class="slotchip muted" data-addgame="${p}.${r}.${roomI}">+</span></td>`;
-            return `<td>
-              <div>${chip({ p, r, g, side: 'a' }, round.games[g].a)}</div>
-              <div>${chip({ p, r, g, side: 'b' }, round.games[g].b)}</div>
-            </td>`;
+            const inRound = schedGameSel && schedGameSel.p === p && schedGameSel.r === r;
+            if (g === -1) {
+              return `<td><span class="slotchip muted" data-addgame="${p}.${r}.${roomI}">${
+                inRound ? '&rarr;' : '+'}</span></td>`;
+            }
+            const sel = inRound && schedGameSel.g === g;
+            return `<td><div class="gcell">
+              <div>
+                <div>${chip({ p, r, g, side: 'a' }, round.games[g].a)}</div>
+                <div>${chip({ p, r, g, side: 'b' }, round.games[g].b)}</div>
+              </div>
+              <span class="gmove${sel ? ' sel' : ''}" data-movegame="${p}.${r}.${g}" title="${
+                sel ? 'cancel' : inRound ? 'move here' : 'move game'}">${
+                inRound && !sel ? '&rarr;' : '&#8646;'}</span>
+            </div></td>`;
           }).join('')}
           ${hasByes ? `<td>${round.byes.map((s, bi) => chip({ p, r, bye: bi }, s)).join('<br>')}</td>` : ''}
         </tr>`).join('')}
@@ -734,6 +755,7 @@ async function renderSchedule(a, t, buckets) {
   box.querySelectorAll('.slotchip[data-ref]').forEach((c) => {
     c.onclick = () => {
       const ref = JSON.parse(c.dataset.ref);
+      schedGameSel = null;
       if (!schedSel) { schedSel = ref; rerender(); return; }
       if (refKey(schedSel) === refKey(ref)) { schedSel = null; rerender(); return; }
       swapSlots(sched, schedSel, ref);
@@ -741,9 +763,30 @@ async function renderSchedule(a, t, buckets) {
       touch();
     };
   });
+  box.querySelectorAll('[data-movegame]').forEach((h) => {
+    h.onclick = () => {
+      const [p, r, g] = h.dataset.movegame.split('.').map(Number);
+      if (schedGameSel && schedGameSel.p === p && schedGameSel.r === r) {
+        if (schedGameSel.g === g) { schedGameSel = null; rerender(); return; }
+        moveGame(sched, schedGameSel, sched.phases[p].rounds[r].games[g].room);
+        schedGameSel = null;
+        touch();
+        return;
+      }
+      schedGameSel = { p, r, g };
+      schedSel = null;
+      rerender();
+    };
+  });
   box.querySelectorAll('[data-addgame]').forEach((c) => {
     c.onclick = () => {
       const [p, r, roomI] = c.dataset.addgame.split('.').map(Number);
+      if (schedGameSel && schedGameSel.p === p && schedGameSel.r === r) {
+        moveGame(sched, schedGameSel, roomI);
+        schedGameSel = null;
+        touch();
+        return;
+      }
       sched.phases[p].rounds[r].games.push({ room: roomI, a: null, b: null });
       touch();
     };
@@ -757,6 +800,7 @@ async function renderSchedule(a, t, buckets) {
     };
     $('schedunsel').onclick = () => { schedSel = null; rerender(); };
   }
+  if ($('schedgunsel')) $('schedgunsel').onclick = () => { schedGameSel = null; rerender(); };
   $('schedsave').onclick = async () => {
     try {
       // fill missing/stale room->bucket links by name so reader rooms
@@ -785,6 +829,7 @@ async function renderSchedule(a, t, buckets) {
     removeRound(sched, p, rounds.length - 1);
     if (!sched.phases[p].rounds.length && sched.phases.length > 1) sched.phases.splice(p, 1);
     schedSel = null;
+    schedGameSel = null;
     touch();
   };
   $('schedroomsbtn').onclick = () => { schedRoomsOpen = !schedRoomsOpen; rerender(); };
@@ -804,6 +849,7 @@ async function renderSchedule(a, t, buckets) {
     if (!confirm('Start over? Unsaved edits are lost; the saved schedule stays until you save a new one.')) return;
     sched = null;
     schedSel = null;
+    schedGameSel = null;
     rerender();
   };
   $('scheddel').onclick = async () => {
@@ -813,6 +859,7 @@ async function renderSchedule(a, t, buckets) {
       sched = null;
       schedDirty = false;
       schedSel = null;
+      schedGameSel = null;
       say('schedule deleted');
       rerender();
     } catch (e) { say(e.message, true); }

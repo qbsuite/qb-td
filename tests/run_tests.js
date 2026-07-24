@@ -8,7 +8,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml } from '../app/engine/buzz.js';
 import { categoryStats, catPlayerLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 
@@ -885,6 +885,29 @@ test('swap/setSlot/addRound/removeRound edit the grid and renumber', () => {
   removeRound(s, 0, 0);
   assert.equal(flatRounds(s).length, 3);
   assert.equal(flatRounds(s)[0].round, 1);
+});
+
+test('moveGame swaps rooms when occupied, moves when free, keeps games sorted', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 4), ROOMS4.slice(0, 3));
+  const round = s.phases[0].rounds[0];
+  const [teamsIn0, teamsIn1] = round.games.map((g) => [g.a.team, g.b.team]);
+  // both rooms occupied: the games trade rooms, teams travel with them
+  moveGame(s, { p: 0, r: 0, g: 0 }, round.games[1].room);
+  assert.deepEqual(round.games.map((g) => [g.a.team, g.b.team]), [teamsIn1, teamsIn0]);
+  assert.deepEqual(round.games.map((g) => g.room), [0, 1]);
+  assert.deepEqual(validateSchedule(s, TEAMS8.slice(0, 4)), []);
+  // target room empty: plain move, no other game touched
+  moveGame(s, { p: 0, r: 0, g: 0 }, 2);
+  assert.deepEqual(round.games.map((g) => g.room), [1, 2]);
+  assert.deepEqual(round.games.map((g) => [g.a.team, g.b.team]), [teamsIn0, teamsIn1]);
+  assert.deepEqual(validateSchedule(s, TEAMS8.slice(0, 4)), []);
+});
+
+test('validateSchedule flags two games in one room', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 4), ROOMS4.slice(0, 2));
+  s.phases[0].rounds[0].games[1].room = s.phases[0].rounds[0].games[0].room;
+  const w = validateSchedule(s, TEAMS8.slice(0, 4));
+  assert.ok(w.some((x) => x.includes('round 1: two games in Room 1')));
 });
 
 test('validateSchedule flags unknown teams, double play, same-phase rematch', () => {

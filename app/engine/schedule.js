@@ -365,6 +365,21 @@ export function swapSlots(schedule, ref1, ref2) {
   setSlot(schedule, ref2, s1);
 }
 
+/**
+ * Move a game ({p, r, g} ref) to a room within its round. If another
+ * game holds that room, the two games trade rooms (their teams move
+ * with them). Same-round only: room numbers are per-round, so a
+ * cross-round trade could stack two games in one room.
+ */
+export function moveGame(schedule, ref, roomIndex) {
+  const round = schedule.phases[ref.p].rounds[ref.r];
+  const game = round.games[ref.g];
+  const other = round.games.find((g) => g !== game && g.room === roomIndex);
+  if (other) other.room = game.room;
+  game.room = roomIndex;
+  round.games.sort((g1, g2) => g1.room - g2.room);
+}
+
 /** Renumber all rounds sequentially (1..N) across phases, in order. */
 export function renumber(schedule) {
   let n = 1;
@@ -416,6 +431,15 @@ export function validateSchedule(schedule, rosterNames) {
         const pairKey = JSON.stringify(a < b ? [a, b] : [b, a]);
         if (met.has(pairKey)) warnings.push('round ' + round.round + ': ' + a + ' v ' + b + ' again');
         met.add(pairKey);
+      }
+      // two games in one room hide each other in the grid
+      const roomsUsed = new Set();
+      for (const g of round.games) {
+        if (roomsUsed.has(g.room)) {
+          const name = schedule.rooms[g.room] ? schedule.rooms[g.room].name : 'room ' + (g.room + 1);
+          warnings.push('round ' + round.round + ': two games in ' + name);
+        }
+        roomsUsed.add(g.room);
       }
     }
   }

@@ -29,8 +29,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   crossover playoffs; 3-4 pools regrouping by finish position —
   clean-room circle-method pairings), then edit freely
   in a grid — click two slots to swap, assign any slot from a dropdown,
-  add/remove rounds, rename rooms, and link each schedule room to a
-  bucket. Playoff slots are placeholders ("A1" = pool A winner) filled
+  move a whole game to another room (click its ⇄ handle, then the
+  target room; an occupied target trades games), add/remove rounds,
+  rename rooms, and link each schedule room to a bucket. Playoff slots are placeholders ("A1" = pool A winner) filled
   in after prelims.
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads any played
