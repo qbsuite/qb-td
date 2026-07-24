@@ -107,6 +107,24 @@ table.box th:first-child {
   border-radius: 99px; padding: 1px 9px; color: var(--muted);
 }
 .pill.on { color: var(--ok); border-color: var(--ok); }
+.pill.warn { color: var(--bad); border-color: var(--bad); }
+.statusbar {
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;
+}
+.statusbar .big { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.jumps {
+  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  display: flex; gap: 2px; border-bottom: 1px solid var(--line);
+  margin: 10px 0; overflow-x: auto;
+}
+.jump { border-bottom: 2px solid transparent; color: var(--muted); padding: 7px 12px; white-space: nowrap; }
+.jump:hover { color: var(--fg); text-decoration: none; }
+.jump.active { color: var(--fg); border-bottom-color: var(--link); font-weight: 600; }
+h2[id], #schedsec { scroll-margin-top: 52px; }
+details.rgroup summary { padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+details.rgroup summary:hover { background: var(--hover-bg); }
+details.rgroup summary .pill { margin: 0 4px; }
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
 .tab {
   font: inherit; background: none; border: none; border-bottom: 2px solid transparent;

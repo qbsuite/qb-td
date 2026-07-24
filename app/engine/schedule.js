@@ -490,3 +490,34 @@ export function flatRounds(schedule) {
   });
   return out;
 }
+
+/**
+ * Round intake for the dashboard: games in vs expected for a round,
+ * naming the rooms still out. Expected = scheduled games with both
+ * slots filled; without a schedule (or a round it doesn't cover), one
+ * game per bucket room. buckets: [{id, room_name}]; files:
+ * [{round, bucket_id, kind, error}] — only clean qbj/combined count.
+ */
+export function roundIntake(schedule, roundNumber, buckets, files) {
+  const inRooms = new Set(files
+    .filter((f) => f.round === roundNumber
+      && (f.kind === 'qbj' || f.kind === 'combined') && !f.error)
+    .map((f) => f.bucket_id));
+  let expected = buckets.length;
+  let missing = buckets.filter((b) => !inRooms.has(b.id)).map((b) => b.room_name);
+  const round = schedule
+    ? flatRounds(schedule).find((r) => r.round === roundNumber) : null;
+  if (round) {
+    const games = round.games.filter((g) => g.a && g.b);
+    expected = games.length;
+    missing = games.map((g) => {
+      const room = schedule.rooms[g.room] || {};
+      const b = buckets.find((x) => x.id === room.bucket);
+      if (b) return inRooms.has(b.id) ? null : b.room_name;
+      // unlinked room: its uploads can't be matched, name it regardless
+      return room.name || 'room ' + (g.room + 1);
+    }).filter(Boolean);
+  }
+  if (inRooms.size >= expected) missing = [];
+  return { got: inRooms.size, expected, missing };
+}

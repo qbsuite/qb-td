@@ -23,7 +23,12 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (paired bonuses, bouncebacks, powers, neg value, overtime rules,
   pronunciation marks), stored as overrides on the preset so it applies
   to every room — download any file, compute stats, export, rotate the
-  admin link if it leaks. Once a roster exists, a **schedule creator**:
+  admin link if it leaks. A sticky section-jump bar navigates the page;
+  a status strip tracks the live round (packet up, games in vs
+  scheduled, which rooms are still out) with one-click advance next to
+  the free set-any-round control; uploads group by round with a
+  completeness pill per group, current round open by default. Once a
+  roster exists, a **schedule creator**:
   pick a format for the team/room count (full round robin; double,
   triple, or quadruple RR for small fields; 2 pools with carryover
   crossover playoffs; 3-4 pools regrouping by finish position —

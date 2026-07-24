@@ -8,7 +8,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake } from '../app/engine/schedule.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml } from '../app/engine/buzz.js';
 import { categoryStats, catPlayerLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 
@@ -901,6 +901,27 @@ test('moveGame swaps rooms when occupied, moves when free, keeps games sorted', 
   assert.deepEqual(round.games.map((g) => g.room), [1, 2]);
   assert.deepEqual(round.games.map((g) => [g.a.team, g.b.team]), [teamsIn0, teamsIn1]);
   assert.deepEqual(validateSchedule(s, TEAMS8.slice(0, 4)), []);
+});
+
+test('roundIntake counts clean games in vs scheduled, names rooms still out', () => {
+  const buckets = [{ id: 11, room_name: 'Main' }, { id: 12, room_name: 'Annex' }];
+  const s = buildSchedule('rr', TEAMS8.slice(0, 4),
+    [{ name: 'Main', bucket: 11 }, { name: 'Annex', bucket: 12 }]);
+  const ok = (bucket) => ({ round: 1, bucket_id: bucket, kind: 'combined', error: null });
+  // one game in: the other linked room is named
+  assert.deepEqual(roundIntake(s, 1, buckets, [ok(11)]),
+    { got: 1, expected: 2, missing: ['Annex'] });
+  // errored and non-game uploads don't count
+  assert.deepEqual(roundIntake(s, 1, buckets,
+    [ok(11), { ...ok(12), error: 'bad' }, { ...ok(12), kind: 'game', error: null }]).got, 1);
+  // all in: nothing missing
+  assert.deepEqual(roundIntake(s, 1, buckets, [ok(11), ok(12)]),
+    { got: 2, expected: 2, missing: [] });
+  // no schedule: one game per bucket room
+  assert.deepEqual(roundIntake(null, 1, buckets, [ok(11)]),
+    { got: 1, expected: 2, missing: ['Annex'] });
+  // round the schedule doesn't cover: bucket fallback too
+  assert.deepEqual(roundIntake(s, 99, buckets, []).expected, 2);
 });
 
 test('validateSchedule flags two games in one room', () => {

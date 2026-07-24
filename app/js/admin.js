@@ -14,7 +14,7 @@ import { renderStats } from './statsview.js';
 import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrides,
   parsePowersText, powersText } from './read_core.js';
 import { formatsFor, buildSchedule, validateSchedule, slotAt, setSlot, swapSlots,
-  moveGame, addRound, removeRound, slotText } from '../engine/schedule.js';
+  moveGame, addRound, removeRound, slotText, roundIntake } from '../engine/schedule.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -115,9 +115,27 @@ let staged = [];       // [{name, data: Uint8Array, guess: round|null}]
 let rosterText = '';
 let rosterOpen = false;
 let fmtOpen = false;   // game-format customize panel
+let uploadsOpen = null; // Set of expanded upload rounds; null = current round only
+
+// Section jump bar: highlight the last section heading scrolled past.
+const JUMP_IDS = ['sec-tournament', 'sec-rooms', 'sec-packets', 'sec-roster',
+  'schedsec', 'sec-uploads', 'sec-stats'];
+function updateJumps() {
+  const bar = document.querySelector('.jumps');
+  if (!bar) return;
+  let active = JUMP_IDS[0];
+  for (const id of JUMP_IDS) {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= 64) active = id;
+  }
+  bar.querySelectorAll('.jump').forEach((j) =>
+    j.classList.toggle('active', j.getAttribute('href') === '#' + active));
+}
+window.addEventListener('scroll', updateJumps, { passive: true });
 
 async function showDetail() {
   const a = '/a/' + adminSecret;
+  const scrollWas = window.scrollY; // survive the full re-render
   let detail;
   try {
     detail = await pub(a);
@@ -141,11 +159,29 @@ async function showDetail() {
     ...rounds.map((r) => r.number));
   const slots = Array.from({ length: totalRounds }, (_, i) => i + 1);
 
+  // the status strip and upload groups read the schedule
+  await ensureSched(a, t);
+  const intake = roundIntake(sched, t.current_round, buckets, files);
+  const uploadRounds = [...new Set([
+    ...Array.from({ length: t.current_round }, (_, i) => i + 1),
+    ...files.map((f) => f.round).filter((n) => Number.isInteger(n) && n > 0),
+  ])].sort((x, y) => y - x);
+
   view.innerHTML = `
     <div class="row">
       <a href="index.html">&larr; all tournaments</a>
     </div>
-    <h2>tournament</h2>
+    <div class="jumps">
+      <a class="jump" href="#sec-tournament">tournament</a>
+      <a class="jump" href="#sec-rooms">rooms</a>
+      <a class="jump" href="#sec-packets">packets</a>
+      <a class="jump" href="#sec-roster">roster</a>
+      <a class="jump" href="#schedsec">schedule</a>
+      <a class="jump" href="#sec-uploads">uploads${intake.missing.length
+        ? ` <span class="pill warn">${intake.missing.length}</span>` : ''}</a>
+      <a class="jump" href="#sec-stats">stats</a>
+    </div>
+    <h2 id="sec-tournament">tournament</h2>
     <div class="row" style="margin-bottom:8px">
       <b style="font-size:18px">${esc(t.name)}</b>
       <span class="mono muted">${esc(t.slug)}</span>
@@ -153,10 +189,19 @@ async function showDetail() {
       <span class="muted">admin link open until ${new Date(t.closes).toLocaleString()}</span>
       <button id="rotate">new admin link</button>
     </div>
-    <div class="row">
-      <label>current round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
-      <button id="setround">set</button>
+    <div class="statusbar">
+      <span><span class="muted">round</span> <span class="big">${t.current_round}</span> <span class="muted">of ${totalRounds}</span></span>
+      ${rounds.length ? (rounds.some((r) => r.number === t.current_round)
+        ? '<span class="ok">packet up</span>' : '<span class="bad">no packet</span>') : ''}
+      ${intake.expected ? `<span><span class="${intake.got >= intake.expected ? 'ok' : 'bad'}">${intake.got}</span><span class="muted">/${intake.expected} games in</span></span>` : ''}
+      ${intake.missing.length ? `<span class="muted">waiting: ${esc(intake.missing.join(', '))}</span>` : ''}
       <span class="spacer" style="flex:1"></span>
+      <label>round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
+      <button id="setround">set</button>
+      ${t.current_round < totalRounds
+        ? `<button id="advround" class="primary">advance to round ${t.current_round + 1}</button>` : ''}
+    </div>
+    <div class="row">
       <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> public page</label>
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
       <button onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">copy</button>
@@ -205,7 +250,7 @@ async function showDetail() {
       <button id="buzzset" ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>set password</button>
     </div>
 
-    <h2>rooms</h2>
+    <h2 id="sec-rooms">rooms</h2>
     ${buckets.map((b) => {
       const closes = b.created + 48 * 3600 * 1000;
       const open = Date.now() < closes;
@@ -229,7 +274,7 @@ async function showDetail() {
       <button id="addroom">add room</button>
     </div>
 
-    <h2>packets</h2>
+    <h2 id="sec-packets">packets</h2>
     <div class="row" style="margin-bottom:8px">
       <label>rounds <input id="numrounds" type="number" min="1" max="999" value="${totalRounds}" style="width:70px"></label>
       <button id="setrounds">set</button>
@@ -260,7 +305,7 @@ async function showDetail() {
       <button id="uppacket">upload packet</button>
     </div>
 
-    <h2>roster</h2>
+    <h2 id="sec-roster">roster</h2>
     <div class="row">
       ${t.roster_name
         ? `<span>${esc(t.roster_name)}</span>
@@ -282,37 +327,47 @@ async function showDetail() {
 
     <div id="schedsec"></div>
 
-    <h2>uploads</h2>
-    <div class="tablewrap"><table>
-      <tr><th>room</th><th>round</th><th>file</th><th>kind</th><th class="num">size</th><th>status</th><th></th></tr>
-      ${files.map((f) => {
-        const room = buckets.find((b) => b.id === f.bucket_id);
-        // A combined reader upload downloads as its two real files — the
-        // match .qbj and the MODAQ game file — not the raw wrapper JSON.
-        const link = (params, label) =>
-          `<a href="${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}" download>${label}</a>`;
-        const base = f.filename.replace(/\.qbtd\.json$/i, '');
-        const links = f.kind === 'combined' && !f.error
-          ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
-            + link(`part=game&dl=${encodeURIComponent(base + '_Game.json')}`, 'game')
-          : link(`dl=${encodeURIComponent(f.filename)}`, 'download');
-        return `<tr>
-          <td>${esc(room ? room.room_name : '#' + f.bucket_id)}</td>
-          <td class="num">${f.round}</td>
-          <td>${esc(f.filename)}</td>
-          <td>${f.kind}</td>
-          <td class="num">${fmtBytes(f.size)}</td>
-          <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">ok</span>'}</td>
-          <td class="row">
-            ${links}
-            <button data-delfile="${f.id}">delete</button>
-          </td>
-        </tr>`;
-      }).join('')}
-    </table></div>
-    ${files.length ? '' : '<div class="muted" style="margin-top:6px">nothing uploaded yet</div>'}
+    <h2 id="sec-uploads">uploads</h2>
+    ${uploadRounds.map((rn) => {
+      const group = files.filter((f) => f.round === rn);
+      const ri = rn === t.current_round ? intake : roundIntake(sched, rn, buckets, files);
+      const open = uploadsOpen ? uploadsOpen.has(rn) : rn === t.current_round;
+      return `
+      <details class="rgroup" data-uprnd="${rn}" ${open ? 'open' : ''}>
+        <summary><b>round ${rn}</b>
+          ${ri.expected ? `<span class="pill ${ri.got >= ri.expected ? 'on' : 'warn'}">${ri.got}/${ri.expected}</span>` : ''}
+          ${ri.missing.length ? `<span class="muted">missing ${esc(ri.missing.join(', '))}</span>` : ''}
+        </summary>
+        ${group.length ? `<div class="tablewrap"><table>
+          <tr><th>room</th><th>file</th><th>kind</th><th class="num">size</th><th>status</th><th></th></tr>
+          ${group.map((f) => {
+            const room = buckets.find((b) => b.id === f.bucket_id);
+            // A combined reader upload downloads as its two real files — the
+            // match .qbj and the MODAQ game file — not the raw wrapper JSON.
+            const link = (params, label) =>
+              `<a href="${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}" download>${label}</a>`;
+            const base = f.filename.replace(/\.qbtd\.json$/i, '');
+            const links = f.kind === 'combined' && !f.error
+              ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
+                + link(`part=game&dl=${encodeURIComponent(base + '_Game.json')}`, 'game')
+              : link(`dl=${encodeURIComponent(f.filename)}`, 'download');
+            return `<tr>
+              <td>${esc(room ? room.room_name : '#' + f.bucket_id)}</td>
+              <td>${esc(f.filename)}</td>
+              <td>${f.kind}</td>
+              <td class="num">${fmtBytes(f.size)}</td>
+              <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">ok</span>'}</td>
+              <td class="row">
+                ${links}
+                <button data-delfile="${f.id}">delete</button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </table></div>` : '<div class="muted" style="padding:6px 10px">no files</div>'}
+      </details>`;
+    }).join('')}
 
-    <h2>stats + export</h2>
+    <h2 id="sec-stats">stats + export</h2>
     <div class="row">
       <button id="calc" class="primary">compute stats</button>
       <button id="dlyft" disabled>download .yft</button>
@@ -321,6 +376,14 @@ async function showDetail() {
     </div>
     <div id="statsout" style="margin-top:12px"></div>`;
 
+  window.scrollTo(0, scrollWas);
+  updateJumps();
+  view.querySelectorAll('details.rgroup').forEach((d) => {
+    d.ontoggle = () => {
+      uploadsOpen = new Set([...view.querySelectorAll('details.rgroup[open]')]
+        .map((x) => Number(x.dataset.uprnd)));
+    };
+  });
   $('rotate').onclick = async () => {
     if (!confirm('Mint a new admin link? The current link stops working.')) return;
     try {
@@ -331,13 +394,16 @@ async function showDetail() {
       showLinkModal(adminLink(out.admin_secret), t.closes, () => location.reload());
     } catch (e) { say(e.message, true); }
   };
-  $('setround').onclick = async () => {
+  const goToRound = async (n) => {
     try {
-      await pub(a, { method: 'POST', json: { current_round: Number($('curround').value) } });
-      say('round set');
+      await pub(a, { method: 'POST', json: { current_round: n } });
+      uploadsOpen = null; // upload groups follow the new round
+      say('round ' + n);
       showDetail();
     } catch (e) { say(e.message, true); }
   };
+  $('setround').onclick = () => goToRound(Number($('curround').value));
+  if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
   const saveSettings = async (next) => {
     await pub(a, { method: 'POST', json: { settings: next } });
     settings = next;
@@ -601,6 +667,18 @@ function chip(ref, slot) {
   return `<span class="${cls}" data-ref="${esc(JSON.stringify(ref))}">${text}</span>`;
 }
 
+// Fetch-once per page load (or per roster change): the roster team list
+// and the saved schedule. showDetail needs it too — the status strip and
+// upload groups read the working schedule.
+async function ensureSched(a, t) {
+  if (schedFetched || !t.roster_r2_key) return;
+  schedFetched = true;
+  try { schedTeams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)).map((x) => x.name); }
+  catch (e) { schedTeams = []; }
+  try { sched = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); }
+  catch (e) { sched = null; }
+}
+
 async function renderSchedule(a, t, buckets) {
   const box = $('schedsec');
   if (!box) return;
@@ -608,13 +686,7 @@ async function renderSchedule(a, t, buckets) {
     box.innerHTML = '<h2>schedule</h2><div class="muted">needs a roster</div>';
     return;
   }
-  if (!schedFetched) {
-    schedFetched = true;
-    try { schedTeams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)).map((x) => x.name); }
-    catch (e) { schedTeams = []; }
-    try { sched = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); }
-    catch (e) { sched = null; }
-  }
+  await ensureSched(a, t);
   const rerender = () => renderSchedule(a, t, buckets);
 
   /* -- creator -- */
@@ -678,7 +750,7 @@ async function renderSchedule(a, t, buckets) {
     <div class="row" style="margin-bottom:6px">
       <span class="muted">${sched.phases.reduce((n, p) => n + p.rounds.length, 0)} rounds</span>
       <span class="spacer" style="flex:1"></span>
-      ${schedDirty ? '<span class="pill bad" style="color:var(--bad);border-color:var(--bad)">unsaved</span>' : ''}
+      ${schedDirty ? '<span class="pill warn">unsaved</span>' : ''}
       <button id="schedsave" class="primary" ${schedDirty ? '' : 'disabled'}>save</button>
       <button id="schedaddround">add round</button>
       <button id="schedrmround">remove last round</button>
