@@ -153,6 +153,22 @@ export function buzzSummary(entries) {
 }
 
 /**
+ * The main answer from a packet answerline: the underlined portion(s)
+ * (packet convention for the required part), else the text before the
+ * first [accept ...] / (prompt ...) clause. Tags stripped either way.
+ */
+export function mainAnswer(html) {
+  const s = String(html || '');
+  const u = [...s.matchAll(/<u[^>]*>([\s\S]*?)<\/u>/gi)]
+    .map((m) => m[1].replace(/<[^>]*>/g, '').trim())
+    .filter(Boolean);
+  if (u.length) return u.join(' ').replace(/\s+/g, ' ');
+  const plain = s.replace(/<[^>]*>/g, '').replace(/^ANSWER:\s*/i, '');
+  const head = plain.split(/[[(]/)[0].replace(/\s+/g, ' ').trim();
+  return head || plain.replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Question text -> word array matching MODAQ's word positions as closely
  * as packet text allows (tags stripped, whitespace-split). word_index N
  * means the buzz came on words[N].

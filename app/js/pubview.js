@@ -8,7 +8,7 @@ import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
-import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion } from '../engine/buzz.js';
+import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion, mainAnswer } from '../engine/buzz.js';
 import { normalizePacket } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
@@ -299,10 +299,11 @@ function tossupHtml(tossup, buzzes, packet) {
   return `
     <details class="qd">
       <summary><span class="roundcell">T${tossup}</span>
-        ${tu ? esc(stripTags(tu.answer)) : '<span class="muted">(no packet text)</span>'}
+        ${tu ? esc(mainAnswer(tu.answer)) : '<span class="muted">(no packet text)</span>'}
         <span class="qdmeta">${dead}${buzzChips}</span></summary>
       <div class="qdbody">
         ${qhtml}
+        ${tu ? `<div class="q muted">ANSWER: ${esc(stripTags(tu.answer))}</div>` : ''}
         ${buzzes.length ? `<div class="buzzlist">
           ${buzzes.map((b, i) => {
             const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
@@ -329,7 +330,7 @@ function bonusHtml(bonus, results, packet) {
     <details class="qd bonus">
       <summary><span class="roundcell">B${bonus}</span>
         ${answers.length
-          ? answers.map((a) => esc(stripTags(a))).join(' <span class="muted">/</span> ')
+          ? answers.map((a) => esc(mainAnswer(a))).join(' <span class="muted">/</span> ')
           : '<span class="muted">(no packet text)</span>'}
         <span class="qdmeta">${avg.toFixed(1)} avg &middot; ${conv.map((c) => c + '/' + heard).join(' ')}</span></summary>
       <div class="qdbody">

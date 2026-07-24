@@ -9,7 +9,7 @@ import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
-import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses } from '../app/engine/buzz.js';
+import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswer } from '../app/engine/buzz.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -1015,6 +1015,15 @@ test('roundBonuses groups per packet bonus across rooms', () => {
   assert.equal(rows[0].bonus, 2);
   assert.deepEqual(rows[0].results.map((r) => [r.room, r.team, r.total]),
     [['R1', 'Alpha', 20], ['R2', 'Gamma', 10]]);
+});
+
+test('mainAnswer prefers underlined text, else pre-bracket head', () => {
+  assert.equal(mainAnswer('Johannes <b><u>Brahms</u></b> [accept anything]'), 'Brahms');
+  assert.equal(mainAnswer('<u>The</u> <b><u>Golden Pot</u></b> [or Der goldne Topf]'), 'The Golden Pot');
+  assert.equal(mainAnswer('E. T. A. Hoffmann [accept Ernst] (prompt on H)'), 'E. T. A. Hoffmann');
+  assert.equal(mainAnswer('ANSWER: mitochondria'), 'mitochondria');
+  assert.equal(mainAnswer('[weird all-bracket line]'), '[weird all-bracket line]');
+  assert.equal(mainAnswer(''), '');
 });
 
 test('tokenizeQuestion strips tags and splits on whitespace', () => {
