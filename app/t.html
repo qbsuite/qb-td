@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>tournament</title>
+<link rel="stylesheet" href="css/td.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="tname">tournament</h1>
+    <span class="spacer"></span>
+    <span id="round" class="sub"></span>
+    <button id="refresh">refresh</button>
+  </header>
+  <div class="tabs">
+    <button class="tab" id="tab-schedule" data-tab="schedule">schedule</button>
+    <button class="tab" id="tab-stats" data-tab="stats">stats</button>
+  </div>
+  <div id="msg"></div>
+  <div id="out"></div>
+</div>
+<script type="module" src="js/pubview.js"></script>
+</body>
+</html>

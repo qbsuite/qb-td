@@ -124,6 +124,38 @@ ok('bucket state carries format overrides',
   r.body.settings.formatOverrides && r.body.settings.formatOverrides.pairTossupsBonuses === true,
   r.body.settings);
 
+// schedule: TO saves it, the bucket view resolves its room, /pub stays
+// gated until publish
+r = await call('/pub/' + slug + '/schedule');
+ok('no schedule pub 404', r.status === 404);
+r = await call('/b/' + secret + '/schedule');
+ok('no schedule bucket 404', r.status === 404);
+const bucketId = (await call(A)).body.buckets[0].id;
+const SCHED = {
+  v: 1,
+  rooms: [{ name: 'Room 1', bucket: bucketId }, { name: 'Room 2', bucket: null }],
+  phases: [{ name: 'Prelims', rounds: [
+    { round: 1, games: [{ room: 0, a: { team: 'Alpha' }, b: { team: 'Beta' } }], byes: [] },
+    { round: 2, games: [{ room: 1, a: { team: 'Beta' }, b: { team: 'Alpha' } }], byes: [] },
+  ] }],
+  updated: 0,
+};
+r = await call(A + '/schedule', { method: 'POST', json: SCHED });
+ok('schedule saved', r.status === 200, r.body);
+r = await call(A + '/schedule', { method: 'POST', json: { v: 2, rooms: [], phases: [] } });
+ok('unknown schedule version rejected', r.status === 400);
+r = await call(A + '/schedule', { method: 'POST', body: 'not json' });
+ok('bad schedule json rejected', r.status === 400);
+r = await call(A + '/schedule', { method: 'POST',
+  body: '{"v":1,"rooms":[],"phases":[],"pad":"' + 'x'.repeat(260 * 1024) + '"}' });
+ok('oversized schedule rejected', r.status === 413);
+r = await call('/b/' + secret + '/schedule');
+ok('bucket schedule resolves its room',
+  r.status === 200 && r.body.room === 0
+  && r.body.schedule.phases[0].rounds[0].games[0].a.team === 'Alpha', r.body);
+r = await call('/pub/' + slug + '/schedule');
+ok('unpublished schedule hidden', r.status === 404);
+
 // public gate: unpublished -> 404
 r = await call('/pub/' + slug);
 ok('unpublished hidden', r.status === 404);
@@ -148,6 +180,25 @@ ok('bucket lists played-round packets',
 r = await call('/pub/' + slug);
 ok('public state', r.status === 200 && r.body.name === 'E2E Open' && r.body.current_round === 2, r.body);
 ok('public lists only valid qbj', r.body.files.length === 1 && r.body.files[0].room === 'Room 1', r.body.files);
+ok('pub state carries schedule stamp', typeof r.body.schedule === 'number' && r.body.schedule > 0, r.body.schedule);
+
+{
+  const res = await fetch(`${BASE}/pub/${slug}/schedule`);
+  const sj = await res.json();
+  ok('public schedule served', res.status === 200 && sj.rooms.length === 2
+    && sj.phases[0].rounds[0].games[0].a.team === 'Alpha', sj);
+  ok('public schedule briefly cacheable',
+    (res.headers.get('cache-control') || '').includes('max-age=60'));
+}
+r = await call(A + '/schedule', { method: 'DELETE' });
+ok('schedule deleted', r.status === 200);
+r = await call('/pub/' + slug + '/schedule');
+ok('deleted schedule 404', r.status === 404);
+r = await call('/pub/' + slug);
+ok('schedule stamp cleared', r.body.schedule === null, r.body.schedule);
+r = await call(A + '/schedule', { method: 'POST', json: SCHED });
+ok('schedule restored', r.status === 200);
+r = await call('/pub/' + slug);   // the sections below read files off this
 
 {
   const res = await fetch(`${BASE}/pub/${slug}/qbj/${r.body.files[0].id}`);
@@ -291,6 +342,8 @@ ok('expired bucket upload 410', r.status === 410);
   ok('expired bucket packet 410', res.status === 410);
   const rr = await fetch(`${BASE}/b/${secret}/roster`);
   ok('expired bucket roster 410', rr.status === 410);
+  const sr = await fetch(`${BASE}/b/${secret}/schedule`);
+  ok('expired bucket schedule 410', sr.status === 410);
 }
 // the TO's own access is unaffected by room expiry
 r = await call(A);

@@ -106,6 +106,27 @@ table.box th:first-child {
   border-radius: 99px; padding: 1px 9px; color: var(--muted);
 }
 .pill.on { color: var(--ok); border-color: var(--ok); }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.tab {
+  font: inherit; background: none; border: none; border-bottom: 2px solid transparent;
+  border-radius: 0; color: var(--muted); padding: 7px 14px; cursor: pointer;
+}
+.tab.active { color: var(--fg); border-bottom-color: var(--link); font-weight: 600; }
+.tab:hover { color: var(--fg); }
+.sched td { vertical-align: top; }
+.sched .g { white-space: nowrap; }
+.sched .score { font-size: 12px; font-variant-numeric: tabular-nums; }
+.sched .win { color: var(--ok); font-weight: 600; }
+.sched td.now, .sched th.now { background: var(--hover-bg); }
+.sched .ph { color: var(--muted); font-style: italic; }
+.roundcell { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.slotchip {
+  display: inline-block; border: 1px solid var(--line); border-radius: 99px;
+  padding: 1px 10px; margin: 1px 0; cursor: pointer; user-select: none; white-space: nowrap;
+}
+.slotchip:hover { background: var(--hover-bg); }
+.slotchip.sel { border-color: var(--link); color: var(--link); }
+.slotchip.ph { color: var(--muted); font-style: italic; }
 .modalback {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
   display: flex; align-items: center; justify-content: center; z-index: 10;

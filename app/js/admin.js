@@ -13,6 +13,8 @@ import { makeZip, readZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrides,
   parsePowersText, powersText } from './read_core.js';
+import { formatsFor, buildSchedule, validateSchedule, slotAt, setSlot, swapSlots,
+  addRound, removeRound, slotText } from '../engine/schedule.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -30,7 +32,7 @@ function pageDir() {
 function adminLink(secret) { return pageDir() + '/index.html?a=' + secret; }
 function bucketLink(secret) { return pageDir() + '/bucket.html?b=' + secret; }
 function readLink(secret) { return pageDir() + '/read.html?b=' + secret; }
-function statsLink(slug) { return pageDir() + '/stats.html?t=' + slug; }
+function statsLink(slug) { return pageDir() + '/t.html?t=' + slug; }
 
 async function copy(text, label) {
   await navigator.clipboard.writeText(text);
@@ -82,7 +84,7 @@ function showList() {
         <span class="mono muted">${esc(e.slug)}</span>
         <span class="spacer" style="flex:1"></span>
         ${open ? `<span class="muted">open until ${new Date(e.closes).toLocaleString()}</span>`
-               : `<span class="pill">closed</span> <a href="${esc(statsLink(e.slug))}">stats</a>`}
+               : `<span class="pill">closed</span> <a href="${esc(statsLink(e.slug))}">page</a>`}
       </div>`;
     }).join('') || '<div class="muted">none yet</div>'}
     <h2>new tournament</h2>
@@ -155,9 +157,9 @@ async function showDetail() {
       <label>current round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
       <button id="setround">set</button>
       <span class="spacer" style="flex:1"></span>
-      <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> public stats</label>
+      <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> public page</label>
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
-      <button onclick="qtd.copy('${esc(statsLink(t.slug))}', 'stats link')">copy</button>
+      <button onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">copy</button>
     </div>
     <div class="row" style="margin-top:8px">
       <label class="row">reader game format
@@ -263,6 +265,8 @@ async function showDetail() {
         <button id="rostersave" class="primary">save as tournament roster</button>
       </div>
     </div>
+
+    <div id="schedsec"></div>
 
     <h2>uploads</h2>
     <div class="tablewrap"><table>
@@ -375,7 +379,7 @@ async function showDetail() {
   $('pub').onchange = async () => {
     try {
       await pub(a, { method: 'POST', json: { published: $('pub').checked } });
-      say($('pub').checked ? 'stats page is public' : 'stats page is private');
+      say($('pub').checked ? 'page is public' : 'page is private');
     } catch (e) { say(e.message, true); }
   };
   $('addroom').onclick = async () => {
@@ -485,6 +489,7 @@ async function showDetail() {
       parseRoster(JSON.parse(text)); // fail before uploading junk
       await pub(`${a}/roster?name=${encodeURIComponent(f.name)}`,
         { method: 'POST', body: text });
+      schedFetched = false; // schedule editor re-reads the team list
       showDetail();
     } catch (e) { say('roster: ' + e.message, true); }
   };
@@ -513,11 +518,230 @@ async function showDetail() {
       await pub(`${a}/roster?name=roster.qbj`,
         { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, teams), null, 2) });
       rosterOpen = false;
+      schedFetched = false; // schedule editor re-reads the team list
       say('roster saved');
       showDetail();
     } catch (e) { say('roster: ' + e.message, true); }
   };
   $('calc').onclick = () => computeStats(a, t, buckets, files);
+  renderSchedule(a, t, buckets);
+}
+
+/* ---------- schedule ----------
+   The working copy lives in module state: edits are local until save
+   (POST /a/:secret/schedule). Blob fetched once per page load through
+   the admin file route; roster changes invalidate the team cache. */
+
+let sched = null;          // working schedule (or null: creator shown)
+let schedFetched = false;
+let schedTeams = null;     // roster team names, seed order
+let schedSel = null;       // selected slot ref for click-to-swap
+let schedDirty = false;
+let schedRoomsOpen = false;
+let schedRoomsN = null;    // creator rooms input
+
+function refKey(ref) {
+  return ref.bye !== undefined ? `${ref.p}.${ref.r}.b${ref.bye}` : `${ref.p}.${ref.r}.${ref.g}.${ref.side}`;
+}
+function chip(ref, slot) {
+  const cls = 'slotchip' + (slot && slot.label ? ' ph' : '')
+    + (schedSel && refKey(schedSel) === refKey(ref) ? ' sel' : '');
+  const text = slot ? esc(slotText(slot)) : '&mdash;';
+  return `<span class="${cls}" data-ref="${esc(JSON.stringify(ref))}">${text}</span>`;
+}
+
+async function renderSchedule(a, t, buckets) {
+  const box = $('schedsec');
+  if (!box) return;
+  if (!t.roster_r2_key) {
+    box.innerHTML = '<h2>schedule</h2><div class="muted">needs a roster</div>';
+    return;
+  }
+  if (!schedFetched) {
+    schedFetched = true;
+    try { schedTeams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)).map((x) => x.name); }
+    catch (e) { schedTeams = []; }
+    try { sched = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); }
+    catch (e) { sched = null; }
+  }
+  const rerender = () => renderSchedule(a, t, buckets);
+
+  /* -- creator -- */
+  if (!sched) {
+    if (schedRoomsN === null) schedRoomsN = Math.max(1, buckets.length);
+    const fmts = formatsFor(schedTeams.length, schedRoomsN);
+    box.innerHTML = `
+      <h2>schedule</h2>
+      <div class="row" style="margin-bottom:8px">
+        <span class="muted">${schedTeams.length} teams</span>
+        <label class="muted">rooms <input id="schedrooms" type="number" min="1" max="60" value="${schedRoomsN}" style="width:64px"></label>
+      </div>
+      ${fmts.map((f, i) => `
+      <div class="card"><label class="row"><input type="radio" name="schedfmt" value="${f.key}" ${i === 0 ? 'checked' : ''}>
+        <span><b>${esc(f.name)}</b> <span class="muted">&mdash; ${esc(f.desc)}</span></span></label></div>`).join('')
+      || '<div class="muted">no format fits</div>'}
+      ${fmts.length ? '<div class="row"><button id="schedgen" class="primary">generate</button></div>' : ''}`;
+    $('schedrooms').onchange = () => {
+      schedRoomsN = Math.max(1, Number($('schedrooms').value) || 1);
+      rerender();
+    };
+    if ($('schedgen')) $('schedgen').onclick = () => {
+      const key = box.querySelector('input[name="schedfmt"]:checked').value;
+      const rooms = [];
+      for (let i = 0; i < schedRoomsN; i++) {
+        rooms.push(buckets[i] ? { name: buckets[i].room_name, bucket: buckets[i].id }
+          : { name: 'Room ' + (i + 1), bucket: null });
+      }
+      try {
+        sched = buildSchedule(key, schedTeams, rooms);
+        sched.format = key;
+        schedDirty = true;
+        schedSel = null;
+        rerender();
+      } catch (e) { say(e.message, true); }
+    };
+    return;
+  }
+
+  /* -- editor -- */
+  const warnings = validateSchedule(sched, schedTeams);
+  const selSlot = schedSel ? slotAt(sched, schedSel) : undefined;
+  box.innerHTML = `
+    <h2>schedule</h2>
+    <div class="row" style="margin-bottom:6px">
+      <span class="muted">${sched.phases.reduce((n, p) => n + p.rounds.length, 0)} rounds</span>
+      <span class="spacer" style="flex:1"></span>
+      <button id="schedsave" class="primary" ${schedDirty ? '' : 'disabled'}>save</button>
+      <button id="schedaddround">add round</button>
+      <button id="schedrmround">remove last round</button>
+      <button id="schedroomsbtn">rooms</button>
+      <button id="schedregen">regenerate</button>
+      <button id="scheddel" style="color:var(--bad)">delete</button>
+    </div>
+    ${warnings.length ? `<div class="bad">${warnings.map(esc).join(' &middot; ')}</div>` : ''}
+    ${schedSel ? `
+    <div class="row" style="margin:6px 0">
+      <span>set ${esc(slotText(selSlot) || 'slot')} to</span>
+      <select id="schedassign">
+        <option value=""></option>
+        ${schedTeams.map((n) => `<option>${esc(n)}</option>`).join('')}
+        <option value="__empty">empty</option>
+      </select>
+      <button id="schedunsel">cancel</button>
+    </div>` : ''}
+    <div id="schedroomspanel" ${schedRoomsOpen ? '' : 'hidden'} class="card" style="margin:6px 0">
+      ${sched.rooms.map((r, i) => `
+      <div class="row" style="margin:2px 0">
+        <input data-roomname="${i}" value="${esc(r.name)}" size="18">
+        <select data-roombucket="${i}">
+          <option value=""></option>
+          ${buckets.map((b) => `<option value="${b.id}" ${b.id === r.bucket ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}
+        </select>
+      </div>`).join('')}
+      <div class="muted" style="font-size:12px;margin-top:4px">linked room readers preselect their scheduled teams</div>
+    </div>
+    ${sched.phases.map((phase, p) => {
+      const hasByes = phase.rounds.some((r) => r.byes.length);
+      return `
+      <div class="rhead">${esc(phase.name)}</div>
+      <div class="tablewrap">
+      <table class="sched">
+        <tr><th></th>${sched.rooms.map((r) => `<th>${esc(r.name)}</th>`).join('')}${hasByes ? '<th>bye</th>' : ''}</tr>
+        ${phase.rounds.map((round, r) => `
+        <tr>
+          <td class="roundcell">${round.round}</td>
+          ${sched.rooms.map((_, roomI) => {
+            const g = round.games.findIndex((x) => x.room === roomI);
+            if (g === -1) return `<td><span class="slotchip muted" data-addgame="${p}.${r}.${roomI}">+</span></td>`;
+            return `<td>
+              <div>${chip({ p, r, g, side: 'a' }, round.games[g].a)}</div>
+              <div>${chip({ p, r, g, side: 'b' }, round.games[g].b)}</div>
+            </td>`;
+          }).join('')}
+          ${hasByes ? `<td>${round.byes.map((s, bi) => chip({ p, r, bye: bi }, s)).join('<br>')}</td>` : ''}
+        </tr>`).join('')}
+      </table>
+      </div>`;
+    }).join('')}`;
+
+  const touch = () => { schedDirty = true; rerender(); };
+  box.querySelectorAll('.slotchip[data-ref]').forEach((c) => {
+    c.onclick = () => {
+      const ref = JSON.parse(c.dataset.ref);
+      if (!schedSel) { schedSel = ref; rerender(); return; }
+      if (refKey(schedSel) === refKey(ref)) { schedSel = null; rerender(); return; }
+      swapSlots(sched, schedSel, ref);
+      schedSel = null;
+      touch();
+    };
+  });
+  box.querySelectorAll('[data-addgame]').forEach((c) => {
+    c.onclick = () => {
+      const [p, r, roomI] = c.dataset.addgame.split('.').map(Number);
+      sched.phases[p].rounds[r].games.push({ room: roomI, a: null, b: null });
+      touch();
+    };
+  });
+  if ($('schedassign')) {
+    $('schedassign').onchange = () => {
+      const v = $('schedassign').value;
+      setSlot(sched, schedSel, v === '__empty' || !v ? null : { team: v });
+      schedSel = null;
+      touch();
+    };
+    $('schedunsel').onclick = () => { schedSel = null; rerender(); };
+  }
+  $('schedsave').onclick = async () => {
+    try {
+      await pub(a + '/schedule', { method: 'POST', json: sched });
+      schedDirty = false;
+      say('schedule saved');
+      rerender();
+    } catch (e) { say(e.message, true); }
+  };
+  $('schedaddround').onclick = () => { addRound(sched, sched.phases.length - 1); touch(); };
+  $('schedrmround').onclick = () => {
+    const p = sched.phases.length - 1;
+    const rounds = sched.phases[p].rounds;
+    if (!rounds.length) return;
+    const last = rounds[rounds.length - 1];
+    const filled = last.games.some((g) => g.a || g.b) || last.byes.length;
+    if (filled && !confirm('Remove round ' + last.round + '?')) return;
+    removeRound(sched, p, rounds.length - 1);
+    if (!sched.phases[p].rounds.length && sched.phases.length > 1) sched.phases.splice(p, 1);
+    schedSel = null;
+    touch();
+  };
+  $('schedroomsbtn').onclick = () => { schedRoomsOpen = !schedRoomsOpen; rerender(); };
+  box.querySelectorAll('[data-roomname]').forEach((inp) => {
+    inp.onchange = () => {
+      sched.rooms[Number(inp.dataset.roomname)].name = inp.value.trim() || inp.value;
+      touch();
+    };
+  });
+  box.querySelectorAll('[data-roombucket]').forEach((sel) => {
+    sel.onchange = () => {
+      sched.rooms[Number(sel.dataset.roombucket)].bucket = sel.value ? Number(sel.value) : null;
+      touch();
+    };
+  });
+  $('schedregen').onclick = () => {
+    if (!confirm('Start over? Unsaved edits are lost; the saved schedule stays until you save a new one.')) return;
+    sched = null;
+    schedSel = null;
+    rerender();
+  };
+  $('scheddel').onclick = async () => {
+    if (!confirm('Delete the schedule?')) return;
+    try {
+      await pub(a + '/schedule', { method: 'DELETE' });
+      sched = null;
+      schedDirty = false;
+      schedSel = null;
+      say('schedule deleted');
+      rerender();
+    } catch (e) { say(e.message, true); }
+  };
 }
 
 /* ---------- stats + export ---------- */

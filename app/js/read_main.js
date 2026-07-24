@@ -24,6 +24,7 @@ import {
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
   staleGameKeys, roundRows,
 } from './read_core.js';
+import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 
@@ -35,6 +36,9 @@ const gid = params.get('g') || '';
 let state = null;   // /b/:secret response (bare-link path only)
 let teams = null;   // [{name, players}] from the roster
 let packet = null;  // normalized IPacket
+let sched = null;      // tournament schedule (when the TO made one)
+let schedRoom = null;  // this bucket's room index in it
+let defaultPick = { a: '', b: '' }; // last schedule preselect, so overrides stick
 
 function say(text, bad = false) {
   $('msg').textContent = text || '';
@@ -140,6 +144,36 @@ function mountModaq(id, meta, isNew) {
   ReactDOM.render(React.createElement(ModaqControl, props), $('modaq'));
 }
 
+/* ---------- schedule defaults (bare-link path) ---------- */
+
+// This room's line of the tournament schedule, current round highlighted.
+function renderSchedRow() {
+  if (!sched || schedRoom === null) return;
+  const rows = roomRounds(sched, schedRoom);
+  if (!rows.length) return;
+  $('schedrow').hidden = false;
+  $('schedrow').innerHTML = rows.map((r) =>
+    `<span class="${r.round === state.current_round ? '' : 'muted'}">R${r.round} ` +
+    `${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}</span>`)
+    .join(' <span class="muted">·</span> ');
+}
+
+// Preselect the scheduled matchup for the selected round. Only fills
+// pickers that are empty or still on the previous round's default — a
+// mod's manual choice is never clobbered.
+function applySchedDefault() {
+  if (!sched || schedRoom === null || !teams || $('teamrow').hidden) return;
+  const g = gameForRoom(sched, schedRoom, selectedRound);
+  const known = (n) => teams.some((t) => t.name === n);
+  if (!g || !known(g.a) || !known(g.b)) return;
+  const untouched = (el, prev) => !el.value || el.value === prev;
+  if (untouched($('teama'), defaultPick.a) && untouched($('teamb'), defaultPick.b)) {
+    $('teama').value = g.a;
+    $('teamb').value = g.b;
+    defaultPick = { a: g.a, b: g.b };
+  }
+}
+
 /* ---------- round + team picker (bare-link path) ---------- */
 
 let selectedRound = 0;
@@ -231,6 +265,8 @@ async function boot() {
     return;
   }
   setHeader(state.tournament, state.room, state.current_round, '');
+  // schedule-less tournaments: this quietly 404s and nothing changes
+  const schedP = pub('/b/' + secret + '/schedule').then((r) => r, () => null);
 
   // rounds + this device's games render even if the roster fails to load
   const packets = state.packets || [];
@@ -244,6 +280,7 @@ async function boot() {
     e.preventDefault();
     selectedRound = round;
     renderRounds();
+    applySchedDefault();
   };
   renderRounds();
 
@@ -259,6 +296,13 @@ async function boot() {
   }
   say('');
   showTeams();
+  const sr = await schedP;
+  if (sr && sr.room !== null && sr.schedule) {
+    sched = sr.schedule;
+    schedRoom = sr.room;
+    renderSchedRow();
+    applySchedDefault();
+  }
   // warm the cache for the common case (start on the default round)
   const sel = packets.find((p) => p.number === selectedRound);
   if (sel) fetchPacket(sel.number, sel.packet_name).then(() => say('')).catch(() => {});

@@ -1,8 +1,9 @@
 # qb-td
 
 Tournament hub for quizbowl TDs: collect ModaQ game files from every room,
-distribute packets, track the live round, publish live stats, and export a
-YellowFruit `.yft` without touching YellowFruit mid-tournament.
+distribute packets, track the live round, generate and publish the
+schedule, publish live stats, and export a YellowFruit `.yft` without
+touching YellowFruit mid-tournament.
 
 Part of [qbsuite](https://qbsuite.github.io/).
 
@@ -22,7 +23,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (paired bonuses, bouncebacks, powers, neg value, overtime rules,
   pronunciation marks), stored as overrides on the preset so it applies
   to every room — download any file, compute stats, export, rotate the
-  admin link if it leaks.
+  admin link if it leaks. Once a roster exists, a **schedule creator**:
+  pick a format for the team/room count (full or double round robin;
+  2 pools with carryover crossover playoffs; 3-4 pools regrouping by
+  finish position — clean-room circle-method pairings), then edit freely
+  in a grid — click two slots to swap, assign any slot from a dropdown,
+  add/remove rounds, rename rooms, and link each schedule room to a
+  bucket. Playoff slots are placeholders ("A1" = pool A winner) filled
+  in after prelims.
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads any played
   round's packet (the live round is highlighted; future rounds stay
@@ -31,7 +39,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   an embedded [MODAQ](https://github.com/alopezlago/MODAQ) preloaded with
   a round's packet (the live round by default; played rounds stay
   selectable for a room running behind), the tournament roster, and the
-  TO's game format — the mod picks the round and two teams and reads. "Upload to qb-td" in MODAQ's
+  TO's game format — the mod picks the round and two teams and reads.
+  With a schedule whose room is linked to this bucket, the pickers
+  preselect the round's scheduled matchup (still overridable) and the
+  room's schedule line shows above the round list. "Upload to qb-td" in MODAQ's
   menu sends one `.qbtd.json` per game into the bucket — the match qbj plus
   the full game state in a single file; no file downloads or uploads. The
   dashboard and public routes split the qbj back out wherever a bare `.qbj`
@@ -48,10 +59,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   packets are parsed in the mod's browser by the public YAPP service
   (the same one MODAQ's demo uses — docx question text transits
   quizbowlreader.com).
-- **Public stats page** (`app/stats.html?t=<slug>`): standings, individual
-  leaderboard, and round-by-round scores computed in the browser from the
-  collected qbj files. Only exists while the TO has publish switched on;
-  fully decoupled from the admin side.
+- **Public tournament page** (`app/t.html?t=<slug>`; `stats.html`
+  redirects): schedule + stats tabs. The schedule tab renders the grid
+  with played games' scores filled in from the collected qbj files
+  (exact team-name match) and a per-team view behind a dropdown; the
+  stats tab has standings, individual leaderboard, and round-by-round
+  scores, all computed in the browser. Only exists while the TO has
+  publish switched on; fully decoupled from the admin side.
 - **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18) and a zip of
   every game's separated files — the match `.qbj` (imports via YellowFruit's
   ModaQ game-file import) and the MODAQ game file — plus the roster. Both
@@ -81,12 +95,15 @@ Part of [qbsuite](https://qbsuite.github.io/).
   reader page preloads it); rosters aren't question material.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
   that leaks into a crawler or an outbound click doesn't spread.
-- **Request economics** (Cloudflare free tier): the public stats page
+- **Request economics** (Cloudflare free tier): the public page
   reads one materialized `combined.json` bundle (maintained on
   upload/delete, TO-rebuildable) instead of fetching every game file, and
   bucket pages poll only while visible, every 60 s. Stats data changes
   only when a file lands; clients compare the `version` stamp in
-  `/pub/:slug` and refetch only on change. The reader page never polls:
+  `/pub/:slug` and refetch only on change. The schedule is one R2 blob
+  (`t/<tid>/schedule.json`) with its own stamp in `/pub/:slug` (R2
+  head), refetched only when it moves and served with `max-age=60`;
+  the reader fetches it once per load, never on the bucket poll. The reader page never polls:
   one state + packet + roster fetch at load, one upload per export click
   (~4 Worker requests per game — fewer than the manual bucket-page flow),
   and the 2 MB MODAQ bundle is a static asset on GitHub Pages, off
@@ -94,11 +111,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
 
 ## Layout
 
-- `app/engine/` — dependency-free JS engine, shared by dashboard and stats
-  page: `qbj.js` (parse ModaQ match qbj + roster), `stats.js` (standings +
-  leaderboard), `yft.js` (`.yft` serialization, contract verified against
-  YellowFruit 4.0.18 source), `zip.js` (store-only zip).
-- `app/` — the four static pages + `js/` page code. Deployable on any
+- `app/engine/` — dependency-free JS engine, shared by dashboard and the
+  public page: `qbj.js` (parse ModaQ match qbj + roster), `stats.js`
+  (standings + leaderboard), `schedule.js` (round-robin/pool generation,
+  format catalog, editing helpers, room lookups), `yft.js` (`.yft`
+  serialization, contract verified against YellowFruit 4.0.18 source),
+  `zip.js` (store-only zip).
+- `app/` — the five static pages + `js/` page code. Deployable on any
   static host; served at `qbsuite.github.io/qb-td/app/`. The reader page
   is `read.html` + `js/read.bundle.js`, a committed esbuild bundle of
   MODAQ (rebuild with `npm run build:read` after editing

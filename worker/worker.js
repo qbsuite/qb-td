@@ -31,6 +31,7 @@ const BUCKET_LIST_LIMIT = 20;            // recent uploads shown to the mod
 const MAX_UPLOAD = 8 * 1024 * 1024;      // moderator file cap
 const MAX_PACKET = 16 * 1024 * 1024;     // packet cap
 const MAX_BUNDLE = 32 * 1024 * 1024;     // combined stats blob cap
+const MAX_SCHEDULE = 256 * 1024;         // schedule blob cap
 const MAX_BUCKETS = 60;
 // Sized for one shared bucket carrying a whole tournament (several mods on
 // one link, ~2 files per game, re-exports adding rows).
@@ -54,13 +55,15 @@ function json(env, data, status = 200) {
 }
 function err(env, status, message) { return json(env, { error: message }, status); }
 
-function blobResponse(env, r2obj, filename) {
+function blobResponse(env, r2obj, filename, cacheSeconds = 0) {
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', r2obj.httpMetadata?.contentType || 'application/octet-stream');
   if (filename) {
     headers.set('Content-Disposition',
       `attachment; filename="${filename.replace(/["\\\r\n]/g, '_')}"`);
   }
+  // slow-moving public blobs let the browser self-serve on refresh spam
+  if (cacheSeconds) headers.set('Cache-Control', 'max-age=' + cacheSeconds);
   return new Response(r2obj.body, { status: 200, headers });
 }
 
@@ -361,6 +364,61 @@ async function putBundle(request, env, t) {
   return json(env, { entries: parsed.entries.length });
 }
 
+/* ---------- schedule (R2 blob t/<tid>/schedule.json) ----------
+   Written whole by the TO's schedule editor; served publicly on the
+   tournament page and to reader rooms (which preselect the scheduled
+   teams). Same publish/secret gates as every other blob. */
+
+function scheduleShapeError(parsed) {
+  if (!parsed || typeof parsed !== 'object') return 'bad schedule';
+  if (parsed.v !== 1) return 'unknown schedule version';
+  if (!Array.isArray(parsed.rooms) || !Array.isArray(parsed.phases)) return 'bad schedule';
+  return null;
+}
+
+async function putSchedule(request, env, t) {
+  const body = await request.arrayBuffer();
+  if (body.byteLength > MAX_SCHEDULE) return err(env, 413, 'schedule too large');
+  let parsed;
+  try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return err(env, 400, 'bad json'); }
+  const shapeErr = scheduleShapeError(parsed);
+  if (shapeErr) return err(env, 400, shapeErr);
+  await env.DATA.put(`t/${t.id}/schedule.json`, body, {
+    httpMetadata: { contentType: 'application/json' },
+  });
+  return json(env, { ok: true });
+}
+
+async function deleteSchedule(env, t) {
+  await env.DATA.delete(`t/${t.id}/schedule.json`);
+  return json(env, { ok: true });
+}
+
+async function pubSchedule(env, slug) {
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
+  if (!obj) return err(env, 404, 'no schedule');
+  return blobResponse(env, obj, null, 60);
+}
+
+// The reader room's view: the whole schedule plus which room index this
+// bucket is (rooms[].bucket link), so it can preselect the round's teams.
+// Fetched once per page load — deliberately not part of the polled
+// bucket state.
+async function bucketSchedule(env, secret) {
+  const b = await getBucketRow(env, secret);
+  if (!b) return err(env, 404, 'bad link');
+  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const obj = await env.DATA.get(`t/${b.tournament_id}/schedule.json`);
+  if (!obj) return err(env, 404, 'no schedule');
+  let schedule;
+  try { schedule = await obj.json(); } catch (e) { return err(env, 404, 'no schedule'); }
+  const room = Array.isArray(schedule.rooms)
+    ? schedule.rooms.findIndex((r) => r && r.bucket === b.id) : -1;
+  return json(env, { room: room === -1 ? null : room, schedule });
+}
+
 /* ---------- moderator bucket API (/b/*, secret-authed) ---------- */
 
 async function getBucketRow(env, secret) {
@@ -500,13 +558,14 @@ async function getPublishedTournament(env, slug) {
 async function pubState(env, slug) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const [files, buckets] = await Promise.all([
+  const [files, buckets, schedHead] = await Promise.all([
     env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
     env.DB.prepare(
       'SELECT id, room_name FROM buckets WHERE tournament_id = ?1'
     ).bind(t.id).all(),
+    env.DATA.head(`t/${t.id}/schedule.json`),
   ]);
   const rooms = Object.fromEntries(buckets.results.map((b) => [b.id, b.room_name]));
   const rows = files.results;
@@ -514,6 +573,8 @@ async function pubState(env, slug) {
     name: t.name,
     current_round: t.current_round,
     roster: !!t.roster_r2_key,
+    // stamp for the schedule tab: refetch only when this moves
+    schedule: schedHead ? schedHead.uploaded.getTime() : null,
     // Stats only change when a file lands (or is deleted): clients compare
     // this stamp and refetch the bundle only when it moves.
     version: (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length,
@@ -558,7 +619,7 @@ async function pubRoster(env, slug) {
   if (!t.roster_r2_key) return err(env, 404, 'no roster');
   const obj = await env.DATA.get(t.roster_r2_key);
   if (!obj) return err(env, 404, 'roster missing');
-  return blobResponse(env, obj, 'roster.qbj');
+  return blobResponse(env, obj, 'roster.qbj', 60);
 }
 
 /* ---------- router ---------- */
@@ -580,12 +641,14 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1]);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1]);
 
     // Public stats routes — publish-gated inside.
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/bundle$/)) && method === 'GET') return pubBundle(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
 
     // Open (rate-limited) tournament creation; the response carries the
     // admin secret, shown to the TO exactly once by the dashboard.
@@ -605,6 +668,8 @@ export default {
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
       if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
       if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
+      if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
+      if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
       if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
       if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
       if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);

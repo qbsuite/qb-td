@@ -8,6 +8,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds } from '../app/engine/schedule.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -684,6 +685,213 @@ test('roundRows merges packets with newest game per round, live flagged', () => 
   assert.equal(rows[1].game, null);
   assert.deepEqual(rows[2], { number: 7, packet: null, live: false, game: { id: 'g5', a: 'E', b: 'F' } });
   assert.deepEqual(roundRows([], [], 1), []);
+});
+
+/* ---------- schedule generation ---------- */
+
+function scheduleSlots(round) {
+  const out = [];
+  for (const g of round.games) out.push(g.a, g.b);
+  out.push(...round.byes);
+  return out;
+}
+
+test('roundRobinRounds even n: n-1 rounds, every pair once, no byes', () => {
+  for (const n of [4, 6, 8, 10, 12]) {
+    const rounds = roundRobinRounds(n);
+    assert.equal(rounds.length, n - 1);
+    const met = new Set();
+    for (const r of rounds) {
+      assert.equal(r.byes.length, 0);
+      const seen = new Set();
+      for (const [a, b] of r.pairs) {
+        for (const t of [a, b]) { assert.ok(!seen.has(t), 'team twice in round'); seen.add(t); }
+        const k = Math.min(a, b) + ':' + Math.max(a, b);
+        assert.ok(!met.has(k), 'pair repeated');
+        met.add(k);
+      }
+      assert.equal(seen.size, n);
+    }
+    assert.equal(met.size, n * (n - 1) / 2);
+  }
+});
+
+test('roundRobinRounds odd n: n rounds, one bye each, every pair once', () => {
+  for (const n of [5, 7, 9]) {
+    const rounds = roundRobinRounds(n);
+    assert.equal(rounds.length, n);
+    const met = new Set();
+    const byeCount = new Array(n).fill(0);
+    for (const r of rounds) {
+      assert.equal(r.byes.length, 1);
+      byeCount[r.byes[0]]++;
+      for (const [a, b] of r.pairs) met.add(Math.min(a, b) + ':' + Math.max(a, b));
+    }
+    assert.deepEqual(byeCount, new Array(n).fill(1));
+    assert.equal(met.size, n * (n - 1) / 2);
+  }
+});
+
+test('crossRounds: every A meets every B exactly once', () => {
+  for (const [p, q] of [[2, 2], [3, 2], [3, 3], [4, 3]]) {
+    const A = [...Array(p).keys()];
+    const B = [...Array(q).keys()].map((i) => 100 + i);
+    const rounds = crossRounds(A, B);
+    assert.equal(rounds.length, Math.max(p, q));
+    const met = new Set();
+    for (const r of rounds) {
+      const seen = new Set();
+      for (const [a, b] of r.pairs) {
+        assert.ok(a < 100 && b >= 100);
+        met.add(a + ':' + b);
+        seen.add(a); seen.add(b);
+      }
+      for (const t of r.byes) { assert.ok(!seen.has(t)); seen.add(t); }
+      assert.equal(seen.size, p + q);
+    }
+    assert.equal(met.size, p * q);
+  }
+});
+
+test('assignRooms keeps a team in its previous room when free', () => {
+  const prev = new Map([[0, 2], [3, 1]]);
+  const rooms = assignRooms([[0, 5], [3, 4], [6, 7]], 3, prev);
+  assert.equal(rooms[0], 2);
+  assert.equal(rooms[1], 1);
+  assert.equal(rooms[2], 0);
+  assert.equal(new Set(rooms).size, 3);
+});
+
+const TEAMS8 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+const ROOMS4 = [1, 2, 3, 4].map((i) => ({ name: 'Room ' + i, bucket: i === 1 ? 11 : null }));
+
+test('buildSchedule rr: valid grid, sequential rounds, roster teams', () => {
+  const s = buildSchedule('rr', TEAMS8, ROOMS4);
+  assert.equal(s.v, 1);
+  assert.deepEqual(s.rooms[0], { name: 'Room 1', bucket: 11 });
+  const rounds = flatRounds(s);
+  assert.equal(rounds.length, 7);
+  rounds.forEach((r, i) => assert.equal(r.round, i + 1));
+  assert.deepEqual(validateSchedule(s, TEAMS8), []);
+  for (const r of rounds) {
+    assert.equal(r.games.length, 4);
+    assert.equal(new Set(r.games.map((g) => g.room)).size, 4);
+  }
+});
+
+test('buildSchedule rr odd teams: byes present, still valid', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 7), ROOMS4.slice(0, 3));
+  const rounds = flatRounds(s);
+  assert.equal(rounds.length, 7);
+  for (const r of rounds) assert.equal(r.byes.length, 1);
+  assert.deepEqual(validateSchedule(s, TEAMS8), []);
+});
+
+test('buildSchedule rr2: each pair exactly twice', () => {
+  const s = buildSchedule('rr2', TEAMS8.slice(0, 6), ROOMS4.slice(0, 3));
+  const met = {};
+  for (const r of flatRounds(s)) {
+    for (const g of r.games) {
+      const k = [g.a.team, g.b.team].sort().join(':');
+      met[k] = (met[k] || 0) + 1;
+    }
+  }
+  assert.deepEqual(new Set(Object.values(met)), new Set([2]));
+  assert.equal(Object.keys(met).length, 15);
+  // repeats live in the second phase, so no same-phase rematch warnings
+  assert.deepEqual(validateSchedule(s, TEAMS8), []);
+});
+
+test('buildSchedule pools2: prelims by pool, crossover playoffs with placeholders', () => {
+  const s = buildSchedule('pools2', TEAMS8, ROOMS4);
+  assert.equal(s.phases.length, 2);
+  assert.equal(s.phases[0].rounds.length, 3);            // pools of 4
+  assert.deepEqual(validateSchedule(s, TEAMS8), []);
+  const playoff = s.phases[1];
+  const labels = new Set();
+  for (const r of playoff.rounds) {
+    for (const g of r.games) {
+      assert.ok(g.a.label && g.b.label, 'playoff slots are placeholders');
+      // crossover: never two slots from the same prelim pool
+      assert.notEqual(g.a.label[0], g.b.label[0]);
+      labels.add(g.a.label); labels.add(g.b.label);
+    }
+  }
+  assert.deepEqual([...labels].sort(), ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4']);
+});
+
+test('buildSchedule pools3: playoff pools regroup by finish position', () => {
+  const teams12 = [...TEAMS8, 'I', 'J', 'K', 'L'];
+  const s = buildSchedule('pools3', teams12, [...ROOMS4, { name: 'Room 5', bucket: null }, { name: 'Room 6', bucket: null }]);
+  assert.deepEqual(validateSchedule(s, teams12), []);
+  const playoff = s.phases[1];
+  for (const r of playoff.rounds) {
+    for (const g of r.games) {
+      assert.ok(g.a.label && g.b.label);
+      // same finish position, different pools
+      assert.equal(g.a.label.slice(1), g.b.label.slice(1));
+      assert.notEqual(g.a.label[0], g.b.label[0]);
+    }
+  }
+});
+
+test('formatsFor filters by room count', () => {
+  const all = allFormats(8).map((f) => f.key);
+  assert.ok(all.includes('rr') && all.includes('rr2') && all.includes('pools2'));
+  const cramped = formatsFor(8, 2).map((f) => f.key);
+  assert.ok(!cramped.includes('rr'));
+  assert.deepEqual(formatsFor(2, 8), []);
+});
+
+test('swap/setSlot/addRound/removeRound edit the grid and renumber', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 4), ROOMS4.slice(0, 2));
+  const r0 = { p: 0, r: 0, g: 0, side: 'a' };
+  const r1 = { p: 0, r: 0, g: 1, side: 'b' };
+  const [was0, was1] = [slotAt(s, r0).team, slotAt(s, r1).team];
+  swapSlots(s, r0, r1);
+  assert.equal(slotAt(s, r0).team, was1);
+  assert.equal(slotAt(s, r1).team, was0);
+  addRound(s, 0);
+  const rounds = flatRounds(s);
+  assert.equal(rounds.length, 4);
+  assert.equal(rounds[3].round, 4);
+  assert.deepEqual(rounds[3].games.map((g) => [g.a, g.b]), [[null, null], [null, null]]);
+  setSlot(s, { p: 0, r: 3, g: 0, side: 'a' }, { team: 'A' });
+  assert.equal(slotAt(s, { p: 0, r: 3, g: 0, side: 'a' }).team, 'A');
+  removeRound(s, 0, 0);
+  assert.equal(flatRounds(s).length, 3);
+  assert.equal(flatRounds(s)[0].round, 1);
+});
+
+test('validateSchedule flags unknown teams, double play, same-phase rematch', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 4), ROOMS4.slice(0, 2));
+  setSlot(s, { p: 0, r: 0, g: 0, side: 'a' }, { team: 'Zed' });
+  const w1 = validateSchedule(s, TEAMS8.slice(0, 4));
+  assert.ok(w1.some((w) => w.includes('not on roster: Zed')));
+  const dup = slotAt(s, { p: 0, r: 1, g: 0, side: 'a' });
+  setSlot(s, { p: 0, r: 1, g: 1, side: 'b' }, dup);
+  const w2 = validateSchedule(s, TEAMS8.slice(0, 4));
+  assert.ok(w2.some((w) => w.includes('twice')));
+  const g0 = s.phases[0].rounds[0].games[0];
+  const g2 = s.phases[0].rounds[2].games[0];
+  g2.a = { ...g0.a }; g2.b = { ...g0.b };
+  assert.ok(validateSchedule(s, TEAMS8.slice(0, 4)).some((w) => w.includes('again')));
+});
+
+test('gameForRoom + roomRounds + roomIndexForBucket', () => {
+  const s = buildSchedule('rr', TEAMS8, ROOMS4);
+  assert.equal(roomIndexForBucket(s, 11), 0);
+  assert.equal(roomIndexForBucket(s, 999), null);
+  const g = gameForRoom(s, 0, 1);
+  assert.ok(g.a && g.b && g.a !== g.b);
+  assert.equal(gameForRoom(s, 0, 99), null);
+  const rr = roomRounds(s, 0);
+  assert.equal(rr.length, 7);
+  assert.deepEqual(rr.map((x) => x.round), [1, 2, 3, 4, 5, 6, 7]);
+  // placeholder slots never preselect
+  const p = buildSchedule('pools2', TEAMS8, ROOMS4);
+  const playoffRound = p.phases[1].rounds[0].round;
+  assert.equal(gameForRoom(p, 0, playoffRound), null);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
