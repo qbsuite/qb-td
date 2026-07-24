@@ -116,22 +116,8 @@ let rosterText = '';
 let rosterOpen = false;
 let fmtOpen = false;   // game-format customize panel
 let uploadsOpen = null; // Set of expanded upload rounds; null = current round only
-
-// Section jump bar: highlight the last section heading scrolled past.
-const JUMP_IDS = ['sec-tournament', 'sec-rooms', 'sec-packets', 'sec-roster',
-  'schedsec', 'sec-uploads', 'sec-stats'];
-function updateJumps() {
-  const bar = document.querySelector('.jumps');
-  if (!bar) return;
-  let active = JUMP_IDS[0];
-  for (const id of JUMP_IDS) {
-    const el = document.getElementById(id);
-    if (el && el.getBoundingClientRect().top <= 64) active = id;
-  }
-  bar.querySelectorAll('.jump').forEach((j) =>
-    j.classList.toggle('active', j.getAttribute('href') === '#' + active));
-}
-window.addEventListener('scroll', updateJumps, { passive: true });
+let setupOpen = null;   // tournament-setup drawer; null = auto: open until set up
+let schedOpen = null;   // schedule drawer; null = open
 
 async function showDetail() {
   const a = '/a/' + adminSecret;
@@ -167,27 +153,19 @@ async function showDetail() {
     ...files.map((f) => f.round).filter((n) => Number.isInteger(n) && n > 0),
   ])].sort((x, y) => y - x);
 
+  const openSetup = setupOpen === null ? !(t.roster_r2_key && buckets.length) : setupOpen;
+  const openSched = schedOpen === null ? true : schedOpen;
+
   view.innerHTML = `
     <div class="row">
       <a href="index.html">&larr; all tournaments</a>
+      <span class="spacer" style="flex:1"></span>
+      <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
+      <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">copy</button>
     </div>
-    <div class="jumps">
-      <a class="jump" href="#sec-tournament">tournament</a>
-      <a class="jump" href="#sec-rooms">rooms</a>
-      <a class="jump" href="#sec-packets">packets</a>
-      <a class="jump" href="#sec-roster">roster</a>
-      <a class="jump" href="#schedsec">schedule</a>
-      <a class="jump" href="#sec-uploads">uploads${intake.missing.length
-        ? ` <span class="pill warn">${intake.missing.length}</span>` : ''}</a>
-      <a class="jump" href="#sec-stats">stats</a>
-    </div>
-    <h2 id="sec-tournament">tournament</h2>
-    <div class="row" style="margin-bottom:8px">
+    <div class="row" style="margin-top:6px">
       <b style="font-size:18px">${esc(t.name)}</b>
       <span class="mono muted">${esc(t.slug)}</span>
-      <span class="spacer" style="flex:1"></span>
-      <span class="muted">admin link open until ${new Date(t.closes).toLocaleString()}</span>
-      <button id="rotate">new admin link</button>
     </div>
     <div class="statusbar">
       <span><span class="muted">round</span> <span class="big">${t.current_round}</span> <span class="muted">of ${totalRounds}</span></span>
@@ -201,132 +179,135 @@ async function showDetail() {
       ${t.current_round < totalRounds
         ? `<button id="advround" class="primary">advance to round ${t.current_round + 1}</button>` : ''}
     </div>
-    <div class="row">
-      <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> public page</label>
-      <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
-      <button onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">copy</button>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <label class="row">reader game format
-        <select id="gformat">${GAME_FORMAT_OPTIONS.map((o) =>
-          `<option value="${o.value}" ${o.value === (settings.gameFormat || '') ? 'selected' : ''}>${o.label}</option>`).join('')}
-        </select>
-      </label>
-      ${Object.keys(cleanOverrides(settings.formatOverrides)).length ? '<span class="pill">custom</span>' : ''}
-      <button id="fmtedit">customize</button>
-    </div>
-    <div id="fmtpanel" ${fmtOpen ? '' : 'hidden'} class="card" style="margin-top:8px">
-      <div class="row">
-        <label>tossups <input id="fmttossups" type="number" min="1" max="999" value="${fmt.regulationTossupCount}" style="width:64px"></label>
-        <label>neg <input id="fmtneg" type="number" min="-100" max="0" value="${fmt.negValue}" style="width:64px"></label>
-        <label>powers <input id="fmtpowers" placeholder="(*)=15" value="${esc(powersText(fmt.powers))}" size="16"></label>
-        <label>overtime tossups <input id="fmtot" type="number" min="1" max="99" value="${fmt.minimumOvertimeQuestionCount}" style="width:56px"></label>
+    <details class="drawer" id="setupdrawer" ${openSetup ? 'open' : ''}>
+      <summary><span class="dtitle">tournament setup</span>
+        <span class="muted">${buckets.length} room${buckets.length === 1 ? '' : 's'}
+          &middot; packets ${rounds.length}/${totalRounds}
+          &middot; ${t.roster_name ? 'roster' : 'no roster'}${t.published ? ' &middot; public' : ''}</span>
+      </summary>
+      <div class="inner">
+      <h2>rooms</h2>
+      ${buckets.length ? `<div class="tablewrap"><table>
+        <tr><th>room</th><th>links</th><th class="num">files</th><th>closes</th><th></th></tr>
+        ${buckets.map((b) => {
+          const closes = b.created + 48 * 3600 * 1000;
+          const open = Date.now() < closes;
+          return `<tr>
+            <td><b>${esc(b.room_name)}</b></td>
+            <td><a href="${esc(readLink(b.secret))}" target="_blank">reader</a>
+              <button class="small" onclick="qtd.copy('${esc(readLink(b.secret))}', '${esc(b.room_name)} reader link')">copy</button>
+              &nbsp;<a href="${esc(bucketLink(b.secret))}" target="_blank">bucket</a>
+              <button class="small" onclick="qtd.copy('${esc(bucketLink(b.secret))}', '${esc(b.room_name)} link')">copy</button></td>
+            <td class="num">${files.filter((f) => f.bucket_id === b.id).length}</td>
+            <td>${open
+              ? `<span class="muted">${new Date(closes).toLocaleString()}</span>`
+              : '<span class="pill">closed</span>'}</td>
+            <td><button class="small" data-delbucket="${b.id}">remove</button></td>
+          </tr>`;
+        }).join('')}
+      </table></div>` : '<div class="muted">no rooms yet</div>'}
+      <div class="row" style="margin-top:8px">
+        <input id="roomname" placeholder="room name" size="18">
+        <button id="addroom">add room</button>
+      </div>
+
+      <h2>packets</h2>
+      ${staged.length ? `
+      <div class="row" style="margin-bottom:8px">
+        ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
+          s.guess ? ` <span class="muted">&rarr; ${s.guess}</span>` : ''}</span>`).join('')}
+        <button id="zipauto">assign by filename</button>
+        <button id="zipclear">clear</button>
+      </div>` : ''}
+      <div class="chiprow">
+        ${slots.map((k) => {
+          const r = rounds.find((x) => x.number === k);
+          return r
+            ? `<a class="rchip has slot" data-round="${k}" title="${esc(r.packet_name)}"
+                 href="${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}"
+                 download><span class="dot"></span>${k}</a>`
+            : `<span class="rchip slot" data-round="${k}"><span class="dot"></span>${k}</span>`;
+        }).join('')}
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>rounds <input id="numrounds" type="number" min="1" max="999" value="${totalRounds}" style="width:70px"></label>
+        <button id="setrounds">set</button>
+        <span class="spacer" style="flex:1"></span>
+        <label>round <input id="pround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
+        <input id="pfile" type="file">
+        <button id="uppacket">upload packet</button>
       </div>
       <div class="row" style="margin-top:6px">
-        <label class="row"><input type="checkbox" id="fmtpaired" ${fmt.pairTossupsBonuses ? 'checked' : ''}> paired bonuses</label>
-        <label class="row"><input type="checkbox" id="fmtbounce" ${fmt.bonusesBounceBack ? 'checked' : ''}> bouncebacks</label>
-        <label class="row"><input type="checkbox" id="fmtotbonus" ${fmt.overtimeIncludesBonuses ? 'checked' : ''}> overtime bonuses</label>
-        <label>pronunciation marks
-          <input id="fmtpron1" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[0])}" size="4">
-          <input id="fmtpron2" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[1])}" size="4">
+        <input id="zipfile" type="file" accept=".zip">
+        <button id="upzip">load packet zip</button>
+      </div>
+
+      <h2>roster</h2>
+      <div class="row">
+        ${t.roster_name
+          ? `<span>${esc(t.roster_name)}</span>
+             <a href="${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}" download>download</a>`
+          : '<span class="muted">none yet</span>'}
+        <span class="spacer" style="flex:1"></span>
+        <input id="rfile" type="file" accept=".qbj,.json">
+        <button id="uproster">upload roster qbj</button>
+        <button id="editroster">${t.roster_name ? 'edit roster' : 'create roster qbj'}</button>
+      </div>
+      <div id="rosteredit" ${rosterOpen ? '' : 'hidden'} style="margin-top:8px">
+        <textarea id="rostertext" rows="10" spellcheck="false"
+          placeholder="Team A: Alice, Bob&#10;Team B: Carol, Dan">${esc(rosterText)}</textarea>
+        <div class="row" style="margin-top:8px">
+          <button id="rosterdl">download roster qbj</button>
+          <button id="rostersave" class="primary">save as tournament roster</button>
+        </div>
+      </div>
+
+      <h2>settings</h2>
+      <div class="row" style="margin-bottom:6px">
+        <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> public page</label>
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <label class="row">reader game format
+          <select id="gformat">${GAME_FORMAT_OPTIONS.map((o) =>
+            `<option value="${o.value}" ${o.value === (settings.gameFormat || '') ? 'selected' : ''}>${o.label}</option>`).join('')}
+          </select>
         </label>
-        <span class="spacer" style="flex:1"></span>
-        <button id="fmtreset">reset to preset</button>
-        <button id="fmtsave" class="primary">save format</button>
+        ${Object.keys(cleanOverrides(settings.formatOverrides)).length ? '<span class="pill">custom</span>' : ''}
+        <button id="fmtedit">customize</button>
       </div>
-    </div>
-
-    <div class="row" style="margin-top:8px">
-      <label class="row">buzzpoints
-        <select id="buzzmode">
-          <option value="">off</option>
-          <option value="password" ${(settings.buzz || {}).mode === 'password' ? 'selected' : ''}>on (password)</option>
-        </select>
-      </label>
-      ${(settings.buzz || {}).hash ? '<span class="pill on">password set</span>' : ''}
-      <input id="buzzpw" type="password" placeholder="password" size="16"
-        ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>
-      <button id="buzzset" ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>set password</button>
-    </div>
-
-    <h2 id="sec-rooms">rooms</h2>
-    ${buckets.map((b) => {
-      const closes = b.created + 48 * 3600 * 1000;
-      const open = Date.now() < closes;
-      return `
-      <div class="card row">
-        <b>${esc(b.room_name)}</b>
-        <a class="mono" href="${esc(readLink(b.secret))}" target="_blank">reader link</a>
-        <button onclick="qtd.copy('${esc(readLink(b.secret))}', '${esc(b.room_name)} reader link')">copy</button>
-        <a class="mono" href="${esc(bucketLink(b.secret))}" target="_blank">bucket link</a>
-        <button onclick="qtd.copy('${esc(bucketLink(b.secret))}', '${esc(b.room_name)} link')">copy</button>
-        <span class="spacer" style="flex:1"></span>
-        <span class="muted">${files.filter((f) => f.bucket_id === b.id).length} files</span>
-        ${open
-          ? `<span class="muted">closes ${new Date(closes).toLocaleString()}</span>`
-          : '<span class="pill">closed</span>'}
-        <button data-delbucket="${b.id}">remove</button>
-      </div>`;
-    }).join('') || '<div class="muted">no rooms yet</div>'}
-    <div class="row" style="margin-top:8px">
-      <input id="roomname" placeholder="room name" size="18">
-      <button id="addroom">add room</button>
-    </div>
-
-    <h2 id="sec-packets">packets</h2>
-    <div class="row" style="margin-bottom:8px">
-      <label>rounds <input id="numrounds" type="number" min="1" max="999" value="${totalRounds}" style="width:70px"></label>
-      <button id="setrounds">set</button>
-      <span class="spacer" style="flex:1"></span>
-      <input id="zipfile" type="file" accept=".zip">
-      <button id="upzip">load packet zip</button>
-    </div>
-    ${staged.length ? `
-    <div class="row" style="margin-bottom:8px">
-      ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
-        s.guess ? ` <span class="muted">&rarr; ${s.guess}</span>` : ''}</span>`).join('')}
-      <button id="zipauto">assign by filename</button>
-      <button id="zipclear">clear</button>
-    </div>` : ''}
-    ${slots.map((k) => {
-      const r = rounds.find((x) => x.number === k);
-      return `
-      <div class="card row slot" data-round="${k}">
-        <b>round ${k}</b>
-        ${r ? `<span>${esc(r.packet_name)}</span>` : '<span class="muted">no packet</span>'}
-        <span class="spacer" style="flex:1"></span>
-        ${r ? `<a href="${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}" download>download</a>` : ''}
-      </div>`;
-    }).join('')}
-    <div class="row" style="margin-top:8px">
-      <label>round <input id="pround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
-      <input id="pfile" type="file">
-      <button id="uppacket">upload packet</button>
-    </div>
-
-    <h2 id="sec-roster">roster</h2>
-    <div class="row">
-      ${t.roster_name
-        ? `<span>${esc(t.roster_name)}</span>
-           <a href="${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}" download>download</a>`
-        : '<span class="muted">none yet</span>'}
-      <span class="spacer" style="flex:1"></span>
-      <input id="rfile" type="file" accept=".qbj,.json">
-      <button id="uproster">upload roster qbj</button>
-      <button id="editroster">${t.roster_name ? 'edit roster' : 'create roster qbj'}</button>
-    </div>
-    <div id="rosteredit" ${rosterOpen ? '' : 'hidden'} style="margin-top:8px">
-      <textarea id="rostertext" rows="10" spellcheck="false"
-        placeholder="Team A: Alice, Bob&#10;Team B: Carol, Dan">${esc(rosterText)}</textarea>
-      <div class="row" style="margin-top:8px">
-        <button id="rosterdl">download roster qbj</button>
-        <button id="rostersave" class="primary">save as tournament roster</button>
+      <div id="fmtpanel" ${fmtOpen ? '' : 'hidden'} class="card" style="margin-bottom:6px">
+        <div class="row">
+          <label>tossups <input id="fmttossups" type="number" min="1" max="999" value="${fmt.regulationTossupCount}" style="width:64px"></label>
+          <label>neg <input id="fmtneg" type="number" min="-100" max="0" value="${fmt.negValue}" style="width:64px"></label>
+          <label>powers <input id="fmtpowers" placeholder="(*)=15" value="${esc(powersText(fmt.powers))}" size="16"></label>
+          <label>overtime tossups <input id="fmtot" type="number" min="1" max="99" value="${fmt.minimumOvertimeQuestionCount}" style="width:56px"></label>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <label class="row"><input type="checkbox" id="fmtpaired" ${fmt.pairTossupsBonuses ? 'checked' : ''}> paired bonuses</label>
+          <label class="row"><input type="checkbox" id="fmtbounce" ${fmt.bonusesBounceBack ? 'checked' : ''}> bouncebacks</label>
+          <label class="row"><input type="checkbox" id="fmtotbonus" ${fmt.overtimeIncludesBonuses ? 'checked' : ''}> overtime bonuses</label>
+          <label>pronunciation marks
+            <input id="fmtpron1" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[0])}" size="4">
+            <input id="fmtpron2" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[1])}" size="4">
+          </label>
+          <span class="spacer" style="flex:1"></span>
+          <button id="fmtreset">reset to preset</button>
+          <button id="fmtsave" class="primary">save format</button>
+        </div>
       </div>
-    </div>
+      <div class="row">
+        <span class="muted">admin link open until ${new Date(t.closes).toLocaleString()}</span>
+        <button id="rotate" class="small">new admin link</button>
+      </div>
+      </div>
+    </details>
 
-    <div id="schedsec"></div>
+    <details class="drawer" id="scheddrawer" ${openSched ? 'open' : ''}>
+      <summary><span class="dtitle">schedule</span><span class="muted" id="schedsum"></span></summary>
+      <div class="inner"><div id="schedsec"></div></div>
+    </details>
 
-    <h2 id="sec-uploads">uploads</h2>
+    <h2>uploads</h2>
     ${uploadRounds.map((rn) => {
       const group = files.filter((f) => f.round === rn);
       const ri = rn === t.current_round ? intake : roundIntake(sched, rn, buckets, files);
@@ -366,23 +347,35 @@ async function showDetail() {
       </details>`;
     }).join('')}
 
-    <h2 id="sec-stats">stats + export</h2>
+    <h2>stats + export</h2>
     <div class="row">
       <button id="calc" class="primary">compute stats</button>
       <button id="dlyft" disabled>download .yft</button>
       <button id="dlzip" disabled>download qbj bundle</button>
       <button id="rebuild" disabled>rebuild stats data</button>
+      <span class="spacer" style="flex:1"></span>
+      <label class="row">buzzpoints
+        <select id="buzzmode">
+          <option value="">off</option>
+          <option value="password" ${(settings.buzz || {}).mode === 'password' ? 'selected' : ''}>on (password)</option>
+        </select>
+      </label>
+      ${(settings.buzz || {}).hash ? '<span class="pill on">password set</span>' : ''}
+      <input id="buzzpw" type="password" placeholder="password" size="16"
+        ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>
+      <button id="buzzset" ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>set password</button>
     </div>
     <div id="statsout" style="margin-top:12px"></div>`;
 
   window.scrollTo(0, scrollWas);
-  updateJumps();
   view.querySelectorAll('details.rgroup').forEach((d) => {
     d.ontoggle = () => {
       uploadsOpen = new Set([...view.querySelectorAll('details.rgroup[open]')]
         .map((x) => Number(x.dataset.uprnd)));
     };
   });
+  $('setupdrawer').ontoggle = () => { setupOpen = $('setupdrawer').open; };
+  $('scheddrawer').ontoggle = () => { schedOpen = $('scheddrawer').open; };
   $('rotate').onclick = async () => {
     if (!confirm('Mint a new admin link? The current link stops working.')) return;
     try {
@@ -680,8 +673,10 @@ async function ensureSched(a, t) {
 async function renderSchedule(a, t, buckets) {
   const box = $('schedsec');
   if (!box) return;
+  const summarize = (text) => { if ($('schedsum')) $('schedsum').textContent = text; };
   if (!t.roster_r2_key) {
-    box.innerHTML = '<h2>schedule</h2><div class="muted">needs a roster</div>';
+    summarize('needs a roster');
+    box.innerHTML = '<div class="muted">needs a roster</div>';
     return;
   }
   await ensureSched(a, t);
@@ -691,8 +686,8 @@ async function renderSchedule(a, t, buckets) {
   if (!sched) {
     if (schedRoomsN === null) schedRoomsN = Math.max(1, buckets.length);
     const fmts = formatsFor(schedTeams.length, schedRoomsN);
+    summarize(schedTeams.length + ' teams, none yet');
     box.innerHTML = `
-      <h2>schedule</h2>
       <div class="row" style="margin-bottom:8px">
         <span class="muted">${schedTeams.length} teams</span>
         <label class="muted">rooms <input id="schedrooms" type="number" min="1" max="60" value="${schedRoomsN}" style="width:64px"></label>
@@ -743,10 +738,10 @@ async function renderSchedule(a, t, buckets) {
     }
   }
   const selSlot = schedSel ? slotAt(sched, schedSel) : undefined;
+  summarize(sched.phases.reduce((n, p) => n + p.rounds.length, 0) + ' rounds · '
+    + sched.rooms.length + ' rooms');
   box.innerHTML = `
-    <h2>schedule</h2>
     <div class="row" style="margin-bottom:6px">
-      <span class="muted">${sched.phases.reduce((n, p) => n + p.rounds.length, 0)} rounds</span>
       <span class="spacer" style="flex:1"></span>
       ${schedDirty ? '<span class="pill warn">unsaved</span>' : ''}
       <button id="schedsave" class="primary" ${schedDirty ? '' : 'disabled'}>save</button>
