@@ -9,7 +9,7 @@ import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
-import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion, mainAnswerHtml } from '../engine/buzz.js';
+import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion, mainAnswerHtml, dedupeEntries } from '../engine/buzz.js';
 import { categoryStats, catPlayerLines, catBreakdown, catCompare } from '../engine/cats.js';
 import { normalizePacket } from './read_core.js';
 
@@ -26,7 +26,7 @@ let roster = null;
 let schedule = null;
 let tab = null;            // 'schedule' | 'stats' | 'buzz'
 let teamFilter = '';
-let rawEntries = [];       // {round, room, qbj} — buzz + category extraction read these
+let rawEntries = [];       // {id, round, room, qbj}, deduped — buzz + category extraction read these
 let buzzView = null;       // selected round number, or 'summary'
 let catmap = null;         // text-free per-tossup categories from /pub/:slug/cats
 let lastCats;              // its stamp
@@ -66,10 +66,10 @@ async function fetchMatches(errors) {
         m.room = entry.room;
         m.fileId = entry.id;
         out.push(m);
-        raw.push({ round: m.round, room: entry.room, qbj: entry.qbj });
+        raw.push({ id: entry.id, round: m.round, room: entry.room, qbj: entry.qbj });
       } catch (e) { errors.push(entry.filename + ': ' + e.message); }
     }
-    rawEntries = raw;
+    rawEntries = dedupeEntries(raw);
     return out;
   } catch (e) { /* no bundle yet: fall through */ }
 
@@ -80,10 +80,10 @@ async function fetchMatches(errors) {
       m.room = f.room;
       m.fileId = f.id;
       out.push(m);
-      raw.push({ round: m.round, room: f.room, qbj });
+      raw.push({ id: f.id, round: m.round, room: f.room, qbj });
     } catch (e) { errors.push(f.filename + ': ' + e.message); }
   }));
-  rawEntries = raw;
+  rawEntries = dedupeEntries(raw);
   return out;
 }
 
@@ -450,12 +450,11 @@ function renderBuzz(box) {
 
 /* ---------- categories tab ---------- */
 
-const CAT_HEAD = '<th class="num">heard</th><th class="num">15</th><th class="num">10</th>'
-  + '<th class="num">-5</th><th class="num">pts</th><th class="num">p/20h</th>';
+const CAT_HEAD = '<th class="num">15</th><th class="num">10</th>'
+  + '<th class="num">-5</th><th class="num">pts</th>';
 function lineCells(l) {
-  const p20 = l.heard ? (l.pts / l.heard * 20).toFixed(1) : '–';
-  return `<td class="num">${l.heard}</td><td class="num">${l.powers}</td><td class="num">${l.gets}</td>`
-    + `<td class="num">${l.negs}</td><td class="num">${l.pts}</td><td class="num">${p20}</td>`;
+  return `<td class="num">${l.powers}</td><td class="num">${l.gets}</td>`
+    + `<td class="num">${l.negs}</td><td class="num">${l.pts}</td>`;
 }
 
 function renderByCategory(box, rows) {

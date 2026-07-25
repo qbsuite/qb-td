@@ -48,6 +48,31 @@ export function matchBuzzes(json) {
 }
 
 /**
+ * The stats.js dedupeMatches rule applied to raw bundle entries
+ * ({id, round, qbj}): a re-uploaded game (mod re-exporting after a fix)
+ * keeps only the latest upload per (round, team pair) — file ids are
+ * upload-ordered; without ids the later entry in input order wins. The
+ * buzz-based views (buzzpoints, categories) read raw entries instead of
+ * parsed matches, so they need their own pass.
+ */
+export function dedupeEntries(entries) {
+  const byGame = new Map();
+  for (const e of entries) {
+    if (!e || !e.qbj) continue;
+    const match = unwrapMatch(e.qbj);
+    const teams = (Array.isArray(match.match_teams) ? match.match_teams : [])
+      .map((mt) => mt && mt.team && typeof mt.team.name === 'string' ? mt.team.name.trim() : '')
+      .sort();
+    const key = e.round + '\n' + teams.join('\n');
+    const prev = byGame.get(key);
+    const older = prev && Number.isFinite(prev.id) && Number.isFinite(e.id)
+      && e.id < prev.id;
+    if (!older) byGame.set(key, e);
+  }
+  return [...byGame.values()];
+}
+
+/**
  * One round's buzzes across every room, merged per packet tossup.
  * entries: [{round, room, qbj}] (the raw stats-bundle rows). Returns
  * [{tossup, buzzes: [{player, team, position, value, room}]}] sorted by

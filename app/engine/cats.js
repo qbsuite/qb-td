@@ -4,11 +4,13 @@
 // (t/<tid>/catmap.json, {rounds: {"<n>": [{c, s} | null, ...]}}). The
 // qbj side contributes the buzzes; this module joins the two.
 //
-// "Heard" is whole-game presence: a player is counted as hearing every
-// categorized tossup read in a game they appear in (mid-game
-// substitutions are not tracked per tossup).
+// Purely buzz-based: each categorized tossup credits only the players
+// who buzzed on it (power/get/neg). No tossups-heard column — with
+// whole-game rosters, per-category heard is a guess, not a stat.
+// Callers pass deduped entries (buzz.js dedupeEntries) so re-uploaded
+// games don't double-count.
 
-import { matchBuzzes, unwrapMatch } from './buzz.js';
+import { matchBuzzes } from './buzz.js';
 
 // display order for primary categories (unknowns sort after, A-Z)
 export const CAT_ORDER = ['Literature', 'History', 'Science', 'Fine Arts',
@@ -21,27 +23,13 @@ export function catCompare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function matchPlayers(qbj) {
-  const match = unwrapMatch(qbj);
-  const out = [];
-  for (const mt of (Array.isArray(match.match_teams) ? match.match_teams : [])) {
-    const team = mt && mt.team && typeof mt.team.name === 'string' ? mt.team.name.trim() : '';
-    for (const mp of (mt && Array.isArray(mt.match_players) ? mt.match_players : [])) {
-      const player = mp && mp.player && typeof mp.player.name === 'string' ? mp.player.name.trim() : '';
-      if (team && player) out.push({ team, player });
-    }
-  }
-  return out;
-}
-
 /**
  * Join the stats-bundle entries ({round, room, qbj}) with the category
- * map. Returns [{player, team, cat, sub, heard, powers, gets, negs,
- * pts}] — one row per player per (category, subcategory) slice, with
+ * map. Returns [{player, team, cat, sub, powers, gets, negs, pts}] —
+ * one row per buzzing player per (category, subcategory) slice, with
  * pts summed from actual buzz values. Rounds absent from the map (docx
  * packets, no packet yet) contribute nothing; uncategorized tossups
- * are skipped. Players who heard a slice without buzzing still get a
- * row (heard only).
+ * are skipped, as are zeroed non-first wrong buzzes.
  */
 export function categoryStats(entries, catmap) {
   const roundsMap = catmap && catmap.rounds && typeof catmap.rounds === 'object'
@@ -50,7 +38,7 @@ export function categoryStats(entries, catmap) {
   const rowFor = (player, team, cat, sub) => {
     const key = JSON.stringify([team, player, cat, sub]);
     if (!rows.has(key)) {
-      rows.set(key, { player, team, cat, sub, heard: 0, powers: 0, gets: 0, negs: 0, pts: 0 });
+      rows.set(key, { player, team, cat, sub, powers: 0, gets: 0, negs: 0, pts: 0 });
     }
     return rows.get(key);
   };
@@ -58,18 +46,17 @@ export function categoryStats(entries, catmap) {
     if (!e || !e.qbj) continue;
     const cats = roundsMap[String(e.round)];
     if (!Array.isArray(cats)) continue;
-    const players = matchPlayers(e.qbj);
     for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
       const info = cats[tossup - 1];
       if (!info || typeof info.c !== 'string' || !info.c) continue;
       const cat = info.c;
       const sub = typeof info.s === 'string' ? info.s : '';
-      for (const p of players) rowFor(p.player, p.team, cat, sub).heard++;
       for (const b of buzzes) {
+        if (!b.value) continue;
         const r = rowFor(b.player, b.team, cat, sub);
         if (b.value > 10) r.powers++;
         else if (b.value > 0) r.gets++;
-        else if (b.value < 0) r.negs++;
+        else r.negs++;
         r.pts += b.value;
       }
     }
@@ -85,16 +72,16 @@ export function catPlayerLines(rows, cat, sub) {
     if (sub && r.sub !== sub) continue;
     const key = JSON.stringify([r.team, r.player]);
     if (!out.has(key)) {
-      out.set(key, { player: r.player, team: r.team, heard: 0, powers: 0, gets: 0, negs: 0, pts: 0 });
+      out.set(key, { player: r.player, team: r.team, powers: 0, gets: 0, negs: 0, pts: 0 });
     }
     const line = out.get(key);
-    line.heard += r.heard;
     line.powers += r.powers;
     line.gets += r.gets;
     line.negs += r.negs;
     line.pts += r.pts;
   }
-  return [...out.values()].sort((a, b) => b.pts - a.pts || b.heard - a.heard);
+  return [...out.values()]
+    .sort((a, b) => b.pts - a.pts || (b.powers + b.gets) - (a.powers + a.gets));
 }
 
 /**
@@ -109,9 +96,9 @@ export function catBreakdown(rows, team, player) {
     byCat.get(r.cat).push(r);
   }
   const sum = (list) => list.reduce((acc, r) => ({
-    heard: acc.heard + r.heard, powers: acc.powers + r.powers,
-    gets: acc.gets + r.gets, negs: acc.negs + r.negs, pts: acc.pts + r.pts,
-  }), { heard: 0, powers: 0, gets: 0, negs: 0, pts: 0 });
+    powers: acc.powers + r.powers, gets: acc.gets + r.gets,
+    negs: acc.negs + r.negs, pts: acc.pts + r.pts,
+  }), { powers: 0, gets: 0, negs: 0, pts: 0 });
   return [...byCat.entries()]
     .sort(([a], [b]) => catCompare(a, b))
     .map(([cat, list]) => ({

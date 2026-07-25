@@ -9,7 +9,7 @@ import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake } from '../app/engine/schedule.js';
-import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml } from '../app/engine/buzz.js';
+import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, catPlayerLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
@@ -1132,21 +1132,24 @@ const CATMAP = { rounds: { 1: [
   { c: 'Mythology', s: '' },
 ] } };
 
-test('categoryStats joins buzzes + heard to the category map', () => {
+test('categoryStats credits only the players who buzzed', () => {
   const entries = [{ round: 1, room: 'R1', qbj: catQbj([
     { t: 1, team: 'Alpha', player: 'Ann', pos: 5, value: 15 },
     { t: 2, team: 'Beta', player: 'Bob', pos: 9, value: -5 },
     { t: 2, team: 'Alpha', player: 'Ann', pos: 20, value: 10 },
+    { t: 3, team: 'Alpha', player: 'Ann', pos: 12, value: 0 }, // zeroed non-first wrong buzz
   ]) }];
   const rows = categoryStats(entries, CATMAP);
   const ann = (sub) => rows.find((r) => r.player === 'Ann' && r.sub === sub);
   assert.deepEqual(ann('American Literature'),
     { player: 'Ann', team: 'Alpha', cat: 'Literature', sub: 'American Literature',
-      heard: 1, powers: 1, gets: 0, negs: 0, pts: 15 });
+      powers: 1, gets: 0, negs: 0, pts: 15 });
   assert.deepEqual(ann('British Literature').pts, 10);
-  // Bob heard the myth tossup without buzzing: row exists, heard only
-  const bobMyth = rows.find((r) => r.player === 'Bob' && r.cat === 'Mythology');
-  assert.deepEqual({ heard: bobMyth.heard, pts: bobMyth.pts }, { heard: 1, pts: 0 });
+  assert.deepEqual(rows.find((r) => r.player === 'Bob' && r.sub === 'British Literature'),
+    { player: 'Bob', team: 'Beta', cat: 'Literature', sub: 'British Literature',
+      powers: 0, gets: 0, negs: 1, pts: -5 });
+  // no buzz, no row: Bob never appears in Mythology, Ann's zeroed buzz counts nothing
+  assert.equal(rows.some((r) => r.cat === 'Mythology'), false);
   // a round missing from the map contributes nothing
   assert.deepEqual(categoryStats([{ round: 2, room: 'R1', qbj: catQbj([]) }], CATMAP), []);
 });
@@ -1160,16 +1163,30 @@ test('catPlayerLines filters + aggregates; catBreakdown nests subs', () => {
   const rows = categoryStats(entries, CATMAP);
   const lit = catPlayerLines(rows, 'Literature', '');
   assert.equal(lit[0].player, 'Ann');
-  assert.deepEqual({ heard: lit[0].heard, pts: lit[0].pts }, { heard: 2, pts: 25 });
+  assert.deepEqual(lit[0], { player: 'Ann', team: 'Alpha', powers: 1, gets: 1, negs: 0, pts: 25 });
+  assert.equal(lit.some((l) => l.player === 'Bob'), false); // Bob only buzzed on myth
   const amer = catPlayerLines(rows, 'Literature', 'American Literature');
-  assert.deepEqual({ heard: amer[0].heard, pts: amer[0].pts }, { heard: 1, pts: 15 });
+  assert.deepEqual({ powers: amer[0].powers, pts: amer[0].pts }, { powers: 1, pts: 15 });
   const bd = catBreakdown(rows, 'Alpha', 'Ann');
-  assert.deepEqual(bd.map((c) => c.cat), ['Literature', 'Mythology']); // canonical order
-  assert.deepEqual(bd[0].line, { heard: 2, powers: 1, gets: 1, negs: 0, pts: 25 });
+  assert.deepEqual(bd.map((c) => c.cat), ['Literature']); // canonical order, buzzed cats only
+  assert.deepEqual(bd[0].line, { powers: 1, gets: 1, negs: 0, pts: 25 });
   assert.deepEqual(bd[0].subs.map((s) => s.sub), ['American Literature', 'British Literature']);
-  assert.deepEqual(bd[1].subs, []); // Mythology has no subcategory
+  assert.deepEqual(catBreakdown(rows, 'Beta', 'Bob')[0].subs, []); // Mythology has no subcategory
   assert.ok(catCompare('Literature', 'History') < 0);
   assert.ok(catCompare('Trash', 'Zzz-unknown') < 0);
+});
+
+test('dedupeEntries keeps the latest upload per round + team pair', () => {
+  const mk = (id, buzzList) => ({ id, round: 1, room: 'R1', qbj: catQbj(buzzList) });
+  const older = mk(3, [{ t: 1, team: 'Alpha', player: 'Ann', pos: 5, value: -5 }]);
+  const newer = mk(7, [{ t: 1, team: 'Alpha', player: 'Ann', pos: 5, value: 15 }]);
+  const deduped = dedupeEntries([newer, older]);
+  assert.deepEqual(deduped.map((e) => e.id), [7]); // higher id wins regardless of order
+  // the corrected re-export is what reaches the category join
+  const rows = categoryStats(deduped, CATMAP);
+  assert.deepEqual({ powers: rows[0].powers, negs: rows[0].negs }, { powers: 1, negs: 0 });
+  // different rounds never collide
+  assert.equal(dedupeEntries([mk(1, []), { ...mk(2, []), round: 2 }]).length, 2);
 });
 
 /* ---------- broadcasts ---------- */
