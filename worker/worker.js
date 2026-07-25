@@ -365,12 +365,12 @@ async function deleteBucket(env, t, bucketId) {
   return json(env, { ok: true });
 }
 
-/* Text-free per-tossup category map (t/<tid>/catmap.json, {rounds:
-   {"<n>": [{c, s} | null, ...]}}), extracted from qbreader-format JSON
-   packets at upload time. It powers the public categories tab without
-   exposing any question text; docx packets carry no category data, so
-   their rounds simply stay absent. Maintained with the same
-   conditional-write retry as the stats bundle. */
+/* Text-free per-question category map (t/<tid>/catmap.json, {rounds:
+   {"<n>": {t: [{c, s} | null, ...], b: [...]}}}), extracted from
+   qbreader-format JSON packets at upload time. It powers the public
+   categories tab without exposing any question text; docx packets carry
+   no category data, so their rounds simply stay absent. Maintained with
+   the same conditional-write retry as the stats bundle. */
 
 // Primary categories we recognize inside ACF/YAPP metadata strings
 // ("History - World, Author" / "Author, History - World" / "Math, Author").
@@ -423,19 +423,24 @@ export function categoryFromMetadata(meta) {
   return best;
 }
 
+// Round entry shape: {t: [{c, s} | null, ...], b: [...]} — tossup and
+// bonus categories by packet position. Maps written before bonuses were
+// extracted store a bare tossup array; readers accept both.
 export function packetCategories(body, filename) {
   if (!/\.json$/i.test(filename)) return null;
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return null; }
   if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) return null;
-  const cats = parsed.tossups.map((tu) => {
-    if (!tu) return null;
-    if (typeof tu.category === 'string' && tu.category) {
-      return { c: tu.category, s: typeof tu.subcategory === 'string' ? tu.subcategory : '' };
+  const catOf = (q) => {
+    if (!q) return null;
+    if (typeof q.category === 'string' && q.category) {
+      return { c: q.category, s: typeof q.subcategory === 'string' ? q.subcategory : '' };
     }
-    return categoryFromMetadata(tu.metadata);
-  });
-  return cats.some(Boolean) ? cats : null;
+    return categoryFromMetadata(q.metadata);
+  };
+  const t = parsed.tossups.map(catOf);
+  const b = (Array.isArray(parsed.bonuses) ? parsed.bonuses : []).map(catOf);
+  return t.some(Boolean) || b.some(Boolean) ? { t, b } : null;
 }
 
 // Backfill for packets uploaded before category extraction existed (or

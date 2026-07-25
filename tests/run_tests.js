@@ -10,7 +10,7 @@ import { buildYft } from '../app/engine/yft.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake } from '../app/engine/schedule.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml, dedupeEntries } from '../app/engine/buzz.js';
-import { categoryStats, catPlayerLines, catBreakdown, catCompare } from '../app/engine/cats.js';
+import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -1109,8 +1109,9 @@ test('tokenizeQuestion strips tags and splits on whitespace', () => {
 
 /* ---------- category stats ---------- */
 
-function catQbj(buzzList) {
-  // one match: Ann (Alpha) + Bob (Beta) rostered; 3 cycles on tossups 1-3
+function catQbj(buzzList, bonuses = {}) {
+  // one match: Ann (Alpha) + Bob (Beta) rostered; 3 cycles on tossups 1-3;
+  // bonuses[n] = controlled points per part for cycle n's bonus
   return {
     tossups_read: 3,
     match_teams: [
@@ -1122,15 +1123,26 @@ function catQbj(buzzList) {
       tossup_question: { type: 'tossup', question_number: n },
       buzzes: buzzList.filter((b) => b.t === n)
         .map((b) => buzz(b.team, b.player, b.pos, b.value)),
+      ...(bonuses[n] ? { bonus: {
+        question: { type: 'bonus', question_number: n },
+        parts: bonuses[n].map((p) => ({ controlled_points: p })),
+      } } : {}),
     })),
     _round: 1,
   };
 }
-const CATMAP = { rounds: { 1: [
-  { c: 'Literature', s: 'American Literature' },
-  { c: 'Literature', s: 'British Literature' },
-  { c: 'Mythology', s: '' },
-] } };
+const CATMAP = { rounds: { 1: {
+  t: [
+    { c: 'Literature', s: 'American Literature' },
+    { c: 'Literature', s: 'British Literature' },
+    { c: 'Mythology', s: '' },
+  ],
+  b: [
+    { c: 'Literature', s: 'American Literature' },
+    { c: 'Science', s: 'Biology' },
+    { c: 'Mythology', s: '' },
+  ],
+} } };
 
 test('categoryStats credits only the players who buzzed', () => {
   const entries = [{ round: 1, room: 'R1', qbj: catQbj([
@@ -1174,6 +1186,42 @@ test('catPlayerLines filters + aggregates; catBreakdown nests subs', () => {
   assert.deepEqual(catBreakdown(rows, 'Beta', 'Bob')[0].subs, []); // Mythology has no subcategory
   assert.ok(catCompare('Literature', 'History') < 0);
   assert.ok(catCompare('Trash', 'Zzz-unknown') < 0);
+});
+
+test('categoryTeamStats joins team buzzes + controlled bonuses; catTeamLines does ppb', () => {
+  const entries = [{ id: 1, round: 1, room: 'R1', qbj: catQbj([
+    { t: 1, team: 'Alpha', player: 'Ann', pos: 5, value: 15 },
+    { t: 2, team: 'Beta', player: 'Bob', pos: 9, value: -5 },
+    { t: 2, team: 'Alpha', player: 'Ann', pos: 20, value: 10 },
+  ], { 1: [10, 10, 0], 2: [0, 10, 0] }) }];
+  const rows = categoryTeamStats(entries, CATMAP);
+  // bonus 1 (Amer Lit, 20 pts) and bonus 2 (Sci - Biology, 10 pts) both went to Alpha
+  assert.deepEqual(rows.find((r) => r.team === 'Alpha' && r.sub === 'American Literature'),
+    { team: 'Alpha', cat: 'Literature', sub: 'American Literature',
+      powers: 1, gets: 0, negs: 0, pts: 15, bh: 1, bpts: 20 });
+  assert.deepEqual(rows.find((r) => r.team === 'Alpha' && r.cat === 'Science'),
+    { team: 'Alpha', cat: 'Science', sub: 'Biology',
+      powers: 0, gets: 0, negs: 0, pts: 0, bh: 1, bpts: 10 });
+  // Beta only negged: no bonus slice
+  assert.equal(rows.filter((r) => r.team === 'Beta').every((r) => r.bh === 0), true);
+  const all = catTeamLines(rows, '', '');
+  assert.deepEqual(all[0], { team: 'Alpha', powers: 1, gets: 1, negs: 0, pts: 25,
+    bh: 2, bpts: 30, ppb: 15 });
+  assert.deepEqual({ negs: all[1].negs, ppb: all[1].ppb }, { negs: 1, ppb: null });
+  // filtering to Literature drops the biology bonus from Alpha's ppb
+  const lit = catTeamLines(rows, 'Literature', '');
+  assert.deepEqual({ bh: lit[0].bh, bpts: lit[0].bpts, ppb: lit[0].ppb }, { bh: 1, bpts: 20, ppb: 20 });
+});
+
+test('cats accept the pre-bonus array map format', () => {
+  const legacy = { rounds: { 1: [{ c: 'Literature', s: 'American Literature' }] } };
+  const entries = [{ id: 1, round: 1, room: 'R1', qbj: catQbj([
+    { t: 1, team: 'Alpha', player: 'Ann', pos: 5, value: 10 },
+  ], { 1: [10, 0, 0] }) }];
+  assert.equal(categoryStats(entries, legacy)[0].gets, 1);
+  // no bonus categories in the old format: tossup side only
+  const rows = categoryTeamStats(entries, legacy);
+  assert.deepEqual({ gets: rows[0].gets, bh: rows[0].bh }, { gets: 1, bh: 0 });
 });
 
 test('dedupeEntries keeps the latest upload per round + team pair', () => {
@@ -1256,17 +1304,22 @@ test('categoryFromMetadata: bare distribution labels (2026 UG Nats)', () => {
   }
 });
 
-test('packetCategories: metadata-only packets map every tossup', () => {
-  const body = new TextEncoder().encode(JSON.stringify({ tossups: [
-    { question: 'q', answer: 'a', metadata: 'American History' },
-    { question: 'q', answer: 'a', metadata: 'Religion' },
-    { question: 'q', answer: 'a' },
-  ] }));
-  assert.deepEqual(packetCategories(body, 'Packet 1.json'), [
-    { c: 'History', s: 'American' },
-    { c: 'Religion', s: '' },
-    null,
-  ]);
+test('packetCategories: metadata-only packets map tossups and bonuses', () => {
+  const body = new TextEncoder().encode(JSON.stringify({
+    tossups: [
+      { question: 'q', answer: 'a', metadata: 'American History' },
+      { question: 'q', answer: 'a', metadata: 'Religion' },
+      { question: 'q', answer: 'a' },
+    ],
+    bonuses: [
+      { leadin: 'l', metadata: 'Physics' },
+      { leadin: 'l', category: 'Literature', subcategory: 'World Literature' },
+    ],
+  }));
+  assert.deepEqual(packetCategories(body, 'Packet 1.json'), {
+    t: [{ c: 'History', s: 'American' }, { c: 'Religion', s: '' }, null],
+    b: [{ c: 'Science', s: 'Physics' }, { c: 'Literature', s: 'World Literature' }],
+  });
   assert.equal(packetCategories(body, 'Packet 1.docx'), null);
 });
 

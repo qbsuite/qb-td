@@ -373,11 +373,14 @@ ok('legacy public mode reads as off', r.body.buzz === null && r.body.buzz_v === 
 ok('no catmap yet', r.body.cats === null, r.body.cats);
 r = await call('/pub/' + slug + '/cats');
 ok('cats 404 before a categorized packet', r.status === 404);
-const CATPACKET = JSON.stringify({ tossups: [
-  { question: 'q1 text', answer: 'a1', category: 'Literature', subcategory: 'American Literature' },
-  { question: 'q2 text', answer: 'a2', category: 'Science', subcategory: 'Biology' },
-  { question: 'q3 text', answer: 'a3' },
-] });
+const CATPACKET = JSON.stringify({
+  tossups: [
+    { question: 'q1 text', answer: 'a1', category: 'Literature', subcategory: 'American Literature' },
+    { question: 'q2 text', answer: 'a2', category: 'Science', subcategory: 'Biology' },
+    { question: 'q3 text', answer: 'a3' },
+  ],
+  bonuses: [{ leadin: 'b1 text', metadata: 'World History' }],
+});
 r = await call(`${A}/packet?round=2&name=Packet2.json`, { method: 'POST',
   headers: { 'Content-Type': 'application/json' }, body: CATPACKET });
 ok('categorized packet uploads', r.status === 200, r.body);
@@ -385,11 +388,14 @@ r = await call('/pub/' + slug);
 ok('pub state carries cats stamp', typeof r.body.cats === 'number' && r.body.cats > 0, r.body.cats);
 r = await call('/pub/' + slug + '/cats');
 ok('cats served, text-free',
-  r.status === 200 && r.body.rounds['2'].length === 3
-  && r.body.rounds['2'][0].c === 'Literature'
-  && r.body.rounds['2'][0].s === 'American Literature'
-  && r.body.rounds['2'][2] === null
-  && !JSON.stringify(r.body).includes('q1 text'), r.body);
+  r.status === 200 && r.body.rounds['2'].t.length === 3
+  && r.body.rounds['2'].t[0].c === 'Literature'
+  && r.body.rounds['2'].t[0].s === 'American Literature'
+  && r.body.rounds['2'].t[2] === null
+  && r.body.rounds['2'].b[0].c === 'History'
+  && r.body.rounds['2'].b[0].s === 'World'
+  && !JSON.stringify(r.body).includes('q1 text')
+  && !JSON.stringify(r.body).includes('b1 text'), r.body);
 // replacement packet without categories clears the round's entry
 r = await call(`${A}/packet?round=2&name=Packet2.json`, { method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -416,10 +422,10 @@ r = await call(`${A}/packet?round=3&name=Packet3.json`, { method: 'POST',
 ok('metadata packet uploads', r.status === 200, r.body);
 r = await call('/pub/' + slug + '/cats');
 ok('metadata categories parsed', r.status === 200
-  && r.body.rounds['3'][0].c === 'History' && r.body.rounds['3'][0].s === 'World'
-  && r.body.rounds['3'][1].c === 'Literature' && r.body.rounds['3'][1].s === 'American'
-  && r.body.rounds['3'][2].c === 'Math' && r.body.rounds['3'][2].s === ''
-  && r.body.rounds['3'][3] === null, r.body.rounds['3']);
+  && r.body.rounds['3'].t[0].c === 'History' && r.body.rounds['3'].t[0].s === 'World'
+  && r.body.rounds['3'].t[1].c === 'Literature' && r.body.rounds['3'].t[1].s === 'American'
+  && r.body.rounds['3'].t[2].c === 'Math' && r.body.rounds['3'].t[2].s === ''
+  && r.body.rounds['3'].t[3] === null, r.body.rounds['3']);
 
 // bare distribution labels (one label per question, 2026 UG Nats style)
 r = await call(`${A}/packet?round=4&name=Packet4.json`, { method: 'POST',
@@ -439,7 +445,7 @@ r = await call(`${A}/packet?round=4&name=Packet4.json`, { method: 'POST',
 ok('label packet uploads', r.status === 200, r.body);
 r = await call('/pub/' + slug + '/cats');
 {
-  const c4 = r.status === 200 ? r.body.rounds['4'] : null;
+  const c4 = r.status === 200 && r.body.rounds['4'] ? r.body.rounds['4'].t : null;
   const eq = (i, c, s) => c4 && c4[i] && c4[i].c === c && c4[i].s === s;
   ok('bare labels parsed', eq(0, 'History', 'American') && eq(1, 'History', '')
     && eq(2, 'Literature', 'World') && eq(3, 'Science', 'Physics')
@@ -617,8 +623,8 @@ ok('expired bucket upload 410', r.status === 410);
 r = await call(A);
 ok('TO access survives room expiry', r.status === 200);
 
-// admin detail reflects everything
-ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 3, r.body.files);
+// admin detail reflects everything (rounds 1-3 + the label-packet round 4)
+ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 4, r.body.files);
 
 // file delete
 const delId = r.body.files.find((f) => f.filename === 'broken.qbj').id;

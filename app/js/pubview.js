@@ -10,7 +10,7 @@ import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion, mainAnswerHtml, dedupeEntries } from '../engine/buzz.js';
-import { categoryStats, catPlayerLines, catBreakdown, catCompare } from '../engine/cats.js';
+import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../engine/cats.js';
 import { normalizePacket } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
@@ -457,13 +457,14 @@ function lineCells(l) {
     + `<td class="num">${l.negs}</td><td class="num">${l.pts}</td>`;
 }
 
-function renderByCategory(box, rows) {
+// Category + subcategory filter pills, shared by the by-category and
+// by-team views (same catSel/catSubSel state).
+function catFilterHtml(rows) {
   const cats = [...new Set(rows.map((r) => r.cat))].sort(catCompare);
   if (catSel && !cats.includes(catSel)) { catSel = ''; catSubSel = ''; }
   const subs = catSel
     ? [...new Set(rows.filter((r) => r.cat === catSel && r.sub).map((r) => r.sub))].sort() : [];
-  const lines = catPlayerLines(rows, catSel, catSubSel);
-  box.innerHTML = `
+  return `
     <div class="row" style="margin-bottom:8px">
       ${['', ...cats].map((c) =>
         `<a href="#" class="pill${catSel === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c) || 'all'}</a>`).join('')}
@@ -471,18 +472,40 @@ function renderByCategory(box, rows) {
     ${subs.length ? `<div class="row" style="margin-bottom:10px">
       ${['', ...subs].map((s) =>
         `<a href="#" class="pill${catSubSel === s ? ' on' : ''}" data-catsub="${esc(s)}">${esc(s) || 'all'}</a>`).join('')}
-    </div>` : ''}
-    <div class="tablewrap"><table>
-      <tr><th>player</th><th>team</th>${CAT_HEAD}</tr>
-      ${lines.map((l) =>
-        `<tr><td>${esc(l.player)}</td><td class="muted">${esc(l.team)}</td>${lineCells(l)}</tr>`).join('')}
-    </table></div>`;
+    </div>` : ''}`;
+}
+function wireCatFilter(box) {
   box.querySelectorAll('[data-cat]').forEach((p) => {
     p.onclick = (e) => { e.preventDefault(); catSel = p.dataset.cat; catSubSel = ''; render(); };
   });
   box.querySelectorAll('[data-catsub]').forEach((p) => {
     p.onclick = (e) => { e.preventDefault(); catSubSel = p.dataset.catsub; render(); };
   });
+}
+
+function renderByCategory(box, rows) {
+  const filter = catFilterHtml(rows);
+  const lines = catPlayerLines(rows, catSel, catSubSel);
+  box.innerHTML = `${filter}
+    <div class="tablewrap"><table>
+      <tr><th>player</th><th>team</th>${CAT_HEAD}</tr>
+      ${lines.map((l) =>
+        `<tr><td>${esc(l.player)}</td><td class="muted">${esc(l.team)}</td>${lineCells(l)}</tr>`).join('')}
+    </table></div>`;
+  wireCatFilter(box);
+}
+
+function renderByTeam(box, teamRows) {
+  const filter = catFilterHtml(teamRows);
+  const lines = catTeamLines(teamRows, catSel, catSubSel);
+  box.innerHTML = `${filter}
+    <div class="tablewrap"><table>
+      <tr><th>team</th>${CAT_HEAD}<th class="num">bonuses</th><th class="num">bpts</th><th class="num">ppb</th></tr>
+      ${lines.map((l) =>
+        `<tr><td>${esc(l.team)}</td>${lineCells(l)}<td class="num">${l.bh}</td>`
+        + `<td class="num">${l.bpts}</td><td class="num">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
+    </table></div>`;
+  wireCatFilter(box);
 }
 
 function renderByPlayer(box, rows) {
@@ -521,7 +544,8 @@ function renderCats(box) {
   if (!rows.length) { box.innerHTML = '<div class="muted">no games yet</div>'; return; }
   box.innerHTML = `
     <div class="row" style="margin-bottom:10px">
-      <a href="#" class="pill${catView === 'cat' ? ' on' : ''}" data-catview="cat">by category</a>
+      <a href="#" class="pill${catView === 'cat' ? ' on' : ''}" data-catview="cat">players</a>
+      <a href="#" class="pill${catView === 'team' ? ' on' : ''}" data-catview="team">teams</a>
       <a href="#" class="pill${catView === 'player' ? ' on' : ''}" data-catview="player">by player</a>
     </div>
     <div id="catbody"></div>`;
@@ -529,6 +553,7 @@ function renderCats(box) {
     p.onclick = (e) => { e.preventDefault(); catView = p.dataset.catview; render(); };
   });
   if (catView === 'cat') renderByCategory($('catbody'), rows);
+  else if (catView === 'team') renderByTeam($('catbody'), categoryTeamStats(rawEntries, catmap));
   else renderByPlayer($('catbody'), rows);
 }
 
