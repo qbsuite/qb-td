@@ -1197,4 +1197,60 @@ test('annLive drops expired, alerts first then newest first', () => {
   assert.deepEqual(annLive(null, now), []);
 });
 
+/* ---------- Worker category extraction ---------- */
+
+const { categoryFromMetadata, packetCategories } = await import('../worker/worker.js');
+
+test('categoryFromMetadata: ACF/YAPP forms', () => {
+  assert.deepEqual(categoryFromMetadata('History - World, Khang Le'), { c: 'History', s: 'World' });
+  assert.deepEqual(categoryFromMetadata('Khang Le, Literature - American'), { c: 'Literature', s: 'American' });
+  assert.deepEqual(categoryFromMetadata('Math, Vikram Narasimhan'), { c: 'Math', s: '' });
+  assert.equal(categoryFromMetadata('Just An Author'), null);
+  assert.equal(categoryFromMetadata(''), null);
+  assert.equal(categoryFromMetadata(undefined), null);
+});
+
+test('categoryFromMetadata: bare distribution labels (2026 UG Nats)', () => {
+  // the set's full label vocabulary, one label per question
+  const cases = [
+    ['American History', 'History', 'American'],
+    ['European History', 'History', 'European'],
+    ['World History', 'History', 'World'],
+    ['Any History', 'History', ''],
+    ['American Literature', 'Literature', 'American'],
+    ['British Literature', 'Literature', 'British'],
+    ['European Literature', 'Literature', 'European'],
+    ['World Literature', 'Literature', 'World'],
+    ['Biology', 'Science', 'Biology'],
+    ['Chemistry', 'Science', 'Chemistry'],
+    ['Physics', 'Science', 'Physics'],
+    ['Other Science', 'Science', 'Other'],
+    ['Painting / Sculpture', 'Fine Arts', 'Painting / Sculpture'],
+    ['Classical Music', 'Fine Arts', 'Classical Music'],
+    ['Other Fine Arts', 'Fine Arts', 'Other'],
+    ['Religion', 'Religion', ''],
+    ['Mythology', 'Mythology', ''],
+    ['Philosophy', 'Philosophy', ''],
+    ['Social Science', 'Social Science', ''],
+    ['Other', 'Other Academic', ''],
+  ];
+  for (const [label, c, s] of cases) {
+    assert.deepEqual(categoryFromMetadata(label), { c, s }, label);
+  }
+});
+
+test('packetCategories: metadata-only packets map every tossup', () => {
+  const body = new TextEncoder().encode(JSON.stringify({ tossups: [
+    { question: 'q', answer: 'a', metadata: 'American History' },
+    { question: 'q', answer: 'a', metadata: 'Religion' },
+    { question: 'q', answer: 'a' },
+  ] }));
+  assert.deepEqual(packetCategories(body, 'Packet 1.json'), [
+    { c: 'History', s: 'American' },
+    { c: 'Religion', s: '' },
+    null,
+  ]);
+  assert.equal(packetCategories(body, 'Packet 1.docx'), null);
+});
+
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

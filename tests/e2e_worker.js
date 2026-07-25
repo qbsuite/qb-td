@@ -421,6 +421,33 @@ ok('metadata categories parsed', r.status === 200
   && r.body.rounds['3'][2].c === 'Math' && r.body.rounds['3'][2].s === ''
   && r.body.rounds['3'][3] === null, r.body.rounds['3']);
 
+// bare distribution labels (one label per question, 2026 UG Nats style)
+r = await call(`${A}/packet?round=4&name=Packet4.json`, { method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ tossups: [
+    { question: 'q', answer: 'a', metadata: 'American History' },
+    { question: 'q', answer: 'a', metadata: 'Any History' },
+    { question: 'q', answer: 'a', metadata: 'World Literature' },
+    { question: 'q', answer: 'a', metadata: 'Physics' },
+    { question: 'q', answer: 'a', metadata: 'Other Science' },
+    { question: 'q', answer: 'a', metadata: 'Painting / Sculpture' },
+    { question: 'q', answer: 'a', metadata: 'Classical Music' },
+    { question: 'q', answer: 'a', metadata: 'Other Fine Arts' },
+    { question: 'q', answer: 'a', metadata: 'Social Science' },
+    { question: 'q', answer: 'a', metadata: 'Other' },
+  ] }) });
+ok('label packet uploads', r.status === 200, r.body);
+r = await call('/pub/' + slug + '/cats');
+{
+  const c4 = r.status === 200 ? r.body.rounds['4'] : null;
+  const eq = (i, c, s) => c4 && c4[i] && c4[i].c === c && c4[i].s === s;
+  ok('bare labels parsed', eq(0, 'History', 'American') && eq(1, 'History', '')
+    && eq(2, 'Literature', 'World') && eq(3, 'Science', 'Physics')
+    && eq(4, 'Science', 'Other') && eq(5, 'Fine Arts', 'Painting / Sculpture')
+    && eq(6, 'Fine Arts', 'Classical Music') && eq(7, 'Fine Arts', 'Other')
+    && eq(8, 'Social Science', '') && eq(9, 'Other Academic', ''), c4);
+}
+
 // backfill: wipe the map (as if the packets predate extraction), then a
 // dashboard load rebuilds it off the response path
 const tid = (await call(A)).body.tournament.id;

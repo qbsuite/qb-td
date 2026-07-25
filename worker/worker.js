@@ -378,21 +378,52 @@ const META_CATS = new Set(['literature', 'history', 'science', 'fine arts',
   'religion', 'mythology', 'philosophy', 'social science', 'current events',
   'geography', 'other academic', 'trash', 'math', 'pop culture']);
 
-function categoryFromMetadata(meta) {
+// Bare distribution labels ("American History", "Physics", "Painting /
+// Sculpture", "Other") used by sets that tag each question with a single
+// label instead of ACF-style metadata. Field labels map onto their
+// primary category; "<Sub> History/Literature/Science/Fine Arts" splits
+// on the suffix ("Any" reads as no subcategory).
+const SCIENCE_FIELDS = new Set(['physics', 'chemistry', 'biology', 'math',
+  'astronomy', 'computer science', 'earth science', 'engineering']);
+const ARTS_FIELDS = new Set(['painting / sculpture', 'painting/sculpture',
+  'painting', 'sculpture', 'classical music', 'music', 'opera', 'jazz',
+  'architecture', 'film', 'photography', 'dance', 'musicals']);
+const LABEL_SUFFIXES = [[' history', 'History'], [' literature', 'Literature'],
+  [' fine arts', 'Fine Arts'], [' science', 'Science']];
+
+function categoryFromLabel(label) {
+  const lower = label.toLowerCase();
+  if (lower === 'other') return { c: 'Other Academic', s: '' };
+  if (SCIENCE_FIELDS.has(lower)) return { c: 'Science', s: label };
+  if (ARTS_FIELDS.has(lower)) return { c: 'Fine Arts', s: label };
+  for (const [suffix, cat] of LABEL_SUFFIXES) {
+    if (lower.length > suffix.length && lower.endsWith(suffix)) {
+      const sub = label.slice(0, label.length - suffix.length).trim();
+      return { c: cat, s: sub.toLowerCase() === 'any' ? '' : sub };
+    }
+  }
+  return null;
+}
+
+export function categoryFromMetadata(meta) {
   if (typeof meta !== 'string' || !meta) return null;
   let best = null;
   for (const part of meta.split(',')) {
     const chunk = part.trim();
     const [head, ...rest] = chunk.split(/\s+-\s+/);
-    if (!META_CATS.has(head.trim().toLowerCase())) continue;
-    const cand = { c: head.trim(), s: rest.join(' - ').trim() };
-    // a "Cat - Sub" part beats a bare "Cat" part
-    if (!best || (cand.s && !best.s)) best = cand;
+    let cand = null;
+    if (META_CATS.has(head.trim().toLowerCase())) {
+      cand = { c: head.trim(), s: rest.join(' - ').trim() };
+    } else if (!rest.length) {
+      cand = categoryFromLabel(chunk);
+    }
+    // a part carrying a subcategory beats one without
+    if (cand && (!best || (cand.s && !best.s))) best = cand;
   }
   return best;
 }
 
-function packetCategories(body, filename) {
+export function packetCategories(body, filename) {
   if (!/\.json$/i.test(filename)) return null;
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return null; }
