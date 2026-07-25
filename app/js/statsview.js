@@ -21,13 +21,13 @@ function valCells(vals, counts, tag = 'td') {
 function boxScore(t, vals) {
   const heard = bonusesHeard(t);
   return `<div class="tablewrap"><table class="box">
-    <tr><th>${esc(t.name)} ${t.points}</th>
+    <tr><th class="name">${esc(t.name)} ${t.points}</th>
       ${vals.map((v) => `<th class="num sep">${v}</th>`).join('')}
       <th class="num sep">TUH</th><th class="num sep">pts</th></tr>
     ${t.players.map((p) => {
       const counts = Object.fromEntries(p.counts.map((c) => [c.value, c.n]));
       return `<tr>
-        <td>${esc(p.name)}</td>
+        <td class="name">${esc(p.name)}</td>
         ${valCells(vals, counts)}
         <td class="num sep">${p.tossupsHeard}</td>
         <td class="num sep">${playerPts(p)}</td>
@@ -58,14 +58,14 @@ export function renderStats(out, agg, errors = []) {
     ${errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')}
     <h2>standings</h2>
     <div class="tablewrap"><table>
-      <tr><th></th><th>team</th>
+      <tr><th></th><th class="name">team</th>
         <th class="num sep">W</th><th class="num">L</th>${ties ? '<th class="num">T</th>' : ''}
         <th class="num sep">PP20TUH</th>
         ${vals.map((v) => `<th class="num sep">${v}</th>`).join('')}
         <th class="num sep">TUH</th><th class="num sep">PPB</th></tr>
       ${agg.teams.map((tm, i) => `<tr>
         <td class="num">${i + 1}</td>
-        <td>${esc(tm.name)}${tm.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
+        <td class="name">${esc(tm.name)}${tm.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
         <td class="num sep">${tm.w}</td><td class="num">${tm.l}</td>${ties ? `<td class="num">${tm.t}</td>` : ''}
         <td class="num sep">${tm.pp20tuh}</td>
         ${valCells(vals, tm.counts)}
@@ -74,15 +74,15 @@ export function renderStats(out, agg, errors = []) {
     </table></div>
     <h2>individuals</h2>
     <div class="tablewrap"><table>
-      <tr><th></th><th>player</th><th>team</th>
+      <tr><th></th><th class="name">player</th><th class="name">team</th>
         <th class="num sep">GP</th>
         ${vals.map((v) => `<th class="num sep">${v}</th>`).join('')}
         <th class="num sep">TUH</th><th class="num sep">pts</th>
         <th class="num sep">PP20TUH</th></tr>
       ${agg.players.map((p, i) => `<tr>
         <td class="num">${i + 1}</td>
-        <td>${esc(p.name)}${p.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
-        <td>${esc(p.team)}</td>
+        <td class="name">${esc(p.name)}${p.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
+        <td class="name">${esc(p.team)}</td>
         <td class="num sep">${p.gp}</td>
         ${valCells(vals, p.counts)}
         <td class="num sep">${p.tuh}</td><td class="num sep">${p.points}</td>

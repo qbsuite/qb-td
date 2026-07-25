@@ -171,7 +171,7 @@ function renderTeamView(box, team) {
           }
         }
         rows.push(`<tr><td class="roundcell">${round.round}</td>
-          <td${oppSlot && oppSlot.label ? ' class="ph"' : ''}>${esc(opp) || '—'}</td>
+          <td class="name${oppSlot && oppSlot.label ? ' ph' : ''}">${esc(opp) || '—'}</td>
           <td class="muted">${esc(room)}</td><td class="num">${result}</td></tr>`);
       } else if (round.byes.some((s) => slotText(s) === team)) {
         rows.push(`<tr><td class="roundcell">${round.round}</td>
@@ -288,10 +288,10 @@ function renderBuzzSummary(box) {
   const rows = buzzSummary(buzzEntries());
   if (!rows.length) { box.innerHTML = '<div class="muted">no buzzes yet</div>'; return; }
   box.innerHTML = `<div class="tablewrap"><table>
-    <tr><th>player</th><th>team</th><th class="num">15</th><th class="num">10</th>
+    <tr><th class="name">player</th><th class="name">team</th><th class="num">15</th><th class="num">10</th>
       <th class="num">neg</th><th class="num">avg buzz</th><th class="num">best</th></tr>
     ${rows.map((p) => `<tr>
-      <td>${esc(p.player)}</td><td class="muted">${esc(p.team)}</td>
+      <td class="name">${esc(p.player)}</td><td class="name muted">${esc(p.team)}</td>
       <td class="num">${p.powers}</td><td class="num">${p.gets}</td><td class="num">${p.negs}</td>
       <td class="num">${p.avg === null ? '–' : (p.avg + 1).toFixed(1)}</td>
       <td class="num">${p.best === null ? '–' : p.best + 1}</td></tr>`).join('')}
@@ -488,9 +488,9 @@ function renderByCategory(box, rows) {
   const lines = catPlayerLines(rows, catSel, catSubSel);
   box.innerHTML = `${filter}
     <div class="tablewrap"><table>
-      <tr><th>player</th><th>team</th>${CAT_HEAD}</tr>
+      <tr><th class="name">player</th><th class="name">team</th>${CAT_HEAD}</tr>
       ${lines.map((l) =>
-        `<tr><td>${esc(l.player)}</td><td class="muted">${esc(l.team)}</td>${lineCells(l)}</tr>`).join('')}
+        `<tr><td class="name">${esc(l.player)}</td><td class="name muted">${esc(l.team)}</td>${lineCells(l)}</tr>`).join('')}
     </table></div>`;
   wireCatFilter(box);
 }
@@ -500,9 +500,9 @@ function renderByTeam(box, teamRows) {
   const lines = catTeamLines(teamRows, catSel, catSubSel);
   box.innerHTML = `${filter}
     <div class="tablewrap"><table>
-      <tr><th>team</th>${CAT_HEAD}<th class="num">bonuses</th><th class="num">bpts</th><th class="num">ppb</th></tr>
+      <tr><th class="name">team</th>${CAT_HEAD}<th class="num">bonuses</th><th class="num">bpts</th><th class="num">ppb</th></tr>
       ${lines.map((l) =>
-        `<tr><td>${esc(l.team)}</td>${lineCells(l)}<td class="num">${l.bh}</td>`
+        `<tr><td class="name">${esc(l.team)}</td>${lineCells(l)}<td class="num">${l.bh}</td>`
         + `<td class="num">${l.bpts}</td><td class="num">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
     </table></div>`;
   wireCatFilter(box);

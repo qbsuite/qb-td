@@ -80,15 +80,15 @@ function render() {
   if (!$('upround').value) $('upround').value = state.current_round;
   const extra = state.upload_count > state.uploads.length
     ? `<div class="muted" style="margin-top:6px">latest ${state.uploads.length} of ${state.upload_count}</div>` : '';
-  $('uploads').innerHTML = (state.uploads.length ? `<table>
+  $('uploads').innerHTML = (state.uploads.length ? `<div class="tablewrap"><table>
     <tr><th class="num">round</th><th>file</th><th class="num">size</th><th>status</th></tr>
     ${state.uploads.map((u) => `<tr>
       <td class="num">${u.round}</td>
-      <td>${esc(u.filename)}</td>
+      <td class="brk">${esc(u.filename)}</td>
       <td class="num">${fmtBytes(u.size)}</td>
       <td>${u.error ? `<span class="bad">${esc(u.error)}</span>` : '<span class="ok">ok</span>'}</td>
     </tr>`).join('')}
-  </table>` : '<div class="muted">none yet</div>') + extra;
+  </table></div>` : '<div class="muted">none yet</div>') + extra;
 }
 
 function showClosed() {

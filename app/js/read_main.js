@@ -167,7 +167,7 @@ function renderSchedPanel() {
   $('schedrows').innerHTML = rows.map((r) => `
     <tr${r.round === state.current_round ? ' class="now"' : ' class="muted"'}>
       <td class="roundcell">${r.round}</td>
-      <td>${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}</td>
+      <td class="name">${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}</td>
     </tr>`).join('');
 }
 

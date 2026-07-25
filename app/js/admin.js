@@ -430,7 +430,7 @@ async function showDetail() {
               : link(`dl=${encodeURIComponent(f.filename)}`, 'download');
             return `<tr>
               <td>${esc(room ? room.room_name : '#' + f.bucket_id)}</td>
-              <td>${esc(f.filename)}</td>
+              <td class="brk">${esc(f.filename)}</td>
               <td>${f.kind}</td>
               <td class="num">${fmtBytes(f.size)}</td>
               <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">ok</span>'}</td>

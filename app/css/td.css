@@ -73,7 +73,14 @@ textarea:focus { outline: none; border-color: var(--link); }
   padding: 12px 14px; margin-bottom: 8px;
 }
 .card:hover { background: var(--hover-bg); }
-table { border-collapse: collapse; width: 100%; }
+/* overflow-wrap back to normal: cells wrap at word boundaries only —
+   under the body's anywhere a narrow screen crushes name columns to
+   one character per line instead of letting the .tablewrap scroll */
+table { border-collapse: collapse; width: 100%; overflow-wrap: normal; }
+.brk { overflow-wrap: anywhere; } /* filename cells: one long "word" */
+/* name columns keep a readable floor; squeezed further they wrap into a
+   few lines and the .tablewrap scrolls for the stat columns */
+th.name, td.name { min-width: 14ch; }
 th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
 th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
