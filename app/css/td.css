@@ -106,6 +106,9 @@ table.box th:first-child {
 .pill {
   display: inline-block; font-size: 12px; border: 1px solid var(--line);
   border-radius: 99px; padding: 1px 9px; color: var(--muted);
+  /* chips never wrap internally — body's overflow-wrap:anywhere would
+     otherwise stack the digits of "round 10" when a flex row squeezes */
+  white-space: nowrap;
 }
 .pill.on { color: var(--ok); border-color: var(--ok); }
 .pill.warn { color: var(--bad); border-color: var(--bad); }
