@@ -115,9 +115,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   room otherwise), so a lagging room's teams can't read answers
   mid-round. Only exists while the TO
   has publish switched on; fully decoupled from the admin side.
-- **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18) and a zip of
+- **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18); the
+  **HTML stat report** as a zip of the same six interlinked pages
+  YellowFruit publishes (`standings.html`, `individuals.html`, `games.html`,
+  `teamdetail.html`, `playerdetail.html`, `rounds.html`) — unzip and host
+  the folder anywhere, no YellowFruit in the loop; and a zip of
   every game's separated files — the match `.qbj` (imports via YellowFruit's
-  ModaQ game-file import) and the MODAQ game file — plus the roster. Both
+  ModaQ game-file import) and the MODAQ game file — plus the roster. All
   are generated client-side in the dashboard. Combined reader uploads are
   never handed out raw: the dashboard's per-file downloads (Worker
   `part=qbj|game`) and the zip both split them into those two real files.
@@ -174,7 +178,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   extraction from match qbj, room-merged tossup buzzes, player buzz
   summary), `yft.js` (`.yft`
   serialization, contract verified against YellowFruit 4.0.18 source),
-  `zip.js` (store-only zip).
+  `report.js` (the six-page HTML stat report, ported from YellowFruit
+  4.0.18's `HTMLReports.ts` / `StatSummaries.ts`), `zip.js` (store-only
+  zip).
 - `app/` — the five static pages + `js/` page code (`announce.js` renders
   the TD's broadcasts on all three read surfaces). Deployable on any
   static host; served at `qbsuite.github.io/qb-td/app/`. The reader page
@@ -192,7 +198,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
 ## Tests
 
 ```bash
-node tests/run_tests.js          # engine: qbj parse, stats, .yft, zip
+node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
@@ -214,13 +220,27 @@ cd .. && node tests/e2e_worker.js
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`.
 
-## .yft verification
+## YellowFruit fidelity
 
-The generated `.yft` replicates YellowFruit's own serialization
+Two exports mirror YellowFruit's own output and are checked against its
+source rather than guessed at.
+
+The generated `.yft` replicates YellowFruit's serialization
 (FileParsing.ts / CaseConversion.ts contracts, `YfVersion` 4.0.18). After
 any change to `app/engine/yft.js`: generate a file from real ModaQ games,
 open it in YellowFruit, confirm no version/schema errors and that YF's
 report matches the stats page.
+
+The HTML stat report (`app/engine/report.js`) is a port of YellowFruit
+4.0.18's `HTMLReports.ts` — same six filenames, page order, table columns,
+CSS, anchor scheme, and the `StatSummaries.ts` formulas (win % counts ties
+as half a win, PP20TUH, fractional games played, `N=` tie ranks). It covers
+what qb-td models: one phase, no pools or finals, no small-school/JV/UG/D2
+tracking, no lightning rounds, bouncebacks folded into bonus points. Its
+tossup-value columns come from values actually scored (the same rule the
+live stats page uses), where YellowFruit uses the tournament's configured
+answer types. After changing it, regenerate from real games and diff
+against a report YellowFruit produces from the same `.yft`.
 
 ## License
 

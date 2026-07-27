@@ -3,10 +3,12 @@
 // structure. Run: node tests/run_tests.js
 
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
+import { buildReport } from '../app/engine/report.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake } from '../app/engine/schedule.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml, dedupeEntries } from '../app/engine/buzz.js';
@@ -1321,6 +1323,158 @@ test('packetCategories: metadata-only packets map tossups and bonuses', () => {
     b: [{ c: 'Science', s: 'Physics' }, { c: 'Literature', s: 'World Literature' }],
   });
   assert.equal(packetCategories(body, 'Packet 1.docx'), null);
+});
+
+/* ---------- html stat report ---------- */
+
+console.log('html stat report');
+
+// M1 (Alpha 125, Beta 55) + M2 (Gamma 145, Alpha 55) through the report.
+// Alpha: 1-1, 180 pts / 40 TUH -> 90.0 PP20TUH, bonuses 90 pts on 9 heard.
+// Gamma: 1-0, 145 / 20 -> 145.0. Beta: 0-1, 55 / 20 -> 55.0.
+const REPORT = buildReport({
+  name: 'Test Tournament',
+  matches: [parseMatch(M1), parseMatch(M2)],
+  roster: parseRoster(ROSTER),
+});
+const page = (name) => REPORT.find((f) => f.name === name).text;
+// strip tags -> whitespace-collapsed text, for asserting on rendered rows
+const flat = (html) => html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ')
+  .replace(/&mdash;/g, '-').replace(/\s+/g, ' ').trim();
+
+test('report emits YellowFruit six-page set', () => {
+  assert.deepEqual(REPORT.map((f) => f.name), [
+    'standings.html', 'individuals.html', 'games.html',
+    'teamdetail.html', 'playerdetail.html', 'rounds.html',
+  ]);
+  for (const f of REPORT) {
+    assert.match(f.text, /^<html>/, f.name + ' is a full document');
+    assert.match(f.text, /<\/html>\s*$/, f.name + ' is closed');
+    // every page carries the same nav to the other five
+    for (const other of REPORT) assert.ok(f.text.includes(`href="${other.name}"`));
+  }
+});
+
+test('standings: YF ordering, win pct, PP20TUH, PPB', () => {
+  const rows = flat(page('standings.html'));
+  assert.ok(rows.includes('Rank Team W L Pct PP20TUH 15 10 -5 TUH PPB'));
+  // Gamma (1.000) above Alpha (.500) above Beta (.000)
+  assert.ok(rows.indexOf('Gamma') < rows.indexOf('Alpha'));
+  assert.ok(rows.indexOf('Alpha') < rows.indexOf('Beta'));
+  // Gamma: 5 correct tossups -> 5 bonuses heard, 80 bonus pts -> 16.00
+  assert.ok(rows.includes('1 Gamma 1 0 1.000 145.0 3 2 0 20 16.00'), rows);
+  assert.ok(rows.includes('2 Alpha 1 1 0.500 90.0 2 7 2 40 10.00'), rows);
+  assert.ok(rows.includes('3 Beta 0 1 0.000 55.0 1 2 2 20 10.00'), rows);
+});
+
+test('standings: teams tied on win pct share an "N=" rank', () => {
+  // two teams at 0-1 tie for 2nd
+  const tied = buildReport({
+    name: 'T',
+    matches: [parseMatch(M1), parseMatch(modaqMatch({
+      round: 2,
+      teamA: { name: 'Alpha', bonusPoints: 60, players: [{ name: 'Ann', counts: { 10: 6 } }] },
+      teamB: { name: 'Gamma', bonusPoints: 0, players: [{ name: 'Gil', counts: { 10: 1 } }] },
+    }))],
+    roster: null,
+  });
+  const rows = flat(tied.find((f) => f.name === 'standings.html').text);
+  assert.equal((rows.match(/2=/g) || []).length, 2, rows);
+});
+
+test('individuals: fractional GP and PP20TUH, ranked by PP20TUH', () => {
+  const rows = flat(page('individuals.html'));
+  assert.ok(rows.includes('Rank Player Team GP 15 10 -5 TUH PP20TUH'));
+  // Gil: 65 pts / 20 TUH -> 65.00; Ann played both games -> GP 2.0
+  assert.ok(rows.includes('1 Gil Gamma 1.0 3 2 0 20 65.00'), rows);
+  assert.ok(rows.includes('Ann Alpha 2.0 2 5 1 40'), rows);
+  // a player with no tossups heard is omitted entirely
+  assert.ok(!rows.includes('Zed'));
+});
+
+test('scoreboard: one box score per game, YF score-string titles', () => {
+  const html = page('games.html');
+  assert.equal((html.match(/class="boxScoreAnchor"><\/div>/g) || []).length, 2);
+  assert.ok(html.includes('<h3 class="boxScoreTitle">Alpha 125, Beta 55</h3>'));
+  assert.ok(html.includes('<h3 class="boxScoreTitle">Gamma 145, Alpha 55</h3>'));
+  assert.ok(html.includes('id="Round-1"') && html.includes('id="Round-2"'));
+  // bonus sub-table per game: Alpha heard 6 in M1 for 60 -> 10.00
+  assert.ok(flat(html).includes('Bonuses Heard Pts PPB Alpha 6 60 10.00'), flat(html));
+});
+
+test('team detail: per-match rows plus a totals footer', () => {
+  const rows = flat(page('teamdetail.html'));
+  assert.ok(rows.includes('Round Opponent Score 15 10 -5 TUH BHrd BPts PPB'));
+  // Alpha's two games, then its totals line
+  assert.ok(rows.includes('1 Beta W 125 - 55'), rows);
+  assert.ok(rows.includes('2 Gamma L 55 - 145'), rows);
+  assert.ok(rows.includes('Total 1-1 2 7 2 40 9 90 10.00'), rows);
+  // teams are alphabetical and anchored for the standings links
+  assert.ok(page('teamdetail.html').includes('<h2 id="Alpha">'));
+  assert.ok(rows.indexOf('Alpha') < rows.indexOf('Beta'));
+});
+
+test('player detail: per-match rows keyed by team-player anchor', () => {
+  const html = page('playerdetail.html');
+  assert.ok(html.includes('<h2 id="Alpha-Ann">Ann, Alpha</h2>'));
+  assert.ok(html.includes('<h2 id="Gamma-Gil">Gil, Gamma</h2>'));
+  const rows = flat(html);
+  assert.ok(rows.includes('Round Opponent Score GP 15 10 -5 TUH Pts'));
+  // Ann: 2 games, 15*2+10*2-5 = 45 then 30 -> 75 total
+  assert.ok(rows.includes('Total 2.0 2 5 1 40 75'), rows);
+});
+
+test('round report: per-round rates and a tournament total', () => {
+  const rows = flat(page('rounds.html'));
+  assert.ok(rows.includes('Round Games Pts/Tm/20TUH TU Powered TU Converted Negs/Tm/20TUH PPB'));
+  // round 1: 180 pts over 20 TUH, 2 teams -> 90.0; 9 of 20 converted -> 45%
+  assert.ok(rows.includes('1 1 90.0 15% 45% 1.5 10.00'), rows);
+  // total: 380 pts, 40 TUH -> 95.0
+  assert.ok(rows.includes('Total 2 95.0'), rows);
+});
+
+test('report links resolve to anchors that exist', () => {
+  const anchors = new Map(REPORT.map((f) =>
+    [f.name, new Set([...f.text.matchAll(/id="([^"]+)"/g)].map((m) => m[1]))]));
+  for (const f of REPORT) {
+    for (const m of f.text.matchAll(/href="([^"#]+\.html)#([^"]+)"/g)) {
+      assert.ok(anchors.has(m[1]), f.name + ' links to unknown page ' + m[1]);
+      assert.ok(anchors.get(m[1]).has(m[2]),
+        `${f.name} links to ${m[1]}#${m[2]}, which has no such anchor`);
+    }
+  }
+});
+
+test('report escapes team and player names', () => {
+  const evil = buildReport({
+    name: 'T',
+    matches: [parseMatch(modaqMatch({
+      round: 1,
+      teamA: { name: '<script>x</script>', bonusPoints: 0,
+        players: [{ name: 'A & B', counts: { 10: 1 } }] },
+      teamB: { name: 'Ok', bonusPoints: 0, players: [{ name: 'C', counts: { 10: 1 } }] },
+    }))],
+    roster: null,
+  });
+  for (const f of evil) {
+    assert.ok(!f.text.includes('<script>'), f.name + ' escapes markup');
+    if (f.text.includes('A &')) assert.ok(f.text.includes('A &amp; B'));
+  }
+});
+
+test('report refuses an empty tournament', () => {
+  assert.throws(() => buildReport({ name: 'T', matches: [], roster: null }), /no games/);
+});
+
+test('report deduplicates re-uploaded games', () => {
+  // same round + same team pair uploaded twice: one box score, 1-0 records
+  const a = { ...parseMatch(M1), fileId: 1 };
+  const b = { ...parseMatch(M1), fileId: 2 };
+  const files = buildReport({ name: 'T', matches: [a, b], roster: null });
+  const games = files.find((f) => f.name === 'games.html').text;
+  assert.equal((games.match(/class="boxScoreAnchor"><\/div>/g) || []).length, 1);
+  assert.ok(flat(files.find((f) => f.name === 'standings.html').text)
+    .includes('1 Alpha 1 0'));
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

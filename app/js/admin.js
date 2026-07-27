@@ -9,6 +9,7 @@ import { parseMatch, parseRoster, matchPayload, parseRosterLines, buildRosterQbj
   guessRound } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
+import { buildReport } from '../engine/report.js';
 import { makeZip, readZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrides,
@@ -448,6 +449,7 @@ async function showDetail() {
     <div class="row">
       <button id="calc" class="primary">compute stats</button>
       <button id="dlyft" disabled>download .yft</button>
+      <button id="dlreport" disabled>download stat report</button>
       <button id="dlzip" disabled>download qbj bundle</button>
       <button id="rebuild" disabled>rebuild stats data</button>
       <span class="spacer" style="flex:1"></span>
@@ -1150,6 +1152,16 @@ async function computeStats(a, t, buckets, files) {
   $('dlyft').onclick = () => {
     try { download(t.slug + '.yft', serializeYft(exportOpts), 'application/json'); }
     catch (e) { say(e.message, true); }
+  };
+  // YellowFruit-style six-page HTML report, zipped so the interlinked
+  // files land as one folder ready to host.
+  $('dlreport').disabled = false;
+  $('dlreport').onclick = () => {
+    try {
+      const files = buildReport(exportOpts);
+      download(t.slug + '-report.zip',
+        makeZip(files.map((f) => ({ name: f.name, data: f.text }))), 'application/zip');
+    } catch (e) { say(e.message, true); }
   };
   $('dlzip').disabled = false;
   $('dlzip').onclick = async () => {
