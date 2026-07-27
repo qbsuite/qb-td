@@ -1,6 +1,6 @@
 // api.js — Worker base URL + fetch helper shared by the qb-td pages.
 // Point a page at another backend with ?server=... or localStorage
-// qbtdServer (same convention as qb-moderator). There is no login:
+// qbtdServer (same convention as qb-scorekeeper). There is no login:
 // admin, bucket, and public routes are all keyed by link secrets.
 
 const qs = new URLSearchParams(location.search);
