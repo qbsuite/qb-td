@@ -12,6 +12,7 @@ import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion, mainAnswerHtml, dedupeEntries } from '../engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../engine/cats.js';
 import { normalizePacket } from './read_core.js';
+import { buzzToken } from './buzzkey.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
@@ -220,19 +221,20 @@ function renderSchedule(box) {
 
 /* ---------- buzzpoints tab ---------- */
 
-// The stored password carries the server's buzz_v stamp: when the TD
-// sets a new password the stamp moves and the stale entry is dropped,
-// so viewers have to enter the new one.
+// What's kept is the derived key, not the password (buzzkey.js): the
+// stretching happens once, on unlock, rather than on every packet fetch.
+// It carries the server's buzz_v stamp, so when the TD sets a new password
+// the stamp moves, the stale entry is dropped, and viewers re-enter.
 function buzzStored() {
   try {
     const s = JSON.parse(sessionStorage.getItem(BUZZ_KEY));
-    return s && typeof s.pw === 'string' ? s : null;
+    return s && typeof s.tok === 'string' ? s : null;
   } catch (e) { return null; }
 }
 
 function buzzAuthHeaders() {
   const s = buzzStored();
-  return state.buzz && s ? { Authorization: 'Buzz ' + s.pw } : {};
+  return state.buzz && s ? { Authorization: 'Buzz ' + s.tok } : {};
 }
 
 function fetchBuzzPacket(round) {
@@ -253,15 +255,26 @@ function fetchBuzzPacket(round) {
 
 async function tryBuzzKey(pw) {
   if (!pw) return;
-  sessionStorage.setItem(BUZZ_KEY, JSON.stringify({ pw, v: state.buzz_v }));
+  // On a current tournament this runs PBKDF2 — a second or so on a phone,
+  // so it gets a message; older ones send the password itself and return
+  // immediately.
+  let tok;
+  try {
+    if (state.buzz_kdf) say('checking password');
+    tok = await buzzToken(pw, state.buzz_kdf);
+  } catch (e) { say('could not check the password', true); return; }
+  sessionStorage.setItem(BUZZ_KEY, JSON.stringify({ tok, v: state.buzz_v }));
   const probe = (state.buzz_done || []).filter((n) =>
     (state.packet_rounds || []).includes(n))[0];
   if (probe !== undefined) {
     try { await fetchBuzzPacket(probe); }
     catch (e) {
-      if (String(e.message).includes('bad password')) {
+      const m = String(e.message);
+      // a rejected key and a hit attempt cap both mean "not unlocked", so
+      // neither should leave a stored key behind
+      if (m.includes('bad password') || m.includes('too many attempts')) {
         sessionStorage.removeItem(BUZZ_KEY);
-        say('bad password', true);
+        say(m.includes('too many') ? m : 'bad password', true);
         return;
       } // other failures (no packet etc.): let the tab render what it can
     }
@@ -591,8 +604,8 @@ async function load(force = false) {
   try {
     const next = await pub('/pub/' + slug);
     state = next;
-    const storedPw = buzzStored();
-    if (storedPw && storedPw.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
+    const storedKey = buzzStored();
+    if (storedKey && storedKey.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;

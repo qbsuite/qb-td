@@ -9,6 +9,7 @@ import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
 
 const WORKER_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'worker');
 
@@ -359,6 +360,66 @@ ok('buzz_v moves with the password', /^[0-9a-f]{12}$/.test(r.body.buzz_v)
     { headers: { Authorization: 'Buzz hunter3' } });
   ok('new password accepted', fresh.status === 200);
 }
+// current scheme: the browser stretches the password with PBKDF2 and the
+// derived key is what travels, so the Worker only ever hashes that key.
+// The salt and iteration count go public (a viewer's browser needs them);
+// the hash must not.
+const kdfSettings = await buzzSettings('hunter4');
+const kdfToken = await buzzToken('hunter4',
+  { kdf: 'pbkdf2', iters: kdfSettings.iters, salt: kdfSettings.salt });
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: kdfSettings } } });
+ok('pbkdf2 password set', r.status === 200);
+r = await call('/pub/' + slug);
+ok('pub state publishes kdf params but never the hash',
+  r.body.buzz_kdf && r.body.buzz_kdf.kdf === 'pbkdf2'
+  && r.body.buzz_kdf.iters === kdfSettings.iters
+  && r.body.buzz_kdf.salt === kdfSettings.salt
+  && !JSON.stringify(r.body).includes(kdfSettings.hash), r.body.buzz_kdf);
+{
+  const right = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz ' + kdfToken } });
+  ok('qpacket accepts the derived key', right.status === 200
+    && (await right.text()) === 'PDFBYTES');
+  // the password itself is no longer a credential under this scheme
+  const asPw = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz hunter4' } });
+  ok('qpacket rejects the raw password once stretched', asPw.status === 401);
+  const wrong = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz ' + 'f'.repeat(64) } });
+  ok('qpacket rejects a wrong key', wrong.status === 401);
+}
+// a config below the iteration floor is not a weak gate, it is no gate
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf',
+  buzz: { ...kdfSettings, iters: 10 } } } });
+ok('under-stretched config write accepted', r.status === 200);
+{
+  const weak = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz ' + kdfToken } });
+  ok('qpacket 404 when iters is below the floor', weak.status === 404);
+}
+r = await call('/pub/' + slug);
+ok('under-stretched config reads as off', r.body.buzz === null, r.body.buzz);
+// unknown kdf likewise: fail shut, never fall back to the legacy compare
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf',
+  buzz: { ...kdfSettings, kdf: 'md5' } } } });
+ok('unknown kdf write accepted', r.status === 200);
+r = await call('/pub/' + slug);
+ok('unknown kdf reads as off', r.body.buzz === null, r.body.buzz);
+
+// attempt cap: only meaningful when the ratelimit binding is present, so
+// the run says which it checked rather than passing silently either way
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: kdfSettings } } });
+{
+  let limited = 0;
+  for (let i = 0; i < 40; i++) {
+    const res = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+      { headers: { Authorization: 'Buzz ' + 'a'.repeat(64) } });
+    if (res.status === 429) { limited++; break; }
+  }
+  if (limited) ok('qpacket caps repeated attempts', true);
+  else console.log('  -- attempt cap not exercised: no ratelimit binding in this dev run');
+}
+
 // passwordless mode no longer exists: legacy 'public' reads as off
 r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: { mode: 'public' } } } });
 ok('legacy public settings write accepted', r.status === 200);

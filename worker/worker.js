@@ -792,22 +792,50 @@ async function getPublishedTournament(env, slug) {
 }
 
 /* ---------- buzzpoints gate ----------
-   The TD's dashboard stores settings.buzz = {mode: 'password', salt,
-   hash} (hash = SHA-256 hex of "salt:password", computed client-side;
-   the Worker never sees or stores the password itself). Password is
-   the ONLY mode: buzzpoints are off or gated, never open. Salt + hash
-   stay private so the hash can't be cracked offline; the public state
-   carries only the mode and buzz_v — a salt-derived stamp that moves
-   when the TD sets a new password, so viewers' cached passwords
-   invalidate. The gated resource is packet text; buzz positions
-   themselves ride in the public stats bundle. */
+   Password is the ONLY mode: buzzpoints are off or gated, never open.
+   The gated resource is packet text; buzz positions themselves ride in
+   the public stats bundle.
+
+   The TD's dashboard stores settings.buzz. Two shapes:
+
+     {mode, kdf: 'pbkdf2', iters, salt, hash} — current. app/js/buzzkey.js
+     stretches the password in the browser with PBKDF2-SHA256; the derived
+     key is what arrives in the Authorization header, and `hash` is SHA-256
+     of that key. So the Worker never receives the password, and its work
+     per request stays one hash — the free tier allows 10 ms CPU, nowhere
+     near enough to run PBKDF2 here. `iters` and `salt` are published in
+     /pub/:slug because a viewer's browser needs them to derive the same
+     key; a salt is not a secret, it only stops one precomputed table from
+     covering every tournament.
+
+     {mode, salt, hash} — tournaments whose password predates the KDF.
+     hash is SHA-256("salt:password") and the password itself is on the
+     wire. Still accepted so those tournaments keep working; the TD
+     setting a new password upgrades them.
+
+   Either way `hash` never leaves the Worker, so there is nothing public
+   to attack offline. buzz_v — a one-way stamp derived from the salt —
+   moves when the TD sets a new password, so viewers' cached keys
+   invalidate. Online guessing is capped in pubQPacket. */
+
+const MIN_BUZZ_ITERS = 100000;
 
 function buzzConfig(t) {
   try {
     const b = (JSON.parse(t.settings) || {}).buzz;
-    if (b && b.mode === 'password' && typeof b.salt === 'string' && typeof b.hash === 'string') return b;
+    if (!b || b.mode !== 'password') return null;
+    if (typeof b.salt !== 'string' || typeof b.hash !== 'string') return null;
+    if (b.kdf === undefined) return b; // legacy sha256("salt:password")
+    if (b.kdf !== 'pbkdf2') return null;
+    if (!Number.isInteger(b.iters) || b.iters < MIN_BUZZ_ITERS) return null;
+    return b;
   } catch (e) { /* fall through */ }
   return null;
+}
+
+// The KDF parameters a viewer's browser needs, and nothing else.
+function buzzKdf(b) {
+  return b && b.kdf === 'pbkdf2' ? { kdf: 'pbkdf2', iters: b.iters, salt: b.salt } : null;
 }
 
 async function sha256Hex(text) {
@@ -815,10 +843,26 @@ async function sha256Hex(text) {
   return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
+// Both sides are digests, never the secret, so a timing leak would give an
+// attacker nothing they could invert — but constant time costs four lines
+// and saves the next reader from having to work that out.
+function sameDigest(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function buzzAllowed(request, b) {
   const auth = request.headers.get('Authorization') || '';
   if (!/^Buzz /.test(auth)) return false;
-  return (await sha256Hex(b.salt + ':' + auth.slice(5))) === b.hash;
+  const token = auth.slice(5);
+  // pbkdf2: the browser already did the stretching, so hash the derived
+  // key once. legacy: the token IS the password.
+  const got = b.kdf === 'pbkdf2'
+    ? await sha256Hex(token)
+    : await sha256Hex(b.salt + ':' + token);
+  return sameDigest(got, b.hash);
 }
 
 // Scheduled games with both slots filled for a round; null when the
@@ -860,6 +904,18 @@ async function pubQPacket(request, url, env, slug) {
   if (!t) return err(env, 404, 'not found');
   const b = buzzConfig(t);
   if (!b) return err(env, 404, 'not found');
+  // Guessing the password is an online attack, so cap attempts per IP.
+  // Generous enough for a viewer opening every round of a long tournament,
+  // tight enough that a wordlist is hopeless. Two limits of what this is:
+  // Cloudflare's rate limiter counts per colo rather than globally, and it
+  // runs inside the Worker, so it protects the password but not the
+  // request budget — a WAF rate-limiting rule on this path is the outer
+  // layer for that (README).
+  if (env.BUZZ_LIMIT) {
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const { success } = await env.BUZZ_LIMIT.limit({ key: slug + ':' + ip });
+    if (!success) return err(env, 429, 'too many attempts, wait a minute');
+  }
   if (!(await buzzAllowed(request, b))) return err(env, 401, 'bad password');
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) return err(env, 400, 'bad round');
@@ -930,9 +986,11 @@ async function pubState(env, slug) {
     announce: pubAnnounce(t),
     // stamp for the schedule tab: refetch only when this moves
     schedule: schedObj ? schedObj.uploaded.getTime() : null,
-    // buzzpoints tab: only the mode is public, never salt/hash; buzz_v
-    // moves with the password so viewers re-enter it
+    // buzzpoints tab: the mode, the KDF parameters a viewer's browser
+    // needs to derive the key, and buzz_v — which moves with the password
+    // so viewers re-enter it. Never the hash.
     buzz: buzz ? buzz.mode : null,
+    buzz_kdf: buzzKdf(buzz),
     buzz_v: buzzV,
     buzz_done: buzzDone,
     packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],

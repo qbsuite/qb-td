@@ -13,6 +13,7 @@ import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake } from '../app/engine/schedule.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../app/engine/cats.js';
+import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -22,8 +23,14 @@ import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload,
 
 let passed = 0;
 function test(name, fn) {
-  try { fn(); passed++; console.log('  ok', name); }
-  catch (e) { console.error('FAIL', name, '\n   ', e.message); process.exitCode = 1; }
+  try {
+    const r = fn();
+    // This runner is synchronous: a returned promise would mean the
+    // assertions inside never got waited on, so the test would "pass"
+    // whatever it did. Await the value before the test instead.
+    if (r && typeof r.then === 'function') throw new Error('test fn must be synchronous');
+    passed++; console.log('  ok', name);
+  } catch (e) { console.error('FAIL', name, '\n   ', e.message); process.exitCode = 1; }
 }
 
 /* ---------- fixtures shaped like MODAQ's toQBJ output ---------- */
@@ -1475,6 +1482,48 @@ test('report deduplicates re-uploaded games', () => {
   assert.equal((games.match(/class="boxScoreAnchor"><\/div>/g) || []).length, 1);
   assert.ok(flat(files.find((f) => f.name === 'standings.html').text)
     .includes('1 Alpha 1 0'));
+});
+
+/* ---------- buzzpoints password KDF ---------- */
+
+// The Worker's half of this is buzzAllowed, covered by e2e_worker.js; here
+// we pin the browser half — the shape the Worker validates, the round trip
+// it verifies, and the legacy path old tournaments still take. Derivations
+// happen up front because the runner is synchronous.
+
+const KDF_A = await buzzSettings('hunter2');
+const KDF_B = await buzzSettings('hunter2');   // same password, fresh salt
+const KDF_PARAMS = { kdf: 'pbkdf2', iters: KDF_A.iters, salt: KDF_A.salt };
+const TOK_GOOD = await buzzToken('hunter2', KDF_PARAMS);
+const TOK_BAD = await buzzToken('hunter3', KDF_PARAMS);
+const TOK_LEGACY = await buzzToken('hunter2', null);
+const [DIG_GOOD, DIG_BAD] = [await sha256Hex(TOK_GOOD), await sha256Hex(TOK_BAD)];
+
+test('buzzSettings stretches with pbkdf2 and stores only a digest', () => {
+  assert.equal(KDF_A.mode, 'password');
+  assert.equal(KDF_A.kdf, 'pbkdf2');
+  assert.equal(KDF_A.iters, BUZZ_ITERS);
+  // worker.js MIN_BUZZ_ITERS — a config below it is rejected outright
+  assert.ok(KDF_A.iters >= 100000, 'at or above the Worker floor');
+  assert.match(KDF_A.salt, /^[0-9a-f]{24}$/);
+  assert.match(KDF_A.hash, /^[0-9a-f]{64}$/);
+  assert.ok(!JSON.stringify(KDF_A).includes('hunter2'), 'password is not stored');
+});
+
+test('the derived key verifies, and only for the right password', () => {
+  assert.match(TOK_GOOD, /^[0-9a-f]{64}$/);
+  assert.equal(DIG_GOOD, KDF_A.hash);
+  assert.notEqual(DIG_BAD, KDF_A.hash);
+  assert.ok(!TOK_GOOD.includes('hunter2'), 'the key travels, not the password');
+});
+
+test('a fresh salt gives the same password a different hash', () => {
+  assert.notEqual(KDF_B.salt, KDF_A.salt);
+  assert.notEqual(KDF_B.hash, KDF_A.hash);
+});
+
+test('no kdf means the legacy scheme: the token is the password', () => {
+  assert.equal(TOK_LEGACY, 'hunter2');
 });
 
 /* ---------- archive ---------- */

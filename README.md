@@ -105,11 +105,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   read with it expands to per-part conversion and each room's line —
   plus a per-player summary (15/10/neg counts, average and earliest
   correct buzz). Question text comes from the round packets through a gated
-  route; the TO's password is hashed client-side (SHA-256 with a random
-  salt) into `settings.buzz` — the Worker never sees or stores the
-  password, and only the mode plus a salt-derived `buzz_v` stamp are
-  public (setting a new password moves the stamp, so viewers must enter
-  it again). A round's buzzpoints and packet text stay hidden — server-
+  route; the TO's password is stretched in the browser (PBKDF2-SHA256,
+  600k iterations, random salt — `app/js/buzzkey.js`) and only the derived
+  key is ever sent, so the Worker neither receives nor stores the password
+  and its own per-request work stays one hash. The salt and iteration
+  count are public because a viewer's browser needs them; the stored hash
+  is not, and attempts are capped per IP. Setting a new password moves the
+  public `buzz_v` stamp, so viewers must enter it again. See "Buzzpoints
+  password" below. A round's buzzpoints and packet text stay hidden — server-
   gated for text, tab-wide for the view — until every room has turned
   that round in (scheduled games when a schedule exists, one game per
   room otherwise), so a lagging room's teams can't read answers
@@ -231,6 +234,43 @@ cd .. && node tests/e2e_worker.js
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`.
+
+## Buzzpoints password
+
+The one place qb-td has a user-chosen secret rather than a generated one,
+so it gets the scrutiny that implies.
+
+**The Worker never sees the password.** `app/js/buzzkey.js` stretches it
+with PBKDF2-SHA256 (600k iterations, per-tournament random salt) in the
+browser, and the derived key is what travels in `Authorization: Buzz`.
+`settings.buzz.hash` is SHA-256 of that key, so verification costs the
+Worker one hash — the free tier allows 10 ms CPU per request, nowhere near
+enough to run PBKDF2 server-side. `iters` and `salt` are published in
+`/pub/:slug` because a viewer's browser needs them to derive the same key;
+a salt is not a secret, it only stops one precomputed table covering every
+tournament. The hash never leaves the Worker, so there is nothing public
+to attack offline, and if a settings row ever did leak, each guess costs a
+full PBKDF2 run rather than one SHA-256.
+
+**Online guessing is capped** at 30 attempts per minute per IP per
+tournament (`BUZZ_LIMIT` in `wrangler.toml`). Two honest limits: Cloudflare's
+rate limiter counts per colo rather than globally, and it runs inside the
+Worker, so it protects the password but not the request budget. A WAF
+rate-limiting rule on `/pub/*/qpacket` is the outer layer for that, and
+worth adding if anyone ever points a script at this — a flood would burn
+the daily request allowance and take the live public page down with it.
+
+**What is still on the TD.** None of the above rescues a guessable
+password. 30 attempts a minute is a wall for a wordlist but not for
+"stanford" as the third guess. Generating the password instead of letting
+the TD pick one would remove the problem rather than slow it; that is a
+deliberate open choice, not an oversight.
+
+Tournaments whose password predates the KDF carry `{mode, salt, hash}`
+with no `kdf`, verified the old way (`sha256("salt:password")`, password
+on the wire). They keep working; setting a new password upgrades them.
+A config claiming `kdf` but with unknown parameters or fewer than 100k
+iterations fails shut — the tab reads as off rather than as a weak gate.
 
 ## Archiving a tournament
 

@@ -17,6 +17,7 @@ import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrid
 import { formatsFor, buildSchedule, validateSchedule, slotAt, setSlot, swapSlots,
   moveGame, addRound, removeRound, slotText, roundIntake } from '../engine/schedule.js';
 import { annLive, annTime } from './announce.js';
+import { buzzSettings } from './buzzkey.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -610,9 +611,11 @@ async function showDetail() {
       const next = { ...settings };
       if (!mode) delete next.buzz;
       else {
-        // keep an existing password; otherwise wait for one to be set
+        // keep an existing password; otherwise wait for one to be set.
+        // Spread it whole: dropping kdf/iters here would silently demote a
+        // stretched password to the legacy scheme.
         if (settings.buzz && settings.buzz.hash) {
-          next.buzz = { mode: 'password', salt: settings.buzz.salt, hash: settings.buzz.hash };
+          next.buzz = { ...settings.buzz, mode: 'password' };
         } else {
           $('buzzpw').hidden = false;
           $('buzzset').hidden = false;
@@ -629,12 +632,10 @@ async function showDetail() {
     const pw = $('buzzpw').value;
     if (!pw) { say('enter a password', true); return; }
     try {
-      const salt = [...crypto.getRandomValues(new Uint8Array(12))]
-        .map((b) => b.toString(16).padStart(2, '0')).join('');
-      const digest = await crypto.subtle.digest('SHA-256',
-        new TextEncoder().encode(salt + ':' + pw));
-      const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-      await saveSettings({ ...settings, buzz: { mode: 'password', salt, hash } });
+      // PBKDF2 at 600k iterations takes about a second here; the Worker
+      // only ever sees what comes back (buzzkey.js).
+      say('setting password');
+      await saveSettings({ ...settings, buzz: await buzzSettings(pw) });
       say('buzzpoints password set');
       showDetail();
     } catch (e) { say(e.message, true); }

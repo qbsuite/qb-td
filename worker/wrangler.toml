@@ -13,6 +13,15 @@ database_id = "d57faef8-7c4b-45c6-9d13-7a7d9ca2d312"
 binding = "DATA"
 bucket_name = "qb-td-data"
 
+# Attempt cap on the buzzpoints password route (worker.js pubQPacket).
+# Cloudflare's rate limiter needs no provisioning and costs nothing, but it
+# counts per colo rather than globally. Period must be 10 or 60.
+[[unsafe.bindings]]
+name = "BUZZ_LIMIT"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
 [vars]
 # Origin of the GitHub Pages site — used for CORS.
 ALLOWED_ORIGIN = "https://qbsuite.github.io"
