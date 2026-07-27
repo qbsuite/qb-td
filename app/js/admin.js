@@ -94,7 +94,9 @@ function showList() {
       <input id="newname" placeholder="name" size="24">
       <input id="newslug" placeholder="slug (public url)" size="18">
       <button id="newbtn" class="primary">create</button>
-    </div>`;
+    </div>
+    <h2>archive</h2>
+    <div><a href="archive.html">past tournaments</a></div>`;
   $('newbtn').onclick = async () => {
     try {
       const out = await pub('/api/tournaments', { method: 'POST', json: {

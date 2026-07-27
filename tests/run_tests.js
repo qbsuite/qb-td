@@ -1477,4 +1477,89 @@ test('report deduplicates re-uploaded games', () => {
     .includes('1 Alpha 1 0'));
 });
 
+/* ---------- archive ---------- */
+
+// The archive is committed data, so it can drift from its manifest in ways
+// no unit test would otherwise catch: a capture regenerated without
+// updating index.json, a report folder left out of a commit, a manifest
+// entry whose files never landed. Check the committed set against itself.
+
+const ARCHIVE_DIR = new URL('../app/archive/', import.meta.url);
+const archiveIndex = existsSync(new URL('index.json', ARCHIVE_DIR))
+  ? JSON.parse(readFileSync(new URL('index.json', ARCHIVE_DIR), 'utf8'))
+  : { tournaments: [] };
+
+// captures are ES modules, so load them before the sync tests run
+const captures = new Map();
+for (const t of archiveIndex.tournaments) {
+  const file = new URL(t.slug + '.js', ARCHIVE_DIR);
+  if (existsSync(file)) captures.set(t.slug, (await import(file)).default);
+}
+
+test('archive manifest entries are well formed', () => {
+  const slugs = new Set();
+  for (const t of archiveIndex.tournaments) {
+    assert.match(t.slug, /^[a-z0-9-]{3,40}$/, 'slug ' + t.slug);
+    assert.ok(!slugs.has(t.slug), 'duplicate slug ' + t.slug);
+    slugs.add(t.slug);
+    assert.ok(t.name, t.slug + ' has a name');
+    assert.match(t.date, /^\d{4}-\d{2}-\d{2}$/, t.slug + ' date');
+  }
+  // newest first: the order the archive page lists them in
+  const dates = archiveIndex.tournaments.map((t) => t.date);
+  assert.deepEqual(dates, [...dates].sort().reverse(), 'sorted newest first');
+});
+
+test('archive captures and report pages are all committed', () => {
+  for (const t of archiveIndex.tournaments) {
+    assert.ok(captures.has(t.slug), 'missing capture for ' + t.slug);
+    for (const p of ['standings.html', 'individuals.html', 'games.html',
+      'teamdetail.html', 'playerdetail.html', 'rounds.html']) {
+      assert.ok(existsSync(new URL(t.slug + '/' + p, ARCHIVE_DIR)),
+        `missing ${t.slug}/${p}`);
+    }
+  }
+});
+
+test('archive captures carry the paths the public page reads', () => {
+  for (const [slug, data] of captures) {
+    assert.ok(data[`/pub/${slug}`], slug + ' has state');
+    assert.ok(data[`/pub/${slug}/bundle`], slug + ' has a bundle');
+    // the buzzpoints tab needs packet text, which is never archived
+    assert.equal(data[`/pub/${slug}`].buzz, null, slug + ' has buzzpoints off');
+    assert.deepEqual(data[`/pub/${slug}`].announce, [], slug + ' has no live broadcasts');
+    assert.ok(!data[`/pub/${slug}/qpacket`], slug + ' must not carry packet text');
+  }
+});
+
+test('archive captures agree with their manifest counts', () => {
+  for (const t of archiveIndex.tournaments) {
+    const data = captures.get(t.slug);
+    const matches = data[`/pub/${t.slug}/bundle`].entries
+      .map((e) => ({ ...parseMatch(e.qbj, { filename: e.filename }), fileId: e.id }));
+    const games = dedupeMatches(matches);
+    assert.equal(games.length, t.games, t.slug + ' games');
+    assert.equal(Math.max(...games.map((m) => m.round)), t.rounds, t.slug + ' rounds');
+    assert.equal(data[`/pub/${t.slug}`].name, t.name, t.slug + ' name');
+  }
+});
+
+test('archive captures carry no question text', () => {
+  // Same guard tools/archive.mjs applies before writing, re-run on what
+  // actually got committed. `notes` is the one long free-text field a
+  // match qbj legitimately has.
+  for (const [slug, data] of captures) {
+    const long = [];
+    (function walk(o, path) {
+      if (!o || typeof o !== 'object') return;
+      for (const [k, v] of Object.entries(o)) {
+        if (k === 'notes') continue;
+        if (typeof v === 'string' && v.length > 120) long.push(path + '.' + k);
+        else if (typeof v === 'object') walk(v, path + '.' + k);
+      }
+    })(data, slug);
+    assert.deepEqual(long, [], slug + ' has unexpected long strings');
+  }
+});
+
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

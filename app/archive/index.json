@@ -1,0 +1,13 @@
+{
+  "tournaments": [
+    {
+      "slug": "ug-nats-stanford",
+      "name": "UG Nats @ Stanford",
+      "date": "2026-07-25",
+      "host": "Stanford",
+      "teams": 4,
+      "rounds": 12,
+      "games": 24
+    }
+  ]
+}

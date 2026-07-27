@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>archive</title>
+<link rel="stylesheet" href="css/td.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="tname">archive</h1>
+    <span class="spacer"></span>
+    <span id="archsub" class="sub"></span>
+    <span id="round" class="sub"></span>
+    <button id="refresh" hidden>refresh</button>
+  </header>
+  <div id="archbar" class="ann" hidden>
+    <div class="annlabel">archived</div>
+    <div class="anntext">Final results, frozen after the tournament.
+      <a href="archive.html">all tournaments</a> ·
+      <a id="reportlink" href="">full stat report</a></div>
+  </div>
+  <div id="ann"></div>
+  <!-- pubview.js drives these; empty and hidden on the list. -->
+  <div class="tabs" id="tabs" hidden>
+    <button class="tab" id="tab-schedule" data-tab="schedule">schedule</button>
+    <button class="tab" id="tab-stats" data-tab="stats">stats</button>
+    <button class="tab" id="tab-cats" data-tab="cats" hidden>categories</button>
+    <button class="tab" id="tab-buzz" data-tab="buzz" hidden>buzzpoints</button>
+  </div>
+  <div id="msg"></div>
+  <div id="out"></div>
+</div>
+<script type="module" src="js/archive.js"></script>
+</body>
+</html>

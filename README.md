@@ -125,6 +125,15 @@ Part of [qbsuite](https://qbsuite.github.io/).
   are generated client-side in the dashboard. Combined reader uploads are
   never handed out raw: the dashboard's per-file downloads (Worker
   `part=qbj|game`) and the zip both split them into those two real files.
+- **Archive** (`app/archive.html`): a curated list of past tournaments, and
+  with `?t=<slug>` any one of them. An archived tournament runs the real
+  `pubview.js` against a committed capture of its `/pub` responses
+  (`app/archive/<slug>.js`) instead of the Worker, so the schedule, stats,
+  and categories tabs work with no server and no tournament of your own,
+  and keep working if the backend ever goes away. Each entry also ships its
+  six-page stat report as static HTML. Buzzpoints is switched off in a
+  capture: that tab needs the gated packet-text route, which isn't
+  archived. See "Archiving a tournament" below.
 
 ## Link lifetime + question security
 
@@ -181,9 +190,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   `report.js` (the six-page HTML stat report, ported from YellowFruit
   4.0.18's `HTMLReports.ts` / `StatSummaries.ts`), `zip.js` (store-only
   zip).
-- `app/` — the five static pages + `js/` page code (`announce.js` renders
+- `app/` — the static pages + `js/` page code (`announce.js` renders
   the TD's broadcasts on all three read surfaces). Deployable on any
-  static host; served at `qbsuite.github.io/qb-td/app/`. The reader page
+  static host; served at `qbsuite.github.io/qb-td/app/`. `archive.html` +
+  `archive/` are the archive page and its committed captures. The reader page
   is `read.html` + `js/read.bundle.js`, a committed esbuild bundle of
   MODAQ (rebuild with `npm run build:read` after editing
   `js/read_main.js` / `js/read_core.js` or bumping the `modaq` dep;
@@ -194,11 +204,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   provision.
 - `tests/` — `run_tests.js` (engine unit tests), `e2e_worker.js` (full
   TO -> moderator -> public flow against `wrangler dev`).
+- `tools/archive.mjs` — the archive's approval CLI (see below). The only
+  code here that reads the live backend outside a browser.
 
 ## Tests
 
 ```bash
-node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip
+node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
@@ -219,6 +231,41 @@ cd .. && node tests/e2e_worker.js
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`.
+
+## Archiving a tournament
+
+A published tournament is public but unlisted: you need its slug to find
+it, and it lives only as long as the Worker and its R2 bucket do. The
+archive is the curated other half, and joining it takes an explicit
+approval.
+
+```bash
+node tools/archive.mjs list                    # published tournaments, and which are archived
+node tools/archive.mjs add <slug> --date 2026-07-25 --host "Stanford"
+node tools/archive.mjs refresh <slug>          # recapture after a late correction
+node tools/archive.mjs remove <slug>           # un-approve
+```
+
+`add` reads the public routes, writes the frozen capture
+(`app/archive/<slug>.js`), generates the six report pages
+(`app/archive/<slug>/`), and adds a manifest entry to
+`app/archive/index.json`. Committing that is the approval. Nothing here
+writes to the backend, and the tournament's live page is unaffected either
+way.
+
+The gate is deliberately outside the Worker. An `archived` column plus an
+owner-only route would mean the first real account in a system whose whole
+auth model is link secrets; here the credential is the Cloudflare login
+`list` needs plus push access to this repo. Keeping captures in the repo
+rather than in R2 also means the archive survives the backend: about 18 KB
+gzipped per tournament, which is what git stores and what a visitor
+downloads, and `archive.html` imports only the one capture being viewed.
+
+`add` refuses to write if the bundle contains any long string outside
+`notes` (the field MODAQ writes "Tossup thrown out on question N" into),
+since that would mean packet text leaking into a file about to be
+committed and served forever. `run_tests.js` re-runs that check on what
+actually got committed, along with manifest-to-capture agreement.
 
 ## YellowFruit fidelity
 

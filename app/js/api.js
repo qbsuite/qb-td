@@ -7,10 +7,29 @@ const qs = new URLSearchParams(location.search);
 export const API = qs.get('server') || localStorage.qbtdServer
   || 'https://qb-td.denisliu10.workers.dev';
 
+// A frozen snapshot of /pub responses, keyed by path. Set by the archive
+// page (archive.html) so the real public page code runs with no Worker
+// behind it; every other page leaves this null and hits the API.
+let frozen = null;
+
+/** Serve pub() from an in-memory {path: response} map instead of the
+    network. Call before importing the page module that reads it. */
+export function useFrozenData(map) {
+  frozen = map;
+}
+
 /** JSON call to any Worker route. Throws Error(message) on failure.
     Pass opts.json to send a JSON body. Non-JSON responses (blobs) return
     the raw Response. */
 export async function pub(path, opts = {}) {
+  if (frozen) {
+    // A frozen page is read-only: unknown paths fail the way a missing
+    // blob does, so callers take their existing "not published" branch.
+    if (!Object.prototype.hasOwnProperty.call(frozen, path)) {
+      throw new Error('not available in this archived copy');
+    }
+    return frozen[path];
+  }
   if (opts.json !== undefined) {
     opts = {
       ...opts,
