@@ -1870,6 +1870,11 @@ test('roster names with commas and quotes round-trip our parser, MODAQ, and .yft
 const { demoPub, reset: demoReset } = await import('../app/js/demo.js');
 const demoFixture = (await import('../app/demo/fixture.js')).default;
 
+// The demo must never touch the network — a visitor costs zero Worker
+// requests. Any fetch during the flows below fails the run.
+const realFetch = globalThis.fetch;
+globalThis.fetch = () => { throw new Error('demo flow called fetch()'); };
+
 demoReset();
 const demoState0 = await demoPub('/pub/demo');
 const demoBundle0 = await demoPub('/pub/demo/bundle');
@@ -1904,6 +1909,7 @@ const demoBad = await demoPub(
 const demoBucket2 = await demoPub('/b/demo');
 demoReset();
 const demoStateReset = await demoPub('/pub/demo');
+globalThis.fetch = realFetch;
 
 test('demo fixture: every game parses and the story holds', () => {
   const matches = demoFixture.entries.map((e) => {
@@ -1924,14 +1930,26 @@ test('demo fixture: every game parses and the story holds', () => {
 });
 
 test('demo fixture: packets are reader-ready and fully categorized', () => {
+  // MODAQ's own formatter must accept every string — it THROWS on unknown
+  // tags, which is why the exporter converts qbreader's <i> to <em>.
+  const { parseFormattedText } = createRequire(import.meta.url)('modaq/src/parser/FormattedTextParser.js');
   for (const n of [1, 2, 3]) {
     const p = normalizePacket(demoFixture.packets[n], 'round ' + n + '.json');
-    assert.equal(p.tossups.length, 10);
-    assert.equal(p.bonuses.length, 10);
-    for (const t of p.tossups) assert.ok(tokenizeQuestion(t.question).includes('(*)'), 'power mark');
+    assert.equal(p.tossups.length, 21); // 2025 VAULT: 20 + tiebreaker
+    assert.equal(p.bonuses.length, 20);
+    for (const t of p.tossups) {
+      assert.ok(tokenizeQuestion(t.question).includes('(*)'), 'power mark');
+      parseFormattedText(t.question, { pronunciationGuideMarkers: ['("', '")'] });
+      parseFormattedText(t.answer, { pronunciationGuideMarkers: ['("', '")'] });
+    }
+    for (const b of p.bonuses) {
+      for (const s of [b.leadin, ...b.parts, ...b.answers]) {
+        parseFormattedText(s, { pronunciationGuideMarkers: ['("', '")'] });
+      }
+    }
     const rc = demoCats.rounds[String(n)];
-    assert.equal(rc.t.length, 10);
-    assert.equal(rc.b.length, 10);
+    assert.equal(rc.t.length, 21);
+    assert.equal(rc.b.length, 20);
     for (const c of [...rc.t, ...rc.b]) assert.ok(c.c, 'category set');
   }
 });
@@ -1947,7 +1965,7 @@ test('demo state: mid-tournament, round 3 open in the reader room', () => {
   assert.equal(demoBucket0.packets.length, 3);
   assert.equal(demoBucket0.roster, true);
   assert.equal(demoSched.room, demoFixture.readerRoom);
-  assert.equal(demoPacket3.tossups.length, 10);
+  assert.equal(demoPacket3.tossups.length, 21);
 });
 
 test('demo upload: lands in the bundle and completes round 3', () => {
@@ -1956,7 +1974,7 @@ test('demo upload: lands in the bundle and completes round 3', () => {
   assert.deepEqual(demoStateAfter.buzz_done, [1, 2, 3]);
   assert.equal(demoStateAfter.files.length, 6);
   assert.notEqual(demoStateAfter.version, demoState0.version);
-  assert.equal(demoQpacketLate.tossups.length, 10, 'buzzpoints packet unlocked');
+  assert.equal(demoQpacketLate.tossups.length, 21, 'buzzpoints packet unlocked');
 });
 
 test('demo upload: re-export dedupes, junk is flagged, reset clears', () => {

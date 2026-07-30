@@ -1,227 +1,533 @@
 {
-  "name": "Demo Packet 1",
-  "tossups": [
-    {
-      "question": "The narrator of this novel rents a cottage next to a mansion whose guests gossip that their host once killed a man. A green light at the end of a dock (*) transfixes this novel's title character, who longs for Daisy Buchanan. For 10 points, name this Jazz Age novel by F. Scott Fitzgerald.",
-      "answer": "The <b><u>Great Gatsby</u></b>",
-      "category": "Literature",
-      "subcategory": "American Literature"
-    },
-    {
-      "question": "This ruler crushed a combined Austrian and Russian army at Austerlitz. After a disastrous invasion of (*) Russia, this ruler abdicated and was exiled to Elba, returning for a Hundred Days that ended at Waterloo. For 10 points, name this French emperor.",
-      "answer": "<b><u>Napoleon</u></b> Bonaparte [accept <b><u>Napoleon</u></b> I]",
-      "category": "History",
-      "subcategory": "European History"
-    },
-    {
-      "question": "The second law of thermodynamics states that this quantity never decreases in an isolated system. Ludwig Boltzmann related it to the (*) number of microstates through a logarithm. For 10 points, name this quantity symbolized S, a measure of disorder.",
-      "answer": "<b><u>entropy</u></b>",
-      "category": "Science",
-      "subcategory": "Physics"
-    },
-    {
-      "question": "This novel's title character is locked in the red-room as a child at Gateshead and later teaches at Lowood School. She flees (*) Thornfield Hall after learning her employer keeps his wife Bertha Mason in the attic. For 10 points, name this Charlotte Bronte novel about a governess who loves Mr. Rochester.",
-      "answer": "<b><u>Jane Eyre</u></b>",
-      "category": "Literature",
-      "subcategory": "British Literature"
-    },
-    {
-      "question": "Robert Livingston and James Monroe negotiated this transaction, prompted in part by the Haitian Revolution. It roughly (*) doubled the size of the United States for fifteen million dollars. For 10 points, name this 1803 deal in which Thomas Jefferson bought territory from France.",
-      "answer": "<b><u>Louisiana Purchase</u></b>",
-      "category": "History",
-      "subcategory": "American History"
-    },
-    {
-      "question": "The light-dependent reactions of this process split water molecules to generate ATP and NADPH. Its dark reactions fix (*) carbon dioxide in the Calvin cycle. For 10 points, name this process by which chloroplasts in green plants turn sunlight into sugar.",
-      "answer": "<b><u>photosynthesis</u></b>",
-      "category": "Science",
-      "subcategory": "Biology"
-    },
-    {
-      "question": "A cypress tree rises like a dark flame on the left side of this painting, whose village church spire the artist added from (*) memory while at an asylum in Saint-Remy. For 10 points, name this swirling nighttime scene by Vincent van Gogh.",
-      "answer": "The <b><u>Starry Night</u></b>",
-      "category": "Fine Arts",
-      "subcategory": "Visual Fine Arts"
-    },
-    {
-      "question": "During this observance, a pre-dawn meal called suhoor precedes daily abstention from food and drink. Its end is celebrated at (*) Eid al-Fitr, and the Quran was first revealed during it on the Night of Power. For 10 points, name this Islamic holy month of fasting.",
-      "answer": "<b><u>Ramadan</u></b>",
-      "category": "Religion",
-      "subcategory": ""
-    },
-    {
-      "question": "This river passes through the Iron Gates gorge on the border of Serbia and Romania. Rising in Germany's (*) Black Forest, it flows through more national capitals than any other river, including Vienna and Budapest. For 10 points, name this second-longest river of Europe.",
-      "answer": "<b><u>Danube</u></b> River",
-      "category": "Geography",
-      "subcategory": ""
-    },
-    {
-      "question": "A recurring item in this video game series is the Master Sword, often drawn from a pedestal deep in a forest. Its protagonist collects pieces of the (*) Triforce and rescues a princess of Hyrule from Ganon. For 10 points, name this Nintendo series starring Link.",
-      "answer": "The Legend of <b><u>Zelda</u></b>",
-      "category": "Trash",
-      "subcategory": ""
-    }
-  ],
-  "bonuses": [
-    {
-      "leadin": "The Buendia family founds the town of Macondo in this author's most famous novel. For 10 points each:",
-      "parts": [
-        "Name this Colombian author of One Hundred Years of Solitude.",
-        "Garcia Marquez wrote in this literary style, which weaves fantastical events into otherwise ordinary settings.",
-        "In this Garcia Marquez novel, Florentino Ariza waits more than fifty years to reunite with Fermina Daza."
-      ],
-      "answers": [
-        "Gabriel <b><u>Garcia Marquez</u></b>",
-        "<b><u>magical realism</u></b>",
-        "<b><u>Love in the Time of Cholera</u></b>"
-      ],
-      "values": [10, 10, 10],
-      "category": "Literature",
-      "subcategory": "World Literature"
-    },
-    {
-      "leadin": "This city's traditional founding date is 753 BC. For 10 points each:",
-      "parts": [
-        "Name this city, ruled by seven legendary kings before it became a republic.",
-        "This first Roman emperor defeated Antony and Cleopatra at Actium.",
-        "Augustus's rise ended decades of civil war that began when this general crossed the Rubicon."
-      ],
-      "answers": [
-        "<b><u>Rome</u></b>",
-        "<b><u>Augustus</u></b> [accept <b><u>Octavian</u></b>]",
-        "Julius <b><u>Caesar</u></b>"
-      ],
-      "values": [10, 10, 10],
-      "category": "History",
-      "subcategory": "Ancient History"
-    },
-    {
-      "leadin": "These elements make up group 18 of the periodic table. For 10 points each:",
-      "parts": [
-        "Name this family of largely unreactive elements.",
-        "This lightest noble gas is the second-most abundant element in the universe.",
-        "This noble gas glows reddish-orange in signs and lends its name to them."
-      ],
-      "answers": [
-        "<b><u>noble gas</u></b>es [accept <b><u>inert gas</u></b>es]",
-        "<b><u>helium</u></b>",
-        "<b><u>neon</u></b>"
-      ],
-      "values": [10, 10, 10],
-      "category": "Science",
-      "subcategory": "Chemistry"
-    },
-    {
-      "leadin": "Three witches greet this character as Thane of Cawdor and king hereafter. For 10 points each:",
-      "parts": [
-        "Name this Scottish general who murders King Duncan in his namesake Shakespeare tragedy.",
-        "Macbeth is finally slain by this nobleman, who was from his mother's womb untimely ripped.",
-        "This wife of Macbeth sleepwalks while trying to wash imagined blood from her hands."
-      ],
-      "answers": [
-        "<b><u>Macbeth</u></b>",
-        "<b><u>Macduff</u></b>",
-        "<b><u>Lady Macbeth</u></b> [prompt on Macbeth]"
-      ],
-      "values": [10, 10, 10],
-      "category": "Literature",
-      "subcategory": "British Literature"
-    },
-    {
-      "leadin": "A Parisian crowd stormed the Bastille on July 14, 1789. For 10 points each:",
-      "parts": [
-        "The Bastille's fall began this revolution, which overthrew the Bourbon monarchy.",
-        "This radical Jacobin leader dominated the Committee of Public Safety during the Reign of Terror.",
-        "This king was executed by guillotine in January 1793."
-      ],
-      "answers": [
-        "<b><u>French Revolution</u></b>",
-        "Maximilien <b><u>Robespierre</u></b>",
-        "<b><u>Louis XVI</u></b> [prompt on Louis]"
-      ],
-      "values": [10, 10, 10],
-      "category": "History",
-      "subcategory": "European History"
-    },
-    {
-      "leadin": "This planet's Great Red Spot is a storm that has raged for centuries. For 10 points each:",
-      "parts": [
-        "Name this largest planet in the solar system.",
-        "This Galilean moon of Jupiter is the most volcanically active body in the solar system.",
-        "Io and Jupiter's other large moons were discovered in 1610 by this Italian astronomer."
-      ],
-      "answers": [
-        "<b><u>Jupiter</u></b>",
-        "<b><u>Io</u></b>",
-        "<b><u>Galileo</u></b> Galilei"
-      ],
-      "values": [10, 10, 10],
-      "category": "Science",
-      "subcategory": "Other Science"
-    },
-    {
-      "leadin": "A critic coined this movement's name from a painting of a sunrise over Le Havre. For 10 points each:",
-      "parts": [
-        "Name this nineteenth-century French movement that captured fleeting effects of light.",
-        "This Impressionist painted Impression, Sunrise as well as a series of water lilies at Giverny.",
-        "This Impressionist is known for paintings of ballet dancers such as The Dance Class."
-      ],
-      "answers": [
-        "<b><u>Impressionism</u></b>",
-        "Claude <b><u>Monet</u></b>",
-        "Edgar <b><u>Degas</u></b>"
-      ],
-      "values": [10, 10, 10],
-      "category": "Fine Arts",
-      "subcategory": "Visual Fine Arts"
-    },
-    {
-      "leadin": "This religion's Trimurti consists of Brahma, Vishnu, and Shiva. For 10 points each:",
-      "parts": [
-        "Name this major religion of India.",
-        "This Hindu concept names the cycle of death and rebirth.",
-        "This dialogue between Krishna and Arjuna forms part of the Mahabharata."
-      ],
-      "answers": [
-        "<b><u>Hinduism</u></b>",
-        "<b><u>samsara</u></b> [prompt on reincarnation]",
-        "<b><u>Bhagavad Gita</u></b>"
-      ],
-      "values": [10, 10, 10],
-      "category": "Religion",
-      "subcategory": ""
-    },
-    {
-      "leadin": "This continent's highest peak is Kilimanjaro. For 10 points each:",
-      "parts": [
-        "Name this continent.",
-        "This longest river of Africa flows north through Egypt to the Mediterranean.",
-        "This Ethiopian capital hosts the headquarters of the African Union."
-      ],
-      "answers": [
-        "<b><u>Africa</u></b>",
-        "<b><u>Nile</u></b> River",
-        "<b><u>Addis Ababa</u></b>"
-      ],
-      "values": [10, 10, 10],
-      "category": "Geography",
-      "subcategory": ""
-    },
-    {
-      "leadin": "This studio's films open with a hopping desk lamp. For 10 points each:",
-      "parts": [
-        "Name this animation studio behind Toy Story.",
-        "In this Pixar film, the rat Remy cooks in a Paris restaurant.",
-        "This Pixar film about personified emotions takes place largely inside the mind of a girl named Riley."
-      ],
-      "answers": [
-        "<b><u>Pixar</u></b>",
-        "<b><u>Ratatouille</u></b>",
-        "<b><u>Inside Out</u></b>"
-      ],
-      "values": [10, 10, 10],
-      "category": "Trash",
-      "subcategory": ""
-    }
-  ]
+ "name": "2025 VAULT Packet 1",
+ "tossups": [
+  {
+   "question": "<b>A week before he was killed by these people, Tara Hayer </b><em>(“HAY-er”)</em><b> flatly declared “If they get me, they get me.” “Black Cat” commandos targeted members of this group during Operation Black Thunder. A Boeing 747 carrying 329 passengers was bombed by these people in Canada’s deadliest act of terrorism. The claim that “when a (*) </b>big tree falls, the earth shakes” was used to justify 1984 attacks against these people. These people’s Khalistan movement gained support after Operation Blue Star. Indira Gandhi was assassinated for raiding these people’s Golden Temple. For 10 points, name this religious minority whose male practitioners wear turbans.",
+   "answer": "<b><u>Sikh</u></b>s [accept <b><u>Khalistani</u></b>s before “Khalistan” is read; prompt on <u>Punjabi</u>s or <u>Indian</u>s; prompt on <u>Babbar Khalsa</u> or <u>Babbar Khalsa</u> International or <u>BK</u> by asking “What general group were members of Babbar Khalsa part of?\"]",
+   "category": "History",
+   "subcategory": "World History"
+  },
+  {
+   "question": "<b>The capacity to maintain this quantity is considered low for systems with a high Revelle factor. </b> <b>This quantity is plotted on the x-axis of a Bjerrum </b><em>(\"B’YAIR-um\")</em><b> plot. A decrease in this quantity drives the CCD upward, damaging the habitat of coccolithophores </b><em>(“kok-oh-LITH-oh-fohrs”)</em><b>. </b> <b>Aragonite-using organisms are the first to be affected by changes in this quantity. </b>(*) Coral bleaching is exacerbated by a global decrease in this quantity. This quantity drops when the equilibrium of a bicarbonate-carbonate buffer is altered. For 10 points, increased carbon dioxide uptake causes a decrease in what quantity through ocean acidification?",
+   "answer": "oceanic <b><u>pH</u></b> [prompt on ocean <u>acid</u>ification or ocean <u>acid</u>ity or ocean <u>alkalin</u>ity before \"acidification\"; prompt on any description of <u>CO2 level</u>s like <u>concentration of carbon dioxide</u> or <u>concentration of CO2</u> or <u>dissolved inorganic carbon</u> or <u>total inorganic carbon</u> before \"carbon dioxide\"]",
+   "category": "Science",
+   "subcategory": "Other Science"
+  },
+  {
+   "question": "<b>According to Saul Rosenzweig’s “Dodo bird verdict,” no type of this practice is more effective than another. The A-B-C-D-E-F model appears in an educational form of this practice pioneered by Albert Ellis. Kierkegaard’s “will to meaning” inspired Viktor Frankl to create a “logo” form of this practice. Aaron Beck introduced a form of this practice designed to counter the (*)</b> cognitive triad. Unconditional positive regard is a core tenet of Carl Rogers’ “client-centered” type of this practice, which is widely used like similar practices in its “cognitive behavioral” type. For 10 points, name this conversational practice used by psychiatrists and psychologists to aid patients.",
+   "answer": "psycho<b><u>therapy</u></b> [or psychological <b><u>therapy</u></b>; accept <b><u>counseling</u></b>; accept client-centered <b><u>therapy</u> </b>or logo<b><u>therapy</u></b> or Cognitive Behavioral <b><u>therapy</u></b>; prompt on <u>psychoanalysis</u>; prompt on <u>psychiatry</u> or <u>psychology</u>; or <u>mental health care</u> with “What specific practice is being performed?”]",
+   "category": "Social Science",
+   "subcategory": "Social Science"
+  },
+  {
+   "question": "<b>An epigraph in this novel originally consisted of lyrics from Joni Mitchell’s “Cactus Tree” before being changed at the last minute. In this novel, Geli Tripping ventures to the top of Brocken with another character to experience “Kirghiz Light”; that character scours continental Europe in search of the S-Gerät. In this novel, a discovery presented by Pointsman, a member of PISCES, is dismissed as a mere </b>(*) Poisson distribution by Roger Mexico. Those events create the “screaming across the sky” that opens this novel. For 10 points, V-2 rocket strike locations are correlated with Tyrone Slothrop’s sexual encounters in what Thomas Pynchon novel?",
+   "answer": "<em><b><u>Gravity’s Rainbow</u> </b></em>",
+   "category": "Literature",
+   "subcategory": "American Literature"
+  },
+  {
+   "question": "<b>The second movement of a concerto by this composer opens with the soloist playing E major arpeggios before a flute introduces the rising theme </b>[read slowly]<b> “B, E, E-sharp, long E-sharp.” Yunchan Lim won the 2022 Van Cliburn Competition after performing a piece by this composer that features a notoriously difficult </b><em><b>ossia</b></em><b> cadenza. An Arnold Böcklin painting inspired this composer’s (*) </b><em>Isle of the Dead</em>. A piano piece by this composer is titled for an Italian violin virtuoso’s 24th caprice. For 10 points, name this Russian composer of four piano concertos and <em>Rhapsody on a</em> <em>Theme of Paganini</em>.",
+   "answer": "Sergei <b><u>Rachmaninoff</u> </b>",
+   "category": "Fine Arts",
+   "subcategory": "Auditory Fine Arts"
+  },
+  {
+   "question": "<b>Lotfi Zadeh defined “fuzzy” versions of these objects where the law of excluded middle doesn’t hold. Atypically, the NF theory of these objects uses an IFF for the axiom of extensionality. Max Zorn showed that partially ordered types of these objects must have a maximal element. The </b>(*) Cartesian product between two of these objects can be formatted using “builder notation.” Zermelo and Fraenkel’s theory for these things is called ZFC when including the axiom of choice. The cardinality of the empty one of these objects is zero. For 10 points, curly braces are used to write what unordered collections of elements?",
+   "answer": "<b><u>set</u></b>s [accept sub<b><u>set</u></b>s; accept partially ordered <b><u>set</u></b>s or po<b><u>set</u></b>s; accept <b><u>set</u></b> theory or Zermelo–Fraenkel <b><u>set</u></b> theory]",
+   "category": "Science",
+   "subcategory": "Other Science"
+  },
+  {
+   "question": "<b>Knot theory was partially inspired by Peter Tait’s expansions on this scientist’s vortex theory of the atom. This scientist’s wildly inaccurate prediction of the age of the earth was based on the time it took for a molten ball’s surface to cool. This person is the second namesake of a throttling process that describes the temperature change of an expanding real gas that is </b>(*) adiabatic. This person was knighted for his work solving bandwidth issues on the transatlantic telegraph cable. The triple point of water is approximately 273 degrees on a temperature scale named for this person. For 10 points, a temperature unit named for what person sets zero degrees at absolute zero?",
+   "answer": "Sir William <b><u>Thomson</u></b>, 1st Baron <b><u>Kelvin</u></b> [accept either underlined name; accept Lord <b><u>Kelvin</u></b>; prompt on <u>Joule–Thomson</u> effect or <u>Joule–Kelvin</u> effect; reject \"J. J. Thomson\" or \"Joseph John Thomson\"]",
+   "category": "Science",
+   "subcategory": "Physics"
+  },
+  {
+   "question": "<b>Rather than being executed for murdering his wife, a character in this novel is tattooed on his face. One character in this novel releases fish from a cage after a fisherman doesn't sell him any, and that character gains a nickname due to his twin axes. This novel begins with the release of golden rays after a stone tortoise is moved. A character in this novel drinks (*) </b> 18 bowls of wine and then beats a tiger dead. That character, Wu Song, inspired an erotic spinoff of this novel titled The Plum in the Golden Vase. Song Jiang leads a group of reincarnated demons against the corrupt official Gao Qiu in, for 10 points, what classic Chinese novel by Shi Nai'an about a group of 108 outlaws?",
+   "answer": "<em><b><u>Water Margin</u></b></em> [or <em><b><u>Outlaws of the Marsh</u></b></em> or <em><b><u>All Men Are Brothers</u></b></em> or <em><b><u>Shui Hu Zhuan</u></b></em>]",
+   "category": "Literature",
+   "subcategory": "World Literature"
+  },
+  {
+   "question": "<b>This polity’s forces </b>[emphasize]<em><b>defeated</b></em><b> the de la Gardie campaign by capturing an enemy ruler at Klushino. After they created </b><em><b>pacta conventa </b>(“PACH-tah CON-vent-ah”)</em><b>, leaders of this polity were forced to agree to a set of 18 provisions known as the Henrician Articles. After this polity’s </b><em><b>Nihil Novi</b>(“NEE-heel NOH-vai”)</em><b> was updated by the Constitution of 3 May, szlachta </b><em>(“SHLAK-ta”)</em> <b>nobles lost the ability to use a</b> (*) Liberum Veto. This country was invaded by Sweden during “the Deluge.” This country governed by the <em>Sejm(“same”)</em> entered a personal union with another after Duke Jogaila <em>(“yo-GAI-luh”)</em> married Queen Jadwiga <em>(“yahd-VEE-gah”)</em>. For 10 points, three partitions disintegrated what European country governed from Warsaw?",
+   "answer": "Kingdom of <b><u>Poland</u></b> [accept <b><u>Poland</u></b>-Lithuania or <b><u>Polish</u></b>-Lithuanian Commonwealth; prompt on <u>Lithuania</u>; prompt on the <u>Commonwealth</u>]",
+   "category": "History",
+   "subcategory": "European History"
+  },
+  {
+   "question": "<b>This politician terminated a contract with DNV after hiring them to investigate a 2021 metro overpass collapse. After this politician rejected a Supreme Court ruling against “Plan C,” 901 judges were elected in a 2025 nationwide special election. This creator of the “Yes to Peace” buyback campaign </b>[emphasize]<em><b>ended</b></em><b> the</b> (*) “Hugs, Not Bullets” policy by authorizing troop deployments. This leader used the USMCA to secure an exemption from 50% U.S. tariffs without issuing countermeasures. This member of the MORENA <em>(“moh-RAY-nah”)</em> party defeated Xóchitl <em>(“SHOH-cheat-ill”)</em> Gálvez in a 2024 election to succeed Andrés Manuel López Obrador. For 10 points, name this president of Mexico.",
+   "answer": "Claudia <b><u>Sheinbaum</u></b><em>(“SHINE-bawm”)</em> [or Claudia <b><u>Sheinbaum</u></b> Pardo]",
+   "category": "Current Events",
+   "subcategory": "Current Events"
+  },
+  {
+   "question": "<b>Laura has a nightmare of one of these characters at the foot of her bed after they crash a carriage into a tree. One of these characters who describes himself as “all in a sea of wonders” is stabbed by Quincy Morris at the end of one novel. Ianthe </b><em>(“EE-ann-fee”)</em><b> is murdered by one of these characters based on Lord Byron, the title character of a John</b> (*) Polidori novel written during the Villa Diodati <em>(“dee-oh-dah-tee”)</em> ghost story contest. Lord Ruthven <em>(“RUFF-venn”)</em> is one of these characters, as is the title character of an 1897 novel who sails to Whitby on the <em>Demeter</em> and is decapitated by Jonathan Harker. For 10 points, examples of what beings include the lesbian Carmilla and Dracula?",
+   "answer": "<b><u>vampire</u></b>s [accept <em>The</em> <em><b><u>Vampyre</u></b></em>, prompt on the <u>undead</u>]",
+   "category": "Literature",
+   "subcategory": "British Literature"
+  },
+  {
+   "question": "<em>Note to Moderator: Read Answerline carefully. Note to players: Description Acceptable.</em> <b>This event's central participant erroneously used Al-Farghani’s calculation for the length of a degree. The </b><em><b>Capitulations of Santa Fe</b></em><b> authorized this event, which encountered the cacique </b><em>(“kah-SEE-kay”)</em> <b>Guacanagaríx </b><em>(“gwah-kah-nah-GAH-reeks”)</em><b>. A fictional biography created by Washington Irving popularized a myth claiming that this event disproved Flat Earth theories. Alfred Crosby described a process that introduced </b>(*) syphilis to Europe in the wake of this event. Two years after this event, the Treaty of Tordesillas partitioned territory explored during it between Spain and Portugal. For 10 points, name this event, where an explorer journeyed to a new land on the Niña, Pinta, and Santa Maria.",
+   "answer": "Christopher <b><u>Columbus</u></b> (not) discovering the <b><u>New World</u></b> [accept <b><u>Columbus’ first voyage</u></b>; accept any description of Christopher <b><u>Columbus</u></b> journeying to the <b><u>New World</u></b>; accept <b><u>Columbian</u></b> <b><u>Exchange</u></b>; accept descriptions of <b><u>Columbus</u></b> travelling to <b><u>Hispaniola</u></b> or the <b><u>Caribbean</u></b> the <b><u>America</u></b>s or North <b><u>America</u></b>; prompt on descriptions that do not mention Columbus such as <u>journeying</u> to the <u>New</u> <u>World</u> or the <u>discovery</u> of the <u>Americas</u>]",
+   "category": "History",
+   "subcategory": "Other History"
+  },
+  {
+   "question": "<b>The Class I of an aaRS enzyme that conducts a reaction in which this molecule is the nucleophile contains a Rossmann fold domain; that reaction is also known as the “charging” of this molecule. A conserved sequence containing pseudouridine comprises the T psi C arm of these molecules. Inosine is one compound that participates in (*) </b>wobble pairing in this molecule. During one process, this molecule enters theA site and exits uncharged from the E site. This cloverleaf-shaped molecule carries a three base-pair sequence known as an anticodon. For 10 points, name this form of RNA that carries amino acids to the ribosome during translation, unlike mRNA.",
+   "answer": "<b><u>transfer RNA</u></b> [accept <b><u>tRNA</u></b>; prompt on other forms of <u>RNA</u> or any answer with <u>RNA</u>; reject “mRNA”]",
+   "category": "Science",
+   "subcategory": "Biology"
+  },
+  {
+   "question": "<b>A character in this opera threatens to “play the little guitar” for a man he believes to be courting his wife. Two characters in this opera sing the duet “Cinque </b><em>(“CHIN-kay”)</em><b>, dieci, venti” while measuring dimensions for a new bed. After he is forced to join the army, a boy in this opera is mocked as an “amorous butterfly.” In this opera, Antonio’s flowerpots are broken after</b> (*) Cherubino jumps out of a window and lands on them. Before realising he is their long-lost son, Bartolo and Marcellina sue this opera’s title character, a man who helps expose Almaviva’s infidelity. For 10 points, name this Mozart opera about Susanna’s wedding to the Barber of Seville.",
+   "answer": "<em>The</em> <em><b><u>Marriage of Figaro</u></b></em> [or <em>La</em> <em><b><u>nozze di Figaro</u></b></em>]",
+   "category": "Fine Arts",
+   "subcategory": "Other Fine Arts"
+  },
+  {
+   "question": "<em>Description Acceptable.</em><b>One event in this location begins at the Ur-Nes and is threatened by a figure born from an umbilical cord. Another event in this location involves reading 42 negative confessions listed in a text named for Ani. After that event, some figures are selected to progress to this place’s (*) </b>“Field of Reeds.” While in this place, priests destroy wax models of one figure to help his adversary pass through this place’s twelve gates. After leaving this place, one god manifests as the scarab Khepri. Ammit devours impure hearts weighed against the feather of Ma'at in this location. At night, Ra’s solar barge traverses through, for 10 points, what place ruled by Osiris?",
+   "answer": "<b><u>Duat</u></b> [or <b><u>Tuat</u></b> or <b><u>Amenthes</u></b>; accept descriptions of the <b><u>Egypt</u></b>ian <b><u>underworld</u></b> or the <b><u>Egypt</u></b>ian <b><u>afterlife</u></b>; accept <b><u>kingdom</u></b> of <b><u>Osiris</u></b> before “Osiris”; prompt on <u>underworld</u> or <u>afterlife</u>]",
+   "category": "Mythology",
+   "subcategory": "Mythology"
+  },
+  {
+   "question": "<b>This artist depicted teepee-shaped trees covered in snow in a work held by the Cleveland Museum of Art. This artist showed various figures looming over him at work in his self-portrait </b><em><b>Return from Bohemia</b></em><b>. A black car is shown about to hit a red truck in this artist’s </b><em><b>Death on the Ridge Road. </b></em><b>A satirical work by this artist depicts three “Tory Gals” in front of an </b>(*) Emanuel Leutze <em>(“LOYT-zuh”)</em> painting.Ella Watson was photographed in front of an American flag by Gordon Parks to parody a work by this artist, in whichhisdentist, Byron McKeeby, stands in front of the Dibble House holding a pitchfork. For 10 points, name this artist of <em>American Gothic</em>.",
+   "answer": "Grant <b><u>Wood</u> </b>",
+   "category": "Fine Arts",
+   "subcategory": "Visual Fine Arts"
+  },
+  {
+   "question": "<b>In the first chapter, the main character of this novel moves through stacks containing “Books Too Expensive Now” and “Books Made For Purposes Other Than Reading.” A character in this novel meets his love-interest's sister while on a mission to pursue a counterfeiter in the country of Ataguitania </b><em>(“ah-TAG-wih-TAH-nee-uh”)</em><b>. In this novel, a suitcase swap at a train station is initiated through the code phrase “Zeno of Elea.” Professor</b> (*) Uzzi-Tuzzi recounts a story titled “Leaning from a steep slope” in this novel, in which every odd chapter advances the relationship between Ludmilla and You, the reader. For 10 points, name this second-person postmodern novel by Italo Calvino.",
+   "answer": "<em><b><u>If on a winter's night a traveler</u></b></em>[accept <em><b><u>Se una notte d'inverno un viaggiatore</u></b></em>]",
+   "category": "Literature",
+   "subcategory": "European Literature"
+  },
+  {
+   "question": "<b>The reduced temperature is equivalent to the actual temperature divided by a temperature described by this adjective. By differentiating the Van der Waals equation twice, one can find that the pressure described by this adjective is a-over-27-b-squared. Oscillatory isotherms vanish at a state described by this adjective where one of the coexistence curves end. Decaffeination utilizes a form of (*) </b>carbon dioxide being [emphasize] <em>beyond</em> a state described by this adjective. At a state described by this adjective, the gas and liquid phases become indistinguishable. For 10 points, name this adjective describing the <em>point</em> at the far right of a phase diagram.",
+   "answer": "<b><u>critical</u></b> [accept <b><u>critical</u></b> temperature or <b><u>critical</u></b> pressure or <b><u>critical</u></b> point or super<b><u>critical</u> </b>fluid]",
+   "category": "Science",
+   "subcategory": "Chemistry"
+  },
+  {
+   "question": "<b>LeRoy Collins refused to sign an interposition resolution attempting to nullify this case. Francis Thompson’s poem “The Hound of Heaven” inspired a phrase used in this decision, which extended </b><em><b>Sweatt v. Painter</b></em><b>. </b><em><b>Cooper v. Aaron </b></em><b>blocked attempts to dodge this ruling by Harry Byrd’s “Massive resistance” campaign. Kenneth and Mamie</b> (*) Clark’s doll experiment was used to support this decision, which called for taking an action with “All deliberate speed.” In 1957, the 101st Airborne was deployed to Little Rock to enforce this decision. For 10 points, <em>Plessy v. Ferguson’s</em> doctrine of “Separate But Equal” was overturned by what landmark school segregation case?",
+   "answer": "<em><b><u>Brown</u></b> v. Board of Education of Topeka, Kansas</em> [or <b><u>Brown</u></b> v. Board]",
+   "category": "History",
+   "subcategory": "American History"
+  },
+  {
+   "question": "<b>A man with this surname issued the “Second Manifesto” in 1904 which removed sanctions from one arrangement. In a forged letter, Mark Hofmann claimed a man with this surname was guided by a white salamander. Oliver Cowdery was among the Three Witnesses who verified an object delivered to a man with this surname. That man with this surname used the stones Urim and Thummim to translate (*)</b> Reformed Egyptian. A man with this surname whose “Word of Wisdom” prohibited drinking coffee and alcohol received a set of golden plates brought to him by the angel Moroni. For 10 points, a man with what surname founded the Church of Latter Day Saints?",
+   "answer": "<b><u>Smith</u></b> [accept Joseph <b><u>Smith</u></b> Jr.; accept Joseph Fielding <b><u>Smith</u></b> Sr.]",
+   "category": "Religion",
+   "subcategory": "Religion"
+  },
+  {
+   "question": "<b>A paper that theorized this particle’s existence noted that Goldstone’s theorem only applies to global continuous transformations, not local ones. This particle’s low mass compared to the Planck mass is the subject of the hierarchy problem. Particles roll down the hat-shaped potential energy graph associated with this particle during spontaneous symmetry breaking. This particle produced a 125 giga electronvolts bump in mass recorded by the</b> (*) ATLAS and CMS experiments. W and Z particles interact with the field associated with this particle, which imparts mass to all elementary particles. The last predicted particle by the Standard Model to be discovered was this particle. For 10 points, name this “God particle” discovered at CERN in 2012.",
+   "answer": "<b><u>Higgs</u></b> boson [or <b><u>Higgs</u></b> particle]",
+   "category": "Science",
+   "subcategory": "Physics"
+  }
+ ],
+ "bonuses": [
+  {
+   "leadin": "In a novel set in this country, a family attends a strange performance which ends with a hypnotist pretending to be the woman Silvestra, causing a man to kiss him. For 10 points each:",
+   "parts": [
+    "Name this country, the setting of a novel in which the protagonist dreams about a group of torch carrying humans worshipping a “stranger-god.”",
+    "This author used Italy as the setting for his novels <em>Mario and the Magician</em> and <em>Death in Venice</em>.",
+    "The boy Hanno dies of typhoid fever in this Thomas Mann novel which chronicles 42 years of the decline of the wealthy title family from Lübeck."
+   ],
+   "answers": [
+    "<b><u>Italy</u></b> [or <b><u>Italian Republic</u></b> or <b><u>Repubblica Italiana</u></b>]",
+    "Thomas <b><u>Mann</u></b> [or Paul Thomas <b><u>Mann</u></b>]",
+    "<em><b><u>Buddenbrooks</u></b></em>"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Literature",
+   "subcategory": "European Literature"
+  },
+  {
+   "leadin": "This man declared “What we need is an Andrew Jackson to stand” during a speech that caused him to be carried around an auditorium for 30 minutes. For 10 points each:",
+   "parts": [
+    "Name this politician who declared that “It is the issue of 1776 over again” while arguing in support of a policy on behalf of “the toilers everywhere.”",
+    "William Jennings Bryan’s raucous 1896 DNC speech advocated for Free Silver by fervently declaring that “you shall not crucify mankind upon a cross of [this metal].”",
+    "The Cross of Gold Speech earned Bryan the endorsement of this party, which adopted the farmer-led “Ocala Demands.” Greenback James Weaver advocated for this party’s Omaha Platform."
+   ],
+   "answers": [
+    "William Jennings <b><u>Bryan</u></b>",
+    "<b><u>gold</u></b> [accept <b><u>gold</u></b> standard or the Cross of <b><u>Gold</u></b> speech; prompt on <u>Au</u>]",
+    "<b><u>Populist</u></b> Party [or <b><u>Populist</u></b>s or The <b><u>People’s</u></b> Party]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "History",
+   "subcategory": "American History"
+  },
+  {
+   "leadin": "<em>Description acceptable.</em> This figure is depicted wearing a gorilla mask in a poster asking “Do women have to be naked to get into the Met Museum?” For 10 points each:",
+   "parts": [
+    "Identify this figure who, in a namesake painting, holds a peacock-feather fan while clinging to a blue curtain. A 2004 paper concluded that this figure was drawn with five extra vertebrae.",
+    "<em>La Grande Odalisque</em> is a painting by this French artist, who depicted a group of nude women in a harem in <em>The Turkish Bath</em>.",
+    "This ruler holds the scepter of Charlemagne in an Ingres portrait depicting him “on His Imperial Throne.” Ingres’s teacher Jacques-Louis David <em>(\"dah-VEED\")</em> painted this ruler “Crossing the Alps.”"
+   ],
+   "answers": [
+    "<em>La</em> <em><b><u>Grande Odalisque</u></b>(\"lah GROND oh-duh-LEESK\")</em> [accept descriptions of the <b><u>woman</u></b> in <em>La</em> <em><b><u>Grande Odalisque</u></b></em>]",
+    "Jean-Auguste-Dominique <b><u>Ingres</u></b><em>(“AANG-gruh”)</em>",
+    "<b><u>Napoleon</u></b> Bonaparte [or <b><u>Napoleon</u></b> I; accept <em><b><u>Napoleon</u></b> I on His Imperial Throne</em>; accept <em><b><u>Napoleon</u></b>Crossing the Alps</em>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Fine Arts",
+   "subcategory": "Visual Fine Arts"
+  },
+  {
+   "leadin": "After cells are lysed, one can utilize the phenol-chloroform variant of this technique on DNA. For 10 points each:",
+   "parts": [
+    "Name this technique. A pear shaped funnel utilized in this technique undergoes cycles of shaking and venting to form distinct layers.",
+    "Extraction often utilizes two of these substances with different properties. These substances dissolve solutes in a solution.",
+    "After extractions are completed, chemists often dry the resulting organic layer of any residual water by using a compound of sodium and this anion. Magnesium’s salt with this anion is called Epsom Salt."
+   ],
+   "answers": [
+    "<b><u>extraction</u></b> [accept phenol-chloroform <b><u>extraction</u></b> or liquid-liquid <b><u>extraction</u></b>]",
+    "<b><u>solvent</u></b>s",
+    "<b><u>sulfate</u> </b>"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Chemistry"
+  },
+  {
+   "leadin": "Members of this movement were told they are in the “Last Havoc” era by its founder Li Hongzhi. For 10 points each:",
+   "parts": [
+    "Name this Chinese religious movement that was founded in 1992. This movement publishes <em>The</em> <em>Epoch Times</em> and operates the Shen Yun dance troupe.",
+    "The name of Falun Gong refers to “turning” a wheel named for this concept. This concept refers to a cosmic sense of duty in many Asian religions and it is used to justify the Hindu caste system.",
+    "“Penetrating the Two Cosmic Extremes” is among the five exercises members of Falun Gong practice to cultivate this other concept. Dantian breathing and other slow, meditative movements are often used to cultivate this concept."
+   ],
+   "answers": [
+    "<b><u>Falun Gong</u></b> [or <b><u>Falun Dafa</u></b>; prompt on but otherwise DO NOT REVEAL <u>Qigong</u>]",
+    "<b><u>dharma</u></b> [accept <b><u>dharma</u></b> wheel]",
+    "<b><u>Qi</u></b> [or <b><u>chi</u></b>; accept <b><u>Qi</u></b>gong]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Religion",
+   "subcategory": "Religion"
+  },
+  {
+   "leadin": "Appius Claudius Crassus’ attempts to force a woman named Verginia to marry him may have sparked the second of these events. For 10 points each:",
+   "parts": [
+    "Name these mass strikes that occurred during the Conflict of the Orders. Lucius Sicinius Vellutus <em>(“SICK-in-ee-us wel-LOO-tus”)</em> proposed travelling to Mons Sacer during one of these events in 494 BC.",
+    "In response to the first secession, Rome allowed the plebs to elect two representatives that were given this title. Holders of this title were permitted to veto the actions of the consuls.",
+    "For making him look too much like a king, this ruler fired two Tribunes of the Plebs. Unfortunately, however, this dictator was stabbed on the Ides of March by senators who felt he was too much like a king."
+   ],
+   "answers": [
+    "<b><u>Secession of the Plebs</u></b> [or <b><u>Secessio Plebis</u></b>; accept First or second <b><u>Secession of the Plebs</u></b> or the first or second <b><u>secessio plebis</u></b>; accept descriptions of th<b>e<u>plebs leaving</u></b> the city of Rome; accept <b><u>plebeians</u></b> in place of “plebs”; prompt on <u>secession</u>]",
+    "<b><u>tribune</u></b>s [or <b><u>tribunus</u></b> or tribuni; accept <b><u>Tribune</u></b>s of the plebs or <b><u>tribune</u></b>s of the people or plebeian <b><u>tribune</u></b>s or <b><u>tribunus</u></b> plebis]",
+    "<b><u>J</u></b>ulius <b><u>Caesar</u></b> [or Gaius <b><u>J</u></b>ulius <b><u>Caesar</u></b>; prompt on <u>Caesar</u>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "History",
+   "subcategory": "Ancient History"
+  },
+  {
+   "leadin": "Answer the following about gods who fight historical figures in <em>Record of Ragnarok</em>. For 10 points each:",
+   "parts": [
+    "Name this god who loses to Qin Shi Huang in the seventh match of <em>Record of Ragnarok</em>. This Greek god of the underworld kidnapped Persephone.",
+    "In <em>Record of Ragnarok</em>, Leonidas resents a god of this domain, who also sends a plague to the Achaeans in the <em>Iliad</em>. Another god of this domain fathered Circe.",
+    "One of Poseidon’s attacks is named for Demeter, referring to his fathering of this figure with her. This figure saved his master Adrastus in the war of the Seven against Thebes, and accompanied Heracles in the war against Elis."
+   ],
+   "answers": [
+    "<b><u>Hades</u></b>",
+    "the <b><u>Sun</u></b><em>(Circe’s father was Helios)</em>",
+    "<b><u>Arion</u></b>"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Mythology",
+   "subcategory": "Mythology"
+  },
+  {
+   "leadin": "Safranin is utilized as a counter in one form of this technique where peptidoglycan traps an iodine-crystal violet complex. For 10 points each:",
+   "parts": [
+    "Name this technique whose “Gram” form can colorize bacterial cells. This technique is a common practice in histology.",
+    "This genus, whose cell wall lacks muramic acid, <em>cannot</em> be visualized using a gram stain. The A-C serovars of its <em>trachomatis(“track-oh-MAT-iss”)</em> species can cause the eyelids to turn inward, potentially resulting in blindness.",
+    "This acid-fast genus can’t be detected via a gram-stain due to high lipid content in its cell wall. A bacteria in this genus causes tuberculosis."
+   ],
+   "answers": [
+    "<b><u>staining</u></b> [accept Gram <b><u>stain</u></b>]",
+    "<em><b><u>Chlamydia</u></b></em> [accept <em><b><u>Chlamydia</u></b>trachomatis</em>; prompt on <em><u>C. trachomatis</u></em>]",
+    "<b><u>Mycobacterium</u></b> [accept <b><u>Mycobacterium</u></b> tuberculosis]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Biology"
+  },
+  {
+   "leadin": "Answer the following about Western plays that have been adapted to be set in the Caribbean. For 10 points each:",
+   "parts": [
+    "Aimé Césaire’s <em>(“ay-MAY say-ZAIRs”)Une Tempête(“oon tom-PET”)</em> explicitly depicted Caliban as a rebellious slave while adapting this English playwright's <em>The Tempest</em> to be set on a Caribbean island.",
+    "Recent Royal Shakespeare Company productions of this non-Shakespeare play have changed its setting from Naples to a Caribbean Carnival. This play ends with Hellena and Captain Willmore agreeing to marry each other.",
+    "Trinidadian Mustapha Matura’s <em>Playboy of the West Indies</em> moves the setting of <em>The Playboy of the</em> <em>Western World</em> [emphasize] <em>from</em> this country, where its premiere sparked a riot at the Abbey Theater."
+   ],
+   "answers": [
+    "William <b><u>Shakespeare</u> </b>",
+    "<em>The</em> <em><b><u>Rover</u></b></em> (by Aphra Behn)",
+    "<b><u>Ireland</u></b> [or Republic of <b><u>Ireland</u></b> or <b><u>Eire</u></b>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Literature",
+   "subcategory": "British Literature"
+  },
+  {
+   "leadin": "The City of Arts and Sciences this architect designed in his home city of Valencia was used to represent the Galactic Senate in Season 2 of <em>Andor</em>. For 10 points each:",
+   "parts": [
+    "Name this Spanish architect, who drew from living organisms to design buildings like the Milwaukee Art Museum and Malmö’s Turning Torso skyscraper.",
+    "Many of Calatrava’s works are these kinds of buildings, such as the <em>Stadelhofen</em> in Zurich. Before it displayed art, the Musée d’Orsay <em>(“moo-ZAY dor-SAY”)</em> was one of these buildings.",
+    "Calatrava used cantilevers to make his <em>Museum of Tomorrow</em> appear like it was floating in this second largest city in Brazil, which is towered over by Paul Landowski’s <em>Christ the Redeemer</em> statue."
+   ],
+   "answers": [
+    "Santiago <b><u>Calatrava</u> </b>",
+    "train <b><u>station</u></b> [or railway <b><u>station</u></b>; or railroad <b><u>station</u></b>; or railway <b><u>depot</u></b>; or train <b><u>depot</u></b>; or railroad <b><u>depot</u></b>]",
+    "<b><u>Rio de Janeiro</u></b> [prompt on <u>Rio</u>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Fine Arts",
+   "subcategory": "Other Fine Arts"
+  },
+  {
+   "leadin": "Francisco Álvares claimed he was “weary of writing more about” buildings in this town because he feared being accused of lying about their beauty. For 10 points each:",
+   "parts": [
+    "Name this Ethiopian city home to 11 rock-cut churches built by the Zagwe <em>(“ZAHG-way”)</em> dynasty.",
+    "Scholars believe the Zagwe <em>(“ZAHG-way”)</em> dynasty arose after Queen Gudit brutally destroyed this kingdom. The Queen of Sheba supposedly founded this kingdom, whose adoption of the Tewahedo Church made it the first Christian state in sub-saharan Africa.",
+    "Queen Gudit likely practiced this religion, which was also practiced by the Himyarite Kingdom before Aksum invaded Yemen. Today, Ethiopians who practice this religion are called Beta Israel."
+   ],
+   "answers": [
+    "<b><u>Lalibela</u></b><em>(“laa-lee-BEH-luh”)</em> [or <b><u>Gebre Meskel</u></b> or <b><u>Gäbrä Mäsqäl</u></b>]",
+    "Kingdom of <b><u>Aksum</u></b><em>(“ACK-soom”)</em> [or Kingdom of <b><u>Axum</u></b> or <b><u>Aksum</u></b>ite Kingdom]",
+    "<b><u>Judaism</u></b> [accept <b><u>Jew</u></b>ish]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "History",
+   "subcategory": "World History"
+  },
+  {
+   "leadin": "Answer the following about references to the fashion house Maison Margiela <em>(“mar-zhell-ah”)</em> in hip-hop. For 10 points each:",
+   "parts": [
+    "This artist raps “I’m in Maison, ah, Martin Margiela” on his song “Run This Town.” This rapper, who collaborated with Alicia Keys on “Empire State of Mind,” is married to Beyoncé.",
+    "This artist raps about rocking “Margielas with no laces” on his song “Goldie.” Doechii and this artist rapped over Thelonious Monk’s recording of “Caravan” on his 2025 album <em>DON’T BE DUMB</em>.",
+    "This rapper began his song “In the Air” with “ Maison Margiela, all I see is numbers” in reference to the brand’s logo. This rapper of “NOSTYLIST” and “If Looks Could Kill” is part of Playboi Carti’s Opium label alongside Ken Car$on and Homixide <em>(“homicide”)</em> Gang."
+   ],
+   "answers": [
+    "<b><u>Jay-Z</u></b> [or Shawn Corey <b><u>Carter</u></b>]",
+    "A$AP <b><u>Rocky</u></b> [or Rakim Athelaston <b><u>Mayers</u></b>]",
+    "<b><u>Destroy Lonely</u></b> [or Bobby Wardell <b><u>Sandimanie</u></b> II]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Current Events",
+   "subcategory": "Current Events"
+  },
+  {
+   "leadin": "This woman accused her lover Marcus Caelius Rufus of attempting to poison her. For 10 points each:",
+   "parts": [
+    "Name this person who was accused of assisting in the murder of Dio of Alexandria in Cicero’s <em>Pro</em> <em>Caelio</em>. This person was “more learned than Sappho’s Muse” in several love poems.",
+    "Clodia was addressed as Lesbia in 116 <em>carmina</em> by this neoteric Roman poet.",
+    "Catullus praised Lesbia’s beauty while writing in this ancient language used by other Roman authors like Ovid and Virgil."
+   ],
+   "answers": [
+    "<b><u>Lesbia</u></b> [accept <b><u>Claudia</u></b> Metelli or <b><u>Clodia</u></b> Metelli or <b><u>Quadrantaria</u></b> or <b><u>Nola</u></b> or <b><u>Medea</u></b> <b><u>Palatina</u></b>]",
+    "<b><u>Catullus</u></b><em>(“kuh-TUL-us”)</em> [or Gaius Valerius <b><u>Catullus</u></b>]",
+    "<b><u>Latin</u></b>"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Literature",
+   "subcategory": "Other Literature"
+  },
+  {
+   "leadin": "In 1915, this scientist proposed a set of field equations to govern his theory of general relativity. For 10 points each:",
+   "parts": [
+    "Name this scientist who described mass-energy equivalence with the equation e equals m c squared.",
+    "In the field equations, Einstein shortened the “Metric” one of these objects to just “Metrics” when describing the geometric and causal structure of spacetime. These objects generalize scalars and vectors.",
+    "In order to generalize Newton’s laws of motion to curved spacetime, Einstein’s Field equations use one of these paths called the World line. Traditionally, these are the shortest paths between two points on a surface."
+   ],
+   "answers": [
+    "Albert <b><u>Einstein</u></b>",
+    "<b><u>tensor</u></b>s [accept metric <b><u>tensor</u></b>]",
+    "<b><u>geodesic</u></b>s [accept <b><u>geodesic</u> </b>equation]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Physics"
+  },
+  {
+   "leadin": "Joseph Berkson popularized the “logistic” type of this technique used to solve binary classification tasks. For 10 points each:",
+   "parts": [
+    "Name this statistical technique whose “linear” type attempts to find a line of best fit.",
+    "Most linear regression algorithms typically seek to minimize the sum of the values of this function on the residuals.",
+    "This man and Gauss name a theorem stating that OLS regression has minimum variance among unbiased estimators. The Metropolis-Hastings algorithm uses a structure named for this mathematician in Monte Carlo simulations."
+   ],
+   "answers": [
+    "<b><u>regression</u></b> [accept linear <b><u>regression</u></b>]",
+    "<b><u>square</u></b> [accept ordinary least <b><u>square</u></b>s]",
+    "Andrey Andreyevich <b><u>Markov</u></b> [accept Gauss–<b><u>Markov</u></b> theorem; accept <b><u>Markov</u></b> chain Monte Carlo]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Other Science"
+  },
+  {
+   "leadin": "During this country’s “National Awakening,” Terenzio Tocci became the first person to raise its double eagle flag in 350 years. For 10 points each:",
+   "parts": [
+    "Name this country where nationalist movements like the League of Prizren took inspiration from Skanderbeg’s campaigns near its modern-day capital of Tirana.",
+    "Albanian independence was officially recognized by a 1913 treaty signed in this city. Treaties signed in this city in the 1830s secured the independence of Belgium and Greece.",
+    "During Albania’s National Awakening, Naum Veqilharxhi <em>(\"nye-OOM veq-eel-HAR-gee\")</em> created one of these systems designed to be religiously neutral. Saint Cyril names one of these systems for Russian."
+   ],
+   "answers": [
+    "<b><u>Albania</u> </b>",
+    "<b><u>London</u></b> [accept Treaty of <b><u>London</u></b> of 1830 or Treaty of <b><u>London</u></b> of 1839]",
+    "<b><u>writing</u></b> systems [or <b><u>script</u></b>s; accept equivalents like <b><u>orthograph</u></b>; accept characters; accept <b><u>alphabet</u></b>s; accept <b><u>logogram</u></b>s; accept <b><u>syllabary</u></b>; accept descriptions of creating a <b><u>written language</u></b>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "History",
+   "subcategory": "European History"
+  },
+  {
+   "leadin": "Saul Kripke described a skeptical problem about meaning from this thinker by asking how one knows whether they mean “plus” or “quus” <em>(“KWUHSS”)</em> when using the plus sign. For 10 points each:",
+   "parts": [
+    "Name this philosopher who described how meaning is shared through shared practices rather than private beliefs.",
+    "Kripke’s plus vs. quus question highlights a form of this paradox from <em>Philosophical Investigations</em>. This paradox examines how finite patterns of past behavior can fix what one means by an expression in future cases.",
+    "Those arguments from Wittgenstein directly contrasted with this supervisor of his at Cambridge who asserted that meaning is grounded in logic. Along with Alfred North Whitehead, this thinker wrote <em>Principia Mathematica</em>."
+   ],
+   "answers": [
+    "Ludwig <b><u>Wittgenstein</u></b><em>(“vitt-GEN-stein”)</em>",
+    "<b><u>rule-following</u></b> paradox",
+    "Bertrand <b><u>Russell</u></b>"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Philosophy",
+   "subcategory": "Philosophy"
+  },
+  {
+   "leadin": "A theory often discussed in English classes claiming that this character is gay is usually supported by a potential double entendre about pulling a lever in an elevator. For 10 points each:",
+   "parts": [
+    "Name this character who blacks out, only to wake up and see Mr. McKee. This man described another man’s “rare smile with a quality of eternal reassurance.”",
+    "This author’s wife Zelda allegedly doubted his heterosexuality and alleged that he was in a gay affair with Ernest Hemingway. This man wrote about Nick in <em>The Great Gatsby</em>.",
+    "This character’s general disinterest in men was suggested by critics as \"vaguely homosexual.\" This golf-tournament cheater is implied to have once dated Nick."
+   ],
+   "answers": [
+    "<b><u>Nick</u></b> Carraway [accept Nick <b><u>Carraway</u></b>]",
+    "F. Scott <b><u>Fitzgerald</u></b> [or Francis Scott Key <b><u>Fitzgerald</u></b>]",
+    "<b><u>Jordan</u></b> Baker [or Jordan <b><u>Baker</u></b>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Literature",
+   "subcategory": "American Literature"
+  },
+  {
+   "leadin": "Laufey’s <em>(“LAY-vays”)</em> song “Everything I Know About Love” opens with a brief performance of a movement of one of these pieces. For 10 points each:",
+   "parts": [
+    "Name these pieces, all of which begin with a French overture. One of these pieces ends with a B minor “Badinerie” <em>(“buh-DEE-nuh-REE”)</em> often performed as a showpiece.",
+    "This instrument plays the melody of the “Badinerie” <em>(“buh-DEE-nuh-REE”)</em> that concludes Bach’s Orchestral Suite No. 2. Johann Joachim Quantz taught Frederick the Great how to play this instrument.",
+    "August Wilhelmj’s <em>(“vill-HELL-mees”)</em> arrangement of a movement from Bach’s third orchestral suite is titled for an <em>Air</em> on a string of this note. This note is a whole step below A."
+   ],
+   "answers": [
+    "J.S. <b><u>Bach</u></b>’s <b><u>orchestral suite</u></b>s",
+    "<b><u>flute</u></b> [or transverse <b><u>flute</u></b>]",
+    "<b><u>G</u></b> [accept <em>Air on the</em> <em><b><u>G</u></b> String</em>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Fine Arts",
+   "subcategory": "Auditory Fine Arts"
+  },
+  {
+   "leadin": "Deficiency in the ALA Synthase enzyme that catalyzes the synthesis of these molecules results in X-linked sideroblastic anemia. For 10 points each:",
+   "parts": [
+    "Name these molecules consisting of four pyrrole rings that serve as a tetradentate ligand for many metals.",
+    "A porphyrin ring surrounds the central iron atom in this protein that carries oxygen in red blood cells.",
+    "The Rothenmund reaction, a clever way to synthesize porphyrins, reacts pyrrole with this functional group. These terminal carbonyls produce a silver mirror in Tollens’ test."
+   ],
+   "answers": [
+    "<b><u>porphyrins</u></b> [prompt on but DO NOT REVEAL <u>chlorophyll</u> or <u>heme</u> with “What general class of molecules does it belong to?”]",
+    "<b><u>hemoglobin</u></b>",
+    "<b><u>aldehyde</u></b> [accept <b><u>aldose</u></b>s]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Biology"
+  }
+ ]
 }

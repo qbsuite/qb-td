@@ -1,7 +1,10 @@
 // demo_fixture.mjs — builds app/demo/fixture.js, the committed data behind
-// the demo tournament (app/demo.html). Reads the hand-written packets in
-// tools/demo/ and simulates the five pre-played games with a seeded PRNG,
-// so the output is deterministic and reviewable in diffs.
+// the demo tournament (app/demo.html). Reads the packets in tools/demo/
+// (2025 VAULT packets 1-3, exported from the qbreader mirror by
+// library-of-stock/dev/oneshots/export_vault_demo_packets.py, with <i>
+// converted to <em> for MODAQ's formatter) and simulates the five
+// pre-played games with a seeded PRNG, so the output is deterministic and
+// reviewable in diffs.
 //
 // The demo story: a 4-team round robin, mid-tournament. Rounds 1-2 are
 // fully played, round 3 has only Room B's game in — Room A's game
@@ -94,7 +97,8 @@ function buzzerFor(rand, team) {
 // One cycle: who buzzed where, and the bonus if someone converted.
 function simCycle(rand, tossup, number, winnerTeam, loserTeam) {
   const words = tokenizeQuestion(tossup.question);
-  const powerIdx = Math.max(1, words.indexOf('(*)'));
+  const marked = words.indexOf('(*)');
+  const powerIdx = marked > 0 ? marked : Math.floor(words.length * 0.55);
   const buzzes = [];
 
   const roll = rand();
@@ -104,7 +108,7 @@ function simCycle(rand, tossup, number, winnerTeam, loserTeam) {
     const player = buzzerFor(rand, convTeam);
     const skill = convTeam.players[player];
     // stronger players buzz deeper into the leadin; everyone converts by the giveaway
-    const depth = (1 - skill * 0.55) * (0.3 + rand() * 0.7);
+    const depth = (1 - skill * 0.45) * (0.35 + rand() * 0.65);
     const position = Math.min(words.length - 2,
       Math.round(powerIdx * 0.5 + depth * (words.length - powerIdx * 0.5)));
     const value = position < powerIdx ? 15 : 10;
@@ -160,7 +164,9 @@ function simGame(seed, packet, aName, bName, winnerName) {
   const counts = new Map(); // player -> Map(value -> n)
   const bonus = new Map([[a.name, 0], [b.name, 0]]);
   const questions = [];
-  for (let n = 1; n <= packet.tossups.length; n++) {
+  // a standard game reads 20; the packet's 21st tossup is the tiebreaker
+  const read = Math.min(20, packet.tossups.length);
+  for (let n = 1; n <= read; n++) {
     const { mq, conv, bonusPoints } = simCycle(rand, packet.tossups[n - 1], n, winner, loser);
     questions.push(mq);
     if (conv) bonus.set(conv.team.name, bonus.get(conv.team.name) + bonusPoints);
@@ -179,7 +185,7 @@ function simGame(seed, packet, aName, bName, winnerName) {
       player: { name },
       answer_counts: [...(counts.get(name) || new Map()).entries()]
         .map(([value, number]) => ({ answer: { value }, number })),
-      tossups_heard: packet.tossups.length,
+      tossups_heard: read,
     })),
     team: teamObj(t),
   });
@@ -189,7 +195,7 @@ function simGame(seed, packet, aName, bName, winnerName) {
     (s, p) => s + p.answer_counts.reduce((x, c) => x + c.answer.value * c.number, 0), 0);
   const winnerScore = score(teams[winner === a ? 0 : 1]);
   const loserScore = score(teams[winner === a ? 1 : 0]);
-  const qbj = { tossups_read: packet.tossups.length, match_teams: teams, match_questions: questions };
+  const qbj = { tossups_read: read, match_teams: teams, match_questions: questions };
   return { qbj, ok: winnerScore > loserScore };
 }
 

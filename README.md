@@ -242,8 +242,11 @@ Part of [qbsuite](https://qbsuite.github.io/).
   `demo.js` in the browser: the committed fixture holds a 4-team round
   robin mid-event, and games a visitor reads in the embedded MODAQ
   upload into localStorage and flow into stats, buzzpoints, and
-  categories. Regenerate the fixture from the hand-written packets in
-  `tools/demo/` with `node tools/demo_fixture.mjs`.
+  categories. A demo visitor costs zero Worker requests — the unit
+  suite runs the whole flow with `fetch` stubbed to throw. The packets
+  in `tools/demo/` are 2025 VAULT packets 1-3 (via qbreader, `<i>`
+  converted to `<em>` for MODAQ's formatter); regenerate the fixture
+  with `node tools/demo_fixture.mjs`.
 
 ## Tests
 
