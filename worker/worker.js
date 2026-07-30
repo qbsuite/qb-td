@@ -294,9 +294,11 @@ async function getTournament(env, t, ctx) {
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
     env.DATA.head(`t/${id}/catmap.json`),
   ]);
-  // packets from before category extraction existed: backfill once,
+  // packets from before category extraction existed — or from before
+  // the current parser (version in R2 custom metadata): backfill once,
   // off the response path
-  if (!catsHead && ctx && rounds.results.some((r) => /\.json$/i.test(r.packet_name))) {
+  const staleCats = !catsHead || (catsHead.customMetadata || {}).v !== CATMAP_VERSION;
+  if (staleCats && ctx && rounds.results.some((r) => /\.json$/i.test(r.packet_name))) {
     ctx.waitUntil(rebuildCatmap(env, id));
   }
   const { admin_secret, creator_ip, ...pub_t } = t;
@@ -394,10 +396,17 @@ async function renameBucket(request, env, t, bucketId) {
    the same conditional-write retry as the stats bundle. */
 
 // Primary categories we recognize inside ACF/YAPP metadata strings
-// ("History - World, Author" / "Author, History - World" / "Math, Author").
-const META_CATS = new Set(['literature', 'history', 'science', 'fine arts',
-  'religion', 'mythology', 'philosophy', 'social science', 'current events',
-  'geography', 'other academic', 'trash', 'math', 'pop culture']);
+// ("History - World, Author" / "Author, History - World" / "Physics,
+// Author"). Keys are lowercase, values the canonical display form, so
+// differently-cased tags land in one bucket; "Pop Culture" reads as
+// Trash so a set mixing the two names stays one bucket.
+const META_CATS = new Map([
+  ['literature', 'Literature'], ['history', 'History'], ['science', 'Science'],
+  ['fine arts', 'Fine Arts'], ['religion', 'Religion'], ['mythology', 'Mythology'],
+  ['philosophy', 'Philosophy'], ['social science', 'Social Science'],
+  ['current events', 'Current Events'], ['geography', 'Geography'],
+  ['other academic', 'Other Academic'], ['trash', 'Trash'], ['pop culture', 'Trash'],
+]);
 
 // Bare distribution labels ("American History", "Physics", "Painting /
 // Sculpture", "Other") used by sets that tag each question with a single
@@ -409,7 +418,11 @@ const SCIENCE_FIELDS = new Set(['physics', 'chemistry', 'biology', 'math',
 const ARTS_FIELDS = new Set(['painting / sculpture', 'painting/sculpture',
   'painting', 'sculpture', 'classical music', 'music', 'opera', 'jazz',
   'architecture', 'film', 'photography', 'dance', 'musicals']);
-const LABEL_SUFFIXES = [[' history', 'History'], [' literature', 'Literature'],
+const SOCIAL_FIELDS = new Set(['political science', 'economics', 'psychology',
+  'sociology', 'anthropology', 'linguistics']);
+// "Social Science" before "Science": "Other Social Science" is social
+const LABEL_SUFFIXES = [[' social science', 'Social Science'],
+  [' history', 'History'], [' literature', 'Literature'],
   [' fine arts', 'Fine Arts'], [' science', 'Science']];
 
 function categoryFromLabel(label) {
@@ -417,11 +430,117 @@ function categoryFromLabel(label) {
   if (lower === 'other') return { c: 'Other Academic', s: '' };
   if (SCIENCE_FIELDS.has(lower)) return { c: 'Science', s: label };
   if (ARTS_FIELDS.has(lower)) return { c: 'Fine Arts', s: label };
+  if (SOCIAL_FIELDS.has(lower)) return { c: 'Social Science', s: label };
   for (const [suffix, cat] of LABEL_SUFFIXES) {
     if (lower.length > suffix.length && lower.endsWith(suffix)) {
       const sub = label.slice(0, label.length - suffix.length).trim();
+      // a sub that is itself a primary category ("Science History") means
+      // the label reads backwards — let the vocabulary sort it out
+      if (META_CATS.has(sub.toLowerCase())) break;
       return { c: cat, s: sub.toLowerCase() === 'any' ? '' : sub };
     }
+  }
+  return null;
+}
+
+// One comma-chunk of a metadata string. Dash-separated segments (plain
+// hyphen needs spaces; en/em dashes don't) are scanned for a primary
+// category — it may sit anywhere ("Author - History - European"), and
+// whatever follows it is the subcategory, kept in the set's own words.
+// A chunk with no dashes falls back to the bare-label vocabulary.
+function categoryFromChunk(chunk) {
+  const segs = chunk.split(/\s+-\s+|\s*[–—]\s*/)
+    .map((s) => s.trim()).filter(Boolean);
+  for (let i = 0; i < segs.length; i++) {
+    const canon = META_CATS.get(segs[i].toLowerCase());
+    if (canon) return { c: canon, s: segs.slice(i + 1).join(' - ') };
+  }
+  return segs.length === 1 ? categoryFromLabel(segs[0]) : null;
+}
+
+// Last-resort vocabulary for tags nothing above understood: real-world
+// subcategory spellings ("Euro Lit", "AmHist", "Bio", "Theology"...)
+// collected from qbreader's packet-parser standardize-subcats table
+// (github.com/qbreader/packet-parser), mapped onto qb-td display
+// categories. Matched by token subset over the whole metadata string,
+// so separators, author names, and word order don't matter. A few
+// packet-parser spellings that are common surnames or lone generic
+// words (Law, Rock, R&B, Soul, Culture, Thought, Stories, Practices,
+// Performance) are deliberately left out — down here a false positive
+// is worse than an uncategorized question.
+const CAT_VOCAB = [
+  // Literature
+  ['American Lit|AmLit|US Literature|US Lit|U.S. Literature|Miscellaneous American', 'Literature', 'American'],
+  ['British Lit|Brit Lit|Anglo Lit|British Literature|British Miscellaneous', 'Literature', 'British'],
+  ['Ancient Literature|Classical Literature', 'Literature', 'Classical'],
+  ['European Lit|Euro Lit|EuroLit|European/World Lit|European Literature', 'Literature', 'European'],
+  ['World Lit|World Literature', 'Literature', 'World'],
+  ['Other Lit|Mixed Lit|Any Lit|Misc Lit|Misc Literature|Miscellaneous Literature|Literary Criticism|Nonfiction|Essay|Other Literature', 'Literature', 'Other'],
+  ['Literature Shakespeare', 'Literature', 'European'],
+  ['Drama', 'Literature', 'Drama'], ['Poetry', 'Literature', 'Poetry'],
+  ['Long Fiction', 'Literature', 'Long Fiction'], ['Short Fiction', 'Literature', 'Short Fiction'],
+  // History
+  ['American Hist|AmHist|US Hist|US History|U.S. History|American History', 'History', 'American'],
+  ['Ancient History|Classical History', 'History', 'Ancient'],
+  ['British History|BritHist|European Hist|Euro History|Europe History|Continental History|ContHist|Mediterranean History|Other Western History|European History', 'History', 'European'],
+  ['World Hist|International Hist|Commonwealth History|Commonwealth/Misc|African History|Asian History|World History', 'History', 'World'],
+  ['Misc History|Misc. History|Mixed History|Any History|Other History|Historiography|Archaeology|Historio/Archaeo|Zeitgeist', 'History', 'Other'],
+  // Science
+  ['Bio|Biology|Botany', 'Science', 'Biology'],
+  ['Chem|Chemistry', 'Science', 'Chemistry'],
+  ['Phys|Physics', 'Science', 'Physics'],
+  ['Math|Mathematics|Statistics', 'Science', 'Math'],
+  ['Astro|Astronomy', 'Science', 'Astronomy'],
+  ['Computer Science|CompSci', 'Science', 'Computer Science'],
+  ['Earth Science|Earth Sci|Earth|Atmospheric Science|Environmental Science|Ocean Science', 'Science', 'Earth Science'],
+  ['Engineering', 'Science', 'Engineering'],
+  ['Other Sci|OSci|Misc Science|Misc. Science|Science Tech|Science History|Science Culture|Science Academic|Science African|Science Applied/Eng|Other Science', 'Science', 'Other'],
+  // Fine Arts
+  ['Painting', 'Fine Arts', 'Painting'], ['Sculpture', 'Fine Arts', 'Sculpture'],
+  ['Visual FA|Visual Fine Art|Visual Fine Arts|Visual Arts|Visual Art|European Art|World Art', 'Fine Arts', 'Visual'],
+  ['Auditory FA|Auditory Fine Art|Auditory Fine Arts|Audial Fine Arts|Auditory Arts|Auditory Art', 'Fine Arts', 'Auditory'],
+  ['Classical Music|Fine Arts Music', 'Fine Arts', 'Classical Music'],
+  ['Photography', 'Fine Arts', 'Photography'], ['Architecture', 'Fine Arts', 'Architecture'],
+  ['Film', 'Fine Arts', 'Film'], ['Jazz', 'Fine Arts', 'Jazz'],
+  ['Opera', 'Fine Arts', 'Opera'], ['Musicals', 'Fine Arts', 'Musicals'],
+  ['Dance|Ballet', 'Fine Arts', 'Dance'], ['Theatre|Theater', 'Fine Arts', 'Theater'],
+  ['Other Arts|Other Fine Art|Misc. FA|Misc Art|Misc. Art|Any Art|OArts|OArt|OtherArt|OVisArt|OAudArt|Performing Arts|Fashion|Other Fine Arts', 'Fine Arts', 'Other'],
+  // RMP
+  ['Rel|Theology|Buddhism|Hinduism|Islam|Bible|New Testament|Hebrew Bible|Christian Practice|Jewish Practice|Bible/Christianity', 'Religion', ''],
+  ['Myth|Legends|Misc Belief', 'Mythology', ''],
+  ['Phil/Thought|PhilO', 'Philosophy', ''],
+  // Social Science
+  ['Econ|Economics|Economy|Economic', 'Social Science', 'Economics'],
+  ['Psych|Psychology', 'Social Science', 'Psychology'],
+  ['Linguistics', 'Social Science', 'Linguistics'],
+  ['Sociology', 'Social Science', 'Sociology'],
+  ['Anthro|Anthropology', 'Social Science', 'Anthropology'],
+  ['Political Science', 'Social Science', 'Political Science'],
+  ['Other Social Science', 'Social Science', 'Other'],
+  // the rest
+  ['CE|Modern World', 'Current Events', ''],
+  ['Geo', 'Geography', ''],
+  ["Misc. Academic|Mixed Academic|Miscellaneous|General Knowledge|Writer's Choice|Writer’s Choice|My Choice|OA", 'Other Academic', ''],
+  ['Movies', 'Trash', 'Movies'], ['Pop Music', 'Trash', 'Music'],
+  ['Sports', 'Trash', 'Sports'], ['TV|Small Screen|Television', 'Trash', 'Television'],
+  ['Video Games', 'Trash', 'Video Games'],
+  ['Comic|Comics|Manga|Popular Culture|Other Pop Culture', 'Trash', 'Other'],
+];
+
+const metaTokens = (s) => s.toLowerCase().replace(/[–—()]/g, ' ')
+  .split(/[\s\/,;:.&-]+/).filter(Boolean);
+
+// compiled once: every spelling as a token list, most words first so
+// "Classical Music" wins over a hypothetical one-word cousin
+const VOCAB = CAT_VOCAB
+  .flatMap(([spellings, c, s]) =>
+    spellings.split('|').map((sp) => ({ tokens: metaTokens(sp), c, s })))
+  .sort((a, b) => b.tokens.length - a.tokens.length);
+
+function categoryFromVocab(meta) {
+  const tokens = new Set(metaTokens(meta));
+  for (const v of VOCAB) {
+    if (v.tokens.every((t) => tokens.has(t))) return { c: v.c, s: v.s };
   }
   return null;
 }
@@ -430,18 +549,11 @@ export function categoryFromMetadata(meta) {
   if (typeof meta !== 'string' || !meta) return null;
   let best = null;
   for (const part of meta.split(',')) {
-    const chunk = part.trim();
-    const [head, ...rest] = chunk.split(/\s+-\s+/);
-    let cand = null;
-    if (META_CATS.has(head.trim().toLowerCase())) {
-      cand = { c: head.trim(), s: rest.join(' - ').trim() };
-    } else if (!rest.length) {
-      cand = categoryFromLabel(chunk);
-    }
+    const cand = categoryFromChunk(part.trim());
     // a part carrying a subcategory beats one without
     if (cand && (!best || (cand.s && !best.s))) best = cand;
   }
-  return best;
+  return best || categoryFromVocab(meta);
 }
 
 // Round entry shape: {t: [{c, s} | null, ...], b: [...]} — tossup and
@@ -464,11 +576,19 @@ export function packetCategories(body, filename) {
   return t.some(Boolean) || b.some(Boolean) ? { t, b } : null;
 }
 
+// Parser generation, stamped into R2 custom metadata on every catmap
+// write. Bump it when categoryFromMetadata learns new formats: maps
+// written by an older parser then read as stale and the dashboard load
+// backfills them, so already-uploaded tournaments pick up the
+// improvement without a re-upload.
+const CATMAP_VERSION = '2';
+
 // Backfill for packets uploaded before category extraction existed (or
-// before a parser understood their format): recompute the whole map
-// from the stored packets. Triggered from the dashboard load when the
-// map is missing; writes an empty {rounds:{}} marker when nothing has
-// categories so the attempt isn't repeated every load.
+// before the current parser understood their format): recompute the
+// whole map from the stored packets. Triggered from the dashboard load
+// when the map is missing or version-stale; writes an empty {rounds:{}}
+// marker when nothing has categories so the attempt isn't repeated
+// every load.
 async function rebuildCatmap(env, tid) {
   const { results } = await env.DB.prepare(
     'SELECT number, packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1'
@@ -483,6 +603,7 @@ async function rebuildCatmap(env, tid) {
   }
   await env.DATA.put(`t/${tid}/catmap.json`, JSON.stringify(map), {
     httpMetadata: { contentType: 'application/json' },
+    customMetadata: { v: CATMAP_VERSION },
   });
 }
 
@@ -503,10 +624,15 @@ async function updateCatmap(env, tid, round, cats) {
       if (cur) await env.DATA.delete(key);
       return;
     }
+    // merging one round into a map an older parser wrote must not mark
+    // the whole map current — keep its version so the backfill still
+    // rebuilds the other rounds; only rebuildCatmap certifies current
+    const v = cur ? (cur.customMetadata || {}).v || '1' : CATMAP_VERSION;
     const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
     try {
       const put = await env.DATA.put(key, JSON.stringify(map), {
         httpMetadata: { contentType: 'application/json' },
+        customMetadata: { v },
         onlyIf,
       });
       if (put) return;

@@ -1279,10 +1279,48 @@ const { categoryFromMetadata, packetCategories } = await import('../worker/worke
 test('categoryFromMetadata: ACF/YAPP forms', () => {
   assert.deepEqual(categoryFromMetadata('History - World, Khang Le'), { c: 'History', s: 'World' });
   assert.deepEqual(categoryFromMetadata('Khang Le, Literature - American'), { c: 'Literature', s: 'American' });
-  assert.deepEqual(categoryFromMetadata('Math, Vikram Narasimhan'), { c: 'Math', s: '' });
+  assert.deepEqual(categoryFromMetadata('Math, Vikram Narasimhan'), { c: 'Science', s: 'Math' });
   assert.equal(categoryFromMetadata('Just An Author'), null);
   assert.equal(categoryFromMetadata(''), null);
   assert.equal(categoryFromMetadata(undefined), null);
+});
+
+test('categoryFromMetadata: separator and position variants', () => {
+  // en/em dashes read like the spaced hyphen
+  assert.deepEqual(categoryFromMetadata('Literature – American'), { c: 'Literature', s: 'American' });
+  assert.deepEqual(categoryFromMetadata('History—European'), { c: 'History', s: 'European' });
+  // the category segment can sit anywhere in a dash chain
+  assert.deepEqual(categoryFromMetadata('Jane Doe - Fine Arts - Opera'), { c: 'Fine Arts', s: 'Opera' });
+  // three-part generated metadata keeps the whole tail as the sub
+  assert.deepEqual(categoryFromMetadata('Fine Arts - Other Fine Arts - Film'), { c: 'Fine Arts', s: 'Other Fine Arts - Film' });
+  // casing is canonicalized on the category, kept on the sub
+  assert.deepEqual(categoryFromMetadata('history - european'), { c: 'History', s: 'european' });
+  // Pop Culture and Trash land in one bucket
+  assert.deepEqual(categoryFromMetadata('Pop Culture - Movies'), { c: 'Trash', s: 'Movies' });
+});
+
+test('categoryFromMetadata: vocabulary fallback (abbreviated/odd spellings)', () => {
+  const cases = [
+    ['Euro Lit, Jane Doe', 'Literature', 'European'],
+    ['Jane Doe, Brit Lit', 'Literature', 'British'],
+    ['AmHist', 'History', 'American'],
+    ['Bio, JW', 'Science', 'Biology'],
+    ['Jane Doe - Econ', 'Social Science', 'Economics'],
+    ['Theology', 'Religion', ''],
+    ['Myth', 'Mythology', ''],
+    ['Drama', 'Literature', 'Drama'],
+    ['Visual Arts', 'Fine Arts', 'Visual'],
+    ['Misc. Academic', 'Other Academic', ''],
+    ['TV', 'Trash', 'Television'],
+    // two-word spellings beat their one-word cousins ("Earth Sci" vs "Earth")
+    ['Earth Sci', 'Science', 'Earth Science'],
+  ];
+  for (const [meta, c, s] of cases) {
+    assert.deepEqual(categoryFromMetadata(meta), { c, s }, meta);
+  }
+  // surname-shaped vocabulary was left out on purpose: no false positives
+  assert.equal(categoryFromMetadata('Jude Law'), null);
+  assert.equal(categoryFromMetadata('Chris Rock'), null);
 });
 
 test('categoryFromMetadata: bare distribution labels (2026 UG Nats)', () => {

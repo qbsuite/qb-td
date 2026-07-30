@@ -43,6 +43,16 @@ snake_case key names were verified against YellowFruit 4.0.18 to ensure
 the generated files open cleanly. The key names themselves follow the
 community tournament-schema (qbj) conventions.
 
+## packet-parser — category spelling vocabulary
+
+The category-metadata parser in `worker/worker.js` (`CAT_VOCAB`) embeds a
+vocabulary of real-world subcategory spellings ("Euro Lit", "AmHist",
+"Bio", ...) derived from the `standardize-subcats.json` table in
+qbreader's [packet-parser](https://github.com/qbreader/packet-parser),
+remapped onto qb-td's display categories. No packet-parser code is
+redistributed — the spellings themselves are factual category names as
+they appear in published packets.
+
 ## External services and formats
 
 - `.docx` packets are converted in the moderator's browser by the public

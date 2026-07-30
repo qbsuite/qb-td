@@ -485,7 +485,7 @@ r = await call('/pub/' + slug + '/cats');
 ok('metadata categories parsed', r.status === 200
   && r.body.rounds['3'].t[0].c === 'History' && r.body.rounds['3'].t[0].s === 'World'
   && r.body.rounds['3'].t[1].c === 'Literature' && r.body.rounds['3'].t[1].s === 'American'
-  && r.body.rounds['3'].t[2].c === 'Math' && r.body.rounds['3'].t[2].s === ''
+  && r.body.rounds['3'].t[2].c === 'Science' && r.body.rounds['3'].t[2].s === 'Math'
   && r.body.rounds['3'].t[3] === null, r.body.rounds['3']);
 
 // bare distribution labels (one label per question, 2026 UG Nats style)
@@ -532,6 +532,22 @@ ok('dashboard load backfills the map', backfilled !== null, backfilled);
 r = await call('/pub/' + slug + '/cats');
 ok('backfilled map has both rounds', r.status === 200
   && r.body.rounds['2'] && r.body.rounds['3'], r.body);
+
+// a map written by an older parser (no version metadata) reads as stale:
+// the next dashboard load rebuilds it with the current parser
+execSync(`node -e "process.stdout.write(JSON.stringify({rounds:{}}))" | npx wrangler r2 object put qb-td-data/t/${tid}/catmap.json --pipe --content-type application/json --local`,
+  { cwd: WORKER_DIR, stdio: 'ignore', shell: true });
+r = await call('/pub/' + slug + '/cats');
+ok('stale map planted', r.status === 200 && !Object.keys(r.body.rounds).length, r.body);
+await call(A); // triggers the version-stale backfill
+let healed = null;
+for (let i = 0; i < 20 && healed === null; i++) {
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const cur = (await call('/pub/' + slug + '/cats')).body;
+  if (cur && cur.rounds && cur.rounds['3']) healed = cur;
+}
+ok('version-stale map rebuilt with current parser', healed !== null
+  && healed.rounds['2'] && healed.rounds['3'], healed);
 
 r = await call('/pub/' + slug);   // the sections below read files off this
 
