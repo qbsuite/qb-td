@@ -1,7 +1,7 @@
-// qbj.js — parse ModaQ match .qbj files and roster/registration qbj into
+// qbj.js — parse MODAQ match .qbj files and roster/registration qbj into
 // normalized objects the stats engine and .yft generator consume.
 //
-// ModaQ's export (MODAQ src/qbj/QBJ.ts toQBJ) is a BARE match object in
+// MODAQ's export (MODAQ src/qbj/QBJ.ts toQBJ) is a BARE match object in
 // snake_case match-schema form, with a nonstandard `_round` field. Other
 // tools may emit camelCase or wrap objects in {version, objects: [...]};
 // every reader here accepts both spellings and both wrappings.
@@ -17,7 +17,7 @@ function asName(x) {
   return '';
 }
 
-/** Round number from the qbj's `_round` or a ModaQ-style filename
+/** Round number from the qbj's `_round` or a MODAQ-style filename
     (`Round_3_A_B.qbj`). Returns null if neither yields one. */
 export function roundFromFilename(filename) {
   const m = /round[ _-]?(\d+)/i.exec(filename || '');

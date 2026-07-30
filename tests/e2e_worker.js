@@ -628,7 +628,7 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
 }
 
 // filenames longer than the 100-char storage cap keep their suffix, so kind
-// detection still sees "_Game.json" / ".qbj" (real ModaQ names with two long
+// detection still sees "_Game.json" / ".qbj" (real MODAQ names with two long
 // team names overflow the cap)
 {
   const longTeams = 'They Will Just Let Anyone Edit Chicago Open These Days_I have no buzzer and I must neg scream';

@@ -115,7 +115,7 @@ function renderAnn(list) {
   $('annstrip').hidden = !$('annstrip').innerHTML;
 }
 
-function mountModaq(id, meta, isNew) {
+function mountMODAQ(id, meta, isNew) {
   document.body.classList.add('reading');
   setHeader(meta.t, meta.room, meta.round, meta.a + ' vs ' + meta.b);
 
@@ -246,7 +246,7 @@ function showTeams() {
     localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
     history.replaceState(null, '', gameLink(id));
     $('picker').hidden = true;
-    mountModaq(id, meta, true);
+    mountMODAQ(id, meta, true);
   };
 }
 
@@ -266,7 +266,7 @@ async function boot() {
       $('newgame').href = roomLink();
       return;
     }
-    mountModaq(gid, meta, false);
+    mountMODAQ(gid, meta, false);
     return;
   }
 

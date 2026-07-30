@@ -45,7 +45,7 @@ export function pickTeams(teams, nameA, nameB) {
   return [...a.players, ...b.players];
 }
 
-/** ModaQ-convention filenames. The reader uploads only `combined`
+/** MODAQ-convention filenames. The reader uploads only `combined`
     (one `.qbtd.json` = {qbj, game} per game); `qbj`/`game` are the names
     consumers derive when splitting it back apart. */
 export function matchFilenames(round, nameA, nameB) {

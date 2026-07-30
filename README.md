@@ -1,6 +1,6 @@
 # qb-td
 
-Tournament hub for quizbowl TDs: collect ModaQ game files from every room,
+Tournament hub for quizbowl TDs: collect MODAQ game files from every room,
 distribute packets, track the live round, generate and publish the
 schedule, publish live stats, and export a YellowFruit `.yft` without
 touching YellowFruit mid-tournament.
@@ -53,7 +53,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads any played
   round's packet (the live round is highlighted; future rounds stay
-  locked), uploads the game's `.qbj` + ModaQ game file, and carries the
+  locked), uploads the game's `.qbj` + MODAQ game file, and carries the
   TD's broadcasts for this room (alerts first, then newest first).
 - **Moderator reader page** (`app/read.html?b=<secret>`, same link secret):
   an embedded [MODAQ](https://github.com/alopezlago/MODAQ) preloaded with
@@ -124,7 +124,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   `teamdetail.html`, `playerdetail.html`, `rounds.html`) — unzip and host
   the folder anywhere, no YellowFruit in the loop; and a zip of
   every game's separated files — the match `.qbj` (imports via YellowFruit's
-  ModaQ game-file import) and the MODAQ game file — plus the roster. All
+  MODAQ game-file import) and the MODAQ game file — plus the roster. All
   are generated client-side in the dashboard. Combined reader uploads are
   never handed out raw: the dashboard's per-file downloads (Worker
   `part=qbj|game`) and the zip both split them into those two real files.
@@ -184,7 +184,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
 ## Layout
 
 - `app/engine/` — dependency-free JS engine, shared by dashboard and the
-  public page: `qbj.js` (parse ModaQ match qbj + roster), `stats.js`
+  public page: `qbj.js` (parse MODAQ match qbj + roster), `stats.js`
   (standings + leaderboard), `schedule.js` (round-robin/pool generation,
   format catalog, editing helpers, room lookups), `buzz.js` (per-buzz
   extraction from match qbj, room-merged tossup buzzes, player buzz
@@ -314,7 +314,7 @@ source rather than guessed at.
 
 The generated `.yft` replicates YellowFruit's serialization
 (FileParsing.ts / CaseConversion.ts contracts, `YfVersion` 4.0.18). After
-any change to `app/engine/yft.js`: generate a file from real ModaQ games,
+any change to `app/engine/yft.js`: generate a file from real MODAQ games,
 open it in YellowFruit, confirm no version/schema errors and that YF's
 report matches the stats page.
 

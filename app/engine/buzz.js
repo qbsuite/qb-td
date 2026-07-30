@@ -1,4 +1,4 @@
-// buzz.js — per-buzz data from ModaQ match qbj. MODAQ's export carries
+// buzz.js — per-buzz data from MODAQ match qbj. MODAQ's export carries
 // match_questions[].buzzes[] with buzz_position.word_index (word offset
 // into the tossup as MODAQ displayed it), player, team, and result.value
 // (15/10/0/neg; non-first wrong buzzes are already zeroed by MODAQ).

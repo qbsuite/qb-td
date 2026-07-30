@@ -1,4 +1,4 @@
-// Engine test suite: ModaQ qbj parsing, stats aggregation, .yft generation
+// Engine test suite: MODAQ qbj parsing, stats aggregation, .yft generation
 // (validated with a port of YellowFruit's own parse requirements), zip
 // structure. Run: node tests/run_tests.js
 
@@ -99,7 +99,7 @@ const ROSTER = {
 
 console.log('qbj parsing');
 
-test('parses a ModaQ match', () => {
+test('parses a MODAQ match', () => {
   const m = parseMatch(M1);
   assert.equal(m.round, 1);
   assert.equal(m.tossupsRead, 20);
@@ -529,7 +529,7 @@ test('pickTeams returns both teams\' players, A first', () => {
   assert.throws(() => pickTeams(teams, '', 'Alpha'), /both/);
 });
 
-test('matchFilenames follow the ModaQ convention', () => {
+test('matchFilenames follow the MODAQ convention', () => {
   const f = matchFilenames(3, 'St. John\'s A', 'Beta');
   assert.equal(f.combined, 'Round_3_St_John_s_A_Beta.qbtd.json');
   assert.equal(f.qbj, 'Round_3_St_John_s_A_Beta.qbj');
