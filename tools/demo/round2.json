@@ -1,0 +1,227 @@
+{
+  "name": "Demo Packet 2",
+  "tossups": [
+    {
+      "question": "This novel's protagonist beats his wife during the Week of Peace and accidentally kills a clansman, forcing seven years of exile. Its title comes from a (*) Yeats poem, and it ends after Okonkwo hangs himself. For 10 points, name this novel of Igbo life by Chinua Achebe.",
+      "answer": "<b><u>Things Fall Apart</u></b>",
+      "category": "Literature",
+      "subcategory": "World Literature"
+    },
+    {
+      "question": "According to the Secret History written after his death, this ruler was born clutching a blood clot. Originally named (*) Temujin, he united the steppe tribes in 1206. For 10 points, name this founder of the Mongol Empire.",
+      "answer": "<b><u>Genghis Khan</u></b> [accept <b><u>Temujin</u></b> before mention]",
+      "category": "History",
+      "subcategory": "World History"
+    },
+    {
+      "question": "August Kekule claimed that a dream of a snake biting its own tail revealed this molecule's structure. Its six (*) delocalized pi electrons make it the classic aromatic compound. For 10 points, name this hydrocarbon with formula C6H6, a six-membered carbon ring.",
+      "answer": "<b><u>benzene</u></b>",
+      "category": "Science",
+      "subcategory": "Chemistry"
+    },
+    {
+      "question": "In this novel, the drunkard Marmeladov is trampled by a carriage, and his daughter Sonya follows the protagonist to Siberia. Its main character kills the (*) pawnbroker Alyona Ivanovna with an axe. For 10 points, name this Dostoevsky novel about the student Raskolnikov.",
+      "answer": "<b><u>Crime and Punishment</u></b>",
+      "category": "Literature",
+      "subcategory": "European Literature"
+    },
+    {
+      "question": "Early in a war, this president suspended habeas corpus along the rail route between Philadelphia and Washington. He delivered a roughly two-minute address at a (*) battlefield cemetery in Pennsylvania. For 10 points, name this president who issued the Emancipation Proclamation and was shot by John Wilkes Booth.",
+      "answer": "Abraham <b><u>Lincoln</u></b>",
+      "category": "History",
+      "subcategory": "American History"
+    },
+    {
+      "question": "Euclid proved there are infinitely many of these numbers by multiplying a finite list of them and adding one. The sieve of (*) Eratosthenes finds them, and every integer greater than one factors uniquely into them. For 10 points, name these numbers divisible only by one and themselves.",
+      "answer": "<b><u>prime</u></b> numbers",
+      "category": "Science",
+      "subcategory": "Other Science"
+    },
+    {
+      "question": "This composer dedicated, then furiously un-dedicated, his third symphony to Napoleon. He premiered his ninth symphony while (*) profoundly deaf, turning around to see the applause he could not hear. For 10 points, name this German composer of the Ode to Joy and a famous fifth symphony.",
+      "answer": "Ludwig van <b><u>Beethoven</u></b>",
+      "category": "Fine Arts",
+      "subcategory": "Auditory Fine Arts"
+    },
+    {
+      "question": "This figure took the form of a mare to distract a builder's stallion, later giving birth to the eight-legged horse Sleipnir. He engineered the death of (*) Baldr with a mistletoe dart, and he fathered Fenrir and the world serpent. For 10 points, name this Norse trickster god.",
+      "answer": "<b><u>Loki</u></b>",
+      "category": "Mythology",
+      "subcategory": ""
+    },
+    {
+      "question": "This thinker described a pin factory to illustrate the division of labor. He argued that self-interested actors are guided as if by an (*) invisible hand toward the public good. For 10 points, name this Scottish economist who wrote The Wealth of Nations.",
+      "answer": "Adam <b><u>Smith</u></b>",
+      "category": "Social Science",
+      "subcategory": ""
+    },
+    {
+      "question": "Laurens Coster of Haarlem is a disputed claimant to this invention, whose European debut produced a forty-two-line Bible. Its inventor adapted a (*) screw press and cast movable metal type. For 10 points, name this device introduced by Johannes Gutenberg that mechanized book production.",
+      "answer": "<b><u>printing press</u></b> [accept <b><u>movable type</u></b>]",
+      "category": "Other Academic",
+      "subcategory": ""
+    }
+  ],
+  "bonuses": [
+    {
+      "leadin": "This epic's hero blinds the cyclops Polyphemus. For 10 points each:",
+      "parts": [
+        "Name this Greek epic about a long journey home from Troy.",
+        "The Odyssey is attributed to this blind poet, also credited with the Iliad.",
+        "This faithful wife of Odysseus weaves and unweaves a shroud to put off her suitors."
+      ],
+      "answers": [
+        "the <b><u>Odyssey</u></b>",
+        "<b><u>Homer</u></b>",
+        "<b><u>Penelope</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Literature",
+      "subcategory": "European Literature"
+    },
+    {
+      "leadin": "The Iron Curtain speech announced this conflict's battle lines. For 10 points each:",
+      "parts": [
+        "Name this decades-long standoff between the United States and the Soviet Union.",
+        "The Cold War nearly turned hot during this 1962 crisis over Soviet weapons in the Caribbean.",
+        "In this 1948 to 1949 operation, Western planes supplied a blockaded city with food and coal."
+      ],
+      "answers": [
+        "<b><u>Cold War</u></b>",
+        "<b><u>Cuban Missile Crisis</u></b>",
+        "<b><u>Berlin Airlift</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "History",
+      "subcategory": "American History"
+    },
+    {
+      "leadin": "Rosalind Franklin's Photo 51 helped reveal this molecule's structure. For 10 points each:",
+      "parts": [
+        "Name this molecule that stores genetic information.",
+        "These two scientists published DNA's double-helix structure in 1953.",
+        "In DNA, adenine pairs with this base."
+      ],
+      "answers": [
+        "<b><u>DNA</u></b> [accept <b><u>deoxyribonucleic acid</u></b>]",
+        "James <b><u>Watson</u></b> and Francis <b><u>Crick</u></b>",
+        "<b><u>thymine</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Science",
+      "subcategory": "Biology"
+    },
+    {
+      "leadin": "Only about ten of this poet's nearly eighteen hundred poems were published in her lifetime. For 10 points each:",
+      "parts": [
+        "Name this reclusive poet of Amherst, Massachusetts.",
+        "In one Dickinson poem, this personified figure kindly stopped for me in a carriage.",
+        "Dickinson wrote that this thing is the thing with feathers that perches in the soul."
+      ],
+      "answers": [
+        "Emily <b><u>Dickinson</u></b>",
+        "<b><u>Death</u></b>",
+        "<b><u>hope</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Literature",
+      "subcategory": "American Literature"
+    },
+    {
+      "leadin": "This civilization mummified its dead for the journey to the afterlife. For 10 points each:",
+      "parts": [
+        "Name this North African civilization along a great river.",
+        "This boy king's nearly intact tomb was found by Howard Carter in 1922.",
+        "This stone, inscribed in three scripts, allowed Champollion to decipher hieroglyphs."
+      ],
+      "answers": [
+        "ancient <b><u>Egypt</u></b>",
+        "<b><u>Tutankhamun</u></b> [accept King <b><u>Tut</u></b>]",
+        "<b><u>Rosetta Stone</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "History",
+      "subcategory": "Ancient History"
+    },
+    {
+      "leadin": "An apocryphal falling apple inspired this scientist's theory of gravity. For 10 points each:",
+      "parts": [
+        "Name this English physicist who formulated three laws of motion.",
+        "Newton's second law states that force equals mass times this quantity.",
+        "Newton and Leibniz independently invented this branch of mathematics."
+      ],
+      "answers": [
+        "Isaac <b><u>Newton</u></b>",
+        "<b><u>acceleration</u></b>",
+        "<b><u>calculus</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Science",
+      "subcategory": "Physics"
+    },
+    {
+      "leadin": "A bus accident at age eighteen left this painter in lifelong pain. For 10 points each:",
+      "parts": [
+        "Name this Mexican painter of The Two Fridas.",
+        "Kahlo is best known for many works in this genre, which depict the artist herself.",
+        "Kahlo married this Mexican muralist, whose works include Man at the Crossroads."
+      ],
+      "answers": [
+        "Frida <b><u>Kahlo</u></b>",
+        "<b><u>self-portrait</u></b>s",
+        "Diego <b><u>Rivera</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Fine Arts",
+      "subcategory": "Visual Fine Arts"
+    },
+    {
+      "leadin": "Souls crossed the river Styx to reach this realm. For 10 points each:",
+      "parts": [
+        "Name this Greek underworld, or the god who rules it.",
+        "This three-headed dog guards the entrance to the underworld.",
+        "This musician nearly retrieved his wife Eurydice from the underworld but looked back too soon."
+      ],
+      "answers": [
+        "<b><u>Hades</u></b>",
+        "<b><u>Cerberus</u></b>",
+        "<b><u>Orpheus</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Mythology",
+      "subcategory": ""
+    },
+    {
+      "leadin": "Dogs salivated at the sound of a bell in this scientist's experiments. For 10 points each:",
+      "parts": [
+        "Name this Russian physiologist.",
+        "Pavlov's work demonstrated this type of learning, in which a neutral stimulus becomes tied to a reflex.",
+        "This American behaviorist studied operant conditioning using namesake boxes."
+      ],
+      "answers": [
+        "Ivan <b><u>Pavlov</u></b>",
+        "<b><u>classical conditioning</u></b> [prompt on conditioning]",
+        "B. F. <b><u>Skinner</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Social Science",
+      "subcategory": ""
+    },
+    {
+      "leadin": "About half the world's population speaks a language from this family. For 10 points each:",
+      "parts": [
+        "Name this language family that includes English, Hindi, and Russian.",
+        "The reconstructed ancestor of the family is abbreviated PIE, short for this name.",
+        "This Romance language is the most spoken native language in South America."
+      ],
+      "answers": [
+        "<b><u>Indo-European</u></b>",
+        "<b><u>Proto-Indo-European</u></b>",
+        "<b><u>Portuguese</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Other Academic",
+      "subcategory": ""
+    }
+  ]
+}

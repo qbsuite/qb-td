@@ -1,0 +1,227 @@
+{
+  "name": "Demo Packet 1",
+  "tossups": [
+    {
+      "question": "The narrator of this novel rents a cottage next to a mansion whose guests gossip that their host once killed a man. A green light at the end of a dock (*) transfixes this novel's title character, who longs for Daisy Buchanan. For 10 points, name this Jazz Age novel by F. Scott Fitzgerald.",
+      "answer": "The <b><u>Great Gatsby</u></b>",
+      "category": "Literature",
+      "subcategory": "American Literature"
+    },
+    {
+      "question": "This ruler crushed a combined Austrian and Russian army at Austerlitz. After a disastrous invasion of (*) Russia, this ruler abdicated and was exiled to Elba, returning for a Hundred Days that ended at Waterloo. For 10 points, name this French emperor.",
+      "answer": "<b><u>Napoleon</u></b> Bonaparte [accept <b><u>Napoleon</u></b> I]",
+      "category": "History",
+      "subcategory": "European History"
+    },
+    {
+      "question": "The second law of thermodynamics states that this quantity never decreases in an isolated system. Ludwig Boltzmann related it to the (*) number of microstates through a logarithm. For 10 points, name this quantity symbolized S, a measure of disorder.",
+      "answer": "<b><u>entropy</u></b>",
+      "category": "Science",
+      "subcategory": "Physics"
+    },
+    {
+      "question": "This novel's title character is locked in the red-room as a child at Gateshead and later teaches at Lowood School. She flees (*) Thornfield Hall after learning her employer keeps his wife Bertha Mason in the attic. For 10 points, name this Charlotte Bronte novel about a governess who loves Mr. Rochester.",
+      "answer": "<b><u>Jane Eyre</u></b>",
+      "category": "Literature",
+      "subcategory": "British Literature"
+    },
+    {
+      "question": "Robert Livingston and James Monroe negotiated this transaction, prompted in part by the Haitian Revolution. It roughly (*) doubled the size of the United States for fifteen million dollars. For 10 points, name this 1803 deal in which Thomas Jefferson bought territory from France.",
+      "answer": "<b><u>Louisiana Purchase</u></b>",
+      "category": "History",
+      "subcategory": "American History"
+    },
+    {
+      "question": "The light-dependent reactions of this process split water molecules to generate ATP and NADPH. Its dark reactions fix (*) carbon dioxide in the Calvin cycle. For 10 points, name this process by which chloroplasts in green plants turn sunlight into sugar.",
+      "answer": "<b><u>photosynthesis</u></b>",
+      "category": "Science",
+      "subcategory": "Biology"
+    },
+    {
+      "question": "A cypress tree rises like a dark flame on the left side of this painting, whose village church spire the artist added from (*) memory while at an asylum in Saint-Remy. For 10 points, name this swirling nighttime scene by Vincent van Gogh.",
+      "answer": "The <b><u>Starry Night</u></b>",
+      "category": "Fine Arts",
+      "subcategory": "Visual Fine Arts"
+    },
+    {
+      "question": "During this observance, a pre-dawn meal called suhoor precedes daily abstention from food and drink. Its end is celebrated at (*) Eid al-Fitr, and the Quran was first revealed during it on the Night of Power. For 10 points, name this Islamic holy month of fasting.",
+      "answer": "<b><u>Ramadan</u></b>",
+      "category": "Religion",
+      "subcategory": ""
+    },
+    {
+      "question": "This river passes through the Iron Gates gorge on the border of Serbia and Romania. Rising in Germany's (*) Black Forest, it flows through more national capitals than any other river, including Vienna and Budapest. For 10 points, name this second-longest river of Europe.",
+      "answer": "<b><u>Danube</u></b> River",
+      "category": "Geography",
+      "subcategory": ""
+    },
+    {
+      "question": "A recurring item in this video game series is the Master Sword, often drawn from a pedestal deep in a forest. Its protagonist collects pieces of the (*) Triforce and rescues a princess of Hyrule from Ganon. For 10 points, name this Nintendo series starring Link.",
+      "answer": "The Legend of <b><u>Zelda</u></b>",
+      "category": "Trash",
+      "subcategory": ""
+    }
+  ],
+  "bonuses": [
+    {
+      "leadin": "The Buendia family founds the town of Macondo in this author's most famous novel. For 10 points each:",
+      "parts": [
+        "Name this Colombian author of One Hundred Years of Solitude.",
+        "Garcia Marquez wrote in this literary style, which weaves fantastical events into otherwise ordinary settings.",
+        "In this Garcia Marquez novel, Florentino Ariza waits more than fifty years to reunite with Fermina Daza."
+      ],
+      "answers": [
+        "Gabriel <b><u>Garcia Marquez</u></b>",
+        "<b><u>magical realism</u></b>",
+        "<b><u>Love in the Time of Cholera</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Literature",
+      "subcategory": "World Literature"
+    },
+    {
+      "leadin": "This city's traditional founding date is 753 BC. For 10 points each:",
+      "parts": [
+        "Name this city, ruled by seven legendary kings before it became a republic.",
+        "This first Roman emperor defeated Antony and Cleopatra at Actium.",
+        "Augustus's rise ended decades of civil war that began when this general crossed the Rubicon."
+      ],
+      "answers": [
+        "<b><u>Rome</u></b>",
+        "<b><u>Augustus</u></b> [accept <b><u>Octavian</u></b>]",
+        "Julius <b><u>Caesar</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "History",
+      "subcategory": "Ancient History"
+    },
+    {
+      "leadin": "These elements make up group 18 of the periodic table. For 10 points each:",
+      "parts": [
+        "Name this family of largely unreactive elements.",
+        "This lightest noble gas is the second-most abundant element in the universe.",
+        "This noble gas glows reddish-orange in signs and lends its name to them."
+      ],
+      "answers": [
+        "<b><u>noble gas</u></b>es [accept <b><u>inert gas</u></b>es]",
+        "<b><u>helium</u></b>",
+        "<b><u>neon</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Science",
+      "subcategory": "Chemistry"
+    },
+    {
+      "leadin": "Three witches greet this character as Thane of Cawdor and king hereafter. For 10 points each:",
+      "parts": [
+        "Name this Scottish general who murders King Duncan in his namesake Shakespeare tragedy.",
+        "Macbeth is finally slain by this nobleman, who was from his mother's womb untimely ripped.",
+        "This wife of Macbeth sleepwalks while trying to wash imagined blood from her hands."
+      ],
+      "answers": [
+        "<b><u>Macbeth</u></b>",
+        "<b><u>Macduff</u></b>",
+        "<b><u>Lady Macbeth</u></b> [prompt on Macbeth]"
+      ],
+      "values": [10, 10, 10],
+      "category": "Literature",
+      "subcategory": "British Literature"
+    },
+    {
+      "leadin": "A Parisian crowd stormed the Bastille on July 14, 1789. For 10 points each:",
+      "parts": [
+        "The Bastille's fall began this revolution, which overthrew the Bourbon monarchy.",
+        "This radical Jacobin leader dominated the Committee of Public Safety during the Reign of Terror.",
+        "This king was executed by guillotine in January 1793."
+      ],
+      "answers": [
+        "<b><u>French Revolution</u></b>",
+        "Maximilien <b><u>Robespierre</u></b>",
+        "<b><u>Louis XVI</u></b> [prompt on Louis]"
+      ],
+      "values": [10, 10, 10],
+      "category": "History",
+      "subcategory": "European History"
+    },
+    {
+      "leadin": "This planet's Great Red Spot is a storm that has raged for centuries. For 10 points each:",
+      "parts": [
+        "Name this largest planet in the solar system.",
+        "This Galilean moon of Jupiter is the most volcanically active body in the solar system.",
+        "Io and Jupiter's other large moons were discovered in 1610 by this Italian astronomer."
+      ],
+      "answers": [
+        "<b><u>Jupiter</u></b>",
+        "<b><u>Io</u></b>",
+        "<b><u>Galileo</u></b> Galilei"
+      ],
+      "values": [10, 10, 10],
+      "category": "Science",
+      "subcategory": "Other Science"
+    },
+    {
+      "leadin": "A critic coined this movement's name from a painting of a sunrise over Le Havre. For 10 points each:",
+      "parts": [
+        "Name this nineteenth-century French movement that captured fleeting effects of light.",
+        "This Impressionist painted Impression, Sunrise as well as a series of water lilies at Giverny.",
+        "This Impressionist is known for paintings of ballet dancers such as The Dance Class."
+      ],
+      "answers": [
+        "<b><u>Impressionism</u></b>",
+        "Claude <b><u>Monet</u></b>",
+        "Edgar <b><u>Degas</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Fine Arts",
+      "subcategory": "Visual Fine Arts"
+    },
+    {
+      "leadin": "This religion's Trimurti consists of Brahma, Vishnu, and Shiva. For 10 points each:",
+      "parts": [
+        "Name this major religion of India.",
+        "This Hindu concept names the cycle of death and rebirth.",
+        "This dialogue between Krishna and Arjuna forms part of the Mahabharata."
+      ],
+      "answers": [
+        "<b><u>Hinduism</u></b>",
+        "<b><u>samsara</u></b> [prompt on reincarnation]",
+        "<b><u>Bhagavad Gita</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Religion",
+      "subcategory": ""
+    },
+    {
+      "leadin": "This continent's highest peak is Kilimanjaro. For 10 points each:",
+      "parts": [
+        "Name this continent.",
+        "This longest river of Africa flows north through Egypt to the Mediterranean.",
+        "This Ethiopian capital hosts the headquarters of the African Union."
+      ],
+      "answers": [
+        "<b><u>Africa</u></b>",
+        "<b><u>Nile</u></b> River",
+        "<b><u>Addis Ababa</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Geography",
+      "subcategory": ""
+    },
+    {
+      "leadin": "This studio's films open with a hopping desk lamp. For 10 points each:",
+      "parts": [
+        "Name this animation studio behind Toy Story.",
+        "In this Pixar film, the rat Remy cooks in a Paris restaurant.",
+        "This Pixar film about personified emotions takes place largely inside the mind of a girl named Riley."
+      ],
+      "answers": [
+        "<b><u>Pixar</u></b>",
+        "<b><u>Ratatouille</u></b>",
+        "<b><u>Inside Out</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Trash",
+      "subcategory": ""
+    }
+  ]
+}

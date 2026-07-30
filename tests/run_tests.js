@@ -1862,4 +1862,116 @@ test('roster names with commas and quotes round-trip our parser, MODAQ, and .yft
   assert.ok(yft.includes(JSON.stringify(tricky[0].name).slice(1, -1)), 'quotes escaped, name intact');
 });
 
+/* ---------- demo tournament (app/js/demo.js + generated fixture) ----------
+   The runner is synchronous, so the async demoPub flows run here at top
+   level and the test() blocks assert on the collected results. Order
+   matters: the upload sequence is stateful (in-memory storage shim). */
+
+const { demoPub, reset: demoReset } = await import('../app/js/demo.js');
+const demoFixture = (await import('../app/demo/fixture.js')).default;
+
+demoReset();
+const demoState0 = await demoPub('/pub/demo');
+const demoBundle0 = await demoPub('/pub/demo/bundle');
+const demoBucket0 = await demoPub('/b/demo');
+const demoSched = await demoPub('/b/demo/schedule');
+const demoPacket3 = await demoPub('/b/demo/packet?round=3');
+const demoCats = await demoPub('/pub/demo/cats');
+let demoQpacketEarly = null;
+try { await demoPub('/pub/demo/qpacket?round=3'); }
+catch (e) { demoQpacketEarly = e.message; }
+
+// the visitor's game: round 3, Riverside vs Summit, uploaded like the
+// reader does (combined {qbj, game})
+const demoMatch = modaqMatch({ round: 3, tossupsRead: 10,
+  teamA: { name: 'Riverside', bonusPoints: 40,
+    players: [{ name: 'Elena', tuh: 10, counts: { 10: 3, '-5': 1 } }] },
+  teamB: { name: 'Summit', bonusPoints: 30,
+    players: [{ name: 'Ada', tuh: 10, counts: { 15: 1, 10: 2 } }] },
+});
+const demoUp1 = await demoPub(
+  '/b/demo/upload?round=3&name=Round_3_Riverside_Summit.qbtd.json',
+  { method: 'POST', body: combinedUpload(demoMatch, 3, null) });
+const demoStateAfter = await demoPub('/pub/demo');
+const demoQpacketLate = await demoPub('/pub/demo/qpacket?round=3');
+// a re-exported game replaces, not double-counts
+const demoUp2 = await demoPub(
+  '/b/demo/upload?round=3&name=Round_3_Riverside_Summit.qbtd.json',
+  { method: 'POST', body: combinedUpload(demoMatch, 3, null) });
+const demoBundle2 = await demoPub('/pub/demo/bundle');
+const demoBad = await demoPub(
+  '/b/demo/upload?round=3&name=broken.qbj', { method: 'POST', body: 'not json' });
+const demoBucket2 = await demoPub('/b/demo');
+demoReset();
+const demoStateReset = await demoPub('/pub/demo');
+
+test('demo fixture: every game parses and the story holds', () => {
+  const matches = demoFixture.entries.map((e) => {
+    const m = parseMatch(e.qbj, { filename: e.filename });
+    m.room = e.room;
+    m.fileId = e.id;
+    return m;
+  });
+  assert.equal(matches.length, 5);
+  const agg = aggregate(matches, parseRoster(demoFixture.roster));
+  const top = agg.teams.slice(0, 2).map((t) => t.name).sort();
+  assert.deepEqual(top, ['Riverside', 'Summit']);
+  for (const t of agg.teams.slice(0, 2)) { assert.equal(t.w, 2); assert.equal(t.l, 0); }
+  // buzz + category views populate from the same entries
+  assert.ok(buzzSummary(dedupeEntries(demoFixture.entries)).length >= 8);
+  const cats = categoryStats(dedupeEntries(demoFixture.entries), demoFixture.catmap);
+  assert.ok(new Set(cats.map((r) => r.cat)).size >= 8, 'category spread');
+});
+
+test('demo fixture: packets are reader-ready and fully categorized', () => {
+  for (const n of [1, 2, 3]) {
+    const p = normalizePacket(demoFixture.packets[n], 'round ' + n + '.json');
+    assert.equal(p.tossups.length, 10);
+    assert.equal(p.bonuses.length, 10);
+    for (const t of p.tossups) assert.ok(tokenizeQuestion(t.question).includes('(*)'), 'power mark');
+    const rc = demoCats.rounds[String(n)];
+    assert.equal(rc.t.length, 10);
+    assert.equal(rc.b.length, 10);
+    for (const c of [...rc.t, ...rc.b]) assert.ok(c.c, 'category set');
+  }
+});
+
+test('demo state: mid-tournament, round 3 open in the reader room', () => {
+  assert.equal(demoState0.current_round, 3);
+  assert.deepEqual(demoState0.buzz_done, [1, 2]);
+  assert.deepEqual(demoState0.packet_rounds, [1, 2, 3]);
+  assert.equal(demoState0.files.length, 5);
+  assert.equal(demoBundle0.entries.length, 5);
+  assert.equal(demoQpacketEarly, 'round in progress');
+  assert.equal(demoBucket0.room, 'Room A');
+  assert.equal(demoBucket0.packets.length, 3);
+  assert.equal(demoBucket0.roster, true);
+  assert.equal(demoSched.room, demoFixture.readerRoom);
+  assert.equal(demoPacket3.tossups.length, 10);
+});
+
+test('demo upload: lands in the bundle and completes round 3', () => {
+  assert.equal(demoUp1.error, null);
+  assert.equal(demoUp1.kind, 'combined');
+  assert.deepEqual(demoStateAfter.buzz_done, [1, 2, 3]);
+  assert.equal(demoStateAfter.files.length, 6);
+  assert.notEqual(demoStateAfter.version, demoState0.version);
+  assert.equal(demoQpacketLate.tossups.length, 10, 'buzzpoints packet unlocked');
+});
+
+test('demo upload: re-export dedupes, junk is flagged, reset clears', () => {
+  assert.ok(demoUp2.id > demoUp1.id);
+  assert.equal(demoBundle2.entries.length, 7, 'raw bundle keeps both uploads');
+  const matches = demoBundle2.entries.map((e) => {
+    const m = parseMatch(e.qbj, { filename: e.filename });
+    m.fileId = e.id;
+    return m;
+  });
+  assert.equal(dedupeMatches(matches).length, 6, 'latest upload wins per game');
+  assert.ok(demoBad.error, 'unparseable upload is flagged');
+  assert.equal(demoBucket2.uploads.length, 3);
+  assert.equal(demoBucket2.uploads[0].qbj, undefined, 'listing carries no qbj');
+  assert.equal(demoStateReset.files.length, 5, 'reset restores the fixture');
+});
+
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

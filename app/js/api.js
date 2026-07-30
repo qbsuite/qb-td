@@ -7,6 +7,12 @@ const qs = new URLSearchParams(location.search);
 export const API = qs.get('server') || localStorage.qbtdServer
   || 'https://qb-td.denisliu10.workers.dev';
 
+// The demo tournament (demo.html): slug and bucket secret 'demo' are
+// reserved, and every pub() call is served in-browser from the committed
+// fixture by demo.js — the pages themselves run unchanged.
+const DEMO = qs.get('t') === 'demo' || qs.get('b') === 'demo';
+let demoModule = null;
+
 // A frozen snapshot of /pub responses, keyed by path. Set by the archive
 // page (archive.html) so the real public page code runs with no Worker
 // behind it; every other page leaves this null and hits the API.
@@ -22,6 +28,10 @@ export function useFrozenData(map) {
     Pass opts.json to send a JSON body. Non-JSON responses (blobs) return
     the raw Response. */
 export async function pub(path, opts = {}) {
+  if (DEMO) {
+    if (!demoModule) demoModule = await import('./demo.js');
+    return demoModule.demoPub(path, opts);
+  }
   if (frozen) {
     // A frozen page is read-only: unknown paths fail the way a missing
     // blob does, so callers take their existing "not published" branch.

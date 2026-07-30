@@ -236,6 +236,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   TO -> moderator -> public flow against `wrangler dev`).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
+- `app/demo.html` + `js/demo.js` + `demo/fixture.js` — the demo
+  tournament. Opening any page with `?t=demo` / `?b=demo` (the slug and
+  secret are reserved) makes `api.js` serve every `pub()` call from
+  `demo.js` in the browser: the committed fixture holds a 4-team round
+  robin mid-event, and games a visitor reads in the embedded MODAQ
+  upload into localStorage and flow into stats, buzzpoints, and
+  categories. Regenerate the fixture from the hand-written packets in
+  `tools/demo/` with `node tools/demo_fixture.mjs`.
 
 ## Tests
 

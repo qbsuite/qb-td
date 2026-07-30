@@ -61,6 +61,10 @@ let A = '/a/' + r.body.admin_secret;
 r = await call('/api/tournaments', { method: 'POST', json: { name: 'dupe', slug } });
 ok('duplicate slug rejected', r.status === 409);
 
+// 'demo' belongs to the in-browser demo tournament (app/js/demo.js)
+r = await call('/api/tournaments', { method: 'POST', json: { name: 'demo', slug: 'demo' } });
+ok('demo slug reserved', r.status === 409, r.body);
+
 // detail hides the secret and echoes expiry
 r = await call(A);
 ok('admin detail', r.status === 200 && r.body.tournament.slug === slug, r.body);

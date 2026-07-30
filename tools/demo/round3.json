@@ -1,0 +1,227 @@
+{
+  "name": "Demo Packet 3",
+  "tossups": [
+    {
+      "question": "In this novel, children roll inside a tire into the yard of a reclusive neighbor who leaves gifts in a tree knothole. Its narrator watches her father (*) defend Tom Robinson, and Boo Radley saves her from Bob Ewell. For 10 points, name this Harper Lee novel narrated by Scout Finch.",
+      "answer": "<b><u>To Kill a Mockingbird</u></b>",
+      "category": "Literature",
+      "subcategory": "American Literature"
+    },
+    {
+      "question": "Conrad Schumann leapt over barbed wire days after this structure began going up in August 1961. Its crossings included (*) Checkpoint Charlie, and Ronald Reagan demanded that Mr. Gorbachev tear it down. For 10 points, name this barrier that divided a German city until 1989.",
+      "answer": "<b><u>Berlin Wall</u></b>",
+      "category": "History",
+      "subcategory": "European History"
+    },
+    {
+      "question": "The no-hair theorem says these objects are fully described by mass, charge, and spin. Light cannot escape from within their (*) event horizons, and one at the center of the galaxy M87 was imaged in 2019. For 10 points, name these objects formed when massive stars collapse.",
+      "answer": "<b><u>black hole</u></b>s",
+      "category": "Science",
+      "subcategory": "Physics"
+    },
+    {
+      "question": "In this novel, workers at the Ministry of Truth drop old newspaper articles down memory holes. Its protagonist is tortured with a cage of (*) rats in Room 101 and betrays his lover Julia. For 10 points, name this dystopian George Orwell novel starring Winston Smith.",
+      "answer": "<b><u>1984</u></b> [accept <b><u>Nineteen Eighty-Four</u></b>]",
+      "category": "Literature",
+      "subcategory": "British Literature"
+    },
+    {
+      "question": "Sogdian merchants dominated trade along this network, whose eastern terminus was often the city of Chang'an. Marco Polo traveled it, and (*) paper, gunpowder, and plague all moved west along it. For 10 points, name this network of routes that carried a luxury fabric out of China.",
+      "answer": "<b><u>Silk Road</u></b> [accept <b><u>Silk Route</u></b>s]",
+      "category": "History",
+      "subcategory": "World History"
+    },
+    {
+      "question": "Joseph Priestley isolated this element by heating mercuric oxide and called it dephlogisticated air. Antoine (*) Lavoisier named it, wrongly believing it appeared in all acids. For 10 points, name this element, about 21 percent of the atmosphere, needed for combustion and breathing.",
+      "answer": "<b><u>oxygen</u></b>",
+      "category": "Science",
+      "subcategory": "Chemistry"
+    },
+    {
+      "question": "This artist painted his own flayed skin held by Saint Bartholomew in a fresco of the Last Judgment. He carved a Pieta at twenty-four and painted (*) God reaching toward Adam on a chapel ceiling. For 10 points, name this sculptor of David who painted the Sistine Chapel.",
+      "answer": "<b><u>Michelangelo</u></b> Buonarroti",
+      "category": "Fine Arts",
+      "subcategory": "Visual Fine Arts"
+    },
+    {
+      "question": "This philosopher's Symposium presents love as a ladder ascending toward beauty itself. In one work, he described prisoners who mistake (*) shadows on a cave wall for reality, and his Republic imagines philosopher-kings. For 10 points, name this student of Socrates and teacher of Aristotle.",
+      "answer": "<b><u>Plato</u></b>",
+      "category": "Philosophy",
+      "subcategory": ""
+    },
+    {
+      "question": "This country's four main islands include Shikoku and Kyushu. Its highest peak, a snow-capped (*) volcano, appears in a famous series of woodblock prints by Hokusai. For 10 points, name this island nation with capital Tokyo.",
+      "answer": "<b><u>Japan</u></b>",
+      "category": "Geography",
+      "subcategory": ""
+    },
+    {
+      "question": "This athlete hit The Shot over Craig Ehlo in 1989 and later scored 38 points in the Flu Game. He won six championships with the (*) Chicago Bulls, twice retiring, once to play minor-league baseball. For 10 points, name this basketball great who wore number 23.",
+      "answer": "Michael <b><u>Jordan</u></b>",
+      "category": "Trash",
+      "subcategory": ""
+    }
+  ],
+  "bonuses": [
+    {
+      "leadin": "This poet's Twenty Love Poems and a Song of Despair made him famous at nineteen. For 10 points each:",
+      "parts": [
+        "Name this Chilean poet.",
+        "Neruda won this international prize for literature in 1971.",
+        "Neruda's Canto General is an epic history of this continent."
+      ],
+      "answers": [
+        "Pablo <b><u>Neruda</u></b>",
+        "<b><u>Nobel</u></b> Prize in Literature",
+        "South <b><u>America</u></b> [accept the <b><u>Americas</u></b>]"
+      ],
+      "values": [10, 10, 10],
+      "category": "Literature",
+      "subcategory": "World Literature"
+    },
+    {
+      "leadin": "The assassination of Franz Ferdinand sparked this conflict. For 10 points each:",
+      "parts": [
+        "Name this war fought from 1914 to 1918.",
+        "This form of combat defined the Western Front, with lines stretching from the Channel to Switzerland.",
+        "This 1919 treaty ended the war with Germany and assigned it war guilt."
+      ],
+      "answers": [
+        "<b><u>World War I</u></b> [accept the <b><u>Great War</u></b> or <b><u>First World War</u></b>]",
+        "<b><u>trench</u></b> warfare",
+        "Treaty of <b><u>Versailles</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "History",
+      "subcategory": "European History"
+    },
+    {
+      "leadin": "Finches of the Galapagos Islands helped inspire this theory. For 10 points each:",
+      "parts": [
+        "Name this theory that species change over time through natural selection.",
+        "This naturalist proposed natural selection in On the Origin of Species.",
+        "Darwin announced the theory jointly with this naturalist, who reached similar conclusions in the Malay Archipelago."
+      ],
+      "answers": [
+        "<b><u>evolution</u></b>",
+        "Charles <b><u>Darwin</u></b>",
+        "Alfred Russel <b><u>Wallace</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Science",
+      "subcategory": "Biology"
+    },
+    {
+      "leadin": "This playwright's Theban plays follow one doomed family. For 10 points each:",
+      "parts": [
+        "Name this Greek tragedian.",
+        "In this Sophocles play, the title king discovers he has killed his father and married his mother.",
+        "In this play, Oedipus's daughter defies Creon to bury her brother Polynices."
+      ],
+      "answers": [
+        "<b><u>Sophocles</u></b>",
+        "<b><u>Oedipus Rex</u></b> [accept <b><u>Oedipus the King</u></b> or <b><u>Oedipus Tyrannus</u></b>]",
+        "<b><u>Antigone</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Literature",
+      "subcategory": "European Literature"
+    },
+    {
+      "leadin": "A bus boycott in Montgomery began after one woman kept her seat. For 10 points each:",
+      "parts": [
+        "Name this seamstress arrested in 1955.",
+        "The boycott elevated this minister, who later delivered the I Have a Dream speech.",
+        "This 1954 Supreme Court case declared school segregation unconstitutional."
+      ],
+      "answers": [
+        "Rosa <b><u>Parks</u></b>",
+        "Martin Luther <b><u>King</u></b> Jr.",
+        "<b><u>Brown</u></b> v. Board of Education"
+      ],
+      "values": [10, 10, 10],
+      "category": "History",
+      "subcategory": "American History"
+    },
+    {
+      "leadin": "The 1883 eruption of Krakatoa was heard thousands of miles away. For 10 points each:",
+      "parts": [
+        "Name these geological features that erupt molten rock.",
+        "Most of the world's volcanoes lie along this seismically active belt around an ocean.",
+        "Before it erupts, molten rock underground is called this."
+      ],
+      "answers": [
+        "<b><u>volcano</u></b>es",
+        "<b><u>Ring of Fire</u></b> [accept Pacific <b><u>Ring of Fire</u></b>]",
+        "<b><u>magma</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Science",
+      "subcategory": "Other Science"
+    },
+    {
+      "leadin": "This composer wrote his first symphony at eight years old. For 10 points each:",
+      "parts": [
+        "Name this Austrian composer of Eine kleine Nachtmusik.",
+        "In this Mozart opera, the Queen of the Night sings a famously high aria and Papageno catches birds.",
+        "Mozart left this final Mass setting unfinished at his death in 1791."
+      ],
+      "answers": [
+        "Wolfgang Amadeus <b><u>Mozart</u></b>",
+        "The <b><u>Magic Flute</u></b> [accept Die <b><u>Zauberflote</u></b>]",
+        "<b><u>Requiem</u></b> in D minor"
+      ],
+      "values": [10, 10, 10],
+      "category": "Fine Arts",
+      "subcategory": "Auditory Fine Arts"
+    },
+    {
+      "leadin": "The phrase existence precedes essence summarizes this movement. For 10 points each:",
+      "parts": [
+        "Name this twentieth-century philosophical movement.",
+        "This French existentialist wrote Being and Nothingness and declined the Nobel Prize.",
+        "Sartre's partner, this philosopher, wrote the feminist landmark The Second Sex."
+      ],
+      "answers": [
+        "<b><u>existentialism</u></b>",
+        "Jean-Paul <b><u>Sartre</u></b>",
+        "Simone de <b><u>Beauvoir</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Philosophy",
+      "subcategory": ""
+    },
+    {
+      "leadin": "This river's annual floods deposit fertile silt across northern India. For 10 points each:",
+      "parts": [
+        "Name this river sacred in Hinduism, which flows past Varanasi.",
+        "This longest river of Asia flows through the Three Gorges Dam.",
+        "This Southeast Asian river forms much of the Thailand-Laos border before its delta in Vietnam."
+      ],
+      "answers": [
+        "<b><u>Ganges</u></b> River [accept <b><u>Ganga</u></b>]",
+        "<b><u>Yangtze</u></b> River [accept <b><u>Chang Jiang</u></b>]",
+        "<b><u>Mekong</u></b> River"
+      ],
+      "values": [10, 10, 10],
+      "category": "Geography",
+      "subcategory": ""
+    },
+    {
+      "leadin": "This character debuted as Jumpman in the arcade game Donkey Kong. For 10 points each:",
+      "parts": [
+        "Name this mustachioed Nintendo plumber.",
+        "Mario's chief antagonist is this fire-breathing Koopa king.",
+        "This Mario spin-off series puts the cast in go-karts, throwing shells at one another."
+      ],
+      "answers": [
+        "<b><u>Mario</u></b>",
+        "<b><u>Bowser</u></b>",
+        "<b><u>Mario Kart</u></b>"
+      ],
+      "values": [10, 10, 10],
+      "category": "Trash",
+      "subcategory": ""
+    }
+  ]
+}

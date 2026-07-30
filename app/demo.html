@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>qb-td demo</title>
+<link rel="stylesheet" href="css/td.css">
+</head>
+<body>
+<div class="wrap narrow">
+  <header>
+    <h1>qb-td demo</h1>
+    <span class="spacer"></span>
+    <span class="sub">simulated tournament</span>
+  </header>
+  <div id="msg"></div>
+
+  <div class="card">
+    <p>A 4-team round robin, mid-event. Rounds 1 and 2 are in; round 3 is
+    live. Riverside and Summit are both 2-0, and Room A reads the game
+    that decides the tournament.</p>
+    <p class="muted" style="margin-top:8px">Everything runs and stays in
+    this browser. No tournament is created and nothing touches the
+    server.</p>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <a href="t.html?t=demo"><strong>Public page</strong></a>
+      <span class="spacer"></span>
+      <span class="muted">what players see</span>
+    </div>
+    <div class="muted" style="font-size:13px;margin-top:4px">
+      Schedule with live results, standings and individual stats,
+      per-category scoring, and word-level buzzpoints for finished rounds.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <a href="read.html?b=demo"><strong>Moderator reader</strong></a>
+      <span class="spacer"></span>
+      <span class="muted">what a mod sees</span>
+    </div>
+    <div class="muted" style="font-size:13px;margin-top:4px">
+      MODAQ preloaded with the round 3 packet and roster. Read the
+      Riverside vs Summit game and upload it; it lands in the stats and
+      completes round 3 on the buzzpoints tab.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <a href="bucket.html?b=demo"><strong>Room uploads</strong></a>
+      <span class="spacer"></span>
+      <span class="muted">manual path</span>
+    </div>
+    <div class="muted" style="font-size:13px;margin-top:4px">
+      The upload page for rooms running MODAQ or scoresheets outside the
+      embedded reader.
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px">
+    <a href="index.html">Create a real tournament</a>
+    <span class="spacer"></span>
+    <a href="#" id="reset" class="muted">reset demo data</a>
+  </div>
+</div>
+<script type="module">
+import { reset } from './js/demo.js';
+const $ = (id) => document.getElementById(id);
+$('reset').onclick = (e) => {
+  e.preventDefault();
+  reset();
+  $('msg').textContent = 'demo data cleared';
+};
+</script>
+</body>
+</html>

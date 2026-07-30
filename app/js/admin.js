@@ -104,7 +104,10 @@ function showList() {
       <button id="newbtn" class="primary">Create</button>
     </div>
     <h2>Archive</h2>
-    <div><a href="archive.html">Past tournaments</a></div>`;
+    <div><a href="archive.html">Past tournaments</a></div>
+    <h2>Demo</h2>
+    <div><a href="demo.html">Simulated tournament</a>
+      <span class="muted">try the reader and the public pages without creating anything</span></div>`;
   $('newbtn').onclick = async () => {
     try {
       const out = await pub('/api/tournaments', { method: 'POST', json: {

@@ -251,6 +251,8 @@ async function createTournament(request, env) {
   if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(slug)) {
     return err(env, 400, 'slug must be 3-40 chars: a-z, 0-9, hyphens');
   }
+  // the in-browser demo tournament owns t.html?t=demo
+  if (slug === 'demo') return err(env, 409, 'slug is reserved');
   if (!name) return err(env, 400, 'name required');
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
