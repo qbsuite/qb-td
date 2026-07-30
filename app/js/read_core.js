@@ -55,11 +55,88 @@ export function matchFilenames(round, nameA, nameB) {
 }
 
 /** The single per-game upload: MODAQ's qbj (round stamped) + the persisted
-    game state (may be null if persistence hasn't flushed yet). */
-export function combinedUpload(match, round, storeText) {
+    game state (may be null if persistence hasn't flushed yet). Games whose
+    packet carried appended tiebreakers (meta.tb) also report which pool
+    questions were read — always, even when the list is empty, so a
+    re-export that no longer reaches the tiebreakers clears its old log. */
+export function combinedUpload(match, round, storeText, tbUsed = null) {
   let game = null;
   try { game = JSON.parse(storeText); } catch (e) { /* upload the qbj anyway */ }
-  return JSON.stringify({ qbj: withRound(match, round), game });
+  return JSON.stringify({
+    qbj: withRound(match, round),
+    game,
+    ...(tbUsed ? { tb: { used: tbUsed } } : {}),
+  });
+}
+
+/* ---------- tiebreakers ----------
+   The TO's tiebreaker pool (Worker blob, GET /b/:secret/tiebreakers) is
+   offered inside MODAQ's Actions -> Add questions dialog (tb_add_dialog.js,
+   swapped in at bundle time): the mod checks with the TD which question to
+   read and appends exactly that one to the end of the current packet. The
+   game meta records the base packet size and the pool ids in appended
+   order, so the upload can map "question 21 was read" back to "TU1 was
+   used". */
+
+/** Validate a fetched pool; null when there is nothing usable in it. */
+export function normalizeTbPool(json) {
+  if (!json || typeof json !== 'object') return null;
+  const tossups = (Array.isArray(json.tossups) ? json.tossups : []).filter((q) =>
+    q && typeof q.id === 'string' && typeof q.question === 'string' && typeof q.answer === 'string');
+  const bonuses = (Array.isArray(json.bonuses) ? json.bonuses : []).filter((b) =>
+    b && typeof b.id === 'string' && Array.isArray(b.parts) && Array.isArray(b.answers));
+  if (!tossups.length && !bonuses.length) return null;
+  return { tossups, bonuses, uses: Array.isArray(json.uses) ? json.uses : [] };
+}
+
+/** The dialog's pick, in pool order: MODAQ-ready questions (pool
+    bookkeeping stripped) plus the ids in the same order, so the meta's
+    appended-id lists line up with the packet exactly. */
+export function tbSelection(pool, ids) {
+  const want = ids instanceof Set ? ids : new Set(ids || []);
+  const strip = ({ id, from, ...q }) => q;
+  const tossups = (pool ? pool.tossups : []).filter((q) => want.has(q.id));
+  const bonuses = (pool ? pool.bonuses : []).filter((b) => want.has(b.id));
+  return {
+    tossups: tossups.map(strip),
+    bonuses: bonuses.map(strip),
+    tu: tossups.map((q) => q.id),
+    bo: bonuses.map((b) => b.id),
+  };
+}
+
+/** Pool question ids a finished game actually read, from MODAQ's match
+    qbj: every tossup (and thrown-out replacement) whose packet position
+    is past the base packet, and every awarded bonus past the base
+    bonuses. (A tiebreaker bonus thrown out before award is the one case
+    with no qbj record — it lands in the match notes only.) */
+export function tbUsedIds(match, tb) {
+  if (!tb) return [];
+  const used = [];
+  const seen = new Set();
+  const hit = (id) => { if (id && !seen.has(id)) { seen.add(id); used.push(id); } };
+  const tuAt = (num) => hit(tb.tu[num - 1 - tb.t]);
+  const boAt = (num) => hit(tb.bo[num - 1 - tb.b]);
+  for (const q of (match && match.match_questions) || []) {
+    const t = q.tossup_question;
+    if (t && Number.isInteger(t.question_number)) tuAt(t.question_number);
+    const r = q.replacement_tossup_question;
+    if (r && Number.isInteger(r.question_number)) tuAt(r.question_number);
+    const bq = q.bonus && q.bonus.question;
+    if (bq && Number.isInteger(bq.question_number)) boAt(bq.question_number);
+  }
+  return used;
+}
+
+/** Per-question rows for the reader's tiebreaker panel: id, kind, and who
+    has already heard it ({heard: [{round, room, teams}]}). */
+export function tbPanelRows(pool) {
+  if (!pool) return [];
+  const usesFor = (id) => pool.uses.filter((u) => u && u.q === id);
+  return [
+    ...pool.tossups.map((q) => ({ id: q.id, kind: 'Tossup', heard: usesFor(q.id) })),
+    ...pool.bonuses.map((b) => ({ id: b.id, kind: 'Bonus', heard: usesFor(b.id) })),
+  ];
 }
 
 /** Stamp the round onto a qbj match (MODAQ's customExport omits _round;

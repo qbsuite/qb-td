@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node tests/run_tests.js",
     "archive": "node tools/archive.mjs",
-    "build:read": "esbuild app/js/read_main.js --bundle --minify --format=iife --outfile=app/js/read.bundle.js --define:process.env.NODE_ENV=\\\"production\\\" --log-level=warning"
+    "build:read": "node tools/build_read.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

@@ -11,8 +11,9 @@
   /* Page chrome collapses to one bar once MODAQ is mounted. */
   .wrap.readerbar { padding: 10px 16px; max-width: none; }
   .wrap.readerbar header { margin-bottom: 0; }
-  body.reading #picker, body.reading #packetrow, body.reading #schedpanel { display: none; }
-  #schedrows td { padding: 2px 8px 2px 0; border-bottom: none; }
+  body.reading #picker, body.reading #packetrow, body.reading #schedpanel,
+  body.reading #tbpanel { display: none; }
+  #schedrows td, #tbrows td { padding: 2px 8px 2px 0; border-bottom: none; }
   #schedrows tr.now td { background: var(--hover-bg); }
   #roundrows .row { margin: 4px 0; }
   #roundrows .pill.sel { background: var(--hover-bg); border-color: currentColor; }
@@ -55,6 +56,11 @@
     <div class="card" id="schedpanel" style="flex:1;min-width:200px" hidden>
       <div class="rhead" style="margin-top:0">schedule</div>
       <div class="tablewrap"><table id="schedrows"></table></div>
+    </div>
+    <div class="card" id="tbpanel" style="flex:1;min-width:220px" hidden>
+      <div class="rhead" style="margin-top:0">tiebreakers</div>
+      <div class="muted" id="tbbase" style="font-size:12px;margin-bottom:4px"></div>
+      <div class="tablewrap"><table id="tbrows"></table></div>
     </div>
   </div>
 </div>

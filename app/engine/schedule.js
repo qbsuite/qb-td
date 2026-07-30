@@ -7,11 +7,14 @@
 //   { v: 1,
 //     rooms:  [{name, bucket}],            // bucket: D1 bucket id or null
 //     phases: [{name, rounds: [{round, games: [{room, a, b}], byes: [slot]}]}],
+//     pools:  {A: [team, ...], ...},       // pool formats only: membership
 //     updated: <ms> }
 // A slot is {team: "<exact roster name>"} for a real team, {label: "A1"}
-// for a playoff placeholder, or null for an empty editor slot. Round
-// numbers are global and sequential across phases (they are packet
-// round numbers).
+// for a playoff placeholder ("A1" = pool A's 1st-place finisher), or null
+// for an empty editor slot. Round numbers are global and sequential
+// across phases (they are packet round numbers). `pools` records which
+// teams the generator seeded into each pool, so placeholders can later
+// be filled from standings (fillPlaceholders).
 
 function slotEq(a, b) {
   if (!a || !b) return false;
@@ -267,6 +270,7 @@ export function buildSchedule(key, teams, rooms) {
   const teamSlot = (i) => ({ team: teams[i] });
   const phases = [];
   const all = teams.map((_, i) => i);
+  let poolRecord = null; // pool formats record membership for fillPlaceholders
 
   const repeat = /^rr([234])$/.exec(key);
   if (key === 'rr') {
@@ -283,6 +287,8 @@ export function buildSchedule(key, teams, rooms) {
     const k = Number(key.slice(5));
     const sizes = poolSizes(teams.length, k);
     const pools = snakePools(teams.length, sizes);
+    poolRecord = {};
+    pools.forEach((idxs, p) => { poolRecord[POOL_LETTERS[p]] = idxs.map((i) => teams[i]); });
     const prelim = rrPhase('Prelims', pools, rooms.length, 1, teamSlot);
     const next = prelim.rounds.length + 1;
     // playoff slots are placeholders ("A1" = pool A's 1st place) the TD
@@ -343,7 +349,13 @@ export function buildSchedule(key, teams, rooms) {
         rrPhase('Playoffs', posPools, rooms.length, next, (i) => slots[i]));
     }
   }
-  return { v: 1, rooms: rooms.map((r) => ({ name: r.name, bucket: r.bucket ?? null })), phases, updated: 0 };
+  return {
+    v: 1,
+    rooms: rooms.map((r) => ({ name: r.name, bucket: r.bucket ?? null })),
+    phases,
+    ...(poolRecord ? { pools: poolRecord } : {}),
+    updated: 0,
+  };
 }
 
 /* ---------- editing ---------- */
@@ -395,6 +407,127 @@ export function addRound(schedule, phaseIndex) {
 export function removeRound(schedule, phaseIndex, roundIndex) {
   schedule.phases[phaseIndex].rounds.splice(roundIndex, 1);
   renumber(schedule);
+}
+
+/** Insert an empty round after roundIndex within a phase (-1 inserts at
+    the phase's start). Later rounds renumber. */
+export function insertRound(schedule, phaseIndex, afterRoundIndex) {
+  const games = schedule.rooms.map((_, i) => ({ room: i, a: null, b: null }));
+  schedule.phases[phaseIndex].rounds.splice(afterRoundIndex + 1, 0,
+    { round: 0, games, byes: [] });
+  renumber(schedule);
+}
+
+/**
+ * Swap the matches in two grid cells ({p, r, room} each), possibly in
+ * different rounds or phases: whole games trade places, teams riding
+ * along. A cell without a game receives the other cell's game (the move
+ * case); two empty cells are a no-op.
+ */
+export function swapCells(schedule, c1, c2) {
+  const round1 = schedule.phases[c1.p].rounds[c1.r];
+  const round2 = schedule.phases[c2.p].rounds[c2.r];
+  const g1 = round1.games.find((g) => g.room === c1.room);
+  const g2 = round2.games.find((g) => g.room === c2.room);
+  if (g1 === g2) return;
+  const move = (game, from, to, toRoom) => {
+    from.games.splice(from.games.indexOf(game), 1);
+    game.room = toRoom;
+    to.games.push(game);
+  };
+  if (g1 && g2) {
+    move(g1, round1, round2, c2.room);
+    move(g2, round2, round1, c1.room);
+  } else if (g1) {
+    move(g1, round1, round2, c2.room);
+  } else if (g2) {
+    move(g2, round2, round1, c1.room);
+  }
+  round1.games.sort((x, y) => x.room - y.room);
+  if (round2 !== round1) round2.games.sort((x, y) => x.room - y.room);
+}
+
+/** Append a room column (empty in every round). */
+export function addRoomCol(schedule, name) {
+  schedule.rooms.push({ name, bucket: null });
+}
+
+/**
+ * Remove a room column. Teams in that column's games drop to their
+ * round's byes (nothing is lost); games in later columns shift left.
+ */
+export function removeRoomCol(schedule, roomIndex) {
+  for (const ph of schedule.phases) {
+    for (const round of ph.rounds) {
+      const g = round.games.find((x) => x.room === roomIndex);
+      if (g) {
+        if (g.a) round.byes.push(g.a);
+        if (g.b) round.byes.push(g.b);
+        round.games.splice(round.games.indexOf(g), 1);
+      }
+      for (const x of round.games) if (x.room > roomIndex) x.room--;
+    }
+  }
+  schedule.rooms.splice(roomIndex, 1);
+}
+
+/* ---------- playoff placeholders ---------- */
+
+const PH_RE = /^([A-D])(\d+)$/;
+
+/** True when any slot in the schedule is still a placeholder. */
+export function hasPlaceholders(schedule) {
+  for (const ph of schedule.phases) {
+    for (const round of ph.rounds) {
+      for (const g of round.games) if ((g.a && g.a.label) || (g.b && g.b.label)) return true;
+      if (round.byes.some((s) => s && s.label)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Pool-by-pool finish order from overall standings. pools: {A: [names]}
+ * (schedule.pools); rankedNames: team names best-first (aggregate()
+ * standings order). Teams with no games yet keep their pool (seed) order,
+ * after any ranked teams.
+ */
+export function poolStandings(pools, rankedNames) {
+  const rank = new Map(rankedNames.map((n, i) => [n, i]));
+  const out = {};
+  for (const [letter, members] of Object.entries(pools || {})) {
+    out[letter] = [...members].sort((x, y) =>
+      (rank.has(x) ? rank.get(x) : Infinity) - (rank.has(y) ? rank.get(y) : Infinity));
+  }
+  return out;
+}
+
+/**
+ * Replace playoff placeholder slots ("A1" = pool A's 1st) with real teams
+ * from per-pool finish order ({A: [names best-first]}). Slots whose pool
+ * or position is unknown stay placeholders. Returns how many were filled.
+ */
+export function fillPlaceholders(schedule, poolRanks) {
+  let filled = 0;
+  const resolve = (slot) => {
+    if (!slot || !slot.label) return slot;
+    const m = PH_RE.exec(slot.label);
+    if (!m) return slot;
+    const team = (poolRanks[m[1]] || [])[Number(m[2]) - 1];
+    if (!team) return slot;
+    filled++;
+    return { team };
+  };
+  for (const ph of schedule.phases) {
+    for (const round of ph.rounds) {
+      for (const g of round.games) {
+        g.a = resolve(g.a);
+        g.b = resolve(g.b);
+      }
+      round.byes = round.byes.map(resolve);
+    }
+  }
+  return filled;
 }
 
 /**

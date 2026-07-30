@@ -10,7 +10,8 @@ import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText } from '../app/engine/schedule.js';
+import { serializeYft } from '../app/engine/yft.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
@@ -19,7 +20,7 @@ import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzke
 // roster builder's output must satisfy it, since read.html feeds the
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
-import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -1609,6 +1610,218 @@ test('archive captures carry no question text', () => {
     })(data, slug);
     assert.deepEqual(long, [], slug + ' has unexpected long strings');
   }
+});
+
+/* ---------- schedule editing: insert / cell swaps / room columns ---------- */
+
+test('insertRound inserts mid-phase and renumbers', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 4), ROOMS4.slice(0, 2));
+  insertRound(s, 0, 0); // after round 1
+  const rounds = flatRounds(s);
+  assert.equal(rounds.length, 4);
+  rounds.forEach((r, i) => assert.equal(r.round, i + 1));
+  assert.deepEqual(rounds[1].games.map((g) => [g.a, g.b]), [[null, null], [null, null]]);
+  insertRound(s, 0, -1); // at the phase's start
+  assert.deepEqual(flatRounds(s)[0].games.map((g) => g.a), [null, null]);
+});
+
+test('swapCells trades matches between rooms, rounds, and empty cells', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 6), ROOMS4.slice(0, 3));
+  const at = (r, room) => s.phases[0].rounds[r].games.find((g) => g.room === room) || null;
+  // same round, two occupied cells: whole matches trade rooms
+  const [a0, b0] = [at(0, 0), at(0, 1)];
+  swapCells(s, { p: 0, r: 0, room: 0 }, { p: 0, r: 0, room: 1 });
+  assert.equal(at(0, 0), b0);
+  assert.equal(at(0, 1), a0);
+  assert.equal(at(0, 0).room, 0);
+  // cross-round swap: matches move between rounds
+  const [x, y] = [at(0, 2), at(1, 0)];
+  swapCells(s, { p: 0, r: 0, room: 2 }, { p: 0, r: 1, room: 0 });
+  assert.equal(at(1, 0), x);
+  assert.equal(at(0, 2), y);
+  // occupied <-> empty game: the match moves, the empty cell trades back
+  insertRound(s, 0, 4);
+  const moved = at(0, 0);
+  swapCells(s, { p: 0, r: 0, room: 0 }, { p: 0, r: 5, room: 1 });
+  assert.equal(at(0, 0).a, null, 'the empty game traded into the old cell');
+  assert.equal(at(5, 1), moved);
+  assert.equal(moved.room, 1);
+  // a truly game-less cell also works: the match just moves there
+  s.phases[0].rounds[5].games = s.phases[0].rounds[5].games.filter((g) => g.room !== 0);
+  swapCells(s, { p: 0, r: 5, room: 1 }, { p: 0, r: 5, room: 0 });
+  assert.equal(at(5, 1), null);
+  assert.equal(at(5, 0), moved);
+  assert.equal(moved.room, 0);
+  // games stay room-sorted
+  for (const round of s.phases[0].rounds) {
+    const rooms = round.games.map((g) => g.room);
+    assert.deepEqual(rooms, [...rooms].sort((p, q) => p - q));
+  }
+});
+
+test('addRoomCol/removeRoomCol keep teams and shift columns', () => {
+  const s = buildSchedule('rr', TEAMS8.slice(0, 6), ROOMS4.slice(0, 3));
+  addRoomCol(s, 'Room X');
+  assert.equal(s.rooms.length, 4);
+  assert.deepEqual(s.rooms[3], { name: 'Room X', bucket: null });
+  const round0 = s.phases[0].rounds[0];
+  const g1 = round0.games.find((g) => g.room === 1);
+  const [ta, tb] = [g1.a, g1.b];
+  removeRoomCol(s, 1);
+  assert.equal(s.rooms.length, 3);
+  assert.ok(round0.byes.includes(ta) && round0.byes.includes(tb), 'teams dropped to byes');
+  assert.ok(!round0.games.some((g) => g.a === ta || g.b === tb));
+  // the old room 2 column shifted to index 1
+  assert.deepEqual([...new Set(round0.games.map((g) => g.room))].sort(), [0, 1]);
+});
+
+/* ---------- playoff placeholders: pools, standings, fill ---------- */
+
+test('buildSchedule pools2 records snake-seeded pool membership', () => {
+  const s = buildSchedule('pools2', TEAMS8, ROOMS4);
+  // snake: seed 1 -> A, 2 -> B, then back (3 -> B, 4 -> A), ...
+  assert.deepEqual(s.pools, { A: ['A', 'D', 'E', 'H'], B: ['B', 'C', 'F', 'G'] });
+  const rr = buildSchedule('rr', TEAMS8, ROOMS4);
+  assert.equal(rr.pools, undefined);
+});
+
+test('poolStandings ranks pool members by overall standings', () => {
+  const pools = { A: ['A', 'D', 'E', 'H'], B: ['B', 'C', 'F', 'G'] };
+  const ranked = ['H', 'B', 'A', 'G', 'D', 'C']; // E and F unranked (no games)
+  assert.deepEqual(poolStandings(pools, ranked), {
+    A: ['H', 'A', 'D', 'E'],
+    B: ['B', 'G', 'C', 'F'],
+  });
+});
+
+test('fillPlaceholders replaces placeholders from pool finish order', () => {
+  const s = buildSchedule('pools2', TEAMS8, ROOMS4);
+  assert.ok(hasPlaceholders(s));
+  // remember what label sat in every playoff slot
+  const want = { A1: 'H', A2: 'A', A3: 'D', A4: 'E', B1: 'B', B2: 'G', B3: 'C', B4: 'F' };
+  const expected = [];
+  for (const round of s.phases[1].rounds) {
+    for (const g of round.games) expected.push([g, 'a', want[g.a.label]], [g, 'b', want[g.b.label]]);
+  }
+  const filled = fillPlaceholders(s, {
+    A: ['H', 'A', 'D', 'E'], B: ['B', 'G', 'C', 'F'],
+  });
+  assert.ok(filled >= expected.length, 'byes fill too');
+  assert.ok(!hasPlaceholders(s));
+  for (const [g, side, team] of expected) assert.equal(g[side].team, team);
+  assert.deepEqual(validateSchedule(s, TEAMS8), []);
+  // an unknown pool letter or missing rank stays a placeholder
+  const s2 = buildSchedule('pools2', TEAMS8, ROOMS4);
+  const partial = fillPlaceholders(s2, { A: ['H'] });
+  assert.ok(partial > 0 && hasPlaceholders(s2));
+});
+
+/* ---------- tiebreakers (reader core) ---------- */
+
+const TB_POOL = {
+  tossups: [
+    { id: 'TU1', from: 'tb.json', question: 'q1', answer: 'Mozart' },
+    { id: 'TU2', from: 'tb.json', question: 'q2', answer: 'Krebs' },
+  ],
+  bonuses: [
+    { id: 'B1', from: 'tb.json', leadin: 'l', parts: ['p'], answers: ['x'], values: [10] },
+  ],
+  uses: [{ q: 'TU1', round: 5, room: 'Room 1', teams: ['Alpha', 'Beta'], at: 1 }],
+};
+
+test('normalizeTbPool filters junk and keeps uses', () => {
+  const pool = normalizeTbPool(TB_POOL);
+  assert.equal(pool.tossups.length, 2);
+  assert.equal(pool.bonuses.length, 1);
+  assert.equal(pool.uses.length, 1);
+  assert.equal(normalizeTbPool({ tossups: [{ id: 'TU1' }] }), null); // no question text
+  assert.equal(normalizeTbPool(null), null);
+  assert.equal(normalizeTbPool({ tossups: [] }), null);
+});
+
+test('tbSelection picks in pool order with matching id lists', () => {
+  const pool = normalizeTbPool(TB_POOL);
+  // selection order does not matter: pool order rules, so the id lists
+  // always line up with where the questions land in the packet
+  const sel = tbSelection(pool, new Set(['B1', 'TU1']));
+  assert.deepEqual(sel.tu, ['TU1']);
+  assert.deepEqual(sel.bo, ['B1']);
+  assert.equal(sel.tossups.length, 1);
+  assert.equal(sel.tossups[0].question, 'q1');
+  assert.equal(sel.tossups[0].id, undefined, 'pool bookkeeping stripped');
+  assert.equal(sel.bonuses[0].leadin, 'l');
+  const both = tbSelection(pool, ['TU2', 'TU1']);
+  assert.deepEqual(both.tu, ['TU1', 'TU2'], 'pool order, not selection order');
+  const none = tbSelection(pool, []);
+  assert.deepEqual(none, { tossups: [], bonuses: [], tu: [], bo: [] });
+  assert.deepEqual(tbSelection(null, ['TU1']), { tossups: [], bonuses: [], tu: [], bo: [] });
+});
+
+test('tbUsedIds maps read questions past the base packet', () => {
+  const tb = { t: 20, b: 20, tu: ['TU1', 'TU2'], bo: ['B1'] };
+  const match = { match_questions: [
+    { tossup_question: { question_number: 20 } },                       // regulation
+    { tossup_question: { question_number: 21 },                        // TU1 read...
+      replacement_tossup_question: { question_number: 22 },            // ...thrown out, TU2 replaces
+      bonus: { question: { question_number: 21 } } },                  // B1 awarded
+    { tossup_question: { question_number: 22 } },                      // TU2 again: deduped
+    { tossup_question: { question_number: 99 } },                      // out of pool range: ignored
+  ] };
+  assert.deepEqual(tbUsedIds(match, tb), ['TU1', 'TU2', 'B1']);
+  assert.deepEqual(tbUsedIds(match, null), []);
+  assert.deepEqual(tbUsedIds({}, tb), []);
+});
+
+test('combinedUpload carries tb.used when given, omits it otherwise', () => {
+  const match = { tossups_read: 21, match_teams: [] };
+  const withTb = JSON.parse(combinedUpload(match, 5, '{"cycles":[]}', ['TU1']));
+  assert.deepEqual(withTb.tb, { used: ['TU1'] });
+  assert.equal(withTb.qbj._round, 5);
+  const emptyTb = JSON.parse(combinedUpload(match, 5, null, []));
+  assert.deepEqual(emptyTb.tb, { used: [] }, 'empty report still clears an old log');
+  const noTb = JSON.parse(combinedUpload(match, 5, null));
+  assert.equal(noTb.tb, undefined);
+});
+
+test('tbPanelRows merges tossups and bonuses with their uses', () => {
+  const rows = tbPanelRows(normalizeTbPool(TB_POOL));
+  assert.deepEqual(rows.map((r) => r.id), ['TU1', 'TU2', 'B1']);
+  assert.equal(rows[0].heard.length, 1);
+  assert.deepEqual(rows[0].heard[0].teams, ['Alpha', 'Beta']);
+  assert.equal(rows[1].heard.length, 0);
+  assert.deepEqual(tbPanelRows(null), []);
+});
+
+/* ---------- tricky roster names: commas + quotes survive every consumer ---------- */
+
+test('roster names with commas and quotes round-trip our parser, MODAQ, and .yft', () => {
+  const tricky = [
+    { name: 'St. John’s "A"', players: ['Robert Smith, Jr.', 'Mary O’Brien'] },
+    { name: 'Comma, The Team', players: ['Jean-Luc "JL" Picard'] },
+  ];
+  const qbj = buildRosterQbj('Tricky Open', tricky);
+  assert.deepEqual(parseRoster(qbj), tricky);
+  // MODAQ's own registration parser (what read.html feeds the roster into)
+  const reg = parseRegistration(JSON.stringify(qbj));
+  assert.ok(reg.success, reg.message);
+  const teamNames = new Set(reg.value.map((p) => p.teamName));
+  const playerNames = new Set(reg.value.map((p) => p.name));
+  for (const t of tricky) {
+    assert.ok(teamNames.has(t.name), t.name);
+    for (const p of t.players) assert.ok(playerNames.has(p), p);
+  }
+  // .yft serialization stays valid JSON with the names intact
+  const m = parseMatch(modaqMatch({ round: 1,
+    teamA: { name: tricky[0].name, bonusPoints: 30,
+      players: [{ name: tricky[0].players[0], counts: { 10: 2 } }] },
+    teamB: { name: tricky[1].name, bonusPoints: 0,
+      players: [{ name: tricky[1].players[0], counts: { 10: 1 } }] },
+  }));
+  const yft = serializeYft({ name: 'Tricky Open', matches: [m], roster: tricky });
+  const parsedYft = JSON.parse(yft);
+  assert.ok(parsedYft && typeof parsedYft === 'object');
+  assert.ok(yft.includes('Robert Smith, Jr.'));
+  assert.ok(yft.includes(JSON.stringify(tricky[0].name).slice(1, -1)), 'quotes escaped, name intact');
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

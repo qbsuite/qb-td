@@ -627,6 +627,89 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
   ok('part respects the ownership boundary', badPart.status === 403);
 }
 
+// tiebreakers: the TO's packet splits into individually tracked questions,
+// the reader pool serves them (with the usage log), and reader uploads log
+// exactly which questions each match read
+{
+  r = await call('/b/' + secret + '/tiebreakers');
+  ok('no tiebreakers 404', r.status === 404);
+  const TBPACKET = JSON.stringify({
+    tossups: [
+      { question: 'tb tossup one', answer: 'Mozart' },
+      { question: 'tb tossup two', answer: 'the Krebs cycle' },
+    ],
+    bonuses: [{ leadin: 'lead', parts: ['p1', 'p2', 'p3'],
+      answers: ['x', 'y', 'z'], values: [10, 10, 10] }],
+  });
+  r = await call(`${A}/tiebreakers?name=tb.json`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: TBPACKET });
+  ok('tiebreaker packet splits', r.status === 200 && r.body.added.tossups === 2
+    && r.body.added.bonuses === 1 && r.body.tossups === 2, r.body);
+  r = await call(`${A}/tiebreakers?name=tb2.docx`, { method: 'POST', body: 'x' });
+  ok('docx tiebreaker rejected', r.status === 400, r.body);
+  r = await call(`${A}/tiebreakers?name=tb2.json`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tossups: [{ question: 'tb three', answer: 'Treaty of Ghent' }] }) });
+  ok('second tiebreaker packet appends with continuing ids',
+    r.status === 200 && r.body.tossups === 3, r.body);
+  r = await call(`${A}/tiebreakers?name=bad.json`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tossups: [{ question: 'no answer' }] }) });
+  ok('tossup without answer rejected', r.status === 400, r.body);
+  r = await call('/b/' + secret + '/tiebreakers');
+  ok('reader pool served with ids and empty log',
+    r.status === 200 && r.body.tossups.length === 3
+    && r.body.tossups[0].id === 'TU1' && r.body.tossups[2].id === 'TU3'
+    && r.body.bonuses[0].id === 'B1' && r.body.uses.length === 0, r.body);
+
+  // a reader upload reports which pool questions its game read
+  const q = JSON.parse(MATCH);
+  q._round = 5;
+  r = await call(`/b/${secret}/upload?round=5&name=Round_5_Alpha_Beta.qbtd.json`,
+    { method: 'POST', body: JSON.stringify({ qbj: q, game: { cycles: [] },
+      tb: { used: ['TU2', 'B1', 'NOPE'] } }) });
+  ok('tb-reporting upload accepted', r.status === 200 && r.body.error === null, r.body);
+  const tbFile1 = r.body.id;
+  r = await call('/b/' + secret + '/tiebreakers');
+  ok('usage logged with the match',
+    r.body.uses.length === 2
+    && r.body.uses.every((u) => u.round === 5 && u.room === 'Room 1'
+      && u.teams.join(',') === 'Alpha,Beta')
+    && r.body.uses.map((u) => u.q).sort().join(',') === 'B1,TU2', r.body.uses);
+
+  // a re-export of the same game replaces its log instead of double-counting
+  r = await call(`/b/${secret}/upload?round=5&name=Round_5_Alpha_Beta.qbtd.json`,
+    { method: 'POST', body: JSON.stringify({ qbj: q, game: { cycles: [] },
+      tb: { used: ['TU3'] } }) });
+  const tbFile2 = r.body.id;
+  r = await call('/b/' + secret + '/tiebreakers');
+  ok('re-export replaces the game log',
+    r.body.uses.length === 1 && r.body.uses[0].q === 'TU3', r.body.uses);
+
+  // clean up so the later file counts hold
+  await call(`${A}/files/${tbFile1}`, { method: 'DELETE' });
+  await call(`${A}/files/${tbFile2}`, { method: 'DELETE' });
+  r = await call(`${A}/tiebreakers`, { method: 'DELETE' });
+  ok('tiebreaker pool deleted', r.status === 200);
+  r = await call('/b/' + secret + '/tiebreakers');
+  ok('deleted pool 404', r.status === 404);
+}
+
+// bucket rename: the TO edits a room name in place
+{
+  const bid = (await call(A)).body.buckets[0].id;
+  r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: 'Library 204' } });
+  ok('bucket renamed', r.status === 200 && r.body.room_name === 'Library 204', r.body);
+  r = await call('/b/' + secret);
+  ok('rename reflected in bucket state', r.body.room === 'Library 204', r.body.room);
+  r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: 'Room 1' } });
+  ok('rename back', r.status === 200);
+  r = await call(`${A}/buckets/999999`, { method: 'POST', json: { room_name: 'X' } });
+  ok('rename unknown room 404', r.status === 404, r.body);
+  r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: '  ' } });
+  ok('empty rename rejected', r.status === 400, r.body);
+}
+
 // filenames longer than the 100-char storage cap keep their suffix, so kind
 // detection still sees "_Game.json" / ".qbj" (real MODAQ names with two long
 // team names overflow the cap)

@@ -12,44 +12,60 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **TO dashboard** (`app/index.html`, no account): creating a tournament
   mints an unguessable admin link — the only credential, shown once with a
   save-this-link warning, remembered in that device's localStorage, and
-  dead 48 hours after creation. From it: add a bucket per room, hand each
-  moderator their private link, set the round count and the live round,
-  upload packets per round — one at a time, or a whole zip whose files are
-  dragged onto their round slots (filenames carrying a round number can be
-  auto-assigned) — create the roster in a text editor (one `Team: Player,
-  Player` line per team; downloadable, or saved as the tournament's
-  MODAQ-compatible roster.qbj) or upload an existing roster qbj, set the
-  reader game format — a MODAQ preset plus every customize-dialog field
-  (paired bonuses, bouncebacks, powers, neg value, overtime rules,
-  pronunciation marks), stored as overrides on the preset so it applies
-  to every room — download any file, compute stats, export, rotate the
-  admin link if it leaks. Layout: a status strip tracks the live round
-  (packet up, games in vs scheduled, which rooms are still out) with
-  one-click advance next to the free set-any-round control (advance
-  hides at the last planned round); below it three collapsible drawers —
-  **broadcasts** (one line, up to 200 characters, addressed to the public
-  page and/or the rooms — every room, or a checked few — as a note or an
+  dead 48 hours after creation. Two views. **Tournament Setup** is the
+  before-the-day work, four steps with a done-state pill each:
+  **Rooms** (create N at once — Room 1…N, renamed inline in the table —
+  each room a bucket whose private reader/bucket links go to its
+  moderator), **Packets + Tiebreakers** (every upload is one button that
+  opens the picker — a whole zip staged as chips dragged onto round
+  slots, filenames carrying a round number auto-assigned without ever
+  overwriting an uploaded round, or loose files the same way; a
+  tiebreaker packet is split into individually tracked questions — see
+  below), **Roster** (structured editor: one card per team, one field
+  per name — so commas in *Smith, Jr.* and quotes in *St. John's "A"*
+  can never split a name, verified against MODAQ's and YellowFruit's own
+  parsers — Tab/Enter grows the player list, card order is seed order
+  with reorder arrows; or upload an existing roster qbj, previewed
+  before it saves), and **Schedule** (pick a format for the team/room
+  count — full round robin; double, triple, or quadruple RR for small
+  fields; 2 pools with carryover crossover playoffs; 3-4 pools
+  regrouping by finish position — clean-room circle-method pairings,
+  snake-seeded from roster order — then edit anywhere in the grid:
+  click a slot for a dropdown of teams still free that round, drag
+  chips to swap teams, drag a match box (or its ⇄ handle) to trade
+  whole matches between any two cells, insert or delete rounds from any
+  row, add or drop room columns (a dropped column's teams land in the
+  bye tray), and link each schedule room to a bucket. Playoff slots are
+  placeholders ("A1" = pool A's 1st) — **Fill playoff slots from
+  standings** resolves them from the collected games' standings once
+  prelims are in, and hand-editing stays the override). The **Live Hub**
+  is the day-of page, carrying a notice until setup is complete: a
+  status strip tracks the live round (packet up, games in vs scheduled,
+  which rooms are still out, tiebreakers used vs unused) with one-click
+  advance next to the free set-any-round control; the **broadcasts**
+  drawer (one line, up to 200 characters, addressed to the public page
+  and/or the rooms — every room, or a checked few — as a note or an
   alert, with a mandatory expiry from 30 minutes to the tournament's own
-  close; a table of what's live, each removable, and the drawer's summary
-  carries the newest one so a collapsed drawer still answers "what did I
-  tell people?"),
-  **tournament setup** (rooms as a table, packet rounds as a chip row
-  that doubles as download links and zip-drag targets, roster, and the
-  set-once settings: public page, game format, admin link; auto-open
-  until a roster and a room exist) and **schedule** — then uploads
-  grouped by round with a completeness pill per group (current round
-  open by default) and stats + export, with the buzzpoints control
-  beside the export buttons. Once a
-  roster exists, a **schedule creator**:
-  pick a format for the team/room count (full round robin; double,
-  triple, or quadruple RR for small fields; 2 pools with carryover
-  crossover playoffs; 3-4 pools regrouping by finish position —
-  clean-room circle-method pairings), then edit freely
-  in a grid — click two slots to swap, assign any slot from a dropdown,
-  move a whole game to another room (click its ⇄ handle, then the
-  target room; an occupied target trades games), add/remove rounds,
-  rename rooms, and link each schedule room to a bucket. Playoff slots are placeholders ("A1" = pool A winner) filled
-  in after prelims.
+  close; a table of what's live, each removable, and the drawer's
+  summary carries the newest one so a collapsed drawer still answers
+  "what did I tell people?"); settings (public page, reader game
+  format — a MODAQ preset plus every field of MODAQ's own customize
+  dialog, stored as overrides so it applies to every room — and
+  admin-link rotation for leaks); stats + export with the buzzpoints
+  control; and uploads grouped by round with a completeness pill per
+  group (current round open by default).
+- **Tiebreakers**: a tiebreaker packet uploads once and is split into
+  individually tracked questions (TU1, TU2, … B1, …), answerlines shown
+  on the dashboard. In every room's MODAQ, **Actions → Add questions…**
+  lists the pool — each question with who has already heard it — and
+  appends exactly the picked question to the end of the packet, mid-game,
+  through MODAQ's own supported path (thrown-out tossups and tied games
+  both land there naturally). Every "Upload to qb-td" reports which pool
+  questions the game actually read, so the dashboard log always says
+  which teams have heard which question — a re-export of the same game
+  replaces its entries instead of double-counting, and a question is
+  logged only when it was truly read (an added-but-unreached question
+  stays unused).
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads any played
   round's packet (the live round is highlighted; future rounds stay
@@ -62,9 +78,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   TO's game format — the mod picks the round and two teams and reads.
   With a schedule whose room is linked to this bucket, the pickers
   preselect the round's scheduled matchup (still overridable) and the
-  room's schedule line shows above the round list. "Upload to qb-td" in MODAQ's
+  room's schedule line shows above the round list; a tiebreaker pool
+  shows beside it with each question's heard-by state, and during a game
+  the pool lives in MODAQ's Actions → Add questions dialog (qb-td's own
+  selector, swapped in at bundle time — the stock file picker stays as
+  its fallback). "Upload to qb-td" in MODAQ's
   menu sends one `.qbtd.json` per game into the bucket — the match qbj plus
-  the full game state in a single file; no file downloads or uploads. The
+  the full game state in a single file, plus which tiebreaker questions
+  the game read; no file downloads or uploads. The
   dashboard and public routes split the qbj back out wherever a bare `.qbj`
   is needed (stats, the zip export, public downloads) — the game half,
   which contains the packet text, never leaves the TO side. Starting a game mints a per-game URL
@@ -160,7 +181,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   the buzzpoints packet route (`/pub/:slug/qpacket`), which the TO
   explicitly enables (password-gated or public) and which serves played
   rounds only, under the same future-round lock. Bucket links also serve the roster (the
-  reader page preloads it); rosters aren't question material.
+  reader page preloads it); rosters aren't question material. The
+  tiebreaker pool (question text included) is served only through admin
+  and bucket links — the same trust level as packets; only the
+  bucket-side copy carries the usage log the reader panel shows.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
   that leaks into a crawler or an outbound click doesn't spread.
 - **Request economics** (Cloudflare free tier): the public page
@@ -198,8 +222,11 @@ Part of [qbsuite](https://qbsuite.github.io/).
   static host; served at `qbsuite.github.io/qb-td/app/`. `archive.html` +
   `archive/` are the archive page and its committed captures. The reader page
   is `read.html` + `js/read.bundle.js`, a committed esbuild bundle of
-  MODAQ (rebuild with `npm run build:read` after editing
-  `js/read_main.js` / `js/read_core.js` or bumping the `modaq` dep;
+  MODAQ (rebuild with `npm run build:read` — `tools/build_read.mjs`,
+  which also swaps MODAQ's stock Add Questions dialog for the tiebreaker
+  selector `js/tb_add_dialog.js`, bridged to the page by
+  `js/tb_bridge.js` — after editing `js/read_main.js` /
+  `js/read_core.js` / `js/tb_add_dialog.js` or bumping the `modaq` dep;
   `read_core.js` holds the pure, unit-tested helpers).
 - `worker/` — Cloudflare Worker (D1 metadata + R2 blobs). Auth model:
   admin link secret for the TO API (48h lifetime), bucket secret for

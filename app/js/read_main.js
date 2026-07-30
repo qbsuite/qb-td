@@ -25,8 +25,9 @@ import { annStrip } from './announce.js';
 import {
   normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
-  staleGameKeys, roundRows,
+  staleGameKeys, roundRows, normalizeTbPool, tbUsedIds, tbPanelRows,
 } from './read_core.js';
+import { tbBridge } from './tb_bridge.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
@@ -42,6 +43,17 @@ let packet = null;  // normalized IPacket
 let sched = null;      // tournament schedule (when the TO made one)
 let schedRoom = null;  // this bucket's room index in it
 let defaultPick = { a: '', b: '' }; // last schedule preselect, so overrides stick
+let tbPool = null;  // TO's tiebreaker pool (offered in Add Questions)
+
+// Non-blocking pool fetch: fills the Add Questions dialog whenever it
+// lands; a resumed game stays fully usable offline without it.
+function fetchTbPool() {
+  pub('/b/' + secret + '/tiebreakers').then((r) => {
+    tbPool = normalizeTbPool(r instanceof Response ? null : r);
+    tbBridge.pool = tbPool;
+    renderTbPanel();
+  }, () => { /* no pool: the dialog falls back to its file picker */ });
+}
 
 function say(text, bad = false) {
   $('msg').textContent = text || '';
@@ -119,6 +131,20 @@ function mountMODAQ(id, meta, isNew) {
   document.body.classList.add('reading');
   setHeader(meta.t, meta.room, meta.round, meta.a + ' vs ' + meta.b);
 
+  // The Add Questions dialog (tb_add_dialog.js) reads the pool and reports
+  // what the mod appended; the meta keeps the id mapping so the upload can
+  // say exactly which tiebreakers this game read.
+  tbBridge.pool = tbPool;
+  tbBridge.addedIds = () => (meta.tb ? [...meta.tb.tu, ...meta.tb.bo] : []);
+  tbBridge.onAdd = (sel, base) => {
+    // games from before the meta carried tb: start the mapping at the
+    // packet size the dialog saw before this append
+    if (!meta.tb) meta.tb = { t: base.t, b: base.b, tu: [], bo: [] };
+    meta.tb.tu.push(...sel.tu);
+    meta.tb.bo.push(...sel.bo);
+    localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
+  };
+
   const props = {
     persistState: true,
     storeName: gameKey(secret, id),
@@ -130,7 +156,11 @@ function mountMODAQ(id, meta, isNew) {
       onExport: async (match) => {
         try {
           const name = matchFilenames(meta.round, meta.a, meta.b).combined;
-          const body = combinedUpload(match, meta.round, localStorage.getItem(gameKey(secret, id)));
+          // games with appended tiebreakers report which ones were read,
+          // so the TD's usage log stays exact (worker logTbUses)
+          const body = combinedUpload(match, meta.round,
+            localStorage.getItem(gameKey(secret, id)),
+            meta.tb ? tbUsedIds(match, meta.tb) : null);
           const out = await pub(
             `/b/${secret}/upload?round=${meta.round}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body });
@@ -156,6 +186,28 @@ function mountMODAQ(id, meta, isNew) {
 }
 
 /* ---------- schedule defaults (bare-link path) ---------- */
+
+// Tiebreaker pool in the side panel: every question, and who has already
+// heard it — the mod checks with the TD which one to read, and this shows
+// at a glance which are burned for which teams. During a game the pool is
+// under MODAQ's Actions -> Add questions, which appends the picked
+// question to the end of the packet.
+function renderTbPanel() {
+  const rows = tbPanelRows(tbPool);
+  if (!rows.length) return;
+  $('tbpanel').hidden = false;
+  $('tbbase').textContent =
+    'During a game: Actions → Add questions… lists these; the one you pick is appended to the packet.';
+  $('tbrows').innerHTML = rows.map((r) => `
+    <tr>
+      <td class="roundcell">${esc(r.id)}</td>
+      <td class="muted">${esc(r.kind)}</td>
+      <td>${r.heard.length
+        ? r.heard.map((u) => `<span class="bad">heard</span> ${esc((u.teams || []).join(' & '))}
+            <span class="muted">(R${esc(String(u.round))}, ${esc(u.room || '')})</span>`).join('<br>')
+        : '<span class="ok">unused</span>'}</td>
+    </tr>`).join('');
+}
 
 // This room's schedule in the side panel: one row per round, round
 // number leading, current round highlighted.
@@ -242,6 +294,9 @@ function showTeams() {
     const meta = {
       a, b, round, packet: info.packet_name,
       t: state.tournament, room: state.room, started: Date.now(),
+      // tiebreakers enter via MODAQ's Add Questions dialog; the mapping
+      // starts at the packet's own size and grows as the mod adds them
+      tb: { t: packet.tossups.length, b: (packet.bonuses || []).length, tu: [], bo: [] },
     };
     localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
     history.replaceState(null, '', gameLink(id));
@@ -266,6 +321,7 @@ async function boot() {
       $('newgame').href = roomLink();
       return;
     }
+    fetchTbPool(); // refresh the Add Questions pool; the game itself is offline
     mountMODAQ(gid, meta, false);
     return;
   }
@@ -281,6 +337,8 @@ async function boot() {
   renderAnn(state.announce);
   // schedule-less tournaments: this quietly 404s and nothing changes
   const schedP = pub('/b/' + secret + '/schedule').then((r) => r, () => null);
+  // likewise tournaments without a tiebreaker pool
+  fetchTbPool();
 
   // rounds + this device's games render even if the roster fails to load
   const packets = state.packets || [];

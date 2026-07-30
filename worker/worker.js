@@ -40,6 +40,8 @@ const MAX_NAME = 120;
 const MAX_ANNOUNCE = 8;                  // live broadcasts per tournament
 const MAX_ANNOUNCE_TEXT = 200;
 const MAX_ANNOUNCE_JSON = 2048;
+const MAX_TB_BLOB = 8 * 1024 * 1024;     // tiebreaker pool blob cap
+const MAX_TB_USES = 500;                 // usage log cap (griefing backstop)
 
 /* ---------- responses ---------- */
 function corsHeaders(env) {
@@ -94,11 +96,14 @@ function cleanName(s) {
 }
 
 // The reader uploads ONE `.qbtd.json` per game: {qbj: <match>, game:
-// <MODAQ state>}. The game half holds the full packet text, so only the
-// extracted qbj half may ever reach the bundle or a public route.
+// <MODAQ state>, tb?: {used: [ids]}}. The game half holds the full packet
+// text, so only the extracted qbj half may ever reach the bundle or a
+// public route. `teams` (the two team names) and `root` (for the tb
+// field) ride along for the tiebreaker usage log.
 function extractMatch(text) {
-  let obj;
-  try { obj = JSON.parse(text); } catch (e) { return { error: 'not valid JSON' }; }
+  let root;
+  try { root = JSON.parse(text); } catch (e) { return { error: 'not valid JSON' }; }
+  let obj = root;
   if (obj && obj.qbj && typeof obj.qbj === 'object') obj = obj.qbj;
   let match = obj;
   if (match && Array.isArray(match.objects)) {
@@ -108,9 +113,13 @@ function extractMatch(text) {
   if (!Array.isArray(teams) || teams.length !== 2) {
     return { error: 'no match with exactly two match_teams' };
   }
+  const names = teams.map((mt) => {
+    const t = mt && mt.team;
+    return typeof t === 'string' ? t : (t && typeof t.name === 'string' ? t.name : '');
+  });
   // qbj: what the bundle stores (an {objects} wrapper is kept as-is —
   // the engine unwraps it — but a combined file contributes only .qbj).
-  return { error: null, qbj: obj };
+  return { error: null, qbj: obj, root, teams: names };
 }
 
 /* ---------- broadcasts ----------
@@ -363,6 +372,18 @@ async function deleteBucket(env, t, bucketId) {
     'DELETE FROM buckets WHERE id = ?1 AND tournament_id = ?2'
   ).bind(bucketId, t.id).run();
   return json(env, { ok: true });
+}
+
+async function renameBucket(request, env, t, bucketId) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const roomName = cleanName(body.room_name);
+  if (!roomName) return err(env, 400, 'room_name required');
+  const out = await env.DB.prepare(
+    'UPDATE buckets SET room_name = ?3 WHERE id = ?1 AND tournament_id = ?2'
+  ).bind(bucketId, t.id, roomName).run();
+  if (!out.meta.changes) return err(env, 404, 'no such room');
+  return json(env, { id: bucketId, room_name: roomName });
 }
 
 /* Text-free per-question category map (t/<tid>/catmap.json, {rounds:
@@ -651,6 +672,141 @@ async function bucketSchedule(env, secret) {
   return json(env, { room: room === -1 ? null : room, schedule });
 }
 
+/* ---------- tiebreakers (R2 blob t/<tid>/tiebreakers.json) ----------
+   The TO uploads a tiebreaker packet; it is split into individually
+   trackable questions (TU1, B1, ...) because MODAQ adds tiebreakers to a
+   game one question at a time. Every room's reader appends the whole pool
+   to its packet, and each reader upload reports which pool questions the
+   game actually read (root.tb.used), so the log always says which teams
+   have heard which question. Blob shape:
+     {v: 1, seq: {t, b},
+      tossups: [{id, from, question, answer, ...}],
+      bonuses: [{id, from, leadin, parts, answers, values, ...}],
+      uses:    [{q, round, room, teams: [a, b], at}]}
+   Question text is served only through admin/bucket-authed routes — the
+   same trust level as packets. */
+
+const TB_KEY = (tid) => `t/${tid}/tiebreakers.json`;
+
+function emptyTbPool() {
+  return { v: 1, seq: { t: 0, b: 0 }, tossups: [], bonuses: [], uses: [] };
+}
+
+async function readTbPool(env, tid) {
+  const obj = await env.DATA.get(TB_KEY(tid));
+  if (!obj) return { cur: null, pool: emptyTbPool() };
+  const pool = await obj.json().catch(() => null);
+  if (!pool || pool.v !== 1 || !Array.isArray(pool.tossups)) {
+    return { cur: obj, pool: emptyTbPool() };
+  }
+  pool.bonuses = Array.isArray(pool.bonuses) ? pool.bonuses : [];
+  pool.uses = Array.isArray(pool.uses) ? pool.uses : [];
+  pool.seq = pool.seq && Number.isInteger(pool.seq.t) ? pool.seq : { t: 0, b: 0 };
+  return { cur: obj, pool };
+}
+
+async function writeTbPool(env, tid, mutate) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { cur, pool } = await readTbPool(env, tid);
+    const out = mutate(pool);
+    if (out && out.error) return out;
+    const text = JSON.stringify(pool);
+    if (text.length > MAX_TB_BLOB) return { error: 'tiebreaker pool too large' };
+    const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
+    try {
+      const put = await env.DATA.put(TB_KEY(tid), text, {
+        httpMetadata: { contentType: 'application/json' },
+        onlyIf,
+      });
+      if (put) return { error: null, pool };
+    } catch (e) { /* precondition failed -> retry */ }
+  }
+  console.log('tiebreaker update lost the retry race for tournament', tid);
+  return { error: 'concurrent update, try again' };
+}
+
+// POST /a/:secret/tiebreakers?name=... — split a packet JSON into pool
+// questions. Repeated uploads append (ids keep counting); the same rules
+// as the reader's own packet validation, so a pool question is guaranteed
+// to load in MODAQ.
+async function uploadTiebreakers(request, url, env, t) {
+  const name = cleanFilename(url.searchParams.get('name') || 'tiebreakers.json');
+  if (!/\.json$/i.test(name)) {
+    return err(env, 400, 'tiebreaker packets must be .json (docx cannot be split server-side)');
+  }
+  const body = await request.arrayBuffer();
+  if (!body.byteLength) return err(env, 400, 'empty body');
+  if (body.byteLength > MAX_PACKET) return err(env, 413, 'packet too large');
+  let parsed;
+  try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return err(env, 400, 'not valid JSON'); }
+  if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) {
+    return err(env, 400, 'packet JSON has no tossups array');
+  }
+  for (const q of parsed.tossups) {
+    if (!q || typeof q.question !== 'string' || typeof q.answer !== 'string') {
+      return err(env, 400, 'a tossup is missing question or answer text');
+    }
+  }
+  const bonuses = Array.isArray(parsed.bonuses) ? parsed.bonuses : [];
+  for (const b of bonuses) {
+    if (!b || !Array.isArray(b.parts) || !Array.isArray(b.answers)) {
+      return err(env, 400, 'a bonus is missing parts or answers');
+    }
+  }
+  const out = await writeTbPool(env, t.id, (pool) => {
+    for (const q of parsed.tossups) {
+      pool.tossups.push({ id: 'TU' + (++pool.seq.t), from: name, ...q });
+    }
+    for (const b of bonuses) {
+      pool.bonuses.push({ id: 'B' + (++pool.seq.b), from: name, ...b });
+    }
+  });
+  if (out.error) return err(env, 400, out.error);
+  return json(env, {
+    added: { tossups: parsed.tossups.length, bonuses: bonuses.length },
+    tossups: out.pool.tossups.length,
+    bonuses: out.pool.bonuses.length,
+  });
+}
+
+async function deleteTiebreakers(env, t) {
+  await env.DATA.delete(TB_KEY(t.id));
+  return json(env, { ok: true });
+}
+
+// GET /b/:secret/tiebreakers — the reader's copy of the pool: full
+// question text (packet trust level) plus the usage log, so the mod can
+// see which teams have already heard each question.
+async function bucketTiebreakers(env, secret) {
+  const b = await getBucketRow(env, secret);
+  if (!b) return err(env, 404, 'bad link');
+  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const obj = await env.DATA.get(TB_KEY(b.tournament_id));
+  if (!obj) return err(env, 404, 'no tiebreakers');
+  return blobResponse(env, obj, null);
+}
+
+// A reader upload reported which pool questions its game read. One game =
+// one log entry set: a re-export of the same game (same round + teams)
+// replaces its earlier entries instead of double-logging.
+async function logTbUses(env, tid, roomName, round, teams, usedIds) {
+  const { cur } = await readTbPool(env, tid);
+  if (!cur) return; // no pool: nothing to log against (and nothing to clear)
+  const pairKey = (ts) => [...ts].sort().join('\n');
+  const gameKey = round + '\n' + pairKey(teams);
+  await writeTbPool(env, tid, (pool) => {
+    const known = new Set([...pool.tossups, ...pool.bonuses].map((q) => q.id));
+    const ids = [...new Set(usedIds.filter((id) => known.has(id)))];
+    pool.uses = pool.uses.filter((u) =>
+      u.round + '\n' + pairKey(u.teams || []) !== gameKey);
+    const now = Date.now();
+    for (const q of ids) {
+      pool.uses.push({ q, round, room: roomName, teams, at: now });
+    }
+    pool.uses = pool.uses.slice(-MAX_TB_USES);
+  });
+}
+
 /* ---------- moderator bucket API (/b/*, secret-authed) ---------- */
 
 async function getBucketRow(env, secret) {
@@ -724,10 +880,18 @@ async function bucketUpload(request, url, env, secret) {
   const kind = isQbj ? 'qbj' : isCombined ? 'combined' : /_game\.json$/i.test(filename) ? 'game' : 'other';
   let error = null;
   let qbjObj = null;
+  let tbReport = null; // {teams, used} from a reader upload's tb field
   if (isQbj || isCombined) {
     const parsed = extractMatch(new TextDecoder().decode(buf));
     error = parsed.error;
     qbjObj = parsed.qbj || null;
+    if (!error && isCombined && parsed.root && parsed.root.tb
+      && Array.isArray(parsed.root.tb.used) && parsed.teams.every(Boolean)) {
+      tbReport = {
+        teams: parsed.teams,
+        used: parsed.root.tb.used.filter((x) => typeof x === 'string').slice(0, 200),
+      };
+    }
   }
 
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
@@ -745,6 +909,9 @@ async function bucketUpload(request, url, env, secret) {
         id: fileId, round, room: b.room_name, filename, qbj: qbjObj,
       });
     });
+  }
+  if (tbReport) {
+    await logTbUses(env, b.tournament_id, b.room_name, round, tbReport.teams, tbReport.used);
   }
   // Broadcasts ride back on the upload response: it's how the reader page
   // (which never polls) picks up new messages, at exactly the between-rounds
@@ -1063,6 +1230,7 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1]);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1]);
 
     // Public stats routes — publish-gated inside.
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1]);
@@ -1089,6 +1257,9 @@ export default {
       if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
       if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
+      if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
+      if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, t);
+      if (sub === '/tiebreakers' && method === 'DELETE') return deleteTiebreakers(env, t);
       if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
       if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
       if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);

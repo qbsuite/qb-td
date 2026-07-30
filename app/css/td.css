@@ -223,6 +223,62 @@ details.qd .qdbody { padding: 6px 10px 4px; border-bottom: 1px solid var(--line)
 .buzzlist .ok, .buzzlist .bad, .buzzlist .pow-t, .buzzlist .muted {
   font-variant-numeric: tabular-nums; font-weight: 600;
 }
+/* dashboard: Tournament Setup / Live Hub split */
+.tabs.bigtabs { margin-bottom: 10px; }
+.bigtabs .tab { font-size: 17px; padding: 8px 18px; }
+.bigtabs .ndot { color: var(--bad); font-weight: 700; }
+.banner {
+  border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px;
+  margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.step {
+  display: inline-flex; gap: 6px; align-items: center; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px; font-size: 13px;
+}
+.step.done { border-color: var(--ok); }
+.step.done .mark { color: var(--ok); }
+.step .mark { color: var(--muted); font-weight: 700; }
+.step:hover { background: var(--hover-bg); }
+/* roster editor */
+.playerline { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+.playerline input { flex: 1; min-width: 160px; }
+.xbtn {
+  border: none; color: var(--muted); background: none; cursor: pointer;
+  font-size: 15px; padding: 2px 6px; border-radius: 6px;
+}
+.xbtn:hover { color: var(--bad); border: none; }
+.xbtn:disabled { color: var(--line); }
+.seedmove { display: inline-flex; flex-direction: column; }
+.seedmove .xbtn { font-size: 9px; padding: 0 4px; line-height: 1.2; }
+.seedmove .xbtn:hover:not(:disabled) { color: var(--link); }
+/* schedule editor */
+.rowtools { display: inline-flex; gap: 2px; margin-left: 4px; visibility: hidden; }
+tr:hover .rowtools { visibility: visible; }
+.rowtools .xbtn { font-size: 13px; padding: 0 4px; }
+.byetray { min-width: 90px; min-height: 26px; border-radius: 8px; }
+.byetray.dragover { outline: 2px dashed var(--link); outline-offset: -2px; }
+th .colx { visibility: hidden; }
+th:hover .colx { visibility: visible; }
+.gamebox {
+  display: flex; align-items: center; gap: 2px; cursor: grab;
+  border: 1px solid transparent; border-radius: 8px; padding: 1px 3px;
+}
+.gamebox:hover { border-color: var(--line); }
+.gamebox.sel { border-color: var(--link); }
+.ghandle {
+  color: var(--muted); cursor: grab; user-select: none; padding: 2px 5px;
+  border-radius: 6px; font-size: 13px;
+}
+.ghandle:hover { color: var(--link); background: var(--hover-bg); }
+.gamebox.sel .ghandle { color: var(--link); }
+select.slotsel { padding: 2px 6px; font-size: 13px; max-width: 16ch; }
+/* tiebreaker splitter drop zone */
+.slotdrop {
+  border: 1px dashed var(--line); border-radius: 8px; padding: 6px 12px;
+  color: var(--muted); font-size: 13px;
+}
+.slotdrop.dragover { border-color: var(--link); background: var(--hover-bg); color: var(--fg); }
 .modalback {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
   display: flex; align-items: center; justify-content: center; z-index: 10;
