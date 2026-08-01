@@ -1,165 +1,205 @@
 {
- "name": "2025 VAULT Packet 3",
+ "name": "2022 ACF Winter Packet 3",
  "tossups": [
   {
-   "question": "<b>One of these objects owned by Michel Schwalbe </b><em>(“MI-shell SHVAHL-buh”)</em><b> was crafted by Dominique Peccatte </b><em>(“peh-KAHT”)</em><b>, who along with Eugene Sartory was a famed French maker of them. Leopold Stokowski pioneered a “free” style of utilizing these objects in Philadelphia. These objects are quite literally flipped upside down in order to perform the </b><em><b>col legno</b></em><b> technique.</b> (*) Pernambuco wood is often a source material for these objects which possess a “frog” and a “point.” Moving these objects lightly can produce a sautillé <em>(“soh-tee-AY”)</em> stroke. Rosin can be used to amplify the sound these objects produce. For 10 points, name these objects made of horsehair that are used to play string instruments.",
-   "answer": "<b><u>bow</u></b>s [accept specific types of <b><u>bow</u></b>s such as violin <b><u>bows</u></b> or viola <b><u>bow</u></b>s or cello <b><u>bow</u></b>s or bass <b><u>bow</u></b>s]",
-   "category": "Fine Arts",
-   "subcategory": "Auditory Fine Arts"
-  },
-  {
-   "question": "<b>This place is compared to a “mad and hallucinating deity” by people denounced as illustrating “deplorable taste and desperate ignorance.” A work repeatedly listing the letters M, C, and V was found in this place’s circuit 15-94. In one story, a footnote citing Letizia Álvarez de Toledo asserts that this place is “pointless.” Corpses are thrown over railings in this place where people search for (*)</b> “vindications.” The “purifiers” scramble through this place searching for a “Crimson Hexagon.<b>” </b>Infinite hexagonal rooms comprise, for 10 points, what place that contains all possible 410-page books in a short story by Jorge Luis Borges?",
-   "answer": "the <b><u>Library of Babel</u></b> [or La <b><u>biblioteca de Babel</u></b>]",
-   "category": "Literature",
-   "subcategory": "World Literature"
-  },
-  {
-   "question": "<b>Graphs named in analogy to these objects are used to visualize hierarchical clustering. Bootstrap aggregating of these structures is used in a machine learning method named for “random” places where they’re abundant. For a weighted undirected graph, Prim’s algorithm finds a</b> (*) “minimum spanning” structure named for these objects. These objects name a structure that, if balanced, can be searched in logarithmic time. Types of a structure named for these objects include AVL, red-black, and a binary search type. For 10 points, a branching data structure named for what objects may have “root nodes” and “leaves?”",
-   "answer": "<b><u>tree</u></b>s [accept minimum spanning <b><u>tree</u></b>s or AVL <b><u>tree</u></b>s or red-black <b><u>tree</u></b>s or binary search <b><u>tree</u></b>s or decision <b><u>tree</u></b>s; accept <b><u>dendrograms</u></b>; accept random <b><u>forest</u></b>s]",
-   "category": "Science",
-   "subcategory": "Other Science"
-  },
-  {
-   "question": "<b>The capacity of these devices is proportional to an expression raised to the dimensionless constant k according to one formulation of Peukert’s </b><em>(“POY-kert's”)</em><b> Law. S</b>•<b>S</b>•<b>Es such as L</b>•<b>L</b>•<b>Z</b>•<b>O are gaining traction to be utilized in one form of these devices, but remain challenged by dendrite formation. John Goodenough won the 2019 Nobel Prize in Chemistry for developing one type of these devices where a cation is intercalated into a graphite matrix. (*) </b>Sulfuric acid is used as an electrolyte in the lead-acid type of these devices. Nickel and cadmium name a common type of, for 10 points, what devices whose “lithium-ion” variant is rechargeable?",
-   "answer": "<b><u>batteries</u></b> [or <b><u>battery</u></b>; accept lithium-ion <b><u>battery</u></b> or Ni-Cad <b><u>battery</u></b> or or nickel-cadmium <b><u>battery</u></b>, or lead-acid <b><u>battery</u></b>] <em>(SSEs are solid-state electrolytes)</em>",
-   "category": "Science",
-   "subcategory": "Chemistry"
-  },
-  {
-   "question": "<b>Out of spite, a mogul in this industry built a Nob Hill mansion with a forty foot tall fence. Cyrus K. Holliday named a company in this industry for the town of Atchison, Kansas. Theodore Judah’s projects in this industry were financed by the “Big Four.” Schuyler Colfax’s political career ended after he fraudulently bought stock from (*) </b>Oakes Ames in this industry's Crédit Mobilier scandal. Leland Stanford drove in the “Golden Spike” at Promontory Point to complete a project in this industry. A. Philip Randolph unionized Pullman porters in this industry. For 10 points, a “transcontinental” project in what industry connected the United States?",
-   "answer": "the <b><u>rail</u></b>road industry [accept <b><u>train</u></b> industry; accept Transcontinental <b><u>Rail</u></b>road; accept <b><u>locomotive</u></b> industry; prompt on <u>transportation</u> or <u>shipping</u>] <em>(the leadin describes Charles Crocker)</em>",
-   "category": "History",
-   "subcategory": "American History"
-  },
-  {
-   "question": "<b>A hybrid seed manufacturer called this leader a “damned poor horse trader” during his visit to Coon Rapids. This leader attacked Lorenzo Sumulong as “a jerk [and] a stooge” in a speech to the UN. While viewing Leisurama houses, this leader joked about a machine that “puts food into the mouth” during a debate at Sokolniki Park. After exiling Georgy Malenkov to Kazakhstan, this leader launched the</b> (*) Virgin Lands campaign. This leader’s modernizing “thaw” began after his speech “On the Cult of Personality and Its Consequences.” In 1962, this premier sent ICBMs to Fidel Castro’s Cuba. For 10 points, what Soviet leader gave the “Secret Speech” after succeeding Stalin?",
-   "answer": "Nikita <b><u>Khrushchev</u></b> [or Nikita Sergeyevich <b><u>Khrushchev</u></b>; accept <b><u>Khrushchev</u></b> Thaw] <em>(The</em> <em>leadin refers to Roswell Garst. Khrushchev banged his shoe at Lorenzo Sumulong)</em>",
-   "category": "History",
-   "subcategory": "European History"
-  },
-  {
-   "question": "<b>One poem by this author tells its reader to “Follow where all is fled! – Rome’s azure sky.” This author, who began one poem by describing “The awful shadow of some unseen Power,” compared the title subject of another work to a “glow-worm golden / In a dell of dew.” This author of “Hymn to Intellectual Beauty” addressed a (*)</b> “Destroyer and Preserver” in a work ending with the question “If Winter comes, can Spring be far behind?” The speaker of one work by this poet greets the title bird with the line “Hail to thee, blithe Spirit!” For 10 points, name this British poet who elegised John Keats in “Adonais” and wrote “Ode to the West Wind” and “To a Skylark.”",
-   "answer": "Percy <b><u>Shelley</u></b> [or Percy Bysshe <b><u>Shelley</u></b>]",
-   "category": "Literature",
-   "subcategory": "British Literature"
-  },
-  {
-   "question": "<b>Scholars often pair one of these texts chronicling Alopen’s journey together with an inscription on a pillar that describes the “Origin of Origins.” The doctrine of “One Vehicle” appears in one of these texts that describes “skillful means” for reaching a goal. The doctrine of śūnyatā </b> <em>(“SHOON-yuh-tah”)</em><b> is used to equate form with emptiness by (*)</b> Avalokiteśvara <em>(“uh-VAH-loh-kee-TESH-vuh-ruh”)</em> in one of these texts about “the Perfection of Wisdom.” Subhuti <em>(“soo-BOO-tee”)</em> appears in one of these texts named for a mineral with the ability to “cut through illusions.” Diamond, Heart, and Lotus are titles of, for 10 points, what texts which record the teachings of the Buddha?",
-   "answer": "<b><u>sutra</u></b>s [accept Buddhist <b><u>sutra</u></b>s; accept Diamond <b><u>Sutra</u></b> or Lotus <b><u>Sutra</u></b> or Heart <b><u>Sutra</u></b>]",
-   "category": "Religion",
-   "subcategory": "Religion"
-  },
-  {
-   "question": "<b>An “apparent” form of this quantity equals the velocity gradient to the power of the behavior index minus one in the Ostwald-de Waele power law. One form of this quantity is divided by another to calculate Trouton’s ratio. Forces named for this quantity dominate in the boundary layer. When this quantity is zero, the Navier-Stokes equations simplify to the Euler equations. In (*) </b>thixotropic materials, this quantity decreases when a stress is applied. This quantity does not change under shear stress for a Newtonian fluid. This quantity comes in “dynamic” and “kinematic” forms and is zero for superfluids. For 10 points, name this measure of a fluid’s resistance to flow.",
-   "answer": "<b><u>viscosity</u></b> [accept dynamic or kinematic <b><u>viscosity</u></b>; accept <b><u>viscous</u></b> forces]",
+   "question": "In one device, this process’s rate is proportional to the central charge density according to the Tersoff–Hamann formula. Work at Sony in the 1950s demonstrated that this process caused a device made of germanium to exhibit decreased current when voltage increases. This process causes the negative differential resistance of the Esaki diode. Binnig and Rohrer invented a device in which this process is detected by a small conducting tip that “scans” the sample. George Gamow outlined how this process is necessary for alpha decay. A type of sub-nanometer resolution microscope is named for this process, which gives rise to counterintuitively non-zero values of the wavefunction. For 10 points, name this quantum process in which a particle crosses a classically forbidden barrier.",
+   "answer": "quantum <b><u>tunnel</u></b>ing [accept scanning <b><u>tunnel</u></b>ing microscope; accept <b><u>tunnel</u></b> diode]",
    "category": "Science",
    "subcategory": "Physics"
   },
   {
-   "question": "<b>“Elegant action” figures are depicted in a set of works of this type named Gwion Gwion. Elongated “claw” motifs dominate works of this type made in Sulawesi. A set of works of this type in Argentina comprise over 2,000 black and red hands. After viewing works of this type, the phrase “we have invented nothing!” was apocryphally declared by (*)</b> Pablo Picasso. The Polychrome Ceiling, which features several depictions of bison, is part of a large group of works of this type in Altamira. A 17-foot auroch is one of many works of this type in the Hall of the Bulls at the Lascaux complex. For 10 points, what works were created by prehistoric people painting on walls?",
-   "answer": "<b><u>cave painting</u></b>s [or <b><u>cave drawings</u></b> or <b><u>cave art</u></b>; accept <b><u>parietal art</u></b>; prompt on <u>painting</u>s by asking “what type of place are the paintings in?”; prompt on <u>cave</u>s by asking “what is in the caves?”]",
-   "category": "Fine Arts",
-   "subcategory": "Visual Fine Arts"
-  },
-  {
-   "question": "<b>Cruschmann Spirals are commonly seen in patients with this disease, which is diagnosed by a score of less than 0.70 on the modified Tiffeneau-Pinelli index. A beta-2 androgenic receptor agonist utilized to treat this disease is called Salmeterol. The methacholine challenge tests for this disease, which is treated by (*) </b>Albuterol. In the development of this disease treated by corticosteroids, eosinophils fill a layer of mucus. This disease is reversible, unlike most cases of COPD. Bronchoconstriction occurs in, for 10 points, what lung disease often treated with inhalers?",
-   "answer": "<b><u>asthma</u> </b>",
-   "category": "Science",
-   "subcategory": "Biology"
-  },
-  {
-   "question": "<b>A thinker from this school of thought who discussed normal and abnormal discourses in his conversational approach to knowledge described “private” writers as ironists. A thinker from this school included “tenacity” and “authority” as the first of his four methods of fixing our beliefs. The author of </b><em><b>Philosophy and the Mirror of Nature</b></em><b>,</b> (*) Richard Rorty, was a leading figure of this school’s “neo” branch. The example of a squirrel going around a tree appears in a book from this school which asserts that what is true is what proves itself useful in experience. For 10 points, what American school of philosophy’s members included C. S. Peirce <em>(“purse”)</em> and William James?",
-   "answer": "<b><u>pragmatism</u></b> [accept neo-<b><u>pragmatism</u></b>; or <b><u>Pragmatic</u></b> school; accept <em><b><u>Pragmatism</u></b>: A New</em> <em>Name For Some Old Ways of Thinking</em>]",
-   "category": "Philosophy",
-   "subcategory": "Philosophy"
-  },
-  {
-   "question": "<b>After the death of a companion, a member of this family states that “wherever there’s a fight, so hungry people can eat- I’ll be there.” A member of this family reprimands his brother for swerving to hit a gopher snake. Muley Graves refuses to accompany this family, a member of whom runs away after Floyd Knowles attacks a contractor. A member of this family </b>(*) breastfeeds a starving man found inside a barn at the conclusion of a novel. Rose of Sharon and Tom are among members of this family which migrate to California following the Dust Bowl. For 10 points, name this family, the protagonists of John Steinbeck’s novel The Grapes of Wrath.",
-   "answer": "<b><u>Joad</u></b> family [accept Tom <b><u>Joad</u></b>, Al <b><u>Joad</u></b>; prompt on <u>Rose</u> of Sharon or <u>Rosa</u>sharn by asking “which protagonist family is she a part of?”]",
+   "question": "This author described life as “an incessant shower of innumerable atoms” in an essay that urged writers to be “spiritualist” and not “materialist.” In a novel by this author, the narrator observes a “seven-sided” flower at a farewell dinner party for his India-bound friend. This author used the term “play-poem” to describe that novel, which consists of nine soliloquies delivered by six friends of the deceased Percival. Another novel by this author uses brackets to set off terse plot points from long imagistic passages in the stream-of-consciousness section “Time Passes,” which reveals that Prue died in childbirth. That novel by this author ends as Lily Briscoe finishes her painting and the Ramsay family sails to the title location. For 10 points, name this author of <em>To the Lighthouse</em>.",
+   "answer": "Virginia <b><u>Woolf</u></b> [or Adeline Virginia <b><u>Woolf</u></b>; or Adeline Virginia <b><u>Stephen</u></b>] (The essay is “Modern Fiction.” The first novel is <em>The Waves</em>.)",
    "category": "Literature",
-   "subcategory": "American Literature"
+   "subcategory": "British Literature"
   },
   {
-   "question": "<b>Karl Julius Beloch used the etymology of this person’s name to argue that he did not exist. This leader was the first to use a rotating pyramid called a kyrbeis </b><em>(“keer-BAY-ees”)</em><b> to display reforms on tablets called Axones. The </b><em><b>Suda</b></em><b> claimed that this leader suffocated after people threw hats, shirts, and cloaks at him in praise. This leader sidelined the </b><em><b>Areopagus</b></em><b> by creating the</b> (*) Council of Four Hundred. Under this leader’s policies, debtors who owed money to people of high class could be enslaved. Legendarily, this man’s anti-homicide laws were the only ones kept by Solon. For 10 points, name this Athenian whose name is synonymous with very strict rules.",
-   "answer": "<b><u>Draco</u></b> [or <b><u>Drakon</u></b>; accept <b><u>draco</u></b>nic or <b><u>draco</u></b>nian]",
-   "category": "History",
-   "subcategory": "Ancient History"
-  },
-  {
-   "question": "<b>During one of these events in 2023, a participant was presented with a wheel of cheese and a bag containing a woman’s ashes. Animal rights activists condemned the killing of hundreds of stray cats for one of these events in Barranquilla</b><em>(“baa-ruhn-KEE-uh”)</em><b>. In 2023, a man claimed he “thought it would be funny” when asked why he ended one of these events by throwing a (*) </b>phone at Bebe Rexha <em>(\"bee-bee rek-suh\")</em>. Kristen Cabot went viral after hiding from a kiss cam that exposed an affair with her boss during one of these events. Over 2 billion dollars were generated from 149 of these events during the <em>Eras Tour</em>. For 10 points, at what events might fans watch Shakira or Coldplay?",
-   "answer": "music <b><u>concerts</u></b> [or reasonable equivalents like <b><u>shows</u></b>, <b><u>gigs</u></b> or <b><u>performances</u></b> for concerts]",
-   "category": "Current Events",
-   "subcategory": "Current Events"
-  },
-  {
-   "question": "<b>Octahedra of this element’s oxyanion are linked to silicate tetrahedra in kaolinite. Inclusions of calcium and this element are used to define the age of the solar system. Oxides of this non-transition metal element are passed through a flame-fusion process named for Verneuil. Oxides of silicon and this element make up adsorbent, microporous catalysts known as zeolites. All (*) </b>feldspars contain silicon, oxygen, and this element. This element is the most abundant metal in Earth’s crust. The Bayer process refines the oxide of this element from its ore, bauxite. For 10 points, name this element usually found in soda cans and foil.",
-   "answer": "<b><u>aluminum</u></b> [or <b><u>Al</u></b>]",
-   "category": "Science",
-   "subcategory": "Other Science"
-  },
-  {
-   "question": "<b>The mythical island of Brasil was west of this region. The first people to inhabit this region were led by Cessair according to </b><em><b>The Book of Invasions</b></em><b>. After a journey to the land of the young, a poet from this region dismounted his horse and aged 300 years. In this region, two hounds refused to kill a deer because they recognized it was their owner’s (*)</b> wife. A hero of this island gained the ability to summon wisdom by sucking his thumb after burning it on the Salmon of Knowledge. Oisin <em>(“oh-SHEEN”)</em> narrated the Fenian Cycle which recounts this island’s mythology. For 10 points, name this island whose Fianna was led by the hero Finn MacCool.",
-   "answer": "<b><u>Ireland</u></b> [or <b><u>Éire</u></b>; accept County <b><u>Kerry</u></b>]",
+   "question": "This figure forced a man to create the demon Agrimas (“AH-gree-mahss”) during his 130-year fast. A book by Moses de León relates that, along with Naamah, this figure created the “plagues of humankind” and invades people’s houses when the moon wanes. The King James Bible translates this figure’s name as “screech owl.” Before this figure promised to allow one hundred demons to die every day, the angels Senoy (“seh-NOY”), Sansenoy (“sahn-seh-NOY”), and Semangelof (“seh-MON-jell-off”) attempted to drown her in the Red Sea. This woman asked her husband “why should I lie beneath you when I am your equal?”, prompting her to be banished from the Garden of Eden. For 10 points, name this she-demon from Judaic mythology, who is often called the first wife of Adam.",
+   "answer": "<b><u>Lilith</u></b> [or <b><u>Līlīṯ</u></b>; accept <b><u>Lamia</u></b>; prompt on <u>lilin</u> or <u>lilu</u>; reject “Eve”]",
    "category": "Mythology",
    "subcategory": "Mythology"
   },
   {
-   "question": "<b>One of this country’s colonies sparred with the guerilla “Black Flag Army.” This country won the Battle of Day River during a war where it dropped paratroopers into a valley as part of Operation Castor. The Béatrice </b><em>(\"bay-uh-TREES\")</em><b> stronghold operated by this country was allegedly named after one of Colonel de Castries’s mistresses. This country’s C</b>•<b>E</b>•<b>F</b>•<b>E</b>•<b>O withdrew from a colony as part of the </b>(*) Geneva Accords. Provinces of one of this country’s colonies included Cochinchina and Tonkin. Vo Nguyen Giap’s <em>(\"voh nu-win zyahp’s\")</em> Viet Minh defeated this country at the battle of Dien Bien Phu. For 10 points, Indochina was ruled by what European country’s Third Republic?",
-   "answer": "<b><u>France</u></b> [or <b><u>French</u></b> Empire; accept <b><u>French</u></b> Third Republic or <b><u>French</u></b> Fourth Republic; accept <b><u>French</u></b> Indochina; prompt on <u>Indochina</u> or the <u>Indochinese</u> Union or the <u>Indochinese</u> Federation before “Indochina” by asking “what country was that a colony of?”; reject “Vietnam” ]",
+   "question": "The protagonist’s character arc in this novel borrows heavily from the author’s earlier novel about a white-passing planter’s son who leads a failed slave revolt and sinks a British warship while escaping. Tom Reiss argues that this novel reflects an incident in which unfriendly forces at Taranto (“TAR-on-toh”) surprised its author’s father, the first Black general-in-chief in his country’s army. This novel’s protagonist falls in love with Pasha’s daughter Haydée (“ai-day”), who was sold into slavery after her father was betrayed by Fernand de Morcerf. This novel’s protagonist saves Monsieur Morrel but bankrupts Danglars (“don-GLAR”) and drives Villefort (“veel-FOR”) insane. The Abbé Faria befriends this novel’s protagonist, who is imprisoned in the Château d’If (“shah-toh DEEF”). For 10 points, name this novel about Edmond Dantès’s quest for revenge, written by Alexandre Dumas (“doo-MAH”).",
+   "answer": "<em>The</em> <em><b><u>Count of Monte Cristo</u></b></em> [or <em>Le</em> <em><b><u>Comte de Monte-Cristo</u></b></em>]",
+   "category": "Literature",
+   "subcategory": "European Literature"
+  },
+  {
+   "question": "Scientists from this country led a mass trial of the malaria drug Artequick in the Comoros (“KOM-uh-roze”). A loan from this country to David Dacko (“dah-VEED dah-KOH”) motivated the 1965 Saint-Sylvestre coup by Jean-Bédel Bokassa. The documentary <em>Racism for Sale</em> exposed Malawian “blessing videos” made for this country, whose film industry fictionalized its 2011 evacuation from Libya in <em>Home Coming</em>. eSwatini (“ess-wah-TEE-nee”) is the only African country that skips the FOCAC (“FOH-cack”) summit with this country, which funded Tanzania’s TAZARA (“tuh-ZAR-uh”) Railway to Zambia’s Copperbelt. This country’s 2012 Port of Doraleh and naval base in Djibouti led to charges of “debt-trap” and “Wolf Warrior” diplomacy. This country backed ZANU (“ZAH-noo”) and Siad Barre (“see-AWD bah-RAY”) during its “split” with the Soviets. For 10 points, what member of BRICS (“bricks”) launched “One Belt, One Road” and many Confucius Institutes?",
+   "answer": "<b><u>China</u></b> [or <b><u>Zhōngguó</u></b>; or People’s Republic of <b><u>China</u></b> or <b><u>PRC</u></b>; or <b><u>Zhōnghuá</u></b> Rénmín Gònghéguó; accept <b><u>Sino</u></b>-Soviet split; accept Forum on <b><u>China</u></b>–Africa Cooperation or <b><u>Zhōng</u></b> Fēi hézuò lùntán or Forum sur la coopération <b><u>sino</u></b>-africaine; reject “Republic of China”] (BRICS stands for Brazil, Russia, India, China, and South Africa.)",
    "category": "History",
    "subcategory": "World History"
   },
   {
-   "question": "<b>An H.R. Giger-designed one of these objects is named “Harkonnen” as it was designed for an unmade </b><em><b>Dune </b></em><b>movie.The “Ball” design of these objects was adapted into the “Bubble”, which is made of transparent material and suspended from a ceiling. Frank Gehry used corrugated cardboard to create his “Wiggle” type of these objects. </b><em><b>Star Trek</b></em><b>’s production designers adapted the design of Eero Saarinen’s </b>(*) “Tulip” type of these objects. A mass-produced fiberglass type of these objects was designed by Charles and Mary Eames, who paired a plywood-and-leather type of them with an ottoman. For 10 points, what furniture objects are usually placed around a table?",
-   "answer": "<b><u>chair</u></b>s [or <b><u>stool</u></b>s or <b><u>seat</u></b>s; reject “couches” or “sofas” or “settees”]",
+   "question": "In a project analyzing this process, up to 200 gigabytes of data a day were taken from the home of a subject by researchers from the MIT Media Lab led by Deb Roy. Roger Brown showed that people undergoing this process can display the “fis (“fiss”) phenomenon.” A 1965 book claimed that successful theories must explain this process and thus display “explanatory adequacy.” This process proceeds through “holophrastic” and “telegraphic” stages. This process, which some believe occurs despite a “poverty of the stimulus,” is broadly thought to only be possible before a “critical period” prior to puberty. For 10 points, Noam Chomsky’s Universal Grammar hypothesis claims that children have an innate ability to go through what process in which people become fluent for the first time?",
+   "answer": "first <b><u>language</u> <u>acquisition</u></b> [or <b><u>learn</u></b>ing a first <b><u>language</u></b>; or <b><u>L1</u></b> acquisition or <b><u>L1</u></b> learning; or <b><u>learn</u></b>ing to <b><u>speak</u></b> or <b><u>learn</u></b>ing <b><u>speech</u></b> or <b><u>develop</u></b>ing <b><u>speech</u></b> or <b><u>speech acquisition</u></b> or equivalents or word forms; prompt on <u>develop</u>ment; reject “second language acquisition” or “L2 acquisition”] (The first line concerns the Human Speechome Project. The “fis phenomenon” involves children being able to distinguish spoken words like “fis” and “fish” before they can say them distinctly.)",
+   "category": "Social Science",
+   "subcategory": "Social Science"
+  },
+  {
+   "question": "A character in this film flails in a broken chair as he screams “it ain’t the way I wanted it!” A shot in this film tracks two characters through a fence as they discuss the “little guys” in the Roman Empire. A sequence in this film follows a character traversing rooftops to intercept a man dressed in white during a procession of Christ covered in money. Near this film’s end, a character filmed in shadow recites the Hail Mary while fishing. This film fades into a shot of a boy’s Communion from a flashback of his immigrant grandfather as a boy singing to the Statue of Liberty. This film brings back a character from a previous film, Sonny, for a flashback in which the central family celebrates Vito’s birthday. For 10 points, name this second film in a Francis Ford Coppola trilogy about the Corleone family.",
+   "answer": "<em>The</em> <em><b><u>Godfather Part II</u></b></em> [accept <em>The</em> <em><b><u>Godfather 2</u></b></em>; reject “<em>The Godfather</em>”]",
    "category": "Fine Arts",
    "subcategory": "Other Fine Arts"
   },
   {
-   "question": "<b>A poem in this collection asks “Would not those dead throw their last coins of happiness” to a pair of lovers. A poem in this collection that asks a being to inscribe an urn with the words “</b><em><b>Subrisio Saltat</b></em><b>” opens with the line “But tell me, who are they, these wanderers.” In addition to a poem inspired by Picasso’s </b><em><b>Family of Saltimbanques</b></em><b>, a poem in this collection describes a “lament for Linos” after stating </b>(*) “Beauty is nothing / but the beginning of terror.” The declaration “every angel is terrifying” comes after the question “Who, if I cried out, would hear me among the angelic / orders” in, for 10 points, what collection by Rainer Maria Rilke?",
-   "answer": "<em><b><u>Duino Elegies</u></b></em> [or <em><b><u>Duineser Elegien</u></b></em>]",
-   "category": "Literature",
-   "subcategory": "European Literature"
+   "question": "The pathway that produces this molecule recycles a substrate with MTK. A key step in the biosynthesis of this molecule is the formation of an achiral, cyclopropane-substituted amino acid. The response to this molecule is downregulated by a member of the raf family called CTR1. Regulation of ACC synthase is key to a pathway that ends in the synthesis of this molecule, which is named for Yang. This molecule stimulates exaggeration of the apical hook as part of the “triple response.” This molecule diffuses in the pericycle and inhibits the transport of IAA. In the absence of auxin, the abscission zone becomes sensitive to this molecule, resulting in plants shedding dead leaves. This hormone is the reason that one rotten apple spoils the bunch. For 10 points, name this gaseous plant hormone that promotes fruit ripening.",
+   "answer": "<b><u>ethylene</u></b> [or <b><u>ethene</u></b>; or <b><u>C</u><u>2</u><u>H</u><u>4</u></b>]",
+   "category": "Science",
+   "subcategory": "Biology"
   },
   {
-   "question": "<b>The “inverse” type of this concept in category theory can be used to define p-adic numbers. If this concept exists for every Cauchy </b><em>(\"KOH-shee\")</em><b> sequence in a space, metric spaces are considered complete. “Superior” and “Inferior” types of this operation are equal when a series converges. Two unrelated functions are used to compute this operation in the </b>(*) squeeze theorem. Bernard Bolzano defined this operation in terms of Epsilon and Delta. Taking a derivative of the numerator and denominator can compute this operation using L’Hôpital’s rule. For 10 points, name this operation that finds the value that a function approaches.",
-   "answer": "<b><u>limit</u></b> [accept <b><u>limit</u></b> inferior or <b><u>limit</u></b> superior; accept inverse <b><u>limit</u></b>; accept the epsilon-delta definition of a <b><u>limit</u></b>]",
+   "question": "A popular legend in this city holds that a pot of hot soup was poured over soldiers attempting to scale its defenses in 1602. Until a popular 1520 revolt ousted John the Bastard, this city’s bishopric was controlled by the House of Savoy. During a visit to this city, John Knox discovered a fellow theologian lawn bowling on the Sabbath. William Whittingham helped translate into English a Bible produced in this city that was later carried by Oliver Cromwell’s soldiers. After denouncing infant baptism, the polymath Michael Servetus fled to this city but was executed as a heretic. A prominent theologian who led this city wrote the <em>Institutes of the Christian Religion</em> and argued in favor of predestination. For 10 points, John Calvin served as a church leader in what Swiss city?",
+   "answer": "<b><u>Geneva</u></b> [or <b><u>Genève</u></b>; accept <b><u>Geneva</u></b> Bible]",
+   "category": "History",
+   "subcategory": "European History"
+  },
+  {
+   "question": "A symphony by this composer begins with a two-octave descending F-sharp minor arpeggio on staccato quarter notes in the first violins. The upper strings play a measure ahead of the lower strings in a minuet labeled “Canon in Diapason” (“dai-uh-PAY-zun”) by this composer of the “Mourning” Symphony. That structure was later used in the “Witches’ Minuet” of one of this composer’s string quartets. One of this composer’s Paris Symphonies quotes the first movement of an earlier symphony, which ends with only the first chair violinists playing. The premiere of that symphony, written for this composer’s patron Prince Esterházy, ended with musicians snuffing out candles and leaving the stage. For 10 points, name this composer of the “Farewell” Symphony.",
+   "answer": "Joseph <b><u>Haydn</u></b> [or Franz Joseph <b><u>Haydn</u></b>]",
+   "category": "Fine Arts",
+   "subcategory": "Auditory Fine Arts"
+  },
+  {
+   "question": "Oxidation of a shale portion of this mountain range produced a red-green color scheme that earned it the nickname “Candy Cane Mountains.” People of this mountain range may have drawn on Greek tales for their Nart sagas. The Ateşgah (“ah-tesh-GAH”) and Yanar Dağ (“yah-NAR dah”) were among the eternal flames that led a country in this mountain range to brand itself as the “land of fire.” Artificial drainage of this mountain range’s largest lake turned an island into the Sevan Peninsula. A mountain in this range is named for Shota Rustaveli (“SHOH-tah roose-tah-VEH-lee”), a medieval poet in one of its Kartvelian languages. Mount Elbrus is the highest peak in this mountain range, which contains the disputed territories of Abkhazia (“ab-KAH-zee-uh”) and Nagorno-Karabakh (“nah-GOR-noh kah-ruh-BAHK”). For 10 points, what mountain range between the Black and Caspian Seas spans countries like Georgia and Azerbaijan?",
+   "answer": "<b><u>Caucasus</u></b> Mountains [or <b><u>Qafqaz</u></b> or <b><u>Kavkaz</u></b>; or <b><u>Kavkasioni</u></b>; accept Greater <b><u>Caucasus</u></b>; accept Lesser <b><u>Caucasus</u></b> or <b><u>Caucasus</u></b> Minor]",
+   "category": "Geography",
+   "subcategory": "Geography"
+  },
+  {
+   "question": "On this holiday in the Philippines, youth participate in a noisy “mobile” practice in which they rev motorcycle engines and honk car horns. In South Asia, the night before this holiday is often marked by an observance called Chaand Raat. Before a prayer on this day, it is mandatory to give a donation of four double handfuls of food to the needy. A special prayer with typically 12 additional <em>takbirs</em> is said on this holiday, which begins after a crescent moon is sighted on the first of Shawwal (“shaw-WOL”). Sweets are often given to children on this holiday, which is considered the “minor” one of two yearly feasts and which celebrates the end of a period of fasting. For 10 points, name this Muslim holiday that marks the end of Ramadan, which occurs before a holiday partly called “al-ʾAḍḥā.”",
+   "answer": "<b><u>Eid al-</u><u>Fiṭr</u></b> [prompt on <u>Eid</u> or <u>Īd</u>; prompt on <u>Lesser Eid</u>; reject “Eid al-ʾAḍḥā”]",
+   "category": "Religion",
+   "subcategory": "Religion"
+  },
+  {
+   "question": "This functional group on the <em>para</em> position of pyridine (“PEER-eh-deen”) is a common nucleophilic catalyst used to accelerate acyl (“ACE-ull”) substitution reactions. This functional group is coupled with aryl (“AIR-ull”) halides in the Buchwald (“BUCK-wald”)–Hartwig reaction. This functional group is difficult to monoalkylate (“mono-alkyl-ate”) and tends to form quaternary salts instead, such as during exhaustive methylation. An alkene and a tertiary example of this function group are products of the Hofmann elimination. Aniline (“ANN-eh-leen”) contains this functional group, which can react with acid chlorides to make amides (“AM-ids”). For 10 points, the rotting fish smell of cadaverine (“cadaver-een”) is attributed to what organic functional group derived from ammonia?",
+   "answer": "<b><u>amine</u></b>s (“uh-meens”) [accept electrophilic <b><u>amination</u></b> or Buchwald–Hartwig <b><u>amination</u></b>; accept O-benzoylhydroxyl<b><u>amine</u></b>s; accept dimethyl<b><u>amino</u></b>pyridine; reject “ammonium salts”]",
+   "category": "Science",
+   "subcategory": "Chemistry"
+  },
+  {
+   "question": "Two standard objections to this concept are likened to a philosopher ascending and descending a mountain in a “Contemporary Introduction” to it by Robert Kane. A man named Black tries to ensure that Jones robs a bank in a prototypical example of problems that reject this concept called “Frankfurt cases.” This concept is analogized to having elbow room in a book by Daniel Dennett. Non-causal, event-causal, and agent-causal are three different stances of the “sourcehood” of this concept held by philosophical libertarians. Compatibilism holds that this concept exists in situations in which an individual isn’t coerced. For 10 points, determinists reject the existence of what concept that allows humans to make their own decisions?",
+   "answer": "<b><u>free will</u></b> [or <b><u>freedom</u></b> of the <b><u>will</u></b>; accept <em>A Contemporary Introduction to</em> <em><b><u>Free Will</u></b></em>; prompt on <u>moral responsibility</u>; prompt on <u>freedom</u>; reject “responsibility”]",
+   "category": "Philosophy",
+   "subcategory": "Philosophy"
+  },
+  {
+   "question": "In a story by this author, a deal to return from college after four years is broken by Helen, forcing Maddy to look after their mother, who has Parkinson’s disease. In a story by this author, a man remembers the line “shoreless seas” from a Joaquin (“h’wah-KEEN”) Miller poem as his daughter enters the room. In that story by this author of “The Peace of Utrecht,” the protagonist stays at Judith’s house and inquires about her estranged daughter Nichola while visiting her father prior to his heart operation. This author wrote a story about a disabled girl from Greenhill School who plays a beautiful rendition of the title piece at Miss Marsalles’s piano recital. For 10 points, “The Moons of Jupiter” and “Dance of the Happy Shades” are by what Canadian short story writer?",
+   "answer": "Alice <b><u>Munro</u></b> [or Alice Ann <b><u>Laidlaw</u></b>]",
+   "category": "Literature",
+   "subcategory": "World Literature"
+  },
+  {
+   "question": "A biography by Richard Hingley discusses Mortimer Wheeler’s discovery of this ruler’s namesake “destruction horizon,” a red layer of ash. Thomas Thornycroft sculpted a scythed chariot driven by this ruler, who supposedly invoked the war god Andraste. Either this ruler of “kingly descent” or the contemporary Cartimandua of the Brigantes (“bree-GAHN-tays”) is referenced in a passage that states “they make a solitude and call it peace” in a speech attributed to Calgacus (“cal-GAH-cuss”). This whip-scarred ruler avenged the rape of two daughters according to the <em>Annals</em> of Tacitus, whose <em>Agricola</em> barely discusses this consort of Prasutagus sacking Camulodunum (“cam-oo-LOH-doo-num”) and Londinium. Around 61 CE, this ruler was defeated by Gaius Suetonius Paulinus at the Battle of Watling Street. For 10 points, what Celtic Iceni queen revolted in Roman Britain?",
+   "answer": "<b><u>Boudica</u></b> [or variants like <b><u>Boadicea</u></b> or <b><u>Boudicea</u></b> or <b><u>Buddug</u></b>; accept <em><b><u>Boadicea</u></b> and Her Daughters;</em> accept <b><u>Boudiccan</u></b> destruction horizon or <b><u>Boudiccan</u></b> destruction layers; accept <em><b><u>Boudica</u></b>: Iron Age Warrior Queen</em>]",
+   "category": "History",
+   "subcategory": "Other History"
+  },
+  {
+   "question": "A certain property can be “extracted” from multiple examples of these constructs using the Allen–Kennedy algorithm. These constructs are assigned to lattice points within a polytope and subjected to affine transformations in the polyhedral model. These constructs can be subjected to “fission” or “fusion” in order to exploit locality of reference. Provided that they are invariant, parts of these constructs may be “hoisted out” of them to improve their efficiency. If their trip count is known, these constructs can be optimized via “unrolling,” which is often performed by compilers. Like switch statements, break statements can be used to leave these constructs, in which a control variable is often incremented on each pass. For 10 points, “while” is a type of what sections of code that are repeatedly executed?",
+   "answer": "<b><u>loop</u></b>s [accept for <b><u>loop</u></b>s or while <b><u>loop</u></b>s or nested <b><u>loop</u></b>s; accept <b><u>loop</u></b> transformations, <b><u>loop</u></b> optimization, <b><u>loop</u></b> fusion, <b><u>loop</u></b> fission, or <b><u>loop</u></b> unrolling] (The Allen–Kennedy algorithm performs parallelism extraction in nested loops.)",
    "category": "Science",
    "subcategory": "Other Science"
+  },
+  {
+   "question": "Allocation of this resource was the subject of the 1629 Charter of Freedoms and Exemptions. Thomas Devyr’s pamphlet <em>Our Natural Rights</em> inspired a conflict over this resource led by a group of self-styled “Calico Indians.” Speculation over this resource made the “Financier of the Revolution,” Robert Morris, go into debt. A war fought over this resource led to the break up of Rensselaerswyck (“REN-suh-lars-vake”). In the colony of New Netherland, access to this resource was controlled by agents termed <em>patroon</em>s. The Lenape gave up large amounts of this resource to the Dutch for just 24 dollars as a result of the so-called “Walking Purchase.” During Andrew Jackson’s presidency, ownership of this resource was removed as a barrier to voting. For 10 points, American acquisition of what resource was the subject of the Louisiana Purchase?",
+   "answer": "<b><u>land</u></b> [accept <b><u>land</u></b> patents; accept real <b><u>estate</u></b>; accept <b><u>manor</u></b>s; accept <b><u>patroonship</u></b>s until “patroons” is read]",
+   "category": "History",
+   "subcategory": "American History"
+  },
+  {
+   "question": "An artist from this empire created “mood landscapes,” such as one in which a woman walks down a tree-lined path on the title <em>Autumn Day</em>. Two artists from this empire painted a scene in which certain young animals climb over a fallen tree during a <em>Morning in</em> the title forest. A realist painting from this empire controversially included a drunk peasant in a religious procession. This empire was home to an artist who painted a group of laughing men writing an insulting letter to Sultan Mehmet IV, as well as to Isaac Levitan and the Wanderers. In a painting from this empire, a boy in rags stands up straight in a line of haggard old men pulling a boat up the title river. For 10 points, name this empire home to Ivan Shishkin and Ilya Repin, who painted <em>Barge Haulers on the Volga</em>.",
+   "answer": "<b><u>Russia</u></b> [or <b><u>Rossiya</u></b>; or <b><u>Russian</u></b> Empire or <b><u>Rossiyskaya</u></b> Imperiya; accept <b><u>Ukraine</u></b> or <b><u>Ukraïna</u></b>; accept <b><u>Lithuania</u></b> or <b><u>Lietuva</u></b>; accept Congress Kingdom of <b><u>Poland</u></b> or <b><u>Polska</u></b> or Królestwo <b><u>Polskie</u></b>] (Ivan Shishkin and Konstantin Savitsky painted bears in <em>Morning in a Pine Forest</em>. The painting in the third line is <em>Religious Procession in Kursk Governorate</em>.)",
+   "category": "Fine Arts",
+   "subcategory": "Visual Fine Arts"
+  },
+  {
+   "question": "In a book [emphasize] <em>titled for</em> this person, a boy is rescued from a flood by his father’s murderer, who had previously stolen the man’s boat to save his pregnant wife. That book titled for this person features a story in which the protagonist escapes with a truck driver to Chicago after his friends are lynched for skinny-dipping in a whites-only pool. James Baldwin criticized this 19th-century character for being “robbed of his humanity and divested of his sex” in the essay “Everybody’s Protest Novel.” The story “Big Boy Leaves Home” appears in a Richard Wright collection titled for this character’s “children.” In a novel, this character refuses to divulge the location of Cassy and Emmeline, leading Simon Legree to order his death. For 10 points, name this enslaved character who titles a novel by Harriet Beecher Stowe.",
+   "answer": "Uncle <b><u>Tom</u></b> [accept <em>Uncle</em> <em><b><u>Tom</u></b>’s Cabin</em>; accept <em>Uncle</em> <em><b><u>Tom</u></b>’s Children</em>] (The first sentence refers to Richard Wright’s story “Down by the Riverside.”)",
+   "category": "Literature",
+   "subcategory": "American Literature"
+  },
+  {
+   "question": "This composer claimed to be writing a “caricature of Romanticism” in a piece whose double-note scales are meant to imitate a pirouetting dwarf. The Ballets Russes commissioned a piece by this composer whose title characters embrace before dancers with tambourines enter the stage and perform a 5/4 (“five-four”) bacchanale. This composer’s Piano Concerto in G opens with a whip crack. This composer drew on Aloysius Bertrand’s (“al-oyze-YOOSE bair-TRON’s”) poems “Le gibet” (“luh zhee-BEH”), “Ondine,” and “Scarbo” in the three sections of a difficult piano suite. Paul Wittgenstein commissioned this composer’s Piano Concerto for the Left Hand. This composer of <em>Gaspard de la nuit</em> also wrote a piece with a repetitive, crescendoing snare drum ostinato. For 10 points, name this French composer of <em>Daphnis et Chloé</em> and <em>Boléro</em>.",
+   "answer": "Maurice <b><u>Ravel</u></b> [or Joseph Maurice <b><u>Ravel</u></b>]",
+   "category": "Fine Arts",
+   "subcategory": "Auditory Fine Arts"
   }
  ],
  "bonuses": [
   {
-   "leadin": "Answer the following about exclaves in southern Africa, for 10 points each:",
+   "leadin": "After this opera’s premiere, its composer’s mentor Charles Gounod (“goo-NOH”) supposedly exclaimed, “take mine out of the score and there remains nothing to [its composer’s] credit but the sauce that masks the fish!” For 10 points each:",
    "parts": [
-    "The islands of Likoma and Chizumulu are exclaves that are part of this country but surrounded by Mozambican territorial waters. Upon independence, this country changed its name from Nyasaland.",
-    "Because it is bounded by only the DRC, ROC, and the Atlantic Ocean, this country’s territory of Cabinda is considered a semi-exclave. This country’s capital is Luanda.",
-    "Until 1994, South Africa governed this second-largest Namibian city as a semi-exclave. Pelican Point is located in this coastal city on the mouth of the Kuiseb River."
+    "Name this opera that features a mezzo-soprano aria that was actually inspired by a Sebastián Iradier (“say-bahss-T’YAHN ee-rahd-YAIR”) song, though its composer believed he was adapting an old folk tune.",
+    "Gounod may have taken the high ground regarding his student Georges Bizet’s plagiarism in <em>Carmen</em> since he cribbed J.S. Bach’s melody for a setting of a Latin prayer titled “ave” this religious figure.",
+    "In the last feuilleton (“fooy-TON”) he ever wrote, Hector Berlioz took no issue with Bizet’s inspirations in a glowing review of his opera about two Ceylonese people with this profession, who sing a duet of friendship near the ruins of a temple."
    ],
    "answers": [
-    "<b><u>Malawi</u></b> [or Republic of <b><u>Malawi</u></b> or Dziko la <b><u>Malawi</u></b>]",
-    "<b><u>Angola</u></b> [or Republic of <b><u>Angola</u></b> or República de <b><u>Angola</u></b>]",
-    "<b><u>Walvis Bay</u></b> [accept <b><u>Walvisbaai</u></b> or <b><u>Ezorongondo</u></b>]"
+    "<em><b><u>Carmen</u></b></em> (The aria is “Habanera.”)",
+    "<b><u>Mary</u></b> [or the <b><u>Virgin</u></b> Mary; or the <b><u>Holy Mother</u></b>; or <b><u>Madonna</u></b>; or <b><u>Maria</u></b>; accept Ave <b><u>Maria</u></b>]",
+    "<b><u>pearl</u></b> fishers [or <b><u>pearl</u></b>ers or <b><u>pearl</u></b> divers or <b><u>pearl</u></b> hunters; accept <em>The</em> <em><b><u>Pearl</u></b> Fishers</em> or <em>Les</em> <em>pêcheurs de</em> <em><b><u>perles</u></b></em>; prompt on <u>fisher</u>men or <u>fisher</u>s or <u>pêcheur</u>s or <u>diver</u>s; reject “hunters”]"
    ],
    "values": [
     10,
     10,
     10
    ],
-   "category": "Geography",
-   "subcategory": "Geography"
+   "category": "Fine Arts",
+   "subcategory": "Other Fine Arts"
   },
   {
-   "leadin": "Scholars have cited this person’s descriptions of Yuan dynasty <em>Jiaochao</em> currency as evidence his story wasn’t completely made up. For 10 points each:",
+   "leadin": "The “reflow” type of this process is often used on surface mounts. For 10 points each:",
    "parts": [
-    "Name this traveller whose life may have been fictionalized by the prison memoir <em>Il Millione</em>.",
-    "Evidence for the story of Marco Polo’s travels being faked comes from his failure to mention this structure. Qin Shi Huang ordered the creation of this anti-Xiongnu <em>(“SHUNG-nu”)</em> structure.",
-    "On the other hand, the events in <em>Il Millione</em> were documented by this organization which had two members join the trip. Bartolome De Las Casas was a member of this order of “Blackfriars.”"
+    "Name this process that joins two metals using a substance with a [emphasize] <em>lower</em> melting point than the adjacent metal.",
+    "Reflow soldering (“SOD-er-ing”) is used to connect the contact pads found on rectangular “boards” onto which these systems are printed. In these systems, electrical components are joined by wires.",
+    "When etching a printed circuit board, these materials stop the dissolution of copper in parts of the circuit board when UV light is shone on it. Microfluidics applications often use one of these materials called SU-8 (“S-U-8”)."
    ],
    "answers": [
-    "Marco <b><u>Polo</u></b>",
-    "<b><u>Great Wall</u></b> of China",
-    "<b><u>Dominican</u></b> Order [or <b><u>Dominicans</u></b>; accept <b><u>Order of Preachers</u></b>]"
+    "<b><u>solder</u></b>ing (“SOD-er-ing”) [accept reflow <b><u>solder</u></b>ing; reject “welding”]",
+    "electrical <b><u>circuit</u></b>s [accept printed <b><u>circuit</u></b> boards or <b><u>PCB</u></b>s]",
+    "photo<b><u>resist</u></b>s [prompt on <u>epoxy</u> resins or epoxy <u>resin</u>s]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Other Science"
+  },
+  {
+   "leadin": "A 2018 <em>VICE</em> exposé revealed that a piece of equipment central to this program is actually of extremely average size. For 10 points each:",
+   "parts": [
+    "Name this series of NPR concerts that take place near an eponymous piece of equipment that belongs to Bob Boilen, the radio host of <em>All Things Considered</em>.",
+    "Despite battling the flu, this musician appeared on the Tiny Desk in 2017 to play songs from her mixtape <em>Telefone</em>. This rapper behind the album <em>Room 25</em> also runs a Black author-focused book club “for the homies.”",
+    "In her Tiny Desk concert, Lizzo played a solo on this instrument, in which she is classically trained. In September 2022, Lizzo played a 200-year-old one of these woodwind instruments once owned by James Madison."
+   ],
+   "answers": [
+    "NPR <b><u>Tiny Desk</u></b> Concerts [or National Public Radio <b><u>Tiny Desk</u></b> Concerts]",
+    "<b><u>Noname</u></b> [or Fatimah Nyeema <b><u>Warner</u></b>]",
+    "<b><u>flute</u></b> [accept glass <b><u>flute</u></b> or crystal <b><u>flute</u></b>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Pop Culture",
+   "subcategory": "Music"
+  },
+  {
+   "leadin": "Paris Herouni claimed that Armenia’s Carahunge was the world’s oldest of these institutions, which employed Taqi ad-Din in İstanbul and Abd al-Rahman al-Sufi in Isfahan. For 10 points each:",
+   "parts": [
+    "Name these institutions that were patronized by Hulagu Khan in Maragheh, Jai Singh II in Jaipur, and Ulugh Beg in Samarkand. Scholars at these places, like Jamshīd al-Kāshī, improved on the models in the <em>Almagest</em>.",
+    "S. F. Starr’s <em>Lost Enlightenment</em> argues that al-Ma’mun stayed in this oasis city after the Fourth Fitna due to its observatory. In 1221, Tolui utterly destroyed this former capital of Margiana in modern-day Turkmenistan.",
+    "In the 12th century, Merv may have been the world’s largest metropolis due to its links to wealthy cities like Suyab, Otrar, and Kashgar along this series of Central Asian trade routes."
+   ],
+   "answers": [
+    "<b><u>observatory</u></b> [or <b><u>observatories</u></b>; accept <b><u>astronomical</u></b> buildings or word forms such as <b><u>astronomy</u></b>; or <b><u>marsad</u></b> or al-<b><u>marasid</u></b> or <b><u>gözlemev</u></b>leri or <b><u>rasadxâne</u></b> or variants of those words] (Ptolemy wrote the <em>Almagest</em>.)",
+    "<b><u>Merv</u></b> [or <b><u>Merw</u></b> or <b><u>Marv</u></b> or <b><u>Marw</u></b> al-Shāhijān; accept <b><u>Mary</u></b>; prompt on <u>Alexandria</u> in Margiana or <u>Antioch</u>ia in Margiana]",
+    "<b><u>Silk</u></b> Roads [or <b><u>Silk</u></b> Routes; or <b><u>Sīchóu</u></b> Zhīlù]"
    ],
    "values": [
     10,
@@ -167,19 +207,199 @@
     10
    ],
    "category": "History",
-   "subcategory": "Other History"
+   "subcategory": "World History"
   },
   {
-   "leadin": "The “Spilled Blood” of a member of this profession titles the second part of a poem that declares “Death has painted him with pale sulfurs.” For 10 points each:",
+   "leadin": "In a novel by this author, Luis Molina recounts the plots of movies like <em>Cat People</em> to his cellmate Valentín Arregui (“vahl-en-TEEN ah-RAY-ghee”). For 10 points each:",
    "parts": [
-    "Name this profession that titles a poem whose speaker repeats “I don’t want to see it!” A member of this profession dies at “at five in the afternoon” in a 1935 poem.",
-    "“Lament for the Death of a Bullfighter” was written by this Generation of ‘27 poet who was killed during the Spanish Civil War. His plays include <em>Blood Wedding</em>.",
-    "A Garcia Lorca poem titled for this form begins by declaring “I want to sleep the sleep of the apples.” The <em>Divan of Hafez</em> includes many poems in this form, which ends each couplet with a repeated word or phrase."
+    "Name this author of <em>Kiss of the Spider Woman</em>.",
+    "The fifth film that Luis recounts in <em>Kiss of the Spider Woman</em> is about a witch doctor who transforms people into these beings, who are often depicted as eating brains.",
+    "These sections in <em>Kiss of the Spider Woman</em> discuss Freudian theories of homosexuality. One of these sections in Jorge Luis Borges’s (“hor-HAY loo-EESS bor-HESS’s”) story “Tlön, Uqbar, Orbis Tertius” (“t’LERN UCK-bar OR-biss TER-shuss”) claims that “all men who repeat a line from Shakespeare are William Shakespeare.”"
    ],
    "answers": [
-    "<b><u>bullfight</u></b>er [accept “Lament for the Death of a <b><u>Bullfighter</u></b>”]",
-    "Federico Garcia <b><u>Lorca</u></b>",
-    "<b><u>ghazal</u></b> [accept <b><u>Ghazal</u></b> of the Dark Death; or <b><u>Gacela</u></b> of the Dark Dearth; or <b><u>Gacela</u></b> De La Muerte Oscura]"
+    "Manuel <b><u>Puig</u></b> (“pweeg”) [or Juan Manuel <b><u>Puig</u></b> Delledonne]",
+    "<b><u>zombie</u></b>s [or <b><u>zombi</u></b>s]",
+    "<b><u>footnote</u></b>s [or <b><u>endnote</u></b>s; prompt on <u>note</u>s]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Literature",
+   "subcategory": "World Literature"
+  },
+  {
+   "leadin": "<em>Greek-language term required.</em> Xenophon (“ZEE-nuh-faun”) argued that nature possesses its own version of this concept that promotes intelligent design. For 10 points each:",
+   "parts": [
+    "Name this term in Greek philosophy often translated as “intellect.” This concept was first explained by Anaxagoras (“ann-aks-ZAYG-or-iss”), who claimed that it set the cosmos in motion and “has power over all things…that have soul.”",
+    "Anaxagoras’s conception of nous (“noose”) is a precursor to this philosopher’s prime mover argument for the universe. This thinker’s texts include the <em>Metaphysics</em> and <em>Nicomachean</em> (“nih-koh-MAH-kee-in”)<em> Ethics</em>.",
+    "Empedocles (“em-PEH-duh-kleez”) held that two nous-like beings named for this concept and strife created the universe. In a dialogue on this concept, the character Aristophanes (“air-ih-STAH-fuh-nees”) claims that Zeus separated early humans into two halves."
+   ],
+   "answers": [
+    "<b><u>nous</u></b> (“noose”)",
+    "<b><u>Aristotle</u></b> [or <b><u>Aristotle</u></b> of Stagira or <b><u>Aristotélēs</u></b>]",
+    "<b><u>love</u></b> [or <b><u>philotes</u></b>; accept <b><u>eros</u></b>] (The dialogue is Plato’s <em>Symposium</em>.)"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Philosophy",
+   "subcategory": "Philosophy"
+  },
+  {
+   "leadin": "This company employed slave labor from the Arbeitsdorf concentration camp at its factories in Wolfsburg. For 10 points each:",
+   "parts": [
+    "Name this company that was commissioned by Hitler to manufacture a car nicknamed the “Beetle.”",
+    "Hitler promoted the Volkswagen Beetle as the “people’s car” as part of this initiative, which created the Autobahn. Robert Ley headed this initiative, which encouraged factory workers to engage in state-sanctioned leisure to improve morale.",
+    "The Krupp family, whose business also collaborated with the Nazis, used slave labor to manufacture this good. This good and “coal” name a European economic union that preceded the EEC."
+   ],
+   "answers": [
+    "<b><u>Volkswagen</u></b> [or <b><u>VW</u></b>; accept <b><u>Volkswagen</u></b> Beetle]",
+    "<b><u>Strength Through Joy</u></b> [or <b><u>Kraft durch Freude</u></b> or <b><u>KdF</u></b>; prompt on German <u>Labor Front</u> or Deutsche <u>Arbeitsfront</u>]",
+    "<b><u>steel</u></b> [accept European Coal and <b><u>Steel</u></b> Community; prompt on <u>alloy</u>s; prompt on <u>ECSC</u> by asking “what does that stand for?”; reject “metal” or “iron” or “Fe”]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "History",
+   "subcategory": "European History"
+  },
+  {
+   "leadin": "Prajāpati Daksha cursed this deity for showing favoritism to Rohinī over his 26 other wives. For 10 points each:",
+   "parts": [
+    "Name this god of poetry and vegetation who gave Indra the strength to defeat Vritra. He shares his name with a plant discussed at length in the ninth maṇḍala of the <em>Rigveda</em>.",
+    "Soma was later syncretized with Chandra, the god of this object. The Sanskrit word “pūrnima” refers to this astronomical body when it’s at its fullest.",
+    "The holiday Chaturthī (“chuh-TURR-thee”) observes when this deity injured Chandra for laughing at him for falling off his mount. While riding a mouse, this deity beat his brother Kārtikeya in a race around the world."
+   ],
+   "answers": [
+    "<b><u>Soma</u></b> [accept <b><u>Chandra</u></b>ma; accept <b><u>Shashi</u></b>; accept <b><u>Nishakara</u></b>]",
+    "the <b><u>Moon</u></b> [or <b><u>Luna</u></b>; accept full <b><u>moon</u></b>]",
+    "<b><u>Ganesh</u></b>a [or <b><u>Ganapati</u></b>; or <b><u>Vinayak</u></b>a; accept <b><u>Pillai</u></b> or <b><u>Pillai</u></b>yar; accept <b><u>Ganesh</u></b>a Chaturthī or <b><u>Vināyak</u></b>a Chaturthī or <b><u>Gaṇesh</u></b>ōtsav]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Mythology",
+   "subcategory": "Mythology"
+  },
+  {
+   "leadin": "An equation named for “makers” of these devices gives their power in diopters (“DAI-op-terz”). For 10 points each:",
+   "parts": [
+    "Name these devices whose “convex” type focuses light to a point.",
+    "The lensmakers’ equation simplifies for lenses with this property, as their width <em>d</em> is much less than their radii of curvature. The paraxial approximation is often paired with an approximation named for this kind of lens.",
+    "The thin lens equation sets [read slowly] the [emphasize] <em>reciprocal</em> of the lens’s focal length <em>f</em> as equal to this function of the object distance <em>u</em> and the image distance <em>v</em>. You have ten seconds."
+   ],
+   "answers": [
+    "optical <b><u>lens</u></b>es [accept convex <b><u>lens</u></b>es; accept <b><u>lens</u></b>makers’ equation]",
+    "<b><u>thin</u></b> lens [accept <b><u>thin</u></b> lens approximation]",
+    "<b><u>one over</u> </b><em><b><u>u</u></b></em><b><u> plus one over</u> </b><em><b><u>v</u></b></em> [or the <b><u>reciprocal of</u> </b><em><b><u>u</u></b></em><b><u> plus the reciprocal of</u> </b><em><b><u>v</u></b></em>; or <em><b><u>u</u> </b></em><b><u>plus</u> </b><em><b><u>v</u></b></em> all <b><u>over</u> </b><em><b><u>u</u></b></em> times <em><b><u>v</u></b></em>; accept <b><u>object distance</u></b> in place of “<em>u</em>”; accept <b><u>image distance</u></b> in place of “<em>v</em>”]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Physics"
+  },
+  {
+   "leadin": "This author feuded with his colleague John Ozell for publishing a translation of the Italian mock epic <em>La secchia rapita</em> (“SECK-yah rah-PEE-tah”) at the same time as a poem by this author. For 10 points:",
+   "parts": [
+    "Name this English poet. The hack bookseller Edmund Curll titled Ozell’s translation <em>The Rape of The Bucket</em> in an attempt to capitalize off the success of this author’s poem “The Rape of the Lock.”",
+    "In retaliation, Pope inserted Curll as a prominent character in this mock-epic poem, in which Curll competes in a series of humiliating games overseen by Dulness, the goddess of stupidity.",
+    "This friend of Pope’s quipped that Curll’s biographies of deceased literati were “one of the new terrors of death.” Pope coined the phrase “who breaks the butterfly upon the wheel?” in a poem addressed to this man."
+   ],
+   "answers": [
+    "Alexander <b><u>Pope</u></b>",
+    "<em>The</em> <em><b><u>Dunciad</u></b></em>",
+    "John <b><u>Arbuthnot</u></b> [accept “Epistle to Dr <b><u>Arbuthnot</u></b>”]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Literature",
+   "subcategory": "British Literature"
+  },
+  {
+   "leadin": "Extracellular binding to this complex is translated into intracellular signals by two zeta chains that each possess three phosphorylation sites called ITAMs. For 10 points each:",
+   "parts": [
+    "Name this protein complex that most often presents as a heterodimer of an alpha and beta chain, but may sometimes be composed of a gamma and delta chain pair.",
+    "The TCR binds to peptides presented by this incredibly polymorphic glycoprotein complex that is needed to distinguish self from non-self. In humans, it is also called HLA, and its class I is present on all nucleated cells.",
+    "While T cells mature in the thymus, they are originally produced in this tissue found within bones, where most blood cells are made."
+   ],
+   "answers": [
+    "<b><u>T-cell receptor</u></b> [or <b><u>TCR</u></b>]",
+    "<b><u>MHC</u></b> [or <b><u>major histocompatibility complex</u></b>; accept <b><u>MHC</u></b> I or <b><u>MHC</u></b> class I]",
+    "bone <b><u>marrow</u></b>"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Biology"
+  },
+  {
+   "leadin": "A poem about this person asks, “Did her eyes slant in the old way?” in its section “Eidolon (“AI-doh-lon”)”. For 10 points each:",
+   "parts": [
+    "Name this mythological woman. A poem by H.D. titled for this woman “in Egypt” was based on a feminist reading of a Euripides play in which she is abducted by Paris for her beauty, inciting the Trojan War.",
+    "H.D. wrote <em>Helen in Egypt</em> as a response to this unfinished long poem, which rails against “usura” and was largely written while its author was imprisoned on treason charges in Italy.",
+    "This other modernist poet imagined Helen’s marriage to Faustus in a poem inspired by his affair with Emil Opffer, who also influenced an erotic six-part poem by this author that describes “bright striped urchins.”"
+   ],
+   "answers": [
+    "<b><u>Helen</u></b> of Troy [or <b><u>Helénē</u></b> or <b><u>Helena</u></b>; accept <em><b><u>Helen</u></b> in Egypt</em>]",
+    "<em>The</em> <em><b><u>Cantos</u></b></em> [accept <em>The Pisan</em> <em><b><u>Cantos</u></b></em>] (by Ezra Pound)",
+    "Hart <b><u>Crane</u></b> [or Harold Hart <b><u>Crane</u></b>] (The other poem is “Voyages.”)"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Literature",
+   "subcategory": "American Literature"
+  },
+  {
+   "leadin": "In 2018, it was revealed that a statue of this woman would be unveiled in the US Capitol building to represent the state of Florida. For 10 points each:",
+   "parts": [
+    "Name this activist and educator who was the sole African-American woman on the committee that drafted the Charter of the United Nations. She was the only female member of the unofficial “Black Cabinet.”",
+    "For helping to establish Cookman College in Daytona Beach, Bethune was awarded the Spingarn Medal by this organization. W. E. B. DuBois founded this organization to advance equality for African-Americans.",
+    "The “Black Cabinet” also pushed this organization to record over two thousand first-person accounts of former slaves. This Second New Deal organization employed hundreds of artists, musicians, and writers as part of Federal Project Number One."
+   ],
+   "answers": [
+    "Mary McLeod <b><u>Bethune</u></b> [or Mary Jane <b><u>McLeod</u></b>]",
+    "<b><u>NAACP</u></b> [or <b><u>National Association for the Advancement of Colored People</u></b>]",
+    "<b><u>Works Progress</u></b> Administration [or <b><u>WPA</u></b>; or <b><u>Work Projects</u></b> Administration; accept <b><u>Federal Writers’ Project</u></b>]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "History",
+   "subcategory": "American History"
+  },
+  {
+   "leadin": "This author denounced rumors that he was secretly a member of the Illuminati in letters about one of his plays, which ends with the Marquis of Posa dying for Dutch liberty. For 10 points each:",
+   "parts": [
+    "Name this German playwright who wrote <em>Don Carlos</em> and the poem “Ode to Joy.”",
+    "This Schiller play begins with the jailer Paulet breaking into the protagonist’s desk. The protagonist of this play confronts her cousin and rival in a park outside her prison.",
+    "<em>The Piccolomini</em> is the second play in a trilogy by Schiller titled for this Bohemian general. Macdonald and Devereux assassinate this character after his plan to enter an alliance with the Swedes is uncovered."
+   ],
+   "answers": [
+    "Friedrich <b><u>Schiller</u></b> [or Johann Christoph Friedrich von <b><u>Schiller</u></b>]",
+    "<em><b><u>Mary Stuart</u></b></em> [or <em><b><u>Maria Stuart</u></b></em>]",
+    "<b><u>Wallenstein</u></b> [or Albrecht von <b><u>Wallenstein</u></b> or Albrecht Wenzel Eusebius von <b><u>Wallenstein</u></b> or Albrecht Václav Eusebius z <b><u>Valdštejna</u></b>]"
    ],
    "values": [
     10,
@@ -190,16 +410,36 @@
    "subcategory": "European Literature"
   },
   {
-   "leadin": "One of these languages that developed in 19th century California uses the eponym “Bill Nunn” for syrup, in reference to a man notorious for drenching his pancakes in it. For 10 points each:",
+   "leadin": "The MP2 level of theory improves on the Hartree–Fock method by including this phenomenon. For 10 points each:",
    "parts": [
-    "Identify these specialised languages used to exclude outsiders, such as Boontling. A Romani-derived “Thieves” one of these languages gives English the word “fence” for a seller of stolen goods.",
-    "Another English argot that draws from Romani is Polari, which was used in 19th and 20th century England by these people to evade the anti-sodomy laws that targeted them.",
-    "Much contemporary French slang derives from the argot verlan, which reorders parts of words like this English-language equivalent, which originated the term “ixnay.”"
+    "Name this phenomenon of electrons interacting with each other in a quantum system.",
+    "Correlation effects include repulsive forces that obey this law. This inverse square law relates electric force to the product of the charges involved.",
+    "The Hartree–Fock method adopts this assumption, which leads to treating nuclei as stationary relative to the electrons. It is named for two physicists."
    ],
    "answers": [
-    "<b><u>argot</u></b><em>(“ARR-goo”)</em> [accept <b><u>cant</u></b><em>(“kant”)</em> or <b><u>anti-language</u></b> or <b><u>cryptolect</u></b>; prompt on descriptions of a <u>secret language</u> or <u>talking in code</u>]",
-    "<b><u>homosexuals</u></b> [or <b><u>gay</u></b> people, accept <b><u>queer</u></b> people or <b><u>LGBT</u></b> people]",
-    "<b><u>Pig Latin</u></b>"
+    "electron <b><u>correlation</u></b> [or <b><u>correlation</u></b> effects; or electronic <b><u>correlation</u></b>; accept <b><u>correlation</u></b> energy]",
+    "<b><u>Coulomb</u></b>’s law",
+    "<b><u>Born–Oppenheimer</u></b> approximation [or <b><u>BO</u></b> approximation]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Science",
+   "subcategory": "Chemistry"
+  },
+  {
+   "leadin": "Answer the following about the career of psychologist James Coan (“KOH-in”), for 10 points each.",
+   "parts": [
+    "<em>Description acceptable.</em> As an undergraduate working under Elizabeth Loftus, Coan created the “lost in the mall” technique, in which these things were created in test subjects.",
+    "With Lane Beckes (“behks”), Coan developed a “baseline theory” prefixed by this adjective. It’s not “organizational,” but Kurt Lewin (“luh-VEEN”) pioneered a branch of psychology named for this adjective.",
+    "Coan used fMRIs to show that this emotion is reduced when people hold hands with their spouses. A condition known as “generalized [this emotion] disorder” is characterized by excessive worries about everyday events."
+   ],
+   "answers": [
+    "<b><u>false memories</u></b> [or <b><u>false memory</u></b>; or <b><u>confabulations</u></b> or <b><u>implanted memories</u></b>; accept any answers that indicate <b><u>memories</u></b> of events that <b><u>did not occur</u></b>; prompt on <u>memories</u> or <u>memory</u>]",
+    "<b><u>social</u></b> [accept <b><u>social</u></b> psychology; accept <b><u>social</u></b> baseline theory]",
+    "<b><u>anxiety</u></b> [accept generalized <b><u>anxiety</u></b> disorder; prompt on <u>GAD</u> by asking “what does that stand for?”]"
    ],
    "values": [
     10,
@@ -210,236 +450,16 @@
    "subcategory": "Social Science"
   },
   {
-   "leadin": "The thickness of these devices is usually assumed to be negligible when analyzing them with a ray transfer matrix. For 10 points each:",
+   "leadin": "This person walks through a street populated by homeless people in a painting depicting him <em>Healing the Sick with his Shadow</em>. For 10 points each:",
    "parts": [
-    "Name these devices whose focal length can often be approximated as half of their radius. These optical devices, which transmit and refract incoming light, come in convex and concave varieties.",
-    "Images reflected in lenses may appear blurred at areas of high-contrast due to this phenomenon, in which light at different wavelengths have differing focal points.",
-    "Chromatic aberration is caused by this phenomenon, which occurs when the index of refraction of the lens varies with the wavelength of the incoming light. This phenomenon causes white light to split as it’s passed through a prism."
+    "Name this saint whom many Renaissance paintings show crucified on an upside-down cross. Michelangelo’s <em>Pietà</em> is housed in a Vatican basilica named for this saint.",
+    "This place of worship, located in the Church of Santa Maria del Carmine (“CAR-mee-nay”), features several depictions of Peter alongside scenes from the lives of other saints. A painting in this place depicts Peter pulling the title object from the mouth of a fish.",
+    "This artist painted the aforementioned fresco, <em>The Tribute Money</em>. Along with his associate Masolino, this artist created many of the depictions of Saint Peter in the Brancacci Chapel."
    ],
    "answers": [
-    "<b><u>lens</u></b>es [accept thin <b><u>lens</u></b>es; accept convex <b><u>lens</u></b>es; accept concave <b><u>lens</u></b>es]",
-    "<b><u>chromatic aberration</u></b> [prompt on <u>aberration</u>]",
-    "optical <b><u>dispersion</u></b> [accept word forms]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Science",
-   "subcategory": "Physics"
-  },
-  {
-   "leadin": "In a play by this author, Nancy spots a giant humanoid lizard following an argument with her husband Charlie. For 10 points each:",
-   "parts": [
-    "Name this author, who in another play wrote about a fight on a Central Park bench that ends with Jerry impaling himself on a knife.",
-    "The lizards Leslie and Sarah feature in Albee’s play <em>Seascape</em>, which is set in one of these locations. Matthew Arnold titled a poem for one of these locations in Dover.",
-    "In <em>Seascape</em>, Nancy proclaims “what a noise they make” after hearing the sounds of some of these objects. In another play, Steve Deever is imprisoned for his role in causing the deaths of 21 people who operate these objects by sending cracked cylinder heads."
-   ],
-   "answers": [
-    "Edward <b><u>Albee</u></b> [or Edward Franklin <b><u>Albee</u></b> III] (the unnamed play is <em>Zoo Story</em>.)",
-    "<b><u>beach</u></b>es [accept “Dover <b><u>Beach</u></b>”]",
-    "air<b><u>plane</u></b>s [accept <b><u>aircraft</u></b>s or <b><u>jet</u></b>s] (the unnamed play is <em>All My Sons</em> by Arthur Miller.)"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Literature",
-   "subcategory": "American Literature"
-  },
-  {
-   "leadin": "While serving as one of these people’s toqui <em>(“toh-KEE”)</em> war chiefs, Nangoniel introduced cavalry to their army. For 10 points each:",
-   "parts": [
-    "Name these indigenous people whose leader Lautaro <em>(“lao-TAH-ro”)</em> successfully killed the conquistador Pedro de Valdivia during the Arauco <em>(“ah-RAO-koh”)</em> War.",
-    "The Mapuche’s campaigns against the Spanish mostly took place in this modern day country, where they repeatedly destroyed its modern capital of Santiago.",
-    "Nicolás Palacios’s 1904 book on the “Chilean Race” describes how conquistadors promoted intermarriage with the Mapuche, resulting in Chile’s population being dominated by this class. In the Spanish ethnic system, people of this <em>casta</em> had both Indigenous and European descent."
-   ],
-   "answers": [
-    "<b><u>Mapuche</u></b> [prompt on <u>Araucanians</u>]",
-    "<b><u>Chile</u></b> [or Republic of <b><u>Chile</u></b>]",
-    "<b><u>mestizo</u></b>s [or <b><u>mestiza</u></b>s or <b><u>mestiza</u></b>je or <b><u>castizo</u></b>; reject “mulatto”]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "History",
-   "subcategory": "World History"
-  },
-  {
-   "leadin": "One of the “loop” types of these drugs, furosemide, works by inhibiting a Na-K-Cl co-transporter. For 10 points each,",
-   "parts": [
-    "Name these drugs, one type of which leaves a large concentration of sodium in the proximal convoluted tubule. Vasopressin counters the effects of these drugs.",
-    "The aforementioned loop diuretics operate on the Loop of Henle, a part of this functional unit of the kidney.",
-    "A lack of vasopressin production can lead to the “insipidus” form of this condition. A drug used to treat this condition is metformin."
-   ],
-   "answers": [
-    "<b><u>diuretics</u></b> [accept loop <b><u>diuretics</u></b> or anti-<b><u>diuretic</u></b> hormone; anti-prompt on <u>carbonic anhydrase</u> <u>inhibitors</u>]",
-    "<b><u>nephron</u></b>s [anti-prompt on <u>glomerulus</u> or <u>distal convoluted tubule</u> or <u>proximal convoluted</u> <u>tubule</u> or <u>renal corpuscle</u>]",
-    "<b><u>diabetes</u></b> [accept <b><u>diabetes</u></b> insipidus or type 2 <b><u>diabetes</u></b> or <b><u>diabetes</u></b> mellitus]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Science",
-   "subcategory": "Biology"
-  },
-  {
-   "leadin": "In 2022, this actress declined to reprise the role of Inez on Broadway in favour of starring as Cinderella in a revival of <em>Into The Woods</em>. For 10 points each:",
-   "parts": [
-    "Name this actress who originated Inez in the musical <em>Suffs</em>. Another character originated by this actress sings of destroying her unfaithful husband’s love letters in the song “Burn.”",
-    "That character Soo originated is Eliza Schuyler, the wife of the title Founding Father in this Pulitzer Prize-winning Lin-Manuel Miranda hip-hop musical.",
-    "Another Broadway role Soo originated was this female title character in a Dave Malloy musical based on the work of Leo Tolstoy, who ends it by watching “the Great Comet of 1812.”"
-   ],
-   "answers": [
-    "Phillippa <b><u>Soo</u></b> [or Phillipa Anne <b><u>Soo</u></b>]",
-    "<em><b><u>Hamilton</u></b></em>",
-    "<b><u>Natasha</u></b> Rostova [accept <em><b><u>Natasha</u></b>, Pierre and the Great Comet of 1812</em>]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Fine Arts",
-   "subcategory": "Other Fine Arts"
-  },
-  {
-   "leadin": "This goddess sometimes appears as a white dog, and sends her sister on a journey to retrieve Lohi’au. For 10 points each:",
-   "parts": [
-    "Name this goddess of fire and volcanoes, who is said to reside in the caldera of Mount Kilauea.",
-    "Pele once competed in this activity against the chief Kahawali, in which she lost due to her inexperience. In another story, Pele competed with the snow goddess Poli’ahu in this activity, which uses a narrow wooden object.",
-    "Pele governs volcanoes like Mauna Kea and Mauna Loa on this archipelago, whose natives perform hula dances."
-   ],
-   "answers": [
-    "<b><u>Pele</u></b>",
-    "lava <b><u>sled</u></b>ding [or he’e <b><u>holua</u></b>]",
-    "<b><u>Hawai’i</u></b> [or <b><u>Hawaii</u></b>an Islands; prompt on <u>Polynesia</u>n Islands]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Mythology",
-   "subcategory": "Mythology"
-  },
-  {
-   "leadin": "For 10 points each, answer the following about the appearance of a certain composer’s music in the trailer for Wes Anderson’s<em> The Phoenician Scheme</em>.",
-   "parts": [
-    "Anderson’s trailer features an allusion to this movement of a larger work, which follows a <em>Berceuse</em> lullaby in which an evil king lures followers into sleep. This movement is scored in 7/4 time.",
-    "This composer of <em>The Firebird</em> also composed music for <em>The Rite of Spring</em>.",
-    "Festive music from the first tableaux of this ballet also features in the trailer. That energetic music depicts a crowd gathering for the Shrovetide Fair, the main setting of this ballet named for a puppet."
-   ],
-   "answers": [
-    "the <b><u>finale</u></b> from<em> The</em> <em><b><u>Firebird</u></b></em> [accept equivalents mentioning the <b><u>last</u></b> movement of the 1919 suite from<em> The</em> <em><b><u>Firebird</u></b></em>]",
-    "Igor <b><u>Stravinsky</u></b>",
-    "<em><b><u>Petrushka</u></b></em>[or <em><b><u>Petrouchka</u></b></em>]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Fine Arts",
-   "subcategory": "Auditory Fine Arts"
-  },
-  {
-   "leadin": "Steve Dahl complained about having to “defend [himself] as a racist homophobe” in his 2016 book about an event he organised in opposition to this music style. For 10 points each:",
-   "parts": [
-    "Name this style of music, whose records were blown up in a crate during a 1979 “Demolition Night” Dahl organised at Comiskey Park. The movie <em>Saturday Night Fever</em> helped popularize this style.",
-    "Dahl organised Disco Demolition Night as a promotion for this baseball team. Eight members of this Chicago team were banned for life after conspiring to fix the 1919 World Series.",
-    "This Chicago-based TV show helped popularise disco by regularly featuring acts like Donna Summer and Kool and the Gang in the 1970s. This music program, one of the first national shows produced by and for Black Americans, was hosted by its creator, Don Cornelius."
-   ],
-   "answers": [
-    "<b><u>disco</u></b> music [accept <b><u>Disco</u></b> Demolition Night]",
-    "the Chicago <b><u>White Sox</u></b> [prompt on <u>Sox</u>; prompt on <u>Black Sox</u> with “what team were the players dubbed ‘Black Sox’ actually part of?”; reject “Cubs” or “Chicago Cubs”]",
-    "<em><b><u>Soul Train</u></b></em>"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "History",
-   "subcategory": "American History"
-  },
-  {
-   "leadin": "According to tradition either six or twelve extra recitations of takbir are said during prayers named for this word. For 10 points each:",
-   "parts": [
-    "Name this Arabic word meaning “feast”, which precedes “al-Fitr” in the name of the festival that marks the end of Ramadan.",
-    "Eid al-Fitr marks the end of this annual obligation for Muslims. This fourth pillar of Islam is characterized by fasting during Ramadan.",
-    "Eid al-Fitr corresponds to the first day of this month of the Islamic calendar. This month comes after Ramadan."
-   ],
-   "answers": [
-    "<b><u>Eid</u></b> [accept <b><u>Eid</u></b> al-Fitr; accept <b><u>Eid</u></b> prayers or <b><u>Eid</u></b> salaah]",
-    "<em><b><u>sawm</u></b></em> [accept <em><b><u>roza</u></b></em> or <em><b><u>puasa</u></b></em>]",
-    "<b><u>Shawwāl</u> </b>"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Religion",
-   "subcategory": "Religion"
-  },
-  {
-   "leadin": "The time residence distribution characterizes these devices, which is a delta function in the “plug-flow” type of them. For 10 points each,",
-   "parts": [
-    "Name these devices. The presence of “dead zones” of stagnant fluid flow in these devices drastically reduces efficiency.",
-    "The residence time distribution is a delta function in a PFR as this process doesn’t occur axially. In the lab, this process is commonly done with a rotating magnetic bar to homogenize a solution.",
-    "For a CSTR, the time distribution function is proportional to this function of minus t over tau. In the Arrhenius equation’s common form, this operation is applied to minus E-sub-a over R T."
-   ],
-   "answers": [
-    "chemical <b><u>reactors</u></b> [accept <b><u>Plug-flow Reactor</u></b>; do NOT accept nuclear reactor]",
-    "<b><u>mixing</u></b> [accept <b><u>stirring</u></b>]",
-    "<b><u>exponential</u></b> function [accept <b><u>e to the x</u></b> or <b><u>e to the minus x</u></b>]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Science",
-   "subcategory": "Chemistry"
-  },
-  {
-   "leadin": "The creator of this object torments a servant with chains and owl attacks while making it. For 10 points each:",
-   "parts": [
-    "Name or describe this object commissioned by the Lord of Horikawa. Yuzuki and her monkey are burned in a carriage so that Yoshihide can finish creating this object.",
-    "Hell Screen is a work by this Japanese author. A woodcutter and a Buddhist priest are among those who give conflicting testimonies about the murder of a samurai in another work by this author.",
-    "Due to guilt from his daughter Yuzuki’s death in completing the Hell Screen, Yoshihide performs this action. The author Yukio Mishima performed a ritual form of this action known as <em>seppuku</em>."
-   ],
-   "answers": [
-    "the <b><u>Hell Screen</u></b> [accept the painting from “<b><u>Hell Screen</u></b>”; accept descriptions of a <b><u>painting</u></b> of <b><u>hell</u></b> or <b><u>Buddhist underworld</u></b>; prompt on <u>painting</u> or <u>artwork</u> or equivalents]",
-    "Ryūnosuke <b><u>Akutagawa</u></b><em>(“ak-tah-gah-wa”)</em> [or <b><u>Akutagawa</u></b> Ryūnosuke]",
-    "<b><u>suicide</u></b> [accept descriptions like <b><u>killing oneself</u></b>]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Literature",
-   "subcategory": "World Literature"
-  },
-  {
-   "leadin": "Vincent van Gogh copied an artwork in this genre that depicts a “sudden shower” in his painting <em>Bridge in the Rain</em>. For 10 points each:",
-   "parts": [
-    "Name this genre of art that often depicted beautiful women and actors. Mary Cassatt drew from a work in this genre depicting a woman holding two mirrors to view her hair for her own <em>The Coiffure</em>.",
-    "Ukiyo-e <em>(“oo-kee-yo-EH”)</em> originated from this Asian country. Many 19th century Western artists found inspiration from art from this country, such as the sketches in Hokusai’s <em>Manga</em>.",
-    "This artist drew directly from Hokusai’s <em>Manga</em> for a painting of a woman bent forward with her face to her knee in front of a double bass. This close friend of Mary Cassatt made a painting of her “Seated Holding Cards.”"
-   ],
-   "answers": [
-    "<b><u>ukiyo-e</u></b> [accept pictures of the <b><u>floating world</u></b>; antiprompt on <u>bijin-ga</u> with “what wider genre of art was that a part of?”]",
-    "<b><u>Japan</u></b> [or <b><u>Nihon</u></b>-koku or <b><u>Nippon</u></b>-koku]",
-    "Edgar <b><u>Degas</u></b> (the woman in that painting is a ballet dancer)"
+    "Saint <b><u>Peter</u></b> [or <b><u>Simon</u></b> Peter or <b><u>Simeon</u></b> or <b><u>Cephas</u></b> or <b><u>Petros</u></b> or <b><u>Petrus</u></b>; accept Saint <b><u>Peter</u></b>’s Basilica or Basilica di San <b><u>Pietro</u></b>]",
+    "<b><u>Brancacci</u></b> (“brahn-KAH-chee”) Chapel [or Cappella dei <b><u>Brancacci</u></b>]",
+    "<b><u>Masaccio</u></b> (“mah-SAH-choh”) [or <b><u>Tomasso di Ser Giovanni</u></b> di Simone]"
    ],
    "values": [
     10,
@@ -450,16 +470,76 @@
    "subcategory": "Visual Fine Arts"
   },
   {
-   "leadin": "The first explicit solution to this equation was created by Brahmagupta, though two signs are different from the modern version. For 10 points each:",
+   "leadin": "The <em>soggetto cavato</em> (“soh-JET-toh cah-VAH-toh”) system, an early type of musical cryptogram, used these syllables to represent the vowels of text in music. For 10 points each:",
    "parts": [
-    "Name this mathematical equation, whose roots are given by [read slowly] negative b plus or minus the square root of the quantity b squared minus 4 a c, all divided by 2 a.",
-    "These formulas, named for a 16th-century French mathematician, relate polynomial coefficients to symmetric functions of the roots. For a quadratic, they state that the sum of roots equals negative b over a.",
-    "Cardano’s method for solving cubics begins by transforming the equation into one of these forms, which lack the second-highest degree term. Completing the square transforms a general quadratic into this form by eliminating the linear coefficient."
+    "Name this set of seven syllables used to teach musical notes, starting with “do, re, mi.”",
+    "This composer, who invented <em>soggetto cavato</em>, used it to represent his patron’s name in the <em>Missa Hercules Dux Ferrariae</em> and to reference a story about Cardinal Sforza saying “Lascia fare mi” (“LAH-shah FAH-ray mee”) in the <em>Missa la sol fa re mi</em>.",
+    "Josquin des Prez used <em>soggetto cavato</em> to represent his own name in the piece <em>Illibata Dei virgo</em>, a piece in this genre. Thomas Tallis’s <em>Spem in alium</em> is also an example of this genre of sacred polyphonic vocal music."
    ],
    "answers": [
-    "<b><u>quadratic</u></b> equation [accept <b><u>quadratic</u></b> formula]",
-    "<b><u>Vieta’s</u></b> formulas [or <b><u>Viète's</u></b> formulas]",
-    "<b><u>depressed</u></b> polynomial [or <b><u>depressed</u></b> equation or <b><u>depressed</u></b> cubic or <b><u>depressed</u></b> quadratic]"
+    "<b><u>solfège</u></b> (“sol-FEZH”) [or <b><u>solfeggio</u></b>; or <b><u>sol-fa</u></b>; or <b><u>solfa</u></b>; or <b><u>solfeo</u></b>; accept <b><u>hexachord</u></b>; prompt on <u>solmization</u>]",
+    "<b><u>Josquin</u></b> des Prez (“zhoh-SKAHN day PRAY”) [or Josquin <b><u>des Prez</u></b>; or Josquin <b><u>Labloitte</u></b>]",
+    "<b><u>motet</u></b>"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Fine Arts",
+   "subcategory": "Auditory Fine Arts"
+  },
+  {
+   "leadin": "A lintel from this culture’s city of Yaxchilán (“yahsh-chee-LAHN”) depicts Lady Xoc (“shoak”) piercing her tongue in a bloodletting ritual. For 10 points each:",
+   "parts": [
+    "Name this culture whose city of Naranjo (“nah-RON-hoh”) allied with Calakmul (“kah-lock-MOOL”) under Lady Six Sky. Royal women from this Mesoamerican civilization included Sak Kʼukʼ of Palenque (“pah-LEN-kay”) and Lady K’ayam of Chichen Itzá.",
+    "Stela 3 near this Maya city’s Caana pyramid highlights Ix (“eesh”) Batz’ Ek’s matrilineal power. This city in modern-day Belize shares its name with an observatory at Chichén Itzá, since both featured spiral-shaped structures.",
+    "Evidence for Maya women’s industry comes from Caracol’s many whorls, which weighted the “drop” type of these objects. The word “distaff” comes from centuries of women processing flax with these fusiform objects."
+   ],
+   "answers": [
+    "<b><u>Maya</u></b> [or <b><u>Mayan</u></b>s; accept <b><u>Kʼiche</u></b>ʼ or <b><u>Tzeltal</u></b> or <b><u>Tzotzil</u></b> or <b><u>Chʼol</u></b> or <b><u>Qʼeqchi</u></b>ʼ or <b><u>Mopan</u></b> or <b><u>Lacandon</u></b>]",
+    "<b><u>Caracol</u></b> [accept El <b><u>Caracol</u></b>; accept <b><u>Caracol</u></b> Stela 3] (The word “caracol” means “spiral” or “snail.” The observatory had a spiral staircase and the city had a winding road.)",
+    "<b><u>spindle</u></b>s [accept drop <b><u>spindle</u></b>s; prompt on <u>spike</u>s or <u>staff</u>s]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "History",
+   "subcategory": "Other History"
+  },
+  {
+   "leadin": "Answer the following about the Gospel of Luke, for 10 points each.",
+   "parts": [
+    "The Gospel of Luke is sometimes paired with a book titled for the Acts of these people, which was also authored by Luke. These twelve followers of Jesus Christ included Thomas and Peter.",
+    "The Gospel of Luke uniquely contains a parable about a rich man and a beggar with this name. The Gospel of John is the only gospel that includes the story of a man with this name from the town of Bethany.",
+    "In the two-source hypothesis, this source is hypothesized to have provided material used by both the Gospels of Luke and Matthew, but not Mark."
+   ],
+   "answers": [
+    "<b><u>Apostle</u></b>s [or the Twelve <b><u>Apostle</u></b>s; accept Acts of the <b><u>Apostle</u></b>s or Práxeis <b><u>Apostólōn</u></b> or Actūs <b><u>Apostolōrum</u></b>; accept the Twelve <b><u>Disciple</u></b>s]",
+    "<b><u>Lazarus</u></b> [accept <b><u>Lazarus</u></b> of Bethany; accept the rich man and <b><u>Lazarus</u></b> or <b><u>Lazarus</u></b> and Dives]",
+    "<b><u>Q</u></b> source [or <b><u>Q</u></b> documents or <b><u>Q</u></b> gospels]"
+   ],
+   "values": [
+    10,
+    10,
+    10
+   ],
+   "category": "Religion",
+   "subcategory": "Religion"
+  },
+  {
+   "leadin": "The limiting ratio of successive intervals between “period-doubling” examples of these points gives the first Feigenbaum (“FAI-gun-baum”) constant. For 10 points each:",
+   "parts": [
+    "Name these points. One of these points that corresponds to complex conjugate eigenvalues crossing the imaginary axis is named for Hopf.",
+    "Increasingly close period-doubling bifurcations are typical of this phenomenon, in which a system is highly sensitive to its initial conditions. This phenomenon is illustrated by the “butterfly effect.”",
+    "Bifurcation points of the logistic map’s Feigenbaum diagram correspond directly to where the real axis intersects the boundary of this shape, which contains a so-called “seahorse valley” next to its “main cardioid.”"
+   ],
+   "answers": [
+    "<b><u>bifurcation</u></b>s [accept <b><u>bifurcation</u></b> diagrams; accept <b><u>bifurcation</u></b> theory; accept Hopf <b><u>bifurcation</u></b>s]",
+    "<b><u>chaos</u></b> [or <b><u>chaotic</u></b> behavior]",
+    "<b><u>Mandelbrot</u></b> set [or <b><u>Mandelbrot</u></b> fractal]"
    ],
    "values": [
     10,
@@ -468,66 +548,6 @@
    ],
    "category": "Science",
    "subcategory": "Other Science"
-  },
-  {
-   "leadin": "The title of one short story in this collection inspired the name of the band Wolf Alice. For 10 points each:",
-   "parts": [
-    "Name this collection by Angela Carter, whose title story features the Marquis gifting a choker of rubies to its narrator before pressing the key of its namesake location into her forehead.",
-    "<em>The Bloody Chamber</em> is comprised of feminist reworkings of these works, which were collected by Charles Perrault and the Brothers Grimm.",
-    "In another<em> Bloody Chamber</em> story, an atypical depiction of this character dies by pricking her finger on a rose thorn. This character’s story typically begins with her mother wishing for a child who looks like her after seeing three drops of blood on the ground."
-   ],
-   "answers": [
-    "<em>The</em> <em><b><u>Bloody Chamber</u></b></em>",
-    "<b><u>fairy tale</u></b>s [or <b><u>folk tale</u></b>s or <b><u>folklore</u></b> or <b><u>fairy stories</u></b>; prompt on <u>children’s stories</u> or equivalents; reject “fables”]",
-    "<b><u>Snow White</u></b>"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Literature",
-   "subcategory": "British Literature"
-  },
-  {
-   "leadin": "While inspired in his time serving this ruler, Procopius backdated his reign to increase the number of infrastructure projects listed in his treatise <em>On Buildings</em>. For 10 points each:",
-   "parts": [
-    "Name this Byzantine emperor whose advisor Tribonian helped him create a namesake law code. This husband of Theodora quashed the Nika riots.",
-    "After becoming disillusioned with Justinian, Procopius wrote this work attacking him and Theodora. This work infamously claimed that Justinian was a demon who could detach his own head.",
-    "Procopius may have turned on Justinian after witnessing Belisarius’ brutal conquest of this Byzantine exarchate. This city was the capital of the Ostrogothic Kingdom under Theodoric."
-   ],
-   "answers": [
-    "<b><u>Justinian I</u></b> [or <b><u>Justinian the Great</u></b>; or Flavius Petrus Sabbatius <b><u>Iustinianus</u></b>; prompt on <u>Justinian</u>]",
-    "the <em><b><u>Secret History</u></b></em> [accept <em><b><u>Historia Arcana</u></b></em> or <em><b><u>Anecdota</u></b></em>]",
-    "<b><u>Ravenna</u></b> [accept Exarchate of <b><u>Ravenna</u></b>]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "History",
-   "subcategory": "European History"
-  },
-  {
-   "leadin": "Examples of these objects form the majority of rungs on the cosmic distance ladder. For 10 points each:",
-   "parts": [
-    "Give this term for astronomical objects of known luminosity that are used by astronomers to calculate distances between cosmic objects.",
-    "These particles’ namesake “acoustic oscillations” are used as an alternative to standard candles when it comes to calculating distance. These particles vastly outnumber their antiparticles in their namesake “asymmetry,” which emerged right after the Big Bang.",
-    "Another common alternative to standard candles utilizes the Type II form of these powerful explosions of stars."
-   ],
-   "answers": [
-    "<b><u>standard candle</u></b>s [prompt on <u>candle</u>s]",
-    "<b><u>baryon</u></b>s [accept <b><u>baryon</u></b> acoustic oscillations; or <b><u>baryon</u></b> asymmetry]",
-    "<b><u>supernova</u></b>e [accept Type II <b><u>supernova</u></b>e]"
-   ],
-   "values": [
-    10,
-    10,
-    10
-   ],
-   "category": "Science",
-   "subcategory": "Physics"
   }
  ]
 }

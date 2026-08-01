@@ -237,16 +237,23 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
 - `app/demo.html` + `js/demo.js` + `demo/fixture.js` — the demo
-  tournament. Opening any page with `?t=demo` / `?b=demo` (the slug and
-  secret are reserved) makes `api.js` serve every `pub()` call from
-  `demo.js` in the browser: the committed fixture holds a 4-team round
-  robin mid-event, and games a visitor reads in the embedded MODAQ
-  upload into localStorage and flow into stats, buzzpoints, and
-  categories. A demo visitor costs zero Worker requests — the unit
-  suite runs the whole flow with `fetch` stubbed to throw. The packets
-  in `tools/demo/` are 2025 VAULT packets 1-3 (via qbreader, `<i>`
-  converted to `<em>` for MODAQ's formatter); regenerate the fixture
-  with `node tools/demo_fixture.mjs`.
+  tournament. Opening any page with `?t=demo`, `?a=demo`, or
+  `?b=demo` / `?b=demo-b` (the slug is reserved; real bucket secrets are
+  long random tokens) makes `api.js` serve every `pub()` call from
+  `demo.js` in the browser: the committed fixture holds a 4-team triple
+  round robin (Stanford, Berkeley, UIUC, ASU) mid-event, the TD hub
+  runs read-only against it (advance-round and visitor-upload deletes
+  work; stats, report, `.yft`, and zip exports are client-side anyway),
+  and games a visitor reads in the embedded MODAQ upload into
+  localStorage and flow into stats, buzzpoints, and categories. A demo
+  visitor costs zero Worker requests — the unit suite runs the whole
+  flow with `fetch` stubbed to throw. The packets in `tools/demo/` are
+  2022 ACF Winter packets 1-9 (via qbreader, `<i>` converted to `<em>`
+  for MODAQ's formatter); regenerate the fixture with
+  `node tools/demo_fixture.mjs`. In `read.bundle.js` the demo module
+  loads via a runtime `import()` (non-literal specifier, so esbuild
+  leaves it out of the bundle) — the fixture never rides along with
+  MODAQ.
 
 ## Tests
 

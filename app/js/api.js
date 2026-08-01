@@ -7,10 +7,12 @@ const qs = new URLSearchParams(location.search);
 export const API = qs.get('server') || localStorage.qbtdServer
   || 'https://qb-td.denisliu10.workers.dev';
 
-// The demo tournament (demo.html): slug and bucket secret 'demo' are
-// reserved, and every pub() call is served in-browser from the committed
-// fixture by demo.js — the pages themselves run unchanged.
-const DEMO = qs.get('t') === 'demo' || qs.get('b') === 'demo';
+// The demo tournament (demo.html): the 'demo' slug/admin id and the
+// 'demo'/'demo-b' bucket secrets are its reserved names, and every pub()
+// call is served in-browser from the committed fixture by demo.js — the
+// pages themselves run unchanged.
+const DEMO = qs.get('t') === 'demo' || qs.get('a') === 'demo'
+  || ['demo', 'demo-b'].includes(qs.get('b'));
 let demoModule = null;
 
 // A frozen snapshot of /pub responses, keyed by path. Set by the archive
@@ -29,7 +31,11 @@ export function useFrozenData(map) {
     the raw Response. */
 export async function pub(path, opts = {}) {
   if (DEMO) {
-    if (!demoModule) demoModule = await import('./demo.js');
+    // Resolved against the page URL at runtime (every page lives in app/),
+    // NOT a static './demo.js': the specifier must stay non-literal so
+    // esbuild leaves it out of read.bundle.js — the fixture inside demo.js
+    // is far too big to ride along with MODAQ.
+    if (!demoModule) demoModule = await import(new URL('js/demo.js', document.baseURI).href);
     return demoModule.demoPub(path, opts);
   }
   if (frozen) {

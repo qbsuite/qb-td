@@ -3,338 +3,198 @@
 // never edit by hand. Served entirely in-browser by app/js/demo.js.
 export default {
  "name": "Demo Tournament",
- "currentRound": 3,
+ "currentRound": 7,
  "rooms": [
   "Room A",
   "Room B"
  ],
  "readerRoom": 0,
  "settings": {
-  "gameFormat": "macf-powers"
+  "gameFormat": "acf"
  },
  "packets": {
   "1": {
-   "name": "2025 VAULT Packet 1",
+   "name": "2022 ACF Winter Packet 1",
    "tossups": [
     {
-     "question": "<b>A week before he was killed by these people, Tara Hayer </b><em>(“HAY-er”)</em><b> flatly declared “If they get me, they get me.” “Black Cat” commandos targeted members of this group during Operation Black Thunder. A Boeing 747 carrying 329 passengers was bombed by these people in Canada’s deadliest act of terrorism. The claim that “when a (*) </b>big tree falls, the earth shakes” was used to justify 1984 attacks against these people. These people’s Khalistan movement gained support after Operation Blue Star. Indira Gandhi was assassinated for raiding these people’s Golden Temple. For 10 points, name this religious minority whose male practitioners wear turbans.",
-     "answer": "<b><u>Sikh</u></b>s [accept <b><u>Khalistani</u></b>s before “Khalistan” is read; prompt on <u>Punjabi</u>s or <u>Indian</u>s; prompt on <u>Babbar Khalsa</u> or <u>Babbar Khalsa</u> International or <u>BK</u> by asking “What general group were members of Babbar Khalsa part of?\"]",
-     "category": "History",
-     "subcategory": "World History"
+     "question": "In Gujarat, participants in an activity involving these items celebrate by shouting “kai po che!” (“kai poh CHAY”) Due to widespread injury by features called “Chinese” manja, many cities in the Indian subcontinent have banned these items during festivals like Uttarayan and Makar Sankranti. Some sources claim that these items were invented for wartime surveying by philosophers Lǔ Bān and Mòzǐ. In a novel, a boy in a California park gives a “lopsided” smile as he looks at a green example of these items used by his adoptive father, who finds himself again uttering the phrase “for you, a thousand times over.” In that novel, failure to relinquish a prized example of these items results in Hassan being raped by Assef in front of his best friend Amir. For 10 points, a Khaled Hosseini (“kuh-LEED hoh-SAY-nee”) novel centers on a “runner” of what toy aircraft?",
+     "answer": "<b><u>kite</u></b>s [accept fighter <b><u>kite</u></b>s; accept <b><u>patang</u></b>; accept <b><u>tukkal</u></b>; accept <em>The</em> <em><b><u>Kite</u></b> Runner</em>]",
+     "category": "Other Academic",
+     "subcategory": "Other Academic"
     },
     {
-     "question": "<b>The capacity to maintain this quantity is considered low for systems with a high Revelle factor. </b> <b>This quantity is plotted on the x-axis of a Bjerrum </b><em>(\"B’YAIR-um\")</em><b> plot. A decrease in this quantity drives the CCD upward, damaging the habitat of coccolithophores </b><em>(“kok-oh-LITH-oh-fohrs”)</em><b>. </b> <b>Aragonite-using organisms are the first to be affected by changes in this quantity. </b>(*) Coral bleaching is exacerbated by a global decrease in this quantity. This quantity drops when the equilibrium of a bicarbonate-carbonate buffer is altered. For 10 points, increased carbon dioxide uptake causes a decrease in what quantity through ocean acidification?",
-     "answer": "oceanic <b><u>pH</u></b> [prompt on ocean <u>acid</u>ification or ocean <u>acid</u>ity or ocean <u>alkalin</u>ity before \"acidification\"; prompt on any description of <u>CO2 level</u>s like <u>concentration of carbon dioxide</u> or <u>concentration of CO2</u> or <u>dissolved inorganic carbon</u> or <u>total inorganic carbon</u> before \"carbon dioxide\"]",
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "question": "<b>According to Saul Rosenzweig’s “Dodo bird verdict,” no type of this practice is more effective than another. The A-B-C-D-E-F model appears in an educational form of this practice pioneered by Albert Ellis. Kierkegaard’s “will to meaning” inspired Viktor Frankl to create a “logo” form of this practice. Aaron Beck introduced a form of this practice designed to counter the (*)</b> cognitive triad. Unconditional positive regard is a core tenet of Carl Rogers’ “client-centered” type of this practice, which is widely used like similar practices in its “cognitive behavioral” type. For 10 points, name this conversational practice used by psychiatrists and psychologists to aid patients.",
-     "answer": "psycho<b><u>therapy</u></b> [or psychological <b><u>therapy</u></b>; accept <b><u>counseling</u></b>; accept client-centered <b><u>therapy</u> </b>or logo<b><u>therapy</u></b> or Cognitive Behavioral <b><u>therapy</u></b>; prompt on <u>psychoanalysis</u>; prompt on <u>psychiatry</u> or <u>psychology</u>; or <u>mental health care</u> with “What specific practice is being performed?”]",
-     "category": "Social Science",
-     "subcategory": "Social Science"
-    },
-    {
-     "question": "<b>An epigraph in this novel originally consisted of lyrics from Joni Mitchell’s “Cactus Tree” before being changed at the last minute. In this novel, Geli Tripping ventures to the top of Brocken with another character to experience “Kirghiz Light”; that character scours continental Europe in search of the S-Gerät. In this novel, a discovery presented by Pointsman, a member of PISCES, is dismissed as a mere </b>(*) Poisson distribution by Roger Mexico. Those events create the “screaming across the sky” that opens this novel. For 10 points, V-2 rocket strike locations are correlated with Tyrone Slothrop’s sexual encounters in what Thomas Pynchon novel?",
-     "answer": "<em><b><u>Gravity’s Rainbow</u> </b></em>",
-     "category": "Literature",
-     "subcategory": "American Literature"
-    },
-    {
-     "question": "<b>The second movement of a concerto by this composer opens with the soloist playing E major arpeggios before a flute introduces the rising theme </b>[read slowly]<b> “B, E, E-sharp, long E-sharp.” Yunchan Lim won the 2022 Van Cliburn Competition after performing a piece by this composer that features a notoriously difficult </b><em><b>ossia</b></em><b> cadenza. An Arnold Böcklin painting inspired this composer’s (*) </b><em>Isle of the Dead</em>. A piano piece by this composer is titled for an Italian violin virtuoso’s 24th caprice. For 10 points, name this Russian composer of four piano concertos and <em>Rhapsody on a</em> <em>Theme of Paganini</em>.",
-     "answer": "Sergei <b><u>Rachmaninoff</u> </b>",
-     "category": "Fine Arts",
-     "subcategory": "Auditory Fine Arts"
-    },
-    {
-     "question": "<b>Lotfi Zadeh defined “fuzzy” versions of these objects where the law of excluded middle doesn’t hold. Atypically, the NF theory of these objects uses an IFF for the axiom of extensionality. Max Zorn showed that partially ordered types of these objects must have a maximal element. The </b>(*) Cartesian product between two of these objects can be formatted using “builder notation.” Zermelo and Fraenkel’s theory for these things is called ZFC when including the axiom of choice. The cardinality of the empty one of these objects is zero. For 10 points, curly braces are used to write what unordered collections of elements?",
-     "answer": "<b><u>set</u></b>s [accept sub<b><u>set</u></b>s; accept partially ordered <b><u>set</u></b>s or po<b><u>set</u></b>s; accept <b><u>set</u></b> theory or Zermelo–Fraenkel <b><u>set</u></b> theory]",
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "question": "<b>Knot theory was partially inspired by Peter Tait’s expansions on this scientist’s vortex theory of the atom. This scientist’s wildly inaccurate prediction of the age of the earth was based on the time it took for a molten ball’s surface to cool. This person is the second namesake of a throttling process that describes the temperature change of an expanding real gas that is </b>(*) adiabatic. This person was knighted for his work solving bandwidth issues on the transatlantic telegraph cable. The triple point of water is approximately 273 degrees on a temperature scale named for this person. For 10 points, a temperature unit named for what person sets zero degrees at absolute zero?",
-     "answer": "Sir William <b><u>Thomson</u></b>, 1st Baron <b><u>Kelvin</u></b> [accept either underlined name; accept Lord <b><u>Kelvin</u></b>; prompt on <u>Joule–Thomson</u> effect or <u>Joule–Kelvin</u> effect; reject \"J. J. Thomson\" or \"Joseph John Thomson\"]",
+     "question": "This phenomenon’s effect is quantified by a tensor that includes a nonlinear term equal to the wedge product of the field <em>A</em> with itself, a feature that helps explain the OZI (“O-Z-I”) rule. A feature of a theory of this phenomenon occurs for positive values of the beta function, which occurs when “n sub f” is less than 33 over 2. That feature of this phenomenon explained Bjorken (“B’YOR-ken”) scaling and was discovered by Gross, Wilczek (“WILL-check”), and Politzer. A theory of this phenomenon is described by the SU(3) (“S-U-3”) symmetry group, which is generated by eight traceless matrices named for Murray Gell-Mann. This interaction’s strength unusually [emphasize] <em>decreases</em> as range decreases, a feature called asymptotic freedom. Quantum chromodynamics describes how this interaction is mediated by gluons. For 10 points, particles in a nucleus are held together by what most powerful fundamental force?",
+     "answer": "<b><u>strong</u></b> interaction [or <b><u>strong</u></b> force or <b><u>strong</u></b> nuclear interaction or <b><u>strong</u></b> nuclear force; or <b><u>color force</u></b>; prompt on <u>asymptotic freedom</u> or <u>color</u> or color <u>confinement</u> before “interaction’s” is read by asking “what interaction displays that feature?”; prompt on <u>gluon</u>s before “interaction’s” is read by asking “what interaction do they mediate?”; prompt on <u>QCD</u> or quantum <u>chromodynamics</u> before “interaction’s” is read by asking “what interaction is explained by that theory?”]",
      "category": "Science",
      "subcategory": "Physics"
     },
     {
-     "question": "<b>Rather than being executed for murdering his wife, a character in this novel is tattooed on his face. One character in this novel releases fish from a cage after a fisherman doesn't sell him any, and that character gains a nickname due to his twin axes. This novel begins with the release of golden rays after a stone tortoise is moved. A character in this novel drinks (*) </b> 18 bowls of wine and then beats a tiger dead. That character, Wu Song, inspired an erotic spinoff of this novel titled The Plum in the Golden Vase. Song Jiang leads a group of reincarnated demons against the corrupt official Gao Qiu in, for 10 points, what classic Chinese novel by Shi Nai'an about a group of 108 outlaws?",
-     "answer": "<em><b><u>Water Margin</u></b></em> [or <em><b><u>Outlaws of the Marsh</u></b></em> or <em><b><u>All Men Are Brothers</u></b></em> or <em><b><u>Shui Hu Zhuan</u></b></em>]",
-     "category": "Literature",
-     "subcategory": "World Literature"
+     "question": "A king in this biblical book has his thumbs and big toes cut off as a punishment for mutilating seventy kings in the same way. A man in this book tests God by laying a fleece of wool on a threshing floor to see if only it, and not the floor, will get wet. In this book, a warrior says, “I have a message from God unto thee” and then buries a sword in the stomach of a fat king. One of the oldest passages in the Bible is a victory hymn from this book sung by the wife of Lappidoth (“LAP-ih-DAWTH”) and Barak (“buh-ROCK”). In this book, the Canaanite (“CAY-nan-ite”) general Sisera (“SISS-err-uh”) has a tent peg driven through his head by Jael (“yah-EL”). Another man in this book loses his strength while he sleeps after Delilah has his hair cut off. For 10 points, Deborah and Samson are two of the eponymous leaders of what book of the Old Testament?",
+     "answer": "Book of <b><u>Judges</u></b> [or Sefer <b><u>Shoftim</u></b>]",
+     "category": "Religion",
+     "subcategory": "Religion"
     },
     {
-     "question": "<b>This polity’s forces </b>[emphasize]<em><b>defeated</b></em><b> the de la Gardie campaign by capturing an enemy ruler at Klushino. After they created </b><em><b>pacta conventa </b>(“PACH-tah CON-vent-ah”)</em><b>, leaders of this polity were forced to agree to a set of 18 provisions known as the Henrician Articles. After this polity’s </b><em><b>Nihil Novi</b>(“NEE-heel NOH-vai”)</em><b> was updated by the Constitution of 3 May, szlachta </b><em>(“SHLAK-ta”)</em> <b>nobles lost the ability to use a</b> (*) Liberum Veto. This country was invaded by Sweden during “the Deluge.” This country governed by the <em>Sejm(“same”)</em> entered a personal union with another after Duke Jogaila <em>(“yo-GAI-luh”)</em> married Queen Jadwiga <em>(“yahd-VEE-gah”)</em>. For 10 points, three partitions disintegrated what European country governed from Warsaw?",
-     "answer": "Kingdom of <b><u>Poland</u></b> [accept <b><u>Poland</u></b>-Lithuania or <b><u>Polish</u></b>-Lithuanian Commonwealth; prompt on <u>Lithuania</u>; prompt on the <u>Commonwealth</u>]",
-     "category": "History",
-     "subcategory": "European History"
-    },
-    {
-     "question": "<b>This politician terminated a contract with DNV after hiring them to investigate a 2021 metro overpass collapse. After this politician rejected a Supreme Court ruling against “Plan C,” 901 judges were elected in a 2025 nationwide special election. This creator of the “Yes to Peace” buyback campaign </b>[emphasize]<em><b>ended</b></em><b> the</b> (*) “Hugs, Not Bullets” policy by authorizing troop deployments. This leader used the USMCA to secure an exemption from 50% U.S. tariffs without issuing countermeasures. This member of the MORENA <em>(“moh-RAY-nah”)</em> party defeated Xóchitl <em>(“SHOH-cheat-ill”)</em> Gálvez in a 2024 election to succeed Andrés Manuel López Obrador. For 10 points, name this president of Mexico.",
-     "answer": "Claudia <b><u>Sheinbaum</u></b><em>(“SHINE-bawm”)</em> [or Claudia <b><u>Sheinbaum</u></b> Pardo]",
-     "category": "Current Events",
-     "subcategory": "Current Events"
-    },
-    {
-     "question": "<b>Laura has a nightmare of one of these characters at the foot of her bed after they crash a carriage into a tree. One of these characters who describes himself as “all in a sea of wonders” is stabbed by Quincy Morris at the end of one novel. Ianthe </b><em>(“EE-ann-fee”)</em><b> is murdered by one of these characters based on Lord Byron, the title character of a John</b> (*) Polidori novel written during the Villa Diodati <em>(“dee-oh-dah-tee”)</em> ghost story contest. Lord Ruthven <em>(“RUFF-venn”)</em> is one of these characters, as is the title character of an 1897 novel who sails to Whitby on the <em>Demeter</em> and is decapitated by Jonathan Harker. For 10 points, examples of what beings include the lesbian Carmilla and Dracula?",
-     "answer": "<b><u>vampire</u></b>s [accept <em>The</em> <em><b><u>Vampyre</u></b></em>, prompt on the <u>undead</u>]",
-     "category": "Literature",
-     "subcategory": "British Literature"
-    },
-    {
-     "question": "<em>Note to Moderator: Read Answerline carefully. Note to players: Description Acceptable.</em> <b>This event's central participant erroneously used Al-Farghani’s calculation for the length of a degree. The </b><em><b>Capitulations of Santa Fe</b></em><b> authorized this event, which encountered the cacique </b><em>(“kah-SEE-kay”)</em> <b>Guacanagaríx </b><em>(“gwah-kah-nah-GAH-reeks”)</em><b>. A fictional biography created by Washington Irving popularized a myth claiming that this event disproved Flat Earth theories. Alfred Crosby described a process that introduced </b>(*) syphilis to Europe in the wake of this event. Two years after this event, the Treaty of Tordesillas partitioned territory explored during it between Spain and Portugal. For 10 points, name this event, where an explorer journeyed to a new land on the Niña, Pinta, and Santa Maria.",
-     "answer": "Christopher <b><u>Columbus</u></b> (not) discovering the <b><u>New World</u></b> [accept <b><u>Columbus’ first voyage</u></b>; accept any description of Christopher <b><u>Columbus</u></b> journeying to the <b><u>New World</u></b>; accept <b><u>Columbian</u></b> <b><u>Exchange</u></b>; accept descriptions of <b><u>Columbus</u></b> travelling to <b><u>Hispaniola</u></b> or the <b><u>Caribbean</u></b> the <b><u>America</u></b>s or North <b><u>America</u></b>; prompt on descriptions that do not mention Columbus such as <u>journeying</u> to the <u>New</u> <u>World</u> or the <u>discovery</u> of the <u>Americas</u>]",
+     "question": "In 1968, military explosives unearthed this dynasty's mausoleum for Liú Shèng (“l’yoo shung”) of Zhōngshān (“jong shahn”), where molten metal sealed off Dòu Wǎn’s (“doh wahn’s”) jade burial suit. This dynasty’s official Sāng Hóngyáng (“sahng hongyahng”) instituted state control of grain and liquor under an emperor who established Gojoseon’s (“koh-joh-SUN’s”) “Four Commanderies” and Tàixué’s (“tai-shweh’s”) Imperial Academy. The polymath Zhāng Héng (“jahng hung”) invented a hydraulic armillary sphere and seismometer in this dynasty’s second capital of Luòyáng (“l’woh-yahng”). Monopolies on salt and iron funded this dynasty’s southward conquest of the Yuè (“yoo-eh”), which began the first “Northern Domination” under the Legalist rule of Wǔdì (“oo-dee”). Vietnam later rebelled against this dynasty under the Trưng (“jung”) sisters. For 10 points, the Pax Romana was roughly contemporary with the “Eastern” period of what dynasty that succeeded the Qín (“chin”)?",
+     "answer": "<b><u>Hàn</u></b> dynasty [or <b><u>Hàn</u></b>cháo; accept Western <b><u>Hàn</u></b> or Xī<b><u>hàn</u></b> or Former <b><u>Hàn</u></b> or Qián<b><u>hàn</u></b>; accept Eastern <b><u>Hàn</u></b> or Dōng<b><u>hàn</u></b> or Later <b><u>Hàn</u></b> or Hòu<b><u>hàn</u></b>; accept Emperor Wǔ of <b><u>Hàn</u></b> or <b><u>Hàn</u></b> Wǔdì; accept Four Commanderies of <b><u>Hàn</u></b> or <b><u>Hàn</u></b> Sìjùn; reject “Xīn dynasty”]",
      "category": "History",
      "subcategory": "Other History"
     },
     {
-     "question": "<b>The Class I of an aaRS enzyme that conducts a reaction in which this molecule is the nucleophile contains a Rossmann fold domain; that reaction is also known as the “charging” of this molecule. A conserved sequence containing pseudouridine comprises the T psi C arm of these molecules. Inosine is one compound that participates in (*) </b>wobble pairing in this molecule. During one process, this molecule enters theA site and exits uncharged from the E site. This cloverleaf-shaped molecule carries a three base-pair sequence known as an anticodon. For 10 points, name this form of RNA that carries amino acids to the ribosome during translation, unlike mRNA.",
-     "answer": "<b><u>transfer RNA</u></b> [accept <b><u>tRNA</u></b>; prompt on other forms of <u>RNA</u> or any answer with <u>RNA</u>; reject “mRNA”]",
-     "category": "Science",
-     "subcategory": "Biology"
-    },
-    {
-     "question": "<b>A character in this opera threatens to “play the little guitar” for a man he believes to be courting his wife. Two characters in this opera sing the duet “Cinque </b><em>(“CHIN-kay”)</em><b>, dieci, venti” while measuring dimensions for a new bed. After he is forced to join the army, a boy in this opera is mocked as an “amorous butterfly.” In this opera, Antonio’s flowerpots are broken after</b> (*) Cherubino jumps out of a window and lands on them. Before realising he is their long-lost son, Bartolo and Marcellina sue this opera’s title character, a man who helps expose Almaviva’s infidelity. For 10 points, name this Mozart opera about Susanna’s wedding to the Barber of Seville.",
-     "answer": "<em>The</em> <em><b><u>Marriage of Figaro</u></b></em> [or <em>La</em> <em><b><u>nozze di Figaro</u></b></em>]",
+     "question": "A subsidiary of this brand hired female directors like Isobel Sandoval and Ava DuVernay to make short films for the <em>Women’s Tales</em> series. Catherine Martin worked with this company to design the dresses for her husband Baz Luhrmann’s adaptation of <em>The Great Gatsby</em>. Sexism in the fashion industry has been highlighted by an anonymous Instagram account called “Diet” this brand. Vandals painted the words “Dum Dum” on an Elmgreen and Dragset installation that resembles one of this brand’s stores in Marfa, Texas. This company sells nylon Saffiano handbags and owns the Miu Miu (“myoo myoo”) brand. Some design executives refused to cameo in a film named for this brand due to fear of <em>Vogue</em> editor Anna Wintour. For 10 points, the title of a Meryl Streep film claims that “the Devil wears” what brand?",
+     "answer": "<b><u>Prada</u></b> [accept <em>The Devil Wears</em> <em><b><u>Prada</u></b></em>; accept <em><b><u>Prada</u></b> Marfa</em>; accept Diet <b><u>Prada</u></b>; accept <b><u>Miu</u><u> Miu</u></b> until read, and prompt afterwards by asking “what company owns Miu Miu?”]",
      "category": "Fine Arts",
      "subcategory": "Other Fine Arts"
     },
     {
-     "question": "<em>Description Acceptable.</em><b>One event in this location begins at the Ur-Nes and is threatened by a figure born from an umbilical cord. Another event in this location involves reading 42 negative confessions listed in a text named for Ani. After that event, some figures are selected to progress to this place’s (*) </b>“Field of Reeds.” While in this place, priests destroy wax models of one figure to help his adversary pass through this place’s twelve gates. After leaving this place, one god manifests as the scarab Khepri. Ammit devours impure hearts weighed against the feather of Ma'at in this location. At night, Ra’s solar barge traverses through, for 10 points, what place ruled by Osiris?",
-     "answer": "<b><u>Duat</u></b> [or <b><u>Tuat</u></b> or <b><u>Amenthes</u></b>; accept descriptions of the <b><u>Egypt</u></b>ian <b><u>underworld</u></b> or the <b><u>Egypt</u></b>ian <b><u>afterlife</u></b>; accept <b><u>kingdom</u></b> of <b><u>Osiris</u></b> before “Osiris”; prompt on <u>underworld</u> or <u>afterlife</u>]",
-     "category": "Mythology",
-     "subcategory": "Mythology"
-    },
-    {
-     "question": "<b>This artist depicted teepee-shaped trees covered in snow in a work held by the Cleveland Museum of Art. This artist showed various figures looming over him at work in his self-portrait </b><em><b>Return from Bohemia</b></em><b>. A black car is shown about to hit a red truck in this artist’s </b><em><b>Death on the Ridge Road. </b></em><b>A satirical work by this artist depicts three “Tory Gals” in front of an </b>(*) Emanuel Leutze <em>(“LOYT-zuh”)</em> painting.Ella Watson was photographed in front of an American flag by Gordon Parks to parody a work by this artist, in whichhisdentist, Byron McKeeby, stands in front of the Dibble House holding a pitchfork. For 10 points, name this artist of <em>American Gothic</em>.",
-     "answer": "Grant <b><u>Wood</u> </b>",
-     "category": "Fine Arts",
-     "subcategory": "Visual Fine Arts"
-    },
-    {
-     "question": "<b>In the first chapter, the main character of this novel moves through stacks containing “Books Too Expensive Now” and “Books Made For Purposes Other Than Reading.” A character in this novel meets his love-interest's sister while on a mission to pursue a counterfeiter in the country of Ataguitania </b><em>(“ah-TAG-wih-TAH-nee-uh”)</em><b>. In this novel, a suitcase swap at a train station is initiated through the code phrase “Zeno of Elea.” Professor</b> (*) Uzzi-Tuzzi recounts a story titled “Leaning from a steep slope” in this novel, in which every odd chapter advances the relationship between Ludmilla and You, the reader. For 10 points, name this second-person postmodern novel by Italo Calvino.",
-     "answer": "<em><b><u>If on a winter's night a traveler</u></b></em>[accept <em><b><u>Se una notte d'inverno un viaggiatore</u></b></em>]",
+     "question": "In this author's last story, a man goes insane from excessively reading about metempsychosis (“met-em-sai-KOH-siss”)<em>.</em> In a story by this author of “Dr. Heraclius Gloss,” peasants think that a church bell is bewitched due to its constant ringing after Baron von Eyrick’s funeral. Two fishermen are executed for refusing to give up a password in this author’s story “Two Friends.” A character created by this author is stabbed with a dessert knife by the prostitute Rachel and receives the title nickname from his fellow Prussian officers. This author wrote a story in which Madame Loisel (“l’wah-ZELL”) spends years trying to pay off an object until Madame Forestier (“foh-rest-YAY”) reveals that it was made of paste. For 10 points, name this French author of “Mademoiselle Fifi” and “The Necklace.”",
+     "answer": "Guy de <b><u>Maupassant</u></b> (“ghee duh moh-pah-SAHNT”) [or Henri René Albert Guy de <b><u>Maupassant</u></b>]",
      "category": "Literature",
      "subcategory": "European Literature"
     },
     {
-     "question": "<b>The reduced temperature is equivalent to the actual temperature divided by a temperature described by this adjective. By differentiating the Van der Waals equation twice, one can find that the pressure described by this adjective is a-over-27-b-squared. Oscillatory isotherms vanish at a state described by this adjective where one of the coexistence curves end. Decaffeination utilizes a form of (*) </b>carbon dioxide being [emphasize] <em>beyond</em> a state described by this adjective. At a state described by this adjective, the gas and liquid phases become indistinguishable. For 10 points, name this adjective describing the <em>point</em> at the far right of a phase diagram.",
-     "answer": "<b><u>critical</u></b> [accept <b><u>critical</u></b> temperature or <b><u>critical</u></b> pressure or <b><u>critical</u></b> point or super<b><u>critical</u> </b>fluid]",
+     "question": "This activity names a tentative World Heritage Site at a counterpart of Mayumba in the former Vili Kingdom of Loango. F. F. de Souza (“jee SOH-zuh”) briefly revitalized this declining activity under King Gezo (“GAY-zoh”), as attested by records of palm oil from Ouidah (“WEE-duh”) in a former Oyo tributary. Nominal opposition to this activity led the French navy to hire Mpongwe (“mm-PAWNG-way”) craftsmen to build the modern-day capital of Gabon (“gah-BONE”). 2019’s “Year of Return” memorialized this activity, whose supposed hub at a “house” with a feared “door” was fabricated by Boubacar Joseph Ndiaye (“boo-bah-CAR zho-ZEFF nn-d’YAI”) on Gorée (“go-RAY”) Island. Europeans exaggerated Dahomey’s (“duh-HOH-mee’s”) primacy in this activity, whose 1807 British prohibition was achieved by activists like Olaudah Equiano (“uh-LAO-duh eh-quee-AH-no”). For 10 points, what activity based in the Bights of Biafra and Benin transported millions through the Middle Passage?",
+     "answer": "<b><u>slave</u></b> trade [accept <b><u>enslave</u></b>ment or <b><u>slavery</u></b> or <b><u>forced labor</u></b> or equivalents; accept transatlantic <b><u>slave</u></b> trade; accept <b><u>Slave</u></b> Trade Act 1807; accept “<b><u>Slave</u></b> Coast”; accept “House of <b><u>Slave</u></b>s” or “Maison des <b><u>Esclave</u></b>s”; accept Loango <b><u>Slavery</u></b> Harbor; prompt on <u>trade</u> or <u>export</u> or <u>sale</u>s or <u>harbor</u>s or <u>port</u>s or similar by asking “what specific activity with an economic component?”] (Gabon’s capital is called Libreville because of an abortive plan to settle freedmen there. The door was the so-called “Door of No Return.”)",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "A hydrodynamic form of this technique in which a centrifuge rotates along a “planetary” axis to hold liquid molecules in place is named for “counter-currents.” This technique’s standard paradigm may be reversed by components marked “C18.” A form of this technique is sped up with inert gas pressure. In a form of this technique, a capillary tube can be used to “spot” samples onto silica gel plates before developing them in a solvent system such as ethyl acetate. Different marker dyes can be distinguished by using water to separate spots on a cellulose backing in a form of this technique named for “paper.” For 10 points, name this technique in which a mixture of compounds is separated by running a mobile phase through a stationary phase.",
+     "answer": "<b><u>chromatography</u></b> [accept paper <b><u>chromatography</u></b>, thin-layer <b><u>chromatography</u></b>, gas <b><u>chromatography</u></b>, high-performance liquid <b><u>chromatography</u></b>, flash column <b><u>chromatography</u></b>, or counter-current <b><u>chromatography</u></b>, or column <b><u>chromatography</u></b>; accept <b><u>PC</u></b> or <b><u>TLC</u></b> or <b><u>GC</u></b> or <b><u>LC</u></b> or <b><u>HPLC</u></b> or <b><u>FCC</u></b> or <b><u>CCC</u></b> or <b><u>CC</u></b>]",
      "category": "Science",
      "subcategory": "Chemistry"
     },
     {
-     "question": "<b>LeRoy Collins refused to sign an interposition resolution attempting to nullify this case. Francis Thompson’s poem “The Hound of Heaven” inspired a phrase used in this decision, which extended </b><em><b>Sweatt v. Painter</b></em><b>. </b><em><b>Cooper v. Aaron </b></em><b>blocked attempts to dodge this ruling by Harry Byrd’s “Massive resistance” campaign. Kenneth and Mamie</b> (*) Clark’s doll experiment was used to support this decision, which called for taking an action with “All deliberate speed.” In 1957, the 101st Airborne was deployed to Little Rock to enforce this decision. For 10 points, <em>Plessy v. Ferguson’s</em> doctrine of “Separate But Equal” was overturned by what landmark school segregation case?",
-     "answer": "<em><b><u>Brown</u></b> v. Board of Education of Topeka, Kansas</em> [or <b><u>Brown</u></b> v. Board]",
-     "category": "History",
-     "subcategory": "American History"
-    },
-    {
-     "question": "<b>A man with this surname issued the “Second Manifesto” in 1904 which removed sanctions from one arrangement. In a forged letter, Mark Hofmann claimed a man with this surname was guided by a white salamander. Oliver Cowdery was among the Three Witnesses who verified an object delivered to a man with this surname. That man with this surname used the stones Urim and Thummim to translate (*)</b> Reformed Egyptian. A man with this surname whose “Word of Wisdom” prohibited drinking coffee and alcohol received a set of golden plates brought to him by the angel Moroni. For 10 points, a man with what surname founded the Church of Latter Day Saints?",
-     "answer": "<b><u>Smith</u></b> [accept Joseph <b><u>Smith</u></b> Jr.; accept Joseph Fielding <b><u>Smith</u></b> Sr.]",
-     "category": "Religion",
-     "subcategory": "Religion"
-    },
-    {
-     "question": "<b>A paper that theorized this particle’s existence noted that Goldstone’s theorem only applies to global continuous transformations, not local ones. This particle’s low mass compared to the Planck mass is the subject of the hierarchy problem. Particles roll down the hat-shaped potential energy graph associated with this particle during spontaneous symmetry breaking. This particle produced a 125 giga electronvolts bump in mass recorded by the</b> (*) ATLAS and CMS experiments. W and Z particles interact with the field associated with this particle, which imparts mass to all elementary particles. The last predicted particle by the Standard Model to be discovered was this particle. For 10 points, name this “God particle” discovered at CERN in 2012.",
-     "answer": "<b><u>Higgs</u></b> boson [or <b><u>Higgs</u></b> particle]",
-     "category": "Science",
-     "subcategory": "Physics"
-    }
-   ],
-   "bonuses": [
-    {
-     "leadin": "In a novel set in this country, a family attends a strange performance which ends with a hypnotist pretending to be the woman Silvestra, causing a man to kiss him. For 10 points each:",
-     "parts": [
-      "Name this country, the setting of a novel in which the protagonist dreams about a group of torch carrying humans worshipping a “stranger-god.”",
-      "This author used Italy as the setting for his novels <em>Mario and the Magician</em> and <em>Death in Venice</em>.",
-      "The boy Hanno dies of typhoid fever in this Thomas Mann novel which chronicles 42 years of the decline of the wealthy title family from Lübeck."
-     ],
-     "answers": [
-      "<b><u>Italy</u></b> [or <b><u>Italian Republic</u></b> or <b><u>Repubblica Italiana</u></b>]",
-      "Thomas <b><u>Mann</u></b> [or Paul Thomas <b><u>Mann</u></b>]",
-      "<em><b><u>Buddenbrooks</u></b></em>"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Literature",
-     "subcategory": "European Literature"
-    },
-    {
-     "leadin": "This man declared “What we need is an Andrew Jackson to stand” during a speech that caused him to be carried around an auditorium for 30 minutes. For 10 points each:",
-     "parts": [
-      "Name this politician who declared that “It is the issue of 1776 over again” while arguing in support of a policy on behalf of “the toilers everywhere.”",
-      "William Jennings Bryan’s raucous 1896 DNC speech advocated for Free Silver by fervently declaring that “you shall not crucify mankind upon a cross of [this metal].”",
-      "The Cross of Gold Speech earned Bryan the endorsement of this party, which adopted the farmer-led “Ocala Demands.” Greenback James Weaver advocated for this party’s Omaha Platform."
-     ],
-     "answers": [
-      "William Jennings <b><u>Bryan</u></b>",
-      "<b><u>gold</u></b> [accept <b><u>gold</u></b> standard or the Cross of <b><u>Gold</u></b> speech; prompt on <u>Au</u>]",
-      "<b><u>Populist</u></b> Party [or <b><u>Populist</u></b>s or The <b><u>People’s</u></b> Party]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "History",
-     "subcategory": "American History"
-    },
-    {
-     "leadin": "<em>Description acceptable.</em> This figure is depicted wearing a gorilla mask in a poster asking “Do women have to be naked to get into the Met Museum?” For 10 points each:",
-     "parts": [
-      "Identify this figure who, in a namesake painting, holds a peacock-feather fan while clinging to a blue curtain. A 2004 paper concluded that this figure was drawn with five extra vertebrae.",
-      "<em>La Grande Odalisque</em> is a painting by this French artist, who depicted a group of nude women in a harem in <em>The Turkish Bath</em>.",
-      "This ruler holds the scepter of Charlemagne in an Ingres portrait depicting him “on His Imperial Throne.” Ingres’s teacher Jacques-Louis David <em>(\"dah-VEED\")</em> painted this ruler “Crossing the Alps.”"
-     ],
-     "answers": [
-      "<em>La</em> <em><b><u>Grande Odalisque</u></b>(\"lah GROND oh-duh-LEESK\")</em> [accept descriptions of the <b><u>woman</u></b> in <em>La</em> <em><b><u>Grande Odalisque</u></b></em>]",
-      "Jean-Auguste-Dominique <b><u>Ingres</u></b><em>(“AANG-gruh”)</em>",
-      "<b><u>Napoleon</u></b> Bonaparte [or <b><u>Napoleon</u></b> I; accept <em><b><u>Napoleon</u></b> I on His Imperial Throne</em>; accept <em><b><u>Napoleon</u></b>Crossing the Alps</em>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Fine Arts",
-     "subcategory": "Visual Fine Arts"
-    },
-    {
-     "leadin": "After cells are lysed, one can utilize the phenol-chloroform variant of this technique on DNA. For 10 points each:",
-     "parts": [
-      "Name this technique. A pear shaped funnel utilized in this technique undergoes cycles of shaking and venting to form distinct layers.",
-      "Extraction often utilizes two of these substances with different properties. These substances dissolve solutes in a solution.",
-      "After extractions are completed, chemists often dry the resulting organic layer of any residual water by using a compound of sodium and this anion. Magnesium’s salt with this anion is called Epsom Salt."
-     ],
-     "answers": [
-      "<b><u>extraction</u></b> [accept phenol-chloroform <b><u>extraction</u></b> or liquid-liquid <b><u>extraction</u></b>]",
-      "<b><u>solvent</u></b>s",
-      "<b><u>sulfate</u> </b>"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Chemistry"
-    },
-    {
-     "leadin": "Members of this movement were told they are in the “Last Havoc” era by its founder Li Hongzhi. For 10 points each:",
-     "parts": [
-      "Name this Chinese religious movement that was founded in 1992. This movement publishes <em>The</em> <em>Epoch Times</em> and operates the Shen Yun dance troupe.",
-      "The name of Falun Gong refers to “turning” a wheel named for this concept. This concept refers to a cosmic sense of duty in many Asian religions and it is used to justify the Hindu caste system.",
-      "“Penetrating the Two Cosmic Extremes” is among the five exercises members of Falun Gong practice to cultivate this other concept. Dantian breathing and other slow, meditative movements are often used to cultivate this concept."
-     ],
-     "answers": [
-      "<b><u>Falun Gong</u></b> [or <b><u>Falun Dafa</u></b>; prompt on but otherwise DO NOT REVEAL <u>Qigong</u>]",
-      "<b><u>dharma</u></b> [accept <b><u>dharma</u></b> wheel]",
-      "<b><u>Qi</u></b> [or <b><u>chi</u></b>; accept <b><u>Qi</u></b>gong]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Religion",
-     "subcategory": "Religion"
-    },
-    {
-     "leadin": "Appius Claudius Crassus’ attempts to force a woman named Verginia to marry him may have sparked the second of these events. For 10 points each:",
-     "parts": [
-      "Name these mass strikes that occurred during the Conflict of the Orders. Lucius Sicinius Vellutus <em>(“SICK-in-ee-us wel-LOO-tus”)</em> proposed travelling to Mons Sacer during one of these events in 494 BC.",
-      "In response to the first secession, Rome allowed the plebs to elect two representatives that were given this title. Holders of this title were permitted to veto the actions of the consuls.",
-      "For making him look too much like a king, this ruler fired two Tribunes of the Plebs. Unfortunately, however, this dictator was stabbed on the Ides of March by senators who felt he was too much like a king."
-     ],
-     "answers": [
-      "<b><u>Secession of the Plebs</u></b> [or <b><u>Secessio Plebis</u></b>; accept First or second <b><u>Secession of the Plebs</u></b> or the first or second <b><u>secessio plebis</u></b>; accept descriptions of th<b>e<u>plebs leaving</u></b> the city of Rome; accept <b><u>plebeians</u></b> in place of “plebs”; prompt on <u>secession</u>]",
-      "<b><u>tribune</u></b>s [or <b><u>tribunus</u></b> or tribuni; accept <b><u>Tribune</u></b>s of the plebs or <b><u>tribune</u></b>s of the people or plebeian <b><u>tribune</u></b>s or <b><u>tribunus</u></b> plebis]",
-      "<b><u>J</u></b>ulius <b><u>Caesar</u></b> [or Gaius <b><u>J</u></b>ulius <b><u>Caesar</u></b>; prompt on <u>Caesar</u>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "History",
-     "subcategory": "Ancient History"
-    },
-    {
-     "leadin": "Answer the following about gods who fight historical figures in <em>Record of Ragnarok</em>. For 10 points each:",
-     "parts": [
-      "Name this god who loses to Qin Shi Huang in the seventh match of <em>Record of Ragnarok</em>. This Greek god of the underworld kidnapped Persephone.",
-      "In <em>Record of Ragnarok</em>, Leonidas resents a god of this domain, who also sends a plague to the Achaeans in the <em>Iliad</em>. Another god of this domain fathered Circe.",
-      "One of Poseidon’s attacks is named for Demeter, referring to his fathering of this figure with her. This figure saved his master Adrastus in the war of the Seven against Thebes, and accompanied Heracles in the war against Elis."
-     ],
-     "answers": [
-      "<b><u>Hades</u></b>",
-      "the <b><u>Sun</u></b><em>(Circe’s father was Helios)</em>",
-      "<b><u>Arion</u></b>"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Mythology",
-     "subcategory": "Mythology"
-    },
-    {
-     "leadin": "Safranin is utilized as a counter in one form of this technique where peptidoglycan traps an iodine-crystal violet complex. For 10 points each:",
-     "parts": [
-      "Name this technique whose “Gram” form can colorize bacterial cells. This technique is a common practice in histology.",
-      "This genus, whose cell wall lacks muramic acid, <em>cannot</em> be visualized using a gram stain. The A-C serovars of its <em>trachomatis(“track-oh-MAT-iss”)</em> species can cause the eyelids to turn inward, potentially resulting in blindness.",
-      "This acid-fast genus can’t be detected via a gram-stain due to high lipid content in its cell wall. A bacteria in this genus causes tuberculosis."
-     ],
-     "answers": [
-      "<b><u>staining</u></b> [accept Gram <b><u>stain</u></b>]",
-      "<em><b><u>Chlamydia</u></b></em> [accept <em><b><u>Chlamydia</u></b>trachomatis</em>; prompt on <em><u>C. trachomatis</u></em>]",
-      "<b><u>Mycobacterium</u></b> [accept <b><u>Mycobacterium</u></b> tuberculosis]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Biology"
-    },
-    {
-     "leadin": "Answer the following about Western plays that have been adapted to be set in the Caribbean. For 10 points each:",
-     "parts": [
-      "Aimé Césaire’s <em>(“ay-MAY say-ZAIRs”)Une Tempête(“oon tom-PET”)</em> explicitly depicted Caliban as a rebellious slave while adapting this English playwright's <em>The Tempest</em> to be set on a Caribbean island.",
-      "Recent Royal Shakespeare Company productions of this non-Shakespeare play have changed its setting from Naples to a Caribbean Carnival. This play ends with Hellena and Captain Willmore agreeing to marry each other.",
-      "Trinidadian Mustapha Matura’s <em>Playboy of the West Indies</em> moves the setting of <em>The Playboy of the</em> <em>Western World</em> [emphasize] <em>from</em> this country, where its premiere sparked a riot at the Abbey Theater."
-     ],
-     "answers": [
-      "William <b><u>Shakespeare</u> </b>",
-      "<em>The</em> <em><b><u>Rover</u></b></em> (by Aphra Behn)",
-      "<b><u>Ireland</u></b> [or Republic of <b><u>Ireland</u></b> or <b><u>Eire</u></b>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
+     "question": "A poem by this author describes “a longing like despair” for a woman separated by “the unplumb’d, salt, estranging sea.” That poem, which notes, “we mortal millions live alone,” is the sequel to a poem by this author titled “Isolation.” During his honeymoon with Frances Wightman, this author wrote a poem that asks the addressee “come to the window, sweet is the night-air!” This author collected the poem “To Marguerite” with his long dramatic poem <em>Empedocles on Etna</em>. This poet described a “long, withdrawing roar” in a poem that imagines what “Sophocles, long ago, heard on the Aegean” and declares, “ah, love, let us be true to one another!” For 10 points, name this poet who described a “darkling plain…where ignorant armies clash by night” in his poem “Dover Beach.”",
+     "answer": "Matthew <b><u>Arnold</u></b>",
      "category": "Literature",
      "subcategory": "British Literature"
     },
     {
-     "leadin": "The City of Arts and Sciences this architect designed in his home city of Valencia was used to represent the Galactic Senate in Season 2 of <em>Andor</em>. For 10 points each:",
+     "question": "This quantity’s relative importance in India and Turkey is compared in a 1974 paper by Anne Krueger. A behavior named for this quantity has counterintuitively low costs per the Tullock paradox. Grades numbered 1, 2, and 3 are invoked in <em>On the Principles of Political Economy and Taxation</em> to show that this quantity should equal the corresponding maximum economic advantage. David Ricardo names that law concerning this quantity, whose “seeking” is a behavior that increases one’s own wealth without creating new wealth. This quantity is the income earned from the ownership of a factor of production. For 10 points, what quantity shares its name with the money paid by a lessee to a lessor in exchange for temporary usage of a property?",
+     "answer": "economic <b><u>rent</u></b> [or word forms like <b><u>rent</u></b>ers; accept <b><u>rent</u></b>-seeking; accept Ricardo’s law of <b><u>rent</u></b>]",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "A man in this play argues with his lover whether life is an endless circle or an endless line, before he refers to her as “what the New World hath finally wrought.” In this play, a snotty college student says, “Good night, Prometheus,” to a man who later angrily tells his wife, “who even cares about you?” That man in this play drunkenly calls himself “Flaming Spear” while his sister chants “OCOMOGOSIAY!” This play ends with a woman retrieving her wilting houseplant after forgiving her son for losing his father’s ten-thousand-dollar life insurance check on a liquor store investment. In this play, Karl Lindner is rebuffed for trying to stop the central family from moving to Clybourne Park. For 10 points, name this play about the Younger family by Lorraine Hansberry.",
+     "answer": "<em>A</em> <em><b><u>Raisin in the Sun</u></b></em>",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "A story in which the king Thamus chastises this deity for making people lose their memories is related in Plato’s dialogue <em>Phaedrus</em>. Amulets that may reference a story in which this deity “fills” a god’s torn-out eye were found in 2020 in the tombs of high clergy at Tuna el-Gebel (“TOO-nah ell-gah-BALL”). Serpents guarded five nested boxes at the bottom of a river that hold this deity’s spellbook. This deity’s cult center was in Hermopolis, which was named after the Greeks’ syncretization of him with Hermes. This deity gives Isis the words for her and Osiris (“oh-SAI-riss”) to conceive Horus. The Egyptians credited this deity with inventing hieroglyphs. For 10 points, name this Egyptian god of knowledge who is often portrayed with the head of an ibis.",
+     "answer": "<b><u>Thoth</u></b> [or <b><u>Djehuty</u></b>; or <b><u>Tehut</u></b>; or <b><u>Thōout</u></b>; or <b><u>Ḏḥwtj</u></b>]",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "In a painting from this movement, a woman in white stands between a woman with sheet music and a woman with a palette. That self-portrait is by an artist from this movement who also created a painting in which a woman holds a necklace while another virtuously gestures to her sons. An artist from this movement painted <em>Cornelia Presenting Her Children as Her Treasures</em> and a portrait of a German art historian whose work influenced this movement, Johann Winckelmann (“VIN-kell-mahn”). Women weep as three soldiers raise their arms in salute in a painting from this movement, <em>The Oath of the</em> <em>Horatii</em> (“hoh-RAY-shee-ai”). For 10 points, name this 18th-century movement that included Angelica Kauffmann and Jacques-Louis David, and sought to revive ideals from Greek and Roman art.",
+     "answer": "<b><u>Neoclassicism</u></b> [or <b><u>Neoclassical</u></b> art or the <b><u>Neoclassicist</u></b>s or <b><u>Néo-classicisme</u></b> or <b><u>Klassizismus</u></b> or <b><u>Neoklassizismus</u></b> or <b><u>Neuklassizismus</u></b>; prompt on <u>history</u> painting or <u>historical</u> painting; prompt on <u>classicism</u>]",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "A text in this language challenges the dualist-physicalist dichotomy by arguing that Socrates and his soul aren’t identical, yet are both subjects of existence. That text’s distinction between essence and existence inspired a school of existentialism founded by Jacques Maritain. A philosopher who wrote in this language used the phrase “faith seeking understanding” to describe his philosophical approach in a text that contains an argument that was challenged by Gaunilo (“gah-NEE-loh”). A text written in this language includes arguments “from degree” and “from contingency” as two of the so-called “five ways.” The ontological argument first appeared in a text in this language by Anselm of Canterbury. For 10 points, name this language used by Thomas Aquinas to write <em>Summa Theologica</em>.",
+     "answer": "<b><u>Latin</u></b> [or lingua <b><u>Latina</u></b>; or <b><u>Latinum</u></b>; accept Ecclesiastical <b><u>Latin</u></b>; accept Medieval <b><u>Latin</u></b>]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "An assay for this process uses GR24 to induce it, then stains with TTC or MTT. An ability to induce this process allowed scientists to discover strigolactones. Borthwick et al. showed that pulses of red light could activate this process, an effect mediated by phytochromes. Depending on where this process occurs, it can be considered epigeal (“ep-uh-JEE-ull”) or hypogeal. Imbibition promotes this process, during which the aleurone layer secretes amylase (“AM-uh-laze”) to break down the endosperm. During this process, the first structure to emerge is the radicle. This process occurs when gibberellin (“jib-uh-RELL-in”) secretion overcomes the effects of abscisic (“ab-SISS-ick”) acid, resulting in rupture of the coat. For 10 points, name this process in which a new plant emerges from a seed.",
+     "answer": "<b><u>germination</u></b> [or word forms like <b><u>germinat</u></b>ing; or <b><u>sprout</u></b>ing; prompt on descriptions like a <u>plant</u> bursting from its <u>seed</u> or emergence of a <u>new plant</u>]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "A speech given in this election year ends with its speaker chanting the phrase \"Keep Hope Alive!\" thrice. During this election’s primary, the <em>National Enquirer</em> published a photograph of a candidate aboard the yacht <em>Monkey Business</em>. During this election’s vice presidential debates, a participant was told “senator, you’re no Jack Kennedy” by Lloyd Bentsen. A vicious attack ad during this election asked viewers if they were okay with “weekend prison passes” for a man convicted of armed robbery and rape. This election’s loser was hurt by a photo-op taken in a tank and the Willie Horton ad, while the winner promised “read my lips: no new taxes.” For 10 points, name this election in which Michael Dukakis was defeated by George H. W. Bush.",
+     "answer": "<b><u>1988</u></b> US presidential election [or United States presidential election of <b><u>1988</u></b>; prompt on election of ‘<u>88</u>]",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "A composer from this country wrote a cantata whose four movements celebrate spring plowing, planting seeds, the harvest, and the “abundant year.” In a violin concerto from this country, the soloist enters [read slowly] B, D E-F and a sudden high note in the sixth movement represents a title character’s suicide. A composer from this country allegedly took only six days to write a cantata with a prelude about boatmen on the title river that was adapted into a piano concerto. A concerto inspired by this country’s legend of the Butterfly Lovers is often performed on this country’s traditional instruments, such as the two-stringed, bowed èrhú (“arr-hoo”) and the liǔqín (“lee-oh-chin”). For 10 points, name this home country of Chén Gāng (“chun gahng”) and Hé Zhànháo (“huh jahn-how”).",
+     "answer": "<b><u>China</u></b> [or People’s Republic of <b><u>China</u></b>; or <b><u>PRC</u></b>; or <b><u>Zhōngguó</u></b>; or <b><u>Zhōnghuá</u></b> Rénmín Gònghéguó; reject “Republic of China”] (The piece in the first sentence is Xiǎn Xīnghǎi’s <em>Production Cantata</em>; the piece in the third sentence is his <em>Yellow River Cantata</em>.)",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "The 20-year-old protagonist of a novel by this author is raised by a couple who own a dry goods store, who tell her that she is a foundling. In another novel by this author, the protagonist recollects how as a child, he saw a woman trim hair on a large birthmark on her breast. The suitor Hideo (“HIH-dee-oh”) confuses Naeko (“NAH-eh-koh”) with her twin sister Chieko (“chee-EH-koh”) in this author’s novel <em>The Old Capital</em>. In another novel by this author, a woman smashes her mother’s old Shino bowl and Mrs. Ota commits suicide shortly after sleeping with Kikuji. One of this author’s protagonists looks up at the Milky Way while a fire rages in a hot springs town after he has an affair with a geisha named Komako. For 10 points, name this Japanese author of <em>Thousand Cranes</em> and <em>Snow Country</em>.",
+     "answer": "Yasunari <b><u>Kawabata</u></b> [or <b><u>Kawabata</u></b> Yasunari]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "Equations named for this shape can be stably solved by using the Forward Time Centered Space scheme, as well as variants of the Crank–Nicolson method. A class of equations named for this shape is related by the Feynman–Kac (“kots”) formula to stochastic processes. A class of PDEs named for this shape is exemplified by [read slowly] “u sub t equals the Laplacian of u,” which is the heat equation. Graphs are approximated with parts of these shapes in Simpson’s method of numerical integration. This 2D shape names a type of “reflector” that reflects parallel incident light to this shape’s single focus. For 10 points, with negligible air resistance, projectiles follow what open conic sections that form the graphs of quadratic functions?",
+     "answer": "<b><u>parabola</u></b> [accept <b><u>parabolic</u></b> partial differential equation; accept <b><u>parabolic</u></b> reflector; accept accept <b><u>paraboloid</u></b> or <b><u>paraboloid</u></b>al in place of “parabolic”]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "A resource is extracted from this commodity in a steam-based process patented by Norway’s Möller family. A so-called “war” fought over this commodity led to the sinking of the patrol boat <em>Aegir</em> after it collided with the frigate <em>Apollo</em>. A prized variety of this commodity was extracted with a small ventjager (“VENT-yah-kher”) that assisted a type of Dutch “buss.” The Spanish and Portuguese acquired this commodity from the Flemish Cap near a “Grand” feature in Newfoundland. The Dogger Bank is named after objects used to obtain this commodity, which the Romans used to make garum. After fighting Iceland in a 1970s “war” over this commodity, the UK abandoned its “open seas” approach to acquiring it. For 10 points, name this commodity obtained by trawling.",
+     "answer": "<b><u>fish</u></b> [accept <b><u>cod</u></b> or Atlantic <b><u>cod</u></b> or <em><b><u>Gadus</u></b> morhua</em> or <b><u>Cod</u></b> Wars or Second <b><u>Cod</u></b> War; accept <b><u>herring</u></b> or Atlantic <b><u>herring</u></b> or <em>Clupea harengus</em> or <b><u>herring</u></b> buss; accept <b><u>fish</u></b> oil; accept <b><u>fish</u></b>ing banks or <b><u>fish</u></b>ing boats; prompt on sea<u>food</u> or <u>meat</u> or <u>protein</u>; prompt on <u>oil</u> by asking “derived from what commodity?”] (The first clue refers to Möller fish oil.)",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "388 distinct frequencies corresponding to these phenomena were discovered by a scientist who described them using six “arguments” denoted “beta 1” to “beta 6.” These phenomena are described by the Doodson numbers, which can be established using a set of PDEs that relate two directional derivatives of “velocity times height” to the time derivative of vorticity, and which are named for Pierre-Simon Laplace (“pee-AYR sih-MOHN lah-PLAHSS”). A component of these phenomena has zero magnitude at amphidromic points. When these often semidiurnal phenomena are at their maximum and minimum, they are respectively referred to as their “spring” and “neap” types. For 10 points, the Earth’s gravitational attraction to the Sun and Moon contributes to what cyclical changes in water level?",
+     "answer": "<b><u>tide</u></b>s [accept <b><u>tidal</u></b> forces or spring <b><u>tide</u></b>s or neap <b><u>tide</u></b>s; prompt on water <u>wave</u>s or surface <u>wave</u>s]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    }
+   ],
+   "bonuses": [
+    {
+     "leadin": "The French scientist Emilie du Châtelet (“shot-LAY”) used this two-word term to refer to an early form of conserved energy. For 10 points each:",
      "parts": [
-      "Name this Spanish architect, who drew from living organisms to design buildings like the Milwaukee Art Museum and Malmö’s Turning Torso skyscraper.",
-      "Many of Calatrava’s works are these kinds of buildings, such as the <em>Stadelhofen</em> in Zurich. Before it displayed art, the Musée d’Orsay <em>(“moo-ZAY dor-SAY”)</em> was one of these buildings.",
-      "Calatrava used cantilevers to make his <em>Museum of Tomorrow</em> appear like it was floating in this second largest city in Brazil, which is towered over by Paul Landowski’s <em>Christ the Redeemer</em> statue."
+      "Give this two-word term that names an orbital equation derived from the conservation of energy, which gives the speed squared at any point in a Keplerian orbit.",
+      "du Châtelet's concept of <em>vis viva</em> is similar to modern definitions of this form of energy, which is equal to one half mass times speed squared.",
+      "du Châtelet also produced the standard French translation of this 1687 book, whose section <em>De motu corporum</em> (“day MOH-too cor-POR-um”) states the inverse-square law of gravity and derives many results in orbital mechanics."
      ],
      "answers": [
-      "Santiago <b><u>Calatrava</u> </b>",
-      "train <b><u>station</u></b> [or railway <b><u>station</u></b>; or railroad <b><u>station</u></b>; or railway <b><u>depot</u></b>; or train <b><u>depot</u></b>; or railroad <b><u>depot</u></b>]",
-      "<b><u>Rio de Janeiro</u></b> [prompt on <u>Rio</u>]"
+      "<em><b><u>vis viva</u></b></em> [accept <em><b><u>vis viva</u></b></em> equation]",
+      "<b><u>kinetic</u></b> energy [accept translational <b><u>kinetic</u></b> energy; prompt on <u>K</u>E or <u>T</u>]",
+      "<em><b><u>Principia</u></b></em> [or <em>Philosophiæ Naturalis</em> <em><b><u>Principia</u></b> Mathematica</em>; or <em>Mathematical</em> <em><b><u>Principles</u></b> of Natural Philosophy</em>] (It was written by Isaac Newton.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "leadin": "This thing’s disappearance is compared to watching “the stain of the rainbow fading out of the sky.” For 10 points each:",
+     "parts": [
+      "Name this thing that resembles a small crimson hand. A scientist who finds this thing a “frightful object” creates an elixir to remove it, which he first tests on a geranium.",
+      "This author described Aylmer’s fatal experiments on his young wife Georgiana in his story “The Birth-Mark.” He also wrote <em>The Scarlet Letter</em>.",
+      "In this story by Hawthorne, Giovanni realizes that the title character, Beatrice, has become as poisonous as the plants that her botanist father grows."
+     ],
+     "answers": [
+      "Georgiana’s <b><u>birth-mark</u></b> [accept “The <b><u>Birth-Mark</u></b>”]",
+      "Nathaniel <b><u>Hawthorne</u></b>",
+      "“<b><u>Rappaccini’s Daughter</u></b>”"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "Guillaume Apollinaire (“ghee-YOHM ah-poh-lee-NAIR”) coined the term “surrealism” in response to this composer’s ballet <em>Parade</em>. For 10 points each:",
+     "parts": [
+      "Name this French avant-garde composer and mentor of Les Six (“lay seess”), who wrote the repetitive piece <em>Vexations</em> and <em>Three Pieces in the Shape of a Pear</em>.",
+      "After founding a spoof of the Rosicrucian sect, Satie wrote a <em>Messe des pauvres</em> (“mess day pohv”) featuring this instrument. Satie’s Notre Dame-inspired piece <em>Ogives</em> (“oh-ZHEEV”) imitates these keyboard instruments that drive air through pipes.",
+      "These Satie piano pieces with no bar lines or time signatures were partly inspired by Indonesian music. Satie’s involvement with esoteric sects likely inspired the name he coined for these slow, free-time pieces."
+     ],
+     "answers": [
+      "Erik <b><u>Satie</u></b> [or Eric Alfred Leslie <b><u>Satie</u></b>]",
+      "pipe <b><u>organ</u></b>s",
+      "<em><b><u>Gnossienne</u></b>s</em> (“naw-SYEN”) [accept <em>Three</em> <em><b><u>Gnossienne</u></b>s</em> or <em>Trois</em> <em><b><u>Gnossienne</u></b>s</em>]"
      ],
      "values": [
       10,
@@ -342,19 +202,19 @@ export default {
       10
      ],
      "category": "Fine Arts",
-     "subcategory": "Other Fine Arts"
+     "subcategory": "Auditory Fine Arts"
     },
     {
-     "leadin": "Francisco Álvares claimed he was “weary of writing more about” buildings in this town because he feared being accused of lying about their beauty. For 10 points each:",
+     "leadin": "In the years before this conflict, the Cananea strike led by Sonora’s copper miners and the Río Blanco strike of textile workers in Veracruz and Puebla epitomized popular discontent with the government. For 10 points each:",
      "parts": [
-      "Name this Ethiopian city home to 11 rock-cut churches built by the Zagwe <em>(“ZAHG-way”)</em> dynasty.",
-      "Scholars believe the Zagwe <em>(“ZAHG-way”)</em> dynasty arose after Queen Gudit brutally destroyed this kingdom. The Queen of Sheba supposedly founded this kingdom, whose adoption of the Tewahedo Church made it the first Christian state in sub-saharan Africa.",
-      "Queen Gudit likely practiced this religion, which was also practiced by the Himyarite Kingdom before Aksum invaded Yemen. Today, Ethiopians who practice this religion are called Beta Israel."
+      "Emiliano Zapata led an agrarian faction during what 1910–1920 civil war that ended the 35-year administration of the Porfiriato?",
+      "During the Mexican Revolution, Venustiano Carranza canceled a Red Cross mission to control Mexico City’s 1915 outbreak of this disease. Mexico adopted DDT to combat malaria and this louse-borne disease.",
+      "Women protested border delousing measures to control typhus in this city’s 1917 “Bath Riots.” This city is named for a Zapotec president of Mexico who enacted liberal anticlerical laws during the War of the Reform."
      ],
      "answers": [
-      "<b><u>Lalibela</u></b><em>(“laa-lee-BEH-luh”)</em> [or <b><u>Gebre Meskel</u></b> or <b><u>Gäbrä Mäsqäl</u></b>]",
-      "Kingdom of <b><u>Aksum</u></b><em>(“ACK-soom”)</em> [or Kingdom of <b><u>Axum</u></b> or <b><u>Aksum</u></b>ite Kingdom]",
-      "<b><u>Judaism</u></b> [accept <b><u>Jew</u></b>ish]"
+      "<b><u>Mexican Revolution</u></b> [or <b><u>Revolución mexicana</u></b>; reject “Mexican Civil War”]",
+      "<b><u>typhus</u></b> [or <b><u>typhus</u></b> fever or epidemic <b><u>typhus</u></b>; accept endemic <b><u>typhus</u></b> or murine <b><u>typhus</u></b>; accept scrub <b><u>typhus</u></b>; reject “typhoid” or “typhoid fever”] (The Instituto Nacional Indigenista led preventative medicine campaigns with DDT.)",
+      "<b><u>Juárez</u></b> [or Ciudad <b><u>Juárez</u></b> or <b><u>Juárez</u></b> City; accept El <b><u>Paso del Norte</u></b>; accept Benito <b><u>Juárez</u></b> or Benito Pablo <b><u>Juárez</u></b> García]"
      ],
      "values": [
       10,
@@ -365,36 +225,96 @@ export default {
      "subcategory": "World History"
     },
     {
-     "leadin": "Answer the following about references to the fashion house Maison Margiela <em>(“mar-zhell-ah”)</em> in hip-hop. For 10 points each:",
+     "leadin": "The author of this sociological essay states that he understands a central concept as “the ownership of the earth forever and ever, Amen!” For 10 points each:",
      "parts": [
-      "This artist raps “I’m in Maison, ah, Martin Margiela” on his song “Run This Town.” This rapper, who collaborated with Alicia Keys on “Empire State of Mind,” is married to Beyoncé.",
-      "This artist raps about rocking “Margielas with no laces” on his song “Goldie.” Doechii and this artist rapped over Thelonious Monk’s recording of “Caravan” on his 2025 album <em>DON’T BE DUMB</em>.",
-      "This rapper began his song “In the Air” with “ Maison Margiela, all I see is numbers” in reference to the brand’s logo. This rapper of “NOSTYLIST” and “If Looks Could Kill” is part of Playboi Carti’s Opium label alongside Ken Car$on and Homixide <em>(“homicide”)</em> Gang."
+      "Name this essay that first appeared in the collection <em>Darkwater: Voices from Within the Veil.</em> The author states that “none intrigue me more” than this essay’s title group, whose prized attribute is “a very modern thing.”",
+      "This author of the essay “The Souls of White Folk” coined the term “double-consciousness” and stated that the title people live “within the Veil” in his book <em>The Souls of Black Folk</em>.",
+      "In the final chapter of <em>The Souls of Black Folk</em>, Du Bois discusses this type of work, preserved by writers such as Lucy McKim Garrison. Each chapter of <em>The Souls of Black Folk</em> begins with a poem and an excerpt from these American works."
      ],
      "answers": [
-      "<b><u>Jay-Z</u></b> [or Shawn Corey <b><u>Carter</u></b>]",
-      "A$AP <b><u>Rocky</u></b> [or Rakim Athelaston <b><u>Mayers</u></b>]",
-      "<b><u>Destroy Lonely</u></b> [or Bobby Wardell <b><u>Sandimanie</u></b> II]"
+      "“The <b><u>Souls of White</u> <u>Folk</u></b>” [reject “The Souls of Black Folk”]",
+      "W. E. B. <b><u>Du Bois</u></b> (“doo BOYZ”) [or William Edward Burghardt <b><u>Du Bois</u></b>]",
+      "<b><u>spiritual</u></b>s [accept “Of the <b><u>Sorrow Songs</u></b>”; prompt on Christian <u>music</u> or <u>song</u>s or <u>hymn</u>s]"
      ],
      "values": [
       10,
       10,
       10
      ],
-     "category": "Current Events",
-     "subcategory": "Current Events"
+     "category": "Social Science",
+     "subcategory": "Social Science"
     },
     {
-     "leadin": "This woman accused her lover Marcus Caelius Rufus of attempting to poison her. For 10 points each:",
+     "leadin": "The Talmudic tractate <em>Sanhedrin</em> (“san-HEE-drin”) calls Adam one of these beings, since he was a creature of dust who was given life. For 10 points each:",
      "parts": [
-      "Name this person who was accused of assisting in the murder of Dio of Alexandria in Cicero’s <em>Pro</em> <em>Caelio</em>. This person was “more learned than Sappho’s Muse” in several love poems.",
-      "Clodia was addressed as Lesbia in 116 <em>carmina</em> by this neoteric Roman poet.",
-      "Catullus praised Lesbia’s beauty while writing in this ancient language used by other Roman authors like Ovid and Virgil."
+      "Name these anthropomorphic creatures from Jewish folklore that are usually made from animated mud. The most famous of these creatures was created to defend Prague in the 16th century.",
+      "In the Prague legend, this Rabbi created the golem to protect the Jewish community. He later had to deactivate the golem by removing the scroll from its mouth when it became uncontrollable.",
+      "The scroll in a golem’s mouth obtains its power from one of these things inscribed on it. The Quran lists 99 of these things, such as “The Subduer,” “The Witness,” and “The Beneficent.”"
      ],
      "answers": [
-      "<b><u>Lesbia</u></b> [accept <b><u>Claudia</u></b> Metelli or <b><u>Clodia</u></b> Metelli or <b><u>Quadrantaria</u></b> or <b><u>Nola</u></b> or <b><u>Medea</u></b> <b><u>Palatina</u></b>]",
-      "<b><u>Catullus</u></b><em>(“kuh-TUL-us”)</em> [or Gaius Valerius <b><u>Catullus</u></b>]",
-      "<b><u>Latin</u></b>"
+      "<b><u>golem</u></b>s",
+      "Judah <b><u>Loew</u></b> ben Bezalel (“YOO-dah LAYV ben beh-ZAH-lull”) [or Yehuda <b><u>Loew</u></b> or Yehuda <b><u>Lev</u></b> or Yehuda <b><u>Leib</u></b>; or Rabbi <b><u>Loew</u></b>; or the <b><u>Maharal</u></b> of Prague]",
+      "<b><u>name</u></b>s of <b><u>God</u></b> [or equivalents such as <b><u>title</u></b>s for <b><u>God</u></b> or <b><u>epithet</u></b>s for <b><u>God</u></b>; accept <b><u>Allah,</u></b> <b><u>Yahweh</u></b>, <b><u>Adonai</u></b>, <b><u>Shaddai</u></b>, <b><u>Tzevaot</u></b>, <b><u>El</u></b>, or <b><u>Elohim</u></b> in place of “God”; prompt on <u>name</u>s or equivalents]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "J. P. Morgan helped to end the Panic of 1907 by pledging to invest his personal money into keeping these institutions afloat. For 10 points each:",
+     "parts": [
+      "Name these financial institutions that were subjected to “runs” during periods of financial instability.",
+      "Prior to the Panic of 1907, Charles W. Morse, the so-called “king” of this good, attempted to buy up as many shares of United Copper as possible. Another “king” of this good, Frederic Tudor, used a massive fleet of ships to deliver it from New England to the Caribbean.",
+      "The events of the Panic of 1907 included the collapse of New York’s third-largest trust, which was named after this word. A satirical 1809 history popularized this term for New Yorkers who had Dutch ancestry."
+     ],
+     "answers": [
+      "<b><u>bank</u></b>s [accept <b><u>bank</u></b> runs]",
+      "<b><u>ice</u></b> [prompt on <u>water</u> or <u>H2O</u>]",
+      "<b><u>knickerbocker</u></b> [accept <em><b><u>Knickerbocker</u></b>'s History of New York</em>; accept Dietrich <b><u>Knickerbocker</u></b>; accept <b><u>Knickerbocker</u></b> Trust Company]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "Inulin (“IN-yoo-lin”) usually gives a very accurate measure of this organ’s function because it is not secreted or reabsorbed by its tubules. For 10 points each:",
+     "parts": [
+      "Name this organ whose functional unit is the nephron. An ascending infection of the urinary tract can cause an infection of this organ called pyelonephritis (“PAI-loh-neh-FRY-tiss”).",
+      "One way to assess kidney function is measuring the blood level of this byproduct of muscle metabolism. The Cockcroft–Gault formula calculates the estimated clearance of this molecule from its level in serum.",
+      "Creatinine clearance estimates the glomerular filtration rate, which is highly dependent on the dilation and contraction of afferent and efferent examples of these vessels. They are smaller than arteries."
+     ],
+     "answers": [
+      "<b><u>kidney</u></b> [accept <b><u>kidney</u></b> tubules or <b><u>renal</u></b> tubules]",
+      "<b><u>creatinine</u></b> [accept <b><u>creatinine</u></b> clearance; reject “creatine” (ask players to spell their answer if necessary)]",
+      "<b><u>arteriole</u></b>s [accept afferent <b><u>arteriole</u></b>s or efferent <b><u>arteriole</u></b>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "This author described the “mad impulse / to put them / into a golden / cage” in a poem addressed to his socks. For 10 points each:",
+     "parts": [
+      "Name this Chilean poet who used more conventional addressees for his collection <em>Twenty Love Poems and a Song of Despair</em>.",
+      "Neruda included that poem about his socks in this collection of poems, which are addressed to ordinary objects like “A Large Tuna in the Market.”",
+      "In an ode addressed to this poet, Neruda described the time they both spent in Europe, which inspired this poet’s work <em>Spain, Take This Cup From Me</em>. This Peruvian poet wrote <em>The Black Heralds</em> and <em>Trilce</em> (“TREEL-say”)."
+     ],
+     "answers": [
+      "Pablo <b><u>Neruda</u></b> [or Neftali Ricardo <b><u>Reyes</u></b> Basoalto]",
+      "<em><b><u>Elemental</u></b><b><u> Odes</u></b></em> [or <em><b><u>Elementary Odes</u></b></em> or <em><b><u>Odas elementales</u></b></em>; prompt on Neruda’s <u>ode</u>s]",
+      "César <b><u>Vallejo</u></b> [or César Abraham <b><u>Vallejo</u></b> Mendoza]"
      ],
      "values": [
       10,
@@ -402,59 +322,19 @@ export default {
       10
      ],
      "category": "Literature",
-     "subcategory": "Other Literature"
+     "subcategory": "World Literature"
     },
     {
-     "leadin": "In 1915, this scientist proposed a set of field equations to govern his theory of general relativity. For 10 points each:",
+     "leadin": "Answer the following about various defenestrations of Prague, for 10 points each.",
      "parts": [
-      "Name this scientist who described mass-energy equivalence with the equation e equals m c squared.",
-      "In the field equations, Einstein shortened the “Metric” one of these objects to just “Metrics” when describing the geometric and causal structure of spacetime. These objects generalize scalars and vectors.",
-      "In order to generalize Newton’s laws of motion to curved spacetime, Einstein’s Field equations use one of these paths called the World line. Traditionally, these are the shortest paths between two points on a surface."
+      "In the First Defenestration of Prague, council members were killed by supporters of this reformist Bohemian theologian, who was burned at the stake at the Council of Constance.",
+      "The more famous 1618 Defenestration of Prague led to this conflict, whose Bohemian phase ended with the Battle of White Mountain. This conflict pitted the Catholic League against various Protestant kingdoms.",
+      "Believers in a modern Defenestration of Prague argue that a Czechoslovak Minister of Foreign Affairs with this surname was murdered. His father, who also had this surname, was the first president of Czechoslovakia."
      ],
      "answers": [
-      "Albert <b><u>Einstein</u></b>",
-      "<b><u>tensor</u></b>s [accept metric <b><u>tensor</u></b>]",
-      "<b><u>geodesic</u></b>s [accept <b><u>geodesic</u> </b>equation]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Physics"
-    },
-    {
-     "leadin": "Joseph Berkson popularized the “logistic” type of this technique used to solve binary classification tasks. For 10 points each:",
-     "parts": [
-      "Name this statistical technique whose “linear” type attempts to find a line of best fit.",
-      "Most linear regression algorithms typically seek to minimize the sum of the values of this function on the residuals.",
-      "This man and Gauss name a theorem stating that OLS regression has minimum variance among unbiased estimators. The Metropolis-Hastings algorithm uses a structure named for this mathematician in Monte Carlo simulations."
-     ],
-     "answers": [
-      "<b><u>regression</u></b> [accept linear <b><u>regression</u></b>]",
-      "<b><u>square</u></b> [accept ordinary least <b><u>square</u></b>s]",
-      "Andrey Andreyevich <b><u>Markov</u></b> [accept Gauss–<b><u>Markov</u></b> theorem; accept <b><u>Markov</u></b> chain Monte Carlo]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "leadin": "During this country’s “National Awakening,” Terenzio Tocci became the first person to raise its double eagle flag in 350 years. For 10 points each:",
-     "parts": [
-      "Name this country where nationalist movements like the League of Prizren took inspiration from Skanderbeg’s campaigns near its modern-day capital of Tirana.",
-      "Albanian independence was officially recognized by a 1913 treaty signed in this city. Treaties signed in this city in the 1830s secured the independence of Belgium and Greece.",
-      "During Albania’s National Awakening, Naum Veqilharxhi <em>(\"nye-OOM veq-eel-HAR-gee\")</em> created one of these systems designed to be religiously neutral. Saint Cyril names one of these systems for Russian."
-     ],
-     "answers": [
-      "<b><u>Albania</u> </b>",
-      "<b><u>London</u></b> [accept Treaty of <b><u>London</u></b> of 1830 or Treaty of <b><u>London</u></b> of 1839]",
-      "<b><u>writing</u></b> systems [or <b><u>script</u></b>s; accept equivalents like <b><u>orthograph</u></b>; accept characters; accept <b><u>alphabet</u></b>s; accept <b><u>logogram</u></b>s; accept <b><u>syllabary</u></b>; accept descriptions of creating a <b><u>written language</u></b>]"
+      "Jan <b><u>Hus</u></b> [or John <b><u>Hus</u></b> or Johannes <b><u>Hus</u></b> or Johannes <b><u>Huss</u></b>]",
+      "<b><u>Thirty Years</u></b>’ War [or <b><u>Dreißigjähriger</u></b> Krieg or <b><u>Třicetiletá</u></b> válka]",
+      "<b><u>Masaryk</u></b> [accept Tomáš Garrigue <b><u>Masaryk</u></b>; accept Jan <b><u>Masaryk</u></b> or Jan Garrigue <b><u>Masaryk</u></b>]"
      ],
      "values": [
       10,
@@ -465,16 +345,136 @@ export default {
      "subcategory": "European History"
     },
     {
-     "leadin": "Saul Kripke described a skeptical problem about meaning from this thinker by asking how one knows whether they mean “plus” or “quus” <em>(“KWUHSS”)</em> when using the plus sign. For 10 points each:",
+     "leadin": "Complexes with this geometry usually split their d-orbitals into four energy levels and belong to the D4h (“D-four-h”) point group. For 10 points each:",
      "parts": [
-      "Name this philosopher who described how meaning is shared through shared practices rather than private beliefs.",
-      "Kripke’s plus vs. quus question highlights a form of this paradox from <em>Philosophical Investigations</em>. This paradox examines how finite patterns of past behavior can fix what one means by an expression in future cases.",
-      "Those arguments from Wittgenstein directly contrasted with this supervisor of his at Cambridge who asserted that meaning is grounded in logic. Along with Alfred North Whitehead, this thinker wrote <em>Principia Mathematica</em>."
+      "Name this geometry of 16-electron complexes like cisplatin (“SISS-plat-in”) and xenon tetrafluoride.",
+      "Square planar complexes are typically low-spin complexes, meaning that these negatively charged particles fill the d orbitals according to the Aufbau principle.",
+      "Generally speaking, a complex with a large value for this quantity tends to be low-spin. For a low-spin complex, this quantity is greater than the electron pairing energy."
      ],
      "answers": [
-      "Ludwig <b><u>Wittgenstein</u></b><em>(“vitt-GEN-stein”)</em>",
-      "<b><u>rule-following</u></b> paradox",
-      "Bertrand <b><u>Russell</u></b>"
+      "<b><u>square planar</u></b>",
+      "<b><u>electron</u></b>s [accept <b><u>e</u>-</b> (“e-minus”)]",
+      "<b><u>delta</u></b> [or crystal field <b><u>splitting</u></b> energy; or <b><u>CFSE</u></b> or crystal field <b><u>splitting</u></b> parameter; accept ligand-field <b><u>splitting</u></b> parameter or <b><u>LFSE</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "Answer the following about the Muslim musician Yusef Lateef, who pioneered the use of non-Western instruments in jazz, for 10 points each.",
+     "parts": [
+      "Lateef switched to playing this instrument’s tenor variety after hearing the distinct playing style of Lester Young, who also influenced Charlie Parker’s style on this instrument.",
+      "Lateef converted to Islam while touring with this bandleader, who himself considered converting to Islam before embracing the Baháʼí Faith after MLK’s death. This bandleader disliked the title of his standard “A Night in Tunisia.”",
+      "Lateef’s album <em>Into Something</em> features the signature triplet fills of this drummer. This drummer strikes a gong to open the track “Acknowledgement” on John Coltrane’s album <em>A Love Supreme</em>."
+     ],
+     "answers": [
+      "<b><u>saxophone</u></b> [accept tenor <b><u>saxophone</u></b>; accept alto <b><u>saxophone</u></b>; accept <b><u>sax</u></b>]",
+      "Dizzy <b><u>Gillespie</u></b> [or John Birks <b><u>Gillespie</u></b>]",
+      "Elvin <b><u>Jones</u></b> [or Elvin Ray <b><u>Jones</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "leadin": "The widespread use of these components in cryptocurrency mining has caused a rapid rise in the prices of models such as the RTX 3090 (“thirty-ninety”). For 10 points each:",
+     "parts": [
+      "NVIDIA’s (“en-VID-ee-uh’s”) GeForce (“G-force”) is a popular type of what “processing units,” which are intended to aid the creation of their eponymous images?",
+      "Since 2007, NVIDIA’s GPUs have used this parallel computing platform with a language based on C++ (“C plus plus”), which only has one-way interoperability with competitors like OpenGL.",
+      "NVIDIA has recently supplied GPU firmware updates to ensure compatibility with this video interface, whose standards were designed by VESA (“VEE-sah”) to provide higher resolution than VGA."
+     ],
+     "answers": [
+      "<b><u>graphic</u></b>s processing units [or <b><u>GPU</u></b>s; accept <b><u>graphic</u></b>s cards]",
+      "<b><u>CUDA</u></b> (“COO-dah”) [or <b><u>Complete Unified Device Architecture</u></b>]",
+      "<b><u>DisplayPort</u></b> [or <b><u>DP</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "Examples of these objects called Śarīra (“shuh-REE-ruh”) are often placed in hemispherical buildings so that pilgrims can walk around them. For 10 points each:",
+     "parts": [
+      "Name these items that Ashoka the Great supposedly housed in 84 thousand newly constructed stupas.",
+      "Relics of the Buddha include hair, nails, teeth, and bodily remains that were left after his body was disposed of in this way, which involved a funeral pyre.",
+      "Many stupas have reliefs or paintings of these stories whose name literally means “birth story.” Animals often feature in these stories of the previous lives of the Buddha that illustrate various virtues."
+     ],
+     "answers": [
+      "<b><u>relic</u></b>s of the Buddha [accept <b><u>hair</u></b>, <b><u>nail</u></b><u>s</u>, <b><u>teeth</u></b>, or <b><u>ash</u></b>es of the Buddha; accept <b><u>bucket</u></b> or <b><u>vessel</u></b> used to hold the ashes of the Buddha]",
+      "<b><u>cremation</u></b> [or being <b><u>cremate</u></b>d; or <b><u>burn</u></b>ing bodies or by <b><u>fire</u></b> or equivalents]",
+      "<b><u>Jātaka</u></b> tales [or <b><u>Jātaka</u></b>s or <b><u>Jātaka</u></b> stories]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "This author wrote <em>The Crime of the Congo</em> to publicize Belgian atrocities in the Congo Free State. For 10 points each:",
+     "parts": [
+      "Name this British author and political advocate who fictionalized Roger Casement and other petitioners for Congo reform as characters in his science fiction novel <em>The Lost World</em>, which introduced Professor Challenger.",
+      "Doyle frequently imbued themes of social justice into his stories about this consulting detective, who solves mysteries with the help of John Watson.",
+      "This author’s novel <em>Arthur & George</em> retells Doyle’s efforts to clear a half-Indian lawyer’s name from false accusations of pony abuse. In another novel by this author, a retired doctor searches for the source of a character from the story “A Simple Heart.”"
+     ],
+     "answers": [
+      "Arthur Conan <b><u>Doyle</u></b> [or Arthur Ignatius Conan <b><u>Doyle</u></b>]",
+      "<b><u>Sherlock</u></b> Holmes [or Sherlock <b><u>Holmes</u></b>]",
+      "Julian <b><u>Barnes</u></b> [or Julian Patrick <b><u>Barnes</u></b>] (The other novel is <em>Flaubert’s Parrot</em>.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "leadin": "Robert Hughes’s history <em>The Fatal Shore</em> describes the many lesbians who were imprisoned at this island’s Cascades Female Factory in the 1840s. For 10 points each:",
+     "parts": [
+      "Name this island where the explorer John Franklin’s wife Jane founded apple orchards and a Royal Society. The novel <em>English Passengers</em> fictionalizes Manx settlers of this island’s colony of Van Diemen’s Land.",
+      "Fanny Cochrane Smith recorded the last Native Tasmanian songs after its Palawa people largely died in this event instigated by George Arthur around 1830. Keith Windschuttle denied this event’s genocide status in the “history wars.”",
+      "T. C. Winegard compared the Black War with this ethnic group’s genocide of the Chatham Islands Moriori (“mor-ee-OR-ee”). This ethnic group gave the name “Aotearoa” (“OW-tay-ah-ROH-ah”) to New Zealand."
+     ],
+     "answers": [
+      "<b><u>Tasmania</u></b> [or <b><u>lutruwita</u></b>; accept Royal Society of <b><u>Tasmania</u></b>; reject “Australia”] (Matthew Kneale wrote <em>English Passengers</em>.)",
+      "<b><u>Black</u></b> War [accept <b><u>Black</u></b> Line; prompt on Australian <u>frontier</u> wars]",
+      "<b><u>Māori</u></b> people [prompt on <u>Polynesian</u>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "Auguste Comte (“KAHMT”) coined the term for this ethical doctrine, calling it “the definitive formula of human morality.” For 10 points each:",
+     "parts": [
+      "Name this ethical doctrine that partly names a modern movement that prioritizes actions that benefit as many people as possible, such as buying malaria nets.",
+      "Effective altruism is often connected to this thinker’s argument that humanity’s priority should be to “reduce existential risk.” This author of the 2014 book <em>Superintelligence</em> popularized the idea that our world is a simulation.",
+      "Altruism is rooted in the doctrines of this moral philosophy developed by Jeremy Bentham, which supports maximizing happiness for all individuals."
+     ],
+     "answers": [
+      "<b><u>altruism</u></b> [or word forms like <b><u>altruist</u></b>; or <b><u>altruisme</u></b>; accept ethical <b><u>altruism</u></b> or moralistic <b><u>altruism</u></b>; accept effective <b><u>altruism</u></b>; prompt on, but DO NOT OTHERWISE REVEAL, <u>utilitarian</u>ism]",
+      "Nick <b><u>Bostrom</u></b> [or Niklas <b><u>Boström</u></b>]",
+      "<b><u>utilitarian</u></b>ism [or <b><u>utilitarian</u></b> thought]"
      ],
      "values": [
       10,
@@ -485,16 +485,76 @@ export default {
      "subcategory": "Philosophy"
     },
     {
-     "leadin": "A theory often discussed in English classes claiming that this character is gay is usually supported by a potential double entendre about pulling a lever in an elevator. For 10 points each:",
+     "leadin": "A marble sculpture of this figure by Michelangelo was first installed at the entrance of the Palazzo Vecchio (“pah-LOT-zoh VECK-yoh”), while another artist’s bronze version of this figure was first displayed inside the building. For 10 points each:",
      "parts": [
-      "Name this character who blacks out, only to wake up and see Mr. McKee. This man described another man’s “rare smile with a quality of eternal reassurance.”",
-      "This author’s wife Zelda allegedly doubted his heterosexuality and alleged that he was in a gay affair with Ernest Hemingway. This man wrote about Nick in <em>The Great Gatsby</em>.",
-      "This character’s general disinterest in men was suggested by critics as \"vaguely homosexual.\" This golf-tournament cheater is implied to have once dated Nick."
+      "Name this figure whom a bronze Donatello sculpture depicts atop the head of Goliath.",
+      "The Palazzo Vecchio houses this other artist’s bronze statue of David wearing a leather tunic and standing on Goliath’s head. This artist also sculpted <em>Christ and St. Thomas</em> for the Orsanmichele (“or-sahm-mee-KEH-lay”).",
+      "Donatello, Verrocchio, and Michelangelo’s statues of David all make use of this pose with an Italian name. In this pose, a figure’s weight rests on one foot, which tilts the hips and creates a relaxed appearance."
      ],
      "answers": [
-      "<b><u>Nick</u></b> Carraway [accept Nick <b><u>Carraway</u></b>]",
-      "F. Scott <b><u>Fitzgerald</u></b> [or Francis Scott Key <b><u>Fitzgerald</u></b>]",
-      "<b><u>Jordan</u></b> Baker [or Jordan <b><u>Baker</u></b>]"
+      "<b><u>David</u></b> [or <b><u>Davide</u></b>; or King <b><u>David</u></b>]",
+      "Andrea del <b><u>Verrocchio</u></b> (“veh-ROH-kyoh”) [or Andrea di Michele di Francesco de’ <b><u>Cioni</u></b>]",
+      "<b><u>contrapposto</u></b>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "A character in this memoir struggles to recite the “Canto of Ulysses” from Dante’s <em>Inferno</em> to Jean (“zhahn”). For 10 points each:",
+     "parts": [
+      "Name this memoir whose final section, “The Story of Ten Days,” describes the author’s friend Alberto leaving on a forced march that results in his death.",
+      "Primo Levi’s memoir <em>If This is a Man</em> and Elie Wiesel’s memoir <em>Night</em> recount their experiences surviving this event. Anne Frank’s diary describes her time hiding in an attic until she was killed due to this event.",
+      "A series of sentences in <em>Night</em> that begin with this word describe “flames that consumed my faith forever” and “moments that murdered my God.” Wiesel and other survivors promoted the use of a phrase from a Hebrew poem beginning with this word for Holocaust remembrance."
+     ],
+     "answers": [
+      "<em><b><u>If This is a Man</u></b></em> [or <em><b><u>Survival in Auschwitz</u></b></em>; or <em><b><u>Se questo è un uomo</u></b></em>]",
+      "<b><u>Holocaust</u></b> [or ha<b><u>Shoah</u></b>; prompt on <u>World War II</u>]",
+      "<b><u>never</u></b> [or <b><u>keynmol</u></b>; or <b><u>le-olam lo</u></b>; accept “<b><u>never</u></b> forget” or “<b><u>never</u></b> again”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "Referencing his self-created nickname “Mr. Unlimmmmited,” critics called a quarterback for a team in this city “Mr. Limmmmited” after a grisly 12-9 loss to the Colts. For 10 points each:",
+     "parts": [
+      "Name this city whose NFL team, the Broncos, has been criticized for the underperformance of its new quarterback Russell Wilson. This city is also home to the Rockies in the MLB.",
+      "Before the 2022 season, the Broncos released a promo video in which Wilson tells “Broncos country” this two-word phrase in front of a green screen in increasingly awkward tones and cadences.",
+      "Wilson claimed that his “dangerwich” was “daaaangerously good” in an ad for a new line of Subway sandwiches that also features this player’s “Meatball Marksman.” This player used his “night night” celebration against the Celtics in the 2022 NBA Finals."
+     ],
+     "answers": [
+      "<b><u>Denver</u></b>, Colorado [accept <b><u>Denver</u></b> Broncos]",
+      "<b><u>let’s ride</u></b> [or “Broncos country, <b><u>let’s ride</u></b>”]",
+      "Steph <b><u>Curry</u></b> [or Wardell Stephen <b><u>Curry</u></b> II]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Pop Culture",
+     "subcategory": "Sports"
+    },
+    {
+     "leadin": "In a play, this activity is initiated after a character is mocked for a story about a matricidal schoolboy who orders “bergin and water.” For 10 points each:",
+     "parts": [
+      "Name this activity in which a man describes the plot of a novel about a blonde professor and his “mousie” wife, who has a hysterical pregnancy after “tooting brandy immodestly,” in the section “Walpurgisnacht.”",
+      "This dramatic character makes up “Get the Guests” in order to belittle Nick and Honey, who eventually learn that this character and his wife Martha have been lying about the existence of their own son.",
+      "This American playwright created the dysfunctional couple George and Martha in his play <em>Who’s Afraid of Virginia Woolf?</em>"
+     ],
+     "answers": [
+      "“<b><u>Get the Guests</u></b>” [prompt on, but DO NOT OTHERWISE REVEAL, <u>George</u>’s <u>game</u> or the <u>game</u> from <em><u>Who’s Afraid of Virginia Woolf?</u></em>]",
+      "<b><u>George</u></b>",
+      "Edward <b><u>Albee</u></b> [or Edward Franklin <b><u>Albee</u></b> III]"
      ],
      "values": [
       10,
@@ -503,191 +563,191 @@ export default {
      ],
      "category": "Literature",
      "subcategory": "American Literature"
-    },
-    {
-     "leadin": "Laufey’s <em>(“LAY-vays”)</em> song “Everything I Know About Love” opens with a brief performance of a movement of one of these pieces. For 10 points each:",
-     "parts": [
-      "Name these pieces, all of which begin with a French overture. One of these pieces ends with a B minor “Badinerie” <em>(“buh-DEE-nuh-REE”)</em> often performed as a showpiece.",
-      "This instrument plays the melody of the “Badinerie” <em>(“buh-DEE-nuh-REE”)</em> that concludes Bach’s Orchestral Suite No. 2. Johann Joachim Quantz taught Frederick the Great how to play this instrument.",
-      "August Wilhelmj’s <em>(“vill-HELL-mees”)</em> arrangement of a movement from Bach’s third orchestral suite is titled for an <em>Air</em> on a string of this note. This note is a whole step below A."
-     ],
-     "answers": [
-      "J.S. <b><u>Bach</u></b>’s <b><u>orchestral suite</u></b>s",
-      "<b><u>flute</u></b> [or transverse <b><u>flute</u></b>]",
-      "<b><u>G</u></b> [accept <em>Air on the</em> <em><b><u>G</u></b> String</em>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Fine Arts",
-     "subcategory": "Auditory Fine Arts"
-    },
-    {
-     "leadin": "Deficiency in the ALA Synthase enzyme that catalyzes the synthesis of these molecules results in X-linked sideroblastic anemia. For 10 points each:",
-     "parts": [
-      "Name these molecules consisting of four pyrrole rings that serve as a tetradentate ligand for many metals.",
-      "A porphyrin ring surrounds the central iron atom in this protein that carries oxygen in red blood cells.",
-      "The Rothenmund reaction, a clever way to synthesize porphyrins, reacts pyrrole with this functional group. These terminal carbonyls produce a silver mirror in Tollens’ test."
-     ],
-     "answers": [
-      "<b><u>porphyrins</u></b> [prompt on but DO NOT REVEAL <u>chlorophyll</u> or <u>heme</u> with “What general class of molecules does it belong to?”]",
-      "<b><u>hemoglobin</u></b>",
-      "<b><u>aldehyde</u></b> [accept <b><u>aldose</u></b>s]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Biology"
     }
    ]
   },
   "2": {
-   "name": "2025 VAULT Packet 2",
+   "name": "2022 ACF Winter Packet 2",
    "tossups": [
     {
-     "question": "<b>The larval form of an aquatic species of these animals is known as the “water tiger” due to its appetite. A type of these animals uses its pygidial glands to mix hydroquinone and hydrogen peroxide in an explosive spray. J. B. S. Haldane quipped that God must have had an “inordinate fondness” for these animals due to their abundance. These animals fly using wings encased in hardened (*)</b> elytra. Some of these non-ant insects in the “rhinoceros” subfamily can lift more than 100 times their body weight. For 10 points, name these insects in the order Coleoptera which make up 25% of all animal species and include fireflies, ladybugs, and scarabs.",
-     "answer": "<b><u>beetle</u></b>s [accept <b><u>Coleoptera</u> </b>before mentioned; accept bombardier <b><u>beetle</u></b>s or rhinoceros <b><u>beetle</u></b>s or Hercules <b><u>beetle</u></b>s or stag <b><u>beetle</u></b>s or diver <b><u>beetle</u></b>s]",
-     "category": "Science",
-     "subcategory": "Biology"
-    },
-    {
-     "question": "<b>These people began a war by cutting down an </b>[emphasize]<em><b>American</b></em><b> consulate’s flagpole. Richard Somers died while trying to use the USS Intrepid as a bomb in these people’s capital. Presley O’Bannon was gifted a sword during a conflict against these people. William Eaton’s routing of these people at Derna inspired the second line of the U.S. Marines’ Hymn. The USS Philadelphia was burned by Stephen (*) </b>Decatur to prevent it from being used by these people, who controlled the Regency of Tripoli. Thomas Jefferson refused to pay tribute to, for 10 points, what North African pirates who waged two namesake wars against the United States?",
-     "answer": "<b><u>Barbary</u></b> pirates [or <b><u>Barbary</u></b> corsairs; accept <b><u>Berber pirate</u></b>s; accept <b><u>Tripolitan pirate</u></b>s before “Tripoli” is read; accept <b><u>Berber</u></b>s or <b><u>Libyan</u></b>s; accept any description of <b><u>pirate</u></b>s from <b><u>North Africa</u> </b>or the <b><u>Maghreb</u></b> before \"North African” is read; prompt on <u>pirate</u>s or <u>corsair</u>s]",
+     "question": "Workers in this country’s capital staged a “meat riot” over a 1905 tariff on imported beef, whose tallow and jerky drove this country’s economy before its wheat exports fed the Australian gold rushes. After its silver rush, this country and its eastern neighbor were settled by Croats during an 1880s gold rush and boom in sheep estancias (“ess-TAHNS-yahss”). Natives of this country traded alerce (“ah-LAIR-say”), or <em>Fitzroya</em> wood, after they led the Destruction of the Seven Cities in Araucanía (“ah-RAO-kah-NEE-ah”). This ABC power’s Chuquicamata (“choo-kee-kuh-MAH-tuh”) mine made it the world’s largest producer of copper, an industry nationalized in 1971 by a socialist president. This country, which contains Valdivia (“bahl-DEEV-yah”), won saltpeter deposits in Antofagasta from Bolivia and Peru in the War of the Pacific. For 10 points, what homeland of the Mapuche was led by Salvador Allende?",
+     "answer": "<b><u>Chile</u></b> [or Republic of <b><u>Chile</u></b> or República de <b><u>Chile</u></b>; accept <b><u>Chile</u></b> Wüdalmapu or <b><u>Chili</u></b> Suyu or <b><u>Chili</u></b> Ripuwlika or Repūvirika o <b><u>Tire</u></b>; accept Captaincy-General of <b><u>Chile</u></b> or Capitanía General de <b><u>Chile</u></b> or Governorate of <b><u>Chile</u></b>]",
      "category": "History",
-     "subcategory": "American History"
+     "subcategory": "World History"
     },
     {
-     "question": "<b>Ferries complete this state’s Highway 12, which terminates near the southern portion of the Currituck Sound. “Old Christmas” is observed on January 6th in this state’s Chicamacomico </b><em>(“chick-a-ma-CAH-me-co”)</em><b> town of Rodanthe </b><em>(“roh-DAN-thee”)</em><b>. An island chain in this state known as the “Graveyard of the Atlantic” contains the Pamlico </b><em>(“pam-LEE-co”)</em><b> Sound town of Buxton. </b> <b>Pisgah National Forest contains this state’s </b>(*) Mount Mitchell. The tallest lighthouse in the U.S. is located in this state’s Cape Hatteras <em>(“HAT-er-iss”)</em>, near the Outer Banks. This state and Tennessee share the Great Smoky Mountains. For 10 points, what state’s “Research Triangle” is centered on the cities of Durham, Chapel Hill, and Raleigh?",
-     "answer": "<b><u>North Carolina</u></b> [or <b><u>NC</u></b>]",
-     "category": "Geography",
-     "subcategory": "Geography"
-    },
-    {
-     "question": "<b>The Duke of Guines commissioned this composer’s C major double concerto for flute, harp, and orchestra. This composer of a B-flat major bassoon concerto featured clarinet alongside viola and piano in a trio named for a place where skittles are played. The “basset” variety of an instrument was featured in an A major concerto by this composer of the (*)</b> Kegelstatt trio. Anton Stadler premiered an A major clarinet concerto by this composer. This composer’s Gran Partita for winds is catalogued as K. 361. For 10 points, two clarinet parts feature in what composer’s “Great” G minor symphony?",
-     "answer": "Wolfgang Amadeus <b><u>Mozart</u></b>",
-     "category": "Fine Arts",
-     "subcategory": "Auditory Fine Arts"
-    },
-    {
-     "question": "<b>T.S. Eliot took dialogue from this play for the epigraph of his poem “Portrait of a Lady.” In the prologue to this play, the line “there is no sin but ignorance” is spoken by the ghost of Machiavelli. Mathias and Ludowick duel in this play as a result of a forged letter, whose real author responds to a blackmail plot by murdering his slave (*) </b>Ithamore. This play’s title character schemes with his daughter Abigail after his wealth is seized to pay tribute to the Turks, before dying when he falls into the boiling cauldron he prepared for Calymath. For 10 points, Barabas is the title character of what Christopher Marlowe play often criticised as anti-Semitic?",
-     "answer": "<em>The</em> <em><b><u>Jew of Malta</u></b></em>",
-     "category": "Literature",
-     "subcategory": "British Literature"
-    },
-    {
-     "question": "<b>This character laments the “hell” of his “inner being” and notes how all the pieces of “life’s game” were in his pocket before resolving to “learn how to laugh.” After reliving his relationship with Rosa Kreisler, this character sees the inscription “HOW ONE KILLS FOR LOVE” on a door. </b> <b>Despite receiving a “treatise” detailing his potential suicide, this character is taught how to dance the</b> (*) foxtrot on his fiftieth birthday. During a ball, this character fulfills a prophecy as he stabs Hermine to death in saxophonist Pablo’s Magic Theatre. For 10 points, name this character, whose resemblance to a canine titles a Herman Hesse novel.",
-     "answer": "<b><u>HarryHaller</u></b> [accept either underlined portion; accept <em>Der</em> <em><b><u>Steppenwolf</u></b></em>]",
+     "question": "A poem in this collection claims that the “weakened voice” of its speaker’s soul “resembles the death rattle of a wounded man.” Another poem in this collection notes how a central concept “makes neither great gestures nor great cries,” yet “would willingly make of the earth a shambles.” A stanza in this collection begins “how sour the knowledge travelers bring away!” and ends by comparing human existence to “an oasis of horror in a desert of” a concept that “dreams of scaffolds while smoking a hookah pipe.” This collection describes a concept sometimes translated as “boredom,” called ennui (“ahn-WEE”), in the sections “The Voyage” and “Spleen and Ideal,” and calls the addressee a “hypocrite reader.” For 10 points, name this poetry collection by Charles Baudelaire.",
+     "answer": "<em>The</em> <em><b><u>Flowers of Evil</u></b></em> [or <em>Les</em> <em><b><u>fleurs du mal</u></b></em>]",
      "category": "Literature",
      "subcategory": "European Literature"
     },
     {
-     "question": "<b>Raffaelo Schmiamossi depicted an ambassador of a kingdom with this name wearing a raffia cloth. In 1518, a prince from a kingdom with this name, Henrique, was appointed Bishop of Utica. After founding Antonianism, the heretic Kimpa Vita was burned at the stake in a kingdom with this name. Adam Hochschild chronicled abuses in a colony with this name in a book titled for a ruler’s “Ghost.” Irish DiplomatRoger</b> (*) Casement reported on the Force Publique’s hand-cutting tactics in a colony with this name. A “Free State” with this name was ruled by Leopold II of Belgium. For 10 points, Brazzaville and Kinshasa are separated by a river with what name?",
-     "answer": "<b><u>Congo</u></b> [accept Kingdom of <b><u>Kongo</u></b> or <b><u>Congo</u></b> Free State or Democratic Republic of the <b><u>Congo</u></b> or Republic of <b><u>Congo</u></b>; accept Henrique of <b><u>Kongo</u></b> or Afonso I of <b><u>Kongo</u></b> or Antonio Manuel of <b><u>Kongo</u></b>; prompt on <u>DRC</u> or <u>ROC</u>; reject “Zaire” or “Angola”]",
-     "category": "History",
-     "subcategory": "World History"
-    },
-    {
-     "question": "<b>This structure is the subject of an “anti-film” that uses the same techniques as its creator’s earlier film </b><em><b>Sleep</b></em><b>. Eight hours and five minutes of footage of this structure comprises a 1964 film by Andy Warhol. Merian C. Cooper directed an RKO Pictures film in which Fay Wray plays a character stuck in this building named (*) </b>Ann Darrow. A 1933 film that pioneered several special effects techniques ended with sequences using stop-motion to depict airplanes flying around this building. Carl Denham claims that “Beauty killed the Beast” after a massive creature falls to his death from this building. For 10 points, name this real-life 102-story skyscraper climbed by King Kong.",
-     "answer": "the <b><u>Empire State Building</u></b>",
-     "category": "Fine Arts",
-     "subcategory": "Other Fine Arts"
-    },
-    {
-     "question": "<b>An event concerning this figure is foreshadowed when the floors of Hel are covered in gold. This figure lived in a hall where “may nothing unclean be.” Another god enters Hel while disguised as Vegtam </b><em>(“VEGG-tahm”)</em><b> in a poem titled for this resident of Breidablik’s </b><em>(“BRY-dah-blicks”)</em><b>“dreams.” This god fathered the god of (*)</b> justice, Forseti. Odin wins a battle of wits by asking what he spoke into this god’s ear. This god’s ship Hringhorni was pushed to sea by Hyrrokkin. The ring Draupnir is burned on the funeral pyre of this god, who can’t be revived when the giantess Thökk refuses to cry. For 10 points, name this Norse god of light who is killed when Loki guides Hodr to shoot an arrow of mistletoe.",
-     "answer": "<b><u>Baldr</u></b> [or <b><u>Baldur</u></b>; accept <em><b><u>Baldr</u></b>’s dreams</em> or <em><b><u>Baldr</u></b>s draumar</em>]",
-     "category": "Mythology",
-     "subcategory": "Mythology"
-    },
-    {
-     "question": "<b>In a violation of the 22-electron rule, this element is sandwiched between two cyclooctatetraene </b><em>(“sigh-cloh-oct-ah-tet-rah-een”)</em><b> rings in a metallocene. A centrifuge named for Gernot Zippe is used to aid in one method of purifying this element, which replaced a gaseous diffusion method. This is the </b>[emphasize]<em><b>heavier</b></em><b> element in a dating method where zircon is utilized to estimate the age of (*) </b>igneous rocks. Martin Klaproth discovered this element when he isolated it from yellowcake. This element’s 235 isotope is the starting point for most nuclear reactors. For 10 points, name this radioactive element with symbol U.",
-     "answer": "<b><u>uranium</u></b> [accept <b><u>U</u></b> before mentioned]",
-     "category": "Science",
-     "subcategory": "Chemistry"
-    },
-    {
-     "question": "<b>If this statement holds, the standalone M1, M2, and M3 terms on the right-hand sides of Euler’s equations all vanish to zero. Universally, this statement is implied by the fact that all four </b> <b>fundamental forces are central forces. Precession that is not “induced” by a force occurs because this statement holds while the direction of omega changes. Isaac Newton showed that this statement implies orbits sweep out equal (*) </b>areas in equal times in his proof of Kepler’s second law. This statement, which holds for systems with no net external torque, explains why ice skaters spin faster upon drawing in their arms. For 10 points, name this law stating that the quantity “I omega” stays constant.",
-     "answer": "<b><u>conservation</u></b> of <b><u>angular momentum</u></b> [accept descriptions of <b><u>angular momentum</u></b> being <b><u>conserved</u></b> or remaining <b><u>constant</u></b>; reject “conservation of momentum” alone or “conservation of linear momentum”]",
-     "category": "Science",
-     "subcategory": "Physics"
-    },
-    {
-     "question": "<b>Xerxes I was credited with inventing this activity in a treatise on it by Pedro Damiano. A Sasanian </b><em><b>Book of the Deeds</b></em><b> claims that Ardashir I mastered a predecessor to this activity. 1-by-1 “citadels” are utilized in a “large” variant of this activity named for Tamerlane. To impress Maria Theresa, Wolfgang von Kempelen constructed a fake automaton that could supposedly perform this activity called the (*) </b>Mechanical Turk. This activity evolved from the ancient Indian <em>chaturanga</em>. The Spanish priest Ruy <em>(“ROO-ee”)</em> López names a sequence used in this game. For 10 points, the Persian “shāh māt” is the origin of what board game’s term “checkmate”?",
-     "answer": "playing <b><u>chess</u></b> [accept Great <b><u>Chess</u></b> or Large <b><u>Chess</u></b>; prompt on <u>Shatranj</u> or <u>Chatrang</u> or <u>Chaturang</u>a before “chaturanga” is read]",
-     "category": "History",
-     "subcategory": "Other History"
-    },
-    {
-     "question": "<b>In the Quran this figure, who goes unnamed, is the first to be referred to as </b><em><b>zawj</b></em><b>. In Gnostic traditions, this embodiment of wisdom is celebrated for awakening others to the oppressive role of the Demiurge. This figure is told “you will not certainly die” by a being whose descendants are cursed to bite another’s heel. This is the alphabetically later of the two figures whose eldest son (*) </b>murders his younger brother and travels to theLand of Nod after being marked. This figure was born from a sleeping man’s rib. A serpent deceived this figure into eating from the Tree of the Knowledge of Good and Evil. For 10 points, name this biblical wife of Adam.",
-     "answer": "<b><u>Eve</u></b> [or <b><u>Hawa</u></b> or <b><u>Hawwa</u></b>]",
+     "question": "In Gerar (“guh-RAHR”), Isaac rebuilds several of these places that had been destroyed by the Philistines. Joseph was said to have been taken from one of these places by a caravan of Midianites after being betrayed by his brothers. After a Samaritan at one of these locations says that she has no husband, Jesus correctly says that she has had five husbands and isn’t married to the man she lives with. A servant searching for a wife for Isaac at one of these places prays for a sign, which Rebecca fulfills by offering to provide for the servant and his camels. One of these places, which is revealed by God to Hagar after she flees with Ishmael, was called Zamzam. For 10 points, name this type of place where Jesus compares his gospel to “living water.”",
+     "answer": "<b><u>well</u></b>s [accept <b><u>cistern</u></b>s; accept <b><u>spring</u></b>s; accept Zamzam <b><u>Well</u></b> or <b><u>Biʾru</u></b> Zamzam; accept Samaritan woman at the <b><u>well</u></b>; accept Joseph’s <b><u>Well</u></b> or <b><u>Jubb</u></b> Yussef; prompt on <u>pit</u>s or <u>hole</u>s or equivalents; prompt on <u>oasis</u>; prompt on <u>water</u> sources or equivalents]",
      "category": "Religion",
      "subcategory": "Religion"
     },
     {
-     "question": "<b>In a painting set in this city, an inscription above a brick archway asserts that those who “wish to repair to patience and meekness” must “first descend [...] to be raised.” A “Musical Instrument Seller’s Stall” in this city appears in a painting with a foreshortened viola da gamba in its foreground. A painting of a goldfinch by a member of this city’s namesake “School”, (*) </b>Carel Fabritius, is one of his few works not to be destroyed in the explosion in this city that killed him. The emptybell tower of this city’s New Church appears across the River Schie <em>(“skee”)</em> in a 1661 “View of” it. For 10 points, name this Dutch city home to Jan Vermeer.",
-     "answer": "<b><u>Delft</u></b> [accept <em>The Courtyard of a House in</em> <em><b><u>Delft</u></b></em>; accept <em>A View of</em> <em><b><u>Delft</u></b>, with a Musical</em> <em>Instrument Seller's Stall</em>; accept <em>View of</em> <em><b><u>Delft</u></b></em>]",
-     "category": "Fine Arts",
-     "subcategory": "Visual Fine Arts"
-    },
-    {
-     "question": "<b>One character in a novel by this author frequently catalogues wildlife because “whatever exists without my knowledge exists without my consent.” In a novel by this author, a 13-year old character astonishingly fires a bullet through a wallet, shocking Rawlins. A giant hairless antagonist in a novel by this author betrays and murders Tobin. Jimmy Blevins is executed in a novel by this author which opens at the </b>(*) funeral of John Grady Cole’s grandfather. The Kid joins a group of scalp hunters named the Glanton Gang in a novel by this author featuring Judge Holden. For 10 points, name this author of <em>All the Pretty Horses</em> and <em>Blood Meridian</em>.",
-     "answer": "Cormac <b><u>McCarthy</u> </b>",
-     "category": "Literature",
-     "subcategory": "American Literature"
-    },
-    {
-     "question": "<b>Over dinner at the Granita restaurant, two politicians from this party allegedly agreed that one of them would resign after two terms. Gerald Kaufman attacked the 1983 manifesto of this party as the “The Longest Suicide Note in History.” TUC strikes opposed James Callaghan, a prime minister from this party, during the 1978 (*) </b>“Winter of Discontent.”The slogan of “New [this party]” was used by a leader of this party who advocated for a “Third Way.” Neil Kinnock led this party when it lost the 1987 election to Margaret Thatcher’s Conservatives. For 10 points, Tony Blair led what British political party named for its working class roots?",
-     "answer": "UK <b><u>Labour</u></b> Party [accept New <b><u>Labour</u></b>] <em>(The leadin refers to Tony Blair and Gordon Brown)</em>",
-     "category": "History",
-     "subcategory": "European History"
-    },
-    {
-     "question": "<b>Empedocles proposed a force named for this concept that “mixed” the classical elements. During a speech on this concept by Eryximachus, one character tries various hiccup cures. A speech in a passage on this concept praises Socrates by comparing him to a statue of Silenus filled with golden figures. Aristophanes explains this concept by explaining that humans used to be spherical until they were</b> (*) split by Zeus. Plato explained this concept’s purest form as ascending to the Form of Beauty in a dialogue where characters give speeches on it at a drinking party. For 10 points, name this concept discussed in Plato’s Symposium, specifically its erotic form.",
-     "answer": "<b><u>love</u></b> [or <b><u>eros</u></b>; or <b><u>philia</u></b>; or <b><u>storge</u></b>; or <b><u>agape</u></b>]",
-     "category": "Philosophy",
-     "subcategory": "Philosophy"
-    },
-    {
-     "question": "<b>Expulsion of this ion is coupled to intake of another by antiporters in the PCT that are triggered by angiotensin II. Enterochromaffin-like cells produce histamine that triggers the release of this cation by binding to H2 receptors. An ATPase that couples expulsion of this ion to K+ intake is blocked by omeprazole. This ion's secretion alongside intrinsic factor by </b>(*) parietal cells is blocked by PPIs. High concentration of this ion turns pepsinogen into its active form, pepsin. Because chyme is rich in this ion, bicarbonate is released to neutralize it upon entry into the small intestine. For 10 points, stomach acid is rich in what cation?",
-     "answer": "<b><u>hydrogen</u></b> ions [or <b><u>H</u></b>+ ions or <b><u>proton</u></b>s; accept <b><u>proton</u></b> pumps or <b><u>proton</u></b> pump inhibitors or Na-<b><u>H</u></b> antiporter or <b><u>H</u></b>-K ATPase]",
+     "question": "A radially symmetric phenomenon in these materials has a strength proportional to the log of a parameter with a critical value of “1 over root 2,” which is denoted by kappa. For these materials, the square root of the quantity [read slowly] “the reduced Planck constant squared over twice the mass times the magnitude of alpha” gives the length scale xi (“zai”). Some of these materials are effectively fixed in place when the phenomenon of “flux pinning” affects their Abrikosov (“uh-BRICK-uh-sov”) vortices (“VOR-tih-seez”), which have a size characterized by the London penetration depth. Type I (“one”) varieties of these materials expel magnetic fields in the Meissner (“MIZE-nur”) effect. For 10 points, name these materials that, below their critical temperature, have effectively zero resistance.",
+     "answer": "<b><u>superconductor</u></b>s [accept <b><u>superconductivity</u></b>; accept Type I <b><u>superconductor</u></b>s or Type II <b><u>superconductor</u></b>s] (Xi denotes the superconducting coherence length.)",
      "category": "Science",
-     "subcategory": "Biology"
+     "subcategory": "Physics"
     },
     {
-     "question": "<em>Note to moderator: “phycologist” is not a typo.</em> <b>One method for meta-analysis sums negative two times the natural log of these quantities to create one value. The Bonferroni correction compares this quantity to another quantity divided by the number of tests. This quantity was proposed in an experiment where a phycologist tasted different tea preparations. A recent “replication crisis” has emerged due to widespread attempts to</b> (*) “hack” this quantity. A “false positive ”occurs when this quantity is both below an alpha level and H-naught is incorrectly rejected. For 10 points, significance testing attempts to find what statistical value representing the probability of obtaining a result if the null hypothesis is true?",
-     "answer": "<b><u>p</u></b>-value [accept <b><u>p</u></b>-rep or <b><u>p</u></b>-hacking]",
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "question": "<b>The realization “I need more grace / than I thought” closes a poem in this language that begs a “Dissolver of Sugar” to “dissolve me.” The title object of a poem in this language is said to be “fire, not wind” after making a “crying sound” upon being separated. An impatient person from an “Earthen Lot” asks “who is the (*)</b> Potter?” in a poem in this language. Coleman Barks popularized a collection of <em>Spiritual Couplets</em> originally in this language. A command to “Awake!” opens a collection in this language whose speaker asks for “A Jug of Wine, a Loaf of Bread, and Thou.” For 10 points, Rumi wrote in what language, used by Omar Khayyam to write the Rubaiyat?",
-     "answer": "<b><u>Farsi</u></b> [or <b><u>Persian</u></b>]",
+     "question": "An anti-war poem by this author includes the image of “ravens and kites” hanging the entrails of the dead in the trees. This author of “Nefarious War” wrote on the less viscerally violent effects of conflict in his wistful “Exile’s Letter.” The speaker of one of this author’s poems awakens and momentarily wonders if light is frost. In another of this author’s poems, the addition of the speaker’s shadow “makes three of us” after the speaker “asked the moon to drink with me.” Despite not knowing this poet’s language, Ezra Pound created a well-known English version of his poem “The Song of Cháng’ān.” For 10 points, what poet with a fondness for wine wrote “Quiet Night Thought” and “Drinking Alone by Moonlight” during the Táng dynasty?",
+     "answer": "<b><u>Lǐ</u></b> Bái (“lee bye”) [or <b><u>Li</u></b> Po; or <b><u>Li</u></b> Bo; <b><u>Li</u></b> Pai; or <b><u>Lǐ</u></b> Taìbaí; accept <b><u>Rihaku</u></b>; accept <b><u>Qīnglián Jūshì</u></b> or <b><u>Ch’ing-lien Chu-shih</u></b>]",
      "category": "Literature",
      "subcategory": "World Literature"
     },
     {
-     "question": "<b>A general of this non-Greek polity nicknamed “the Boetharch” surrendered after losing the Battle of Oroscopa. Warhawks in this polity launched a conflict by sending forces against </b> <b>Masinissa, who used his Numidian Calvary against it nearly 50 years earlier. This city’s U-Shaped “Great Cothon” may have been reconstructed after Belisarius’ victory at the battle of </b>(*) Ad Decimum made it the center of Byzantine Africa. Scipio Aemilianus’ troops salted this city’s soil during a war sparked by Cato the Elder’s repeated declarations that “[this city] must be destroyed.” For 10 points, name this city that was razed by Rome after the Third Punic War.",
-     "answer": "<b><u>Carthage</u></b> [accept <b><u>Carthago</u></b> or Byzantine <b><u>Carthage</u></b>; accept “<b><u>Carthage</u></b> must be destroyed\" or “<b><u>Carthago</u></b> delenda est”]",
+     "question": "The results were not affected by subjects’ attention being directed to this phenomenon’s source in a study by Allen, Kenrick, Linder, and McCall. In a study of how people interpreted the source of this phenomenon, the Thematic Apperception Test was administered by a confederate who gave the subjects their phone number. Experiencing moderate, but not low or high, amounts of this phenomenon can improve task performance according to the Yerkes–Dodson law. Emotions are formed by a combination of the cognitive label and this phenomenon according to the two-factor theory of Stanley Schachter and Jerome Singer. Dutton and Aron tested this phenomenon’s “misattribution” by making subjects cross a scary bridge and encounter a conventionally attractive woman. For 10 points, name this form of psychological and physiological alertness.",
+     "answer": "<b><u>arousal</u></b> [or being <b><u>aroused</u></b>; accept misattribution of <b><u>arousal</u></b>; accept sexual <b><u>arousal</u></b>; prompt on <u>alert</u>ness or <u>awake</u>ness or equivalents until “alertness” is read; prompt on <u>excitation</u> or word forms like <u>excite</u>d; prompt on <u>fear</u> or equivalents until “scary” is read; prompt on <u>stress</u>]",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "A supporter of this legislation claimed “I’ve never been in reverse in my lifetime” only two weeks after he had told radio host Hoppy Kercheval of his reservations about it. That politician supported this law only after hearing arguments from Lawrence Summers and the Penn Wharton Budget Model. Late negotiations over this legislation led to the closure of the carried interest loophole being dropped and a one-percent tax on stock buybacks being added. Meetings with Chuck Schumer led to support of this legislation, rather than the preceding Build Back Better Act, by Joe Manchin. For 10 points, over 300 billion dollars of energy funding were provided by what act signed into law in August 2022, which is named for its attempts to slow increases in price levels?",
+     "answer": "<b><u>Inflation Reduction</u></b> Act of 2022 [prompt on <u>Build</u> <u>Back Better</u> Act by asking “that was a precursor of what enacted legislation?”]",
+     "category": "Current Events",
+     "subcategory": "Current Events"
+    },
+    {
+     "question": "A book review portrait by this photographer angered its subject because it showed him smoking with legs spread awkwardly in an armchair. Marvin Israel compiled this photographer’s work into the photobook <em>Monograph</em>. A museumgoer once spat on this photographer’s image of a smoking man with manicured nails wearing hair curlers. This photographer captured an elderly couple looking up at their nearly nine-foot-tall son, the “Jewish Giant.” This photographer’s image of two girls with matching headbands and corduroy dresses may have inspired the twin motif in <em>The Shining</em>. An image by this photographer depicts a boy with a tilted head clutching a fake “pineapple”-model weapon. For 10 points, Susan Sontag’s essay “Freak Show” criticizes what New York City photographer of <em>Child With Toy Hand Grenade in Central Park</em>?",
+     "answer": "Diane <b><u>Arbus</u></b> [or Diane <b><u>Nemerov</u></b>] (The first line refers to Arbus’s portrait of Norman Mailer.)",
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "question": "This organization used gas cylinders to develop a type of custom mortar known as a “barrack buster.” The discovery of a weapons stash held by this organization resulted in the enactment of the Falls Curfew. Attacks carried out by this organization made the Europa Hotel the “most bombed hotel in the world.” A favorite weapon of this organization partially names their “armalite and ballot box strategy.” Members of this organization wore only blankets and refused to take showers as part of a peaceful protest at the Maze prison. This organization’s popularity swelled after paratroopers fired on civilians in 1972 on “Bloody Sunday.” For 10 points, the Good Friday Agreement was signed by what paramilitary organization, the provisional wing of a group that fought for the creation of a united Ireland?",
+     "answer": "Provisional <b><u>IRA</u></b> [or Provisional <b><u>Irish Republican Army</u></b>; or <b><u>Óglaigh na hÉireann</u></b>; prompt on <u>Provos</u>; reject “Old IRA”]",
      "category": "History",
-     "subcategory": "Ancient History"
+     "subcategory": "European History"
+    },
+    {
+     "question": "The density of these structures can be determined by staining for the scaffold proteins Homer, Bassoon, or Piccolo, the latter two of which organize an “active zone” adjacent to them. A type of these structures is stabilized by the interaction between C-a-d-m and the scaffold P-S-D-95. Cochlear hair cells and the retina contain a version of these structures with an electron-dense ribbon. Spillover between these structures is prevented by astrocytes, which ensheath them. These structures are strengthened by inserting AMPA receptors in the post-[<em>this structure</em>]-membrane. Their namesake boutons contain vesicles docked by SNAREs. These structures strengthen and weaken based on their activity in the simplest example of their namesake plasticity. They typically occur after an axon. For 10 points, name these spaces between neurons where neurotransmitters are released.",
+     "answer": "<b><u>synapse</u></b>s [or <b><u>synaptic</u></b> cleft; accept <b><u>synaptic</u></b> plasticity; accept <b><u>synaptic</u></b> boutons; accept post-<b><u>synaptic</u></b> membrane]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "In a novel titled for this sort of place, a pompous writer claims that Branwell was the true genius of the Brontë siblings. In that novel, the protagonist moves to one of these places to live with her Aunt Ada, who sees “something nasty in the woodshed.” Characters in another novel titled for one of these places drop rocks from a quarry to create an object that is later destroyed with blasting powder. In that novel titled for one of these places, a leader’s love of whisky leads to the addition of qualifiers like “with sheets” and “to excess” to a list of “Seven Commandments.” The skull of Old Major is displayed in one of these places by a character who lies about his role in a battle that was won by his rival, Snowball. For 10 points, name this sort of place ruled by the pig Napoleon in an allegorical novel by George Orwell.",
+     "answer": "<b><u>farm</u></b>s [accept <em>Animal</em> <em><b><u>Farm</u></b></em>; accept <em>Cold Comfort</em> <em><b><u>Farm</u></b></em>; prompt on <u>barn</u>s by asking “what larger type of place is it located on?”] (<em>Cold Comfort Farm</em> is by Stella Gibbons.)",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "question": "In its first three years orbiting this body, no flashes at all were detected by the LAC (“L-A-C”) instrument. While traveling to this body in 2010, a 200-square-meter sheet helped power a probe in the first successful use of a solar sail. After its initial launch alongside <em>IKAROS</em> in 2010, this body was successfully orbited from 2015 onwards by the JAXA (“JACK-sah”) probe <em>Akatsuki</em> (“ack-at-SOO-kee”). The <em>Magellan</em> probe mapped this body’s Maxwell Montes (“MON-tez”). In 1761, the solar parallax was first calculated during an event named for this body, which occurred most recently in 2004 and 2012 and involves its transit across the Sun. For 10 points, what planet with a 225-day orbital period is the hottest in the solar system, and the second from the Sun?",
+     "answer": "<b><u>Venus</u></b> [accept transit of <b><u>Venus</u></b>]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "In a painting by this artist, a bust, likely of Pythagoras, faces left over a guitarist who reads the sheet music on the lap of a woman seated on the ground. This artist of <em>The Scale of Love</em> depicted four actors dressed as stock characters below a man in a white commedia dell’arte costume who stands facing the viewer in the painting <em>Gilles</em> (“zheels”) or <em>Pierrot</em> (“pyeh-ROH”). A man offers his hand to a woman climbing a step while a couple examines a large painting of nudes in a painting by this artist, in which men pack a portrait of Louis XIV into a wooden box. This artist of <em>The Shop Sign of Gersaint</em> (“zhair-SAHN”) also painted several cupids flying in the air as a procession of couples approaches a golden gondola. For 10 points, name this Rococo artist of <em>The Embarkation for Cythera</em> (“SITH-uh-rah”).",
+     "answer": "Antoine <b><u>Watteau</u></b> (“an-TWAHN wot-OH”) [or Jean-Antoine <b><u>Watteau</u></b>]",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "A building in this city was designated a landmark in 1968 to prevent Marcel Breuer’s plan to redevelop it into a skyscraper, leading to a landmark Supreme Court case on regulatory takings. The replacement of a train station in this city with a sports arena led art historian Vincent Scully to comment, “One entered the city like a god. One scuttles in now like a rat.” It's not Toronto, but Jane Jacobs led the opposition to this city’s construction of the LOMEX expressway. This city’s suburbs were the site of the first Levittowns. This city’s construction of bridges and highways is the focus of Robert Caro’s book <em>The Power Broker</em>, a biography of developer Robert Moses. For 10 points, name this city where structures like the George Washington Bridge cross the East River and Hudson River.",
+     "answer": "<b><u>New York</u></b> City [or <b><u>NYC</u></b>] (The first line refers to the planned redevelopment of Grand Central Terminal and the subsequent case <em>Penn Central Transportation Co. v. New York City</em>.)",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "In a section of this text, a man’s blood shoots out like a burst pipe after he stabs himself, making the mulberries next to him purple. While trying to gain access to an orchard, a man in this text disguised as an old lady tells the story of Iphis (“AI-fiss”) hanging himself on his beloved’s doorway. It’s not by Hesiod (“HEZZ-ee-id”), but the first book of this text outlines how mankind became impious during its fourth and final age, the Iron Age. This text originated a story in which a man dies after thinking that a lion ate his beloved, whom he talked to using a crack between their walls. This text’s fifteenth and final book closes with the apotheosis of Julius Caesar. This text originated the story of Pomona and Vertumnus and the tragedy of Pyramus and Thisbe. For 10 points, name this text that centers on transformation and was written by Ovid.",
+     "answer": "<em><b><u>Metamorphoses</u></b></em> (“met-uh-MOAR-foh-seez”)",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "In a lecture given at Johns Hopkins, this thinker claimed that systems open up in an “event” upon the realization that centers are established arbitrarily. This thinker coined a meaning of the word “trace” that refers to the “always-already hidden” contradictions of a term. This thinker argued with an American on the theories of J. L. Austin in a debate sparked by this thinker’s essay “Signature Event Context.” Gayatri Spivak translated a book by this thinker that opens with a critique of Ferdinand de Saussure’s (“day sah-SOOR’s”) philosophy of signifiers. That book by this philosopher introduced a term that is an intentional misspelling of “difference” and argued that scholars have always valued writing as a derivative of speech. For 10 points, name this French deconstructionist who wrote <em>Of Grammatology</em>.",
+     "answer": "Jacques <b><u>Derrida</u></b> (“DAYR-ih-dah”) [or Jackie Élie <b><u>Derrida</u></b>] (The debate in the third sentence is the Derrida–Searle debate.)",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "In a poem by this author, the speaker watches “planets gather / like leaves” and sees the “striding” of “the color of the heavy hemlocks.” The speaker tries not to think “of any misery in the sound of the wind” in a poem by this author that depicts “spruces rough in the distant glitter.” That poem by this author concludes by describing “the nothing that is not there and the nothing that is,” and opens, “one must have a mind of winter.” This poet describes “lucid, inescapable rhythms” and “the beauty of innuendoes” in a poem that criticizes “thin men of Haddam” (“HAD-am”) and begins by noting that the title creature’s eye is the only moving thing among “twenty snowy mountains.” For 10 points, name this American poet of “The Snow Man” and “Thirteen Ways of Looking at a Blackbird.”",
+     "answer": "Wallace <b><u>Stevens</u></b> (The poem in the first line is “Domination of Black.”)",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "A piece in this genre that includes the <em>arioso</em> section “In the swamp” and the march “Over the breast of spring” was based on text by Walt Whitman; that piece in this genre was written by Paul Hindemith (“HIN-duh-mitt”). The seven-measure introduction of a piece in this genre opens with bassoons playing [read slowly] D, C sharp D E F before they are joined by the basset horns. During the <em>Sequentia</em> of a piece in this genre, a bass soloist repeats a descending B-flat major melody played by the trombone in the <em>Tuba mirum</em> movement. Franz Süssmayr (“SOOSS-mah-yer”) completed a piece in this genre left unfinished at its composer’s death, including its <em>Lacrimosa</em> movement. For 10 points, Mozart wrote a D minor example of what pieces, which set a mass for the dead?",
+     "answer": "<b><u>requiem</u></b> mass [accept Mozart's <em><b><u>Requiem</u></b> in D minor</em>; prompt on <u>mass</u> for the dead]",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "The “efficient” form of a process that forms these structures employs a high ratio of accelerators such as thiurams. Manganese soaps can be used to form these structures in drying oils, which can lead to paint “drying.” The alkylating agent mustard gas reacts with DNA to form these structures on guanine residues. The first fully synthetic plastic, Bakelite, is a thermosetting resin that has a high frequency of these structures as every phenol (“fen-OLL”) can connect to three groups. These structures form reversibly between proteins and DNA exposed to formaldehyde. Epoxy resins can form these structures with themselves in curing, leading to rigidity. In proteins, these structures are exemplified by oxidized cysteine residues, which form disulfide bridges. For 10 points, what structures connect different polymer chains into a network?",
+     "answer": "<b><u>cross</u><u>-link</u></b>s [accept <b><u>cross-link</u></b>ing agents or <b><u>cross-link</u></b>ing reagents or <b><u>cross-link</u></b>ers; prompt on efficient <u>vulcanization</u> or <u>curing</u>; prompt on <u>disulfide</u>s until read; prompt on <u>bond</u>s or disulfide <u>bridge</u>s; prompt on <u>connection</u>s or <u>link</u>s; reject “polymerization”]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "A poetic epigraph on one of these objects praises the union of yellow and white waterlilies and lists the creators of three temples at Paṭṭadakal (“PUT-uh-duck-ull”). Some of these objects record a “schism” that led to the convocation of a group’s third council by a ruler who declared a tax exemption with one at Lumbini (“LOOM-bee-nee”). A cannonball dented one of these objects made of corrosion-resistant iron at the Qutb Minar (“KOOT-ub MIN-ar”) during an invasion by Nader Shah. One of these objects made of sandstone at Sarnath (“SAR-not”) was originally topped with an abacus and lion capital. Like similar rock inscriptions, “major” and “minor” examples of these objects describe a 3rd-century ruler’s remorse for the Kaliṅga War and embrace of the dharma. For 10 points, Buddhist edicts were promulgated by Ashoka Maurya on what objects that resemble Egyptian obelisks?",
+     "answer": "<b><u>pillar</u></b>s [or <b><u>column</u></b>s; accept <b><u>pillar</u></b> edicts or <b><u>Pillar</u></b>s of Ashoka; accept Iron <b><u>pillar</u></b> of Delhi or Iron <b><u>pillar</u></b> at Mehrauli; accept Lumbini <b><u>pillar</u></b> inscription; prompt on <u>inscription</u>s or <u>edict</u>s by asking “recorded on what objects?”; prompt on <u>monolith</u>s or <u>pole</u>s; prompt on <u>steles</u> or <u>stela</u>e; prompt on <u>monument</u>s or similar; prompt on <u>rock</u>s or <u>stone</u>s until “rock” is read; reject “towers” or “minarets”]",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "It’s not by Spinoza, but in a series of letters about this book’s author, Germaine de Staël (“stahl”) claimed it was written with “the method of geometricians” by “[reducing] political problems to calculation.” This book’s opening chapter claims that order “is a sacred right that serves as foundation for all others.” This book criticizes the idea that slaves willingly “alienate” their freedom, as put forth by Hugo Grotius. This book holds that people escape the state of Nature by surrendering some of their rights to a government that embodies the “general will.” This book was written by a self-described “Citizen of Geneva.” For 10 points, the line “Man is born free, and everywhere he is in chains” opens what political treatise by Jean-Jacques Rousseau?",
+     "answer": "<em>The</em> <em><b><u>Social Contract</u></b></em> [or <em>On the</em> <em><b><u>Social Contract</u></b>; or, Principles of Political Right</em>; or <em>Du</em> <em><b><u>contrat social</u></b>; ou, Principes du droit politique</em>]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
     }
    ],
    "bonuses": [
     {
-     "leadin": "A fragmentary one of these works often translated as <em>Searchers</em> or <em>Trackers</em> has the original language title <em>Ichneutae</em>. For 10 points each:",
+     "leadin": "Answer the following about the Lehigh (“LEE-high”) Valley, an important site of early American industrialization, for 10 points each.",
      "parts": [
-      "Name these specific works that accompany a cycle of three tragedies at the Dionysia festival.",
-      "The only full surviving satyr play is <em>Cyclops</em>, a work by this author. This playwright earned a third place medal in the Dionysia for a play that ends with a woman leaving in a serpent-drawn chariot.",
-      "Euripides loses a poetry contest judged by Dionysus in this play by Aristophanes. This play’s title animals annoy Dionysus by repeating the phrase “Brekekekex-koax-koax” <em>(“BREH-keh-keh-kex ko-AX</em> <em>ko-AX”)</em> while he attempts to cross Lake Acheron."
+      "The Lehigh Valley was a center for the mining of the anthracite form of this resource, which was both transported by and used to power steam trains.",
+      "In managing both mining and shipment, the Lehigh Coal & Navigation Company was an early example of this business practice, in which every part of the supply chain is controlled by a single company.",
+      "Steel for the Empire State Building, Rockefeller Center, and many other skyscrapers came from this city in the Lehigh Valley. Charles Schwab was the president of a steel company named for this city, which is east of Allentown."
      ],
      "answers": [
-      "<b><u>satyr</u></b> plays [prompt on <u>play</u>s]",
-      "<b><u>Euripides</u></b><em>(The play is Medea)</em>",
-      "<em>The</em> <em><b><u>Frogs</u></b></em>"
+      "<b><u>coal</u></b> [accept anthracite <b><u>coal</u></b>; prompt on fossil <u>fuel</u>s; prompt on sedimentary <u>rock</u>s]",
+      "<b><u>vertical integration</u></b> [accept <b><u>vertical monopoly</u></b>; prompt on <u>integration</u>; prompt on <u>monopoly</u> or <u>monopolization</u>; reject “horizontal integration”]",
+      "<b><u>Bethlehem</u></b> [accept <b><u>Bethlehem</u></b> Steel or <b><u>Bethlehem</u></b> Steel Corporation]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "Answer the following about accidents involving the Beechcraft Bonanza, which has been in continuous production for longer than any other aircraft, for 10 points each.",
+     "parts": [
+      "Don McLean’s song “American Pie” uses the phrase “The Day the Music Died” to refer to a Bonanza crash that killed Buddy Holly, The Big Bopper, and this musician who helped lay the groundworks for Chicano rock with his hit rock ‘n’ roll version of the folk song “La Bamba.”",
+      "While recovering from a 1981 Bonanza crash, this former Atari engineer re-enrolled at UC Berkeley. This inventor of the first programmable universal remote designed the I and II models of an early personal computer.",
+      "A 2014 round-the-world charity flight by a Pakistani father and son started in this US state but ended when their Bonanza crashed near American Sāmoa. This Midwestern state’s Purdue University funded Amelia Earhart’s round-the-world flight."
+     ],
+     "answers": [
+      "Ritchie <b><u>Valens</u></b> [or Richard Steven <b><u>Valenzuela</u></b>]",
+      "Steve <b><u>Wozniak</u></b> [or Stephen Gary <b><u>Wozniak</u></b>; prompt on “<u>Woz</u>”]",
+      "<b><u>Indiana</u></b> [or <b><u>IN</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Other Academic",
+     "subcategory": "Other Academic"
+    },
+    {
+     "leadin": "This author alluded to his love of cricket in a scene in which a pianist is interrogated with questions like “who watered the wicket in Melbourne?” For 10 points each:",
+     "parts": [
+      "Name this British playwright of <em>The Dumb Waiter</em>, who wrote of Goldberg and McCann’s harassment of Stanley Webber in his play <em>The Birthday Party</em>.",
+      "To describe the sinister undertones present in many of Pinter’s early plays, the critic Irving Wardle coined a genre named for “comedies of” this concept.",
+      "During the title event in <em>The Birthday Party</em>, Goldberg and McCann force Stanley to participate in this game, which concludes with Stanley attacking Lulu after the lights go out."
+     ],
+     "answers": [
+      "Harold <b><u>Pinter</u></b>",
+      "<b><u>menace</u></b> [accept comedies of <b><u>menace</u></b>]",
+      "<b><u>blind man’s buff</u></b> [accept <b><u>blind man’s bluff</u></b>]"
      ],
      "values": [
       10,
@@ -695,39 +755,19 @@ export default {
       10
      ],
      "category": "Literature",
-     "subcategory": "Other Literature"
+     "subcategory": "British Literature"
     },
     {
-     "leadin": "Due to poor preservation, an artwork that used this substance began to deteriorate, causing its creator to note how its subject “didn’t look frightening.” For 10 points each:",
+     "leadin": "The cities of Kurkat, Istaravshan (“eess-tah-RAHV-shahn”), and Khujand (“HOH-jond”) in modern-day Tajikistan may correspond to this ruler’s namesake city, which he founded as a garrison along his empire’s northeastern frontier. For 10 points each:",
      "parts": [
-      "Name this substance that surrounds creatures like a golden calf and a tiger shark in artworks by Damien Hirst.",
-      "Hirst belonged to a group of “Young” artists from this country. An annual visual arts award in this country is named after J.M.W Turner, a painter from this country.",
-      "This British-Iraqi art collector commissioned Hirst’s <em>The Physical Impossibility of Death in the</em> <em>Mind of Someone Living</em> in 1991. This man, who also purchased Tracey Emin’s <em>My Bed,</em> aided the rise of the Young British Artists by exhibiting their work in his exhibition <em>Sensation!</em>"
+      "Name this king of Anshan, a son of Cambyses I who allied with the Amyrgians against the Sakā with pointed caps. This shahanshah created satrapies in Arachosia (“air-uh-KOH-see-uh”) and Bactria after he conquered the Medes.",
+      "Herodotus claims that this queen of the Massagetae (“mah-sah-GAY-tay”) rejected Cyrus’s marriage proposal and cut off his head after he crossed the Jaxartes (“jack-SAR-teez”) and killed her son. Uzbekistan, Kazakhstan, and Azerbaijan adopted her as a national hero.",
+      "Tomyris’s Massagetae supposedly got drunk on Cyrus’s wine because they only drank this beverage, which Central Asian nomads fermented into kumis despite their lactose intolerance."
      ],
      "answers": [
-      "<b><u>formaldehyde</u></b>",
-      "<b><u>United Kingdom</u></b> [or <b><u>Britain</u></b> or <b><u>UK</u></b> or <b><u>United Kingdom</u></b> of Great Britain and Northern Ireland; accept <b><u>England</u></b>]",
-      "Charles <b><u>Saatchi</u></b><em>(“SAH-chee”)</em>"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Fine Arts",
-     "subcategory": "Visual Fine Arts"
-    },
-    {
-     "leadin": "A priest from this country documented military torture tactics during “Sunday Radio Sermons” that drew from his paper <em>Orientación</em>. For 10 points each:",
-     "parts": [
-      "Name this country where Roberto D'Aubuisson <em>(“dow-bwee-SOHN”)</em> ordered the killing of Archbishop Oscar Romero. This country fought a civil war with the FMLN.",
-      "El Salvador’s military government briefly went to war with Honduras in a conflict named for this sport. Andrés Escobar was murdered for scoring an own goal during this sport’s FIFA World Cup.",
-      "El Salvador’s Civil War ended when the government and FMLN signed a 1992 agreement named for this place. Juan de la Barrera was one of the <em>Niños Héroes</em> who dieddefending this castle."
-     ],
-     "answers": [
-      "<b><u>El Salvador</u> </b>",
-      "<b><u>soccer</u></b> [or <b><u>football</u></b>; reject “American football”]",
-      "<b><u>Chapultepec</u></b> Castle [or Castillo de <b><u>Chapultepec</u></b>]"
+      "<b><u>Cyrus</u></b> the <b><u>Great</u></b> [or <b><u>Cyrus II</u></b>; or <b><u>Cyrus</u></b> the <b><u>Elder</u></b>; accept <b><u>Kūruš</u></b> or <b><u>Kỹros</u></b> in place of “Cyrus”; accept <b><u>Cyropolis</u></b> or <b><u>Kyroúpolis</u></b> or <b><u>Kurush</u></b> or <b><u>Kuruškaθa</u></b>; prompt on <u>Cyrus</u> or <u>Kūruš</u> or <u>Kỹros</u>] (The Amyrgians are also called the Sakā haumavargā and the “Sakā with pointed caps” are the Sakā tigraxaudā.)",
+      "<b><u>Tomyris</u></b> [or <b><u>Tómuris</u></b> or <b><u>Tomris</u></b> or <b><u>Tomiride</u></b>]",
+      "<b><u>milk</u></b> [accept mare’s <b><u>milk</u></b> or donkey’s <b><u>milk</u></b>; accept <b><u>yogurt</u></b> or <b><u>ayran</u></b>; prompt on <u>dairy</u>]"
      ],
      "values": [
       10,
@@ -735,19 +775,19 @@ export default {
       10
      ],
      "category": "History",
-     "subcategory": "World History"
+     "subcategory": "Other History"
     },
     {
-     "leadin": "This statement formalizes the law of conservation of energy for circuits. For 10 points each:",
+     "leadin": "One of these two quantities, and the multiplicity of the other, are signified by the two top-left entries in a term symbol. For 10 points each:",
      "parts": [
-      "What law in circuit analysis states that the sum of all potential differences around a closed circuit path is zero?",
-      "The loop rule holds if this operation applied to the electric field in a circuit is zero, implying the electric force is conservative. This operation applied to the vector potential gives the magnetic field.",
-      "Circuit analysis uses the loop rule alongside the junction rule, which states that the amount of this quantity entering equals the amount of this quantity exiting a junction. This quantity is measured in amperes."
+      "What two quantities, which share a unit, affect each other in an interaction named after Russell and Saunders?",
+      "That interaction, spin-orbit coupling, is often demonstrated with a model of an atom of this element, which consists of a single electron orbiting a proton.",
+      "For spin one-half particles, spin-orbit coupling can be calculated using this equation, whose publication in 1928 made it the first equation to fully combine the effects of quantum mechanics and special relativity."
      ],
      "answers": [
-      "<b><u>loop</u></b> rule [or Kirchhoff’s <b><u>loop</u></b> rule or Kirchhoff’s <b><u>voltage</u></b> rule; accept <b><u>Kirchhoff</u></b>’s <b><u>second</u> </b>law or <b><u>Kirchhoff</u></b>’s <b><u>second</u></b> rule or answers suggesting the latter of two rules devised by <b><u>Kirchhoff</u></b>; prompt on <u>Kirchhoff</u>’s rule or <u>Kirchhoff</u>’s law or <u>Kirchhoff</u>’s circuit law or <u>Kirchhoff</u>’s circuit rule]",
-      "<b><u>curl</u></b> [accept <b><u>del cross</u></b>; reject “del”]",
-      "<b><u>current</u></b> [or <b><u>I</u></b>]"
+      "<b><u>spin</u></b> AND <b><u>angular momentum</u></b> [accept <b><u>spin</u></b> angular momentum or <em><b><u>S</u></b></em> in place of “spin”; accept orbital <b><u>angular momentum</u></b> or <em><b><u>L</u></b></em> in place of “angular momentum”; accept <b><u>spin-orbit</u></b> coupling; accept answers in either order]",
+      "<b><u>hydrogen</u></b> [or <b><u>H</u></b>; accept <b><u>hydrogen</u></b> atom]",
+      "<b><u>Dirac</u></b> equation"
      ],
      "values": [
       10,
@@ -758,16 +798,136 @@ export default {
      "subcategory": "Physics"
     },
     {
-     "leadin": "This effect is observed by John Quiñones on the show <em>What Would You Do?</em> For 10 points each:",
+     "leadin": "This religious action includes both an external and an internal component, the latter of which refers to minimization of the passions. For 10 points:",
      "parts": [
-      "Name this effect in which an individual in a large group does not offer help to a person in need.",
-      "These two American psychologists studied the bystander effect by introducing an individual in a group to crises such as someone having an epileptic seizure or to smoke filling a room. Name either.",
-      "Darley and Latané’s <em>(“LAH-tuh-nay”)</em> work led to the passage of some of these laws. These laws provide legal protection to volunteers that help a person having an emergency, and they are contrasted with “duty to rescue” laws."
+      "Sallekhana (“suh-LAY-kuh-nah”) is what general type of action? Practitioners also engage in a less intensive variety of this practice in the leadup to Paryushana (“pur-YOO-shuh-nuh”).",
+      "Paryushana is a major holiday for this religion that has a “white-clad” subdivision and practices ahimsa, or nonviolence.",
+      "Sallekhana, or fasting until death, was revived in the 20th century by monks of this Jain sect. This “sky-clad” division of Jainism, which is often contrasted with Śvētāmbara (“shweh-TAHM-buh-ruh”), holds that women cannot attain moksha."
      ],
      "answers": [
-      "<b><u>bystander</u></b> effect [or <b><u>bystander</u></b> apathy; prompt on <u>diffusion of responsibility</u>]",
-      "Bibb <b><u>Latané</u></b> or John <b><u>Darley</u></b> [accept either underlined portion; accept John McConnon <b><u>Darley</u></b> in place of John Darley]",
-      "<b><u>Good Samaritan</u></b> laws"
+      "<b><u>fast</u></b>ing [or descriptions of <b><u>not eat</u></b>ing or <b><u>abstain</u></b>ing from food or equivalents; accept <b><u>starvation</u></b> or word forms like <b><u>starve</u></b>]",
+      "<b><u>Jain</u></b>ism [or <b><u>Jain</u></b>s]",
+      "<b><u>Digambar</u></b>a (“dig-UM-buh-ruh”)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "In this play, characters including Caloniki and Lampito vow not to “take the pose of a lioness on a cheese grater” while swearing an oath on a wine skin. For 10 points each:",
+     "parts": [
+      "Name this play in which a group of women attempts to stop the Peloponnesian War.",
+      "<em>Lysistrata</em> is a comedy by this ancient Greek playwright of <em>The Birds</em> and <em>The Clouds</em>.",
+      "At this event in another Aristophanes play, a man threatens what he believes to be a baby, only to learn that it is just a wine skin. A character cross-dresses to infiltrate this event so that he can spy on a group of women and learn what they think about him."
+     ],
+     "answers": [
+      "<em><b><u>Lysistrata</u></b></em>",
+      "<b><u>Aristophanes</u></b>",
+      "<b><u>Thesmophoria</u></b> Festival [accept <em><b><u>Thesmophoria</u></b>zusae</em> or <em>Women at the</em> <em><b><u>Thesmophoria</u></b></em> or <em>Women Celebrating the Festival of the</em> <em><b><u>Thesmophoria</u></b></em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "In a painting by this artist, Plato and Aristotle gesture in different directions. For 10 points each:",
+     "parts": [
+      "Name this Italian artist of <em>The School of Athens</em>.",
+      "Marcantonio Raimondi collaborated with Raphael to produce <em>The Massacre of the Innocents</em> using this intaglio printing technique that typically uses metal plates. Though better known for his woodcuts, Albrecht Dürer used this technique to create <em>Melencolia I</em>.",
+      "Raimondi also made an engraving that draws on this large final painting by Raphael, whose upper section depicts a white-robed Christ between Moses and Elijah."
+     ],
+     "answers": [
+      "<b><u>Raphael</u></b> [or <b><u>Raffaello</u></b> Sanzio or Raffaello <b><u>Sanzio</u></b> da Urbino or Raffaello <b><u>Santi</u></b>]",
+      "<b><u>engraving</u></b> [or <b><u>Gravur</u></b> or <b><u>incisione</u></b>; reject “lithography”; reject “etchings”; reject “relief printing”]",
+      "<em> The</em> <em><b><u>Transfiguration</u></b></em> [or <em>The</em> <em><b><u>Transfiguration</u></b> of Christ</em>; or <em>La</em> <em><b><u>Trasfigurazione</u></b></em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "This quantity is equal to 0 for an ice-water system at 0 degrees Celsius. For 10 points each:",
+     "parts": [
+      "Name this thermodynamic quantity that decreases for spontaneous reactions. Enthalpy minus temperature times entropy equals this quantity named after an American scientist.",
+      "The molar Gibbs free energy for a one-component system is equal to this quantity. This quantity, usually denoted “mu,” represents the change in free energy from adding a particle to a system.",
+      "For a second-order phase transition in the Ehrenfest classification, the second derivative of chemical potential with respect to temperature has this mathematical property, while the first derivative does not."
+     ],
+     "answers": [
+      "<b><u>Gibbs free energy</u></b> [prompt on free <u>energy</u>; prompt on <u>G</u> or delta <u>G</u>]",
+      "<b><u>chemical potential</u></b> [reject “potential”]",
+      "<b><u>discontinuous</u></b> [or <b><u>non-continuous</u></b> function or equivalents]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "A Christine Korsgaard collection titled for “Creating” this place discusses a different philosopher’s view that humans see themselves as a source of value by conferring value on other things. For 10 points each:",
+     "parts": [
+      "Name this place that consists solely of rational beings. A 1785 book conceived of this hypothetical place that only judges people by laws of universal necessity.",
+      "The Kingdom of Ends is proposed in this German philosopher’s book<em> Groundwork of the Metaphysics of Morals</em>, which introduced his idea of the categorical imperative. This thinker wrote the <em>Critique of Pure Reason</em>.",
+      "Kant’s ethical theory falls under this branch of ethics, which holds that an action’s morality should be judged by the action itself, rather than its consequences. As such, this branch of ethics is contrasted with consequentialism."
+     ],
+     "answers": [
+      "<b><u>Kingdom</u></b> of <b><u>Ends</u></b> [or <b><u>Reich</u></b> der <b><u>Zwecke</u></b>; accept <b><u>Realm</u></b> of <b><u>Ends</u></b>; accept <em>Creating the</em> <em><b><u>Kingdom</u></b> of</em> <em><b><u>Ends</u></b></em>]",
+      "Immanuel <b><u>Kant</u></b>",
+      "<b><u>deontological</u></b> ethics [or word forms such as <b><u>deontology</u></b> or <b><u>deontologist</u></b> ethics]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "Species of <em>Clostridium</em> variably take up the dye in this procedure, though laboratory strains are usually positive. For 10 points each:",
+     "parts": [
+      "Name this fundamental microbiology stain that uses the dye crystal violet. Bacteria that are positive for this stain have a lot of peptidoglycan in their cell walls, while those that are negative for this stain appear pink.",
+      "Gram stains are inconsistent for members of this genus, which includes the causative agents of TB and leprosy. Members of this genus have a waxy cell wall that shows up under an acid-fast stain.",
+      "The final step of Gram staining involves adding either fuchsin or this dye, which contains a diaminophenazine (“di-amino-phen-azine”) motif and counterstains Gram-negative species red."
+     ],
+     "answers": [
+      "<b><u>Gram</u></b> stain [or <b><u>Gram</u></b>’s method; accept <b><u>Gram</u></b>-positive bacteria or <b><u>Gram</u></b>-negative bacteria]",
+      "<em><b><u>Mycobacterium</u></b></em> [accept <em><b><u>Mycobacterium</u></b> tuberculosis</em>; accept <em><b><u>Mycobacterium</u></b> leprae</em>; reject “<em>Mycoplasma</em>”]",
+      "<b><u>safranin</u></b> [or <b><u>safranin</u></b> O]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "In the aftermath of the breakup of the USSR, this thinker wrote the <em>Foreign Affairs</em> article “The Case for a Ukrainian Nuclear Deterrent.” For 10 points each:",
+     "parts": [
+      "Name this “offensive realist” IR scholar who wrote <em>The Tragedy of Great Power Politics</em>.",
+      "Mearsheimer and Stephen Walt wrote a controversial book about the American lobby for this country, which they say consists not only of a subset of Jewish people but also Christian Zionists and various conservatives.",
+      "Mearsheimer has investigated this phenomenon, in which states exert power over other states through economic and social means. Antonio Gramsci (“GRAHM-shee”) defined the “cultural” form of this phenomenon."
+     ],
+     "answers": [
+      "John <b><u>Mearsheimer</u></b> [or John Joseph <b><u>Mearsheimer</u></b>]",
+      "<b><u>Israel</u></b> [or State of <b><u>Israel</u></b> or Medīnat <b><u>Yīsrāʾēl</u></b> or Dawlat <b><u>ʾIsrāʾīl</u></b>; accept <em>The</em> <em><b><u>Israel</u></b> Lobby and U.S. Foreign Policy</em>]",
+      "<b><u>hegemon</u></b>y [or word forms like <b><u>hegemonic</u></b>; accept cultural <b><u>hegemony</u></b> or <b><u>egemonia</u></b> culturale]"
      ],
      "values": [
       10,
@@ -778,96 +938,16 @@ export default {
      "subcategory": "Social Science"
     },
     {
-     "leadin": "In 2024, Larry Guth and James Maynard proved a new upper bound on the number of these values between 0.75 and 1. For 10 points each:",
+     "leadin": "A map created by Östen Dahl suggests that this province’s maritime traders introduced the Mǐn Nán word “te” (“tay”) to Sinhalese and Javanese rather than the Mandarin “chá” that spread overland. For 10 points each:",
      "parts": [
-      "What values are called “trivial” when they are equal to a negative even integer? An unsolved conjecture claims that all “nontrival” types of these values have a real part of “one half.”",
-      "When evaluated at 1, the Riemann zeta function is equal to this series. The Euler-Mascheroni constant is defined as the limiting difference between this series and the natural log.",
-      "In 1737, Euler proved that for real inputs, the Riemann zeta function is equal to the infinite product of “1 over 1 - [these numbers] to the s.” These numbers are only divisible by 1 and themselves."
+      "Name this Chinese province, the origin of Malaysia’s Hokkien (“HAH-kee-en”)-speaking Peranakan (“puh-RAH-nuh-con”) diaspora. Incense wood was found in a 13th-century shipwreck from this province’s city of Quánzhōu (“ch’wen-joh”), the Sòng dynasty’s main emporium.",
+      "Emperor Zhēnzōng (“jun-dzong”) disseminated Châmpa’s drought-resistant variety of this crop north from Fújiàn (“foo-j’yen”). Tai migrations spread this crop’s wet paddy cultivation to mueang (“moo-ahng”) in Lan Na and Laos.",
+      "Fújiàn’s costly imports of Taiwanese rice led to copper shortages that inspired jiāozǐ (“j’yow dzih”) made of this material. Cài Lún (“tsai l’wun”) invented this material, which supposedly spread west after the Battle of Ṭalās."
      ],
      "answers": [
-      "non-trivial <b><u>zeroes</u></b> of the Riemann <b><u>zeta</u></b> function [accept <b><u>roots</u></b> or <b><u>solution</u></b>s of the Riemann <b><u>zeta</u></b> function; prompt on <u>root</u>s or <u>solution</u>s or <u>zero</u>s alone]",
-      "<b><u>harmonic</u></b> series",
-      "<b><u>prime</u></b>s"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "leadin": "The spectra of highly ionized atoms of this element were mistaken to be a new element in the Sun’s corona. For 10 points each:",
-     "parts": [
-      "Name this element that indicates the end of heavy-element fusion for massive stars. The r and s processes are responsible for producing elements heavier than this element.",
-      "The r and s processes are named for the rapid and slow capture of these particles respectively. Isotopes of the same element only differ in the number of these particles.",
-      "The core-collapse mechanism begins when gravity overcomes this quantity in a massive star. In neutron stars, a quantum-mechanical form of this quantity arises from the Pauli exclusion principle."
-     ],
-     "answers": [
-      "<b><u>iron</u></b> [or <b><u>Fe</u></b>]",
-      "<b><u>neutron</u></b>s",
-      "<b><u>pressure</u></b> [or neutron degeneracy <b><u>pressure</u></b>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "leadin": "In his <em>Confessions</em>, this man said he was “seduced and seducing, deceived and deceiving” while following one group. For 10 points each:",
-     "parts": [
-      "Name this 5th-century Christian theologian and bishop of Hippo.",
-      "As detailed in his <em>Confessions</em>, Saint Augustine practiced this religion before his conversion to Christianity. This dualistic religion is based upon a cosmic battle between the worlds of light and darkness.",
-      "A group of Manichaean followers referred to by this word were devout ascetic monks. Those who are predestined to salvation in Calvinism are referred to as “unconditionally” this term."
-     ],
-     "answers": [
-      "Saint <b><u>Augustine</u></b> of Hippo [or Aurelius <b><u>Augustinus</u></b> Hipponensis]",
-      "<b><u>Manichaeism</u></b> [or <b><u>Manichaeanism</u></b> or <b><u>Monijiao</u></b> or <b><u>Mingjiao</u></b>; prompt on <u>gnostic</u>ism]",
-      "<b><u>elect</u></b> [accept unconditional <b><u>elect</u></b>ion or unconditionally <b><u>elect</u></b>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Religion",
-     "subcategory": "Religion"
-    },
-    {
-     "leadin": "Harvard philosopher Stanley Cavell wrote about <em>The Senses of [this book]</em>. For 10 points each:",
-     "parts": [
-      "Name this book whose “Visitors” section tells of the illiterate Frenchman Alec Thérien <em>(“Tair-ee-AN”)</em>. Fishing trips with Ellery Channing inspired this book’s “Brute Neighbors” chapter, which describes a war between red and black ants.",
-      "This transcendentalist author wrote about his two-year, two-month, and two-day experiment living in a cabin in his book <em>Walden</em>.",
-      "This chapter of <em>Walden</em> contains the quote “the mass of men lead lives of quiet desperation.” This first chapter of <em>Walden</em> notes that the cabin Thoreau lived in cost $28.12."
-     ],
-     "answers": [
-      "<em><b><u>Walden</u></b></em>[or <em><b><u>Walden</u></b>: or, Life in the Woods</em>]",
-      "Henry David <b><u>Thoreau</u></b>",
-      "“<b><u>Economy</u></b>”"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Literature",
-     "subcategory": "American Literature"
-    },
-    {
-     "leadin": "The legend of the Pied Piper of Hamelin may have been inspired by children who travelled from Erfurt to Arnstadt while performing this activity. For 10 points each:",
-     "parts": [
-      "Name this activity that may have been caused by ergot poisoning during a 1518 event in Strasbourg.",
-      "Alternative theories for the cause of dancing mania argue that they were caused by residual stress from this event. Doctors did not actually wear a costume with a beak during this 14th century epidemic.",
-      "Ergot poisoning was often blamed for causing mass hysteria during these events. Heinrich Kramer’s<em> Malleus Maleficarum</em> served as a manual for these events."
-     ],
-     "answers": [
-      "<b><u>dancing</u></b> [or <b><u>dance</u></b>; or <b><u>dancing</u></b> mania or <b><u>dancing</u></b> plague; accept <b><u>choreomania</u></b>]",
-      "the <b><u>Black Death</u></b> [or <b><u>Black Plague</u></b>, or <b><u>bubonic plague;</u></b> prompt on <u>plague</u>]",
-      "<b><u>witch trial</u></b>s [accept <b><u>witch hunt</u></b>s; prompt on <u>trial</u>s or <u>hunt</u>s]"
+      "<b><u>Fújiàn</u></b> (“foo-j’yen”) [or <b><u>Fújiàn</u></b> Shěng or <b><u>Fukien</u></b>]",
+      "<b><u>rice</u></b> [or <em><b><u>Oryza</u></b> sativa</em>; or <b><u>dào</u></b>; accept <b><u>rice</u></b> paddies or wet <b><u>rice</u></b> cultivation; accept Châmpa <b><u>rice</u></b>]",
+      "<b><u>paper</u></b> [accept <b><u>paper</u></b> money; accept <b><u>paper</u></b>making; or <b><u>zhǐ</u></b>; reject “papyrus”]"
      ],
      "values": [
       10,
@@ -875,99 +955,19 @@ export default {
       10
      ],
      "category": "History",
-     "subcategory": "European History"
+     "subcategory": "World History"
     },
     {
-     "leadin": "In 2025, this leader gifted Donald Trump a three-pronged Silla crown. For 10 points each:",
+     "leadin": "Typical Guinean ensembles of these instruments consist of six musicians playing cycles of beats at different pitches that result in complex polyrhythms. For 10 points each:",
      "parts": [
-      "Name this current President of South Korea, who live-streamed himself climbing over a fence during Yoon Suk Yeol’s 2024 declaration of martial law.",
-      "As a gesture of good faith, Lee ended propaganda broadcasts sent by South Korea in this buffer region between the Koreas that follows the 38th parallel.",
-      "<em>Description Required.</em> Lee’s attempt to restore the “Sunshine Policy” of good relations with the north have involved punishing activists who attempt to send pamphlets into North Korea in this illegal manner. In 2024, North Korea sent trash, manure, and cigarette butts across the DMZ in this manner."
+      "Name this general class of percussion instruments that players strike with their hands or mallets to produce sound.",
+      "Along with dundun, these goblet drums with a hardwood body and rawhide drumhead make up traditional Guinean and Malian drum ensembles.",
+      "For the djembe, this action can be done by twisting the vertical ropes on the side of the drum. Scordatura refers to adjusting how this action is done."
      ],
      "answers": [
-      "<b><u>Lee</u></b> Jae-myung",
-      "<b><u>DMZ</u></b> [or <b><u>demilitarized zone</u></b>; accept <b><u>Joint Security Area</u></b>; prompt on descriptions of the <u>border</u> between North and South Korea]",
-      "using a <b><u>balloon</u></b> [accept descriptions of putting things in <b><u>balloon</u></b>s or generally using a <b><u>balloon</u> </b>to send things across the border]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Current Events",
-     "subcategory": "Current Events"
-    },
-    {
-     "leadin": "Unlike adherens junctions, these structures are formed via the linking of nonclassical cadherins. For 10 points each:",
-     "parts": [
-      "Name these anchoring junctions found in cells formed by the connection of intermediate filaments.",
-      "E-cadherin, or the classical cadherin, is commonly found in this tissue, where cells are typically anchored to a basement membrane. This tissue comes in squamous, columnar, and cuboidal types.",
-      "Removal of E-cadherin can cause the epithelial-mesenchymal transition to ignite metastasis, a process where one of these cells spreads."
-     ],
-     "answers": [
-      "<b><u>desmosomes</u></b>",
-      "<b><u>epithelium</u></b> [accept <b><u>epithelial</u></b> tissue; accept squamous <b><u>epithelium</u></b>, columnar <b><u>epithelium</u></b>, or cuboidal <b><u>epithelium</u></b>]",
-      "<b><u>cancer</u></b> cells [accept <b><u>tumor</u></b> cell]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Biology"
-    },
-    {
-     "leadin": "This organization’s leader told Gifford Pinchot \"I don't want anything more to do with you\" after he proposed allowing sheep grazing in forest reserves. For 10 points each:",
-     "parts": [
-      "Name this environmental organization that helped promote the creation of National Parks. This organization’s founder took a U.S. President on a 1903 tour of Yosemite.",
-      "Gifford Pinchot was a close personal friend of this adventurous U.S. President who toured Yosemite with John Muir <em>(“myoor”)</em>. This naturalist ran under the “Bull Moose” party in 1912.",
-      "Muir opposed Pinchot’s advocacy for one of these projects in the Hetch Hetchy Valley by claiming there was “no holier temple” than nature. As a swipe at a political enemy, Harold Ickes <em>(“ICK-iss”)</em> changed the name of one of these projects built by the Bureau of Reclamation."
-     ],
-     "answers": [
-      "<b><u>Sierra Club</u></b>",
-      "<b><u>T</u></b>heodore<b><u> Roosevelt</u></b> [or <b><u>TR</u></b>; or <b><u>Teddy Roosevelt</u></b>; prompt on <u>Roosevelt</u>]",
-      "<b><u>dams</u></b> [accept Hoover <b><u>Dam</u></b> or O'Shaughnessy <b><u>Dam</u></b>; prompt on hydro<u>electric plant</u>s or <u>power</u> <u>plant</u>s; prompt on <u>water</u> project or artificial <u>lake</u>s]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "History",
-     "subcategory": "American History"
-    },
-    {
-     "leadin": "The protagonist of this story is told by a doorman that “this gate was made only for you.” For 10 points each:",
-     "parts": [
-      "Name this parable that is also told to the protagonist of another story by a priest in a cathedral. In this parable, the doorman tells the protagonist he can enter “but not now.”",
-      "The protagonist of this novel is told of the parable while waiting for an Italian client. The central character of this novel cries “like a dog!” before being executed for an unnamed crime.",
-      "“Before the Law” and <em>The Trial</em> are works by this 20th-century writer known for his depictions of nightmarish bureaucracies. This Czech author also wrote <em>The Metamorphosis</em>."
-     ],
-     "answers": [
-      "“<b><u>Before the Law</u></b>” [accept “<b><u>Vor dem Gesetz</u></b>”]",
-      "<em>The</em> <em><b><u>Trial</u></b></em>[accept <em>Der</em> <em><b><u>Prozess</u></b></em>]",
-      "Franz <b><u>Kafka</u></b>"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Literature",
-     "subcategory": "European Literature"
-    },
-    {
-     "leadin": "Nina Simone’s 1964 recording of a song from this work begins “you gentlemen can watch me while I’m scrubbin’ the floor.” For 10 points each:",
-     "parts": [
-      "Name this musical work, a song from which appears on the fourth track of Saxophone Colossus titled “Moritat.”",
-      "The aforementioned “Moritat” features a version of “Mack the Knife,” another version of which was recorded by this “First Lady of Song” who wrote “A Tisket, A-tasket.”",
-      "Lotte Lenya collaborated with this musician to produce a 1959 recording of “Mack the Knife.” This musician’s “Hot Five” repopularized King Oliver’s song “West End Blues.”"
-     ],
-     "answers": [
-      "<em>The</em> <em><b><u>Threepenny Opera</u></b></em>[prompt on “<u>Mack the Knife</u>” or “<u>Pirate Jenny</u>” by asking “What musical work were they originally from?”]",
-      "Ella <b><u>Fitzgerald</u></b> [or Ella Jane <b><u>Fitzgerald</u></b>]",
-      "Louis <b><u>Armstrong</u></b> [accept <b><u>Satchmo</u></b>]"
+      "<b><u>drum</u></b>s [accept <b><u>dundun</u></b>; accept, BUT DO NOT OTHERWISE REVEAL, <b><u>djembe</u></b> or variants like <b><u>jenbe</u></b>, <b><u>djimbe</u></b>, <b><u>jimbe</u></b>, or <b><u>dyinbe</u></b>]",
+      "<b><u>djembe</u></b> [or variants like <b><u>jenbe</u></b> or <b><u>djimbe</u></b> or <b><u>jimbe</u></b> or <b><u>dyinbe</u></b>]",
+      "<b><u>tuning</u></b> [or word forms like to <b><u>tune</u></b>; accept adjusting the <b><u>pitch</u></b> or <b><u>frequency</u></b> of an instrument or equivalents]"
      ],
      "values": [
       10,
@@ -975,39 +975,19 @@ export default {
       10
      ],
      "category": "Fine Arts",
-     "subcategory": "Other Fine Arts"
+     "subcategory": "Auditory Fine Arts"
     },
     {
-     "leadin": "Fourteen of these structures including “orthorhombic” were proposed by Auguste Bravais <em>(“brah-vay”)</em>. For 10 points each:",
+     "leadin": "In an anthology whose title popularized this term, Dora Ahmad praises how literature described by this term “can escape the control of its own creator.” For 10 points each:",
      "parts": [
-      "Name these repeating arrays of points that define the arrangement of atoms in a crystal.",
-      "The intersection of planes with crystalline lattices can be described by these indices. To calculate these indices, one takes the reciprocal of the plane’s intercepts with the coordinate axes.",
-      "The body-centered cubic unit cell, which can build a Bravais <em>(“brah-vay”)</em> lattice, contains this many atoms. Contributions from this many ions are depicted in a Born-Haber Cycle."
+      "Give this two-word term coined by Ken Saro-Wiwa to describe the vernacular language used in his novel <em>Sozaboy</em>.",
+      "Kamau (“kuh-MAO”) Brathwaite’s essay “History of a Voice,” which was collected in <em>Rotten English</em>, contrasts “imperial” English with the “nation language” used by authors from many islands in this sea, such as Derek Walcott.",
+      "<em>Rotten English</em> includes a piece by M. NourbeSe Philip, a Tobago-born author from this country. A Sri Lankan-born author from this country set a novel about the badly-burned adventurer Almasy during World War II."
      ],
      "answers": [
-      "<b><u>lattice</u></b>s [accept crystal <b><u>lattice</u></b>s or Bravais <b><u>lattice</u></b>s]",
-      "<b><u>Miller</u></b> indices",
-      "<b><u>two</u></b> atoms"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Chemistry"
-    },
-    {
-     "leadin": "After becoming engaged to Miss Grey, Willoughby returns a letter and a lock of hair to a woman with this surname. For 10 points each:",
-     "parts": [
-      "Give this surname of the character who marries Colonel Brandon. This surname is shared by the sisters Elinor and Marianne.",
-      "The Dashwood sisters appear in <em>Sense and Sensibility</em>, a novel by this British author of <em>Pride and</em> <em>Prejudice</em>.",
-      "At the end of <em>Sense and Sensibility</em>, Elinor Dashwood marries this man. This clergyman was secretly engaged to Lucy Steele until she left this character for his brother, Robert."
-     ],
-     "answers": [
-      "<b><u>Dashwood</u></b> [accept Elinor <b><u>Dashwood</u></b>; accept Marianne <b><u>Dashwood</u></b>; accept <b><u>Dashwood</u></b> sisters]",
-      "Jane <b><u>Austen</u></b>",
-      "<b><u>Edward</u></b> Ferrars [accept <b><u>E</u></b>dward <b><u>Ferrars</u></b>; prompt on <u>Ferrars</u>]"
+      "<b><u>Rotten</u> <u>English</u></b>",
+      "<b><u>Caribbean</u></b> Sea [or <b><u>Kiaribiyan</u></b> Sii or Mar <b><u>Caribe</u></b> or Mer des <b><u>Caraïbes</u></b>]",
+      "<b><u>Canada</u></b> (The latter novel is <em>The English Patient</em> by Michael Ondaatje.)"
      ],
      "values": [
       10,
@@ -1015,19 +995,19 @@ export default {
       10
      ],
      "category": "Literature",
-     "subcategory": "British Literature"
+     "subcategory": "World Literature"
     },
     {
-     "leadin": "The founder of this city sowed dragon’s teeth into the earth to create the Spartoi. For 10 points each:",
+     "leadin": "These figures cause a tree to grow with a group of men in it and turn them into monkeys when they try to climb down. For 10 points each:",
      "parts": [
-      "Name this city founded by Cadmus. Oedipus ruled this city after solving the riddle of the sphinx and marrying his mother Jocasta.",
-      "Thebes was attacked by a group of seven Argive heroes after this son of Oedipus was denied his share of the throne by his brother Eteocles <em>(“eh-TEE-oh-kleez”)</em>.",
-      "This daughter of Oedipus defied the king Creon’s orders by burying Polynices, leading to her being condemned to death."
+      "Name these mythological figures, one of whom is decapitated while in the Bat House in the realm of Xibalba.",
+      "The Hero Twins are burned to death by the lords of Xibalba (“shih-BALL-bah”) before regenerating into these animals and then humans. In Shintō myth, one of these animals called the Namazu causes earthquakes by thrashing about.",
+      "Before going to Xibalba, the Hero Twins plant this crop in their house, telling their grandmother it will dry up if they die. The Mayan gods use this staple crop to create humanity."
      ],
      "answers": [
-      "<b><u>Thebes</u></b> [or <b><u>Thêbai</u></b> or <b><u>Thíva</u></b>]",
-      "<b><u>Polynices</u></b>",
-      "<b><u>Antigone</u></b>"
+      "Mayan <b><u>Hero Twins</u></b> [accept <b><u>Hunahpu</u></b> AND <b><u>Xbalanque</u></b> (“hoo-nah-POO and sh’bah-lang-KAY”) or <b><u>Xbalanque</u></b> AND <b><u>Hunahpu</u></b>]",
+      "<b><u>catfish</u></b> [or <b><u>silurid</u></b>s or <b><u>Siluriformes</u></b>; accept specific catfish species; prompt on <u>fish</u> or ray-finned <u>fish</u>]",
+      "<b><u>maize</u></b> [or <b><u>corn</u></b>; or <em><b><u>Zea</u></b> mays</em>; accept <b><u>teosinte</u></b> or <b><u>ixim</u></b>; accept <b><u>aj</u></b>]"
      ],
      "values": [
       10,
@@ -1038,16 +1018,36 @@ export default {
      "subcategory": "Mythology"
     },
     {
-     "leadin": "<em>Note to moderator: read the answerline to the third part carefully.</em> Constantine II moved an obelisk from this site to the center of the Circus Maximus, where Augustus had placed one from Heliopolis 300 years earlier. For 10 points each:",
+     "leadin": "Name these American authors who were influenced by the Beatles, for 10 points each.",
      "parts": [
-      "Name this temple complex in Luxor. Priests based at this temple’s Great Hypostyle Hall likely destroyed reliefs created by Akhenaten, who sidelined and replaced them with worship of Aten.",
-      "This Pharaoh commissioned two obelisks and the Djeser-Djeseru <em>(\"JEH-ser jeh-SEH-roo\")</em> for the temple at Karnak. Records of this longest-reigning female pharaoh were suppressed by Thutmose III.",
-      "<em>Description Required</em>. A \"pocket-book\" version of this document was etched into a wall at Karnak. Ḫattušili III signed this text fourteen years after stalemating a 1274 BC battle for control of Amurru."
+      "The fictional song “I Want to Kiss Your Feet” and a band of teenaged Beatles wannabes called The Paranoids appear in <em>The Crying of Lot 49</em>, a novel by this reclusive postmodern author of <em>Gravity’s Rainbow</em>.",
+      "This essayist of <em>Slouching Towards Bethlehem</em> claimed that “we tell ourselves stories in order to live” in her collection <em>The White Album</em>, which she titled after a Beatles album.",
+      "This author recorded a spoken-word album for the Beatles’ short-lived avant-garde label Zapple. A novel by this author describes the post-apocalyptic commune iDEATH, which is made up of the title substance."
      ],
      "answers": [
-      "<b><u>Karnak</u></b> [or the <b><u>Karnak</u></b> Temple Complex]",
-      "<b><u>Hatshepsut</u></b><em>(“HAAT-shep-soot”)</em> [accept <b><u>Hatchepsut</u></b> or <b><u>Hatasu</u></b> or <b><u>Hatchepsout</u></b>]",
-      "the <b><u>Egyptian–Hittite</u></b> peace <b><u>treaty</u></b> [accept the <b><u>Treaty of Kadesh</u></b> or descriptions of the <b><u>treaty</u> </b>signed after the Battle of <b><u>Kadesh</u></b>; accept descriptions of a peace <b><u>treaty</u></b> signed between <b><u>Ramesses II</u></b> and the <b><u>Hittites</u></b>; prompt on descriptions of the <u>first</u> peace <u>treaty</u> ever signed by asking “who was the treaty between?”; prompt on the <u>Eternal Treaty</u> or the <u>Eternal Peace</u> the or <u>Silver Treaty</u>]"
+      "Thomas <b><u>Pynchon</u></b> [or Thomas Ruggles <b><u>Pynchon</u></b>]",
+      "Joan <b><u>Didion</u></b>",
+      "Richard <b><u>Brautigan</u></b> [or Richard Gary <b><u>Brautigan</u></b>] (The novel is <em>In Watermelon Sugar</em>.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "Marino Faliero’s plan to lead a coup against this city involved stoking public fears of a Genoese invasion. For 10 points each:",
+     "parts": [
+      "Name this Italian city whose doges lived in a palace in Saint Mark’s Square.",
+      "Prior to becoming doge, Faliero served in this body that secretly monitored the activities of all Venetians. Citizens could submit information to this body by placing letters in <em>bocche di leone</em> (“BOKE-kay dee lay-OH-nay”).",
+      "Faliero succeeded a doge from this family named Andrea. Another doge from this family with the first name Enrico forced soldiers on the Fourth Crusade to sack Zara in order to repay Venice."
+     ],
+     "answers": [
+      "<b><u>Venice</u></b> [or <b><u>Venezia</u></b>; or Most Serene Republic of <b><u>Venice</u></b>; or La <b><u>Serenissima</u></b>]",
+      "Council of <b><u>Ten</u></b> [or the <b><u>Ten</u></b>; or Consiglio dei <b><u>Dieci</u></b> or Consejo de i <b><u>Diexe</u></b>]",
+      "<b><u>Dandolo</u></b> [or House of <b><u>Dandolo</u></b>; accept Enrico <b><u>Dandolo</u></b>; accept Andrea <b><u>Dandolo</u></b>]"
      ],
      "values": [
       10,
@@ -1055,19 +1055,39 @@ export default {
       10
      ],
      "category": "History",
-     "subcategory": "Ancient History"
+     "subcategory": "European History"
     },
     {
-     "leadin": "The soloist of this piece enters on the notes “A, A, up to long E,” followed by the phrase “A, A, A, up to long E” an octave higher. For 10 points each:",
+     "leadin": "By definition, the roots of cyclotomic (“sike-loh-TOM-ick”) polynomials are “primitive” examples of these numbers. For 10 points each:",
      "parts": [
-      "Name this Édouard Lalo piece, performances of which inspired Tchaikovsky to begin composing his violin concerto. Despite its name, this piece, written for Pablo de Sarasate <em>(“sa-ra-SAH-tay”)</em>, is not actually a symphony.",
-      "Sarasate was also the dedicatee of this composer’s <em>Introduction and Rondo Capriccioso</em>. A harp plays 12 Ds to begin a piece by this composer that uses a xylophone to imitate the sound of rattling bones.",
-      "Themes from Sarasate’s piece <em>Zigeunerweisen(“zee-goo-nur-wye-zen”)</em> were adapted from the folk music of this country. Johannes Brahms wrote a set of 21 “Dances” titled for this country."
+      "Name these complex numbers, the <em>n</em>th examples of which are given by the formula [read slowly] “<em>e</em> to the power 2 pi <em>i</em> <em>k</em> over <em>n</em>” for integers <em>k</em>, and are equally spaced around a circle of radius 1.",
+      "The <em>n</em>th cyclotomic polynomial is simply the sum of the first <em>n</em> powers of <em>x</em> when <em>n</em> has this property of being divisible only by one and itself.",
+      "Cyclotomic polynomials can be expressed as rational functions using this mathematician’s “inversion formula.” That formula uses this mathematician’s namesake function, which takes on values of minus 1 or 1 for squarefree inputs."
      ],
      "answers": [
-      "<em><b><u>Symphonie espagnole</u></b></em>",
-      "Camille <b><u>Saint-Saëns</u></b>",
-      "<b><u>Hungary</u></b> [accept <em><b><u>Hungarian</u></b> Dances</em>]"
+      "<b><u>root</u></b>s <b><u>of unity</u></b> [or <em>n</em>th primitive <b><u>root</u></b>s <b><u>of unity</u></b>; accept <b><u>de Moivre</u></b> numbers]",
+      "<b><u>prime</u></b> number [accept <b><u>primality</u></b>]",
+      "August Ferdinand <b><u>Möbius</u></b> [accept <b><u>Möbius</u></b> inversion formula; accept <b><u>Möbius</u></b> function]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "Tom Scutt’s set design for a 2022 revival of this musical mimics its setting by having audiences walk through a flurry of dancers after entering the Playhouse Theatre from a side door. For 10 points each:",
+     "parts": [
+      "Name this musical that opens with the Emcee greeting the audience in German, French, and English. A Christopher Isherwood collection indirectly inspired this Kander and Ebb musical about the Kit Kat Klub.",
+      "Rebecca Frecknall’s revival of <em>Cabaret</em> for this European city’s West End theatre scene, which starred Jessie Buckley as Sally Bowles and Eddie Redmayne as the Emcee, swept this city’s 2022 Olivier (“oh-LIV-ee-ay”) Awards.",
+      "In Frecknall’s revival, identical statues of soldiers revolve on a turntable as the Emcee, in Nazi attire, sings a song titled for how this thing “belongs to me.”"
+     ],
+     "answers": [
+      "<em><b><u>Cabaret</u></b></em>",
+      "<b><u>London</u></b> [accept Society of <b><u>London</u></b> Theatre]",
+      "<b><u>tomorrow</u></b> [accept “<b><u>Tomorrow</u></b> Belongs to Me”]"
      ],
      "values": [
       10,
@@ -1075,172 +1095,232 @@ export default {
       10
      ],
      "category": "Fine Arts",
-     "subcategory": "Auditory Fine Arts"
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "leadin": "Answer the following about the Shockley equation, for 10 points each.",
+     "parts": [
+      "The Shockley equation describes the operation of these devices in either forward or reverse bias. These devices can consist of a single p–n junction.",
+      "For a diode, the Shockley equation relates the current to this quantity, which equals current times resistance by Ohm’s law.",
+      "The Shockley equation includes the ratio of the standard voltage to a type of voltage named for this adjective. Some forms of the Sackur–Tetrode equation include the cube of a variant of the de Broglie (“duh broy”) wavelength named for this adjective."
+     ],
+     "answers": [
+      "<b><u>diode</u></b>s",
+      "<b><u>voltage</u></b> [or <b><u>potential</u></b> difference or electric <b><u>potential</u></b>; accept <b><u>electromotive force</u></b> or <b><u>emf</u></b>; prompt on <u>V</u>]",
+      "<b><u>thermal</u></b> [accept <b><u>thermal</u></b> voltage; accept <b><u>thermal</u></b> de Broglie wavelength]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
     }
    ]
   },
   "3": {
-   "name": "2025 VAULT Packet 3",
+   "name": "2022 ACF Winter Packet 3",
    "tossups": [
     {
-     "question": "<b>One of these objects owned by Michel Schwalbe </b><em>(“MI-shell SHVAHL-buh”)</em><b> was crafted by Dominique Peccatte </b><em>(“peh-KAHT”)</em><b>, who along with Eugene Sartory was a famed French maker of them. Leopold Stokowski pioneered a “free” style of utilizing these objects in Philadelphia. These objects are quite literally flipped upside down in order to perform the </b><em><b>col legno</b></em><b> technique.</b> (*) Pernambuco wood is often a source material for these objects which possess a “frog” and a “point.” Moving these objects lightly can produce a sautillé <em>(“soh-tee-AY”)</em> stroke. Rosin can be used to amplify the sound these objects produce. For 10 points, name these objects made of horsehair that are used to play string instruments.",
-     "answer": "<b><u>bow</u></b>s [accept specific types of <b><u>bow</u></b>s such as violin <b><u>bows</u></b> or viola <b><u>bow</u></b>s or cello <b><u>bow</u></b>s or bass <b><u>bow</u></b>s]",
-     "category": "Fine Arts",
-     "subcategory": "Auditory Fine Arts"
-    },
-    {
-     "question": "<b>This place is compared to a “mad and hallucinating deity” by people denounced as illustrating “deplorable taste and desperate ignorance.” A work repeatedly listing the letters M, C, and V was found in this place’s circuit 15-94. In one story, a footnote citing Letizia Álvarez de Toledo asserts that this place is “pointless.” Corpses are thrown over railings in this place where people search for (*)</b> “vindications.” The “purifiers” scramble through this place searching for a “Crimson Hexagon.<b>” </b>Infinite hexagonal rooms comprise, for 10 points, what place that contains all possible 410-page books in a short story by Jorge Luis Borges?",
-     "answer": "the <b><u>Library of Babel</u></b> [or La <b><u>biblioteca de Babel</u></b>]",
-     "category": "Literature",
-     "subcategory": "World Literature"
-    },
-    {
-     "question": "<b>Graphs named in analogy to these objects are used to visualize hierarchical clustering. Bootstrap aggregating of these structures is used in a machine learning method named for “random” places where they’re abundant. For a weighted undirected graph, Prim’s algorithm finds a</b> (*) “minimum spanning” structure named for these objects. These objects name a structure that, if balanced, can be searched in logarithmic time. Types of a structure named for these objects include AVL, red-black, and a binary search type. For 10 points, a branching data structure named for what objects may have “root nodes” and “leaves?”",
-     "answer": "<b><u>tree</u></b>s [accept minimum spanning <b><u>tree</u></b>s or AVL <b><u>tree</u></b>s or red-black <b><u>tree</u></b>s or binary search <b><u>tree</u></b>s or decision <b><u>tree</u></b>s; accept <b><u>dendrograms</u></b>; accept random <b><u>forest</u></b>s]",
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "question": "<b>The capacity of these devices is proportional to an expression raised to the dimensionless constant k according to one formulation of Peukert’s </b><em>(“POY-kert's”)</em><b> Law. S</b>•<b>S</b>•<b>Es such as L</b>•<b>L</b>•<b>Z</b>•<b>O are gaining traction to be utilized in one form of these devices, but remain challenged by dendrite formation. John Goodenough won the 2019 Nobel Prize in Chemistry for developing one type of these devices where a cation is intercalated into a graphite matrix. (*) </b>Sulfuric acid is used as an electrolyte in the lead-acid type of these devices. Nickel and cadmium name a common type of, for 10 points, what devices whose “lithium-ion” variant is rechargeable?",
-     "answer": "<b><u>batteries</u></b> [or <b><u>battery</u></b>; accept lithium-ion <b><u>battery</u></b> or Ni-Cad <b><u>battery</u></b> or or nickel-cadmium <b><u>battery</u></b>, or lead-acid <b><u>battery</u></b>] <em>(SSEs are solid-state electrolytes)</em>",
-     "category": "Science",
-     "subcategory": "Chemistry"
-    },
-    {
-     "question": "<b>Out of spite, a mogul in this industry built a Nob Hill mansion with a forty foot tall fence. Cyrus K. Holliday named a company in this industry for the town of Atchison, Kansas. Theodore Judah’s projects in this industry were financed by the “Big Four.” Schuyler Colfax’s political career ended after he fraudulently bought stock from (*) </b>Oakes Ames in this industry's Crédit Mobilier scandal. Leland Stanford drove in the “Golden Spike” at Promontory Point to complete a project in this industry. A. Philip Randolph unionized Pullman porters in this industry. For 10 points, a “transcontinental” project in what industry connected the United States?",
-     "answer": "the <b><u>rail</u></b>road industry [accept <b><u>train</u></b> industry; accept Transcontinental <b><u>Rail</u></b>road; accept <b><u>locomotive</u></b> industry; prompt on <u>transportation</u> or <u>shipping</u>] <em>(the leadin describes Charles Crocker)</em>",
-     "category": "History",
-     "subcategory": "American History"
-    },
-    {
-     "question": "<b>A hybrid seed manufacturer called this leader a “damned poor horse trader” during his visit to Coon Rapids. This leader attacked Lorenzo Sumulong as “a jerk [and] a stooge” in a speech to the UN. While viewing Leisurama houses, this leader joked about a machine that “puts food into the mouth” during a debate at Sokolniki Park. After exiling Georgy Malenkov to Kazakhstan, this leader launched the</b> (*) Virgin Lands campaign. This leader’s modernizing “thaw” began after his speech “On the Cult of Personality and Its Consequences.” In 1962, this premier sent ICBMs to Fidel Castro’s Cuba. For 10 points, what Soviet leader gave the “Secret Speech” after succeeding Stalin?",
-     "answer": "Nikita <b><u>Khrushchev</u></b> [or Nikita Sergeyevich <b><u>Khrushchev</u></b>; accept <b><u>Khrushchev</u></b> Thaw] <em>(The</em> <em>leadin refers to Roswell Garst. Khrushchev banged his shoe at Lorenzo Sumulong)</em>",
-     "category": "History",
-     "subcategory": "European History"
-    },
-    {
-     "question": "<b>One poem by this author tells its reader to “Follow where all is fled! – Rome’s azure sky.” This author, who began one poem by describing “The awful shadow of some unseen Power,” compared the title subject of another work to a “glow-worm golden / In a dell of dew.” This author of “Hymn to Intellectual Beauty” addressed a (*)</b> “Destroyer and Preserver” in a work ending with the question “If Winter comes, can Spring be far behind?” The speaker of one work by this poet greets the title bird with the line “Hail to thee, blithe Spirit!” For 10 points, name this British poet who elegised John Keats in “Adonais” and wrote “Ode to the West Wind” and “To a Skylark.”",
-     "answer": "Percy <b><u>Shelley</u></b> [or Percy Bysshe <b><u>Shelley</u></b>]",
-     "category": "Literature",
-     "subcategory": "British Literature"
-    },
-    {
-     "question": "<b>Scholars often pair one of these texts chronicling Alopen’s journey together with an inscription on a pillar that describes the “Origin of Origins.” The doctrine of “One Vehicle” appears in one of these texts that describes “skillful means” for reaching a goal. The doctrine of śūnyatā </b> <em>(“SHOON-yuh-tah”)</em><b> is used to equate form with emptiness by (*)</b> Avalokiteśvara <em>(“uh-VAH-loh-kee-TESH-vuh-ruh”)</em> in one of these texts about “the Perfection of Wisdom.” Subhuti <em>(“soo-BOO-tee”)</em> appears in one of these texts named for a mineral with the ability to “cut through illusions.” Diamond, Heart, and Lotus are titles of, for 10 points, what texts which record the teachings of the Buddha?",
-     "answer": "<b><u>sutra</u></b>s [accept Buddhist <b><u>sutra</u></b>s; accept Diamond <b><u>Sutra</u></b> or Lotus <b><u>Sutra</u></b> or Heart <b><u>Sutra</u></b>]",
-     "category": "Religion",
-     "subcategory": "Religion"
-    },
-    {
-     "question": "<b>An “apparent” form of this quantity equals the velocity gradient to the power of the behavior index minus one in the Ostwald-de Waele power law. One form of this quantity is divided by another to calculate Trouton’s ratio. Forces named for this quantity dominate in the boundary layer. When this quantity is zero, the Navier-Stokes equations simplify to the Euler equations. In (*) </b>thixotropic materials, this quantity decreases when a stress is applied. This quantity does not change under shear stress for a Newtonian fluid. This quantity comes in “dynamic” and “kinematic” forms and is zero for superfluids. For 10 points, name this measure of a fluid’s resistance to flow.",
-     "answer": "<b><u>viscosity</u></b> [accept dynamic or kinematic <b><u>viscosity</u></b>; accept <b><u>viscous</u></b> forces]",
+     "question": "In one device, this process’s rate is proportional to the central charge density according to the Tersoff–Hamann formula. Work at Sony in the 1950s demonstrated that this process caused a device made of germanium to exhibit decreased current when voltage increases. This process causes the negative differential resistance of the Esaki diode. Binnig and Rohrer invented a device in which this process is detected by a small conducting tip that “scans” the sample. George Gamow outlined how this process is necessary for alpha decay. A type of sub-nanometer resolution microscope is named for this process, which gives rise to counterintuitively non-zero values of the wavefunction. For 10 points, name this quantum process in which a particle crosses a classically forbidden barrier.",
+     "answer": "quantum <b><u>tunnel</u></b>ing [accept scanning <b><u>tunnel</u></b>ing microscope; accept <b><u>tunnel</u></b> diode]",
      "category": "Science",
      "subcategory": "Physics"
     },
     {
-     "question": "<b>“Elegant action” figures are depicted in a set of works of this type named Gwion Gwion. Elongated “claw” motifs dominate works of this type made in Sulawesi. A set of works of this type in Argentina comprise over 2,000 black and red hands. After viewing works of this type, the phrase “we have invented nothing!” was apocryphally declared by (*)</b> Pablo Picasso. The Polychrome Ceiling, which features several depictions of bison, is part of a large group of works of this type in Altamira. A 17-foot auroch is one of many works of this type in the Hall of the Bulls at the Lascaux complex. For 10 points, what works were created by prehistoric people painting on walls?",
-     "answer": "<b><u>cave painting</u></b>s [or <b><u>cave drawings</u></b> or <b><u>cave art</u></b>; accept <b><u>parietal art</u></b>; prompt on <u>painting</u>s by asking “what type of place are the paintings in?”; prompt on <u>cave</u>s by asking “what is in the caves?”]",
-     "category": "Fine Arts",
-     "subcategory": "Visual Fine Arts"
-    },
-    {
-     "question": "<b>Cruschmann Spirals are commonly seen in patients with this disease, which is diagnosed by a score of less than 0.70 on the modified Tiffeneau-Pinelli index. A beta-2 androgenic receptor agonist utilized to treat this disease is called Salmeterol. The methacholine challenge tests for this disease, which is treated by (*) </b>Albuterol. In the development of this disease treated by corticosteroids, eosinophils fill a layer of mucus. This disease is reversible, unlike most cases of COPD. Bronchoconstriction occurs in, for 10 points, what lung disease often treated with inhalers?",
-     "answer": "<b><u>asthma</u> </b>",
-     "category": "Science",
-     "subcategory": "Biology"
-    },
-    {
-     "question": "<b>A thinker from this school of thought who discussed normal and abnormal discourses in his conversational approach to knowledge described “private” writers as ironists. A thinker from this school included “tenacity” and “authority” as the first of his four methods of fixing our beliefs. The author of </b><em><b>Philosophy and the Mirror of Nature</b></em><b>,</b> (*) Richard Rorty, was a leading figure of this school’s “neo” branch. The example of a squirrel going around a tree appears in a book from this school which asserts that what is true is what proves itself useful in experience. For 10 points, what American school of philosophy’s members included C. S. Peirce <em>(“purse”)</em> and William James?",
-     "answer": "<b><u>pragmatism</u></b> [accept neo-<b><u>pragmatism</u></b>; or <b><u>Pragmatic</u></b> school; accept <em><b><u>Pragmatism</u></b>: A New</em> <em>Name For Some Old Ways of Thinking</em>]",
-     "category": "Philosophy",
-     "subcategory": "Philosophy"
-    },
-    {
-     "question": "<b>After the death of a companion, a member of this family states that “wherever there’s a fight, so hungry people can eat- I’ll be there.” A member of this family reprimands his brother for swerving to hit a gopher snake. Muley Graves refuses to accompany this family, a member of whom runs away after Floyd Knowles attacks a contractor. A member of this family </b>(*) breastfeeds a starving man found inside a barn at the conclusion of a novel. Rose of Sharon and Tom are among members of this family which migrate to California following the Dust Bowl. For 10 points, name this family, the protagonists of John Steinbeck’s novel The Grapes of Wrath.",
-     "answer": "<b><u>Joad</u></b> family [accept Tom <b><u>Joad</u></b>, Al <b><u>Joad</u></b>; prompt on <u>Rose</u> of Sharon or <u>Rosa</u>sharn by asking “which protagonist family is she a part of?”]",
+     "question": "This author described life as “an incessant shower of innumerable atoms” in an essay that urged writers to be “spiritualist” and not “materialist.” In a novel by this author, the narrator observes a “seven-sided” flower at a farewell dinner party for his India-bound friend. This author used the term “play-poem” to describe that novel, which consists of nine soliloquies delivered by six friends of the deceased Percival. Another novel by this author uses brackets to set off terse plot points from long imagistic passages in the stream-of-consciousness section “Time Passes,” which reveals that Prue died in childbirth. That novel by this author ends as Lily Briscoe finishes her painting and the Ramsay family sails to the title location. For 10 points, name this author of <em>To the Lighthouse</em>.",
+     "answer": "Virginia <b><u>Woolf</u></b> [or Adeline Virginia <b><u>Woolf</u></b>; or Adeline Virginia <b><u>Stephen</u></b>] (The essay is “Modern Fiction.” The first novel is <em>The Waves</em>.)",
      "category": "Literature",
-     "subcategory": "American Literature"
+     "subcategory": "British Literature"
     },
     {
-     "question": "<b>Karl Julius Beloch used the etymology of this person’s name to argue that he did not exist. This leader was the first to use a rotating pyramid called a kyrbeis </b><em>(“keer-BAY-ees”)</em><b> to display reforms on tablets called Axones. The </b><em><b>Suda</b></em><b> claimed that this leader suffocated after people threw hats, shirts, and cloaks at him in praise. This leader sidelined the </b><em><b>Areopagus</b></em><b> by creating the</b> (*) Council of Four Hundred. Under this leader’s policies, debtors who owed money to people of high class could be enslaved. Legendarily, this man’s anti-homicide laws were the only ones kept by Solon. For 10 points, name this Athenian whose name is synonymous with very strict rules.",
-     "answer": "<b><u>Draco</u></b> [or <b><u>Drakon</u></b>; accept <b><u>draco</u></b>nic or <b><u>draco</u></b>nian]",
-     "category": "History",
-     "subcategory": "Ancient History"
-    },
-    {
-     "question": "<b>During one of these events in 2023, a participant was presented with a wheel of cheese and a bag containing a woman’s ashes. Animal rights activists condemned the killing of hundreds of stray cats for one of these events in Barranquilla</b><em>(“baa-ruhn-KEE-uh”)</em><b>. In 2023, a man claimed he “thought it would be funny” when asked why he ended one of these events by throwing a (*) </b>phone at Bebe Rexha <em>(\"bee-bee rek-suh\")</em>. Kristen Cabot went viral after hiding from a kiss cam that exposed an affair with her boss during one of these events. Over 2 billion dollars were generated from 149 of these events during the <em>Eras Tour</em>. For 10 points, at what events might fans watch Shakira or Coldplay?",
-     "answer": "music <b><u>concerts</u></b> [or reasonable equivalents like <b><u>shows</u></b>, <b><u>gigs</u></b> or <b><u>performances</u></b> for concerts]",
-     "category": "Current Events",
-     "subcategory": "Current Events"
-    },
-    {
-     "question": "<b>Octahedra of this element’s oxyanion are linked to silicate tetrahedra in kaolinite. Inclusions of calcium and this element are used to define the age of the solar system. Oxides of this non-transition metal element are passed through a flame-fusion process named for Verneuil. Oxides of silicon and this element make up adsorbent, microporous catalysts known as zeolites. All (*) </b>feldspars contain silicon, oxygen, and this element. This element is the most abundant metal in Earth’s crust. The Bayer process refines the oxide of this element from its ore, bauxite. For 10 points, name this element usually found in soda cans and foil.",
-     "answer": "<b><u>aluminum</u></b> [or <b><u>Al</u></b>]",
-     "category": "Science",
-     "subcategory": "Other Science"
-    },
-    {
-     "question": "<b>The mythical island of Brasil was west of this region. The first people to inhabit this region were led by Cessair according to </b><em><b>The Book of Invasions</b></em><b>. After a journey to the land of the young, a poet from this region dismounted his horse and aged 300 years. In this region, two hounds refused to kill a deer because they recognized it was their owner’s (*)</b> wife. A hero of this island gained the ability to summon wisdom by sucking his thumb after burning it on the Salmon of Knowledge. Oisin <em>(“oh-SHEEN”)</em> narrated the Fenian Cycle which recounts this island’s mythology. For 10 points, name this island whose Fianna was led by the hero Finn MacCool.",
-     "answer": "<b><u>Ireland</u></b> [or <b><u>Éire</u></b>; accept County <b><u>Kerry</u></b>]",
+     "question": "This figure forced a man to create the demon Agrimas (“AH-gree-mahss”) during his 130-year fast. A book by Moses de León relates that, along with Naamah, this figure created the “plagues of humankind” and invades people’s houses when the moon wanes. The King James Bible translates this figure’s name as “screech owl.” Before this figure promised to allow one hundred demons to die every day, the angels Senoy (“seh-NOY”), Sansenoy (“sahn-seh-NOY”), and Semangelof (“seh-MON-jell-off”) attempted to drown her in the Red Sea. This woman asked her husband “why should I lie beneath you when I am your equal?”, prompting her to be banished from the Garden of Eden. For 10 points, name this she-demon from Judaic mythology, who is often called the first wife of Adam.",
+     "answer": "<b><u>Lilith</u></b> [or <b><u>Līlīṯ</u></b>; accept <b><u>Lamia</u></b>; prompt on <u>lilin</u> or <u>lilu</u>; reject “Eve”]",
      "category": "Mythology",
      "subcategory": "Mythology"
     },
     {
-     "question": "<b>One of this country’s colonies sparred with the guerilla “Black Flag Army.” This country won the Battle of Day River during a war where it dropped paratroopers into a valley as part of Operation Castor. The Béatrice </b><em>(\"bay-uh-TREES\")</em><b> stronghold operated by this country was allegedly named after one of Colonel de Castries’s mistresses. This country’s C</b>•<b>E</b>•<b>F</b>•<b>E</b>•<b>O withdrew from a colony as part of the </b>(*) Geneva Accords. Provinces of one of this country’s colonies included Cochinchina and Tonkin. Vo Nguyen Giap’s <em>(\"voh nu-win zyahp’s\")</em> Viet Minh defeated this country at the battle of Dien Bien Phu. For 10 points, Indochina was ruled by what European country’s Third Republic?",
-     "answer": "<b><u>France</u></b> [or <b><u>French</u></b> Empire; accept <b><u>French</u></b> Third Republic or <b><u>French</u></b> Fourth Republic; accept <b><u>French</u></b> Indochina; prompt on <u>Indochina</u> or the <u>Indochinese</u> Union or the <u>Indochinese</u> Federation before “Indochina” by asking “what country was that a colony of?”; reject “Vietnam” ]",
+     "question": "The protagonist’s character arc in this novel borrows heavily from the author’s earlier novel about a white-passing planter’s son who leads a failed slave revolt and sinks a British warship while escaping. Tom Reiss argues that this novel reflects an incident in which unfriendly forces at Taranto (“TAR-on-toh”) surprised its author’s father, the first Black general-in-chief in his country’s army. This novel’s protagonist falls in love with Pasha’s daughter Haydée (“ai-day”), who was sold into slavery after her father was betrayed by Fernand de Morcerf. This novel’s protagonist saves Monsieur Morrel but bankrupts Danglars (“don-GLAR”) and drives Villefort (“veel-FOR”) insane. The Abbé Faria befriends this novel’s protagonist, who is imprisoned in the Château d’If (“shah-toh DEEF”). For 10 points, name this novel about Edmond Dantès’s quest for revenge, written by Alexandre Dumas (“doo-MAH”).",
+     "answer": "<em>The</em> <em><b><u>Count of Monte Cristo</u></b></em> [or <em>Le</em> <em><b><u>Comte de Monte-Cristo</u></b></em>]",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "question": "Scientists from this country led a mass trial of the malaria drug Artequick in the Comoros (“KOM-uh-roze”). A loan from this country to David Dacko (“dah-VEED dah-KOH”) motivated the 1965 Saint-Sylvestre coup by Jean-Bédel Bokassa. The documentary <em>Racism for Sale</em> exposed Malawian “blessing videos” made for this country, whose film industry fictionalized its 2011 evacuation from Libya in <em>Home Coming</em>. eSwatini (“ess-wah-TEE-nee”) is the only African country that skips the FOCAC (“FOH-cack”) summit with this country, which funded Tanzania’s TAZARA (“tuh-ZAR-uh”) Railway to Zambia’s Copperbelt. This country’s 2012 Port of Doraleh and naval base in Djibouti led to charges of “debt-trap” and “Wolf Warrior” diplomacy. This country backed ZANU (“ZAH-noo”) and Siad Barre (“see-AWD bah-RAY”) during its “split” with the Soviets. For 10 points, what member of BRICS (“bricks”) launched “One Belt, One Road” and many Confucius Institutes?",
+     "answer": "<b><u>China</u></b> [or <b><u>Zhōngguó</u></b>; or People’s Republic of <b><u>China</u></b> or <b><u>PRC</u></b>; or <b><u>Zhōnghuá</u></b> Rénmín Gònghéguó; accept <b><u>Sino</u></b>-Soviet split; accept Forum on <b><u>China</u></b>–Africa Cooperation or <b><u>Zhōng</u></b> Fēi hézuò lùntán or Forum sur la coopération <b><u>sino</u></b>-africaine; reject “Republic of China”] (BRICS stands for Brazil, Russia, India, China, and South Africa.)",
      "category": "History",
      "subcategory": "World History"
     },
     {
-     "question": "<b>An H.R. Giger-designed one of these objects is named “Harkonnen” as it was designed for an unmade </b><em><b>Dune </b></em><b>movie.The “Ball” design of these objects was adapted into the “Bubble”, which is made of transparent material and suspended from a ceiling. Frank Gehry used corrugated cardboard to create his “Wiggle” type of these objects. </b><em><b>Star Trek</b></em><b>’s production designers adapted the design of Eero Saarinen’s </b>(*) “Tulip” type of these objects. A mass-produced fiberglass type of these objects was designed by Charles and Mary Eames, who paired a plywood-and-leather type of them with an ottoman. For 10 points, what furniture objects are usually placed around a table?",
-     "answer": "<b><u>chair</u></b>s [or <b><u>stool</u></b>s or <b><u>seat</u></b>s; reject “couches” or “sofas” or “settees”]",
+     "question": "In a project analyzing this process, up to 200 gigabytes of data a day were taken from the home of a subject by researchers from the MIT Media Lab led by Deb Roy. Roger Brown showed that people undergoing this process can display the “fis (“fiss”) phenomenon.” A 1965 book claimed that successful theories must explain this process and thus display “explanatory adequacy.” This process proceeds through “holophrastic” and “telegraphic” stages. This process, which some believe occurs despite a “poverty of the stimulus,” is broadly thought to only be possible before a “critical period” prior to puberty. For 10 points, Noam Chomsky’s Universal Grammar hypothesis claims that children have an innate ability to go through what process in which people become fluent for the first time?",
+     "answer": "first <b><u>language</u> <u>acquisition</u></b> [or <b><u>learn</u></b>ing a first <b><u>language</u></b>; or <b><u>L1</u></b> acquisition or <b><u>L1</u></b> learning; or <b><u>learn</u></b>ing to <b><u>speak</u></b> or <b><u>learn</u></b>ing <b><u>speech</u></b> or <b><u>develop</u></b>ing <b><u>speech</u></b> or <b><u>speech acquisition</u></b> or equivalents or word forms; prompt on <u>develop</u>ment; reject “second language acquisition” or “L2 acquisition”] (The first line concerns the Human Speechome Project. The “fis phenomenon” involves children being able to distinguish spoken words like “fis” and “fish” before they can say them distinctly.)",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "A character in this film flails in a broken chair as he screams “it ain’t the way I wanted it!” A shot in this film tracks two characters through a fence as they discuss the “little guys” in the Roman Empire. A sequence in this film follows a character traversing rooftops to intercept a man dressed in white during a procession of Christ covered in money. Near this film’s end, a character filmed in shadow recites the Hail Mary while fishing. This film fades into a shot of a boy’s Communion from a flashback of his immigrant grandfather as a boy singing to the Statue of Liberty. This film brings back a character from a previous film, Sonny, for a flashback in which the central family celebrates Vito’s birthday. For 10 points, name this second film in a Francis Ford Coppola trilogy about the Corleone family.",
+     "answer": "<em>The</em> <em><b><u>Godfather Part II</u></b></em> [accept <em>The</em> <em><b><u>Godfather 2</u></b></em>; reject “<em>The Godfather</em>”]",
      "category": "Fine Arts",
      "subcategory": "Other Fine Arts"
     },
     {
-     "question": "<b>A poem in this collection asks “Would not those dead throw their last coins of happiness” to a pair of lovers. A poem in this collection that asks a being to inscribe an urn with the words “</b><em><b>Subrisio Saltat</b></em><b>” opens with the line “But tell me, who are they, these wanderers.” In addition to a poem inspired by Picasso’s </b><em><b>Family of Saltimbanques</b></em><b>, a poem in this collection describes a “lament for Linos” after stating </b>(*) “Beauty is nothing / but the beginning of terror.” The declaration “every angel is terrifying” comes after the question “Who, if I cried out, would hear me among the angelic / orders” in, for 10 points, what collection by Rainer Maria Rilke?",
-     "answer": "<em><b><u>Duino Elegies</u></b></em> [or <em><b><u>Duineser Elegien</u></b></em>]",
-     "category": "Literature",
-     "subcategory": "European Literature"
+     "question": "The pathway that produces this molecule recycles a substrate with MTK. A key step in the biosynthesis of this molecule is the formation of an achiral, cyclopropane-substituted amino acid. The response to this molecule is downregulated by a member of the raf family called CTR1. Regulation of ACC synthase is key to a pathway that ends in the synthesis of this molecule, which is named for Yang. This molecule stimulates exaggeration of the apical hook as part of the “triple response.” This molecule diffuses in the pericycle and inhibits the transport of IAA. In the absence of auxin, the abscission zone becomes sensitive to this molecule, resulting in plants shedding dead leaves. This hormone is the reason that one rotten apple spoils the bunch. For 10 points, name this gaseous plant hormone that promotes fruit ripening.",
+     "answer": "<b><u>ethylene</u></b> [or <b><u>ethene</u></b>; or <b><u>C</u><u>2</u><u>H</u><u>4</u></b>]",
+     "category": "Science",
+     "subcategory": "Biology"
     },
     {
-     "question": "<b>The “inverse” type of this concept in category theory can be used to define p-adic numbers. If this concept exists for every Cauchy </b><em>(\"KOH-shee\")</em><b> sequence in a space, metric spaces are considered complete. “Superior” and “Inferior” types of this operation are equal when a series converges. Two unrelated functions are used to compute this operation in the </b>(*) squeeze theorem. Bernard Bolzano defined this operation in terms of Epsilon and Delta. Taking a derivative of the numerator and denominator can compute this operation using L’Hôpital’s rule. For 10 points, name this operation that finds the value that a function approaches.",
-     "answer": "<b><u>limit</u></b> [accept <b><u>limit</u></b> inferior or <b><u>limit</u></b> superior; accept inverse <b><u>limit</u></b>; accept the epsilon-delta definition of a <b><u>limit</u></b>]",
+     "question": "A popular legend in this city holds that a pot of hot soup was poured over soldiers attempting to scale its defenses in 1602. Until a popular 1520 revolt ousted John the Bastard, this city’s bishopric was controlled by the House of Savoy. During a visit to this city, John Knox discovered a fellow theologian lawn bowling on the Sabbath. William Whittingham helped translate into English a Bible produced in this city that was later carried by Oliver Cromwell’s soldiers. After denouncing infant baptism, the polymath Michael Servetus fled to this city but was executed as a heretic. A prominent theologian who led this city wrote the <em>Institutes of the Christian Religion</em> and argued in favor of predestination. For 10 points, John Calvin served as a church leader in what Swiss city?",
+     "answer": "<b><u>Geneva</u></b> [or <b><u>Genève</u></b>; accept <b><u>Geneva</u></b> Bible]",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "A symphony by this composer begins with a two-octave descending F-sharp minor arpeggio on staccato quarter notes in the first violins. The upper strings play a measure ahead of the lower strings in a minuet labeled “Canon in Diapason” (“dai-uh-PAY-zun”) by this composer of the “Mourning” Symphony. That structure was later used in the “Witches’ Minuet” of one of this composer’s string quartets. One of this composer’s Paris Symphonies quotes the first movement of an earlier symphony, which ends with only the first chair violinists playing. The premiere of that symphony, written for this composer’s patron Prince Esterházy, ended with musicians snuffing out candles and leaving the stage. For 10 points, name this composer of the “Farewell” Symphony.",
+     "answer": "Joseph <b><u>Haydn</u></b> [or Franz Joseph <b><u>Haydn</u></b>]",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "Oxidation of a shale portion of this mountain range produced a red-green color scheme that earned it the nickname “Candy Cane Mountains.” People of this mountain range may have drawn on Greek tales for their Nart sagas. The Ateşgah (“ah-tesh-GAH”) and Yanar Dağ (“yah-NAR dah”) were among the eternal flames that led a country in this mountain range to brand itself as the “land of fire.” Artificial drainage of this mountain range’s largest lake turned an island into the Sevan Peninsula. A mountain in this range is named for Shota Rustaveli (“SHOH-tah roose-tah-VEH-lee”), a medieval poet in one of its Kartvelian languages. Mount Elbrus is the highest peak in this mountain range, which contains the disputed territories of Abkhazia (“ab-KAH-zee-uh”) and Nagorno-Karabakh (“nah-GOR-noh kah-ruh-BAHK”). For 10 points, what mountain range between the Black and Caspian Seas spans countries like Georgia and Azerbaijan?",
+     "answer": "<b><u>Caucasus</u></b> Mountains [or <b><u>Qafqaz</u></b> or <b><u>Kavkaz</u></b>; or <b><u>Kavkasioni</u></b>; accept Greater <b><u>Caucasus</u></b>; accept Lesser <b><u>Caucasus</u></b> or <b><u>Caucasus</u></b> Minor]",
+     "category": "Geography",
+     "subcategory": "Geography"
+    },
+    {
+     "question": "On this holiday in the Philippines, youth participate in a noisy “mobile” practice in which they rev motorcycle engines and honk car horns. In South Asia, the night before this holiday is often marked by an observance called Chaand Raat. Before a prayer on this day, it is mandatory to give a donation of four double handfuls of food to the needy. A special prayer with typically 12 additional <em>takbirs</em> is said on this holiday, which begins after a crescent moon is sighted on the first of Shawwal (“shaw-WOL”). Sweets are often given to children on this holiday, which is considered the “minor” one of two yearly feasts and which celebrates the end of a period of fasting. For 10 points, name this Muslim holiday that marks the end of Ramadan, which occurs before a holiday partly called “al-ʾAḍḥā.”",
+     "answer": "<b><u>Eid al-</u><u>Fiṭr</u></b> [prompt on <u>Eid</u> or <u>Īd</u>; prompt on <u>Lesser Eid</u>; reject “Eid al-ʾAḍḥā”]",
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "question": "This functional group on the <em>para</em> position of pyridine (“PEER-eh-deen”) is a common nucleophilic catalyst used to accelerate acyl (“ACE-ull”) substitution reactions. This functional group is coupled with aryl (“AIR-ull”) halides in the Buchwald (“BUCK-wald”)–Hartwig reaction. This functional group is difficult to monoalkylate (“mono-alkyl-ate”) and tends to form quaternary salts instead, such as during exhaustive methylation. An alkene and a tertiary example of this function group are products of the Hofmann elimination. Aniline (“ANN-eh-leen”) contains this functional group, which can react with acid chlorides to make amides (“AM-ids”). For 10 points, the rotting fish smell of cadaverine (“cadaver-een”) is attributed to what organic functional group derived from ammonia?",
+     "answer": "<b><u>amine</u></b>s (“uh-meens”) [accept electrophilic <b><u>amination</u></b> or Buchwald–Hartwig <b><u>amination</u></b>; accept O-benzoylhydroxyl<b><u>amine</u></b>s; accept dimethyl<b><u>amino</u></b>pyridine; reject “ammonium salts”]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "Two standard objections to this concept are likened to a philosopher ascending and descending a mountain in a “Contemporary Introduction” to it by Robert Kane. A man named Black tries to ensure that Jones robs a bank in a prototypical example of problems that reject this concept called “Frankfurt cases.” This concept is analogized to having elbow room in a book by Daniel Dennett. Non-causal, event-causal, and agent-causal are three different stances of the “sourcehood” of this concept held by philosophical libertarians. Compatibilism holds that this concept exists in situations in which an individual isn’t coerced. For 10 points, determinists reject the existence of what concept that allows humans to make their own decisions?",
+     "answer": "<b><u>free will</u></b> [or <b><u>freedom</u></b> of the <b><u>will</u></b>; accept <em>A Contemporary Introduction to</em> <em><b><u>Free Will</u></b></em>; prompt on <u>moral responsibility</u>; prompt on <u>freedom</u>; reject “responsibility”]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "In a story by this author, a deal to return from college after four years is broken by Helen, forcing Maddy to look after their mother, who has Parkinson’s disease. In a story by this author, a man remembers the line “shoreless seas” from a Joaquin (“h’wah-KEEN”) Miller poem as his daughter enters the room. In that story by this author of “The Peace of Utrecht,” the protagonist stays at Judith’s house and inquires about her estranged daughter Nichola while visiting her father prior to his heart operation. This author wrote a story about a disabled girl from Greenhill School who plays a beautiful rendition of the title piece at Miss Marsalles’s piano recital. For 10 points, “The Moons of Jupiter” and “Dance of the Happy Shades” are by what Canadian short story writer?",
+     "answer": "Alice <b><u>Munro</u></b> [or Alice Ann <b><u>Laidlaw</u></b>]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "A biography by Richard Hingley discusses Mortimer Wheeler’s discovery of this ruler’s namesake “destruction horizon,” a red layer of ash. Thomas Thornycroft sculpted a scythed chariot driven by this ruler, who supposedly invoked the war god Andraste. Either this ruler of “kingly descent” or the contemporary Cartimandua of the Brigantes (“bree-GAHN-tays”) is referenced in a passage that states “they make a solitude and call it peace” in a speech attributed to Calgacus (“cal-GAH-cuss”). This whip-scarred ruler avenged the rape of two daughters according to the <em>Annals</em> of Tacitus, whose <em>Agricola</em> barely discusses this consort of Prasutagus sacking Camulodunum (“cam-oo-LOH-doo-num”) and Londinium. Around 61 CE, this ruler was defeated by Gaius Suetonius Paulinus at the Battle of Watling Street. For 10 points, what Celtic Iceni queen revolted in Roman Britain?",
+     "answer": "<b><u>Boudica</u></b> [or variants like <b><u>Boadicea</u></b> or <b><u>Boudicea</u></b> or <b><u>Buddug</u></b>; accept <em><b><u>Boadicea</u></b> and Her Daughters;</em> accept <b><u>Boudiccan</u></b> destruction horizon or <b><u>Boudiccan</u></b> destruction layers; accept <em><b><u>Boudica</u></b>: Iron Age Warrior Queen</em>]",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "A certain property can be “extracted” from multiple examples of these constructs using the Allen–Kennedy algorithm. These constructs are assigned to lattice points within a polytope and subjected to affine transformations in the polyhedral model. These constructs can be subjected to “fission” or “fusion” in order to exploit locality of reference. Provided that they are invariant, parts of these constructs may be “hoisted out” of them to improve their efficiency. If their trip count is known, these constructs can be optimized via “unrolling,” which is often performed by compilers. Like switch statements, break statements can be used to leave these constructs, in which a control variable is often incremented on each pass. For 10 points, “while” is a type of what sections of code that are repeatedly executed?",
+     "answer": "<b><u>loop</u></b>s [accept for <b><u>loop</u></b>s or while <b><u>loop</u></b>s or nested <b><u>loop</u></b>s; accept <b><u>loop</u></b> transformations, <b><u>loop</u></b> optimization, <b><u>loop</u></b> fusion, <b><u>loop</u></b> fission, or <b><u>loop</u></b> unrolling] (The Allen–Kennedy algorithm performs parallelism extraction in nested loops.)",
      "category": "Science",
      "subcategory": "Other Science"
+    },
+    {
+     "question": "Allocation of this resource was the subject of the 1629 Charter of Freedoms and Exemptions. Thomas Devyr’s pamphlet <em>Our Natural Rights</em> inspired a conflict over this resource led by a group of self-styled “Calico Indians.” Speculation over this resource made the “Financier of the Revolution,” Robert Morris, go into debt. A war fought over this resource led to the break up of Rensselaerswyck (“REN-suh-lars-vake”). In the colony of New Netherland, access to this resource was controlled by agents termed <em>patroon</em>s. The Lenape gave up large amounts of this resource to the Dutch for just 24 dollars as a result of the so-called “Walking Purchase.” During Andrew Jackson’s presidency, ownership of this resource was removed as a barrier to voting. For 10 points, American acquisition of what resource was the subject of the Louisiana Purchase?",
+     "answer": "<b><u>land</u></b> [accept <b><u>land</u></b> patents; accept real <b><u>estate</u></b>; accept <b><u>manor</u></b>s; accept <b><u>patroonship</u></b>s until “patroons” is read]",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "An artist from this empire created “mood landscapes,” such as one in which a woman walks down a tree-lined path on the title <em>Autumn Day</em>. Two artists from this empire painted a scene in which certain young animals climb over a fallen tree during a <em>Morning in</em> the title forest. A realist painting from this empire controversially included a drunk peasant in a religious procession. This empire was home to an artist who painted a group of laughing men writing an insulting letter to Sultan Mehmet IV, as well as to Isaac Levitan and the Wanderers. In a painting from this empire, a boy in rags stands up straight in a line of haggard old men pulling a boat up the title river. For 10 points, name this empire home to Ivan Shishkin and Ilya Repin, who painted <em>Barge Haulers on the Volga</em>.",
+     "answer": "<b><u>Russia</u></b> [or <b><u>Rossiya</u></b>; or <b><u>Russian</u></b> Empire or <b><u>Rossiyskaya</u></b> Imperiya; accept <b><u>Ukraine</u></b> or <b><u>Ukraïna</u></b>; accept <b><u>Lithuania</u></b> or <b><u>Lietuva</u></b>; accept Congress Kingdom of <b><u>Poland</u></b> or <b><u>Polska</u></b> or Królestwo <b><u>Polskie</u></b>] (Ivan Shishkin and Konstantin Savitsky painted bears in <em>Morning in a Pine Forest</em>. The painting in the third line is <em>Religious Procession in Kursk Governorate</em>.)",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "In a book [emphasize] <em>titled for</em> this person, a boy is rescued from a flood by his father’s murderer, who had previously stolen the man’s boat to save his pregnant wife. That book titled for this person features a story in which the protagonist escapes with a truck driver to Chicago after his friends are lynched for skinny-dipping in a whites-only pool. James Baldwin criticized this 19th-century character for being “robbed of his humanity and divested of his sex” in the essay “Everybody’s Protest Novel.” The story “Big Boy Leaves Home” appears in a Richard Wright collection titled for this character’s “children.” In a novel, this character refuses to divulge the location of Cassy and Emmeline, leading Simon Legree to order his death. For 10 points, name this enslaved character who titles a novel by Harriet Beecher Stowe.",
+     "answer": "Uncle <b><u>Tom</u></b> [accept <em>Uncle</em> <em><b><u>Tom</u></b>’s Cabin</em>; accept <em>Uncle</em> <em><b><u>Tom</u></b>’s Children</em>] (The first sentence refers to Richard Wright’s story “Down by the Riverside.”)",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "This composer claimed to be writing a “caricature of Romanticism” in a piece whose double-note scales are meant to imitate a pirouetting dwarf. The Ballets Russes commissioned a piece by this composer whose title characters embrace before dancers with tambourines enter the stage and perform a 5/4 (“five-four”) bacchanale. This composer’s Piano Concerto in G opens with a whip crack. This composer drew on Aloysius Bertrand’s (“al-oyze-YOOSE bair-TRON’s”) poems “Le gibet” (“luh zhee-BEH”), “Ondine,” and “Scarbo” in the three sections of a difficult piano suite. Paul Wittgenstein commissioned this composer’s Piano Concerto for the Left Hand. This composer of <em>Gaspard de la nuit</em> also wrote a piece with a repetitive, crescendoing snare drum ostinato. For 10 points, name this French composer of <em>Daphnis et Chloé</em> and <em>Boléro</em>.",
+     "answer": "Maurice <b><u>Ravel</u></b> [or Joseph Maurice <b><u>Ravel</u></b>]",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
     }
    ],
    "bonuses": [
     {
-     "leadin": "Answer the following about exclaves in southern Africa, for 10 points each:",
+     "leadin": "After this opera’s premiere, its composer’s mentor Charles Gounod (“goo-NOH”) supposedly exclaimed, “take mine out of the score and there remains nothing to [its composer’s] credit but the sauce that masks the fish!” For 10 points each:",
      "parts": [
-      "The islands of Likoma and Chizumulu are exclaves that are part of this country but surrounded by Mozambican territorial waters. Upon independence, this country changed its name from Nyasaland.",
-      "Because it is bounded by only the DRC, ROC, and the Atlantic Ocean, this country’s territory of Cabinda is considered a semi-exclave. This country’s capital is Luanda.",
-      "Until 1994, South Africa governed this second-largest Namibian city as a semi-exclave. Pelican Point is located in this coastal city on the mouth of the Kuiseb River."
+      "Name this opera that features a mezzo-soprano aria that was actually inspired by a Sebastián Iradier (“say-bahss-T’YAHN ee-rahd-YAIR”) song, though its composer believed he was adapting an old folk tune.",
+      "Gounod may have taken the high ground regarding his student Georges Bizet’s plagiarism in <em>Carmen</em> since he cribbed J.S. Bach’s melody for a setting of a Latin prayer titled “ave” this religious figure.",
+      "In the last feuilleton (“fooy-TON”) he ever wrote, Hector Berlioz took no issue with Bizet’s inspirations in a glowing review of his opera about two Ceylonese people with this profession, who sing a duet of friendship near the ruins of a temple."
      ],
      "answers": [
-      "<b><u>Malawi</u></b> [or Republic of <b><u>Malawi</u></b> or Dziko la <b><u>Malawi</u></b>]",
-      "<b><u>Angola</u></b> [or Republic of <b><u>Angola</u></b> or República de <b><u>Angola</u></b>]",
-      "<b><u>Walvis Bay</u></b> [accept <b><u>Walvisbaai</u></b> or <b><u>Ezorongondo</u></b>]"
+      "<em><b><u>Carmen</u></b></em> (The aria is “Habanera.”)",
+      "<b><u>Mary</u></b> [or the <b><u>Virgin</u></b> Mary; or the <b><u>Holy Mother</u></b>; or <b><u>Madonna</u></b>; or <b><u>Maria</u></b>; accept Ave <b><u>Maria</u></b>]",
+      "<b><u>pearl</u></b> fishers [or <b><u>pearl</u></b>ers or <b><u>pearl</u></b> divers or <b><u>pearl</u></b> hunters; accept <em>The</em> <em><b><u>Pearl</u></b> Fishers</em> or <em>Les</em> <em>pêcheurs de</em> <em><b><u>perles</u></b></em>; prompt on <u>fisher</u>men or <u>fisher</u>s or <u>pêcheur</u>s or <u>diver</u>s; reject “hunters”]"
      ],
      "values": [
       10,
       10,
       10
      ],
-     "category": "Geography",
-     "subcategory": "Geography"
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
     },
     {
-     "leadin": "Scholars have cited this person’s descriptions of Yuan dynasty <em>Jiaochao</em> currency as evidence his story wasn’t completely made up. For 10 points each:",
+     "leadin": "The “reflow” type of this process is often used on surface mounts. For 10 points each:",
      "parts": [
-      "Name this traveller whose life may have been fictionalized by the prison memoir <em>Il Millione</em>.",
-      "Evidence for the story of Marco Polo’s travels being faked comes from his failure to mention this structure. Qin Shi Huang ordered the creation of this anti-Xiongnu <em>(“SHUNG-nu”)</em> structure.",
-      "On the other hand, the events in <em>Il Millione</em> were documented by this organization which had two members join the trip. Bartolome De Las Casas was a member of this order of “Blackfriars.”"
+      "Name this process that joins two metals using a substance with a [emphasize] <em>lower</em> melting point than the adjacent metal.",
+      "Reflow soldering (“SOD-er-ing”) is used to connect the contact pads found on rectangular “boards” onto which these systems are printed. In these systems, electrical components are joined by wires.",
+      "When etching a printed circuit board, these materials stop the dissolution of copper in parts of the circuit board when UV light is shone on it. Microfluidics applications often use one of these materials called SU-8 (“S-U-8”)."
      ],
      "answers": [
-      "Marco <b><u>Polo</u></b>",
-      "<b><u>Great Wall</u></b> of China",
-      "<b><u>Dominican</u></b> Order [or <b><u>Dominicans</u></b>; accept <b><u>Order of Preachers</u></b>]"
+      "<b><u>solder</u></b>ing (“SOD-er-ing”) [accept reflow <b><u>solder</u></b>ing; reject “welding”]",
+      "electrical <b><u>circuit</u></b>s [accept printed <b><u>circuit</u></b> boards or <b><u>PCB</u></b>s]",
+      "photo<b><u>resist</u></b>s [prompt on <u>epoxy</u> resins or epoxy <u>resin</u>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "A 2018 <em>VICE</em> exposé revealed that a piece of equipment central to this program is actually of extremely average size. For 10 points each:",
+     "parts": [
+      "Name this series of NPR concerts that take place near an eponymous piece of equipment that belongs to Bob Boilen, the radio host of <em>All Things Considered</em>.",
+      "Despite battling the flu, this musician appeared on the Tiny Desk in 2017 to play songs from her mixtape <em>Telefone</em>. This rapper behind the album <em>Room 25</em> also runs a Black author-focused book club “for the homies.”",
+      "In her Tiny Desk concert, Lizzo played a solo on this instrument, in which she is classically trained. In September 2022, Lizzo played a 200-year-old one of these woodwind instruments once owned by James Madison."
+     ],
+     "answers": [
+      "NPR <b><u>Tiny Desk</u></b> Concerts [or National Public Radio <b><u>Tiny Desk</u></b> Concerts]",
+      "<b><u>Noname</u></b> [or Fatimah Nyeema <b><u>Warner</u></b>]",
+      "<b><u>flute</u></b> [accept glass <b><u>flute</u></b> or crystal <b><u>flute</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Pop Culture",
+     "subcategory": "Music"
+    },
+    {
+     "leadin": "Paris Herouni claimed that Armenia’s Carahunge was the world’s oldest of these institutions, which employed Taqi ad-Din in İstanbul and Abd al-Rahman al-Sufi in Isfahan. For 10 points each:",
+     "parts": [
+      "Name these institutions that were patronized by Hulagu Khan in Maragheh, Jai Singh II in Jaipur, and Ulugh Beg in Samarkand. Scholars at these places, like Jamshīd al-Kāshī, improved on the models in the <em>Almagest</em>.",
+      "S. F. Starr’s <em>Lost Enlightenment</em> argues that al-Ma’mun stayed in this oasis city after the Fourth Fitna due to its observatory. In 1221, Tolui utterly destroyed this former capital of Margiana in modern-day Turkmenistan.",
+      "In the 12th century, Merv may have been the world’s largest metropolis due to its links to wealthy cities like Suyab, Otrar, and Kashgar along this series of Central Asian trade routes."
+     ],
+     "answers": [
+      "<b><u>observatory</u></b> [or <b><u>observatories</u></b>; accept <b><u>astronomical</u></b> buildings or word forms such as <b><u>astronomy</u></b>; or <b><u>marsad</u></b> or al-<b><u>marasid</u></b> or <b><u>gözlemev</u></b>leri or <b><u>rasadxâne</u></b> or variants of those words] (Ptolemy wrote the <em>Almagest</em>.)",
+      "<b><u>Merv</u></b> [or <b><u>Merw</u></b> or <b><u>Marv</u></b> or <b><u>Marw</u></b> al-Shāhijān; accept <b><u>Mary</u></b>; prompt on <u>Alexandria</u> in Margiana or <u>Antioch</u>ia in Margiana]",
+      "<b><u>Silk</u></b> Roads [or <b><u>Silk</u></b> Routes; or <b><u>Sīchóu</u></b> Zhīlù]"
      ],
      "values": [
       10,
@@ -1248,19 +1328,199 @@ export default {
       10
      ],
      "category": "History",
-     "subcategory": "Other History"
+     "subcategory": "World History"
     },
     {
-     "leadin": "The “Spilled Blood” of a member of this profession titles the second part of a poem that declares “Death has painted him with pale sulfurs.” For 10 points each:",
+     "leadin": "In a novel by this author, Luis Molina recounts the plots of movies like <em>Cat People</em> to his cellmate Valentín Arregui (“vahl-en-TEEN ah-RAY-ghee”). For 10 points each:",
      "parts": [
-      "Name this profession that titles a poem whose speaker repeats “I don’t want to see it!” A member of this profession dies at “at five in the afternoon” in a 1935 poem.",
-      "“Lament for the Death of a Bullfighter” was written by this Generation of ‘27 poet who was killed during the Spanish Civil War. His plays include <em>Blood Wedding</em>.",
-      "A Garcia Lorca poem titled for this form begins by declaring “I want to sleep the sleep of the apples.” The <em>Divan of Hafez</em> includes many poems in this form, which ends each couplet with a repeated word or phrase."
+      "Name this author of <em>Kiss of the Spider Woman</em>.",
+      "The fifth film that Luis recounts in <em>Kiss of the Spider Woman</em> is about a witch doctor who transforms people into these beings, who are often depicted as eating brains.",
+      "These sections in <em>Kiss of the Spider Woman</em> discuss Freudian theories of homosexuality. One of these sections in Jorge Luis Borges’s (“hor-HAY loo-EESS bor-HESS’s”) story “Tlön, Uqbar, Orbis Tertius” (“t’LERN UCK-bar OR-biss TER-shuss”) claims that “all men who repeat a line from Shakespeare are William Shakespeare.”"
      ],
      "answers": [
-      "<b><u>bullfight</u></b>er [accept “Lament for the Death of a <b><u>Bullfighter</u></b>”]",
-      "Federico Garcia <b><u>Lorca</u></b>",
-      "<b><u>ghazal</u></b> [accept <b><u>Ghazal</u></b> of the Dark Death; or <b><u>Gacela</u></b> of the Dark Dearth; or <b><u>Gacela</u></b> De La Muerte Oscura]"
+      "Manuel <b><u>Puig</u></b> (“pweeg”) [or Juan Manuel <b><u>Puig</u></b> Delledonne]",
+      "<b><u>zombie</u></b>s [or <b><u>zombi</u></b>s]",
+      "<b><u>footnote</u></b>s [or <b><u>endnote</u></b>s; prompt on <u>note</u>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "leadin": "<em>Greek-language term required.</em> Xenophon (“ZEE-nuh-faun”) argued that nature possesses its own version of this concept that promotes intelligent design. For 10 points each:",
+     "parts": [
+      "Name this term in Greek philosophy often translated as “intellect.” This concept was first explained by Anaxagoras (“ann-aks-ZAYG-or-iss”), who claimed that it set the cosmos in motion and “has power over all things…that have soul.”",
+      "Anaxagoras’s conception of nous (“noose”) is a precursor to this philosopher’s prime mover argument for the universe. This thinker’s texts include the <em>Metaphysics</em> and <em>Nicomachean</em> (“nih-koh-MAH-kee-in”)<em> Ethics</em>.",
+      "Empedocles (“em-PEH-duh-kleez”) held that two nous-like beings named for this concept and strife created the universe. In a dialogue on this concept, the character Aristophanes (“air-ih-STAH-fuh-nees”) claims that Zeus separated early humans into two halves."
+     ],
+     "answers": [
+      "<b><u>nous</u></b> (“noose”)",
+      "<b><u>Aristotle</u></b> [or <b><u>Aristotle</u></b> of Stagira or <b><u>Aristotélēs</u></b>]",
+      "<b><u>love</u></b> [or <b><u>philotes</u></b>; accept <b><u>eros</u></b>] (The dialogue is Plato’s <em>Symposium</em>.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "This company employed slave labor from the Arbeitsdorf concentration camp at its factories in Wolfsburg. For 10 points each:",
+     "parts": [
+      "Name this company that was commissioned by Hitler to manufacture a car nicknamed the “Beetle.”",
+      "Hitler promoted the Volkswagen Beetle as the “people’s car” as part of this initiative, which created the Autobahn. Robert Ley headed this initiative, which encouraged factory workers to engage in state-sanctioned leisure to improve morale.",
+      "The Krupp family, whose business also collaborated with the Nazis, used slave labor to manufacture this good. This good and “coal” name a European economic union that preceded the EEC."
+     ],
+     "answers": [
+      "<b><u>Volkswagen</u></b> [or <b><u>VW</u></b>; accept <b><u>Volkswagen</u></b> Beetle]",
+      "<b><u>Strength Through Joy</u></b> [or <b><u>Kraft durch Freude</u></b> or <b><u>KdF</u></b>; prompt on German <u>Labor Front</u> or Deutsche <u>Arbeitsfront</u>]",
+      "<b><u>steel</u></b> [accept European Coal and <b><u>Steel</u></b> Community; prompt on <u>alloy</u>s; prompt on <u>ECSC</u> by asking “what does that stand for?”; reject “metal” or “iron” or “Fe”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "leadin": "Prajāpati Daksha cursed this deity for showing favoritism to Rohinī over his 26 other wives. For 10 points each:",
+     "parts": [
+      "Name this god of poetry and vegetation who gave Indra the strength to defeat Vritra. He shares his name with a plant discussed at length in the ninth maṇḍala of the <em>Rigveda</em>.",
+      "Soma was later syncretized with Chandra, the god of this object. The Sanskrit word “pūrnima” refers to this astronomical body when it’s at its fullest.",
+      "The holiday Chaturthī (“chuh-TURR-thee”) observes when this deity injured Chandra for laughing at him for falling off his mount. While riding a mouse, this deity beat his brother Kārtikeya in a race around the world."
+     ],
+     "answers": [
+      "<b><u>Soma</u></b> [accept <b><u>Chandra</u></b>ma; accept <b><u>Shashi</u></b>; accept <b><u>Nishakara</u></b>]",
+      "the <b><u>Moon</u></b> [or <b><u>Luna</u></b>; accept full <b><u>moon</u></b>]",
+      "<b><u>Ganesh</u></b>a [or <b><u>Ganapati</u></b>; or <b><u>Vinayak</u></b>a; accept <b><u>Pillai</u></b> or <b><u>Pillai</u></b>yar; accept <b><u>Ganesh</u></b>a Chaturthī or <b><u>Vināyak</u></b>a Chaturthī or <b><u>Gaṇesh</u></b>ōtsav]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "An equation named for “makers” of these devices gives their power in diopters (“DAI-op-terz”). For 10 points each:",
+     "parts": [
+      "Name these devices whose “convex” type focuses light to a point.",
+      "The lensmakers’ equation simplifies for lenses with this property, as their width <em>d</em> is much less than their radii of curvature. The paraxial approximation is often paired with an approximation named for this kind of lens.",
+      "The thin lens equation sets [read slowly] the [emphasize] <em>reciprocal</em> of the lens’s focal length <em>f</em> as equal to this function of the object distance <em>u</em> and the image distance <em>v</em>. You have ten seconds."
+     ],
+     "answers": [
+      "optical <b><u>lens</u></b>es [accept convex <b><u>lens</u></b>es; accept <b><u>lens</u></b>makers’ equation]",
+      "<b><u>thin</u></b> lens [accept <b><u>thin</u></b> lens approximation]",
+      "<b><u>one over</u> </b><em><b><u>u</u></b></em><b><u> plus one over</u> </b><em><b><u>v</u></b></em> [or the <b><u>reciprocal of</u> </b><em><b><u>u</u></b></em><b><u> plus the reciprocal of</u> </b><em><b><u>v</u></b></em>; or <em><b><u>u</u> </b></em><b><u>plus</u> </b><em><b><u>v</u></b></em> all <b><u>over</u> </b><em><b><u>u</u></b></em> times <em><b><u>v</u></b></em>; accept <b><u>object distance</u></b> in place of “<em>u</em>”; accept <b><u>image distance</u></b> in place of “<em>v</em>”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "leadin": "This author feuded with his colleague John Ozell for publishing a translation of the Italian mock epic <em>La secchia rapita</em> (“SECK-yah rah-PEE-tah”) at the same time as a poem by this author. For 10 points:",
+     "parts": [
+      "Name this English poet. The hack bookseller Edmund Curll titled Ozell’s translation <em>The Rape of The Bucket</em> in an attempt to capitalize off the success of this author’s poem “The Rape of the Lock.”",
+      "In retaliation, Pope inserted Curll as a prominent character in this mock-epic poem, in which Curll competes in a series of humiliating games overseen by Dulness, the goddess of stupidity.",
+      "This friend of Pope’s quipped that Curll’s biographies of deceased literati were “one of the new terrors of death.” Pope coined the phrase “who breaks the butterfly upon the wheel?” in a poem addressed to this man."
+     ],
+     "answers": [
+      "Alexander <b><u>Pope</u></b>",
+      "<em>The</em> <em><b><u>Dunciad</u></b></em>",
+      "John <b><u>Arbuthnot</u></b> [accept “Epistle to Dr <b><u>Arbuthnot</u></b>”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "leadin": "Extracellular binding to this complex is translated into intracellular signals by two zeta chains that each possess three phosphorylation sites called ITAMs. For 10 points each:",
+     "parts": [
+      "Name this protein complex that most often presents as a heterodimer of an alpha and beta chain, but may sometimes be composed of a gamma and delta chain pair.",
+      "The TCR binds to peptides presented by this incredibly polymorphic glycoprotein complex that is needed to distinguish self from non-self. In humans, it is also called HLA, and its class I is present on all nucleated cells.",
+      "While T cells mature in the thymus, they are originally produced in this tissue found within bones, where most blood cells are made."
+     ],
+     "answers": [
+      "<b><u>T-cell receptor</u></b> [or <b><u>TCR</u></b>]",
+      "<b><u>MHC</u></b> [or <b><u>major histocompatibility complex</u></b>; accept <b><u>MHC</u></b> I or <b><u>MHC</u></b> class I]",
+      "bone <b><u>marrow</u></b>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "A poem about this person asks, “Did her eyes slant in the old way?” in its section “Eidolon (“AI-doh-lon”)”. For 10 points each:",
+     "parts": [
+      "Name this mythological woman. A poem by H.D. titled for this woman “in Egypt” was based on a feminist reading of a Euripides play in which she is abducted by Paris for her beauty, inciting the Trojan War.",
+      "H.D. wrote <em>Helen in Egypt</em> as a response to this unfinished long poem, which rails against “usura” and was largely written while its author was imprisoned on treason charges in Italy.",
+      "This other modernist poet imagined Helen’s marriage to Faustus in a poem inspired by his affair with Emil Opffer, who also influenced an erotic six-part poem by this author that describes “bright striped urchins.”"
+     ],
+     "answers": [
+      "<b><u>Helen</u></b> of Troy [or <b><u>Helénē</u></b> or <b><u>Helena</u></b>; accept <em><b><u>Helen</u></b> in Egypt</em>]",
+      "<em>The</em> <em><b><u>Cantos</u></b></em> [accept <em>The Pisan</em> <em><b><u>Cantos</u></b></em>] (by Ezra Pound)",
+      "Hart <b><u>Crane</u></b> [or Harold Hart <b><u>Crane</u></b>] (The other poem is “Voyages.”)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "In 2018, it was revealed that a statue of this woman would be unveiled in the US Capitol building to represent the state of Florida. For 10 points each:",
+     "parts": [
+      "Name this activist and educator who was the sole African-American woman on the committee that drafted the Charter of the United Nations. She was the only female member of the unofficial “Black Cabinet.”",
+      "For helping to establish Cookman College in Daytona Beach, Bethune was awarded the Spingarn Medal by this organization. W. E. B. DuBois founded this organization to advance equality for African-Americans.",
+      "The “Black Cabinet” also pushed this organization to record over two thousand first-person accounts of former slaves. This Second New Deal organization employed hundreds of artists, musicians, and writers as part of Federal Project Number One."
+     ],
+     "answers": [
+      "Mary McLeod <b><u>Bethune</u></b> [or Mary Jane <b><u>McLeod</u></b>]",
+      "<b><u>NAACP</u></b> [or <b><u>National Association for the Advancement of Colored People</u></b>]",
+      "<b><u>Works Progress</u></b> Administration [or <b><u>WPA</u></b>; or <b><u>Work Projects</u></b> Administration; accept <b><u>Federal Writers’ Project</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "This author denounced rumors that he was secretly a member of the Illuminati in letters about one of his plays, which ends with the Marquis of Posa dying for Dutch liberty. For 10 points each:",
+     "parts": [
+      "Name this German playwright who wrote <em>Don Carlos</em> and the poem “Ode to Joy.”",
+      "This Schiller play begins with the jailer Paulet breaking into the protagonist’s desk. The protagonist of this play confronts her cousin and rival in a park outside her prison.",
+      "<em>The Piccolomini</em> is the second play in a trilogy by Schiller titled for this Bohemian general. Macdonald and Devereux assassinate this character after his plan to enter an alliance with the Swedes is uncovered."
+     ],
+     "answers": [
+      "Friedrich <b><u>Schiller</u></b> [or Johann Christoph Friedrich von <b><u>Schiller</u></b>]",
+      "<em><b><u>Mary Stuart</u></b></em> [or <em><b><u>Maria Stuart</u></b></em>]",
+      "<b><u>Wallenstein</u></b> [or Albrecht von <b><u>Wallenstein</u></b> or Albrecht Wenzel Eusebius von <b><u>Wallenstein</u></b> or Albrecht Václav Eusebius z <b><u>Valdštejna</u></b>]"
      ],
      "values": [
       10,
@@ -1271,16 +1531,36 @@ export default {
      "subcategory": "European Literature"
     },
     {
-     "leadin": "One of these languages that developed in 19th century California uses the eponym “Bill Nunn” for syrup, in reference to a man notorious for drenching his pancakes in it. For 10 points each:",
+     "leadin": "The MP2 level of theory improves on the Hartree–Fock method by including this phenomenon. For 10 points each:",
      "parts": [
-      "Identify these specialised languages used to exclude outsiders, such as Boontling. A Romani-derived “Thieves” one of these languages gives English the word “fence” for a seller of stolen goods.",
-      "Another English argot that draws from Romani is Polari, which was used in 19th and 20th century England by these people to evade the anti-sodomy laws that targeted them.",
-      "Much contemporary French slang derives from the argot verlan, which reorders parts of words like this English-language equivalent, which originated the term “ixnay.”"
+      "Name this phenomenon of electrons interacting with each other in a quantum system.",
+      "Correlation effects include repulsive forces that obey this law. This inverse square law relates electric force to the product of the charges involved.",
+      "The Hartree–Fock method adopts this assumption, which leads to treating nuclei as stationary relative to the electrons. It is named for two physicists."
      ],
      "answers": [
-      "<b><u>argot</u></b><em>(“ARR-goo”)</em> [accept <b><u>cant</u></b><em>(“kant”)</em> or <b><u>anti-language</u></b> or <b><u>cryptolect</u></b>; prompt on descriptions of a <u>secret language</u> or <u>talking in code</u>]",
-      "<b><u>homosexuals</u></b> [or <b><u>gay</u></b> people, accept <b><u>queer</u></b> people or <b><u>LGBT</u></b> people]",
-      "<b><u>Pig Latin</u></b>"
+      "electron <b><u>correlation</u></b> [or <b><u>correlation</u></b> effects; or electronic <b><u>correlation</u></b>; accept <b><u>correlation</u></b> energy]",
+      "<b><u>Coulomb</u></b>’s law",
+      "<b><u>Born–Oppenheimer</u></b> approximation [or <b><u>BO</u></b> approximation]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "Answer the following about the career of psychologist James Coan (“KOH-in”), for 10 points each.",
+     "parts": [
+      "<em>Description acceptable.</em> As an undergraduate working under Elizabeth Loftus, Coan created the “lost in the mall” technique, in which these things were created in test subjects.",
+      "With Lane Beckes (“behks”), Coan developed a “baseline theory” prefixed by this adjective. It’s not “organizational,” but Kurt Lewin (“luh-VEEN”) pioneered a branch of psychology named for this adjective.",
+      "Coan used fMRIs to show that this emotion is reduced when people hold hands with their spouses. A condition known as “generalized [this emotion] disorder” is characterized by excessive worries about everyday events."
+     ],
+     "answers": [
+      "<b><u>false memories</u></b> [or <b><u>false memory</u></b>; or <b><u>confabulations</u></b> or <b><u>implanted memories</u></b>; accept any answers that indicate <b><u>memories</u></b> of events that <b><u>did not occur</u></b>; prompt on <u>memories</u> or <u>memory</u>]",
+      "<b><u>social</u></b> [accept <b><u>social</u></b> psychology; accept <b><u>social</u></b> baseline theory]",
+      "<b><u>anxiety</u></b> [accept generalized <b><u>anxiety</u></b> disorder; prompt on <u>GAD</u> by asking “what does that stand for?”]"
      ],
      "values": [
       10,
@@ -1291,236 +1571,16 @@ export default {
      "subcategory": "Social Science"
     },
     {
-     "leadin": "The thickness of these devices is usually assumed to be negligible when analyzing them with a ray transfer matrix. For 10 points each:",
+     "leadin": "This person walks through a street populated by homeless people in a painting depicting him <em>Healing the Sick with his Shadow</em>. For 10 points each:",
      "parts": [
-      "Name these devices whose focal length can often be approximated as half of their radius. These optical devices, which transmit and refract incoming light, come in convex and concave varieties.",
-      "Images reflected in lenses may appear blurred at areas of high-contrast due to this phenomenon, in which light at different wavelengths have differing focal points.",
-      "Chromatic aberration is caused by this phenomenon, which occurs when the index of refraction of the lens varies with the wavelength of the incoming light. This phenomenon causes white light to split as it’s passed through a prism."
+      "Name this saint whom many Renaissance paintings show crucified on an upside-down cross. Michelangelo’s <em>Pietà</em> is housed in a Vatican basilica named for this saint.",
+      "This place of worship, located in the Church of Santa Maria del Carmine (“CAR-mee-nay”), features several depictions of Peter alongside scenes from the lives of other saints. A painting in this place depicts Peter pulling the title object from the mouth of a fish.",
+      "This artist painted the aforementioned fresco, <em>The Tribute Money</em>. Along with his associate Masolino, this artist created many of the depictions of Saint Peter in the Brancacci Chapel."
      ],
      "answers": [
-      "<b><u>lens</u></b>es [accept thin <b><u>lens</u></b>es; accept convex <b><u>lens</u></b>es; accept concave <b><u>lens</u></b>es]",
-      "<b><u>chromatic aberration</u></b> [prompt on <u>aberration</u>]",
-      "optical <b><u>dispersion</u></b> [accept word forms]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Physics"
-    },
-    {
-     "leadin": "In a play by this author, Nancy spots a giant humanoid lizard following an argument with her husband Charlie. For 10 points each:",
-     "parts": [
-      "Name this author, who in another play wrote about a fight on a Central Park bench that ends with Jerry impaling himself on a knife.",
-      "The lizards Leslie and Sarah feature in Albee’s play <em>Seascape</em>, which is set in one of these locations. Matthew Arnold titled a poem for one of these locations in Dover.",
-      "In <em>Seascape</em>, Nancy proclaims “what a noise they make” after hearing the sounds of some of these objects. In another play, Steve Deever is imprisoned for his role in causing the deaths of 21 people who operate these objects by sending cracked cylinder heads."
-     ],
-     "answers": [
-      "Edward <b><u>Albee</u></b> [or Edward Franklin <b><u>Albee</u></b> III] (the unnamed play is <em>Zoo Story</em>.)",
-      "<b><u>beach</u></b>es [accept “Dover <b><u>Beach</u></b>”]",
-      "air<b><u>plane</u></b>s [accept <b><u>aircraft</u></b>s or <b><u>jet</u></b>s] (the unnamed play is <em>All My Sons</em> by Arthur Miller.)"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Literature",
-     "subcategory": "American Literature"
-    },
-    {
-     "leadin": "While serving as one of these people’s toqui <em>(“toh-KEE”)</em> war chiefs, Nangoniel introduced cavalry to their army. For 10 points each:",
-     "parts": [
-      "Name these indigenous people whose leader Lautaro <em>(“lao-TAH-ro”)</em> successfully killed the conquistador Pedro de Valdivia during the Arauco <em>(“ah-RAO-koh”)</em> War.",
-      "The Mapuche’s campaigns against the Spanish mostly took place in this modern day country, where they repeatedly destroyed its modern capital of Santiago.",
-      "Nicolás Palacios’s 1904 book on the “Chilean Race” describes how conquistadors promoted intermarriage with the Mapuche, resulting in Chile’s population being dominated by this class. In the Spanish ethnic system, people of this <em>casta</em> had both Indigenous and European descent."
-     ],
-     "answers": [
-      "<b><u>Mapuche</u></b> [prompt on <u>Araucanians</u>]",
-      "<b><u>Chile</u></b> [or Republic of <b><u>Chile</u></b>]",
-      "<b><u>mestizo</u></b>s [or <b><u>mestiza</u></b>s or <b><u>mestiza</u></b>je or <b><u>castizo</u></b>; reject “mulatto”]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "History",
-     "subcategory": "World History"
-    },
-    {
-     "leadin": "One of the “loop” types of these drugs, furosemide, works by inhibiting a Na-K-Cl co-transporter. For 10 points each,",
-     "parts": [
-      "Name these drugs, one type of which leaves a large concentration of sodium in the proximal convoluted tubule. Vasopressin counters the effects of these drugs.",
-      "The aforementioned loop diuretics operate on the Loop of Henle, a part of this functional unit of the kidney.",
-      "A lack of vasopressin production can lead to the “insipidus” form of this condition. A drug used to treat this condition is metformin."
-     ],
-     "answers": [
-      "<b><u>diuretics</u></b> [accept loop <b><u>diuretics</u></b> or anti-<b><u>diuretic</u></b> hormone; anti-prompt on <u>carbonic anhydrase</u> <u>inhibitors</u>]",
-      "<b><u>nephron</u></b>s [anti-prompt on <u>glomerulus</u> or <u>distal convoluted tubule</u> or <u>proximal convoluted</u> <u>tubule</u> or <u>renal corpuscle</u>]",
-      "<b><u>diabetes</u></b> [accept <b><u>diabetes</u></b> insipidus or type 2 <b><u>diabetes</u></b> or <b><u>diabetes</u></b> mellitus]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Biology"
-    },
-    {
-     "leadin": "In 2022, this actress declined to reprise the role of Inez on Broadway in favour of starring as Cinderella in a revival of <em>Into The Woods</em>. For 10 points each:",
-     "parts": [
-      "Name this actress who originated Inez in the musical <em>Suffs</em>. Another character originated by this actress sings of destroying her unfaithful husband’s love letters in the song “Burn.”",
-      "That character Soo originated is Eliza Schuyler, the wife of the title Founding Father in this Pulitzer Prize-winning Lin-Manuel Miranda hip-hop musical.",
-      "Another Broadway role Soo originated was this female title character in a Dave Malloy musical based on the work of Leo Tolstoy, who ends it by watching “the Great Comet of 1812.”"
-     ],
-     "answers": [
-      "Phillippa <b><u>Soo</u></b> [or Phillipa Anne <b><u>Soo</u></b>]",
-      "<em><b><u>Hamilton</u></b></em>",
-      "<b><u>Natasha</u></b> Rostova [accept <em><b><u>Natasha</u></b>, Pierre and the Great Comet of 1812</em>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Fine Arts",
-     "subcategory": "Other Fine Arts"
-    },
-    {
-     "leadin": "This goddess sometimes appears as a white dog, and sends her sister on a journey to retrieve Lohi’au. For 10 points each:",
-     "parts": [
-      "Name this goddess of fire and volcanoes, who is said to reside in the caldera of Mount Kilauea.",
-      "Pele once competed in this activity against the chief Kahawali, in which she lost due to her inexperience. In another story, Pele competed with the snow goddess Poli’ahu in this activity, which uses a narrow wooden object.",
-      "Pele governs volcanoes like Mauna Kea and Mauna Loa on this archipelago, whose natives perform hula dances."
-     ],
-     "answers": [
-      "<b><u>Pele</u></b>",
-      "lava <b><u>sled</u></b>ding [or he’e <b><u>holua</u></b>]",
-      "<b><u>Hawai’i</u></b> [or <b><u>Hawaii</u></b>an Islands; prompt on <u>Polynesia</u>n Islands]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Mythology",
-     "subcategory": "Mythology"
-    },
-    {
-     "leadin": "For 10 points each, answer the following about the appearance of a certain composer’s music in the trailer for Wes Anderson’s<em> The Phoenician Scheme</em>.",
-     "parts": [
-      "Anderson’s trailer features an allusion to this movement of a larger work, which follows a <em>Berceuse</em> lullaby in which an evil king lures followers into sleep. This movement is scored in 7/4 time.",
-      "This composer of <em>The Firebird</em> also composed music for <em>The Rite of Spring</em>.",
-      "Festive music from the first tableaux of this ballet also features in the trailer. That energetic music depicts a crowd gathering for the Shrovetide Fair, the main setting of this ballet named for a puppet."
-     ],
-     "answers": [
-      "the <b><u>finale</u></b> from<em> The</em> <em><b><u>Firebird</u></b></em> [accept equivalents mentioning the <b><u>last</u></b> movement of the 1919 suite from<em> The</em> <em><b><u>Firebird</u></b></em>]",
-      "Igor <b><u>Stravinsky</u></b>",
-      "<em><b><u>Petrushka</u></b></em>[or <em><b><u>Petrouchka</u></b></em>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Fine Arts",
-     "subcategory": "Auditory Fine Arts"
-    },
-    {
-     "leadin": "Steve Dahl complained about having to “defend [himself] as a racist homophobe” in his 2016 book about an event he organised in opposition to this music style. For 10 points each:",
-     "parts": [
-      "Name this style of music, whose records were blown up in a crate during a 1979 “Demolition Night” Dahl organised at Comiskey Park. The movie <em>Saturday Night Fever</em> helped popularize this style.",
-      "Dahl organised Disco Demolition Night as a promotion for this baseball team. Eight members of this Chicago team were banned for life after conspiring to fix the 1919 World Series.",
-      "This Chicago-based TV show helped popularise disco by regularly featuring acts like Donna Summer and Kool and the Gang in the 1970s. This music program, one of the first national shows produced by and for Black Americans, was hosted by its creator, Don Cornelius."
-     ],
-     "answers": [
-      "<b><u>disco</u></b> music [accept <b><u>Disco</u></b> Demolition Night]",
-      "the Chicago <b><u>White Sox</u></b> [prompt on <u>Sox</u>; prompt on <u>Black Sox</u> with “what team were the players dubbed ‘Black Sox’ actually part of?”; reject “Cubs” or “Chicago Cubs”]",
-      "<em><b><u>Soul Train</u></b></em>"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "History",
-     "subcategory": "American History"
-    },
-    {
-     "leadin": "According to tradition either six or twelve extra recitations of takbir are said during prayers named for this word. For 10 points each:",
-     "parts": [
-      "Name this Arabic word meaning “feast”, which precedes “al-Fitr” in the name of the festival that marks the end of Ramadan.",
-      "Eid al-Fitr marks the end of this annual obligation for Muslims. This fourth pillar of Islam is characterized by fasting during Ramadan.",
-      "Eid al-Fitr corresponds to the first day of this month of the Islamic calendar. This month comes after Ramadan."
-     ],
-     "answers": [
-      "<b><u>Eid</u></b> [accept <b><u>Eid</u></b> al-Fitr; accept <b><u>Eid</u></b> prayers or <b><u>Eid</u></b> salaah]",
-      "<em><b><u>sawm</u></b></em> [accept <em><b><u>roza</u></b></em> or <em><b><u>puasa</u></b></em>]",
-      "<b><u>Shawwāl</u> </b>"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Religion",
-     "subcategory": "Religion"
-    },
-    {
-     "leadin": "The time residence distribution characterizes these devices, which is a delta function in the “plug-flow” type of them. For 10 points each,",
-     "parts": [
-      "Name these devices. The presence of “dead zones” of stagnant fluid flow in these devices drastically reduces efficiency.",
-      "The residence time distribution is a delta function in a PFR as this process doesn’t occur axially. In the lab, this process is commonly done with a rotating magnetic bar to homogenize a solution.",
-      "For a CSTR, the time distribution function is proportional to this function of minus t over tau. In the Arrhenius equation’s common form, this operation is applied to minus E-sub-a over R T."
-     ],
-     "answers": [
-      "chemical <b><u>reactors</u></b> [accept <b><u>Plug-flow Reactor</u></b>; do NOT accept nuclear reactor]",
-      "<b><u>mixing</u></b> [accept <b><u>stirring</u></b>]",
-      "<b><u>exponential</u></b> function [accept <b><u>e to the x</u></b> or <b><u>e to the minus x</u></b>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Science",
-     "subcategory": "Chemistry"
-    },
-    {
-     "leadin": "The creator of this object torments a servant with chains and owl attacks while making it. For 10 points each:",
-     "parts": [
-      "Name or describe this object commissioned by the Lord of Horikawa. Yuzuki and her monkey are burned in a carriage so that Yoshihide can finish creating this object.",
-      "Hell Screen is a work by this Japanese author. A woodcutter and a Buddhist priest are among those who give conflicting testimonies about the murder of a samurai in another work by this author.",
-      "Due to guilt from his daughter Yuzuki’s death in completing the Hell Screen, Yoshihide performs this action. The author Yukio Mishima performed a ritual form of this action known as <em>seppuku</em>."
-     ],
-     "answers": [
-      "the <b><u>Hell Screen</u></b> [accept the painting from “<b><u>Hell Screen</u></b>”; accept descriptions of a <b><u>painting</u></b> of <b><u>hell</u></b> or <b><u>Buddhist underworld</u></b>; prompt on <u>painting</u> or <u>artwork</u> or equivalents]",
-      "Ryūnosuke <b><u>Akutagawa</u></b><em>(“ak-tah-gah-wa”)</em> [or <b><u>Akutagawa</u></b> Ryūnosuke]",
-      "<b><u>suicide</u></b> [accept descriptions like <b><u>killing oneself</u></b>]"
-     ],
-     "values": [
-      10,
-      10,
-      10
-     ],
-     "category": "Literature",
-     "subcategory": "World Literature"
-    },
-    {
-     "leadin": "Vincent van Gogh copied an artwork in this genre that depicts a “sudden shower” in his painting <em>Bridge in the Rain</em>. For 10 points each:",
-     "parts": [
-      "Name this genre of art that often depicted beautiful women and actors. Mary Cassatt drew from a work in this genre depicting a woman holding two mirrors to view her hair for her own <em>The Coiffure</em>.",
-      "Ukiyo-e <em>(“oo-kee-yo-EH”)</em> originated from this Asian country. Many 19th century Western artists found inspiration from art from this country, such as the sketches in Hokusai’s <em>Manga</em>.",
-      "This artist drew directly from Hokusai’s <em>Manga</em> for a painting of a woman bent forward with her face to her knee in front of a double bass. This close friend of Mary Cassatt made a painting of her “Seated Holding Cards.”"
-     ],
-     "answers": [
-      "<b><u>ukiyo-e</u></b> [accept pictures of the <b><u>floating world</u></b>; antiprompt on <u>bijin-ga</u> with “what wider genre of art was that a part of?”]",
-      "<b><u>Japan</u></b> [or <b><u>Nihon</u></b>-koku or <b><u>Nippon</u></b>-koku]",
-      "Edgar <b><u>Degas</u></b> (the woman in that painting is a ballet dancer)"
+      "Saint <b><u>Peter</u></b> [or <b><u>Simon</u></b> Peter or <b><u>Simeon</u></b> or <b><u>Cephas</u></b> or <b><u>Petros</u></b> or <b><u>Petrus</u></b>; accept Saint <b><u>Peter</u></b>’s Basilica or Basilica di San <b><u>Pietro</u></b>]",
+      "<b><u>Brancacci</u></b> (“brahn-KAH-chee”) Chapel [or Cappella dei <b><u>Brancacci</u></b>]",
+      "<b><u>Masaccio</u></b> (“mah-SAH-choh”) [or <b><u>Tomasso di Ser Giovanni</u></b> di Simone]"
      ],
      "values": [
       10,
@@ -1531,16 +1591,76 @@ export default {
      "subcategory": "Visual Fine Arts"
     },
     {
-     "leadin": "The first explicit solution to this equation was created by Brahmagupta, though two signs are different from the modern version. For 10 points each:",
+     "leadin": "The <em>soggetto cavato</em> (“soh-JET-toh cah-VAH-toh”) system, an early type of musical cryptogram, used these syllables to represent the vowels of text in music. For 10 points each:",
      "parts": [
-      "Name this mathematical equation, whose roots are given by [read slowly] negative b plus or minus the square root of the quantity b squared minus 4 a c, all divided by 2 a.",
-      "These formulas, named for a 16th-century French mathematician, relate polynomial coefficients to symmetric functions of the roots. For a quadratic, they state that the sum of roots equals negative b over a.",
-      "Cardano’s method for solving cubics begins by transforming the equation into one of these forms, which lack the second-highest degree term. Completing the square transforms a general quadratic into this form by eliminating the linear coefficient."
+      "Name this set of seven syllables used to teach musical notes, starting with “do, re, mi.”",
+      "This composer, who invented <em>soggetto cavato</em>, used it to represent his patron’s name in the <em>Missa Hercules Dux Ferrariae</em> and to reference a story about Cardinal Sforza saying “Lascia fare mi” (“LAH-shah FAH-ray mee”) in the <em>Missa la sol fa re mi</em>.",
+      "Josquin des Prez used <em>soggetto cavato</em> to represent his own name in the piece <em>Illibata Dei virgo</em>, a piece in this genre. Thomas Tallis’s <em>Spem in alium</em> is also an example of this genre of sacred polyphonic vocal music."
      ],
      "answers": [
-      "<b><u>quadratic</u></b> equation [accept <b><u>quadratic</u></b> formula]",
-      "<b><u>Vieta’s</u></b> formulas [or <b><u>Viète's</u></b> formulas]",
-      "<b><u>depressed</u></b> polynomial [or <b><u>depressed</u></b> equation or <b><u>depressed</u></b> cubic or <b><u>depressed</u></b> quadratic]"
+      "<b><u>solfège</u></b> (“sol-FEZH”) [or <b><u>solfeggio</u></b>; or <b><u>sol-fa</u></b>; or <b><u>solfa</u></b>; or <b><u>solfeo</u></b>; accept <b><u>hexachord</u></b>; prompt on <u>solmization</u>]",
+      "<b><u>Josquin</u></b> des Prez (“zhoh-SKAHN day PRAY”) [or Josquin <b><u>des Prez</u></b>; or Josquin <b><u>Labloitte</u></b>]",
+      "<b><u>motet</u></b>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "A lintel from this culture’s city of Yaxchilán (“yahsh-chee-LAHN”) depicts Lady Xoc (“shoak”) piercing her tongue in a bloodletting ritual. For 10 points each:",
+     "parts": [
+      "Name this culture whose city of Naranjo (“nah-RON-hoh”) allied with Calakmul (“kah-lock-MOOL”) under Lady Six Sky. Royal women from this Mesoamerican civilization included Sak Kʼukʼ of Palenque (“pah-LEN-kay”) and Lady K’ayam of Chichen Itzá.",
+      "Stela 3 near this Maya city’s Caana pyramid highlights Ix (“eesh”) Batz’ Ek’s matrilineal power. This city in modern-day Belize shares its name with an observatory at Chichén Itzá, since both featured spiral-shaped structures.",
+      "Evidence for Maya women’s industry comes from Caracol’s many whorls, which weighted the “drop” type of these objects. The word “distaff” comes from centuries of women processing flax with these fusiform objects."
+     ],
+     "answers": [
+      "<b><u>Maya</u></b> [or <b><u>Mayan</u></b>s; accept <b><u>Kʼiche</u></b>ʼ or <b><u>Tzeltal</u></b> or <b><u>Tzotzil</u></b> or <b><u>Chʼol</u></b> or <b><u>Qʼeqchi</u></b>ʼ or <b><u>Mopan</u></b> or <b><u>Lacandon</u></b>]",
+      "<b><u>Caracol</u></b> [accept El <b><u>Caracol</u></b>; accept <b><u>Caracol</u></b> Stela 3] (The word “caracol” means “spiral” or “snail.” The observatory had a spiral staircase and the city had a winding road.)",
+      "<b><u>spindle</u></b>s [accept drop <b><u>spindle</u></b>s; prompt on <u>spike</u>s or <u>staff</u>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "Answer the following about the Gospel of Luke, for 10 points each.",
+     "parts": [
+      "The Gospel of Luke is sometimes paired with a book titled for the Acts of these people, which was also authored by Luke. These twelve followers of Jesus Christ included Thomas and Peter.",
+      "The Gospel of Luke uniquely contains a parable about a rich man and a beggar with this name. The Gospel of John is the only gospel that includes the story of a man with this name from the town of Bethany.",
+      "In the two-source hypothesis, this source is hypothesized to have provided material used by both the Gospels of Luke and Matthew, but not Mark."
+     ],
+     "answers": [
+      "<b><u>Apostle</u></b>s [or the Twelve <b><u>Apostle</u></b>s; accept Acts of the <b><u>Apostle</u></b>s or Práxeis <b><u>Apostólōn</u></b> or Actūs <b><u>Apostolōrum</u></b>; accept the Twelve <b><u>Disciple</u></b>s]",
+      "<b><u>Lazarus</u></b> [accept <b><u>Lazarus</u></b> of Bethany; accept the rich man and <b><u>Lazarus</u></b> or <b><u>Lazarus</u></b> and Dives]",
+      "<b><u>Q</u></b> source [or <b><u>Q</u></b> documents or <b><u>Q</u></b> gospels]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "The limiting ratio of successive intervals between “period-doubling” examples of these points gives the first Feigenbaum (“FAI-gun-baum”) constant. For 10 points each:",
+     "parts": [
+      "Name these points. One of these points that corresponds to complex conjugate eigenvalues crossing the imaginary axis is named for Hopf.",
+      "Increasingly close period-doubling bifurcations are typical of this phenomenon, in which a system is highly sensitive to its initial conditions. This phenomenon is illustrated by the “butterfly effect.”",
+      "Bifurcation points of the logistic map’s Feigenbaum diagram correspond directly to where the real axis intersects the boundary of this shape, which contains a so-called “seahorse valley” next to its “main cardioid.”"
+     ],
+     "answers": [
+      "<b><u>bifurcation</u></b>s [accept <b><u>bifurcation</u></b> diagrams; accept <b><u>bifurcation</u></b> theory; accept Hopf <b><u>bifurcation</u></b>s]",
+      "<b><u>chaos</u></b> [or <b><u>chaotic</u></b> behavior]",
+      "<b><u>Mandelbrot</u></b> set [or <b><u>Mandelbrot</u></b> fractal]"
      ],
      "values": [
       10,
@@ -1549,18 +1669,171 @@ export default {
      ],
      "category": "Science",
      "subcategory": "Other Science"
+    }
+   ]
+  },
+  "4": {
+   "name": "2022 ACF Winter Packet 4",
+   "tossups": [
+    {
+     "question": "A section of this piece opens with an “Allegro con brio, feroce” (“fair-OH-chay”) scherzo on the notes [read slowly] F sharp, G [pause] F sharp-F sharp, G. This piece’s dedicatee added annotations to each of its movements, such as one describing a “Polish cart on enormous wheels.” Alternating fortissimo and piano dotted half notes make up the first section of a movement of this piece whose second section is marked “Cum mortuis in lingua morta.” This piece’s “Catacombs” movement was among those included in Maurice Ravel’s orchestration of it, which uses a trumpet solo for its opening “Promenade.” This suite includes the movements “The Hut on Fowl’s Legs” and “The Great Gate of Kiev.” For 10 points, the paintings of Viktor Hartmann inspired what piano suite by Modest Mussorgsky?",
+     "answer": "<em><b><u>Pictures at an Exhibition</u></b></em> [or <em><b><u>Pictures from an Exhibition</u></b>,</em> or <em><b><u>Kartinki y vystavski</u></b></em>; accept “The <b><u>Hut on Hen’s Legs</u></b>” or “The <b><u>Hut on Fowl’s Legs</u></b>” until “each of its movements” is read and prompt afterwards]",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
     },
     {
-     "leadin": "The title of one short story in this collection inspired the name of the band Wolf Alice. For 10 points each:",
+     "question": "This thinker names a “gap” proposed by Robert Cummins that refers to the problem of being unable to use scientific processes to explain thoughts. He’s not Spinoza, but this thinker made a distinction between necessary and contingent truths to argue that truths of reasoning can be reduced to identities. This thinker invented the metaphysical principle that distinct objects can’t have all of their properties in common. This philosopher’s treatise <em>Discourse on Metaphysics</em> repeated claims about God that he arrived at using the principle of contradiction and the principle of sufficient reason. For 10 points, name this German author who claimed we must be in the best of all possible worlds, and who pioneered calculus independently of Isaac Newton.",
+     "answer": "Gottfried <b><u>Leibniz</u></b> [or Gottfried Wilhelm von <b><u>Leibniz</u></b>; accept <b><u>Leibniz</u></b>’s gap; accept <b><u>Leibniz</u></b>’s law]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "R. S. H. Liu proposed that this phenomenon induces the volume-preserving hula-twist mechanism. The effect of this phenomenon is the subject of the Grotthus–Draper law. A detection device for this phenomenon generates mobile “holes” and stores them in a charge inversion region before measuring the voltage change of the local electrode. Processes that [emphasize] <em>do</em> <em>not</em> result in this phenomenon are shown as squiggly lines on Jablonski diagrams. Selectors that filter for certain forms of this phenomenon include grating monochromators. When electrons in atoms drop from excited states down to their ground state, this phenomenon is emitted. For 10 points, electricity is generated when what phenomenon is incident on solar panels?",
+     "answer": "<b><u>light</u></b> [accept <b><u>photon</u></b>s; accept <b><u>UV</u></b> or <b><u>infrared</u></b> light; accept visible <b><u>light</u></b>; accept <b><u>fluorescence</u></b> or <b><u>fluorescent</u></b> light; prompt on <u>absorb</u>ing or <u>absorp</u>tion by asking “of what phenomenon?”; prompt on <u>photoisomer</u>ization or <u>photoreact</u>ion by asking “induced by what phenomenon?”; prompt on <u>wavelength</u> or EM <u>radiation</u> or electromagnetic <u>radiation</u>]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "This leader planned a “zone of peace” with France-Albert René (“FRONCE ahl-BAIR ruh-NAY”), but later prepared an invasion to forestall Paul Bérenger’s (“BAIR-on-zhay’s”) putative pro-Creole government in the abortive Operation <em>Lal Dora</em> in Mauritius. Police under this leader killed protesters of targeted demolition at the Turkman Gate, motivating the Shah Commission. This leader ordered air strikes in response to Operation Chingiz Khan to support a “Liberation War” against a 1971 genocide launched by Operation Searchlight. This leader, who oversaw the “Smiling Buddha” nuclear test and ruled by decree during “the Emergency,” was assassinated by bodyguards in 1984 in retribution for attacking Punjab’s (“pun-JOB’s”) Sikh temples in Operation Blue Star. For 10 points, Sanjay (“SUN-jay”) and Rajiv (“RAH-jeev”) were the sons of what daughter of Jawaharlal Nehru (“juh-VAH-hurr-LAHL NEH-roo”), the first female prime minister of India?",
+     "answer": "<b><u>I</u></b>ndira <b><u>Gandhi</u></b> [or <b><u>I</u></b>ndira Priyadarshini <b><u>Gandhi</u></b> or <b><u>I</u></b>ndira Priyadarshini <b><u>Nehru</u></b>; prompt on <u>Gandhi</u> or <u>Nehru</u>] (The “Indian Ocean Zone of Peace” was a precursor of the Indian Ocean Commission; René was the president of Seychelles. The third line refers to the Bangladesh Liberation War and Indo-Pakistani War of 1971.)",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "Jimmy Mundy’s arrangement of a song by an artist with this first name incorporated elements of Chu Berry’s “Christopher Columbus.” The Kids See Ghosts track “4th Dimension” samples a Christmas song by an artist with this first name, who wrote another song’s lyrics like “listen to the trombones go.” At a 1938 Carnegie Hall concert, Benny Goodman’s band performed the song “Sing, Sing, Sing” by an artist with this first name and the surname Prima. Another artist with this first name popularized his mentor King Oliver’s song “West End Blues” while leading his “Hot Five.” That artist with this first name pioneered scat singing on his recording of “Heebie Jeebies.” For 10 points, give this first name of a trumpeter who sang of “trees of green, red roses too” on “What a Wonderful World,” who had the surname Armstrong.",
+     "answer": "<b><u>Louis</u></b> [or <b><u>Louie</u></b>; accept <b><u>Louis</u></b> Armstrong or <b><u>Louie</u></b> Daniel Armstrong; accept <b><u>Louis</u></b> Prima]",
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "question": "A song about this war that was set to the tune of the “Unfortunate Miss Bailey” notes how the title men were “half a horse” and “half an alligator.” A man’s supposed actions during a battle in this war were memorialized in a slogan that began “Rumpsey Dumpsey, Rumpsey Dumpsey.” A battle in this war inspired Samuel Woodward to write a song celebrating the actions of the “Hunters of Kentucky,” who helped defend the Chalmette Plantation. Richard Mentor Johnson claimed to have killed Tecumseh during this war’s Battle of the Thames. A poem later set to the tune of “Anacreon in Heaven” was inspired by this war’s bombing of Fort McHenry. For 10 points, Francis Scott Key composed “Star-Spangled Banner” during what war that included the burning of Washington?",
+     "answer": "War of <b><u>1812</u></b>",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "The relatively high prevalence of “hidden” examples of these things may be explained by Pollock and Seligmann’s ambush hypothesis. When preparing phage display libraries, a strain of <em>E. coli</em> that ignores one of these things, called a suppressor strain, allows the incorporation of the insert onto the phage coat. The presence of a downstream PYLIS (“PAI-liss”) or SECIS (“SEE-siss”) element changes the function of these things to direct the incorporation of pyrrolysine or selenocysteine. These things mark the end of an ORF (“orf”). These things direct the addition of a water molecule by a release factor to the C-terminus of a growing polypeptide. These things, which are named amber, ochre, and opal, are prematurely created by nonsense mutations. For 10 points, name these nucleotide triplets that terminate translation.",
+     "answer": "<b><u>stop</u></b> codons [or <b><u>stop</u></b> signal or <b><u>termination</u></b> codons; accept <b><u>nonsense</u></b> mutations until read; accept <b><u>amber</u></b> or <b><u>opal</u></b> or <b><u>ochre</u></b> until each is read; prompt on <u>codon</u>s or <u>anticodon</u>s]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "At the age of three, a boy with this first name shocks his mother when a pot slowly moves towards the edge of a table after he says that soup is going to spill. A character with this first name faints after refusing to accept a draw during an eating contest with a woman nicknamed “The Elephant.” A character with this first name dies in a windstorm just minutes after a baby who also has this first name is devoured by ants. In a novel, seventeen characters with this first name are murdered due to the permanent ash crosses on their foreheads. At the start of that novel, a character with this first name recalls the first time he saw ice as he faces a firing squad. For 10 points, a colonel with what first name is the son of José Arcadio Buendía (“hoh-SAY ahr-CAH-dee-oh bwen-DEE-ah”) in <em>One Hundred Years of Solitude</em>?",
+     "answer": "<b><u>Aureliano</u></b> (“oh-ray-lee-AH-noh”) [accept Colonel <b><u>Aureliano</u></b> Buendía or <b><u>Aureliano</u></b> José Buendía or <b><u>Aureliano</u></b> Segundo Buendía or <b><u>Aureliano</u></b> Babilonia Buendía]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "This deity’s names are often invoked while making an offering made from water and three twigs during Baj prayers. He’s not Marduk, but this deity’s most commonly used name literally translates to “Lord of Wisdom.” According to tradition, a priest fetching holy water was brought before this deity by Vohu Manah. In an offshoot religion, this deity is not the creator but is instead one of the twin sons of the sect’s eponymous primary spirit, Zurvan. This deity had emanations known as the Amesha Spenta and created good spirits known as yazatas to fight against evil gods known as daevas. For 10 points, name this deity who opposes the evil Angra Mainyu, and who is the primary god of Zoroastrianism.",
+     "answer": "<b><u>Ahurā Mazdā</u></b> [or <b><u>Ormazd</u></b> or variants like <b><u>Hurmuz</u></b> or <b><u>Hormazd</u></b> or <b><u>Oromasdes</u></b>]",
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "question": "A man in this novel notes the “ache of modernism” in a woman who is impressed by his harp-playing. After fleeing to an overgrown plantation, a woman in this novel mercifully snaps the necks of several wounded pheasants. This novel’s protagonist tells her brother that they live on a “blighted star” before she falls asleep and crashes into a cart, killing their horse. This novel ends as two characters observe a black flag signifying the execution of the title character, whose final words are “I am ready” after being found asleep at Stonehenge. This novel’s protagonist shares an aristocratic surname with her rapist Alec, whom she murders before reuniting with her husband, Angel Clare. For 10 points, name this novel about the title former milkmaid, written by Thomas Hardy.",
+     "answer": "<em><b><u>Tess of the d’Urbervilles</u></b></em> [or <em><b><u>Tess of the d’Urberville</u></b>s: A Pure Woman Faithfully Presented</em>; prompt on <em><u>Tess</u></em>]",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "question": "An “open eye” is formed in a container of this substance when adjusting its composition via sealed argon bubbling. The SAE’s 41xx (“forty-one X-X”) series of this substance is made using molybdenum. Examples of this substance made prior to the use of the Linz–Donawitz process are often salvaged from shipwrecks due to their low background radiation. It’s not an element, but rapidly cooling this substance causes it to harden as it transitions from its austenite structure to its martensite structure. Basic oxygen furnaces and open hearth furnaces are used to produce this substance, which is formed by blowing air through an element’s “pig” variety in the Bessemer process. For 10 points, what alloy formed mainly from carbon and iron has a “stainless” variety?",
+     "answer": "<b><u>steel</u></b> [accept stainless <b><u>steel</u></b>; accept carbon <b><u>steel</u></b>; accept alloy <b><u>steel</u></b>; accept <b><u>cast iron</u></b>; accept low-background <b><u>steel</u></b>; reject “iron” or “Fe”]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "Georg Heinrich Flock organized resistance to one of these events after the Prince von Dornheim ordered the execution of a relative. These events contributed to primitive accumulation of capital according to a 2004 book by Silvia Federici. Planning these events brought a fortune to the former lawyer Matthew Hopkins. A frost that devastated a wine harvest sparked a series of these events in Bamberg in the 1620s and 1630s. After being expelled from Innsbruck, the Dominican friar Heinrich Kramer authored a text endorsing these events titled for a “hammer,” the <em>Malleus Maleficarum</em>. Common practices during these events involved pricking the skin and seeing if subjects would float after being thrown into a river. For 10 points, name these events that convicted women for supposed magical powers.",
+     "answer": "<b><u>witch</u></b> hunts [or <b><u>witch</u></b> trials; or descriptions of <b><u>witch</u></b>es being tried or executed or burned; prompt on <u>ordeal</u>s or <u>trial</u>s or equivalents] (The book in the second sentence is <em>Caliban and the Witch</em>.)",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "In the preface to one of his novels, this author compares novelists to different windows in a “house of fiction” and praises a scene in which the protagonist contemplates her stepdaughter’s suitors in front of a dying fire. This author argued against Walter Besant’s suggestion that novels be confined to the author’s experience in an essay from his collection <em>Partial Portraits</em> titled “The Art of Fiction.” In his <em>New York Edition</em>, this author prepended a preface regarding his time in Florence to a novel in which Pansy is revealed to be the daughter of Madame Merle. In that novel by this author, the protagonist visits the dying Ralph Touchett before returning to Rome and her husband Gilbert Osmond. For 10 points, name this author who created Isabel Archer in his novel <em>The Portrait of a Lady</em>.",
+     "answer": "Henry <b><u>James</u></b>",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "In the <em>Volundarkvida</em> (“VOH-lun-dar-k’VEE-dah”), Völund (“VOH-lund”) and his brothers marry some of these non-human creatures before they mysteriously leave 10 years later. The maiden Fionnghuala (“fee-ah-NWAH-lah”) and her brothers are turned into these creatures by their stepmother Aoife (“EE-fah”) in the Irish story <em>The Children of Lir</em>. These creatures transport a knight who must never be asked his name in Wolfram von Eschenbach’s epic <em>Parzival</em>. They’re not seals, but a prevalent European folktale motif revolves around men stealing the transformational garments of “maidens” named for these creatures. In the <em>Kalevala</em> (“KAH-lay-vah-lah”), Lemminkäinen (“lemon-KAI-nin”) gets chopped into pieces while trying to kill one of these creatures in Tuonela (“TOO-oh-nell-ah”). For 10 points, Zeus raped Leda in the form of what beautiful white bird identified with the constellation Cygnus?",
+     "answer": "<b><u>swan</u></b>s [or <b><u>Schwan</u></b>e; or <b><u>svan</u></b>r; or <b><u>eala</u></b>í; or <b><u>joutsen</u></b>ia; accept <b><u>cygni</u></b> or <b><u>cygnus</u></b>; accept the <b><u>Swan</u></b> Knight; accept <b><u>swan</u></b> maidens; prompt on <u>bird</u>s or <u>avian</u>s or <u>Aves</u> or water<u>fowl</u>]",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "A character in this play shrieks and puts out a lamp at sunrise after her son tells her that she “must come to the rescue.” After being warned not to show a lack of “faith in a Higher Providence,” a character in this play is convinced not to insure a building named for her husband, a captain who had an affair with a maid. In this play, Jacob makes an offer to take the blame when an orphanage is accidentally burned down by Pastor Manders. After Regina and her half brother unknowingly fall in love in this play, Helen learns that her son Oswald has inherited syphilis from his father when Oswald asks her to euthanize him. For 10 points, Mrs. Alving describes the title supernatural figures as representing “dead ideas” and “lifeless beliefs” in what play by Henrik Ibsen?",
+     "answer": "<em><b><u>Ghosts</u></b></em> [or <em><b><u>Gengangere</u></b></em>]",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "question": "A concession for processing this resource was condemned in a 1930 report by trypanosome researcher Cuthbert Christy, causing the resignation of President Charles D. B. King. Walter Hardenburg indicted the “devil’s paradise” created by J. C. Arana’s control of this resource in Putumayo (“poo-too-MAH-yo”). This resource and tin were the main exports of British Malaya. During its fin de siècle (“fahn duh SYECK-ull”) “boom,” many Sephardic Jews traded coffee and this crop from Iquitos (“ee-KEE-toce”) and Manaus (“mah-NOWCE”). Square dancing was compulsory for collectors of this resource in the failed company town of Fordlândia, Brazil. E. D. Morel and Roger Casement exposed the Force Publique chopping off workers’ hands to enforce this crop’s quotas in the Congo Free State. For 10 points, what crop was processed by Firestone after Charles Goodyear invented its vulcanization?",
+     "answer": "<b><u>rubber</u></b> [accept <b><u>latex</u></b>; accept vulcanized <b><u>rubber</u></b>; accept Amazon <b><u>rubber</u></b> boom or Ciclo da <b><u>borracha</u></b>; accept Pará <b><u>rubber</u></b> trees or <b><u>sharinga</u></b> or <em><b><u>Hevea</u></b> brasiliensis</em>; accept <b><u>caucho</u></b> or <b><u>caoutchouc</u></b>; prompt on <u>tree</u>s or <u>euphorbia</u>s or <u>spurge</u>s] (The first line refers to Harbel’s Firestone plantation in Liberia, which still exists. Arana controlled the Peruvian Amazon Company.)",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "This constant’s value is renormalized by the Immirzi (“ih-MEER-zee”) parameter. Apparent coincidences in physical values inspired the claim that this quantity is inversely proportional to time as part of Dirac’s large numbers hypothesis. This least-accurately-known fundamental constant multiplies “8 pi over the speed of light to the power 4” in a theory’s field equations. The hierarchy problem concerns the small value of this fundamental constant, which in meters cubed per kilogram per second squared equals “6.674 times 10 to the minus 11.” This constant times the product of two masses all over distance squared gives the strength of a fundamental force. For 10 points, name this constant that appears in Newton’s universal law of its eponymous force.",
+     "answer": "<b><u>gravitational</u></b> constant [or big <b><u>G</u></b>; or universal <b><u>gravitational</u></b> constant or <b><u>Newton</u></b>’s constant or <b><u>Newtonian</u></b> constant of gravitation or <b><u>Cavendish</u></b> constant; prompt on <u>gravity</u> or <u>gravitation</u>; reject “little g”]",
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "question": "In a work that uses this technique, a woman holds a baby by a bare tree as a seated nude woman with a red and white plaid (“plad”) hat places her foot in a basin. This technique was used to depict artists such as Käthe (“KAY-tuh”) Kollwitz and Weimar politicians in a work whose artist also used this technique in the series <em>From an Ethnographic Museum</em>. This technique was used for <em>The Calabash</em> by Romare (“ROH-muh-ree”) Bearden, as well as for a work partly titled for a <em>Kitchen Knife Dada</em> by Hannah Höch (“herk”). Due to his failing health, Henri Matisse designed the prints in the book <em>Jazz</em> using découpage, a version of this general technique that was used for Dadaist photomontages. For 10 points, name this technique in which paper, photographs, or other materials are glued onto a painting.",
+     "answer": "<b><u>collage</u></b> [accept <b><u>découpage</u></b> until read; accept <b><u>cut-out</u></b>s; accept <b><u>photomontage</u></b> until read]",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "This thinker, who is not Heinz Von Foerster, gave a conference address entitled “The Cybernetics of Cybernetics” that helped pioneer the field of second-order cybernetics. Martin Orans defended this thinker’s ability to identify jokes in <em>Not Even Wrong</em>. This thinker described how a society’s men “primped” themselves while the women worked in a book that contrasts the Tchambuli, Mundugumor, and Arapesh. This author was argued to have been misled by a lying informant in a book on their “Fateful Hoaxing<em>”</em> by Derek Freeman. This author of <em>Sex and Temperament in Three Primitive Societies</em> may have romanticized adolescents in a book about sexual development on the island of Ta’u. For 10 points, name this anthropologist who wrote <em>Coming of Age in Samoa.</em>",
+     "answer": "Margaret <b><u>Mead</u></b>",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "A protester from this country, who became iconic when she was killed while wearing a T-shirt reading “Everything Will Be OK,” was nicknamed “Angel.” On the 2022 anniversary of a change of government in this country, business owners shut their stores in the “Silent Strike.” Symbols of a protest movement in this country include a red ribbon and the song “Kabar Maykay Bu” (“KAH-bar MAY-kay boo”). A dance workout video filmed in this country captured vehicles involved in a 2021 coup, which was followed by its ongoing Spring Revolution. In 2021, this country’s Tatmadaw (“TAT-mah-dor”) armed forces overthrew a Nobel Peace Prize winner who has been criticized for her response to the genocide of its Rohingya (“roh-HIN-juh”) population. For 10 points, name this country once led by Aung San Suu Kyi (“aong sahn soo CHEE”).",
+     "answer": "<b><u>Myanmar</u></b> [or <b><u>Burma</u></b> or <b><u>Bama</u></b>; or <b><u>Mranma</u></b>; or Republic of the Union of <b><u>Myanmar</u></b> or Pyidaungzu <b><u>Myanma</u></b> Naingngandaw] (The first line refers to Kyal Sin.)",
+     "category": "Current Events",
+     "subcategory": "Current Events"
+    },
+    {
+     "question": "In one story, this deity beat another in a drinking contest and convinced him to hand over his <em>mes</em>, or divine decree for rule. To save this deity, a god used the dirt under his fingernails to create kurjara and galatura, who gave this deity the food and water of life. The eight-pointed star is a symbol of this deity, who rode in a chariot pulled by lions. This deity was revived with the help of the attendant Ninshubur after a journey that involved several run-ins with the gatekeeper Neti. To complete the funeral rites for Gugulanna, this deity had to remove seven pieces of clothing while descending through the underworld. Gilgamesh threw the Bull of Heaven at this consort of Dumuzid after turning down her advances. For 10 points, name this Mesopotamian goddess of war and love.",
+     "answer": "<b><u>Ishtar</u></b> [or <b><u>Inanna</u></b>; accept <b><u>Astarte</u></b> or <b><u>Ashtart</u></b>]",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    }
+   ],
+   "bonuses": [
+    {
+     "leadin": "Answer the following about PARP (“parp”) inhibitors, for 10 points each.",
      "parts": [
-      "Name this collection by Angela Carter, whose title story features the Marquis gifting a choker of rubies to its narrator before pressing the key of its namesake location into her forehead.",
-      "<em>The Bloody Chamber</em> is comprised of feminist reworkings of these works, which were collected by Charles Perrault and the Brothers Grimm.",
-      "In another<em> Bloody Chamber</em> story, an atypical depiction of this character dies by pricking her finger on a rose thorn. This character’s story typically begins with her mother wishing for a child who looks like her after seeing three drops of blood on the ground."
+      "PARP inhibition is synthetic lethal with mutations in BRCA1 (“BRACK-uh-one”) or BRCA2 (“BRACK-uh-two”), which confer a genetic risk for this disease. This disease is screened for with self-exams and mammograms.",
+      "PARP inhibition is also synthetically lethal with mutations in this tumor suppressor, whose inherited mutations cause Li–Fraumeni (“fro-MAY-nee”) syndrome. This protein is mutated in about 50 percent of human cancers.",
+      "This E3 ubiquitin ligase targets p53 for degradation. Staining for CDK4 or this protein can be used to distinguish liposarcoma from benign lipomatous (“LAI-po-muh-tuss”) tumors."
      ],
      "answers": [
-      "<em>The</em> <em><b><u>Bloody Chamber</u></b></em>",
-      "<b><u>fairy tale</u></b>s [or <b><u>folk tale</u></b>s or <b><u>folklore</u></b> or <b><u>fairy stories</u></b>; prompt on <u>children’s stories</u> or equivalents; reject “fables”]",
-      "<b><u>Snow White</u></b>"
+      "<b><u>breast cancer</u></b> [prompt on <u>cancer</u> or <u>tumor</u>s]",
+      "<b><u>p53</u></b> [or T<b><u>P53</u></b> or tumor <b><u>protein 53</u></b> or tumor suppressor <b><u>protein 53</u></b> or TR<b><u>P53</u></b> or transformation-related <b><u>protein 53</u></b>]",
+      "<b><u>Mdm2</u></b> [or <b><u>mouse double minute 2</u></b> homolog]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "A man obsessed with the “blank spaces” on maps is dismayed to discover that one of them has become a “place of” this concept. For 10 points each:",
+     "parts": [
+      "Name this concept that “was here yesterday” according to a character sitting aboard the <em>Nellie</em> in a frame story, who suddenly notes that the Thames has been one of the “places of the earth” described by this concept.",
+      "Chinua Achebe’s essay “An Image of Africa” criticized this Polish-British author for equating Africans with the title concept in his novella <em>Heart of Darkness</em>.",
+      "Contra Achebe, this postcolonial thinker praised Conrad for recognizing the “autonomy” of darkness in the essay “Two Visions in <em>Heart of Darkness</em>” from his collection <em>Culture and Imperialism</em>."
+     ],
+     "answers": [
+      "<b><u>dark</u></b>ness [accept <b><u>dark</u></b> places of the earth]",
+      "Joseph <b><u>Conrad</u></b> [or Josef Teodor <b><u>Konrad</u></b> Korzeniowski]",
+      "Edward <b><u>Said</u></b> (“sai-EED”) [or Edward Wadie <b><u>Said</u></b>]"
      ],
      "values": [
       10,
@@ -1571,16 +1844,316 @@ export default {
      "subcategory": "British Literature"
     },
     {
-     "leadin": "While inspired in his time serving this ruler, Procopius backdated his reign to increase the number of infrastructure projects listed in his treatise <em>On Buildings</em>. For 10 points each:",
+     "leadin": "An essay compares today’s workmen with the life of this man, whose “hatred of death” leads to the “unspeakable penalty” of accomplishing nothing. For 10 points each:",
      "parts": [
-      "Name this Byzantine emperor whose advisor Tribonian helped him create a namesake law code. This husband of Theodora quashed the Nika riots.",
-      "After becoming disillusioned with Justinian, Procopius wrote this work attacking him and Theodora. This work infamously claimed that Justinian was a demon who could detach his own head.",
-      "Procopius may have turned on Justinian after witnessing Belisarius’ brutal conquest of this Byzantine exarchate. This city was the capital of the Ostrogothic Kingdom under Theodoric."
+      "Name this man who is used as an example of an “absurd hero” in an essay that he titles, which ends by stating, “One must imagine [this man] happy.”",
+      "“The Myth of Sisyphus” was written by this French author and thinker, whose philosophy of absurdism is prominent in his novel <em>The Stranger</em>.",
+      "Camus holds that “from the moment absurdity is recognized, it becomes” one of these things. Book Two of David Hume’s <em>A Treatise of Human Nature</em> claims these specific things are solely responsible for human motivation."
      ],
      "answers": [
-      "<b><u>Justinian I</u></b> [or <b><u>Justinian the Great</u></b>; or Flavius Petrus Sabbatius <b><u>Iustinianus</u></b>; prompt on <u>Justinian</u>]",
-      "the <em><b><u>Secret History</u></b></em> [accept <em><b><u>Historia Arcana</u></b></em> or <em><b><u>Anecdota</u></b></em>]",
-      "<b><u>Ravenna</u></b> [accept Exarchate of <b><u>Ravenna</u></b>]"
+      "<b><u>Sisyphus</u></b> [or <b><u>Sisyphe</u></b>; accept “The Myth of <b><u>Sisyphus</u></b>” or “Le mythe de <b><u>Sisyphe</u></b>]",
+      "Albert <b><u>Camus</u></b> (“cah-MOO”)",
+      "<b><u>passion</u></b>s [accept “Of the <b><u>Passions</u></b>”; prompt on <u>emotion</u>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "This city was renamed “Shōnan” during its control by the Kempeitai, who massacred Chinese residents in the “Sook Ching” and tortured detainees at Changi Prison in the “Double Tenth Incident.” For 10 points each:",
+     "parts": [
+      "Name this city where Azad Hind was based during its Japanese occupation. This “Gibraltar of the East” in the Straits Settlements fell four days before the bombing of Darwin in 1942.",
+      "After the fall of Singapore, the Japanese advance on New Guinea was halted in this 1942 campaign, which is named for a trail whose Papuan carriers were given a racist nickname by Australian troops.",
+      "This defunct interwar predecessor of the United Nations awarded Japan the “South Seas Mandate” that it used to launch its capture of Rabaul, which precipitated the Kokoda Track campaign."
+     ],
+     "answers": [
+      "<b><u>Singapore</u></b> [or <b><u>Singapura</u></b> or <b><u>Xīnjiāpō</u></b>; accept Battle of <b><u>Singapore</u></b> or Fall of <b><u>Singapore</u></b>]",
+      "<b><u>Kokoda</u></b> Track campaign [accept <b><u>Kokoda</u></b> Trail]",
+      "<b><u>League</u></b> of Nations [or <b><u>Société</u></b> des Nations; accept the <b><u>League</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "leadin": "During the 16th century, these works changed from featuring a large central figure to featuring three equally sized figures to create triadic symmetry. For 10 points each:",
+     "parts": [
+      "Name these reliefs that include a plaque depicting a river-leaf motif and a coral-clad king with two mudfish at his waist. Some of these works, made with lost-wax casting, depict Portuguese visitors to a West African kingdom.",
+      "The king in that plaque holds two of these animals, which symbolized the Oba of Benin, while other reliefs depict their heads on warriors’ armor. West African stools depicting these animals share their name with the character Osebo.",
+      "After being looted by English forces invading Nigeria, many Benin Bronzes were taken to this London museum, where they remain on display. This museum has refused to return the Elgin Marbles to Greece."
+     ],
+     "answers": [
+      "<b><u>Benin</u></b> <b><u>Bronze</u></b>s [or <b><u>Benin</u></b> <b><u>Brass</u></b>es; accept <b><u>Edo</u></b> in place of “Benin”; accept <b><u>oze</u></b> or <b><u>ęronwo</u></b> or <b><u>eronmwen</u></b> in place of “Bronzes”; prompt on <u>bronze</u>s or <u>brass</u> sculptures]",
+      "<b><u>leopard</u></b>s [or <em><b><u>P</u></b>anthera</em> <em><b><u>pardus</u></b></em>; or <b><u>ekpe</u></b> or <b><u>ekpen</u></b>; accept <b><u>Ekpe</u></b> n’Owa or “<b><u>leopard</u></b> of the house”; prompt on big <u>cat</u>s or <u>feline</u>s or <u>felid</u>s or <em><u>Panthera</u></em>]",
+      "<b><u>British</u></b> Museum"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "Yao Bikuni ate the flesh of a creature of this type called a ningyo<em>,</em> allowing her to live for one thousand years before becoming a Buddhist nun. For 10 points each:",
+     "parts": [
+      "Name these general mythological creatures often depicted with the top half of a human and bottom half of a fish.",
+      "Mermaids from this country called sirenas live with other aquatic humanoids called siyokoys and kataws. A monster from this country that resembles a bipedal horse makes travelers lose their way in the forest.",
+      "In Thai myth, Suvaṇṇmacchā was a mermaid who fell in love with this god while he built a bridge from India to Lankā. This vānara was the son of Vāyu."
+     ],
+     "answers": [
+      "<b><u>mermaid</u></b>s [or <b><u>merpeople</u></b> or <b><u>merfolk</u></b> or <b><u>mermen</u></b>; prompt on <u>siren</u>s]",
+      "<b><u>Philippines</u></b> [or Republic of the <b><u>Philippines</u></b>; or Republika ng <b><u>Pilipinas</u></b>] (The bipedal horse is the tikbalang.)",
+      "<b><u>Hanumān</u></b> [accept <b><u>Ānjaneya</u></b>] (The vānara were monkeys.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "The stability of these systems is quantified by their zeta potential, which is measured at their slipping plane. For 10 points each:",
+     "parts": [
+      "Name these systems whose stability decreases when they undergo flocculation.",
+      "This theory posits a Yukawa potential proportional to the Bjerrum (“B’YEH-rum”) length in order to model the effects of electrical double layers on the stability of colloids.",
+      "DLVO theory combines the effects of electrical double layer forces and these weak intermolecular forces, which include London dispersion forces and are named after a Dutch scientist."
+     ],
+     "answers": [
+      "<b><u>colloid</u></b>s [or <b><u>colloid</u></b>al suspensions or <b><u>colloid</u></b>al dispersions; prompt on <u>dispersion</u>s or <u>suspension</u>s; prompt on <u>aerosol</u>s or <u>gel</u>s or <u>emulsion</u>s by asking “that is an example of what more general type of system?”]",
+      "<b><u>DLVO</u></b> theory [or <b><u>Derjaguin–Landau–Verwey–Overbeek</u></b> theory]",
+      "<b><u>van der Waals</u></b> forces [or <b><u>van der Waals</u></b> interaction]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "Gabriel-Joseph de la Vergne (“VAYR-nyuh”) attributed a series of these works to a Portuguese nun, despite writing them himself. For 10 points each:",
+     "parts": [
+      "Name this type of work. Madame de Sévigné (“say-veen-YAY”) gained fame from the publication of over 1,000 of these works that she wrote over the course of 30 years.",
+      "The narrator’s grandmother admires the letters of Madame de Sévigné (“say-veen-YAY”) in this author’s novel <em>In Search of Lost Time</em>.",
+      "In her novel <em>Letters from a</em> <em>Peruvian Woman</em>, Françoise de Graffigny (“frahn-SWAHZ duh grah-feen-YEE”) criticizes French society from a fictional outsider’s perspective in the style of this French author’s <em>Persian Letters</em>."
+     ],
+     "answers": [
+      "<b><u>letter</u></b>s [or <b><u>correspondence</u></b>s; or <b><u>missive</u></b>s; or <b><u>epistle</u></b>s; accept <b><u>epistolary</u></b> novels; accept <em><b><u>Letter</u></b>s of a Portuguese Nun</em> or <em>Les</em> <em><b><u>Lettre</u></b>s Portugaises</em>]",
+      "Marcel <b><u>Proust</u></b> (“proost”) [or Valentin Louis Georges Eugène Marcel <b><u>Proust</u></b>]",
+      "Baron de <b><u>Montesquieu</u></b> [or Charles-Louis de <b><u>Secondat</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "Heraclius sent the monoenergist Georgian prefect Cyrus to hunt down this group’s Miaphysite leader Benjamin I in 631, shortly after their homeland’s brief Sasanian conquest. For 10 points each:",
+     "parts": [
+      "Name this ethno-religious group that converted people to their south in Alodia and Nobatia. Shenoute led this group’s White Monastery in Sohag, where 11th-century frescoes depict their rule by Badr’s Armenians.",
+      "The Coptic Patriarch of Alexandria chose the head of this kingdom’s Tewahedo Church before a 9th-century schism. Kaleb and Ezana were Christian neguses of this kingdom based in modern-day Eritrea and Ethiopia.",
+      "Abraha of Aksum supposedly invaded this Qurayshi city in 570 CE’s “Year of the Elephant.” Some early Muslims fled to Adulis and Aksum [emphasize] <em>from</em> this birthplace of the Prophet Muhammad in the “First Hijra.”"
+     ],
+     "answers": [
+      "<b><u>Copt</u></b>s [or <b><u>Coptic</u></b> Christians; or <b><u>niremənkhēmi</u></b> or al-<b><u>qibṭ</u></b>; accept <b><u>Coptic</u></b> Orthodox Church or al-Kanīsa al-<b><u>Qibṭiyya</u></b> al-ʾUrṯūḏuksiyya or Ti.eklyseya en.<b><u>remenkimi</u></b> en.orthodoxos; prompt on <u>Egyptian</u>s or El-<u>Maṣr</u>eeyeen or Ewlad <u>Maṣr</u> or <u>Miṣr</u>; prompt on Oriental <u>Orthodox</u> or <u>Christian</u>s]",
+      "<b><u>Aksum</u></b> [or Kingdom of <b><u>Axum</u></b> or <b><u>Aksum</u></b>ite Empire or Mängəśtä ʾ<b><u>äksum</u></b>; prompt on <u>Abyssinia</u>]",
+      "<b><u>Mecca</u></b> [or <b><u>Makkah</u></b> or <b><u>Makkah</u></b> al-Mukarramah; accept <b><u>Umm al-Qura</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "Residents of a region of this U.S. state jokingly call tourists to one of its islands “fudgies” because they are rarely able to leave without purchasing its famous fudge. For 10 points each:",
+     "parts": [
+      "Name this US state where “yoopers” and “trolls” occupy Upper and Lower Peninsulas framed by four of the five Great Lakes, including one that provides this state’s name.",
+      "Finnish immigrants welcomed the Cornish diaspora’s baked pasties (“PASS-tees”) to the Upper Peninsula because they resembled a pasty from this region, which borders Lake Ladoga and the White Sea and is divided between Russia and Finland.",
+      "The Jesuit missionary Jacques Marquette (“mar-KET”) founded this second-largest city of the Upper Peninsula. This city’s namesake Soo Locks span a river that separates it from a larger, identically named city in Ontario."
+     ],
+     "answers": [
+      "<b><u>Michigan</u></b> [or <b><u>MI</u></b>; accept Upper Peninsula of <b><u>Michigan</u></b> or Lower Peninsula of <b><u>Michigan</u></b>]",
+      "<b><u>Karelia</u></b> [or <b><u>Karjala</u></b> or <b><u>Karélija</u></b> or <b><u>Korjela</u></b> or <b><u>Karelen</u></b>]",
+      "<b><u>Sault Ste. Marie</u></b> (“soo saint muh-REE”)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Geography",
+     "subcategory": "Geography"
+    },
+    {
+     "leadin": "Name these directors of non-English-language films titled for mothers, for 10 points each.",
+     "parts": [
+      "A woman calmly dances in a field in the opening of this director’s film <em>Mother</em>. This Korean director described the “one-inch tall barrier of subtitles” in an Oscar speech after winning Best Picture for <em>Parasite</em>.",
+      "Two teenage boys go on a raunchy road trip with a middle-aged woman in this director’s film <em>Y tu mamá también</em> (“ee too mah-MAH tahm-b’YEN”). This director drew on his childhood for a 2018 film about an Indigenous housekeeper.",
+      "In this director’s film <em>Mamma Roma</em>, a former sex worker hides her profession from her son. This gay Italian director’s staunch anti-Fascist views and profane films like <em>Salò</em> contributed to his mysterious unsolved murder."
+     ],
+     "answers": [
+      "<b><u>Bong</u></b> Joon-ho",
+      "Alfonso <b><u>Cuarón</u></b> (“kwah-ROHN”) [or Alfonso <b><u>Cuarón</u></b> Orozco; prompt on <u>Orozco</u>] (The second film is <em>Roma</em>.)",
+      "Pier Paolo <b><u>Pasolini</u></b>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "leadin": "Brendan Koerner’s book about the “golden age” of this crime includes the story of Raffaele Minichiello, whom the Italian government refused to extradite after he committed this crime. For 10 points each:",
+     "parts": [
+      "Name this crime, which was the subject of an unsolved FBI case from 1971 codenamed NORJAK. A description is acceptable.",
+      "Many American hijackers hoped to obtain passage to this country. Soviet missiles stationed in this country almost sparked international war during the Kennedy administration.",
+      "Koerner also wrote about Roger Holder and Cathy Kerkow’s 1972 hijacking to free this activist from jail. This activist went into hiding after being accused by the FBI of participating in George Jackson’s jailbreak from San Quentin Prison."
+     ],
+     "answers": [
+      "<b><u>hijack</u></b>ing a plane [or <b><u>skyjack</u></b>ing; accept <b><u>air piracy</u></b>; accept descriptions such as <b><u>commandeer</u></b>ing a plane; reject “carjacking” or “hijacking a car”] (The case was the D. B. Cooper hijacking.)",
+      "<b><u>Cuba</u></b> [or Republic of <b><u>Cuba</u></b> or República de <b><u>Cuba</u></b>; accept <b><u>Cuban</u></b> Missile Crisis]",
+      "Angela <b><u>Davis</u></b> [or Angela Yvonne <b><u>Davis</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "“In the beginning was the Word, and the Word was with God, and the Word was God.” For 10 points each:",
+     "parts": [
+      "That quote is the King James translation of the first verse of the first chapter of what New Testament book? This non-synoptic and final gospel relates different events than the first three.",
+      "“The Word” is the usual English translation of this Greek word, which in a biblical context is usually interpreted to refer metaphorically to the pre-existent form of Jesus Christ.",
+      "This theologian argued that the Word emanated from, but is inseparable from, the Father. This theologian attacked Greek philosophy’s place in Christian thinking by asking “what has Athens to do with Jerusalem?”"
+     ],
+     "answers": [
+      "Gospel of <b><u>John</u></b> [or Gospel According To Saint <b><u>John</u></b> or Euangélion katà <b><u>Iōánnēn</u></b>]",
+      "<b><u>logos</u></b>",
+      "<b><u>Tertullian</u></b> [or Quintus Septimius Florens <b><u>Tertullian</u></b>us]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "After this character delivers a punch as “quick as the flame from a discharged cannon at night,” his victim’s body is compared to “handling a dead snake.” For 10 points each:",
+     "parts": [
+      "Name this “handsome sailor” who kills the master-at-arms John Claggart after being falsely accused of plotting a mutiny in a posthumously published novel titled for him.",
+      "After the title character is hanged for murdering Claggart, the “spar from which he was suspended” is compared to the Cross in this author’s novel <em>Billy Budd</em>. This author also wrote <em>Moby-Dick</em>.",
+      "Melville used a quote from the Book of Job to open this section of <em>Moby-Dick</em>, which was inexplicably excluded from the first British edition of the novel, leading to its initial poor reviews."
+     ],
+     "answers": [
+      "<b><u>Billy</u></b> Budd [or Billy <b><u>Budd</u></b>; accept <em><b><u>Billy</u></b> Budd, Sailor (An Inside Narrative)</em>]",
+      "Herman <b><u>Melville</u></b>",
+      "the <b><u>Epilogue</u></b> [prompt on the <u>last</u> section]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "A “second” theorem of the same name extends this theorem to the Lie (“lee”) algebra of infinitesimal symmetries of an action functional. For 10 points each:",
+     "parts": [
+      "Name this theorem named for a German mathematician, which states if a system has a differentiable symmetry, then there is a corresponding conservation law for the system.",
+      "Noether’s theorem shows that the conservation of energy corresponds to a symmetry in this quantity. By definition, constants of motion do not depend on this quantity, whose units include nanoseconds.",
+      "As Noether’s theorem makes use of the classical equations of motion, it is described as being “on” this construct. Virtual particles are described as “off” this construct, as they violate the energy-momentum relation."
+     ],
+     "answers": [
+      "<b><u>Noether</u></b>’s (“NUR-turz”) theorem [or <b><u>Noether</u></b>’s first theorem; accept <b><u>Noether</u></b>’s second theorem]",
+      "<b><u>time</u></b> [accept <b><u>time</u></b> translation symmetry]",
+      "mass <b><u>shell</u></b> [accept on <b><u>shell</u></b> or off <b><u>shell</u></b>; accept mass <b><u>hyperboloid</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "leadin": "This musical school included the Greek composer Nikos Skalkottas, who wrote the overture <em>The Return of Ulysses</em> and <em>36 Greek Dances</em>. For 10 points each:",
+     "parts": [
+      "Name this school whose music was featured at the 1913 “Skandalkonzert,” where one of the organizers slapped a concertgoer. Earlier that year, a composer from this musical school premiered the piece <em>Gurrelieder</em>.",
+      "Skalkottas studied composition under this Austrian composer and founder of the Second Viennese School. This pioneer of twelve-tone technique wrote<em> Gurrelieder</em> and the sextet <em>Transfigured Night</em>.",
+      "This composer’s <em>Six Pieces for Orchestra</em> were also premiered at the <em>Skandalkonzert</em>. This composer used a “derived row” in his <em>Concerto for Nine Instruments</em>."
+     ],
+     "answers": [
+      "<b><u>Second Viennese</u></b> School [or <b><u>Zweite Wiener</u></b> Schule; or <b><u>New Viennese</u></b> School or <b><u>Neue Wiener</u></b> Schule; prompt on <u>Viennese</u> School or <u>Wiener</u> Schule]",
+      "Arnold <b><u>Schoenberg</u></b> [or Arnold <b><u>Schönberg</u></b>]",
+      "Anton <b><u>Webern</u></b> [Anton Friedrich Wilhelm von <b><u>Webern</u></b>; reject “von Weber”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "The generalization of the extreme value theorem to topological spaces relies on the fact that this property of a space is preserved by continuous functions. For 10 points each:",
+     "parts": [
+      "Name this property of spaces that have a finite subcover for any given cover. In Euclidean (“yoo-CLID-ee-un”) spaces, this property is equivalent to being closed and bounded.",
+      "If the topologies in a set are all compact, a topology named for the “Cartesian” form of this operation is also compact. Vectors are acted on by the “dot” and “cross” types of this operation.",
+      "Product topologies preserve compactness according to a theorem named for this Russian mathematician, who also names the “T_3.5” (“T three-and-a-half”) separation axiom."
+     ],
+     "answers": [
+      "<b><u>compact</u></b>ness",
+      "<b><u>product</u></b>s [accept dot <b><u>product</u></b> or scalar <b><u>product</u></b>; accept cross <b><u>product</u></b>; accept Cartesian <b><u>product</u></b>; accept <b><u>product</u></b> topology or <b><u>product</u></b> space]",
+      "Andrey Nikolayevich <b><u>Tikhonov</u></b> (“TICK-uh-nov”) [accept <b><u>Tychonoff</u></b>, <b><u>Tychonov</u></b>, <b><u>Tihonov</u></b>, or <b><u>Tichonov</u></b> in place of “Tikhonov”; accept <b><u>Tychonoff</u></b>’s theorem]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "During this decade, the Gay Liberation Front planned what is often considered the United Kingdom’s first official pride parade. For 10 points each:",
+     "parts": [
+      "Identify this decade, during which <em>The Sun</em> printed the headline “Crisis? What Crisis?” in response to a series of crippling strikes termed the “Winter of Discontent.”",
+      "Marchers during the 1984 pride parade in London solicited donations for workers in this industry who were striking under the leadership of Arthur Scargill. Workers in this industry often suffer from “black lung” disease.",
+      "This politician argued against anti-gay discrimination in the 1983 Labour Party manifesto, which was called “history’s longest suicide note” due to the disastrous defeat his party faced in elections that year."
+     ],
+     "answers": [
+      "19<b><u>70</u></b>s [or the <b><u>Seventies</u></b>]",
+      "coal <b><u>miner</u></b>s [or coal <b><u>mining</u></b> or <b><u>mine</u></b>s; or <b><u>coal</u></b> industry or <b><u>collieries</u></b>; accept UK <b><u>miner</u></b>s’ strike]",
+      "Michael <b><u>Foot</u></b> [or Michael Mackintosh <b><u>Foot</u></b>]"
      ],
      "values": [
       10,
@@ -1591,16 +2164,389 @@ export default {
      "subcategory": "European History"
     },
     {
-     "leadin": "Examples of these objects form the majority of rungs on the cosmic distance ladder. For 10 points each:",
+     "leadin": "In a novel by this author, Christopher Chubb invents the fictional working-class poet Bob McCorkle. For 10 points each:",
      "parts": [
-      "Give this term for astronomical objects of known luminosity that are used by astronomers to calculate distances between cosmic objects.",
-      "These particles’ namesake “acoustic oscillations” are used as an alternative to standard candles when it comes to calculating distance. These particles vastly outnumber their antiparticles in their namesake “asymmetry,” which emerged right after the Big Bang.",
-      "Another common alternative to standard candles utilizes the Type II form of these powerful explosions of stars."
+      "Name this author of <em>My Life as a Fake</em>. In another novel by this author, two gamblers make a bet over transporting a glass church 400 kilometers through New South Wales.",
+      "Carey’s novel <em>My Life as a Fake</em> was inspired by a hoax in which James McAuley and Harold Stewart mocked an Australian journal by successfully submitting deliberately bad poems attributed to this fictitious author.",
+      "The Ern Malley poems were published by a journal named for “Angry” examples of these birds. A publisher named for this bird merged with Random House in 2013 and publishes a paperback “Classics” series."
      ],
      "answers": [
-      "<b><u>standard candle</u></b>s [prompt on <u>candle</u>s]",
-      "<b><u>baryon</u></b>s [accept <b><u>baryon</u></b> acoustic oscillations; or <b><u>baryon</u></b> asymmetry]",
-      "<b><u>supernova</u></b>e [accept Type II <b><u>supernova</u></b>e]"
+      "Peter <b><u>Carey</u></b> [or Peter Philip <b><u>Carey</u></b>] (The second novel is <em>Oscar and Lucinda</em>.)",
+      "Ern <b><u>Malley</u></b> [or Ernest Lalor <b><u>Malley</u></b>]",
+      "<b><u>penguin</u></b>s [accept <b><u>Penguin</u></b> Books or <b><u>Penguin</u></b> Random House or <b><u>Penguin</u></b> Classics; accept <em>Angry</em> <em><b><u>Penguin</u></b>s</em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "leadin": "This book argues that exchange values are determined by the socially necessary labor time. For 10 points each:",
+     "parts": [
+      "Name this book in which the first chapter of the first volume discusses the rise of “commodity fetishism.”",
+      "This economist discussed his theories of surplus value and surplus labor in <em>Das Kapital</em>.",
+      "In <em>Das Kapital</em>, Marx claims that technological innovation leads to a tendency of this quantity to fall. Okishio’s (“oh-KISH-ee-oh’s”) theorem contradicted Marx by showing that, in certain cases, an increase in this quantity for one capitalist caused it to increase for [emphasize] <em>all</em> capitalists."
+     ],
+     "answers": [
+      "<em>Das</em> <em><b><u>K</u></b><b><u>apital</u></b></em> [or <em><b><u>Capital</u></b></em>; or <em>Das</em> <em><b><u>Kapital</u></b>: Kritik der politischen Ökonomie</em> or <em><b><u>Capital</u></b>: Critique of Political Economy</em>]",
+      "Karl <b><u>Marx</u></b> [or Karl Heinrich <b><u>Marx</u></b>]",
+      "<b><u>rate</u></b> of <b><u>profit</u></b> [or <b><u>profit rate</u></b>; prompt on <u>profit</u>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "leadin": "In the 1970s, debate erupted among this city’s white and Black residents about whether its Zulu name, eThekwini (“eh-tek-WEE-nee”), meant “in the bay” or “thing with one testicle,” with the latter referring to the bay’s shape. For 10 points each:",
+     "parts": [
+      "Name this city that was originally called Port Natal (“nuh-TAHL”). This city, which contains one of the world’s largest Indian diaspora populations, is the third-most populous in South Africa.",
+      "The first post-apartheid name change was the renaming of this province’s city of Verwoerdburg (“fur-VOORD-boorg”) to Centurion. This smallest province by area contains Pretoria, which has remained indecisive about changing its name to Tshwane (“ch’WAH-nay”).",
+      "In 2006, the name of Johannesburg’s suburb of Sophiatown was restored 52 years after whites-only rezoning resulted in its name meaning “triumph” in this language that developed from the Dutch spoken by European settlers."
+     ],
+     "answers": [
+      "<b><u>Durban</u></b> [or <b><u>eZibubulungwini</u></b>]",
+      "<b><u>Gauteng</u></b> (“khow-TENG”) [or <b><u>eGoli</u></b>; or <b><u>Gauteng/eXilungwini</u></b>; or <b><u>iRhawuti</u></b>; or <b><u>I-Gauteng</u></b>]",
+      "<b><u>Afrikaans</u></b>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Geography",
+     "subcategory": "Geography"
+    }
+   ]
+  },
+  "5": {
+   "name": "2022 ACF Winter Packet 5",
+   "tossups": [
+    {
+     "question": "Ferrioxalate illustrates how this geometry can display helical chirality. Depending on the ratio between bite size and hard-sphere radius, racemization of compounds with this geometry can proceed through an intermediate with either D3h (“D-three-H”) or C2v (“C-two-V”) symmetry. Complexes of this geometry are racemized in the Bailar and Ray–Dutt twists. Complexes with this geometry may display facial or meridional isomerism. For coordination complexes with this geometry, the chelate effect enables EDTA to have a high formation constant. One axis of a complex with this geometry elongates in the most common example of the Jahn–Teller (“yahn-TELL-er”) effect. A ligand’s dissociation from this geometry yields a square pyramidal or trigonal bipyramidal intermediate. For 10 points, sulfur hexafluoride exhibits what geometry, in which a central atom is surrounded by six groups?",
+     "answer": "<b><u>octahedral</u></b> [accept <b><u>O</u><u>h</u></b>]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "A 1999 essay by this writer describes his profession’s scorn for objects they call “coffee filters” and “anal research gloves” and opens by asserting that it’s all about “blood and organs, cruelty and decay.” George Orwell’s <em>Down and Out in Paris and London</em> inspired a memoir by this writer that features “Adam Real-Last-Name-Unknown” and a beloved boss he calls “Bigfoot.” The 2021 documentary <em>Roadrunner</em> is about this author, whose friend Éric Ripert (“rih-PAIR”) honored him at the Brasserie Les Halles (“lay ahl”). This author’s <em>New Yorker</em> essay “Don’t Eat Before Reading This” launched his media career, enabling him to travel around the world trying exotic dishes for the TV show <em>Parts Unknown</em> until his 2018 death. For 10 points, <em>Kitchen Confidential</em> is a memoir by what American chef who hosted <em>No Reservations</em>?",
+     "answer": "Anthony <b><u>Bourdain</u></b> (“bor-DAYN”) [or Anthony Michael <b><u>Bourdain</u></b>]",
+     "category": "Other Academic",
+     "subcategory": "Other Academic"
+    },
+    {
+     "question": "A 1996 Act was argued to be “overbroad” with regard to this Constitutional amendment by the NCSF in the case <em>Nitke v. Gonzales</em>. Until 1957, some US jurisdictions applied this amendment by considering the “most susceptible persons,” based on the 1868 English case <em>R v. Hicklin</em>. “Community standards” form one of the three prongs of a test for exceptions to this amendment established in the case <em>Miller v. California</em>. While discussing an exception to this amendment, Potter Stewart declared during the case <em>Jacobellis v. Ohio</em> that “I know it when I see it.” The case <em>FCC v. Pacifica</em>, which involved George Carlin, identified exceptions to this amendment by their use of “seven dirty words.” For 10 points, many decisions in obscenity cases draw on what amendment to the Constitution, which protects freedom of speech?",
+     "answer": "<b><u>First</u></b> Amendment [or Amendment <b><u>1</u></b>]",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "A leader in this conflict tells another that “nothing but our own red blood” can make the title object in the poem “The Rose Tree.” Another poem compares a stone that “trouble[s] the living stream” to fighters in this conflict, who have “hearts with one purpose alone.” Three poems about this conflict appear in the collection <em>Michael Robartes</em> (“Roberts”)<em> and the Dancer</em>. A leader in this conflict who married Maud Gonne is described as a “drunken, vainglorious lout” in a poem whose narrator greets participants in this conflict with “polite, meaningless words.” That poem begins, “I have met them at close of day” and repeats the refrain, “a terrible beauty is born” after listing Connolly, Pearse (“purse”), and other leaders of this rebellion. For 10 points, a W. B. Yeats (“yates”) poem revisits what 1916 Irish Republican uprising?",
+     "answer": "<b><u>Easter Rising</u></b> [or <b><u>Easter Rebellion</u></b> or <b><u>Éirí Amach na Cásca</u></b>; prompt on the <u>Rising</u> or equivalents; prompt on <u>Irish</u> revolutionary period]",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "question": "Alice Albinia’s book about this river’s “empires” describes the arrival of Black Siddis (“sid-eez”) after the conquest of the Chacha dynasty. Scylax of Caryanda and Nearchus began expeditions on this river, which contained carnivorous oil-bearing worms according to Ctesias (“TEE-see-us”). Makrān was located just west of this river, which was the heartland of a culture likely known to Sumer as “Meluhha” that shipped carnelian from the port of Lothal. A culture based around this river left stamp seals decorated with “unicorns” and an undeciphered script that may have influenced Brāhmī. Alexander the Great allied with the king of Taxila on this river and crossed a tributary of it to defeat Porus at the Battle of the Hydaspes. For 10 points, the cities of Harappa and Mohenjo-Daro were built by a civilization based on what river in modern-day Pākistān?",
+     "answer": "<b><u>Indus</u></b> River [or <b><u>Sindhu</u></b> River; or <b><u>Mehran</u></b>; accept <b><u>Indus</u></b> River Valley civilization; accept <b><u>Hydaspes</u></b> until read; accept <b><u>Jhelum</u></b> or <b><u>Vitástā</u></b>; accept <b><u>Beas</u></b> River or <b><u>Hyphasis</u></b> or <b><u>Vipāshā</u></b>; accept <b><u>Chenab</u></b> River or <b><u>Acesines</u></b> or <b><u>Ashkini</u></b>; accept <b><u>Sutlej</u></b> River or <b><u>Hesudrus</u></b>; accept <b><u>Kabul</u></b> River or <b><u>Cophen</u></b>; accept <b><u>Sabarmati</u></b> River; accept <b><u>Ravi</u></b> River; accept <b><u>Indus</u></b> script; accept <b><u>Indus</u></b> worm; accept <em>Empires of the</em> <em><b><u>Indus</u></b></em>]",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "A woman with this profession was turned into a spring after going insane and eating one of her children who was the brother of Iacchus (“ee-YAH-kiss”). A man with this profession was born after three gods urinated on a cowhide belonging to Hyrieus (“HAI-ree-us”) and buried it. Hylaeus (“HAI-LAY-us”) and Rhoecus (“ROH-kuss”) were killed by a woman with this profession who was suckled by a she-bear as a child. After following the sounds of Hephaestus’s forges to Lemnos, a man with this profession had his eyesight restored by the Sun shortly before dying from a scorpion. Upon stumbling on a bathing goddess, a man with this profession named Actaeon was turned into a deer and killed by his dogs. For 10 points, Atalanta (“at-uh-LAN-tuh”) and Orion (“oh-RAI-un”) held what profession, which was patronized by the goddess Artemis?",
+     "answer": "<b><u>hunt</u></b>ers [or <b><u>hunt</u></b>resses; or <b><u>kynigos</u></b>; or word forms like <b><u>hunt</u></b>ing; accept <b><u>archer</u></b>s or <b><u>toxotai</u></b> or <b><u>toxótes</u></b>; reject “soldiers” or “military”] (The woman in the first line is Aura.)",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "Glass workers of this nationality protested for the right to vote during what is often considered the first strike in North America in Jamestown. Funds for the Yorktown campaign were secured by a Jewish businessman of this nationality named Haym Solomon. Agrippa Hull served as aide-de-camp to a general of this nationality who asked Thomas Jefferson to free his slaves in his will. An Illinois holiday celebrates a general of this nationality who was likely intersex and died while leading a cavalry charge during the Siege of Savannah. Before fighting in the American Revolution, a general of this nationality helped found the Bar Confederation to resist Russian encroachment. For 10 points, name this nationality of Casimir Pułaski (“poo-WAH-skee”) and Tadeusz Kościuszko (“tah-DEH-oosh kosh-CHOOSH-koh”).",
+     "answer": "<b><u>Polish</u></b> [or <b><u>Pole</u></b>s; or <b><u>polacy</u></b> or <b><u>polak</u></b> or <b><u>polka</u></b>; or people from <b><u>Poland</u></b> or Rzeczpospolita <b><u>Polska</u></b>; accept <b><u>Belarusian</u></b>s or <b><u>Byelorussian</u></b>s or people from <b><u>Belarus</u></b> or Riespublika <b><u>Bielaruś</u></b> or Respublika <b><u>Bielaruś</u></b>; accept <b><u>Polish</u></b>–Lithuanian Commonwealth]",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "In a novel from this modern-day country, the protagonist is taken from the pouch of a giant slain animal by childlike soldiers who serve a “Flash-Eyed Mother.” In that novel from this country, a woman follows a beautiful man who keeps losing body parts until he is simply a skull that captures her. A woman gives birth to a full-grown child out of her thumb in that novel from this country, whose protagonist searches for his tapster in Dead’s Town. The protagonist beats his wife during the “Week of Peace” in a novel from this home country of the author of <em>The Palm-Wine Drinkard</em>. In a novel from this country, the adopted son Ikemefuna is killed by a resident of Umuofia named Okonkwo. For 10 points, name this home country of Amos Tutuola and Chinua Achebe.",
+     "answer": "<b><u>Nigeria</u></b> [or Federal Republic of <b><u>Nigeria</u></b> or Orílẹ̀-èdè Olómìniira Àpapọ̀ <b><u>Nàìjíríà</u></b> or Ọ̀hàńjíkọ̀ Ọ̀hànézè <b><u>Naìjíríyà</u></b> or Jamhuriyar Tarayyar <b><u>Najeriya</u></b>]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "In 2019, Soares-Santos et al. estimated a term in this statement using data from a “dark siren.” This statement was experimentally based on 41 measurements made by Milton Humason and Vesto Slipher (“SLY-fer”). Deviations from this statement lead to distortions called “fingers of God.” This statement’s usual form is equivalent to the time derivative of the scale factor divided by the scale factor being constant. The age of the universe can be estimated as the reciprocal of a constant in this law, which has been estimated as about 70 kilometers per second per megaparsec based on observations of Cepheid variables’ redshifts. For 10 points, distance is proportional to the recessional velocity of galaxies according to what law named for an American astronomer?",
+     "answer": "<b><u>Hubble</u></b>’s law [or <b><u>Hubble</u></b>–Lemaître law or <b><u>Lemaître</u></b>’s law]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "A symphony by this composer opens with [read slowly] four repeated Cs, then descending B, A, G, in the celli and bass. That third symphony by this composer features a fortissimo descending horn call in its third and final movement and, like his fourth symphony, repeatedly uses a C-F sharp tritone. This composer’s fifth symphony ends with six unison isolated chords and features the slow horn theme [read slowly] E flat up to B flat, down to E flat, D, A, D, representing birds he saw in flight with a “swan call.” This composer’s seventh symphony in one movement uses a theme named for his wife, Aino. For 10 points, the nationalistic symphonic poem <em>Tapiola</em> is by what composer of the <em>Lemminkäinen Suite</em> and the tone poem <em>Finlandia</em>?",
+     "answer": "Jean <b><u>Sibelius</u></b> [or Johan Julius Christian <b><u>Sibelius</u></b>]",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "Unusually, these organisms have 62 copies of CGGBP1, suggesting recent horizontal gene transfer. These organisms have a jelly-filled structure on their snout called the rostral organ, which senses low-level electrical impulses. One of the two extant species of these organisms was discovered in a market in Sulawesi. Like members of the order Dipnoi, these organisms diverged from tetrapods 400 million years ago as members of the Sarcopterygii (“sar-cop-tuh-RIDGE-ee-ai”). These organisms, which have a three-lobed caudal fin, belong to the genus <em>Latimeria</em>, named for Marjorie Courtenay-Latimer, the curator of the East London Museum. The West Indian Ocean species of these organisms was rediscovered by Hendrik Goosen in the 1930s after it was thought extinct. For 10 points, name these “living fossils,” evolutionarily ancient fishes.",
+     "answer": "<b><u>coelacanth</u></b> (“SEE-luh-canth”) [or <b><u>Actinistia</u></b>; accept <em><b><u>Latimeria</u></b></em> until read; prompt on bony <u>fish</u> or <u>Osteichthyes</u>; prompt on jawed <u>fish</u>; prompt on lobe-finned <u>fish</u>; prompt on <u>Sarcopterygii</u> until read]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "An alleged genocide [emphasize] <em>within</em> this European country targeted supposed Nazi collaborators among its Cham ethnic minority. In 1943, Nazis in this country killed POWs belonging to the Acqui (“OCK-kwee”) Division. In this country’s capital, the massacre of strikers in late 1944 resulted in a series of clashes termed the “December Events,” or <em>Dekemvriana</em> (“theh-kem-vree-AH-NAH”). The disastrous failure of a 1941 “spring offensive” prompted Hitler to assist an Italian invasion of this country, which forced its king George II to flee to Egypt. Along with a similar conflict in Turkey, a postwar civil war in this country was used by Harry Truman to justify the doctrine of containment. For 10 points, name this country once ruled by the dictator Ioannis Metaxas (“yo-AH-neece meh-tock-SAHSS”), whose iconography often referenced the Minoans.",
+     "answer": "<b><u>Greece</u></b> [or <b><u>Elláda</u></b> or <b><u>Hellas</u></b>; or <b><u>Hellenic</u></b> Republic or <b><u>Ellinikí</u></b> Dimokratía; accept <b><u>Greek</u></b> Civil War]",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "They’re not genitals, but certain types of these objects are prohibited by the Hebrew term “orlah” and are blessed with the recitation “borei pri ha-etz.” According to an interpretation of the Gemara, the insides of one of these objects are numbered 613 like the mitzvot (“meets-VOTE”). Alongside the combined lulav, a person shakes one of these objects in the cardinal directions, in front of, and behind them during the festival of Sukkot. Ceremonially important examples of these objects include the etrog. People celebrating Rosh Hashanah eat a type of these objects dipped in honey. For 10 points, latkes are served with a “sauce” made of what general type of food that grew on the Tree of Knowledge?",
+     "answer": "<b><u>fruit</u></b> [accept <b><u>tree</u></b>s until “lulav” is read and prompt afterwards; accept <b><u>citrus</u></b> fruits or <b><u>citron</u></b>s or <b><u>apple</u></b>s or other specific fruits; accept <b><u>apples</u></b>auce; accept <b><u>etrog</u></b>s until read; prompt on <u>plant</u>s; prompt on <u>food</u> until read]",
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "question": "This character faints with chest pains after reading a letter from his wife that says “we will never, ever see each other again.” This character repeats the observation “still the gloom of night around” in the poem “Holy Week.” While returning home from visiting a woman he met at the library, this character is abducted by men loyal to the cocaine addict Liberius. This character is the protagonist of a novel that was covertly distributed in Brussels and published through CIA intervention. This character learns that Tonya was deported after escaping the Forest Brotherhood. After she tries to shoot the lawyer Komarovsky, Lara has an affair with this character amidst the Russian Civil War. For 10 points, name this physician who titles a novel by Boris Pasternak.",
+     "answer": "Doctor <b><u>Zhivago</u></b> [or <b><u>Yuri</u></b> Andreievich Zhivago]",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "question": "This equation’s explicit time dependence is neglected under the MQS approximation. This equation arises from setting nu equal to 1, 2, and 3 in an expression for the 4-derivative of the raised Faraday tensor “F superscript mu, nu.” Taking the divergence of this equation yields the charge continuity equation. The modern form of this law includes the term [read slowly] “mu-nought epsilon-nought times the partial derivative of the E-field with respect to time.” In addition to terms equal to “mu-nought J” and the curl of the B-field, this law includes a displacement current term added by James Clerk Maxwell. For 10 points, the line integral of the magnetic field around a closed path is related to the enclosed current by what law named for a French physicist?",
+     "answer": "<b><u>Ampère</u></b>’s law [accept <b><u>Ampère</u></b>’s circuital law or <b><u>Ampère</u></b>–Maxwell law; prompt on <u>Maxwell</u>’s equations until “Maxwell” is read] (MQS stands for “magnetoquasistatic.”)",
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "question": "A poem titled for one of these people describes “strange license plates and engines that devour America.” A speaker who thinks of “how terrible orange is” asks one of these people, “where’s SARDINES?” in a Frank O’Hara poem titled “Why I Am Not” this sort of person. A Lawrence Ferlinghetti poem lauds one of these people for observing “suffering humanity.” These people “never forgot...the dreadful martyrdom” in a poem that praises them for showing how “everything turns away / quite leisurely from the disaster” of “white legs disappearing into the green.” That poem notes that “about suffering” [these people] “were never wrong.” For 10 points, W. H. Auden’s “Musée des Beaux Arts” (“moo-ZAY day bo-ZAR”) begins by describing a member of what profession who created <em>Landscape with the Fall of Icarus</em>?",
+     "answer": "<b><u>painter</u></b>s [accept <b><u>artist</u></b>s until “Arts” is read and prompt afterwards; accept Old <b><u>Master</u></b>s; accept “Why I Am Not a <b><u>Painter</u></b>”] (The Ferlinghetti poem is “In Goya’s Greatest Scenes We Seem To See…”)",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "<em>Note to moderator: Read the answerline carefully.</em> The <em>Suma Oriental</em> (“SOO-mah or-ee-en-TAO”) reports that rice was exchanged for these items by Demak (“DEH-mock”). A circa-14th-century minister supposedly vowed that he would never rest or enjoy these items until he unified Nusantara (“noo-sahn-TAH-rah”) in the Palapa Oath recorded in the <em>Pararaton</em>. The extirpatie (“ex-teer-POT-see”) policy destroyed sources of these items in the sultanates of Tidore (“tee-DOR-ay”) and Ternate (“tair-NAH-tay”) after the genocidal conquest of the Bandanese. Varieties of these items were named for Tellicherry and the Malabar Coast, whence they were exported to Europe by Cochin and Calicut. Said bin Sultan’s Zanzibar grew plantations of these items that Europeans used to stud orange pomanders. The Moluccas were nicknamed the “islands” of these items due to native evergreen trees that supplied mace. For 10 points, what luxury goods include Indonesian cloves and nutmeg?",
+     "answer": "<b><u>spice</u></b>s [or <b><u>seasoning</u></b>s or <b><u>flavoring</u></b>s; accept <b><u>clove</u></b>s or <b><u>nutmeg</u></b> or <b><u>mace</u></b> until each is read; accept black <b><u>pepper</u></b> or long <b><u>pepper</u></b>; accept <b><u>cinnamon</u></b> or <b><u>cassia</u></b> or <b><u>cardamom</u></b>; accept <b><u>spicy</u></b> food or <b><u>hot food</u></b>; accept <b><u>coconut</u></b> meat; accept <b><u>spice</u></b> trade or <b><u>Spice</u></b> Islands; prompt on <u>crop</u>s or <u>plant</u>s or <u>tree</u>s or <u>bud</u>s or <u>bark</u> or <u>fruit</u> or similar; prompt on <u>food</u> or <u>comestible</u>s or equivalents; prompt on <u>aromatic</u> materials or <u>perfume</u>s or <u>fragrance</u>s or <u>scent</u>s or equivalents] (The second line refers to Gajah Mada of Majapahit.)",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "A mural of Apollo and the Muses by this artist draws on his sketches of the Black elevator attendant Thomas McKeller, whom this artist also depicted in a nude portrait. A woman wears a lavender sash around her waist in a portrait by this artist, who created a painting in which a line of men walk in single file with bandages over their eyes. In another painting by this artist, two guitars hang on a wall above a man clapping his hands. A girl leans against a porcelain vase as three other girls stare at the viewer in a group portrait by this artist of <em>Gassed</em> and <em>El Jaleo</em>. This artist of <em>The</em> <em>Daughters of Edward Darley Boit</em> painted a controversial portrait of a woman wearing a black dress with one strap missing. For 10 points, name this artist of <em>Portrait of Madame X.</em>",
+     "answer": "John Singer <b><u>Sargent</u></b>",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "A thinker from this tradition argued that a man who gets his foot amputated has his substance destroyed and regenerated, according to the “growing argument.” A member of this tradition used a hand to illustrate different levels of understanding, with an open palm being perception and a covered fist being knowledge. Five proposition connectives were developed by a follower of this tradition who literally died of laughter. This tradition emphasized volition, or prohairesis (“pro-hair-REE-sis”), in holding that the only good and bad things in the world are what’s within our control. Zeno of Citium founded this tradition, whose other practitioners included Epictetus (“eh-pick-TEE-tuss”) and Marcus Aurelius. For 10 points, name this ancient school of philosophy, whose name today refers to indifference to emotions.",
+     "answer": "<b><u>Stoic</u></b>ism [or word forms like the <b><u>Stoic</u></b>s; or <b><u>Stoic</u></b>ismus]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "A work by this author inspired a woodblock-like drawing of a woman wearing a feather headdress and swirling skirt glaring at an androgynous “Syrian.” Aleister Crowley removed a butterfly plaque that covered the testicles of a monument to this author and wore it as a necklace. Visitors wearing lipstick often damaged the lamassu-inspired naked winged angel on that monument to this author designed by Jacob Epstein. After liking a drawing of a woman kissing a severed head, this author asked Aubrey Beardsley to illustrate the play that inspired it. This author proclaimed “all art is quite useless” in the preface to a novel in which the “yellow book” is read by a man who poses for Basil Hallward. For 10 points, name this author who discussed art’s nature in <em>The Picture of Dorian Gray</em>.",
+     "answer": "Oscar <b><u>Wilde</u></b> [or Oscar Fingal O’Flahertie Wills <b><u>Wilde</u></b>; accept Oscar <b><u>Wilde</u></b>’s tomb] (The play is <em>Salome</em>.)",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "Signs of this disease include circular calcifications surrounding epiphyseal centers called Wimberger’s rings, projections in the metaphysis called Pelkin spurs, and a pencil-point cortex. It’s not rickets, but this condition can cause an expansion of the costochondral junctions in a namesake type of “rosary.” Fairly specific signs of this disease include perifollicular hemorrhage and corkscrew hairs. This disease can be prevented by raw fish and organ meats. The manifestations of this disease are due to the loss of a cofactor required for hydroxylating proline and lysine, which are necessary for assembling collagen fibrils. Bleeding gums are a sign of this disease, for which James Lind developed a successful treatment after studying sailors. For 10 points, name this disease caused by a deficiency of vitamin C.",
+     "answer": "<b><u>scurvy</u></b> [or <b><u>scorbutus</u></b>; accept <b><u>hypovitaminosis C</u></b> or <b><u>vitamin C deficiency</u></b> or <b><u>hypoascorbemia</u></b> until “deficiency” is read; accept <b><u>scorbutic</u></b> rosaries; prompt on <u>malnutrition</u>]",
+     "category": "Science",
+     "subcategory": "Biology"
+    }
+   ],
+   "bonuses": [
+    {
+     "leadin": "In this novel, Amor clashes with her brother Anton about whether a house should be given to the servant Salome. For 10 points each:",
+     "parts": [
+      "Name this 2021 novel about the Swart family’s lives in South Africa between 1986 and 2018.",
+      "In 2021, Damon Galgut’s novel <em>The Promise</em> won this annual literary prize awarded to a novel published in English. From 2002 to 2019, this prize was partly named for the Man Group.",
+      "Much of <em>The Promise</em> is set on one of these places outside of Pretoria. In J. M. Coetzee’s (“coot-SAY’s”) novel <em>Disgrace</em>, David Lurie spends time at one of these places owned by his daughter Lucy."
+     ],
+     "answers": [
+      "<em>The</em> <em><b><u>Promise</u></b></em>",
+      "<b><u>Booker</u></b> Prize [or <b><u>Booker</u></b> Prize for Fiction; accept Man <b><u>Booker</u></b> Prize]",
+      "<b><u>farm</u></b>s [or <b><u>plantation</u></b>s; or <b><u>plaas</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "leadin": "Pierre Schaeffer’s work on this type of composition resulted in the formation of a French research group named for it that included Edgar Varèse (“vah-REZ”) and Karlheinz Stockhausen. For 10 points each:",
+     "parts": [
+      "Give this two-word French name for a musical composition that consists of manipulated recordings of sounds, such as tapes of instruments or the human voice.",
+      "This composer used taped portions of a pastor’s sermon at different speeds in the piece “It’s Gonna Rain.” Holocaust survivors were taped discussing their experiences for this composer’s piece <em>Different Trains</em>.",
+      "Stockhausen’s piece <em>Gesang der Jünglinge</em> (“geh-ZAHNG duhr YOONG-ling-uh”), which combines electronic music with musique concrète, is one of these typically choral settings of the Catholic liturgy."
+     ],
+     "answers": [
+      "<b><u>musiq</u><u>ue concrète</u></b> (“kon-KREHT”)",
+      "Steve <b><u>Reich</u></b> (“RAISH”)",
+      "<b><u>mass</u></b> [or <b><u>missa</u></b> or <b><u>Messe</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "Algorithms for finding these things include MEME (“meem”), which uses the expectation-maximization algorithm and outputs a colored diagram with letters of various heights. For 10 points each:",
+     "parts": [
+      "Identify these recurrent patterns in a set of nucleic acid or protein sequences. An example of these things is consensus binding sites for proteins in DNA or RNA.",
+      "Motif-finding algorithms discovered the Asn-X-Pro (“A-S-N-X-P-R-O”) motif for the <em>N</em>-linked form of this chemical modification, which involves adding sugar residues to another macromolecule.",
+      "<em>N</em>-linked glycosylation occurs in this organelle, which packages proteins for transport to the Golgi apparatus. The smooth version of this organelle makes lipids."
+     ],
+     "answers": [
+      "sequence <b><u>motif</u></b>s [prompt on <u>conserved</u> sequences]",
+      "<b><u>glycosylation</u></b> [or word forms like <b><u>glycosylated</u></b>; reject “glycation”]",
+      "<b><u>endoplasmic reticulum</u></b> [or <b><u>ER</u></b>; accept smooth <b><u>ER</u></b> or smooth <b><u>endoplasmic reticulum</u></b>; accept rough <b><u>ER</u></b> or rough <b><u>endoplasmic reticulum</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "A paper titled for this action uses the example of spelunkers blowing up a man blocking a cave exit to demonstrate how some actions can be made permissible if they aren’t an intended consequence. For 10 points each:",
+     "parts": [
+      "Name this action that Judith Jarvis Thomson defended in a paper that poses a thought experiment in which a person wakes up connected to a famous violinist.",
+      "An essay by this philosopher analyzed abortion ethics using the lens of the doctrine of double effect. This philosopher outlined the “natural normativity” theory of ethics in the book <em>Natural Goodness</em>.",
+      "Foot’s essay on abortion also introduced this ethical problem, which asks you to decide whether you should let a vehicle run over and kill five people or divert its path to only kill one person."
+     ],
+     "answers": [
+      "<b><u>abortion</u></b> [or induced <b><u>abortion</u></b>; or equivalents such as <b><u>abort</u></b>ing a pregnancy or <b><u>termination</u></b> of a <b><u>fetus</u></b>; accept “A Defense of <b><u>Abortion</u></b>”]",
+      "Philippa <b><u>Foot</u></b> [or Philippa Ruth <b><u>Foot</u></b>; or Philippa <b><u>Bosanquet</u></b>]",
+      "<b><u>trolley</u></b> problem [or <b><u>tram</u></b> problem; accept <b><u>trolley</u></b> dilemma]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "A rather abrupt solo in this musical style interrupts the saxophone on the third track of Charles Mingus’s album <em>The Black Saint and the Sinner Lady</em>. For 10 points each:",
+     "parts": [
+      "Name this musical style that titles a track that Bill Evans described as “a series of five scales, each to be played as long as the soloist wishes.” That track titled for this style is preceded by “All Blues” on an album’s Side 2.",
+      "Flamenco music informed tracks like “Solea” on this musician’s album <em>Sketches of Spain</em>. The track “Flamenco Sketches” appears on this trumpeter’s album <em>Kind of Blue</em>.",
+      "Guitarist Paco de Lucía recorded a flamenco cover of “Spain,” a standard by a player of this instrument named Chick Corea. Wynton Kelly played this instrument on the <em>Kind of Blue</em> track “Freddie Freeloader.”"
+     ],
+     "answers": [
+      "<b><u>flamenco</u></b> [accept “<b><u>Flamenco</u></b> Sketches”]",
+      "Miles <b><u>Davis</u></b> [or Miles Dewey <b><u>Davis</u></b> III]",
+      "<b><u>piano</u></b> [or <b><u>piano</u></b>forte; accept electric <b><u>piano</u></b>; accept <b><u>keyboard</u></b> or <b><u>key</u></b>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "leadin": "A novel from this country begins with the crucifixion of Jesus and ends with the crucifixion of the title character, Barabbas. For 10 points each:",
+     "parts": [
+      "Name this home country of the Nobel Prize-winning author of a children’s book about the <em>Wonderful Adventures of Nils</em>. A redheaded girl created by an author from this country has a pet monkey and lives in the Villa Villekula.",
+      "This Swedish author wrote <em>Barabbas</em> and described the title character’s life during the Renaissance in <em>The Dwarf.</em>",
+      "Selma Lagerlöf’s novel about the priest Gösta Berling is titled for this genre of epic Norse literature. Medieval works in this genre include one titled for the Völsungs."
+     ],
+     "answers": [
+      "<b><u>Sweden</u></b> [or Kingdom of <b><u>Sweden</u></b> or Konungariket <b><u>Sverige</u></b>] (The girl is Astrid Lindgren’s character Pippi Longstocking.)",
+      "Pär <b><u>Lagerkvist</u></b> [or Pär Fabian <b><u>Lagerkvist</u></b>]",
+      "<b><u>saga</u></b>s [accept <em>Völsunga</em> <em><b><u>saga</u></b></em> or <em><b><u>Saga</u></b> of the</em> <em>Völsungs</em>; accept Norse <b><u>saga</u></b>s or Icelandic <b><u>saga</u></b>s; accept <em>Gösta Berling’s</em> <em><b><u>Saga</u></b></em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "This statesman introduced basic health insurance, accident insurance, and social security as part of his plan to undermine the popularity of the Social Democratic Party. For 10 points each:",
+     "parts": [
+      "Name this “Iron Chancellor” who helped unify Germany in the mid-to-late 1800s.",
+      "Bismarck was himself a member of this class of Prussian elites. This class held immense sway over German politics through their virtual monopoly on agriculture.",
+      "The German SPD was co-founded by August Bebel and a revolutionary foe of Bismarck with this surname. Another revolutionary with this surname co-founded the Spartacist League with Rosa Luxemburg."
+     ],
+     "answers": [
+      "Otto von <b><u>Bismarck</u></b> [or Otto Eduard Leopold von <b><u>Bismarck</u></b>; or Otto, Prince of <b><u>Bismarck</u></b>, Count of Bismarck-Schönhausen, Duke of Lauenburg or Otto Fürst von <b><u>Bismarck</u></b>, Graf von Bismarck-Schönhausen, Herzog zu Lauenburg; prompt on Duke of <u>Lauenburg</u> or Herzog zu <u>Lauenburg</u>]",
+      "<b><u>Junker</u></b>s (“YOONG-kers”)",
+      "<b><u>Liebknecht</u></b> [accept Karl <b><u>Liebknecht</u></b> or Karl Paul August Friedrich <b><u>Liebknecht</u></b>; accept Wilhelm <b><u>Liebknecht</u></b> or Wilhelm Martin Philipp Christian Ludwig <b><u>Liebknecht</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "leadin": "Some of these movements predict the return of Masren. For 10 points each:",
+     "parts": [
+      "Name these religious movements in which people pray and prepare for the delivery of goods from foreign societies.",
+      "A major figure in several cargo cults bears this name. First attested by missionaries on Tanna Island, Vanuatu, this messianic figure is said to live in the volcano Yasur.",
+      "A Yaohnanen cargo cult from Vanuatu believed in the divinity of this British royal, who was married to Queen Elizabeth II until his death in 2021."
+     ],
+     "answers": [
+      "<b><u>cargo</u></b> cults [or <b><u>cargo</u></b>ism; prompt on <u>cult</u>s; prompt on <u>new</u> religious movements or <u>NRM</u>s or <u>revitalization</u> movements; prompt on <u>millenarian</u> movements or <u>millenarian</u>ism]",
+      "<b><u>John Frum</u></b> [prompt on <u>John</u>]",
+      "Prince <b><u>Philip</u></b> [or Prince Philip, Duke of <b><u>Edinburgh</u></b>; or Prince <b><u>Philip</u></b> of Greece and Denmark; accept Philip <b><u>Mountbatten</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "One of these events that originated from underneath Loma Prieta Peak coincided with a 1989 World Series match between the San Francisco Giants and Oakland Athletics. For 10 points each:",
+     "parts": [
+      "Name these natural disasters, another of which leveled San Francisco in 1906.",
+      "The Loma Prieta earthquake led to the collapse of a freeway named for this man. A class of aircraft carrier is named for this admiral, who commanded the Pacific Fleet during World War II.",
+      "After the 1906 earthquake, a banker of this ethnicity granted loans to victims by asking for no more than a handshake. San Francisco’s North Beach neighborhood was historically home to many people of this ethnicity."
+     ],
+     "answers": [
+      "earth<b><u>quake</u></b>s [or <b><u>temblor</u></b>s; prompt on <u>tremor</u>s or <u>seismic</u> events]",
+      "Chester W. <b><u>Nimitz</u></b> [or Chester William <b><u>Nimitz</u></b>; accept <em><b><u>Nimitz</u></b></em>-class aircraft carrier]",
+      "<b><u>Italian</u></b>-Americans [or <b><u>italo</u></b>americani or <b><u>italiani</u></b>; accept Little <b><u>Italy</u></b>] (The banker was Amadeo Giannini, who founded Bank of America.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "The confusing nature of this particle prompted I. I. Rabi (“RAH-bee”) to say “who ordered that?” after its discovery. For 10 points each:",
+     "parts": [
+      "Name this ordinary-matter particle that makes up the second generation of leptons along with its namesake neutrino.",
+      "Due to having a much greater mass than electrons, muons can be used to catalyze this process, in which multiple nuclei combine to form a more massive nucleus.",
+      "Depending on chirality, muons have a value of either minus one-half or zero for the “weak” analog of this quantity. This quantity’s third component equals the number of up quarks minus the number of down quarks, all over two."
+     ],
+     "answers": [
+      "<b><u>muon</u></b>s [or <b><u>mu</u></b> leptons; accept <b><u>muon</u></b> neutrino]",
+      "nuclear <b><u>fusion</u></b> [or <b><u>fusing</u></b> nuclei or word forms; accept hydrogen <b><u>fusion</u></b>; accept muon-catalyzed <b><u>fusion</u></b>]",
+      "<b><u>isospin</u></b> [accept weak <b><u>isospin</u></b>; accept <b><u>isobaric spin</u></b> or <b><u>isotopic spin</u></b>; prompt on <u>I</u>; reject “spin”]"
      ],
      "values": [
       10,
@@ -1609,6 +2555,2438 @@ export default {
      ],
      "category": "Science",
      "subcategory": "Physics"
+    },
+    {
+     "leadin": "An initiative called “La Gran [<em>this country</em>]” upgraded Rómulo Betancourt’s CVP into the state-owned PDVSA, which oversaw an oil industry that was reopened during “La Apertura” (“lah ah-pair-TOO-rah”). For 10 points each:",
+     "parts": [
+      "Name this country whose oil industry was nationalized after a 1976 ceremony at Zumaque 1 (“soo-MAH-kay uno”). This country joined Iran, Iraq, Saudi Arabia, and Kuwait as a founding member of OPEC (“OH-peck”) in 1960.",
+      "During his first term, this Democratic Action president nationalized Venezuelan iron and petroleum and created the “Great Marshall of Ayacucho” scholarship. Ten years later, the Caracazo (“kah-rah-KAH-soh”) protested this president’s “Economic Package.”",
+      "This later Venezuelan president, who led a failed 1992 coup against Pérez, used oil revenue to fund leftist social programs called the Bolivarian missions. Nicolás Maduro (“nee-ko-LAHSS mah-THOO-roh”) succeeded him in 2013."
+     ],
+     "answers": [
+      "<b><u>Venezuela</u></b> [or Bolivarian Republic of <b><u>Venezuela</u></b> or República Bolivariana de <b><u>Venezuela</u></b>; accept La Gran <b><u>Venezuela</u></b>; accept Petróleos de <b><u>Venezuela</u></b>, S.A. or Corporación <b><u>Venezolana</u></b> del Petróleo]",
+      "Carlos Ándrés <b><u>Pérez</u></b> (“CAR-loce on-DRESS PAY-ress”) [or Carlos Andrés <b><u>Pérez</u></b> Rodríguez; accept <b><u>CAP</u></b>; prompt on <u>Rodríguez</u>]",
+      "Hugo <b><u>Chávez</u></b> (“OO-go CHAH-vess”) [or Hugo Rafael <b><u>Chávez</u></b> Frías; accept <b><u>Chavismo</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "leadin": "A 2017 study by Styles and Gawne found that speakers of the Himalayan language Syuba (“s’YOO-bah”) used these two words inconsistently. For 10 points each:",
+     "parts": [
+      "Name these two words that were shown to be used consistently by about 98 percent of participants, regardless of the language they spoke, in a 2001 study by Ramachandran and Hubbard.",
+      "One explanation for the kiki-bouba effect involves the “b” in “bouba” being a bilabial consonant, which means it is made when this pair of body parts touches, stopping airflow through the mouth.",
+      "Ramachandran’s research on the kiki-bouba effect contrasted American college students with speakers of Tamil, a language from this family that also includes Telugu."
+     ],
+     "answers": [
+      "<b><u>kiki</u></b> AND <b><u>bouba</u></b> [accept answers in either order]",
+      "<b><u>lip</u></b>s",
+      "<b><u>Dravidian</u></b> languages [or <b><u>Dravidic</u></b> languages]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "leadin": "Answer the following about mythological squirrels, for 10 points each.",
+     "parts": [
+      "The squirrel Ratatoskr carried messages between the dragon Nidhogg and the eagle sitting atop this world tree, the center of the nine realms in Norse myth.",
+      "Squirrels were once giant murderous beasts before this Wabanaki culture hero made them shrink by petting them. This culture hero birthed the Mi’kmaq people after lying on the ground for one year straight.",
+      "In another culture’s mythology, this figure gave squirrels their white stripes when he ran his fingers through their fur. In a text named for this figure, he leaves his wife before she proves her chastity by walking into a lit pyre."
+     ],
+     "answers": [
+      "<b><u>Yggdrasil</u></b> (“eeg-drah-SEEL”)",
+      "<b><u>Glooscap</u></b> [or <b><u>Gluskabe</u></b> or <b><u>Gluskabi</u></b> or <b><u>Kluscap</u></b>; or <b><u>Kloskomba</u></b>]",
+      "<b><u>Rām</u></b>a [or <b><u>Rām</u></b>achandra; accept the <em><b><u>Rāmā</u></b>yaṇa</em> or <em><b><u>Rāmā</u></b>yaṇam</em>; prompt on <u>Vishnu</u>] (His wife is Sītā.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "This pope praised “African values” such as “community life” in his “Message to Africa,” which contained a thinly veiled appeal to aid the Catholics of Igboland in the Biafran War. For 10 points each:",
+     "parts": [
+      "Name this pope who canonized the Uganda martyrs and later visited Kampala in 1969 in the first papal trip to Africa. This pope presided over the end of Vatican II after the death of John XXIII (“the twenty-third”).",
+      "Pope Paul VI convened a symposium of African bishops that was partially named for this island country, whose Vy Vato Sakelika society led the 1947 Malagasy Uprising against French rule.",
+      "Madagascar’s Merina people largely became Protestant rather than Catholic due to this Congregationalist group. David Livingstone traveled for this “missionary society,” which competed with the Anglican Church Mission Society."
+     ],
+     "answers": [
+      "<b><u>Paul VI</u></b> [or <b><u>Paulus VI</u></b> or <b><u>Paolo VI</u></b>; or Giovanni Battista Enrico Antonio Maria <b><u>Montini</u></b>; prompt on <u>Paul</u> or <u>Paulus</u> or <u>Paolo</u>]",
+      "<b><u>Madagascar</u></b> [or Republic of <b><u>Madagascar</u></b> or Repoblikan'i <b><u>Madagasikara</u></b> or République de <b><u>Madagascar</u></b>; accept Symposium of Episcopal Conferences of Africa and <b><u>Madagascar</u></b>]",
+      "<b><u>London</u></b> Missionary Society [or <b><u>LMS</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "An “inverse electron-demand” version of this reaction reverses the typical paradigm for electron-donating and withdrawing substituents. For 10 points each:",
+     "parts": [
+      "Name this cycloaddition reaction in which a diene (“DAI-een”) and dienophile (“dai-EEN-oh-fyle”) combine to form a cyclohexene skeleton.",
+      "A diene with one EDG (“E-D-G”) and a dienophile with one EWG (“E-W-G”) can participate in a Diels–Alder reaction to form a cyclohexene core with two possible disubstitution (“di-substitution”) patterns. Name either.",
+      "Esters, aldehydes, and carboxylic acids are moderate electron-withdrawing groups that can be added to the dienophile because they contain this functional group that consists of a carbon double-bonded to an oxygen."
+     ],
+     "answers": [
+      "<b><u>Diels–Alder</u></b> (“DEELS ALL-der”) reaction [accept inverse electron-demand <b><u>Diels–Alder</u></b> reaction]",
+      "<b><u>1,2</u></b> (“one-two”)-substitution OR <b><u>1,4</u></b> (“one-four”)-substitution",
+      "<b><u>carbonyl</u></b> (“carbon-eel”) [prompt on <u>oxo</u> group]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "A. C. Bradley suggested that a character doing this action had been denied “the dignity of verse” due to the largely prosaic form of the scene in which this action occurs. For 10 points each:",
+     "parts": [
+      "Name this action observed by a Doctor of Physic in a character who rubs her hands together and exclaims, “out damned spot, out, I say!” while doing this action.",
+      "This character sleepwalks in her final scene before her husband learns of her death. This Shakespeare character persuades her husband, the Thane of Cawdor, to murder Duncan, and eventually becomes the queen of Scotland.",
+      "At the end of the sleepwalking scene, Lady Macbeth exits for the final time after noting that she hears this sort of action, which she previously hears in a scene that titles an essay by Thomas de Quincey."
+     ],
+     "answers": [
+      "<b><u>sleepwalk</u></b>ing [or <b><u>somnambulism</u></b>; prompt on <u>sleep</u>ing or <u>hallucinat</u>ing]",
+      "<b><u>Lady Macbeth</u></b> [reject “Macbeth”]",
+      "<b><u>knock</u></b>ing [accept “On the <b><u>Knock</u></b>ing at the Gate in Macbeth”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "leadin": "From 2020 to 2021, this politician led the Kuskokwim (“KUH-skuh-kwim”) River Inter-Tribal Fish Commission. For 10 points each:",
+     "parts": [
+      "Name this Democrat who won a 2022 election to replace Representative Don Young, in which Nick Begich III (“BAY-gich the third”) was eliminated in the first round.",
+      "Peltola won a 2022 special election in this state based on transfers from ranked-choice voting. She defeated this state’s one-time governor Sarah Palin with a platform that supported its large oil and gas industries.",
+      "In 2018, this state became the first to use ranked-choice voting in a federal election. This state and Vermont are the only two states represented by independents in the Senate."
+     ],
+     "answers": [
+      "Mary Sattler <b><u>Peltola</u></b> [or <b><u>Akalleq</u></b>; accept Mary <b><u>Kapsner</u></b> or Mary <b><u>Sattler</u></b>]",
+      "<b><u>Alaska</u></b> [or <b><u>AK</u></b>]",
+      "<b><u>Maine</u></b> [or <b><u>ME</u></b>] (Maine’s independent senator is Angus King.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Current Events",
+     "subcategory": "Current Events"
+    },
+    {
+     "leadin": "This type of transformation is characterized by the matrix with elements [read slowly] “cosine theta, minus sine theta, [pause] sine theta, cosine theta.” For 10 points each:",
+     "parts": [
+      "Name these geometric transformations, which in two dimensions are characterized by an angle and a direction of either clockwise or counterclockwise.",
+      "This group represents the symmetries of a regular polygon under rotation and reflection. For a regular polygon with <em>n</em> sides, this group has 2<em>n</em> elements.",
+      "For <em>n</em> greater than 2, the dihedral group is non-abelian (“non-ah-BEE-lee-un”), which means that its group operation [emphasize] <em>does not</em> have this property."
+     ],
+     "answers": [
+      "<b><u>rotation</u></b>s [accept <b><u>rotate</u></b>d or <b><u>rotating</u></b>]",
+      "<b><u>dihedral</u></b> group [or <b><u>D</u><u>n</u></b> (“D-n”) or <b><u>D</u><u>2n</u></b> (“D-two-n”)]",
+      "<b><u>commutative</u></b> [or <b><u>commutativity</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "After this character accidentally burns down his newly-constructed mansion, he moves back to his Vermont farm with his wife, Persis. For 10 points each:",
+     "parts": [
+      "Name this fictional Boston paint magnate, who squanders his fortune by investing in his former partner’s business schemes in a William Dean Howells novel titled for his “Rise.”",
+      "<em>The Rise of Silas Lapham</em> satirizes a formulaic genre epitomized by this novel, in which the title bootblack eventually becomes a merchant named Richard Hunter.",
+      "This author parodied Horatio Alger’s rags-to-riches stories like <em>Ragged Dick</em> in his short story “A Self-Made Man.” This author also wrote the novel <em>The Red Badge of Courage</em>."
+     ],
+     "answers": [
+      "<b><u>Silas</u></b> Lapham [or Silas <b><u>Lapham</u></b>; accept <em>The Rise of</em> <em><b><u>Silas</u></b> Lapham</em>]",
+      "<em><b><u>Ragged Dick</u></b></em> [or <em><b><u>Ragged Dick</u></b>; or, Street Life in New York with the Boot Blacks</em>]",
+      "Stephen <b><u>Crane</u></b>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "Answer the following about art vandalism, for 10 points each.",
+     "parts": [
+      "In 2022, the glass that covers this Leonardo da Vinci painting of a woman with an enigmatic expression was smeared with cake.",
+      "In 1985, sulfuric acid was thrown on this artist’s painting of Danaё (“duh-NAY-ee”) before it was sliced with a knife. This artist’s wife Saskia was the original model for Danaё in that painting.",
+      "Cài Yuán (“tsai y’wen”) and Jiàn Jūn Xī (“j’yen j’win shee”) jumped on this Tracey Emin piece while shirtless for the unlicensed performance “Two Naked Men Jump Into” this installation. Empty liquor bottles, condoms, and other detritus clutter a blue rug next to this installation’s title object."
+     ],
+     "answers": [
+      "<em><b><u>Mona Lisa</u></b></em> [or<em> La</em> <em><b><u>Gioconda</u></b></em>; or <em>La</em> <em><b><u>Joconde</u></b></em>]",
+      "<b><u>Rembrandt</u></b> [or Rembrandt <b><u>van Rijn</u></b> or Rembrandt Harmenszoon <b><u>van Rijn</u></b>]",
+      "<em><b><u>My Bed</u></b></em> [prompt on <u>bed</u> or Tracey Emin’s <u>bed</u> or similar descriptions; prompt on <em>Two Naked Men Jump into Tracey’s</em> <em><u>Bed</u></em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "A former commander of the Black Flag Army led a short-lived republic in this territory, where the Indigenous Seediq (“suh-AY-deek”) people staged a rebellion called the “Musha Incident.” For 10 points each:",
+     "parts": [
+      "Name this territory that was ceded with the nearby Pescadores in the Treaty of Shimonoseki (“shee-moh-noh-seck-ee”). As part of Nanshin-ron, Japan annexed this territory years before occupying South Sakhalin and Korea.",
+      "Satō Haruo critiqued Japanese rule of Taiwan during this era, when Hara Takashi advanced a failed “Racial Equality Proposal.” This Japanese era names brief stirrings of “democracy” despite the Peace Preservation Law.",
+      "Taishō Japan signed the Five-Power Washington Treaty to disarm these forces. All-rice diets caused beriberi (“BAIR-ee-BAIR-ee”) in Meiji Japan’s force of this kind, which was modernized with ironclads and dreadnoughts."
+     ],
+     "answers": [
+      "<b><u>Taiwan</u></b> [or <b><u>Formosa</u></b>; or <b><u>Táiwān</u></b> or <b><u>Tâi-uân</u></b> or <b><u>Tǒi-vǎn</u></b>; accept Republic of <b><u>Formosa</u></b> or <b><u>Tâi-oân</u></b> Bîn-chú-kok or <b><u>Thòi-vân</u></b> Mìn-chú-koet]",
+      "<b><u>Taishō</u></b> era [accept <b><u>Taishō</u></b> democracy or <b><u>Taishō</u></b> demakurashī or <b><u>Taishō</u></b> liberalism; accept Emperor <b><u>Taishō</u></b> or <b><u>Taishō</u></b>-tennō] (The Racial Equality Proposal was rejected at the Paris Peace Conference.)",
+      "<b><u>navy</u></b> [or word forms like <b><u>navies</u></b> or <b><u>naval</u></b>; accept war<b><u>ship</u></b>s or battle<b><u>ship</u></b>s or <b><u>cruiser</u></b>s or torpedo <b><u>boat</u></b>s or <b><u>destroyer</u></b>s or <b><u>sub</u></b>marines; accept Washington <b><u>Naval</u></b> Treaty or Washington <b><u>Naval</u></b> Conference; accept Imperial Japanese <b><u>Navy</u></b> or <b><u>IJN</u></b> or Nippon <b><u>Kaigun</u></b> or Dai-Nippon Teikoku <b><u>Kaigun</u></b>; prompt on <u>military</u> forces or equivalents]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "World History"
+    }
+   ]
+  },
+  "6": {
+   "name": "2022 ACF Winter Packet 6",
+   "tossups": [
+    {
+     "question": "As part of the CIA-backed Human Ecology Fund, this researcher was tasked with covert brainwashing in order to gain information about Nikita Khrushchev. One of this researcher’s works details the “poor helpless individual tied into his seat by the ironclad bonds of conformity.” This author of <em>Freedom to Learn</em> described people who do not obtain their full potential and live disingenuous lives as “incongruent.” This psychologist, who pioneered student-centered learning, claimed that the organism’s one basic tendency is “to actualize” in one of 19 propositions about human behavior. This psychologist argued that therapists should exhibit unconditional positive regard toward patients. For 10 points, name this psychologist who wrote <em>On Becoming a Person</em> and pioneered client-centered therapy.",
+     "answer": "Carl <b><u>Rogers</u></b> [or Carl Ransom <b><u>Rogers</u></b>]",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "The simplest of the Bridgman equations sets a differential of this quantity equal to [emphasize] <em>plus</em> one. An infinitesimal change proportional to this quantity’s inverse square is predicted by the Gibbs–Helmholtz equation. On the Born square, this quantity appears between Helmholtz free energy and Gibbs free energy. The second virial coefficient depends on this quantity, and is zero for a value of this quantity named for Robert Boyle. With other variables held constant, this quantity's reciprocal is the derivative of entropy with respect to internal energy. Thermodynamic beta equals one over this quantity times the Boltzmann constant. Entropy goes to zero as this quantity goes to its minimum value. For 10 points, name this quantity whose minimum is absolute zero.",
+     "answer": "<b><u>temperature</u></b> [or <b><u>T</u></b>; accept Boyle <b><u>temperature</u></b>]",
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "question": "A leader of this island’s National Council of Maubere Resistance wrote <em>The Crossing</em> in its Tetum (“TEH-toom”) language. John Martinkus reported on this island in <em>A Dirty Little War</em>. This island unveiled a statue of Christ on a globe days after Bishop Carlos Belo (“BELL-oo”) won the Nobel Peace Prize in a P.R. stunt criticized by the activist “Xanana” (“shah-NAH-nah”). On this island, Max Stahl filmed the 1991 massacre of protesters in the Santa Cruz cemetery. José Ramos-Horta (“zhoo-ZEH RAH-mooze-OR-tah”) now leads this island’s revolutionary party Fretilin. The majority-Catholic province of East Nusa Tenggara administers half of this Lesser Sunda island, where a former Portuguese colony was invaded in 1975 by the “New Order” forces of Suharto. For 10 points, 1999 violence in Dili ended Indonesia’s occupation of a country named for what island’s east?",
+     "answer": "<b><u>Timor</u></b> [accept East <b><u>Timor</u></b> or <b><u>Timor</u></b>-Leste or <b><u>Timor</u></b> Timur or <b><u>Timor</u></b> Lorosa’e or Democratic Republic of <b><u>Timor</u></b>-Leste or República Democrática de <b><u>Timor</u></b>-Leste; accept Portuguese <b><u>Timor</u></b> or <b><u>Timor</u></b> Português; accept West <b><u>Timor</u></b> or <b><u>Timor</u></b> Barat; accept 1999 <b><u>Timorese</u></b> Crisis] (Luís Cardoso wrote <em>The Crossing</em>. The statue is the Cristo Rei of Dili.)",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "Trusheim’s (“TRUSS-hime’s”) model of this substance’s movement includes the formation of “turtle-back structures.” Downhill flows either called namakiers (“nam-ah-KEE-erz”) or this substance’s namesake “glaciers” exemplify its surface structures, which also include allochthonous (“ah-LOCK-thuh-nuss”) “canopies.” Buoyancy causes this substance to intrude upwards into rocks in a form of diapirism (“dai-ah-PEER-izm”) that produces a common type of petroleum trap, which are called its namesake “domes.” Satellite altimeters are often calibrated in a region named for this substance near Uyuni (“oo-YOO-nee”) due to its near-perfect flatness. Cubic crystals of this compound form the mineral halite (“HAY-lite”). For 10 points, namesake “pans” and “flats” are covered in what solid substance, which is left behind when seawater evaporates?",
+     "answer": "<b><u>salt</u></b> [or table <b><u>salt</u></b> or rock <b><u>salt</u></b> or <b><u>sodium chloride</u></b> or <b><u>NaCl</u></b>; accept <b><u>salt</u></b> glaciers or <b><u>salt</u></b> surface structures or <b><u>salt</u></b> domes or <b><u>salt</u></b> pans or <b><u>salt</u></b> flats; accept <b><u>Salar</u></b> de Uyuni; accept <b><u>halite</u></b> until read]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "In a story, a soldier in this conflict remembers the advice “do what you conceive to be your duty” upon waking up in a clump of laurel. In another story set during this conflict, a man sees “trees like giant garden plants” after comparing sand to “diamonds, rubies, emeralds.” A soldier in this conflict falls off a cliff face when his own son reluctantly shoots his horse in the story “A Horseman in the Sky.” The protagonist of a story set during this conflict wanders through a strange forest and hears a clanging from his ticking watch. In that story set during this conflict, the protagonist feels “a stunning blow” to the back of his neck after imagining that he has escaped execution. For 10 points, Peyton Farquhar is hanged during what conflict in “An Occurrence at Owl Creek Bridge” by Ambrose Bierce?",
+     "answer": "American <b><u>Civil War</u></b> [or US <b><u>Civil War</u></b>; or <b><u>War Between the States</u></b>; or <b><u>War</u></b> of the <b><u>Rebellion</u></b>]",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "<em>Note to moderator: Read the answerline carefully.</em> A ruler of this ethnicity supposedly dreamed of a tree that emerged from his navel into the world, presaging conquests that inspired Paul Wittek’s outmoded “Ghaza thesis.” Generals of this ethnicity like Bugha al-Kabir and Wasif assassinated al-Mutawakkil and began the Anarchy at Samarra. During their early medieval western migrations, divisions of this ethnicity founded the Karluk Karakhanids, Oghuz Pecheneg state, Cuman–Kipchak confederation, and Khazar Khaganate. Persianized princes of this ethnicity founded the Sultanate of Rûm. Many beyliks emerged from an empire ruled by this ethnicity that defeated Romanos IV at Manzikert under Alp Arslan, the Seljuks. For 10 points, what ethnic group’s sultans Osman I, Orhan, and Murad I conquered Western Anatolia for the Ottomans?",
+     "answer": "<b><u>Turk</u></b>s [or <b><u>Türk</u></b>ler or <b><u>Turk</u></b>ic peoples; accept <b><u>Türkmen</u></b> or <b><u>Turcoman</u></b>s; accept <b><u>Ottoman</u></b> Turks, <b><u>Osman</u></b>lı Türkleri, <b><u>Seljuk</u></b> Turks, <b><u>Khazar</u></b>s, <b><u>Kipchak</u></b>s, <b><u>Cuman</u></b>s, <b><u>Pecheneg</u></b>s, <b><u>Oghuz</u></b> Turks, or <b><u>Karluk</u></b>s until each is read; accept <b><u>Polovtsian</u></b>s or <b><u>Polovtsy</u></b>; accept <b><u>Ashina</u></b>; accept <b><u>Patzinak</u></b>s; accept Wasif al-<b><u>Turki</u></b> or Bugha al-<b><u>Turki</u></b>; reject “Mongols” or “Golden Horde”; reject “Jews” or “Ashkenazim”] (The first line refers to Osman I’s dream.)",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "A player for this team was the only attendee of the first televised MLB Draft, in which he was selected 25th. A viral tweet about this team notes that they were defeated 8-to-3 after referencing the fictitious “Tungsten Arm O’Doyle.” This team’s players wear a cowboy hat in the dugout after hitting home runs in honor of their founder, Gene Autry. This team’s former player Tim Salmon informs a nickname for one of its current players, who led the MLB in total wins above replacement in the 2010s. Three years after leaving the NPB, another player for this team won a unanimous AL MVP for a season in which he was named an All-Star as both a designated hitter and a pitcher. For 10 points, Mike Trout and Shohei Ohtani (“sho-hay oh-TAW-nee”) play for what MLB team, nicknamed the Halos?",
+     "answer": "Los Angeles <b><u>Angels</u></b> [or Anaheim <b><u>Angels</u></b>; or Los Angeles <b><u>Angels</u></b> of Anaheim; prompt on <u>L.A.</u> or <u>Los Angeles</u>] (Salmon’s nickname was “King Fish”; Trout’s is “King Fish 2.0.”)",
+     "category": "Pop Culture",
+     "subcategory": "Sports"
+    },
+    {
+     "question": "This novel ends by recalling a phrase written in a “school copybook with twenty pages” in a child’s “delicate calligraphy,” per Magda Bogin’s English translation. A man in this novel has a heart attack after his son shows up naked in front of the gates of Congress. A Conservative Senate candidate in this novel adopts the slogan “those who have always won will win again.” This novel opens and closes with the words “Barrabás came to us by sea,” which are written by a character who predicts an earthquake that destroys the estate of Las Tres Marías. In this novel, the death of the green-haired Rosa the Beautiful is predicted by Clara del Valle (“VAI-ay”). For 10 points, generations of the Trueba family are chronicled in what magical realist novel by Isabel Allende (“ai-YEN-day”)?",
+     "answer": "<em>The</em> <em><b><u>House of the Spirits</u></b></em> [or <em>La</em> <em><b><u>casa de los espíritus</u></b></em>]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "Barbarians seeking one of these objects killed the Gothic king Heidrek, who owned one cursed to cause three evil deeds. Two sons of Hreidmarr (“RIDE-marr”) were killed after a hero tested one of these objects using a piece of wool in a river. Odin placed one of these objects in the Barnstokkr (“BARN-stoker”) tree during the wedding of Sigmund. Freyr gave up a sentient one of these objects to Skírnir (“SKEER-neer”) in order to marry the giantess Gerd. The dwarves Dvalinn and Durinn created one of these objects that was cursed to kill someone every time it was used, called Tyrfing (“TEER-fing”). Heimdall uses a large one of these objects called Hofund to open up the Bifrost. For 10 points, name these weapons that include Gram, which Sigurd used to slay Fafnir.",
+     "answer": "<b><u>sword</u></b>s [or <b><u>sverd</u></b>s; prompt on <u>weapon</u>s or <u>arm</u>s or <u>arm</u>aments until “weapons” is read; prompt on <u>Tyrfing</u> or <u>Gram</u> or <u>Hofund</u> until each is read by asking “what type of object is that?”]",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "In this city, Cole Porter helped a performer known as “Bricktop” set up clubs after she taught him how to dance the Black Bottom and Charleston. Loïe Fuller popularized her veiled “serpentine dance” in this city, whose bargoers nicknamed a performer the “glutton” because she downed their drinks while dancing. A cheetah with a diamond collar named Chiquita terrorized a backing orchestra in this city during performances of a “savage dance.” Gene Kelly discovered Leslie Caron in this city, where a number wearing a skirt of fake bananas was performed by a mostly-nude Josephine Baker. A red windmill adorns a cabaret in this city that birthed the can-can. For 10 points, name this city home to the Folies Bergère (“foh-LEE bayr-ZHAYR”) and Moulin Rouge.",
+     "answer": "<b><u>Paris</u></b> (The “glutton” was La Goulue.)",
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "question": "Practitioners of this religion symbolize one of their deities by keeping a statue of a cement head in a dish behind a door in their home. Parables in this religion called patakis include stories about its four “warrior deities.” One of this religion’s male gods, who is sometimes syncretized with Saint Barbara, is clothed in white and red, wears a crown, and wields a double ax. Practitioners of this religion perform drumming and dancing in <em>bembe</em> ceremonies. In 1993, a law in the city of Hialeah (“hai-uh-LEE-uh”) was challenged by a church of this religion named for its healer god Babalu Aye (“BAH-buh-loo AH-yay”). This [emphasize] <em>syncretic</em> religion’s pantheon incorporates the supreme being Olódùmarè (“oh-loh-doo-mah-ray”) from Yoruba religion. For 10 points, chicken sacrifices are controversially performed in what Afro-Caribbean religion that is popular in Cuba?",
+     "answer": "<b><u>Santería</u></b> [or <b><u>Regla de Ocha</u></b> or Order of <b><u>Lucumí</u></b>; prompt on <u>Yoruba</u> religion until read; prompt on <u>Ìṣẹ̀ṣe</u>]",
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "question": "This artist was inspired by a trip to visit a mural by José Clemente Orozco to paint a piece in which yellow faces surround a woman arched over a set of bones, titled <em>Bald Woman with Skeleton.</em> In 1973, a painting by this artist was controversially purchased for 1.3 million dollars by the National Gallery of Australia. Marcel Duchamp suggested that this artist paint one of his works on canvas rather than directly on the wall of Peggy Guggenheim’s apartment. This artist was introduced to Clement Greenberg by his wife, Lee Krasner. A painting by this artist created using liquid paint was described as a “dense bird’s nest.” This artist painted <em>Blue Poles,</em> <em>Lavender Mist,</em> and<em> Full Fathom Five.</em> For 10 points, name this abstract expressionist known for his “drip” technique.",
+     "answer": "Jackson <b><u>Pollock</u></b> [or Paul Jackson <b><u>Pollock</u></b>]",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "It’s not blood clotting, but as part of this process, plasmin helps cumulus cells detach. A drug that is used on-label to induce this process, clomiphene citrate, has been replaced as first-line treatment by letrozole, an aromatase inhibitor. During this process, CD24 is upregulated by a subpopulation of granulosa cells. Mittelschmirtz is a pinching pain associated with this process, which is immediately preceded by an increase in basal body temperature. An LH spike triggers this process, in which a follicle ruptures and leaves behind a corpus luteum, which secretes progesterone to thicken the endometrial lining. This event typically happens on day 14 of the menstrual cycle. For 10 points, name this event in which an egg is released from the ovary.",
+     "answer": "<b><u>ovulation</u></b> [or word forms like <b><u>ovulate</u></b>; prompt on <u>reproduction</u>; prompt on <u>menstruation</u> or <u>period</u>s or <u>menstrual</u> cycle or equivalents; prompt on <u>follicular rupture</u> or equivalents; prompt on descriptive answers like <u>egg release</u>]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "The firm Colnaghi and Co. commissioned watercolors of this conflict from the artist William Simpson. A set of bells taken as spoils during this conflict from the Church of the Twelve Apostles were later installed in Windsor Castle’s Round Tower. A painting by Robert Gibb memorialized when soldiers in this conflict were told “there is no retreat from here, men. You must die where you stand.” A Roger Fenton photograph taken during this conflict depicts cannonballs lying scattered on a deserted road. During a battle of this conflict, an enemy cavalry charge was repulsed by the “Thin Red Line.” In that battle of this conflict, a misinterpreted order from Lord Raglan caused a disastrous British cavalry charge. For 10 points, name this 1850s conflict that included the “Charge of the Light Brigade.”",
+     "answer": "<b><u>Crimean</u></b> War [or <b><u>Kırım</u></b> Savaşı; or <b><u>Vostochnaya</u></b> voyna] (The battle was the Battle of Balaclava.)",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "A nonclassical bioisostere (“bio-iso-stere”) for this molecule is the [1.1.1]propellane (“one-one-one-propel-ane”) that was introduced into a clinical gamma-secretase candidate. Michael Levitt calculated that this molecule can act as a weak hydrogen bond acceptor. This molecule can engage in offset or T-shaped stacking interactions. The anisotropic effect explains why the NMR peak for the protons of this molecule is unusually downfield at 7.34 ppm. Two substituents on this molecule or its derivatives can be arranged <em>ortho</em>, <em>meta</em>, or <em>para</em>. August Kekulé described the structure of this molecule, which is simplified by drawing a circle within a hexagon. For 10 points, name this molecule with four degrees of unsaturation that is the simplest neutral aromatic hydrocarbon.",
+     "answer": "<b><u>benzene</u></b> [or <b><u>C</u><u>6</u><u>H</u><u>6</u></b>; accept <b><u>[6]annulene</u></b> or <b><u>phenyl</u></b>; reject “benzyl” or “benzoyl”]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "A character in this play wishes to command “the ocean to overwhelm the world,” foreshadowing his later request to be “chang’d into small water-drops, and fall into the ocean.” Another character in this play is tested on the makeup of the Solar System, but refuses to answer the question “who made the world?” In his final line, this play’s title character pleads “I’ll burn my books!” as a clock strikes twelve. After seeing the words “homo, fuge” appear on his arm, a man in this play travels to Rome and plays tricks on the Pope. This play’s protagonist requests, “make me immortal with a kiss” and asks, “was this the face that launch’d a thousand ships?” to the ghost of Helen of Troy. For 10 points, name this Christopher Marlowe play in which the title scholar sells his soul to Mephistophilis.",
+     "answer": "<em><b><u>Doctor</u> </b><b><u>Faustus</u></b></em> [or <em>The Tragical History of the Life and Death of</em> <em><b><u>Doctor Faustus</u></b></em>; reject “Faust”]",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "question": "One of these performers whistles the hymn “Will There Be Any Stars In My Crown?” in the <em>Night-Spell</em> <em>I</em> (“one”) movement of a 12-movement suite. One of these performers shouts, “Chri-ste!” (“KREE-stay”) in a <em>Crucifixus</em> movement literally shaped like a cross, part of a zodiac-inspired piece by George Crumb. Square note heads indicate that these performers should play harmonics in a set of 153 increasingly hard pieces by Béla Bartók. Before playing <em>Sonatas and Interludes</em>, these performers use screws, bolts, and rubber chunks to “prepare” their instrument. One of these performers, David Tudor, barely interacted with his instrument at the premiere of John Cage’s <em>4’33”</em> (“four minutes thirty-three seconds”). For 10 points, name these performers who play a common keyboard instrument with 88 keys.",
+     "answer": "<b><u>pianist</u></b>s [or <b><u>piano</u></b> players; accept prepared <b><u>piano</u></b> players; prompt on <u>musician</u>s] (The first two lines refer to Crumb’s <em>Makrokosmos</em>. The third line refers to Bartók’s <em>Mikrokosmos</em>.)",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "A manifesto for a 20th-century revival of this thinker’s ideas claims that understanding a society’s “mind-nature” is the only way to fully understand its history. This thinker asks “to study and practice what one has studied, is this not a pleasure?” at the beginning of a book often split into “upper” and “lower” texts by scholars. This thinker is credited with the argument that social disorder stems from not referring to things by terms corresponding to reality. A book of sayings by this philosopher argues for the importance of “rectification of names” and an ethical virtue called <em>rén</em> (“run”), as well as emphasizing filial piety. For 10 points, students of what influential Chinese philosopher compiled his sayings in the <em>Analects</em>?",
+     "answer": "<b><u>Confucius</u></b> [or <b><u>Kǒng</u></b> Fūzǐ; or <b><u>Kǒng</u></b>zǐ; or Master <b><u>Kǒng</u></b>; accept <b><u>Confucian</u></b>ism; accept New <b><u>Confucian</u></b>ism]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "This service was provided by a government organization whose Democratic employees were replaced with thousands of Republicans under John Wanamaker. Illegal contracts awarded to workers providing this service were exposed during the Grant administration in the Star Routes scandal. In 1893, Georgia congressman Tom Watson pushed for a bill that would provide this service for free to rural areas. People attempting to use this service to promote contraceptives or lewd materials were prosecuted by the Comstock Act. A translation of Herodotus’s <em>Histories</em> inspired an unofficial motto used by workers providing this service, which begins “Neither snow nor rain nor heat nor gloom of night.” For 10 points, name this service provided by the USPS.",
+     "answer": "<b><u>post</u></b>al service [or <b><u>mail</u></b>; accept mail <b><u>delivery</u></b> or package <b><u>delivery</u></b> or parcel <b><u>delivery</u></b> or equivalents; accept <b><u>courier</u></b> service; accept <b><u>USPS</u></b> until read; accept Rural Free <b><u>Delivery</u></b>]",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "In a short story, Baron Kilnevich tells other characters with this trait to cast aside all shame and exposes Tarasevich for embezzling 400,000 rubles earmarked for widows and orphans. In that story, characters with this trait discuss the philosopher Platon Nikolaevich and one of them repeatedly says the nonsense word “Bobok.” Vladimir Nabokov argued that a novel partly titled for this trait exemplifies “poshlust” through its descriptions of a character who visits Manilov and Nozdryov. A charismatic conman goes to landowners to buy papers representing serfs with this title trait in a novel centered on a “get rich quick” scheme invented by Chichikov. For 10 points, name this trait that describes the title “Souls” of a novel by Nikolai Gogol.",
+     "answer": "being <b><u>dead</u></b> [or <b><u>mertvykh</u></b>; accept being a <b><u>ghost</u></b> or <b><u>spirit</u></b> or <b><u>phantom</u></b> or equivalents; accept <em><b><u>Dead</u></b> Souls</em> or <em><b><u>Myertvye</u></b> dushi</em>] (The first story is Dostoevsky’s “Bobok.”)",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "question": "A character from this country studies engineering geology and encounters the title member of the “Theater of Morality Tales” troupe after becoming a well digger. A girl travels from Arizona to this country to search for her roots in a novel titled for the “Bastard” of this country’s largest city. This country is the setting of <em>The Red-Headed Woman</em> and a novel that includes a diagram with axes labeled Reason, Imagination, and Memory. Butterfly, Stork, and Olive are suspected of murdering the miniaturist Elegant Effendi in a novel from this country whose protagonist, Black, falls in love with Shekure. In another novel from this country, Ipek thinks that the police found Blue because of the poet Ka, who investigates the suicides of the “headscarf girls.” For 10 points, name this home country of Orhan Pamuk.",
+     "answer": "<b><u>Turkey</u></b> [or Republic of <b><u>Turkey</u></b>; or <b><u>Türkiye</u></b> Cumhuriyeti] (The second line refers to <em>The Bastard of Istanbul</em> by Elif Shafak. The unnamed novels are <em>My Name is Red</em> and <em>Snow</em>.)",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    }
+   ],
+   "bonuses": [
+    {
+     "leadin": "A poem about this historical figure that begins, “He is dead. Our uncrowned king is dead” is called “a very fine piece of writing” by Mr. Crofton. For 10 points each:",
+     "parts": [
+      "Name this politician whom the canvassers Mr. Henchy and Mr. Lyons discuss on the anniversary of his death in the story “Ivy Day in the Committee Room.”",
+      "Parnell’s supposed complicity in the Phoenix Park murders was satirized as HCE’s vague sexual encounter with a “cad with a pipe” in this novel about the Earwicker family, which begins, “riverrun, past Eve and Adam’s.”",
+      "James Joyce’s story “Ivy Day in the Committee Room” and his novel <em>Finnegans Wake</em> are both set in this city, which also titles a Joyce collection that includes the stories “The Dead” and “Araby.”"
+     ],
+     "answers": [
+      "Charles <b><u>Parnell</u></b> [or Charles Stewart <b><u>Parnell</u></b>]",
+      "<em><b><u>Finnegans Wake</u></b></em>",
+      "<b><u>Dublin</u></b> [or <b><u>Baile Átha Cliath</u></b>; accept <em><b><u>Dublin</u></b>ers</em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "leadin": "A book cites Borges’s (“BOR-hess’s”) story “On Exactitude in Science” as a demonstration of the “precession” of these things, in which they begin to precede reality. For 10 points each:",
+     "parts": [
+      "Name these imitations of persons or objects that eventually supersede the original. These are the first title things of a book that was required reading for the crew of <em>The Matrix</em> and even appears in the movie itself.",
+      "Jean Baudrillard (“zhahn boh-dree-YAR”) names these things as some of the causes blurring the line between simulacra and reality. “Hot” and “cool” types of these things were identified by a Canadian theorist who pioneered the study of them.",
+      "Baudrillard specifically warns that media can alter our collective memory of tragedies like this event. Hannah Arendt wrote about the “banality of evil” of this event’s “architect” in her book <em>Eichmann in Jerusalem</em>."
+     ],
+     "answers": [
+      "<b><u>simulacra</u></b> (“sim-yoo-LACK-rah”) [or <b><u>simulacrum</u></b>; or <b><u>simulacres</u></b>; accept <em><b><u>Simulacra</u></b> and Simulation</em> or <em><b><u>Simulacre</u></b> et Simulations</em>; reject “simulations”] (The book is Jean Baudrillard’s <em>Simulacra and Simulation</em>.)",
+      "<b><u>media</u></b> [or <b><u>medium</u></b>s; accept hot <b><u>media</u></b>; accept cool <b><u>media</u></b>; prompt on specific forms of media such as <u>television</u>, the <u>internet</u>, <u>film</u>, <u>print</u>, etc. by asking “that is a specific example of what class of things?”] (The theorist is Marshall McLuhan.)",
+      "<b><u>Holocaust</u></b> [or <b><u>Shoah</u></b> or Ha<b><u>Shoah</u></b>; prompt on <u>World War II</u> or the <u>Second World War</u> or <u>WW2</u> or <u>WWII</u>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "Viriathus led a rebellion that Polybius called the “fiery war” in this region, where velites (“WAY-lee-tace”) units failed to counter weapons like the pilum (“PEE-loom”) and falcata in the Numantine War. For 10 points each:",
+     "parts": [
+      "Identify this region that contained the mysterious Tartessos civilization. After Sulla’s civil war, Quintus Sertorius led a revolt in this region, where “New Carthage” controlled rich silver mines before the Battle of Ilipa (“ILL-ipp-uh”).",
+      "Rome conquered Hispania after Augustus’s wars with the Cantabri and the people of this modern-day Spanish principality. The Hispano-Visigothic ruler Pelagius founded a Christian kingdom based in this region circa 718 CE.",
+      "The Castro Culture may have first built coastal hillforts in Asturias during the “late” “Atlantic” arm of this period, which the three-age system places between the Stone and Iron ages."
+     ],
+     "answers": [
+      "<b><u>Hispania</u></b> [accept <b><u>Iberia</u></b> or <b><u>Iberia</u></b>n peninsula; accept <b><u>Spain</u></b> or <b><u>España</u></b>; accept <b><u>Portugal</u></b>; accept <b><u>Catalonia</u></b> or <b><u>Catalunya</u></b>; accept Hispania <b><u>Baetica</u></b> or Hispania <b><u>Tarraconensis</u></b> or <b><u>Hispania</u></b> Citerior or <b><u>Hispania</u></b> Ulterior; accept <b><u>Lusitania</u></b> or <b><u>Lusitanian</u></b> War; accept <b><u>Andalusia</u></b> or <b><u>Andalucía</u></b>; accept <b><u>Murcia</u></b>] (“New Carthage” is Cartagena.)",
+      "<b><u>Asturias</u></b> [or <b><u>Asturies</u></b> or Principado de <b><u>Asturias</u></b> or Principáu d’<b><u>Asturies</u></b> or Principao d’<b><u>Asturias</u></b>; accept Kingdom of <b><u>Asturias</u></b> or Reinu d’<b><u>Asturies</u></b> or <b><u>Asturum</u></b> Regnum; accept <b><u>Astures</u></b> or <b><u>Astyrs</u></b>]",
+      "<b><u>Bronze</u></b> Age [accept Late <b><u>Bronze</u></b> Age; accept Atlantic <b><u>Bronze</u></b> Age]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "For a 1974 piece, this artist pretended to be an architecture journalist to interview construction workers and had colleagues learn to shoot a rope nearly 140 feet in length with a bow and arrow. For 10 points each:",
+     "parts": [
+      "Name this artist whose high-wire walk between the Twin Towers of the World Trade Center was documented in the film <em>Man on Wire</em>.",
+      "In a 1986 film, Petit re-enacted one of the many tightrope walks across this river by his idol, French acrobat Blondin (“blon-DAN”). Annie Taylor survived a trip in a barrel over the falls of this river on the border of Ontario and New York.",
+      "This fellow French artist wrote the preface to Petit’s book <em>On the High Wire</em>. This artist’s “Bip the Clown” act made him the world’s most famous mime in the latter half of the 20th century."
+     ],
+     "answers": [
+      "Philippe <b><u>Petit</u></b> (“fee-LEEP puh-TEE”)",
+      "<b><u>Niagara</u></b> River [accept <b><u>Niagara</u></b> Falls; accept <b><u>Niagara</u></b> Gorge]",
+      "Marcel <b><u>Marceau</u></b> (“mar-SOH”) [or Marcel <b><u>Mangel</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Other Academic",
+     "subcategory": "Other Academic"
+    },
+    {
+     "leadin": "Eight percent of this gas’s human emissions are caused by concrete manufacturing. For 10 points each:",
+     "parts": [
+      "The heating of limestone to make lime releases what greenhouse gas that is produced and breathed out in human metabolism?",
+      "This vibrational mode is one of the three IR-active vibrational modes for carbon dioxide, along with two bending modes. This mode maintains the collinearity of the three nuclei.",
+      "Asymmetric stretching of carbon dioxide is an IR-active mode because it leads to changes in this quantity with respect to vibration. This quantity is typically measured in debyes (“duh-BIZE”)."
+     ],
+     "answers": [
+      "<b><u>carbon dioxide</u></b> [or <b><u>CO</u><u>2</u></b> (“C-O-two”)]",
+      "<b><u>asymmetric stretch</u></b>ing [or <b><u>antisymmetric stretch</u></b>ing; or <b><u>ν</u><u>as</u></b> (“nu-A-S”); prompt on <u>stretch</u>ing modes]",
+      "<b><u>dipole</u></b> moment [or electric <b><u>dipole</u></b> moment; reject “magnetic dipole moment”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "The Pate (“PAH-tay”) Chronicle in this language records a widespread origin myth in which local rulers claimed the Persian title “Shirazi” to legitimize their status as Islamic elites. For 10 points each:",
+     "parts": [
+      "Name this Bantu lingua franca whose many Arabic loanwords arose from Indian Ocean trade in cities like Lamu, Sofala, and Kilwa along its namesake “coast” in East Africa.",
+      "Míng vases suggest that this Swahili Coast city eclipsed nearby Mambrui by the 15th century, when it sent giraffes to Bengal. This city in modern-day Kenya allied with Portugal to compete with Mombasa for Gujarati trade.",
+      "Malindi supplied Khambhat with this product, which was exported by the Hausa city-states of Rano and Kano. The Tuareg color their clothes with this product, which was cultivated in Bengal and imitated with woad."
+     ],
+     "answers": [
+      "<b><u>Swahili</u></b> [or Ki<b><u>swahili</u></b>; accept <b><u>Swahili</u></b> coast]",
+      "<b><u>Malindi</u></b> [accept <b><u>Malindi</u></b> Kingdom; accept <b><u>Malindi</u></b> giraffe]",
+      "<b><u>indigo</u></b> [or <b><u>babba</u></b> or <b><u>nīla</u></b>; or <em><b><u>Indigofera</u></b> tinctoria</em>; prompt on blue <u>dye</u>s or <u>pigment</u>s or <u>color</u>ants or <u>paint</u>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "leadin": "Answer the following about the links between architecture and shoe design, for 10 points each.",
+     "parts": [
+      "Le Corbusier inspired the Bata shoe company’s functionalist redesign of a city in this country. “Fred and Ginger” was the original name of Frank Gehry’s Dancing House in this country’s capital, Prague.",
+      "In 2012, this architect teamed up with Converse to release Chuck Taylor trainers printed with a poem about his longing for the “free and sensual curve.” This architect designed the headquarters of the French Communist Party while in exile in Paris.",
+      "In 2015, this architect was one of five invited by Rem Koolhaas’s (“KOHL-hahss’s”) company United Nude to design 3D-printed women’s shoes. This Deconstructivist architect, who also created shoes for Melissa, designed the Guǎngzhōu Opera House."
+     ],
+     "answers": [
+      "<b><u>Czechia</u></b> [or <b><u>Czech</u></b> Republic or <b><u>Česká</u></b> republika; prompt on <u>Czechoslovakia</u>]",
+      "Oscar <b><u>Niemeyer</u></b> [or Oscar Ribeiro de Almeida <b><u>Niemeyer</u></b> Soares Filho] (The two collaborated because they both celebrated their 104th birthdays in 2012.)",
+      "Zahā <b><u>Ḥadīd</u></b> [or Dame Zahā Mohammad <b><u>Ḥadīd</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "leadin": "This character states that “a servant is a servant” while her lover counters, “and a whore is a whore.” For 10 points each:",
+     "parts": [
+      "Name this dramatic character who loses the courage to escape to Lake Como when her father returns after her servant decapitates her pet greenfinch.",
+      "<em>Miss Julie</em> is a play by this Swedish author of <em>The Ghost Sonata</em> and the novel <em>The Red Room</em>.",
+      "Miss Julie tells Jean that she has a recurring dream in which she sits on one of these objects but “can find no rest or peace.” Bernick tries to sink the <em>Indian Girl</em> in a Henrik Ibsen play titled for these objects."
+     ],
+     "answers": [
+      "Miss <b><u>Julie</u></b> [or Fröken <b><u>Julie</u></b>]",
+      "August <b><u>Strindberg</u></b> [or Johan August <b><u>Strindberg</u></b>]",
+      "a <b><u>pillar</u></b> [or synonyms such as <b><u>column</u></b>; accept <em>The</em> <em><b><u>Pillar</u></b>s of Society</em> or <em><b><u>Pillar</u></b>s of the Community</em> or <em>Samfundets</em> <em><b><u>støtte</u></b>r</em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "Like the yeast two-hybrid assay, this assay is used to generate interactome maps. For 10 points each:",
+     "parts": [
+      "Name this assay in which the binding partners of a given protein are pulled down using an antibody specific to that protein. Subsequent to this assay, mass spec is used to identify binding partners.",
+      "Co-IP experiments often use epitope tags, such as a popular one with six copies of this positively charged amino acid. This amino acid with an imidazole side chain coordinates the oxygen and the iron in hemoglobin.",
+      "IP experiments are also used to determine binding sites for proteins on this molecule. This double-helical molecule wraps around histones to form chromatin in the nucleus."
+     ],
+     "answers": [
+      "<b><u>co-IP</u></b> [or <b><u>co-immunoprecipitation</u></b>; prompt on <u>IP</u> or <u>immunoprecipitation</u> or <u>precipitation</u> or <u>pulldown</u>]",
+      "<b><u>histidine</u></b> [or <b><u>His</u></b> or <b><u>H</u></b>]",
+      "<b><u>DNA</u></b> [or <b><u>deoxyribonucleic acid</u></b>; prompt on <u>nucleic acid</u>s or <u>polynucleotide</u>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "The 2021 Supreme Court decision <em>Google LLC v. Oracle America, Inc.</em> mainly concerned the question of whether this protection applied to APIs. For 10 points each:",
+     "parts": [
+      "Name this basic form of intellectual property protection that applies to works like books and songs.",
+      "In the case, Google argued that their work based on Java APIs fell under this doctrine, under which copyrighted works can be adapted in limited ways depending on factors including the effect on the original work’s value.",
+      "Another factor invoked in the case was whether a work has this property of having a different purpose to the original work. The importance of this property derives from a case centered on a 2 Live Crew parody of “Oh, Pretty Woman.”"
+     ],
+     "answers": [
+      "<b><u>copyright</u></b>",
+      "<b><u>fair use</u></b> doctrine",
+      "<b><u>transformative</u></b> use [or <b><u>transform</u></b>ation or other word forms]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "leadin": "Gravity Probe B used four gyroscopes to experimentally verify the geodetic (“jee-oh-DET-ick”) effect, which is a form of this process sometimes named for Willem de Sitter. For 10 points each:",
+     "parts": [
+      "Name this process whose “torque-induced” type affects the perihelion of Mercury by about 38 arcseconds per century.",
+      "Both of those forms of precession were predicted by this theory of gravitation, which Albert Einstein proposed a decade after a related “special” theory.",
+      "Gravity Probe B also tested Lense–Thirring (“LEN-zuh-TIH-ring”) precession, the first known form of this effect in which a rotating massive object perturbs spacetime for objects orbiting it."
+     ],
+     "answers": [
+      "<b><u>precess</u></b>ion [accept torque-induced <b><u>precess</u></b>ion; accept de Sitter <b><u>precess</u></b>ion]",
+      "<b><u>general relativity</u></b> [or <b><u>GR</u></b>; prompt on <u>relativity</u> or <u>general</u>]",
+      "<b><u>frame-drag</u></b>ging [prompt on <u>drag</u>ging]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "leadin": "Answer the following about foreign deities in the Roman world, for 10 points each.",
+     "parts": [
+      "An Anatolian chief god became syncretized as Jupiter Dolichenus in a mystery cult popular among these people in the Roman empire. These people were the majority of the practitioners of the cult of Mithras.",
+      "Plutarch proposed that this Roman god was equivalent to the Phrygian god Sabazius, as well as the Jewish God. This deity is the Roman god of wine.",
+      "The cult of the Syrian sun god Elagabalus was based around a Roman temple at this location that housed the god’s cult stone. Romulus killed Remus at this specific location to become the first Roman king."
+     ],
+     "answers": [
+      "<b><u>soldier</u></b>s [or <b><u>miles</u></b> or <b><u>milites</u></b>; accept <b><u>equites</u></b>; accept specific types of soldiers such as <b><u>infantry</u></b>men or <b><u>cavalry</u></b>men]",
+      "<b><u>Bacchus</u></b> [prompt on <u>Dionysus</u> by asking “who is his Roman equivalent?”]",
+      "<b><u>Palatine</u></b> Hill [or Mons <b><u>Palatinus</u></b>; or Collis <b><u>Palatium</u></b>; or il <b><u>Palatino</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "John Hajnal (“HOY-nol”) divided Europe via an imaginary line into two regions where this practice either occurred early or late in life. For 10 points each:",
+     "parts": [
+      "Name this practice whose “clandestine” type was officially deemed invalid by the decree “Tametsi” promulgated at the Council of Trent.",
+      "A possible cause in the delayed age for marriage is the large increase in women who entered farming as a result of this disease, which wiped out nearly a third of Europe’s population in the 14th century.",
+      "Gratian, a jurist from this city, argued that consent and sexual union were the only things required to affirm marriages. This city’s university, founded in 1088, is the oldest continuously operated university in the world."
+     ],
+     "answers": [
+      "<b><u>marriage</u></b>s [or <b><u>wedding</u></b>s or <b><u>nuptial</u></b>s or equivalents]",
+      "<b><u>plague</u></b> [or <b><u>Black Death</u></b>; or Black <b><u>Plague</u></b>; accept bubonic <b><u>plague</u></b> or pneumonic <b><u>plague</u></b> or septicemic <b><u>plague</u></b>; accept Great <b><u>Plague</u></b> or Great <b><u>Pestilence</u></b>; accept second <b><u>plague</u></b> pandemic; prompt on <u>Great Morality</u>; prompt on <u>pneumonia</u>]",
+      "<b><u>Bologna</u></b> [or <b><u>Bulåggna</u></b>; or <b><u>Bononia</u></b>; accept University of <b><u>Bologna</u></b> or Università di <b><u>Bologna</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "leadin": "The fourth movement of this symphony, which features the timpani and the snare drum playing a march as a funeral dirge, supposedly symbolizes soldiers muttering “our business is rejoicing.” For 10 points each:",
+     "parts": [
+      "Name this symphony whose composer called it “a Soviet artist’s creative response to justified criticism.”",
+      "Shostakovich’s fifth symphony responded to an article accusing him of belonging to this ill-defined artistic school. He later satirized the Zhdanov Decree, which accused him and other artists of being in this school, in a cantata about the official Rayok.",
+      "Shostakovich’s eighth piece for this ensemble quotes his fifth symphony and mourns “victims of fascism and the war.” Two violins, a viola, and a cello make up this ensemble."
+     ],
+     "answers": [
+      "Dmitri <b><u>Shostakovich</u></b>’s Symphony No. <b><u>5</u></b> in D minor [or <b><u>Shostakovich</u></b>’s <b><u>fifth</u></b> symphony; prompt on Symphony No. <u>5</u>]",
+      "<b><u>f</u><u>ormalism</u></b> [or word forms like <b><u>formalist</u></b>; or <b><u>formalizm</u></b>; accept <em>Anti-<b><u>Formalist</u></b> Rayok</em>]",
+      "string <b><u>quartet</u></b>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "Charles Parham was horrified to see that worshipers were not segregated during the meetings that popularized this revival. For 10 points each:",
+     "parts": [
+      "Name this Pentecostal revival led by William J. Seymour, who organized a series of meetings in the early 20th century.",
+      "Participants in the Azusa Street Revival sometimes fell to the ground in a manner described as being “slain” by this figure, who forms the Trinity along with the Son and the Father.",
+      "Pentecostalism’s emphasis on glossolalia and miracles characterizes it as a type of Christianity named for this adjective, which refers to the gifts of the Holy Spirit."
+     ],
+     "answers": [
+      "<b><u>Azusa</u></b> Street Revival [or <b><u>Azusa</u></b> Revival]",
+      "Holy <b><u>Spirit</u></b> [or Holy <b><u>Ghost</u></b>; or <b><u>Spiritus</u></b> Sanctus; accept slain in the <b><u>Spirit</u></b>]",
+      "<b><u>charismatic</u></b> Christianity"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "Namesake “ratios” of two of these functions are the subject of a type of hypothesis test named for Samuel Wilks. For 10 points each:",
+     "parts": [
+      "Name these functions whose derivative is the score function. The derivatives of these functions’ logarithms are set to zero in a frequentist methodology.",
+      "The likelihood principle states that likelihood functions inherently contain all the useful information from these sets. This term refers to smaller datasets taken from a population, which can be done with or without replacement.",
+      "Likelihood functions relate priors and posteriors in this type of statistical inference, which is contrasted with frequentism and is based on a result concerning conditional probabilities."
+     ],
+     "answers": [
+      "<b><u>likelihood</u></b> functions [accept log-<b><u>likelihood</u></b> functions; accept maximum <b><u>likelihood</u></b> estimation; accept <b><u>likelihood</u></b> ratio tests]",
+      "<b><u>sample</u></b>s [accept <b><u>sampling</u></b>]",
+      "<b><u>Bayes</u></b>ian inference [accept <b><u>Bayes</u></b>’ theorem or <b><u>Bayes</u></b>’ rule]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "The protagonist of a novel gives a lecture on this person’s mother, intercut with a simultaneous lecture on Elvis’s mother by Murray Jay Siskind. For 10 points each:",
+     "parts": [
+      "Name this historical person, the subject of study for a professor at the College-on-the-Hill who is exposed to an “Airborne Toxic Event.”",
+      "Jack Gladney invents the field of Hitler studies in <em>White Noise</em>, a novel by this postmodern American author of <em>Underworld</em>.",
+      "The Nazi studies professor William Frederick Kohler inserts a depressing account of his life into his book on Hitler’s Germany in this American author’s novel <em>The Tunnel</em>."
+     ],
+     "answers": [
+      "Adolf <b><u>Hitler</u></b> [accept <b><u>Hitler</u></b> studies]",
+      "Don <b><u>DeLillo</u></b> [or Donald Richard <b><u>DeLillo</u></b>]",
+      "William H. <b><u>Gass</u></b> [or William Howard <b><u>Gass</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "This collection’s opening poem describes a “little flute of a reed thou hast carried over hills and dales” of which “[thou] hast breathed through it melodies eternally new.” For 10 points each:",
+     "parts": [
+      "Name this collection whose English-language version opens with the line “Thou hast made me endless, such is thy pleasure.”",
+      "This Bengali author of <em>Gitanjali</em> wrote many songs, including the national anthems of India and Bangladesh.",
+      "In this Tagore novel, Nikhilesh says that he “is not running amuck crying ‘Bande Mataram,’” a reference to the national song of India. In this novel, Sandip symbolizes the anti-colonial Swadeshi movement."
+     ],
+     "answers": [
+      "<em><b><u>Gitanjali</u></b></em> (“ghee-TAHN-juh-lee”) [or <em><b><u>Song Offerings</u></b></em>]",
+      "Rabindranath <b><u>Tagore</u></b> [or Rabindranath <b><u>Thakur</u></b>; accept <b><u>Gurudev</u></b>; prompt on <u>Biswakobi</u> or <u>Kobiguru</u>]",
+      "<em>The</em> <em><b><u>Home and the World</u></b></em> [or <em><b><u>Ghôre Baire</u></b></em> or <em><b><u>Ghare Baire</u></b></em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "leadin": "A duke of this city likely commissioned one of three Renaissance <em>Ideal City</em> paintings, another of which is housed in and named for this city. For 10 points each:",
+     "parts": [
+      "Name this city that also partly titles a painting that depicts a maid rummaging through a chest behind its central nude woman.",
+      "On the left of the<em> Ideal City</em> of Baltimore, a building modeled after this largest Roman amphitheater commissioned by Vespasian may symbolize the importance of providing entertainment for the masses.",
+      "The <em>Ideal City</em> in Berlin is attributed to either Francesco di Giorgio Martini or this artist. This Florentine artist also painted three paintings of a 1432 battle, including one of Niccolò da Tolentino."
+     ],
+     "answers": [
+      "<b><u>Urbino</u></b> [or <b><u>Urbìn</u></b>; accept <em>Venus of</em> <em><b><u>Urbino</u></b></em>]",
+      "<b><u>Colosseum</u></b> [or <b><u>Colosseo</u></b>; or <b><u>Flavian Amphitheater</u></b> or <b><u>Amphitheatrum Flavium</u></b> or <b><u>Anfiteatro Flavio</u></b>]",
+      "Paolo <b><u>Uccello</u></b> [or Paolo <b><u>di Dono</u></b>] (Uccello’s <em>Battle of San Romano</em> comprises the three paintings.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "Answer the following about John Randolph, who broke with the Democratic-Republicans over states’ rights to form the tertium quids, for 10 points each.",
+     "parts": [
+      "Randolph broke with Jefferson after the latter pursued this type of proceeding against Samuel Chase. Andrew Johnson was the only president to be successfully convicted under one of these proceedings.",
+      "Randolph was enraged by the federal government’s response towards this scandal. The Supreme Court ruled that sales made during this scandal could not be repealed due to the Contract Clause in an 1810 case.",
+      "Randolph was a co-founder of this organization, which helped resettle African-Americans in places like Liberia on the argument that white and African-American people should not live together."
+     ],
+     "answers": [
+      "<b><u>impeachment</u></b>s [accept impeachment <u>trial</u>s; prompt on <u>trial</u>s or <u>tribunal</u>s]",
+      "<b><u>Yazoo</u></b> land fraud [or <b><u>Yazoo</u></b> scandal or <b><u>Yazoo</u></b> land scandal] (The case was <em>Fletcher v. Peck</em>.)",
+      "<b><u>American</u> <u>Colonization</u></b> Society [or <b><u>ACS</u></b>; or Society for the <b><u>Colonization of Free People of Color of America</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "While hosting this tour at his Bedminster golf course, Donald Trump lamented that “nobody’s gotten to the bottom of 9/11,” despite previously blaming the attacks on this tour’s benefactor. For 10 points each:",
+     "parts": [
+      "Name this recently founded professional golf tour financed by the Saudi Arabian sovereign wealth fund. Its roster of golfers includes Bryson DeChambeau, Dustin Johnson, and Phil Mickelson.",
+      "In April 2022, DeChambeau appeared in a golf video with the sports YouTubers Dude Perfect, who came under fire in July for filming a sponsored video in this country, the host of the 2022 FIFA World Cup.",
+      "The Saudi investment into LIV and Qaṭar’s World Cup hosting bid have both been cited as examples of this practice, in which corrupt regimes sponsor competitive events to improve their reputations."
+     ],
+     "answers": [
+      "<b><u>LIV</u></b> (\"liv\") Golf",
+      "<b><u>Qaṭar</u></b> [or State of <b><u>Qaṭar</u></b>; or Dawlat <b><u>Qaṭar</u></b>]",
+      "<b><u>sportswash</u></b>ing"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Pop Culture",
+     "subcategory": "Sports"
+    }
+   ]
+  },
+  "7": {
+   "name": "2022 ACF Winter Packet 7",
+   "tossups": [
+    {
+     "question": "This character hides under the “shade” of her “tree”-like father and takes a shower in an elevator in a 2020 Matthew Aucoin (“oh-KOYN”) opera adapted from a Sarah Ruhl play. Soon after this operatic character bemoans a man’s infidelity in the aria “Che fiero momento” (“kay f’YAY-roh moh-MEN-toh”), the man asks, “Che farò senza?” (“kay FAH-roh SENT-zah”), or “what shall I do without” this character. In a duet from another opera, this character sings in tandem with a tenor or baritone playing a god who buzzes rather than sings. This character sings in joy after the “Dance of the Blessed Spirits” from the first “reform opera” by Gluck. This character disappears after Jupiter’s thunderbolt shocks her lover into looking at her in a parodic opera by Jacques Offenbach. For 10 points, what female operatic character from Greek myth is rescued by her lover Orpheus?",
+     "answer": "<b><u>Eurydice</u></b> [or <b><u>Euridice</u></b>; prompt on <em><u>Orfeo ed Euridice</u></em>] (Offenbach’s opera is <em>Orpheus in the Underworld</em>.)",
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "question": "With a British scientist, this mathematician names a quantity equal to the modulus of half the log of the cross-ratio, which is a metric used in non-Euclidean geometries. In an influential manifesto, this mathematician advocated the classification of geometries using their transformation groups. This creator of the Erlangen program names the sole exception to the Heawood conjecture, which can be created by identifying two pairs of opposite sides of a unit square with one pair antiparallel and the other parallel. This mathematician names a 2D manifold that [emphasize] <em>cannot</em> be embedded into 3D space, which can be formed from two cross-caps and has no well-defined inside or outside. For 10 points, gluing two Möbius strips together produces what German mathematician’s namesake “bottle”?",
+     "answer": "Felix <b><u>Klein</u></b> [or Christian Felix <b><u>Klein</u></b>; accept <b><u>Klein</u></b> bottle] (The first line refers to the Cayley–Klein metric.)",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "In the 1960s, Melvin L. Fowler excavated one of these structures, supporting the “big bang” theory of Timothy R. Paukektat. Charles McIlvane orchestrated a hoax that some of these structures contained the “Newark Holy Stones.” The oldest of these structures may be those at Watson Brake. Over 72 of these structures were built in a medieval city that was surrounded by rings of wooden posts nicknamed “Woodhenge.” They are not found on Easter Island, but artifacts uncovered in these structures include a tablet depicting a “birdman” and implements used to play chunkey. During the Woodland Period, the Adena people built an “effigy” example of these places named for resembling a “Great Serpent.” For 10 points, the ancient city of Cahokia features what raised earthworks?",
+     "answer": "<b><u>mound</u></b>s [accept <b><u>tumulus</u></b> or <b><u>tumuli</u></b>; accept burial <b><u>mound</u></b>s; accept <b><u>Mound</u></b> Builders; accept Cahokia <b><u>Mound</u></b>s; accept platform <b><u>mound</u></b>s; accept effigy <b><u>mound</u></b>s or Great Serpent <b><u>Mound</u></b>; prompt on <u>earth</u>works or <u>earth</u>en structures; prompt on <u>burial</u> places or <u>tomb</u>s or <u>grave</u>s or equivalents; prompt on <u>pyramid</u>s or <u>monument</u>s or <u>ceremonial</u> structures or equivalents; prompt on <u>temple</u>s] (Timothy Paukektat’s “big bang” theory refers to the rapid population growth of Cahokia.)",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "This character exclaims “have mercy, Jesus!” upon waking from a dream in which he is told that he will “fall in height of all his pride.” This character is cursed to “take deep traitors for thy dearest friends” by a woman who calls him an “elvish-mark’d, abortive, rooting hog.” A prophecy concerning the letter G convinces this character to murder his brother, who later appears as one of several ghosts who tell this character to “despair and die!” This character decides, “I am determined to prove a villain” in resolving to imprison the Duke of Clarence in a speech that describes a “glorious summer” and opens “now is the winter of our discontent.” For 10 points, name this hunchbacked Shakespeare character who dies at the Battle of Bosworth Field after proclaiming “my kingdom for a horse!”",
+     "answer": "<b><u>Richard III</u></b> [or Richard, Duke of <b><u>Gloucester</u></b>; prompt on <u>Richard</u>]",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "question": "Nikolai Kapustin’s piece titled for this musical form “in the Old Style” combines it with jazz improvisation. The opening prelude of a piece in this form begins with a rising G major arpeggio, while the last piece of this form by the same composer is meant to be played on an unusual five-stringed instrument. August Wilhelmj (“vill-HELL-mee”) arranged a movement from an orchestral piece in this form for his “Air on the G String.” Baroque pieces in this form typically followed a slow French overture with an allemande, courante, sarabande, and gigue (“ZHEEG”) as their four dances. Yo-Yo Ma won a Grammy for recording Bach’s six pieces in this form for cello. For 10 points, name this musical form that consists of an ordered set of instrumental pieces.",
+     "answer": "<b><u>suite</u></b>s [accept specific types of <b><u>suite</u></b>s, such as cello <b><u>suite</u></b>s or Baroque <b><u>suite</u></b>s or <b><u>suite</u></b>s de danse; accept Bach’s Cello <b><u>Suite</u></b>s; accept <em><b><u>Suite</u></b> in the Old Style</em>]",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "This modern-day country’s Habr Yunis state was led by its Isaaq people. A colony in this country signed treaties with the Majerteen and Hobyo and with the Hiraab and Geledi based around the Shebelle and Jubba rivers, which were engineered by the Ajuran Empire. This country’s port of Zeila was controlled by coastal clans ruled by the Ifat and Adal sultanates. In this country, Sheikh Madar founded Hargeisa (“har-GAY-suh”), which replaced Berbera as the capital of a British protectorate whose Dervish movement was led by Mohammed Abdile Hassan, the “Mad Mullah.” Yemen obtained camel meat from this country, which [emphasize] <em>lost</em> the Ogaden to Menelik II. An Italian colony in this country controlled Puntland, which has arrested modern pirates in the Gulf of Aden. For 10 points, what Islamic country in the Horn of Africa contains Mogadishu?",
+     "answer": "<b><u>Somalia</u></b> [or Federal Republic of <b><u>Somalia</u></b> or Jamhuuriyadda Federaalka <b><u>Soomaaliya</u></b> or Jumhūriyah as-<b><u>Sūmāl</u></b> al-Fīdirāliyah; accept <b><u>Somaliland</u></b> or Republic of <b><u>Somaliland</u></b> or Jamhuuriyadda <b><u>Soomaaliland</u></b> or Jumhūrīyat <b><u>Ṣūmālīlānd</u></b>; accept British <b><u>Somaliland</u></b> or <b><u>Somaliland</u></b> Protectorate or Dhulka <b><u>Soomaalida</u></b> ee Biritishka; accept Italian <b><u>Somaliland</u></b> or <b><u>Somalia</u></b> Italiana or Dhulka Talyaaniga ee <b><u>Soomaalida</u></b> or Al-<b><u>Sumal</u></b> Al-Italiy]",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "In 1980, Sumio Iijima discovered a material formed from this element whose main application is in supercapacitors, and which is named for its “onion-like” structure. This element forms a material that doesn’t become crystalline at high temperatures and may be used to coat electrodes, which is known as this element’s “glassy” form. A cage-like molecule composed of hydrogen and this element that resembles the repeating network it forms in certain minerals is called adamantane. This element forms a material whose “slippery” feel, or superlubricity, is caused by the sliding of sheets of it that are one atom thick. Sixty atoms of this element form its allotrope buckminsterfullerene. For 10 points, name this element whose allotropes include graphene and diamond.",
+     "answer": "<b><u>carbon</u></b> [or <b><u>C</u></b>; accept <b><u>diamond</u></b> or <b><u>graphene</u></b> or <b><u>buckminsterfullerene</u></b> until each is read; accept <b><u>C</u></b>60 (“C-sixty”); accept glassy <b><u>carbon</u></b> or vitreous <b><u>carbon</u></b>; accept onion-like <b><u>carbon</u></b> or <b><u>carbon</u></b> onions]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "As a man goes into a trance in a play, a woman describes versions of this thing “of war,” “of water,” and “of indecision.” Some women say “we knew you for a man of honor” after a play’s protagonist delivers a monologue that claims “Memory is the Master” of this thing. In that play, as a character dances towards a marketplace, he chants a story in which this thing “came calling” for a proverbial animal called the “Not-I bird.” This is the first title word of a play in which Amusa is offended by a man wearing a ritual mask to a party. This word begins the title of a play in which Simon Pilkings stops a ritual form of it being performed by Elesin Oba. For 10 points, what concept titles a Wole Soyinka play alongside “the King’s Horseman”?",
+     "answer": "<b><u>death</u></b> [accept <em><b><u>Death</u></b> and the King’s Horseman</em>; prompt on ritual <u>suicide</u> or <u>kill</u>ing oneself or similar]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "In a myth from this country, the sun was created when the yolk of an egg broken by Brolga the bird bursts into flames, inspiring a good spirit to recreate the event each day. In a story from this country, Nabunum the eel made Tiddalik the frog laugh, releasing all the water in the world. Inhabitants of this country believe that culture heroes created its natural paths during an ethereal period sometimes referred to as jukurrpa. Rivers that change course in this country leave behind lakes inhabited by amphibious monsters called bunyips. A recurring creature in mythologies from this country created its Songlines while slithering between water holes. For 10 points, the Rainbow Serpent and Dreamtime are common myth motifs among what country’s Aboriginal peoples?",
+     "answer": "<b><u>Australia</u></b> [or Commonwealth of <b><u>Australia</u></b>; accept <b><u>Aboriginal country</u></b> or <b><u>Aboriginal land</u></b>s or equivalents until “Aboriginal” is read]",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "Ray Monk called this thinker “the Spirit of Solitude” in a biography based in part on this thinker’s collected writings held at McMaster University. A paper by this thinker compared classifying substances to sorting a letter by alphabetical or geographical order in a postal directory analogy that rejects dualism. Contra Alexius Meinong, an essay by this thinker argues that phrases can mean nothing by themselves, yet still contribute to a statement’s meaning, such as in the sentence “the present king of France is bald.” This author of “On Denoting” critiqued the existence of God by positing a too-small-to-see teapot floating in space in his book <em>Why I Am Not a Christian</em>. For 10 points, name this British philosopher who, with Alfred Whitehead, wrote <em>Principia Mathematica</em>.",
+     "answer": "Bertrand <b><u>Russell</u></b> [or Bertrand Arthur William <b><u>Russell</u></b>, 3rd Earl Russell]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "In 2013, a former aide to a member of this family illegally auctioned the Claude Monet (“MOH-nay”) painting <em>Le Bassin aux Nymphéas</em> (“luh bass-AN oh NAM-fay-AH”). In 2011, two members of this family were given what is believed to be the largest contempt fine in history by the Hawaiʻi District Court. A member of this family was popularly claimed to possess the “Tallano gold” during a 2022 election that resulted in him moving to the Malacañang (“mah-lah-con-YAHNG”) Palace. In a 2022 presidential election, a member of this family who heads the PFP party defeated Leni Robredo (“roh-BRAY-doh”) and the boxer Manny Pacquiao (“PACK-ee-ow”) alongside his running mate, the daughter of former president Rodrigo Duterte (“doo-TAIR-tay”). For 10 points, what family includes the current president “Bongbong,” the former first lady Imelda, and the former president Ferdinand, all from the Philippines?",
+     "answer": "<b><u>Marcos</u></b> family [accept <b><u>Romualdez</u></b> family; accept Ferdinand <b><u>Marcos</u></b> or Ferdinand Emmanuel Edralin <b><u>Marcos</u></b>; accept Imelda <b><u>Marcos</u></b> or Imelda Romualdez <b><u>Marcos</u></b> or Imelda Remedios Visitacion Trinidad <b><u>Romualdez</u></b>; accept Bongbong <b><u>Marcos</u></b> or Ferdinand Romualdez <b><u>Marcos</u></b>]",
+     "category": "Current Events",
+     "subcategory": "Current Events"
+    },
+    {
+     "question": "This person was able to convince the cannibal Kauda Bheel to stop eating men and convert. An inscription on the tomb of Bahlul serves as evidence that this person reached Baghdad on one of his five <em>udasis</em> (“oo-DAH-sees”). This person went missing and remained in a trance for three days after being offered a cup to drink from by God. This person responded that God is everywhere upon being asked why his feet pointed toward the Ka’aba while sleeping. This person’s biographies are known as <em>Janamsakhi</em>. This person’s successor, Angad, created the Gurmukhī script. This author of the Mūl Mantar founded the institution of the free kitchen, or langar. This figure’s first words after his enlightenment were “there is no Hindu and no Musalman.” For 10 points, name this first of ten gurus, the founder of Sikhism.",
+     "answer": "Guru <b><u>Nānak</u></b> [or Bābā <b><u>Nānak</u></b>; or Guru <b><u>Nānak</u></b> Dev Ji]",
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "question": "A novel by this author describes entities that “like dreams, are made of desires and fears, even if the thread of their discourse is secret, their rules are absurd, their perspectives deceitful.” In a story by this author, the narrator and Lieutenant Fenimore both love Ursula, even though their trajectories cannot cross. This author described prehistoric mankind using ladders to collect “milk” from a celestial object until it is too far away from Earth’s surface in the story “The Distance of the Moon.” Isidora, Diomira, and Ersilia are among the title places of a novel by this author in which Marco Polo tells Kublai Khan about his travels. For 10 points, name this Italian author of <em>Cosmicomics</em>, <em>Invisible Cities</em>, and the second-person novel <em>If on a Winter’s Night a Traveler</em>.",
+     "answer": "Italo <b><u>Calvino</u></b> [or Italo Giovanni <b><u>Calvino</u></b> Mameli; prompt on <u>Mameli</u>]",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "question": "A supposedly haunted painting from this country that depicts polar bears tearing at bones and sailcloth is covered during a university’s exams. T. S. R. Boase argues that French artist Claude-Joseph Vernet (“clohd-zho-ZEFF vair-NAY”) influenced this country’s paintings of marine disasters, such as one titled for Thomas à Kempis’s phrase “Man proposes, God disposes.” In a painting from this country, a moon in an otherwise dark, cloudy sky illuminates the title <em>Fishermen at Sea</em>. A poem that ends “where is thy market now?” was displayed with a painting from this country that includes a red sunset and depicts an incident in which 132 slaves were thrown overboard. A steamer tows one of this country’s naval ships in the painting <em>The Fighting Temeraire</em>. For 10 points, name this home country of Edwin Landseer and J. M. W. Turner.",
+     "answer": "<b><u>England</u></b> [accept <b><u>UK</u></b> or <b><u>United Kingdom</u></b>; accept Great <b><u>Britain</u></b>]",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "This thinker and an alphabetically later colleague wrote a text that opens by describing the “delegates of a hundred nations” at the United Nations, in a section titled “The World Is Shrinking.” This was the alphabetically prior author of a cartoon-illustrated pamphlet designed to counteract racial tension, along with Gene Weltfish. This thinker used their mentor’s field notes on the Kwakiutl (“kwah-kee-OO-tull”) to compare them with the Dobu and Zuni in a book that defines its title concept as “personality writ large.” While consulting for the Office of War Information, this co-author of <em>The Races of Mankind</em> conducted an example of “anthropology at a distance” that contrasts guilt and shame cultures. For 10 points, what anthropologist wrote <em>Patterns of Culture</em> and a study of Japanese society titled <em>The Chrysanthemum and the Sword</em>?",
+     "answer": "Ruth <b><u>Benedict</u></b> [or Ruth Fulton <b><u>Benedict</u></b>]",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "This practice was mandated by brigades led by Oswaldo Cruz (“ohz-VOW-doo KROOCE”), sparking a 1904 revolt in Rio de Janeiro. Mexican orphans disseminated this practice in the Spanish Empire’s 1803 Balmis (“bahl-MEECE”) expedition. The death of 72 infants in the “Lübeck disaster” slowed the adoption of a form of this practice invented by Calmette (“kahl-MET”) and Guérin (“gay-RON”). Circassian women may have introduced a precursor of this practice to the Ottoman Empire, whence it was popularized by Lady Mary Wortley Montagu. The enslaved African Onesimus taught a precursor of this practice to Cotton Mather. The March of Dimes funded oral and inactivated types of this practice developed by Albert Sabin and Jonas Salk. Healthy milkmaids inspired this practice’s 1796 invention by Edward Jenner. For 10 points, Louis Pasteur enabled what practice for anthrax and rabies?",
+     "answer": "<b><u>vaccination</u></b> [or word forms like <b><u>vaccine</u></b>s or getting <b><u>vaccinated</u></b>; accept <b><u>inoculation</u></b> or <b><u>immunization</u></b> or <b><u>variolation</u></b> or word forms; accept <b><u>shot</u></b>s; accept <b><u>vaccination</u></b> for specific diseases like polio or smallpox or tuberculosis; accept BCG <b><u>vaccine</u></b>; accept <b><u>Vaccine</u></b> Revolt or Revolta da <b><u>Vacina</u></b>; or <b><u>vacuna</u></b>; prompt on <u>cure</u> of a disease or health<u>care</u> or preventative <u>medicine</u> or <u>treat</u>ment or <u>prophylaxis</u> or similar answers]",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "Under electron microscopy, this substance forms gamma particles that are contained in beta granules, which then form rosette-shaped alpha granules. A small amount of this substance is used as an inert carrier to stain the pellet white when using ethanol to precipitate DNA. This substance no longer stains a characteristic magenta color with P-A-S after being treated with diastase (“DAI-uh-stase”). This substance is synthesized from UDP-conjugated monomers. A debranching enzyme cleaves the alpha-1,6 linkages in this substance and a phosphorylase breaks down its alpha-1,4 linkages, which resemble those in the straight chain of amylopectin. Epinephrine triggers the breakdown of this substance in skeletal muscle, which releases glucose-6-phosphate for use in glycolysis. For 10 points, name this polymer of glucose also found in the liver, the animal equivalent to starch.",
+     "answer": "<b><u>glycogen</u></b> [accept animal <b><u>starch</u></b> until read; accept <b><u>glycogen</u></b> phosphorylase; prompt on <u>carbohydrate</u>s or <u>polysaccharide</u>s]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "To celebrate the engagement of his son, Charles the Wise was given an illuminated history of these people known as the <em>Chronicon Pictum</em>. These people trace their origins to a ruler who drank the commingled blood of the leaders of tribes known as the “ten arrows.” The Holy Lance was credited with helping a ruler defeat a siege by these people near present-day Augsburg. After defeating Luitpold at the Battle of Pressburg, these people conquered Pannonia. Michael VII Doukas presented these people with a crown that was used by Sylvester II to crown their king in 1000 CE. Otto I stopped the westward expansion of these people at the Battle of Lechfeld. For 10 points, name this ethnic group ruled by the Árpád dynasty, which founded a country whose modern capital is Budapest.",
+     "answer": "<b><u>Mag</u><u>yar</u></b>s [or <b><u>Hungarian</u></b>s; or <b><u>magyar</u></b>ok; or <b><u>Ungri</u></b> or <b><u>Ungari</u></b> or <b><u>Ungari</u></b>; prompt on <u>Ugrian</u> peoples or <u>Yugrai</u>]",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "A nondimensionalized version of this quantity equals two over three times the d’Alembert (“DAL-om-bair”) parameter by the Darwin–Radau (“RAD-ow”) equation. This is the most common quantity measured using a three-string torsional, or “trifilar” (“try-fai-lar”), pendulum. Values for this quantity correspond to the eigenvalues of a symmetric tensor that appear in the Euler (“OY-lur”) equations. The middle of three values for this quantity for a body corresponds to instability by the tennis racket theorem. Jakob (“YAH-kob”) Steiner sometimes names a theorem that evaluates this quantity about a parallel axis, which involves adding a factor of “mass times distance squared.” For 10 points, angular momentum equals angular velocity times what rotational analog of mass?",
+     "answer": "<b><u>moment of inertia</u></b> [or <b><u>moment of inertia</u></b> factor; accept <b><u>MOI</u></b>; prompt on <u>inertia</u> tensor by asking “what quantities are its eigenvalues?”]",
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "question": "This character repeatedly says “a hot thing” in a stream-of-consciousness chapter that begins, “I am [this character] and she is mine.” Three people returning from a carnival discover this character sitting on a stump, wearing new shoes. This character disappears after a group of women sing a prayer outside her house, leading her companion to lament that her “best thing” has left her. This character dies after a woman sees a hat belonging to a schoolteacher. The opening lines of a novel note how the “venom” of this character makes a house feel “spiteful.” As a baby, this character is killed with a handsaw before Stamp Paid saves her sister Denver. For 10 points, name this character who returns to 124 Bluestone Road to haunt her mother Sethe, the title character of a novel by Toni Morrison.",
+     "answer": "<b><u>Beloved</u></b> [accept the ghost from <em><b><u>Beloved</u></b></em>; prompt on Sethe’s <u>baby</u>; prompt on the <u>ghost</u> or <u>spirit</u> or equivalents]",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "A neo-Vedānta-inspired book by this author consists of 27 short chapters that list Western and Eastern religious quotations on different spiritual topics. This author recalls viewing art books at the World’s Biggest Drug Store in a book titled for a line from <em>The Marriage of Heaven and Hell</em>. A novel by this author describes a media frenzy that leads to a massive substance-induced orgy in a lighthouse. This author described his mescaline use in a book that inspired Jim Morrison to name his band “The Doors.” In a novel by this author, a “Resident World Controller” leads a society that uses a drug named for a Vedic ritual drink to achieve happiness, which frustrates Bernard Marx. For 10 points, name this author who created John the Savage in his novel <em>Brave New World</em>.",
+     "answer": "Aldous <b><u>Huxley</u></b> [or Aldous Leonard <b><u>Huxley</u></b>] (The book in the first sentence is <em>The Perennial Philosophy</em>. The other unnamed book is <em>The Doors of Perception</em>.)",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    }
+   ],
+   "bonuses": [
+    {
+     "leadin": "An essay on writing advice by this man titled “Letter to a Young Contributor” led to his years-long correspondence with an author who signed her letters as “Your Gnome.” For 10 points each:",
+     "parts": [
+      "Name this author and minister, who in 1862 received four poems and an unsigned letter that asked him, “are you too deeply occupied to say if my Verse is alive?”",
+      "Higginson eventually learned that his pen pal was this reclusive “Belle of Amherst,” who penned poems such as “Because I could not stop for Death—.”",
+      "An essay by Higginson on Nat Turner’s rebellion may have inspired a Dickinson poem titled for this sort of object, which describes “the power to kill / without the power to die” and begins, “my life had stood —” like one of these objects."
+     ],
+     "answers": [
+      "Thomas <b><u>Higginson</u></b> [or Thomas Wentworth <b><u>Higginson</u></b>]",
+      "Emily <b><u>Dickinson</u></b> [or Emily Elizabeth <b><u>Dickinson</u></b>]",
+      "loaded <b><u>gun</u></b>s [accept “My life had stood — a loaded <b><u>gun</u></b>”; prompt on <u>firearm</u>s or equivalents]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "Morgan Shuster wrote “The Strangling of [this country]” after Russia forced him out of managing its finances for the Second Majlis in the years after the British got oil rights in the D’Arcy concession. For 10 points each:",
+     "parts": [
+      "Name this country whose oil industry was abortively nationalized twice, under Reza Khan and Mohammad Mosaddegh (“moh-sad-DAYG”), before Ayatollah Khomeini (“khoh-MAY-nee”) succeeded after a 1979 revolution.",
+      "Iran’s early oil industry was based around the Ābādān (“ah-bah-DON”) refinery in this southwestern province. Arab separatists like the DRFLA led a 1979 insurgency in this province, which was the main front of the Iran–Iraq War.",
+      "During this conflict, the Trans-Iranian Railway supplied Khuzestan’s oil to the “Persian Corridor” and the Arab League was founded. Iran hosted the “Big Three” during this conflict, whose Levant Crisis led to Syrian independence."
+     ],
+     "answers": [
+      "<b><u>Iran</u></b> [accept <b><u>Persia</u></b>; accept Islamic Republic of <b><u>Iran</u></b> or Jomhuri-ye Eslâmi-ye <b><u>Irân</u></b>; accept Imperial State of <b><u>Iran</u></b> or Kešvar-e Šâhanšâhi-ye <b><u>Irân</u></b>; accept <b><u>Qajar</u></b> empire or Sublime State of <b><u>Persia</u></b> or Dowlat-e 'Aliyye-ye <b><u>Irân</u></b> or <b><u>Guarded Domains</u></b>; accept 1979 <b><u>Iranian</u></b> Revolution or Enqelâb-e <b><u>Irân</u></b>; accept Anglo-<b><u>Persian</u></b> Oil Company; accept <em>The Strangling of</em> <em><b><u>Persia</u></b></em>]",
+      "<b><u>Khuzestan</u></b> [or <b><u>Khuzestan</u></b> Province or Ostān-e <b><u>Xūzestān</u></b>; accept 1979 <b><u>Khuzestan</u></b> insurgency; prompt on <u>Arabistan</u>] (DRFLA stands for Democratic Revolutionary Front for the Liberation of Arabistan.)",
+      "<b><u>World War II</u></b> [or the <b><u>Second World War</u></b> or <b><u>WWII</u></b> or <b><u>WW2</u></b>] (The “Big Three” were Stalin, Churchill, and FDR, who attended the Tehran Conference.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "leadin": "In 2009, this telescope was used to discover what is thought to be the largest ring of Saturn. For 10 points each:",
+     "parts": [
+      "Name this telescope that was retired in 2020, over a decade after it ran out of liquid helium. It was the first telescope to be launched in an Earth-trailing orbit, from which it observed the Double Helix Nebula.",
+      "The Spitzer Space Telescope operated in this region of the electromagnetic spectrum, which lies between microwaves and visible light.",
+      "This astronomer discovered infrared radiation by refracting sunlight. In 1781, this astronomer's sister Caroline assisted him in the discovery of a body that has a 98-degree axial tilt."
+     ],
+     "answers": [
+      "<b><u>Spitzer</u></b> Space Telescope [or <b><u>SIRTF</u></b>; accept, but DO NOT OTHERWISE REVEAL, <b><u>Space Infrared Telescope Facility</u></b>]",
+      "<b><u>infrared</u></b> light [or <b><u>IR</u></b>]",
+      "William <b><u>Herschel</u></b> [or Frederick William <b><u>Herschel</u></b> or Freidrich Wilhelm <b><u>Herschel</u></b>] (The body is Uranus.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "The <em>Vishnu Purāṇa</em> relates how this event occurred after the sage Durvāsā (“dur-VAH-sah”) enervated all the devas (“DAY-vuhs”) when Indra’s mount threw Durvāsā’s lucky garland on the ground. For 10 points each:",
+     "parts": [
+      "Name this event in which the devas and asuras (“UH-soo-ruhs”) worked together to obtain the nectar of immortality, amṛita (“UM-rih-tuh”). Mount Mandāra was used as the rod for this event and the nāga Vāsuki was used as the rope.",
+      "This deity drank the poison halāhala that was released during the churning, leading to his throat turning blue. This deity is the destroyer god of the Hindu Trimūrti.",
+      "The churning caused the emergence of many beings, such as these female celestial nymphs who include Urvashī (“OOR-vuh-shee”) and Rambhā (“RUM-bah”). Many of these beings married the Gandharvas (“GUND-hur-vuhs”) as dancers in the court of Indra."
+     ],
+     "answers": [
+      "<b><u>churn</u></b>ing of the <b><u>ocean</u></b> of milk [or <b><u>churn</u></b>ing of the milky <b><u>ocean</u></b>; or <b><u>churn</u></b>ing of the <b><u>sea</u></b> of milk; or <b><u>Samudra</u> <u>Manthana</u></b>; prompt on <u>churn</u>ing]",
+      "<b><u>Shiv</u></b>a [or <b><u>Śiv</u></b>a; or <b><u>Nīlakaṇth</u></b>a or <b><u>Neelkanth</u></b>; accept <b><u>Mahādev</u></b>a]",
+      "<b><u>apsarā</u></b>s (“UP-suh-rahs”) [or <b><u>accharā</u></b>; or <b><u>Bidadari</u></b> or <b><u>Biraddali</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "A 2022 exhibit at the Met displays sculptures by this artist alongside contemporary sculptures that he inspired. For 10 points each:",
+     "parts": [
+      "Name this sculptor who depicted a Black woman struggling against the ropes that bind her in his piece <em>Why Born Enslaved?</em> This male French artist depicted Bacchus and his followers in the sculpture <em>The Dance</em>.",
+      "Carpeaux’s <em>Why Born Enslaved?</em> inspired a sculpture by Kehinde Wiley of a man wearing a Lakers jersey under a toga to imitate classical sculptures of this type. Sculptures of this type depict only the head and shoulders of a person.",
+      "Carpeaux also created a sculpture of Ugolino, who ate his children while imprisoned, that influenced part of this artwork by a different artist. This artwork also includes a sculpture of a man embracing a woman, titled <em>Fugit Amor</em>."
+     ],
+     "answers": [
+      "Jean-Baptiste <b><u>Carpeaux</u></b> (“kar-POH”)",
+      "<b><u>bust</u></b>s",
+      "<em>The</em> <em><b><u>Gates of Hell</u></b></em> [or <em>La</em> <em><b><u>Porte de l’Enfer</u></b></em>] (by Auguste Rodin)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "This philosopher used the term “Geist” to describe the large-scale “spirits” running through different societies throughout history. For 10 points each:",
+     "parts": [
+      "Name this German philosopher who is credited with using a dialectic method in books like <em>Phenomenology of Spirit</em>.",
+      "Hegel propounded an “absolute” form of this position, which broadly holds that all of reality is based on mental conceptions. Hegel and others such as Johann Fichte (“FICK-tuh”) were part of this position’s “German” school.",
+      "Hegel claimed that all individuals have an “abstract” form of this concept defined in relation to society. Fichte argued that consciousness is socially constructed in a book on the “Foundations of” this concept."
+     ],
+     "answers": [
+      "Georg Wilhelm Friedrich <b><u>Hegel</u></b> [or G. W. F. <b><u>Hegel</u></b>]",
+      "<b><u>ideal</u></b>ism [or <b><u>Idealism</u></b>us; accept German <b><u>ideal</u></b>ism or Deutscher <b><u>Idealism</u></b>us; accept absolute <b><u>ideal</u></b>ism or Absoluter <b><u>Idealism</u></b>us]",
+      "<b><u>right</u></b> [or <b><u>right</u></b>s; or <b><u>Recht</u></b>e or <b><u>Recht</u></b>s; accept abstract <b><u>right</u></b> or abstraktes <b><u>Recht</u></b>; accept natural <b><u>right</u></b> or Natur<b><u>recht</u></b>s; accept <em>Elements of the Philosophy of</em> <em><b><u>Right</u></b></em> or <em>Philosophy of</em> <em><b><u>Right</u></b></em> or <em>Grundlinien der Philosophie des</em> <em><b><u>Recht</u></b>s</em>; accept <em>Foundations of Natural</em> <em><b><u>Right</u></b></em> or <em>Grundlagen des Natur<b><u>recht</u></b>s nach Prinzipien der Wissenschaftslehre</em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "In a novel, people with this condition include the girl with the dark glasses and the car thief. For 10 points each:",
+     "parts": [
+      "Name this condition whose early victims are placed in an asylum. A woman pretends to have this condition in order to stay with her afflicted husband and later helps those victims escape.",
+      "In the novel <em>Blindness</em>, the doctor’s wife starts crying while lost in the rain but is comforted by this character, who licks her face and joins her group. This character kills and eats a hen that belongs to an old woman.",
+      "This Portuguese author used his dog Camões (“cah-MOYSH”) as an inspiration for the dog of tears in his novel <em>Blindness</em>."
+     ],
+     "answers": [
+      "<b><u>blind</u></b>ness [or word forms; or equivalents such as <b><u>vision</u></b> <b><u>impair</u></b>ment; or <b><u>cegueira</u></b> or <b><u>cego</u></b> or <b><u>cega</u></b>; prompt on “the <u>white</u> sickness” or “mal-<u>branco</u>”]",
+      "the <b><u>dog of tears</u></b> [or <b><u>Constant</u></b> or <b><u>Constante</u></b>; or o <b><u>cachorro das lágrimas</u></b>; prompt on <u>dog</u> or <u>cachorro</u>]",
+      "José <b><u>Saramago</u></b> [or José de Sousa <b><u>Saramago</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "Niels Bohr persisted in doubting the existence of these particles even after the experimental confirmation of Compton scattering, in which these particles scatter off an electron. For 10 points each:",
+     "parts": [
+      "Name these massless particles, which are the quanta of light.",
+      "In 1921, this Dutch scientist was admitted to the hospital after days of loud arguments with Bohr about photons. This scientist’s theorem states that any energy level of a time reversal-symmetric, half-integer spin system is at least doubly degenerate.",
+      "The sole equation in Bohr, Kramers, and John Slater’s ill-fated paper opposing the existence of photons involved this constant, which is the product of momentum and the de Broglie (“broy”) wavelength."
+     ],
+     "answers": [
+      "<b><u>photon</u></b>s",
+      "Hans <b><u>Kramers</u></b> [or Hendrik Anthony <b><u>Kramers</u></b>; accept <b><u>Kramers</u></b>’ degeneracy theorem]",
+      "<b><u>Planck</u></b>’s constant [or <b><u>h</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "leadin": "Answer the following about emigration from the Eastern Bloc, for 10 points each.",
+     "parts": [
+      "To prevent East Germans from leaving the capital city, Walter Ulbricht ordered the construction of this structure, whose crossing points included the infamous Checkpoint Charlie.",
+      "A series of 1975 accords signed in this country’s capital eased Eastern Bloc immigration policies during a détente in US-Soviet relations. This country continued a policy of “active neutrality” under Urho Kekkonen.",
+      "This was the name given to Soviet Jews who were denied permission to emigrate abroad. Two of these people, Sylva Zalmanson and Eduard Kuznetsov, attempted to hijack a plane in order to escape the Soviet Union."
+     ],
+     "answers": [
+      "<b><u>Berlin Wall</u></b> [or <b><u>Berliner Mauer</u></b>; prompt on <u>Wall</u> or <u>Mauer</u>]",
+      "<b><u>Finland</u></b> [or <b><u>Suomi</u></b>; or Republic of <b><u>Finland</u></b> or <b><u>Suomen</u></b> tasavalta or Republiken <b><u>Finland</u></b>] (The accords were the Helsinki Accords.)",
+      "<b><u>refusenik</u></b>s [or <b><u>otkazniki</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "leadin": "Answer the following about genetic linkage, for 10 points each.",
+     "parts": [
+      "This scientist’s law of independent assortment is violated by chromosomal linkage. This monk’s experiments with pea plants form the basis of modern genetics.",
+      "The unit of map distance used to make linkage maps is named for this scientist, who carried out early genetic experiments on fruit flies.",
+      "In this phenomenon that sometimes confounds linkage analysis, a recombination event on one part of a chromosome suppresses other recombination events nearby."
+     ],
+     "answers": [
+      "Gregor <b><u>Mendel</u></b> [or Gregor Johann <b><u>Mendel</u></b>; or Řehoř Jan <b><u>Mendel</u></b>]",
+      "Thomas Hunt <b><u>Morgan</u></b> [accept centi<b><u>morgan</u></b>]",
+      "genetic <b><u>interference</u></b> [or crossover <b><u>interference</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "A character visiting this place is let down to discover that a mysterious set of apartments do not contain the corpse of her lover’s mother. For 10 points each:",
+     "parts": [
+      "Name this estate owned by the Tilney family, which Catherine Morland visits after bonding with her friend Isabella Thorpe over Gothic novels.",
+      "Although it spoofs the Gothic genre, Jane Austen’s <em>Northanger Abbey</em> praises novels as a form, citing this author’s novels <em>Cecilia</em> and <em>Camilla</em>. This author also wrote <em>Evelina</em>.",
+      "At the end of Burney’s <em>Cecilia</em>, a character credits the various miseries of the novel to these two concepts, which Austen borrowed to title her novel about Elizabeth Bennet and Mr. Darcy."
+     ],
+     "answers": [
+      "<b><u>Northanger Abbey</u></b>",
+      "Frances <b><u>Burney</u></b> [or Fanny <b><u>Burney</u></b>; accept Madame Frances <b><u>D’Arblay</u></b>]",
+      "<b><u>pride</u></b> AND <b><u>prejudice</u></b> [accept in either order; accept <em><b><u>Pride</u></b> and</em> <em><b><u>Prejudice</u></b></em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "leadin": "This suite incorporates the “Dies irae” motif in one of its movements to suggest the arrival of death. For 10 points each:",
+     "parts": [
+      "Name this astrology-inspired suite by Gustav Holst.",
+      "A movement of <em>The Planets</em> opens with a theme of major seconds that imitates one of these objects. Zoltán Kodály’s (“KOH-dai’s”) <em>Háry János</em> (“HAR-ee YAH-nohsh”) suite includes a movement about a Viennese one of these objects.",
+      "The “Dies irae” melody and opening clock theme suggest the passage of time and late stages of life in this movement of <em>The Planets</em>, which Holst called his favorite. This movement opens with a quiet adagio and uses minimal percussion before climactic tubular bells."
+     ],
+     "answers": [
+      "<em>The</em> <em><b><u>Planets</u></b></em>",
+      "<b><u>clock</u></b>s [or musical <b><u>clock</u></b>s; or <b><u>harangjáték</u></b>; accept “Viennese Musical <b><u>Clock</u></b>” or “Bécsi <b><u>harangjáték</u></b>”]",
+      "“<b><u>Saturn</u></b>” [or “<b><u>Saturn</u></b>, the Bringer of Old Age”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "Dialectical Behavioral Therapy, or DBT, is used to treat a wide array of mental health conditions. For 10 points each:",
+     "parts": [
+      "DBT was the first therapeutic treatment to be experimentally demonstrated as effective for one of this group of disorders. This type of disorder comes in three clusters and includes types such as “schizoid” and “avoidant.”",
+      "DBT is primarily used to treat this Cluster B personality disorder, whose name was coined by Adolf Stern. People with this disorder often perform dangerous acts and have a fear of abandonment that leads to unstable relationships.",
+      "Borderline personality disorder, or BPD, should not be confused with this mood disorder that is also treated with DBT. This disorder is characterized by manic and depressive episodes."
+     ],
+     "answers": [
+      "<b><u>personality</u></b> disorders [accept schizoid <b><u>personality</u></b> disorder; accept avoidant <b><u>personality</u></b> disorder; accept, BUT DO NOT OTHERWISE REVEAL, borderline <b><u>personality</u></b> disorder; prompt on, BUT DO NOT OTHERWISE REVEAL, <u>BPD</u> by asking “what does that stand for?”]",
+      "<b><u>borderline</u></b> personality disorder [or <b><u>BPD</u></b>]",
+      "<b><u>bipolar</u></b> disorder [or <b><u>bipolar</u></b> affective disorder or <b><u>BPAD</u></b>; prompt on <u>mania</u> or <u>manic</u> syndrome; prompt on <u>manic</u> depressive disorder or <u>manic</u> depression by asking “what is its current name?”; reject “depression”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "leadin": "In 1980, Lois Gibbs held two officials from this organization hostage in order to attract attention to a crisis in her neighborhood. For 10 points each:",
+     "parts": [
+      "Name this organization that started to create Superfund sites after protests at Love Canal came to national attention.",
+      "The EPA’s Superfund program was established under this president, who gave the “Crisis of Confidence” speech to address Americans’ energy use in 1979.",
+      "One of the earliest Superfund sites was an abandoned town in Missouri whose name contains “Times” followed by this word. This word follows “Bombay” in the name of a California town that was abandoned due to environmental degradation."
+     ],
+     "answers": [
+      "<b><u>EPA</u></b> [or United States <b><u>Environmental Protection Agency</u></b>]",
+      "Jimmy <b><u>Carter</u></b> [or James Earl <b><u>Carter</u></b> Jr.]",
+      "<b><u>beach</u></b> [accept Bombay <b><u>Beach</u></b>; accept Times <b><u>Beach</u></b>] (Bombay Beach was a resort town on the Salton Sea.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "Raju carries out a fast in order to stop a famine in this town in the novel <em>The Guide</em>. For 10 points each:",
+     "parts": [
+      "Name this town where R. K. Narayan (“nah-RAH-yun”) set most of his fiction, including his novel <em>The Painter of Signs</em>.",
+      "Narayan’s follow-up to <em>The Painter of Signs</em> is told in the first person by one of these animals, who is taken to a circus in Malgudi. In <em>Life of</em> <em>Pi</em>, Pi is stranded on a boat with one of these large predators named Richard Parker.",
+      "Upon visiting India, this author wrote that he found it “cruel and overwhelming” compared to Malgudi. This author himself wrote a 1961 novel about a man who works as a painter of signs and marries into the Tulsi family."
+     ],
+     "answers": [
+      "<b><u>Malgudi</u></b> (“MAHL-goo-dee”)",
+      "<b><u>tiger</u></b>s [or <em>Panthera</em> <em><b><u>tigris</u></b></em>; accept <em>A</em> <em><b><u>Tiger</u></b> for Malgudi</em>; prompt on <u>feline</u>s or <u>felid</u>s or big <u>cat</u>s or <em><u>Panthera</u></em>]",
+      "V. S. <b><u>Naipaul</u></b> [or Vidiadhar Surajprasad <b><u>Naipaul</u></b>] (The unnamed novel is <em>A House for Mr. Biswas</em>.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "leadin": "In this technique, the formal potential of a reversible one-electron transfer can be calculated by averaging the potentials corresponding to oxidation and reduction peaks. For 10 points each:",
+     "parts": [
+      "Name this technique whose “cyclic” type can be used to analyze redox potentials by scanning back and forth across a potential range to produce characteristic “duck-shaped” graphs.",
+      "Rising scans in cyclic voltammetry can measure oxidation potentials, which occur at this type of electrode. One of them is paired with a cathode in typical electrochemical cells.",
+      "In electrochemistry, the equations for redox reactions at the anode and cathode are often expressed as a pair of these reactions, one to describe oxidation and one to describe reduction."
+     ],
+     "answers": [
+      "<b><u>voltammetry</u></b> [accept cyclic <b><u>voltammetry</u></b> or <b><u>CV</u></b>]",
+      "<b><u>anode</u></b> [prompt on <u>electrode</u> or electrical <u>conductor</u>s]",
+      "<b><u>half</u></b>-reactions [or <b><u>half</u></b>-equations]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "A popular chéngyǔ (“chung-eww”) idiom sums up the 4th century as this many “barbarians” “throwing China into chaos” by founding the Sixteen Kingdoms during the Jìn dynasty. For 10 points each:",
+     "parts": [
+      "Give this traditional number of dynasties that later arose alongside “ten kingdoms” between the Táng and Sòng. The “Celestial Masters” led a Daoist separatist movement named for this many “pecks of rice.”",
+      "This region’s people may descend from two of the “Five Barbarians,” the Qiāng (“chahng”) and Dī. Under Songtsen Gampo, this Himalayan region adopted a namesake arm of Buddhism centuries before the first Dalai Lama.",
+      "Another of the “Five Barbarians,” the Xiānbēi (“sh’yen-bay”), founded Tǔyùhún (“too-eww-hwun”), which the Tibetan empire conquered with these Indo-European people’s Tarim Basin oasis states of Kucha, Khotan, and Karasahr."
+     ],
+     "answers": [
+      "<b><u>five</u></b> [or <b><u>wǔ</u></b>; accept Way of the <b><u>Five</u></b> Pecks of Rice or <b><u>Wǔ</u></b> Dǒu Mǐ Dào; accept <b><u>Five</u></b> Dynasties and Ten Kingdoms period or <b><u>Wǔ</u></b> dài shí guó; accept <b><u>Five</u></b> Barbarians or <b><u>Wǔ</u></b> Hú or <b><u>Wǔ</u></b> Hú luàn Huá]",
+      "<b><u>Tibet</u></b> [or <b><u>Böd</u></b> or Xī<b><u>zàng</u></b>; accept <b><u>Tibetan</u></b>s or <b><u>Bod</u></b> pa or <b><u>Bö</u></b> pa; accept <b><u>Tibetan</u></b> Empire or <b><u>Bod</u></b> chen po or Tǔ<b><u>bō</u></b>; accept <b><u>Tibetan</u></b> Buddhism; accept <b><u>Tibetan</u></b> Plateau or <b><u>Bod</u></b> sa mtho or Qīng–<b><u>Zàng</u></b> Gāoyuán]",
+      "<b><u>Tocharian</u></b>s (“toh-CAR-ee-uns”) [or <b><u>Tókharoi</u></b>; accept <b><u>Tocharian</u></b> languages; accept <b><u>Agnean</u></b> or <b><u>Arśi</u></b>; accept <b><u>Kuchean</u></b> or <b><u>Kuči</u></b>; prompt on <u>Wūsūn</u>] (The Four Garrisons of Ānxī controlled those cities when Tibet conquered them.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "Answer the following about everyday Catholic devotional items, for 10 points each.",
+     "parts": [
+      "Catholics may wear this symbol on a necklace. Some Protestants believe that this symbol violates the commandment that prohibits graven images, so they wear empty crosses instead of this depiction of Jesus on the cross.",
+      "Some Catholics keep little statues depicting this patron saint of travelers in their cars, although this saint’s feast day was removed from the universal Catholic calendar due to his lack of historicity.",
+      "Laypeople may wear “devotional” forms of these items that consist of two rectangles connected by string that hang on the chest and back. The larger form of these garments is a piece of cloth worn by monks."
+     ],
+     "answers": [
+      "<b><u>crucifix</u></b> [prompt on <u>cross</u>es]",
+      "Saint <b><u>Christopher</u></b> [or Sanctus <b><u>Christophorus</u></b> or <b><u>Theophorus</u></b> or Ágios <b><u>Christóforos</u></b>]",
+      "<b><u>scapular</u></b>s [accept devotional <b><u>scapular</u></b>; accept monastic <b><u>scapular</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "This city’s influential transit-oriented development plan began with the 1974 implementation of a bus rapid transit system called the Rede Integrada de Transporte (“HAY-jee een-teh-GRAH-duh jee trans-POR-chee”). For 10 points each:",
+     "parts": [
+      "The mayor Jaime (“ZHAI-mee”) Lerner conducted pioneering urban planning in what city, the capital of the state of Paraná (“pah-rah-NAH”)?",
+      "Curitiba (“koo-ree-CHEE-bah”) has been described as the “green capital” of this country, whose most populous city is São Paulo (“sao POW-loo”).",
+      "Curitiba lies near the source of this river, whose namesake “Falls” on the border between Brazil and Argentina form the largest waterfall system in the world."
+     ],
+     "answers": [
+      "<b><u>Curitiba</u></b> (“koo-ree-CHEE-bah”)",
+      "<b><u>Brazil</u></b> [or <b><u>Brasil</u></b>; or Federative Republic of <b><u>Brazil</u></b> or República Federativa do <b><u>Brasil</u></b>]",
+      "<b><u>Iguazú</u></b> (“eeg-wah-SOO”) River [or <b><u>Iguaçu</u></b> River or Rio <b><u>Iguassu</u></b> or <b><u>Yguasu</u></b> River; accept <b><u>Iguazú</u></b> Falls or <b><u>Iguaçu</u></b> Falls or Cataratas del <b><u>Iguazú</u></b> or Cataratas do <b><u>Iguaçu</u></b> or Chororō <b><u>Yguasu</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Geography",
+     "subcategory": "Geography"
+    },
+    {
+     "leadin": "Competitions for this dance exhibit signature styles of Greek organizations at historically Black colleges and universities, as depicted in the film <em>Stomp the Yard</em>. For 10 points each:",
+     "parts": [
+      "Name this Black dance style that blends aspects of forms like tap and break. The taps of a pair of dancing twins are featured on several tracks of a 2022 rap album titled “Mr. Morale and the Big” practitioners of this style.",
+      "<em>Mr. Morale and the Big Steppers</em> was this artist’s first LP since his Pulitzer-winning album <em>DAMN</em>.",
+      "A Black dance called Pattin’ Juba or hamboning is often cited as influencing this musician’s namesake clave (“KLAH-vay”) beat, which is often described as a “syncopated 3-2.” “I’m a Man” was the B-side to the namesake song of this musician, who often played a rectangular guitar."
+     ],
+     "answers": [
+      "<b><u>step</u></b>ping [or <b><u>step</u></b>-dancing; accept <em>Mr. Morale and the Big</em> <em><b><u>Stepper</u></b>s</em>; reject “stomp”]",
+      "Kendrick <b><u>Lamar</u></b> [or <b><u>Kendrick</u></b> Lamar; or Kendrick Lamar <b><u>Duckworth</u></b>]",
+      "Bo <b><u>Diddley</u></b> [or Elias <b><u>McDaniel</u></b>; or Elias <b><u>Bates</u></b>; prompt on <u>Bo</u>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "In the second painting in this series, a man points to a white castle in the sky as an angel stands to his right. For 10 points each:",
+     "parts": [
+      "Name this series of four allegorical paintings that depicts a man in a boat as the landscape around him changes.",
+      "<em>The Voyage of Life</em> was painted by this British-American artist. This member of the Hudson River School also painted the five-part series <em>The Course of Empire</em>.",
+      "Cole also painted a series of four works that depict scenes from this novel, including a “Landscape with Figures” and a painting of this novel’s heroine dying while another man hangs off the edge of a cliff."
+     ],
+     "answers": [
+      "<em>The</em> <em><b><u>Voyage of Life</u></b></em>",
+      "Thomas <b><u>Cole</u></b>",
+      "<em>The</em> <em><b><u>Last of the Mohicans</u></b></em> [or <em>The</em> <em><b><u>Last of the Mohicans</u></b>: A Narrative of 1757</em>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    }
+   ]
+  },
+  "8": {
+   "name": "2022 ACF Winter Packet 8",
+   "tossups": [
+    {
+     "question": "On a picnic in this country, two characters joke that they are “utilizing” wine and chicken. A waiter in this country asks “what do you think of that?” after cynically noting that an activity is “all for fun.” While visiting this country, the narrator of a novel is punched and called a “damned pimp” for setting a woman up with a man who gives her a severed ear. In that novel, two men meet the Englishman Harris on a fishing trip in this country before going to see an event that was profiled in the book <em>Death in the Afternoon</em>. While riding through this country’s capital in a taxi, Lady Brett Ashley is asked “isn’t it pretty to think so?” by the impotent journalist Jake Barnes. For 10 points, the characters in Ernest Hemingway’s novel <em>The Sun Also Rises</em> travel to what European country to watch bullfighting?",
+     "answer": "<b><u>Spain</u></b> [or <b><u>España</u></b>; or Kingdom of <b><u>Spain</u></b> or Reino de <b><u>España</u></b>]",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "A book on this city’s women by Sarah Pomeroy reports their consent for extramarital paternity and profiles a queen who supposedly told her father to throw out a corrupting stranger’s bribe and decoded a message by scraping wax off a tablet. Unmarried women in this city sang Alcman’s partheneia and mothered the men who founded Taras, its only colony in Magna Graecia (“MAHNG-nah GRAI-kee-ah”). Plutarch’s <em>Moralia</em> features the “sayings” of this city’s women, which included the injunction to come back either “with” a shield or “on it” with characteristic terse wit. Women in this city may have exercised nude in the Gymnopaedia. This city’s queen Gorgo was the daughter of the Agiad (“AG-ee-ad”) king Cleomenes I (“clee-AH-min-eez the first”). For 10 points, women could inherit land under the Lycurgan laws of what Peloponnesian (“pell-uh-puh-NEEZH-un”) polis led by Leonidas at the Battle of Thermopylae?",
+     "answer": "<b><u>Sparta</u></b> [or <b><u>Spártē</u></b>; or <b><u>Lacedaemon</u></b> or <b><u>Lakedaímōn</u></b>; accept <em><b><u>Spartan</u></b> Constitution</em> or<em> Constitution of the</em> <em><b><u>Lacedaemonian</u></b>s</em> or <em><b><u>Lacedaemonion</u></b> Politeia</em> or <em>Republic of the</em> <em><b><u>Lacedaemonian</u></b>s</em>; accept <em>Sayings of</em> <em><b><u>Spartan</u></b> Women</em> or <em><b><u>Lacaenarum</u></b> Apophthegmata</em>] (The corrupting stranger was Aristagoras of Miletus. Taras is the modern city of Taranto.)",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "A composer from this country, whose piece partly titled for <em>Ethiopia’s Shadow</em> was one of many rediscovered in an abandoned house in 2009, gained prominence for her Symphony in E Minor. An epic poem from this country inspired a trilogy of cantatas by British composer Samuel Coleridge-Taylor. The protagonist of a ballet from this country goes on the run after stabbing a man who shot his mother. In a piece from this country, trumpets play [read slowly] rising F, B flat, F to evoke a political speech. A leader of this country provides the quote “we cannot escape history” in a musical “Portrait.”. Composers from this country created <em>Fanfare for the Common Man</em> and a ballet that uses the hymn <em>Simple Gifts</em> and was choreographed by Martha Graham. For 10 points, name this home country of Florence Price and Aaron Copland.",
+     "answer": "<b><u>U</u><u>nited States</u></b> of America [or <b><u>America</u></b>; or <b><u>US</u></b>A; accept <em>Ethiopia’s Shadow in</em> <em><b><u>America</u></b></em>] (The first line is about Florence Price. The epic poem was <em>The Song of Hiawatha</em>. The third line refers to Copland’s <em>Billy the Kid</em>. The other ballet is <em>Appalachian Spring</em>.)",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "Matthew Gavin Frank reported on carrier pigeons smuggling this resource from coastal towns like Alexander Bay. The “Sperrgebiet” (“SHPAIR-guh-beet”) prohibited entry into this resource’s boomtowns of Kolmanskop (“KOLE-monz-kope”) and Lüderitz (“LOO-durr-itz”). Labor migrants from Sekhukhune’s (“say-koo-KOO-nay’s”) Pedi (“PED-ee”) Kingdom bought guns with profits from this resource in the 1860s after a Griqua (“GREEK-wuh”) shepherd started its “new rush,” which brought electric lights to the future site of Sol Plaatje (“soal PLAH-kee”) University. The Marange (“mah-RON-gay”) and Orapa (“oh-RAH-pah”) fields supply Zimbabwe and Botswana with this resource, whose Cullinan discovery was celebrated by Louis Botha (“LOO-ee BOO-uh-tuh”) and the “Randlords.” Before gold, this prototypical conflict resource kicked off the “mineral revolution” around the Big Hole in Kimberley, Northern Cape. For 10 points, De Beers gained a monopoly on what precious gems?",
+     "answer": "<b><u>diamond</u></b>s [accept blood <b><u>diamond</u></b>s or conflict <b><u>diamond</u></b>s or war <b><u>diamond</u></b>s or hot <b><u>diamond</u></b>s or red <b><u>diamond</u></b>s; accept <b><u>Diamond</u></b> Rush; accept <b><u>Diamond</u></b> Coast; accept <b><u>kimberlite</u></b> until “Kimberley” is read; accept <em>Flight of the</em> <em><b><u>Diamond</u></b> Smugglers</em>; prompt on <u>gem</u>stones or <u>jewel</u>s or precious <u>stone</u>s or igneous <u>rock</u>s until “gems” is read; prompt on <u>mineral</u>s until read; prompt on <u>peridotite</u> or <u>crystal</u>s]",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "On this holiday, food is set out on leaf plates for crows and dogs are garlanded as gatekeepers by the “self-worshiping” Newar (“nay-WAHR”) people. Towards the end of this holiday, women who live far away from their brothers send prayers through the moon, though more commonly they invite their brothers into their homes. The Sikh holiday of Bandi Chhor Divas (“BUN-dee shor DEE-vuss”) overlaps with this holiday, which includes the day of Bhai Dooj. This is the most common holiday on which participants make powder patterns called rangoli and place <em>diya</em>s around their homes. On the third day of this holiday, participants make offerings to a goddess of prosperity in the Lakshmi Pūjā. For 10 points, fireworks are set off as part of what Hindu holiday that celebrates the victory of light?",
+     "answer": "<b><u>Diwali</u></b> [or <b><u>Deepawali</u></b> or <b><u>Dipavali</u></b>; accept <b><u>Bhai Dooj</u></b> or <b><u>Bandi Chhor Divas</u></b> until each is read; accept <b><u>Bhaubeej</u></b>, <b><u>Bhai Tika</u></b>, <b><u>Bhai Phonta</u></b>, or <b><u>Bhratri Dwitiya</u></b>; accept <b><u>Tihar</u></b> or <b><u>Yamapanchak</u></b>a; prompt on <u>Lakshmi</u> Pūjā until read]",
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "question": "Sadegh Hedayat (“saw-deg uh heh-DEH-yat”), the author of <em>The Blind Owl</em>, stated in critical pieces that this author subscribed to a philosophy of agnostic skepticism. A work by this author describes Destiny playing with men on a “Chequer-board of Nights and Days.” In that work by this author, the topics of creation and the possibility of destruction by the creator are discussed by some clay pots. A line by this author was translated to “Oh, Wilderness were Paradise enow!” by Edward FitzGerald, whose loose English translation of this author popularized his lines about how “the Moving Finger writes, and, having writ, / Moves on.” For 10 points, what Persian poet used the rhyme scheme AABA for the quatrains in his <em>Rubaiyat</em> (“roo-bai-YAHT”)?",
+     "answer": "Omar <b><u>Khayyam</u></b> [or Ghiyāth al-Dīn Abū al-Fatḥ ʿUmar ibn Ibrāhīm al-<b><u>Khayyāmī</u></b> Nishapuri or Ghiyāth al-Dīn Abū al-Fatḥ ʿUmar ibn Ibrāhīm al-<b><u>Khayyāmī</u></b> Nīsābūrī; prompt on Edward <u>FitzGerald</u> until read by asking “what author did he most famously translate?”; prompt on <u>Nīsābūrī</u> or <u>Nishapuri</u>]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "A US-based economist from this country worked with Thomas Tørsløv (“TUR-slurv”) and Ludvig Wier (“VEE-ur”) on a 2018 paper that estimated that 40 percent of multinational profits are “shifted.” That economist from this country claimed that eight percent of the world’s wealth is hidden in tax havens in his book <em>The Hidden Wealth of Nations</em>. An economist from this country argued that a U-shaped curve, rather than the Kuznets curve, should describe income data in a book that advocates for a progressive global wealth tax. That economist from this country theorized that wealth inequality rises when “<em>r</em> is greater than <em>g</em>” in his surprise 2013 bestseller <em>Capital in the Twenty-First Century</em>. For 10 points, economists from what country include Gabriel Zucman and his PhD advisor, Thomas Piketty?",
+     "answer": "<b><u>France</u></b> [or <b><u>French</u></b> Republic or République <b><u>française</u></b>]",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "Robert Tarjan co-developed an algorithm that identifies a certain type of these things by computing their “lowpoint.” All possible [emphasize] <em>pairs</em> of these things are considered in Johnson’s algorithm. The removal of order “root <em>n</em>” of these things is the subject of the planar separator theorem. Each of these things corresponds to one row and one column in an adjacency matrix. The term [read slowly] “big O of the number of these things times the log of the number of these things” appears in the complexity of Dijkstra’s (“DIKE-struh’s”) algorithm, which begins with all of these things unvisited and constructs the shortest path between two of them. For 10 points, the indegree is the number of directed arcs leading to one of what parts of graphs that are connected by edges?",
+     "answer": "<b><u>node</u></b>s [or <b><u>vertices</u></b> or <b><u>vertex</u></b>; accept cut <b><u>vertices</u></b>; prompt on <u>V</u>]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "Frank Gehry turned down commissions in this city until he designed its Lou Ruvo Center for Brain Health. <em>The Wizard of Oz</em> inspired a literal yellow brick road in the lobby of a building in this city and the emerald green stripes on its façade. Factions called the “Greys” and “Whites” debated a book titled for this city that contrasts a New York farm building shaped like a duck with “decorated sheds.” Curved mirrors at the zenith of a building in this city emit the world’s brightest light beam. This city’s architecture was scrutinized in a book by Steven Izenour, Denise Scott Brown, and Robert Venturi titled for “Learning from” it. Egyptian architecture inspired one of this city’s hotels to feature a sphinx and pyramid tower. For 10 points, the Luxor and Bellagio hotels are casinos on what city’s namesake “strip”?",
+     "answer": "Las <b><u>Vegas</u></b>, Nevada [accept Las <b><u>Vegas</u></b> Strip; accept Luxor Las <b><u>Vegas</u></b>; accept <em>Learning from Las</em> <em><b><u>Vegas</u></b></em>; prompt on “<u>Sin City</u>”] (The building in the second line is the MGM Grand Hotel.)",
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "question": "This phenomenon is represented by the non-constant terms in the Briot (“BREE-oh”) formula, which is sometimes named for its use by the German company Schott (“shot”) AG. In an equation, this phenomenon is accounted for by terms of the form [read slowly] “B times x squared over x squared minus C.” The Sellmeier (“SELL-mai-er”) equation can model both this phenomenon’s “normal” and “anomalous” forms. Differentiating a statement named for this phenomenon yields the group velocity. A wave’s wavenumber and frequency are linked by “relations” named for this phenomenon, which causes chromatic aberration. This phenomenon occurs if the angle of refraction by a material depends on wavelength. For 10 points, name this phenomenon that allows prisms to split white light into different colors.",
+     "answer": "<b><u>dispersion</u></b> [or <b><u>dispersive</u></b>; accept <b><u>dispersion</u></b> relations; accept chromatic <b><u>dispersion</u></b>; accept <b><u>dispersion</u></b> equation; accept <b><u>dispersive</u></b> prisms]",
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "question": "One of these artworks from Archaic Greece that depicts a wreathed kouros is named for Rampin<em>.</em> Cosimo de Medici holds a scroll in one of these works by Giambologna (“jahm-boh-LOH-nyah”). Alessandro Leopardi finished one of these works by Verrocchio that depicts Bartolomeo Colleoni. Many Renaissance sculptures of this type were modeled on Roman ones, such as the destroyed <em>Regisole</em> and one depicting Marcus Aurelius with an outstretched arm. A Donatello sculpture of this type depicts Erasmo de Narni, who was nicknamed “Honey Cat.” E. M. Falconet created a sculpture of this type that depicts Peter the Great in bronze. For 10 points, <em>Gattamelata</em> is what type of sculpture that depicts a rider on a certain animal?",
+     "answer": "<b><u>equestrian</u></b> statues [accept statues of people on <b><u>horse</u></b>s or <b><u>horse</u></b>back; accept <b><u>rider</u></b>s or <b><u>riding</u></b> a horse or equivalents; accept <em>Bronze</em> <em><b><u>Horse</u></b>man</em> or <em>Mednyy</em> <em><b><u>Vsadnik</u></b></em>; accept <em>Rampin</em> <em><b><u>Rider</u></b></em> or <em>Rampin</em> <em><b><u>Horse</u></b>man</em>; prompt on <u>statue</u>s or <u>sculpture</u>s by asking “what action or pose does the sculpture depict?” until “sculptures” is read; prompt on <u>bronze</u> sculptures until read]",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "This deity entered people’s houses in the form of a skunk or a bundle of ashes to portend death. After an elderly couple disturbed the heavens by cooking a fish, this non-water deity tore off their heads and placed them on their rears, creating the first dogs. This deity caused the rains to stop for several years after kidnapping and marrying a flower goddess. This deity served as bait for a primordial crocodile, from whose body he made the land with his brother. That brother was later tricked by this deity into sleeping with his sister. After this deity lost his foot to Cipactli (“sih-PAHKT-lee”), he replaced it with a piece of obsidian, giving him a name meaning “Smoking Mirror.” For 10 points, name this Aztec god who had a rivalry with his brother Quetzalcōātl (“ket-zoll-KOH-ah-tull”).",
+     "answer": "<b><u>Tezcatlipōca</u></b> [or Black-<b><u>Tezcatlipōca</u></b>; or <b><u>Yoalehecatl</u></b>; or <b><u>Acxomocuil</u></b>; prompt on “<u>Smoking Mirror</u>” until read] (The flower goddess was Xōchiquetzal. Quetzalpetlatl was Quetzalcōātl’s sister.)",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "This book criticizes the “narrow theory of life” propounded by Calvinism, arguing that “pagan self-assertion” is what increases a person’s self-worth. This book’s fifth and final chapter, “Applications,” expands on two earlier maxims, the first being that generally, “the individual is not accountable to society for his actions.” This book argues that the suppression of beliefs, whether they be true, partially true, or false, is always detrimental to society and is an example of “the tyranny of the majority.” This book, published shortly after the death of its author’s wife Harriet, holds that power can only be exercised if it is used for the purpose of “[preventing] harm to others.” For 10 points, name this book about freedom by John Stuart Mill.",
+     "answer": "<em><b><u>On Liberty</u></b></em>",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "In this technique, either DpnI (“D-p-n-one”) treatment or UNG (“ung”) are used to decrease carryover contamination. A nonspecific version of this technique replaces a reagent with random hexamers. To increase specificity, a reagent used in this technique can be inactivated by a monoclonal antibody that is removed in a “hot start” procedure. In this technique, several components are usually combined into a master mix that is then aliquoted into a strip of tubes that contain individual samples. This technique uses a thermal cycler to go through denaturation, annealing, and elongation steps. This technique was developed by Kary Mullis. For 10 points, name this technique that uses a thermostable substance such as Taq (“tack”) to amplify a specific segment of DNA.",
+     "answer": "<b><u>PCR</u></b> [or <b><u>polymerase chain reaction</u></b>; accept RT-<b><u>PCR</u></b> or reverse transcription <b><u>polymerase chain reaction</u></b>]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "A dissenting opinion in this case argued that its central issue “lies about like a loaded weapon, ready for the hand of any authority that can bring forward a plausible claim of urgent need.” In the 1980s, it was discovered that this case’s outcome was likely influenced by Charles Fahy’s suppression of the Ringle Report. Hugo Black’s majority opinion in this case drew upon an earlier case that involved a university student accused of violating a curfew. John Roberts called this case “morally repugnant” in a 2018 majority opinion that upheld the Trump travel ban. The plaintiff in this case challenged an order issued by General John DeWitt and the legality of Executive Order 9066. For 10 points, name this Supreme Court case that upheld the World War II internment of Japanese-Americans.",
+     "answer": "<em><b><u>Korematsu</u></b></em> <em>v. U. S.</em> [or <em><b><u>Korematsu</u></b> v. United States</em>] (The earlier case was <em>Hirabayashi v. United States</em>.)",
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "question": "A Richard Wilbur poem titled for this sort of place describes “a wild supposed bloom” and is addressed to the author of an earlier poem titled for one of these places, whose speaker feels “a breezy call of incense-breathing morn.” A poem set in this sort of place describes “many a gem of purest ray serene” and was written by a member of a group of poets named for these places that included Thomas Parnell and Robert Blair. A narrator in one of these places imagines being spotted by a “hoary-headed swain” while pondering “rude forefathers of the hamlet,” such as a “guiltless” “Cromwell.” One of these places is noted to be “far from the madding crowd’s ignoble strife” in a poem that begins, “the curfew tolls the knell of parting day.” For 10 points, name this sort of place that titles an elegy by Thomas Gray.",
+     "answer": "<b><u>churchyard</u></b> [or <b><u>graveyard</u></b>; accept <b><u>cemetery</u></b> or <b><u>burial</u></b> ground; accept “Elegy Written in a Country <b><u>Churchyard</u></b>”; accept “In a <b><u>Churchyard</u></b>”; accept <b><u>Graveyard</u></b> Poets; prompt on <u>church</u>; prompt on <u>grave</u>]",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "question": "A chiral ligand with two of these functional groups features a ferrocene core and is named after Josi Puleo (“HOH-see POO-lay-oh”). These compounds form three of the four ligands around a central rhodium atom in Wilkinson’s catalyst. These compounds are paired with the azo compound DEAD (“D-E-A-D”) to facilitate nucleophilic substitutions of alcohols in the Mitsunobu (“MIT-soo-no-boo”) reaction. An SN2 (“S-N-two”) reaction between alkyl (“AL-keel”) halides and a triphenyl-substituted (“tri-FEEN-ull”) example of these compounds can form ylides (“ILL-ids”) upon deprotonation (“dee-PRO-tuh-nay-shun”) in the Wittig (“VIT-ig”) reaction. For 10 points, name these compounds that feature organic substituents on phosphorus.",
+     "answer": "<b><u>phosphine</u></b>s [or <b><u>phosphane</u></b>s; or organo<b><u>phosphine</u></b>s; accept triphenyl<b><u>phosphine</u></b> or triphenyl<b><u>phosphane</u></b>; accept triphenyl<b><u>phosphine</u></b> oxide or <b><u>TPPO</u></b>; accept tertiary <b><u>phosphine</u></b>s; prompt on organo<u>phosphorus</u> compounds until “phosphorus” is read; prompt on Josi<u>phos</u> ligands]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "In this country in 2002, a French stuntman cycled at a world-record 107 miles per hour down the gravel slopes of the active volcano of Cerro Negro. This country contains the Western Hemisphere’s second-largest rainforest, the Bosawás Biosphere Reserve. This country’s citizens use the term “mar dulce,” meaning “sweet sea,” to refer to a body of water upon which the Concepción and Maderas volcanoes formed the island of Ometepe (“OM-ay-TEP-ay”). A Dutch pirate names this country’s city of Bluefields. A waterfall on the Tipitapa River prevents the migration of bull sharks out of this country’s primary lake. This is the southernmost of the two countries whose eastern shores were called the “Mosquito Coast.” For 10 points, what country contains Central America’s largest lake and Lake Managua?",
+     "answer": "<b><u>Nicaragua</u></b> [or Republic of <b><u>Nicaragua</u></b> or República de <b><u>Nicaragua</u></b>; accept Lake <b><u>Nicaragua</u></b> or Lago de <b><u>Nicaragua</u></b>] (The other Mosquito Coast country is Honduras.)",
+     "category": "Geography",
+     "subcategory": "Geography"
+    },
+    {
+     "question": "Vincent de Beauvais’s <em>Speculum Maius</em> popularized a history of these people written by the papal envoy Giovanni da Pian del Carpine. According to legend, a trumpeter at Saint Mary’s Church was killed while warning against an invasion by these people that ended with the head of Duke Henry the Pious being paraded on a spike at the Battle of Legnica (“leg-NEET-sah”). Under the command of a general nicknamed the “valiant dog of war,” these people feigned retreat to win the Battle of Kalka River. These people issued edicts known as <em>yarlyks</em> from their capital at Sarai. After defeating these people at the Great Stand on the Ugra, Ivan the Great ended their “yoke” of vassalage over Moscow. For 10 points, name these people who invaded Eastern Europe in the 1240s under Batu Khan.",
+     "answer": "<b><u>Mongol</u></b>s [or <b><u>Moŋğol</u></b>çuud; accept <b><u>Mongol</u></b> Empire or Yeke <b><u>Monggol</u></b> Ulus; accept <b><u>Tatar</u></b>s or <b><u>Tatar</u></b>lar; accept <b><u>Borjigin</u></b> or <b><u>Borjigid</u></b> or <b><u>Kiyat</u></b> clan; accept <b><u>Golden Horde</u></b> or Ulug <b><u>Ulus</u></b> or <b><u>Ulus</u></b> of Jochi; accept <b><u>Mongol</u></b> yoke or <b><u>Tatar</u></b> yoke]",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "At the end of a 1983 novel in this language, a musician stabs herself in the shoulder. A sick pianist’s condition worsens in a novella in this language after a writer asks her to play excerpts from the title opera. In a novel in this language, a pianist descends into self-destruction after meeting Glenn Gould. In another novel in this language, a student has a sadomasochistic relationship with the title <em>Piano</em> <em>Teacher</em>. This language of <em>The Loser</em> was used for a novel whose protagonist writes <em>The Apocalypse with Figures</em> and contracts syphilis as part of a demonic deal for 24 years of musical genius. A soldier hums a song about a linden tree that he heard while visiting his tubercular cousin at a sanatorium in a novel in this language titled <em>The Magic Mountain</em>. For 10 points, name this language used by Elfriede Jelinek (“el-FREE-duh YELL-in-ek”) and Thomas Mann.",
+     "answer": "<b><u>German</u></b> [or <b><u>Deutsch</u></b>] (The second line refers to Mann’s <em>Tristan</em>. Thomas Bernhard wrote <em>The Loser</em>.)",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "question": "Jan Vansina’s book on “antecedents” to this modern-day country describes Tsobe ritualists backing its ruler Sentabyo, who caught smallpox from a cloth from Gisaka. This country’s Nyiginya dynasty was abolished in 1961 after the “Wind of Destruction,” an anti-pastoralist “social revolution” led by Grégoire Kayibanda. This country’s army funded the Rally for Congolese Democracy by forcing Kivu’s Walikale people to mine coltan in the Second Congo War. Leaders of this country’s “Patriotic Front” met in Tanzania to end its civil war in the Arusha Accords before an assassin shot down its president Juvénal Habyarimana (“hob-gyah-ree-mah-nah”). Paul Rusesabagina’s (“roo-say-sah-bah-gyee-nah’s”) Hôtel des Mille Collines (“oh-tell day meel kaw-leen”) saved people from the Interahamwe in this former Belgian mandate north of Burundi. For 10 points, what country’s president Paul Kagame (“kah-GAH-may”) led a Tutsi force during its 1994 genocide?",
+     "answer": "<b><u>Rwanda</u></b> [or Republic of <b><u>Rwanda</u></b> or Repubulika y’u <b><u>Rwanda</u></b> or République du <b><u>Rwanda</u></b> or Jamhuri ya <b><u>Rwanda</u></b>; accept Kingdom of <b><u>Rwanda</u></b>; or Ubwami bw’u <b><u>Rwanda</u></b> or Royaume du <b><u>Rwanda</u></b>; accept <b><u>Rwandan</u></b> Genocide; accept <b><u>Rwandan</u></b> Civil War; accept <b><u>Rwandan</u></b> Patriotic Front; accept <b><u>Rwandan</u></b> Revolution or Révolution <b><u>rwandaise</u></b>; accept <em>Antecedents to Modern</em> <em><b><u>Rwanda</u></b></em>; prompt on <u>Ruanda–Urundi</u>]",
+     "category": "History",
+     "subcategory": "World History"
+    }
+   ],
+   "bonuses": [
+    {
+     "leadin": "When working with materials with this hazard, one should have a class D fire extinguisher on hand. For 10 points each:",
+     "parts": [
+      "Potassium hydride, diethyl (“dai-ETH-ill”) zinc, and <em>n</em>-butyl (“n-BYOO-till”) lithium have what property that enables them to form metal fires upon exposure to any moisture?",
+      "To avoid metal fires, pyrophoric reagents like <em>n</em>-butyl lithium are stored in this common solvent composed of an impure mixture of a straight-chain hydrocarbon with molecular formula C6H14 (“C-six-H-fourteen”) and its isomers.",
+      "Reactions involving pyrophoric reagents are typically run with an inert atmosphere of either argon or this diatomic gas that makes up about 78 percent of the Earth’s atmosphere."
+     ],
+     "answers": [
+      "<b><u>pyrophoric</u></b>ity [prompt on <u>combustible</u>]",
+      "<b><u>hexane</u></b>s [accept <b><u>petroleum ether</u></b>; reject “pentane” or “heptane” or “cyclohexane”]",
+      "<b><u>nitrogen</u></b> gas [or <b><u>N</u><u>2</u></b> (“N-two”)]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "Marauders known as écorcheurs (“ay-kor-SHUR”) harassed French peasants during this conflict. For 10 points each:",
+     "parts": [
+      "Name this conflict during which the French hired Genoese crossbowmen to fight against Edward III at the Battle of Crécy. Joan of Arc helped fend off the siege of Orléans during this conflict.",
+      "One of these people named John Hawkwood led many English and French Hundred Years’ War veterans in the White Company. These mercenary captains fought various wars in Italy.",
+      "This French term refers to the fast, devastating raids on the countryside that were carried out by Edward III’s troops during the Hundred Years’ War."
+     ],
+     "answers": [
+      "<b><u>Hundred Years</u></b>’ War [or La guerre de <b><u>Cent Ans</u></b>; prompt on <u>Anglo-French</u> Wars; prompt on <u>Edwardian</u> War or <u>Lancastrian</u> War by asking “that was a phase of what broader conflict?”]",
+      "<b><u>condottiere</u></b> (“cone-dote-TYEH-ray”) [or <b><u>condottiero</u></b>; or <b><u>condottieri</u></b>]",
+      "<b><u>chevauchée</u></b>s (“sheh-voh-SHAYs”)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "leadin": "One of these processes named for California has led to an increased occurrence of the cot-caught (“cot-cawt”) merger. For 10 points each:",
+     "parts": [
+      "Name this type of linguistic process, whose best-known example resulted in a change in the pronunciation of certain sounds in English between about 1400 and 1700.",
+      "The Great Vowel Shift was first studied by this Danish historical linguist, whose namesake “cycle” describes the appearance and disappearance of preverbal and postverbal elements in negations.",
+      "Jespersen advocated for a choice of mid vowel sounds in Ido (“AI-doh”), an offshoot of this most widely-spoken international auxiliary language. It was constructed by L. L. Zamenhof (“ZAH-mun-hoff”)."
+     ],
+     "answers": [
+      "<b><u>vowel shift</u></b>s [accept Great <b><u>Vowel Shift</u></b>; accept California <b><u>vowel shift</u></b>; prompt on linguistic <u>shift</u>s]",
+      "Otto <b><u>Jespersen</u></b> (“YESS-per-suhn”) [or Jens Otto Harry <b><u>Jespersen</u></b>; accept <b><u>Jespersen</u></b>’s cycle]",
+      "<b><u>Esperanto</u></b> [or la <b><u>lingvo internacia</u></b>; accept Reformed <b><u>Esperanto</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "leadin": "Helen Edmundson’s 2012 play <em>The Heresy of Love</em> is based on the life of this author. For 10 points each:",
+     "parts": [
+      "Name this author who defended women’s rights to education in a letter that is discussed in the book <em>The Traps of Faith</em>.",
+      "Sor Juana wrote her <em>Reply to Sister Filotea</em> while serving as a nun in this modern-day country. Her play <em>The Divine Narcissus</em> links Christ’s crucifixion to the human sacrifices performed by this country’s native Aztecs.",
+      "The <em>Reply to Sister Filotea</em> claims that if Aristotle had done this activity, he would have written much more. Tita de la Garza expresses herself through this activity in a 1989 Laura Esquivel novel, whose title references this activity."
+     ],
+     "answers": [
+      "Sor <b><u>Juana</u></b> [or Sor <b><u>Juana</u></b> Inés de la Cruz; or Juana Inés de Asbaje y <b><u>Ramírez</u></b> de Santillana; prompt on de la <u>Cruz</u> or de <u>Asbaje</u> or de <u>Santillana</u>] (Octavio Paz wrote <em>The Traps of Faith</em>.)",
+      "<b><u>Mexico</u></b> [or <b><u>Méjico</u></b>; or United <b><u>Mexican</u></b> States or Estados Unidos <b><u>Mexicanos</u></b>; reject “Estados Unidos”]",
+      "<b><u>cook</u></b>ing [or making <b><u>food</u></b>; accept making <b><u>drink</u></b>s or making hot <b><u>chocolate</u></b>; accept <b><u>baking</u></b> or <b><u>culinary</u></b> work or being a <b><u>chef</u></b> or similar] (The novel is <em>Like Water for Chocolate</em>.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "leadin": "Members of this kingdom generally lack the ability to photosynthesize and often have chitin in their cell walls. For 10 points each:",
+     "parts": [
+      "Name this kingdom whose divisions include Basidiomycota and Ascomycota. This kingdom includes both yeasts and molds.",
+      "Like plants, fungi cycle between a haploid gametophyte phase and a diploid sporophyte phase, a phenomenon known by this name.",
+      "This is the name for the root-like main body of a fungus, which is composed of interconnected hyphae."
+     ],
+     "answers": [
+      "<b><u>fungi</u></b> [or <b><u>fungus</u></b>es]",
+      "<b><u>alternation</u></b> of <b><u>generations</u></b> [or <b><u>metagenesis</u></b>]",
+      "<b><u>mycelium</u></b> [or <b><u>mycelia</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "A serialized chapter regarding the inquest of a death in this manner cites the work of “two pestilent Frenchmen” to counter skeptics like the author’s friend George Henry Lewes (“looz”). For 10 points each:",
+     "parts": [
+      "Name this manner of death that befalls the alcoholic owner of a rag-and-bone shop where Nemo dies of an opium overdose.",
+      "After the miserly Mr. Krook spontaneously combusts in this novel, found among his possessions is a letter that proves Nemo to be the father of Esther Summerson. This novel concerns the interminable court case <em>Jarndyce and Jarndyce</em>.",
+      "This author, whose belief in the dangers of spontaneous combustion turned out to be unfounded, drew on his experience as a law clerk to write <em>Bleak House</em>. He also wrote <em>Great Expectations</em>."
+     ],
+     "answers": [
+      "<b><u>spontaneous</u></b> human <b><u>combust</u></b>ion [or equivalents such as <b><u>sudden</u></b>ly catching on <b><u>fire</u></b>; prompt on <u>combust</u>ion; prompt on <u>burn</u>ing up or equivalents]",
+      "<em><b><u>Bleak House</u></b></em>",
+      "Charles <b><u>Dickens</u></b> [or Charles John Huffam <b><u>Dickens</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "leadin": "The pre-Socratic philosopher Democritus proposed an early theory of the void in his argument for the existence of these things. For 10 points each:",
+     "parts": [
+      "Name these basic units of matter whose name is derived from the Greek for “indivisible.”",
+      "The Roman philosopher Lucretius proposed that atoms will spontaneously undergo this process, creating randomness in the universe. This process titles a Stephen Greenblatt book about the birth of Renaissance culture.",
+      "Lucretius was a proponent of this earlier philosopher’s atomic theory. This philosopher believed that the greatest good in life is achieved by pursuing both <em>aponia</em> and <em>ataraxia</em>."
+     ],
+     "answers": [
+      "<b><u>atom</u></b>s [or <b><u>atom</u></b>os; accept <b><u>atom</u></b>ism or <b><u>atom</u></b>ic theory]",
+      "the <b><u>swerve</u></b> [or <b><u>clinamen</u></b>; accept <em>The</em> <em><b><u>Swerve</u></b>: How the World Became Modern</em>; prompt on descriptive answers such as <u>changing direction</u> or <u>deflect</u>ing by asking “what is the term that Lucretius used?”]",
+      "<b><u>Epicurus</u></b> [or <b><u>Epikouros</u></b>; accept <b><u>Epicureanism</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "The Mitchell Map was used during negotiations of this treaty to create the borders of a newly independent country. For 10 points each:",
+     "parts": [
+      "Name this treaty that awarded a country an enclave known as the Northwest Angle.",
+      "Albert Gallatin and this diplomat traveled to the Convention of 1818 to resettle territory exchanged by the Treaty of Paris. This man signed an 1817 treaty with Charles Bagot that helped demilitarize the Great Lakes.",
+      "Lumberjacks from this American state almost sparked a border dispute during the Aroostook War. This New England state was created out of Massachusetts as a result of the Missouri Compromise."
+     ],
+     "answers": [
+      "Treaty of <b><u>Paris</u></b> [or Treaty of <b><u>1763</u></b>; reject answers that indicate a Treaty of Paris from another year]",
+      "Richard <b><u>Rush</u></b> [accept <b><u>Rush</u></b>–Bagot Treaty]",
+      "<b><u>Maine</u></b> [or <b><u>ME</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "Norman Mailer reused the title of <em>The Executioner’s Song</em> from a chapter of his book about this person, whom he once dubbed “America’s biggest ego.” For 10 points each:",
+     "parts": [
+      "Name this person whose influence on hip-hop and rap is demonstrated by his spoken-word album <em>I Am the Greatest</em>. This boxer quipped “I’m so mean, I made medicine sick” and “float like a butterfly, sting like a bee.”",
+      "Ali said, “When Liston reads about [this group]” visiting me, he’ll get so mad I’ll knock him out in three!” The KKK targeted this group after one of them wondered in an interview if Christianity would outlive rock ’n’ roll.",
+      "This New York poet and baseball fan praised Ali as the “smiling pugilist” in the liner notes for <em>I Am the Greatest</em>. At George Plimpton’s request, this author wrote a poem with Ali about Ernie Terrell’s impending annihilation."
+     ],
+     "answers": [
+      "Muhammad <b><u>Ali</u></b> [or Cassius <b><u>Clay</u></b>; or Cassius Marcellus <b><u>Clay</u></b>, Jr.] (Mailer’s book is <em>The Fight</em>.)",
+      "The <b><u>Beatles</u></b> [or George <b><u>Harrison</u></b>, John <b><u>Lennon</u></b>, Paul <b><u>McCartney</u></b>, AND Ringo <b><u>Starr</u></b>; or <b><u>George</u></b>, <b><u>John</u></b>, <b><u>Paul</u></b>, AND <b><u>Ringo</u></b>; accept answers in any order; prompt on any individual Beatle]",
+      "Marianne <b><u>Moore</u></b> [or Marianne Craig <b><u>Moore</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Other Academic",
+     "subcategory": "Other Academic"
+    },
+    {
+     "leadin": "This composer often performed alongside violinist Joseph Joachim (“YOH-sef yoh-AH-keem”) and dedicated a set of <em>Three Romances for Violin and Piano</em> to him. For 10 points each:",
+     "parts": [
+      "Name this composer of a piano trio in G minor and the <em>Soirées Musicales</em>.",
+      "Schumann and Joachim performed several works by this German composer, who wrote his violin concerto for Joachim and used a “Clara theme” in his Intermezzi. This composer of the <em>Hungarian Dances</em> wrote a celebrated “Lullaby.”",
+      "Joachim wrote the most commonly performed version of this part of Brahms’s violin concerto. Versions of these short, virtuosic solo passages written by Clara Schumann for a Mozart piano concerto were rediscovered in 2019."
+     ],
+     "answers": [
+      "<b><u>C</u></b>lara <b><u>Schumann</u></b> [or Clara <b><u>Wieck</u></b>; prompt on <u>Schumann</u>]",
+      "Johannes <b><u>Brahms</u></b>",
+      "<b><u>cadenza</u></b> [or <b><u>cadenze</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "Answer the following about the axis mundi in Asian religions, for 10 points each.",
+     "parts": [
+      "In this kami-venerating belief system, Izanami and Izanagi walked around an axis mundi called the Heavenly Pillar before having sex and then birthing the islands of the Japanese archipelago.",
+      "This temple complex was built to symbolize Mount Meru, part of the Hindu axis mundi, but it was turned into a Buddhist site under King Jayavarman VII in the 12th century CE.",
+      "This faith considers the jiba to be the axis mundi and where humans were created. This new religion was founded in the 19th century by Nakayama Miki, who encouraged her followers to live the “joyous life.”"
+     ],
+     "answers": [
+      "<b><u>Shintō</u></b> [or <b><u>Shinto</u></b>ism; or <b><u>kami-no-michi</u></b>]",
+      "<b><u>Angkor Wat</u></b> [prompt on <u>Angkor</u> or <u>Yaśodharapura</u>] (It was built by the Khmer people in Cambodia.)",
+      "<b><u>Tenrikyō</u></b> [or <b><u>Tenri</u></b>ism]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "Paintings in this style include <em>Four Darks on Red</em> and <em>Magenta, Black, Green on Orange</em>. For 10 points each:",
+     "parts": [
+      "Name this popular style of abstract expressionism whose two-word name refers to the use of large blocks of a single solid hue.",
+      "Agnes Martin praised this Latvian-American artist for having “reached zero” through his color field paintings, which decorate his namesake chapel in Houston.",
+      "Helen Frankenthaler created color field paintings using this technique, in which she applied paint diluted with turpentine directly to unprimed canvas, creating watercolor-like effects."
+     ],
+     "answers": [
+      "<b><u>color field</u></b> painting",
+      "Mark <b><u>Rothko</u></b> [or Markus Yakovlevich <b><u>Rothkowitz</u></b>; accept <b><u>Rothko</u></b> Chapel]",
+      "<b><u>soak stain</u></b> technique"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "Answer the following about hospitality in mythology, for 10 points each.",
+     "parts": [
+      "This Greek word for hospitality encompasses reciprocity and mutual gift-giving. Zeus had an epithet referring to this word, highlighting his role as a protector of strangers.",
+      "The Irish warrior Cú Chulainn (“koo KULL-in”) was bound to eat the meat of one of these animals from an old woman, breaking a taboo called a geas (“gaysh”) and weakening him before his final battle.",
+      "In Cherokee myth, these phenomena began after Pine Tree allowed Sparrow to stay with him to avoid the cold. Persephone’s return to and from the Underworld personified the changing of these natural phenomena."
+     ],
+     "answers": [
+      "<b><u>xenia</u></b> (”K’SEN-yah”) [accept Zeus <b><u>Xenio</u></b>s; accept theo<b><u>xenia</u></b>]",
+      "<b><u>dog</u></b>s [or <b><u>madra</u></b>í; accept <b><u>dog</u></b> meat; prompt on <u>cú</u>]",
+      "<b><u>season</u></b>s [or <b><u>horae</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "During this event, Victor Hugues (“oog”) attempted to capture Martinique (“mar-tih-NEEK”), communicated with Julien Fédon’s (“zhool-yen fay-dawn’s”) rebels in Grenada (“gruh-NAY-duh”), and sent aid to the Black Caribs of Saint Vincent and “brigands” of Saint Lucia. For 10 points each:",
+     "parts": [
+      "What 1791–1804 revolution led by Toussaint L’ouverture (“too-san loo-vair-ter”) inspired later revolts of enslaved Afro-Caribbean sugar workers in Curaçao (“K’YOO-ruh-sao”), Demerara, and Jamaica?",
+      "Although this criollo (“cree-oh-yo”) leader admired the Haitian Revolution, he fought against Jean-Pierre Boyer’s (“zhawn-pyair bwah-YAY’s”) occupation of Santo Domingo. This founding father of the Dominican Republic names Hispaniola’s highest peak.",
+      "Duarte founded a secret society named for this word, which names a battle won by Francisco Morazán (“moh-rah-SAHN”) in Honduras. On an island of this name, indentured cocoa and sugar workers founded the largest Indo-Caribbean population."
+     ],
+     "answers": [
+      "<b><u>Haitian</u></b> Revolution [or Révolution <b><u>haïtienne</u></b> or Revolisyon <b><u>ayisyen</u></b>; or <b><u>Haiti</u></b>’s Revolution or Revolution of <b><u>Saint-Domingue</u></b>]",
+      "Juan Pablo <b><u>Duarte</u></b> [or Juan Pablo <b><u>Duarte</u></b> y Diez; accept Pico <b><u>Duarte</u></b>]",
+      "<b><u>Trinidad</u></b> [accept La <b><u>Trinitaria</u></b> or Los <b><u>Trinitarios</u></b>; accept La Isla de la <b><u>Trinidad</u></b>; accept Battle of La <b><u>Trinidad</u></b>; accept Holy <b><u>Trinity</u></b> or <b><u>Trinitarian</u></b>ism]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "leadin": "A work in this genre ends, “I taught women how to speak…but God, how to make them shut up?” For 10 points each:",
+     "parts": [
+      "Name this genre that titles a poem that describes the “huge laughing cockroaches” on the top lip of a “Kremlin Highlander.”",
+      "The author of that epigram, Osip Mandelstam, was a 20th-century writer from this country, like Marina Tsvetaeva, Alexander Blok, and Mikhail Bulgakov.",
+      "Mandelstam was a close friend of this Soviet poet, who described standing in line in front of a Leningrad prison in the section “Instead of a Preface” of her poem “Requiem.” She also wrote “Poem without a Hero.”"
+     ],
+     "answers": [
+      "<b><u>epigram</u></b> [accept “Stalin <b><u>Epigram</u></b>”]",
+      "<b><u>Soviet Union</u></b> [or <b><u>USSR</u></b>; or <b><u>Union of Soviet Socialist Republics</u></b>; or <b><u>CCCP</u></b> or <b><u>Soyuz Sovetskikh Sotsialisticheskikh Respublik</u></b>; prompt on <u>Russia</u> or <u>Rossiya</u>]",
+      "Anna <b><u>Akhmatova</u></b> [or Anna Andreyevna <b><u>Gorenko</u></b>] (The poem in the first line is an epigram by Akhmatova.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "This force is approximately independent of speed in a simple model proposed by Charles-Augustin de Coulomb (“sharls-OH-goo-stan duh COO-loam”). For 10 points each:",
+     "parts": [
+      "Name this force whose “dry” form is subject to Amontons’s laws.",
+      "The first of Amontons’s laws asserts that dry friction is independent of this quantity. Pressure can be defined as force divided by this quantity.",
+      "The contact area between two bodies is smaller than it seems due to these microscopic surface imperfections. Under a load, these features deform until the actual contact area is large enough to support the load."
+     ],
+     "answers": [
+      "<b><u>friction</u></b> [accept dry <b><u>friction</u></b> or kinetic <b><u>friction</u></b>]",
+      "contact <b><u>area</u></b> [or surface <b><u>area</u></b>]",
+      "<b><u>asperities</u></b> [or <b><u>asperity</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "leadin": "Princess Ennigaldi’s prestige as an entu dedicated to this god allowed her to establish what may have been the world’s first museum. For 10 points each:",
+     "parts": [
+      "Name this god who displaced Marduk as Babylon’s chief deity under Ennigaldi’s father Nabonidus, who prays to this god, Ishtar, and Shamash on the Harran Stela. Ur-Nammu built the Ziggurat of Ur for this lunar deity.",
+      "Ennigaldi-Nanna was chosen as an entu of Sīn via this general process, which Roman religious figures like haruspices and augurs performed by interpreting entrails, auspices, dreams, and oracles.",
+      "Sheep liver omen texts are key sources on the migrations of speakers of these languages like the Amorites, who founded Babylon, Isin, and Larsa. Sumerian was eclipsed by the Akkadian language from this family."
+     ],
+     "answers": [
+      "<b><u>Nanna</u></b> [or <b><u>Sīn</u></b> or variants like <b><u>Su’en</u></b> or <b><u>Sen</u></b>; or <b><u>Nannar</u></b>; accept <b><u>Dilimbabbar</u></b> or <b><u>Ašimbabbar</u></b>; accept Ennigaldi-<b><u>Nanna</u></b> or Bel-Shalti-<b><u>Nannar</u></b>; reject “Inanna”]",
+      "<b><u>divination</u></b> [or word forms like <b><u>divine</u></b>rs; or interpreting <b><u>omen</u></b>s; or interpreting <b><u>divine</u></b> will or <b><u>divine</u></b> favor or the <b><u>will</u></b> of the <b><u>god</u></b>s or equivalents; or determining the <b><u>future</u></b>; or <b><u>fortune</u></b>-telling or <b><u>prophecy</u></b> or <b><u>prediction</u></b>s or equivalents; accept interpreting <b><u>symptom</u></b>s or <b><u>Sakikkū</u></b>]",
+      "<b><u>Semitic</u></b> languages [accept <b><u>Canaanite</u></b> languages; accept East <b><u>Semitic</u></b> or Northwest <b><u>Semitic</u></b>; prompt on <u>Afroasiatic</u> languages or <u>Hamito-Semitic</u> languages]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "Maria Martin painted many of the backgrounds for a book by this artist that he intended to print on “double elephant” sized paper to make its subjects feel life-size. For 10 points each:",
+     "parts": [
+      "Name this artist who, at the advice of Napoleon’s nephew Charles Lucien Bonaparte, sailed to the UK from Philadelphia to commission the engraving of a book’s 435 hand-colored prints.",
+      "Wood engraver Thomas Bewick’s (“BYOO-wick’s”) “History of” this general class of non-quadruped animals in Great Britain predates Audubon’s illustrated field guide to them “in America” by nearly 30 years.",
+      "This critic praised Bewick’s engravings of feathers as “the most masterly thing ever done in woodcutting.” This critic’s most famous negative review described an oil painting as “flinging a pot of paint in the public’s face.”"
+     ],
+     "answers": [
+      "John James <b><u>Audubon</u></b> [or Jean-Jacques <b><u>Rabin</u></b>]",
+      "<b><u>bird</u></b>s [or <b><u>avian</u></b>s or <b><u>Aves</u></b> or <b><u>Neornithes</u></b>; accept <em><b><u>Bird</u></b>s of America</em>; accept <em>A History of British</em> <em><b><u>Bird</u></b>s</em>; prompt on specific types of birds like <u>falcon</u>s or <u>eagle</u>s by asking “what general class of animals do they belong to?”]",
+      "John <b><u>Ruskin</u></b> (The second review panned Whistler’s <em>Nocturne in Black and Gold</em>.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "One of these things prompts the protagonist’s wife Sarah Ruth to beat him with a broom in the Flannery O’Connor short story “Parker’s Back.” For 10 points each:",
+     "parts": [
+      "Name these things that inspire stories like “The Veldt” and “The Concrete Mixer” in a collection titled for a man described by these things.",
+      "This author of <em>The Illustrated Man</em> previously included the character in his novel <em>Something Wicked This Way Comes</em>. This author also wrote <em>Fahrenheit 451</em>.",
+      "“Parker’s Back” appears in this O’Connor collection. In this collection’s title story, a woman gives the young Black boy Carver a penny, then has a stroke after Carver’s mother strikes her in retaliation."
+     ],
+     "answers": [
+      "<b><u>tattoo</u></b>s [or <b><u>illustration</u></b>s; accept <em>The</em> <em><b><u>Illustrated</u></b> Man</em>; prompt on <u>art</u>works or <u>drawing</u>s or similar]",
+      "Ray <b><u>Bradbury</u></b> [or Ray Douglas <b><u>Bradbury</u></b>]",
+      "<em><b><u>Everything That Rises Must Converge</u></b></em>"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "Welch’s <em>t</em>-test is used to test whether two populations have equal values for this statistic. For 10 points each:",
+     "parts": [
+      "Name this statistic found by adding up the data and dividing by the number of data points.",
+      "For more than two populations, this technique tests for differences in means without multiple <em>t</em>-tests. Ronald Fisher devised this technique, which is based on partitioning its eponymous statistic.",
+      "ANOVA is conducted using this distribution. By definition, it is the distribution of a ratio of two chi-squared variables times the ratio of their degrees of freedom."
+     ],
+     "answers": [
+      "<b><u>mean</u></b> [accept <b><u>average</u></b>; accept population <b><u>mean</u></b> or sample <b><u>mean</u></b>]",
+      "<b><u>ANOVA</u></b> [or <b><u>analysis of variance</u></b>]",
+      "<b><u>F</u></b>-distribution [or <b><u>F</u></b>-ratio; or <b><u>Snedecor</u></b>’s distribution or Fisher–<b><u>Snedecor</u></b> distribution]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "Tetramethylsilane is used as a reference at zero parts per million in instruments that perform this technique. For 10 points each:",
+     "parts": [
+      "Name this spectroscopic technique whose “proton” form produces peaks that can be split by nearby distinct protons. Powerful magnets are used to probe chemical structure in this technique.",
+      "NMR can be used to deduce this quantity for a reaction. This quantity equals the actual amount of isolated product divided by the theoretical amount of product that can be formed.",
+      "To find NMR yield, one of these entities must have been spiked into the sample. Examples of these species for proton NMR include dibromomethane and trichloroethylene."
+     ],
+     "answers": [
+      "<b><u>NMR</u></b> spectroscopy [or <b><u>nuclear magnetic resonance</u></b> spectroscopy; accept proton <b><u>NMR</u></b> or other types of NMR; prompt on <u>spectroscopy</u>]",
+      "<b><u>yield</u></b> [accept percent <b><u>yield</u></b> or reaction <b><u>yield</u></b>; accept NMR <b><u>yield</u></b>; prompt on reaction <u>efficiency</u>]",
+      "internal <b><u>standard</u></b>s [accept NMR <b><u>standard</u></b>s; accept <b><u>standard</u></b> peaks; prompt on <u>peak</u>s; prompt on <u>reference</u>s]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    }
+   ]
+  },
+  "9": {
+   "name": "2022 ACF Winter Packet 9",
+   "tossups": [
+    {
+     "question": "This story titles a Carol Ann Duffy poem whose narrator “found some hobbies for myself,” reimagining a character in this story who induces an “obsequious and conciliating nature” in the protagonist and dies from a broken blood vessel “in a fit of passion at a peddler.” A man in this story encounters figures with “enormous breeches” and “long knives in their belts” after walking to a natural amphitheater with a man carrying a keg. This story’s protagonist finds that his favorite inn has painted over one of its portraits to reflect their new head of state. Upon seeing his rusted gun, this story’s title character determines that a group of men playing ninepins drugged him in the Catskill Mountains. For 10 points, the title farmer sleeps for 20 years in what story by Washington Irving?",
+     "answer": "“<b><u>Rip Van Winkle</u></b>”",
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "question": "A 2006 book by Walter Gibson discusses how this artist’s paintings illustrate “the Art of Laughter.” Several men, one of whom wears a paper crown, appear below lifeless trees in the bottom right of a painting by this artist that is set around February or March. This artist’s paintings <em>Haymaking</em>, <em>The Gloomy Day,</em> and <em>The Return of the Herd</em> are among the five extant works in his series of six landscapes that depict the<em> Labors of the Months</em>. In a painting by this artist, a man carrying a dead fox and his companion walk on a hill in the foreground. In that painting by this artist, people skate on a lake in the distance while dogs trail the title figures in a winter landscape. For 10 points, name this Flemish artist of <em>The Hunters in the Snow</em>.",
+     "answer": "Pieter <b><u>Bruegel</u></b> the Elder [or Pieter <b><u>Brueghel</u></b> the Elder; accept <em>Pieter</em> <em><b><u>Bruegel</u></b></em> <em>and the Art of Laughter</em>; reject “Pieter Brueghel the Younger” or other Brueghels]",
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "question": "These are the main phenomena modeled by a mathematical technique for which Ravn (“rav’n”) and Uhlig (“UR-lig”) proposed a means of estimating the parameter “lambda,” which is often set to 1600. The HP filter is usually used to analyze these phenomena, whose measurement titles a 1946 book by Burns and Mitchell. Edward Prescott and Finn Kydland proposed a theory named for how these phenomena are caused by “real,” not nominal, supply-side shocks. Joseph Schumpeter’s (“SHUM-pay-tur’s”) analysis of these phenomena identified a long, technology-driven example he named “Kondratiev (“kon-DRAT-ee-ehv”) waves.” In 1992, the National Bureau for Economic Research estimated that, on average, these phenomena last 4.5 years. For 10 points, name these phenomena in which an economy goes through booms and recessions periodically.",
+     "answer": "<b><u>business cycle</u></b>s [or <b><u>economic cycle</u></b>s or <b><u>trade cycle</u></b>s; accept real <b><u>business cycle</u></b> theory; accept <em>Measuring</em> <em><b><u>Business Cycle</u></b>s</em>; prompt on <u>cycle</u>s; prompt on <u>expansion</u>s or <u>contraction</u>s by asking “what more general phenomena are they a part of?”; prompt on <u>recession</u>s or <u>boom</u>s until each is read by asking “what more general phenomena are they a part of?”]",
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "question": "Pausanias recounts that this city was built on the land of the Ectenes and ruled by the king Ogyges (“oh-GAI-jeez”), who survived his namesake worldwide flood. After defending this city from King Erginus and the Minyans, Heracles married its princess Megara. An epic by Statius recounts a failed siege of this city that was made successful ten years later by the Epigoni. A ruler of this city blinded himself after learning he had killed his father at a crossroads, inadvertently fulfilling part of a tragic prophecy. Polynices (“paw-lee-NAI-seez”) led an army named for the “Seven against” this city, which was home to Antigone and the queen Jocasta. For 10 points name this Greek city in Boeotia (“bee-OH-shuh”) whose mythical kings included Cadmus and Oedipus.",
+     "answer": "<b><u>Thebes</u></b> [or <b><u>Thebai</u></b>; or <b><u>Cadmea</u></b>; accept <em>Seven against</em> <em><b><u>Thebes</u></b></em> or <em>Hepta epi</em> <em><b><u>Thēbas</u></b></em> or <em>Septem contra</em> <em><b><u>Thebas</u></b></em>]",
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "question": "In the fourth movement of this symphony, a section marked <em>incalzando</em> ends in quiet tam-tam strokes that introduce a solemn tuba and trombone section before the <em>allegro giusto</em> (“ah-LEG-roh JOO-stoh”) coda. Staccato triplets in the strings and flutes develop into the march-like theme of this symphony’s third movement, which is simultaneously in 12/8 (“twelve eight”) and 4/4 (“four four”) time. This symphony opens with a slow bassoon solo over strings, though a later bassoon solo may be replaced by a bass clarinet to match the intended dynamic marking of 6 p’s. This symphony, which quotes the Russian Orthodox requiem, has a second movement “limping waltz” in 5/4 (“five four”) time. For 10 points, name this final symphony by Pyotr Ilyich Tchaikovsky.",
+     "answer": "<b><u>Tchaikovsky</u></b>’s Symphony No. <b><u>6</u></b> [or <em><b><u>Pathétique</u></b> Symphony</em>; or <b><u>Tchaikovsky</u></b>’s <b><u>Six</u></b>th Symphony; accept No. <b><u>6</u></b> or <b><u>Six</u></b>th after “Tchaikovsky” is read]",
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "question": "In a play, a character with this first name repeatedly responds to mentions of death with the expression “how long a term for credit!” An atheist with this first name points his sword at a veiled woman in a censored Molière play. At the end of another play, a character with this first name is invited to dine on scorpions and snakes by his fiancée Ana’s father. A character with this first name sneaks into Inés’s convent in a play by José Zorrilla that gives him the surname Tenorio. A protagonist with this first name sees a ghostly statue come to life and is dragged to hell for his abuse of women in Tirso de Molina’s play <em>The Trickster of Seville and the Stone Guest</em>. For 10 points, give this first name of a Spanish womanizer whose legend inspired a Lord Byron poem and a Mozart opera.",
+     "answer": "<b><u>Juan</u></b> [accept <em>Don</em> <em><b><u>Juan</u></b> Tenorio</em> or <em>Don</em> <em><b><u>Juan</u></b> Tenorio: Drama religioso-fantástico en dos partes</em>; accept <em>Don</em> <em><b><u>Juan</u></b></em> (“JOO-un”) or<em> Dom</em> <em><b><u>Juan</u></b> (</em>“zhoo-AHN”); prompt on Don <u>Giovanni</u>] (The quote from <em>The</em> <em>Trickster of Seville</em> in the first line is the source of the Spanish idiom “Cuán largo me lo fiáis.”)",
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "question": "This color names a family of compounds that exhibit it due to a dipolar fused-ring system and are found in German chamomile oil. An oxidized indicator turns this color before being reduced by glucose to its colorless form in a common kinetics demonstration named for a “bottle.” A protein-binding dye that exhibits this “brilliant” color above a pH of 2 is named for the city of Coomassie. This color results when electrons are solvated in a solution of sodium dissolved in ammonia. A common pH indicator partly named for this color is a derivative of bromothymol. Green or this color is the characteristic color of copper (II) (”copper-two”) salts. For 10 points, alkaline solutions cause litmus paper to turn what color?",
+     "answer": "<b><u>blue</u></b> [accept <b><u>indigo</u></b> or <b><u>violet</u></b>; accept <b><u>cyan</u></b> or <b><u>turquoise</u></b> or other shades of blue; accept <b><u>blue</u></b>-green; accept methylene <b><u>blue</u></b>; accept Coomassie brilliant <b><u>blue</u></b>; accept <b><u>blue</u></b> bottle experiment; accept bromothymol <b><u>blue</u></b>; accept <b><u>azul</u></b>ene; reject “green”]",
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "question": "George Shultz quipped that the State Department should give this leader AIDS. Dobbins Air Reserve Base in Marietta, Georgia currently houses eight C-130s whose delivery to this leader’s country was blocked in 1982. This leader agreed to grant a 220,000-dollar loan to Jimmy Carter’s brother Billy. This leader pitched a tent on Donald Trump’s property in Bedford, New York prior to addressing the United Nations. Condoleezza Rice convinced this leader to provide financial compensation for victims of the Lockerbie bombing. Hilary Clinton quipped “we came, we saw, he died!” after this leader was discovered near a drainage pipe in Sirte (“sairt”) and executed by US-backed rebels. For 10 points, from 1969 to 2011, what dictator led Libya?",
+     "answer": "Muammar <b><u>Gaddafi</u></b> [or Muammar <b><u>Qadaffi</u></b>; or Muammar Muhammad Abu Minyar al-<b><u>Gaddafi</u></b> or Muʿammar Muḥammad ʾAbū Minyār al-<b><u>Qaḏḏāfī</u></b>]",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "The lifetimes of these things increase due to human activity in the Albrecht effect, which has similar results to the Twomey effect. John Latham and Stephen Salter have proposed mixing seawater with these things in order to change their color. The formation of these things is the main application of Köhler theory. These large-scale things are the site of a process whose rate increases in a method co-developed by Bernard Vonnegut, which initially used solid carbon dioxide in the vicinity of supercooled crystals. Silver iodide is used to form these things’ condensation nuclei in a climate engineering technique named for their “seeding.” For 10 points, contrails are man-made examples of what large meteorological objects made from water vapor?",
+     "answer": "<b><u>cloud</u></b>s [accept <b><u>cloud</u></b> seeding; accept marine <b><u>cloud</u></b> brightening; prompt on <u>water</u> vapor or <u>H2O</u> (“H-two-O”); prompt on <u>vapor</u> or <u>droplet</u>s; prompt on atmospheric <u>aerosol</u>s]",
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "question": "This figure’s name was given to rocks from Berekhat Ram and Tan-Tan. Betty Meggers incorrectly argued that pots and sculptures named for this figure from Ecuador’s Valdivia (“bahl-DEEV-yah”) culture derived from transpacific contact with Japan’s Jōmon culture. This figure names a black ceramic from Dolní Věstonice (“doal-NEE-vyess-toh-NEET-say”), an Aurignacian (“or-ig-NAY-shun”) mammoth ivory statue from Hohle Fels, and a Gravettian statuette from Lespugue (“less-POOG”) that may represent steatopygia (“stee-at-uh-PIDGE-ee-uh”). Rome’s largest temple honored Roma and this deity, whose sanctuary at Paphos brought many Greeks to Cyprus. Vienna’s Natural History Museum displays a Paleolithic oolite (“oh-oh-lite”) sculpture named for this deity, which may be a fertility idol and was found near Willendorf. Praxiteles made a cult statue for this goddess’s temple at Knidos. For 10 points, what goddess names an armless marble sculpture from Milos?",
+     "answer": "<b><u>Venus</u></b> [accept <b><u>Aphrodite</u></b>; accept <em><b><u>Venus</u></b> de Milo</em> or <em><b><u>Aphrodite</u></b> de Milos</em>; accept <b><u>Venus</u></b> of Willendorf; accept <b><u>Aphrodite</u></b> Paphia or <b><u>Aphrodite</u></b> of Knidos; accept <b><u>Cytherea</u></b> or <b><u>Cypris</u></b> until “Cyprus” is read; accept Temple of <b><u>Venus</u></b> and Roma or Templum <b><u>Veneris</u></b> et Romae; accept <b><u>Venus</u></b> of Lespugue, <b><u>Venus</u></b> of Hohle Fels, <b><u>Venus</u></b> of Dolní Věstonice, Jōmon <b><u>Venus</u></b>, <b><u>Venus</u></b> of Valdivia, <b><u>Venus</u></b> of Tan-Tan, or <b><u>Venus</u></b> of Berekhat Ram]",
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "question": "In a novel by this author, a home invader with Huntington’s disease is moved to tears upon hearing the protagonist’s daughter recite “Dover Beach.” In another novel by this author, a vase owned by Uncle Clem is broken, leading a woman to strip naked to retrieve it from a fountain. An anti-Iraq War protest frames a novel by this author that follows a day in the life of neurosurgeon Henry Perowne. After accidentally sending her a dirty letter, a man in a novel by this author has sex in a library with his lover, who reunites with him after he is evacuated from Dunkirk. The postscript to a novel by this author reveals its main action to be a fabrication by Briony Tallis. For 10 points, name this contemporary British author of <em>Saturday</em> and <em>Atonement</em>.",
+     "answer": "Ian <b><u>McEwan</u></b> [or Ian Russell <b><u>McEwan</u></b>]",
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "question": "This scientist names a phenomenon in which atmospheric pressure exceeding the exit pressure of a propelling nozzle creates a series of namesake “disks.” This scientist sometimes names an effect in which an accelerating body pitches downwards, his namesake “tuck.” An infinite number of waves named for this scientist arise in a Prandtl–Meyer (“PRAN-tull-MY-ur”) expansion fan, whose cone angle is the arcsine of one over a quantity named for this scientist. If a quantity named for this scientist is less than about 0.3, a fluid is approximately incompressible. If that quantity named for this scientist exceeds one, it leads to a loud noise called a sonic boom. For 10 points, the ratio of an object’s speed to the speed of sound is a “number” named after what German scientist?",
+     "answer": "Ernst <b><u>Ma</u><u>ch</u></b> (“mahk”) [or Ernst Waldfried Josef Wenzel <b><u>Mach</u></b>; accept <b><u>Mach</u></b> number; accept <b><u>Mach</u></b> cone; accept <b><u>Mach</u></b> waves; accept <b><u>Mach</u></b> tuck; accept <b><u>Mach</u></b> disks]",
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "question": "At the end of one of this author’s novels, the protagonist decides to only answer letters from her niece Marianita (“mah-ree-ah-NEE-tah”). In that novel by this author, the shards of a lightbulb are swallowed in a suicide attempt by Pupo Román (“POO-poh roh-MON”). In a different novel by this author, characters such as a mysterious scarred African man start to appear in the wrong storylines. In that novel by this author, the underage protagonist attempts to bribe a series of small-town mayors to marry him to a divorced relative. This author created a semi-autobiographical protagonist who works with a writer of wild radio plays named Pedro Camacho (“cah-MAH-cho”). For 10 points, name this Peruvian author of <em>The Feast of the Goat</em> and <em>Aunt Julia and the Scriptwriter</em>.",
+     "answer": "Mario <b><u>Vargas Llosa</u></b> (“YO-sah”) [or Jorge Mario Pedro <b><u>Vargas Llosa</u></b>; prompt on <u>Vargas</u> or <u>Llosa</u>]",
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "question": "A book by this thinker ends by bemoaning the idea that “one must [always] go further” by referencing a student of Heraclitus who said that one can’t step in the same river once. A book by this thinker asks “who deserves the distinction of being unhappier than everyone else?” in a section framed as a lecture by the man “A.” A book by this thinker that takes its title from Psalm 55 was written in part to process his break-up with Regine Olsen. One of this thinker’s books analogizes “crop rotation” to an aesthetic life, which it contrasts with an ethical life. This thinker compared a person who accepts “infinite resignation” with one who can make a “teleological suspension of the ethical” to become a “Knight of Faith.” For 10 points, name this Danish existentialist who wrote <em>Either/Or</em> and <em>Fear and Trembling</em>.",
+     "answer": "Søren <b><u>Kierkegaard</u></b> [or Søren Aabye <b><u>Kierkegaard</u></b>; accept Johannes <b><u>de Silentio</u></b>; accept Victor <b><u>Eremita</u></b>]",
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "question": "Susan Shirk’s recent book <em>Overreach</em> examines the “ghost” left by this leader after the end of his “hide and bide” doctrine. Biographies of this leader by Richard Evans and Ezra Vogel highlight him wearing a cowboy hat on a state visit to the US. This leader of the “Eight Elders” sent his successor to study Ireland’s Shannon Airport one year after his army invaded Vietnam. This “second generation” leader’s “Southern Tour” publicized the success of the first four special economic zones he created as part of “reform and opening up.” This leader proposed the principle of “one country, two systems” and instituted the one-child policy. For 10 points, Jiāng Zémín (“j’yahng dzuh-min”) succeeded what modernizing paramount leader who resigned after the 1989 Tiānānmén Square protests?",
+     "answer": "<b><u>Dèng</u></b> Xiǎopíng [accept <b><u>Dèng</u></b> Xiǎopíng theory or <b><u>Dèng</u></b> Xiǎopíng Lǐlùn or <b><u>Deng</u></b>ism; accept <em><b><u>Dèng</u></b> Xiǎopíng and the Transformation of China</em>; accept <em><b><u>Dèng</u></b> Xiǎopíng and the Making of Modern China</em>] (The third line refers to the 1979 Sino-Vietnamese War.)",
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "question": "This disease can cause black sunbursts to appear in the retina. Patients with this disease are susceptible to medullary renal cancer, salmonella-induced osteomyelitis (“ahss-tee-oh-MY-lite-iss”), and parvovirus-B19-induced aplastic crisis. Penicillin prophylaxis is used in patients with this disease due to splenic auto-infarction. The frequency of this disease’s crises can be reduced by triggering the expression of a gamma chain with hydroxyurea. Using electrophoresis, Linus Pauling showed that sufferers of this disease have an altered charge on a certain protein. This disease, which is caused by a glutamate-to-valine substitution, confers a heterozygote advantage against malaria in its carrier state. For 10 points, name this disease in which a mutation in hemoglobin deforms red blood cells.",
+     "answer": "<b><u>sickle cell</u></b> anemia [or <b><u>sickle cell</u></b> disease; or <b><u>SCA</u></b>, or <b><u>SCD</u></b>; prompt on <u>anemia</u>]",
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "question": "This goddess is the primary one worshiped at several monsoon festivals during the month of Shrāvana, at which <em>ghevar</em> sweets are often eaten. Women mostly pray to this goddess during Teej. This goddess is worshiped at sites where, according to legend, parts of her predecessor’s body fell while her distraught husband carried her corpse around. This goddess created a child out of turmeric paste and told him to guard her while she was bathing. This goddess is the reincarnation of Sati (“suh-tee”), who immolated herself. This goddess’s husband cut off her child’s head, leading it to be replaced with an elephant’s head. Alongside Saraswatī and Lakshmī, this deity forms the Tridevī. For 10 points, name this Hindu goddess who is the mother of Ganesha and wife of Shiva.",
+     "answer": "<b><u>Pārvatī</u></b> [or <b><u>Umā</u></b>; or <b><u>Gaurī</u></b>; or <b><u>Aparnā</u></b>; or <b><u>Girijā</u></b> or <b><u>Girirajaputri</u></b>; or <b><u>Haimavathi</u></b>; or <b><u>Shailaja</u></b> or <b><u>Shailaputri</u></b>; accept <b><u>Sati</u></b> until read; prompt on <u>Devī</u> or Mahā<u>devī</u> until “Tridevī” is read; prompt on Adi <u>Shakti</u> or Adi Para <u>Shakti</u>; prompt on <u>Mātṝikā</u>s or <u>Matar</u> or <u>Matri</u> or Sapta<u>mātṝikā</u> or Ashta<u>mātṝikā</u>]",
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "question": "In a song, this artist blows a kiss to a cloud that “looks like Ireland.” In a music video, this musician and Michael Hervieu perform an interpretive dance meant to evoke a bow and arrow. The second half of an album by this artist describes a vision quest in an icy landscape and is titled <em>The Ninth Wave</em>. This artist sings of a buried yo-yo in a song inspired by Peter Reich’s <em>Book of Dreams</em> and titled for a rainmaking invention. This artist sings “come on baby, come on darling” in the bridge to a 1985 song that surged in popularity in 2022 due to its inclusion in a scene in which Max escapes Vecna in Season 4 of <em>Stranger Things</em>. For 10 points, name this English singer whose album <em>Hounds of Love</em> includes the songs “Cloudbusting” and “Running Up That Hill.”",
+     "answer": "Kate <b><u>Bush</u></b> [or Catherine <b><u>Bush</u></b>] (The song in the first line is “The Big Sky.”)",
+     "category": "Pop Culture",
+     "subcategory": "Music"
+    },
+    {
+     "question": "A leader of this country was led to believe he was ruling it for two years after a 1968 stroke allegedly caused by his deckchair collapsing underneath him. A leader of this country claimed that the encyclical <em>Rerum novarum</em> (“RAY-rum noh-VAR-um”) was the basis of the ideology of his so-called “non-party,” the National Union. After success balancing the budget as a finance minister under the “National Dictatorship,” a political economy professor from this country became its dictator in 1932, in which role he established the PIDE (“P-I-D-E”) secret police and was succeeded by Marcelo Caetano (“mar-SELL-oo cay-TAH-noo”). The 1974 Carnation Revolution overthrew this European country’s Estado Novo (“eece-TAH-doo NOH-voo”). For 10 points, Antόnio Salazar (“sah-lah-ZAR”) was a dictator of what Iberian country?",
+     "answer": "<b><u>Portugal</u></b> [or <b><u>Portuguese</u></b> Republic or República <b><u>Portuguesa</u></b>]",
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "question": "A space-inspired album partly titled for this concept concludes with the track “Back to Earth.” At the end of a hit single from an album titled for this concept, the drummer laughs out loud and says “yeah!” after playing a solo that consists entirely of rim shots over a clap beat. An album titled for this concept misspelled the name of the composer’s five-year-old daughter on a track titled for her “waltz.” This concept is followed by the word “further” on a sequel album whose lead single was “Unsquare Dance.” An album named for this concept opens with a track built around a 2+2+2+3 Turkish metrical pulse and features a Joe Morello drum solo on a “quintuple meter” track. For 10 points, Paul Desmond wrote “Take Five” for a Dave Brubeck Quartet album punningly titled what musical concept “out”?",
+     "answer": "<b><u>time</u></b> [accept <b><u>time</u></b> signatures; accept <b><u>countdown</u></b>; accept <em><b><u>Time</u></b> Out</em>; accept <em><b><u>Time</u></b> Further Out</em>; accept <em>Countdown</em>—<em><b><u>Time</u></b> in Outer Space</em>] (The track in the second line is “Unsquare Dance.” The misspelled track is “Kathy’s Waltz,” which should have correctly been spelled as “Cathy.”)",
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "question": "The operation of some of these devices is described by the Courant–Snyder parameters, which describe an ellipse whose area is proportional to emittance. One of the first of these devices, which was powered using a bank of diodes and capacitors as a voltage multiplier circuit, was built in 1932 by John Cockcroft and Ernest Walton. A characteristic value of “charge times magnetic field strength over mass” arises in a type of these devices pioneered by Ernest Lawrence, which include two “D” shaped sections. The fact that it could reach tera-electronvolts of energy gave the name Tevatron to one of these devices built at Fermilab. For 10 points, Stanford operated a “linear” example of what devices that can bring protons and electrons up to high speeds?",
+     "answer": "particle <b><u>accelerator</u></b>s [accept linear <b><u>accelerator</u></b>s or <b><u>cyclotron</u></b> accelerators or <b><u>synchrotron</u></b> accelerators; accept particle <b><u>collider</u></b>s or <b><u>atom smasher</u></b>s]",
+     "category": "Science",
+     "subcategory": "Physics"
+    }
+   ],
+   "bonuses": [
+    {
+     "leadin": "<em>Note to players: the answer to the first part of this bonus requires an animal and a city, like “clownfish of Sydney” or “rabbits of Seville.”</em> A statue of one of these animals known for living in Kadıköy (“KUH-dee-koy”) district named Tombili (“TOM-bee-lee”) depicts her leaning on a curb, a pose that went viral in 2012. For 10 points each:",
+     "parts": [
+      "Name these animals that are the subject of the documentary <em>Kedi</em> (“KEH-dee”). Some attribute the prevalence of these animals to their reverence in Islam, which considers them ritually pure enough to enter mosques.",
+      "A European shorthair cat named Gli (“glee”) gained international fame for her residence in this major İstanbul mosque but died just a few months after its 2020 conversion from a museum.",
+      "Cats roam just as freely in the ruins of this ancient Greek city that is now a tourist attraction in Turkey’s İzmir Province due to sights like the Library of Celsus, the House of the Virgin Mary, and the Temple of Artemis."
+     ],
+     "answers": [
+      "feral <b><u>cat</u></b>s of <b><u>İsta</u><u>nbul</u></b> [or stray <b><u>cat</u></b>s of <b><u>İstanbul</u></b>; accept <b><u>cat</u></b>s of <b><u>Constantinople</u></b>; accept <b><u>feline</u></b>s or <b><u>felid</u></b>s in place of “cats”]",
+      "<b><u>Hagia Sophia</u></b> [or <b><u>Ayasofya</u></b>; or <b><u>Sancta Sophia</u></b>]",
+      "<b><u>Ephesus</u></b> [or <b><u>Efes</u></b>; accept <b><u>Selçuk</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Geography",
+     "subcategory": "Geography"
+    },
+    {
+     "leadin": "According to a variant of the Shintō creation myth, Izanagi birthed Amaterasu by holding one of these objects in his left hand. For 10 points each:",
+     "parts": [
+      "Name these objects, one of which called the Yata no Kagami was hung from a tree to lure Amaterasu out of her hiding spot after Susano’o threw a flayed horse at her.",
+      "Amaterasu’s birth by mirror is related in this book that opens with two chapters on creation myths. This text is the second oldest book on Japanese history behind the <em>Kojiki</em>.",
+      "The mirror Yata no Kagami, a jewel, and the sword Kusanagi are the Three Sacred Treasures belonging to people with this title. Amaterasu is said to be the ancestor of Jimmu, the first person to hold this ruling title."
+     ],
+     "answers": [
+      "<b><u>mirror</u></b>s [accept specific types of mirrors such as a bronze <b><u>mirror</u></b> or copper <b><u>mirror</u></b>; prompt on <u>kagami</u>]",
+      "<em>Nihon</em> <em><b><u>Shoki</u></b></em> [or <em><b><u>Nihongi</u></b></em>; or <em>The</em> <em><b><u>Chronicles of Japan</u></b></em>]",
+      "<b><u>emperor</u></b> of Japan [or <b><u>Tennō</u></b>; accept <b><u>Mikado</u></b>; accept <b><u>Emperor</u></b> Jimmu]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Mythology",
+     "subcategory": "Mythology"
+    },
+    {
+     "leadin": "This place’s agoraphobic proprietor promises to leave it for the first time in 20 years and walk around the block on his birthday. For 10 points each:",
+     "parts": [
+      "Name this place where Theodore “Hickey” Hickman admits to murdering his wife Evelyn after criticizing this place’s patrons, such as Don Parritt, for holding onto “pipe dreams.”",
+      "In Eugene O’Neill’s <em>The Iceman Cometh</em>, Hickey is a traveling worker in this profession, which provides a cover for his flight from the law. Willy Loman holds this title profession in a play by Arthur Miller.",
+      "In a play by this author, Joe and Kitty Duval frequent Nick’s Pacific Street Saloon. This author also wrote the collection <em>My Name Is Aram</em>."
+     ],
+     "answers": [
+      "<b><u>Harry</u></b> Hope’s <b><u>saloon</u></b> [or Harry <b><u>Hope</u></b>’s <b><u>saloon</u></b>; accept the <b><u>saloon</u></b> from <em>The</em> <em><b><u>Iceman Cometh</u></b></em>; accept <b><u>bar</u></b> in place of “saloon”; prompt on <u>bar</u> or <u>saloon</u> by asking “from what literary work?”]",
+      "<b><u>sales</u></b>man [or <b><u>sales</u></b>person; accept traveling <b><u>sales</u></b>man; accept hardware <b><u>sales</u></b>man; accept <em>Death of a</em> <em><b><u>Sales</u></b>man</em>]",
+      "William <b><u>Saroyan</u></b> (The play is <em>The Time of Your Life</em>.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "American Literature"
+    },
+    {
+     "leadin": "Answer the following about fashion labels changing the typeface class in their logos between serif and sans serif, for 10 points each.",
+     "parts": [
+      "In 2019, Virgil Abloh switched from Helvetica to a serif font for the logo for a label called “off” this color. Princess Diana wore a dress of this traditional color with a 25-foot train to her wedding to Prince Charles in 1981.",
+      "In 2018, Peter Saville switched the font in the logo of this luxury label to sans serif and dropped a comma between “London” and “England” in its subtitle. This label’s namesake beige “checks” line its famous trench coats.",
+      "For a 2012 rebrand, Hedi Slimane (“ay-DEE slee-MON”) dropped the first name of this designer from his namesake label and switched to a sans serif logo. This Algerian-born designer started the label in 1962 to create items in the style of his “Le Smoking” tuxedo."
+     ],
+     "answers": [
+      "<b><u>white</u></b> [accept Off-<b><u>White</u></b>™]",
+      "<b><u>Burberry</u></b> [accept <b><u>Burberry</u></b> check]",
+      "Yves <b><u>Saint Laurent</u></b> (“eev san loh-RON”) [prompt on <u>YSL</u>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Other Fine Arts"
+    },
+    {
+     "leadin": "Gordon Parks captured a famous photo of a boy pointing at one of these toys during a psychological experiment. For 10 points each:",
+     "parts": [
+      "Name these toys that Black children favored when they resembled white people in an experiment by Mamie (“MAY-mee”) and Kenneth Clark. These toys include the “Bobo” that names an experiment conducted by Albert Bandura.",
+      "Other experiments on minorities’ perceptions of their own minority have investigated this phenomenon’s namesake “threat,” which causes minorities to underperform on tests.",
+      "An early experiment demonstrating stereotype threat was performed by Claude Steele and a scholar with this last name. A psychologist with this last name invented the “jigsaw classroom” technique."
+     ],
+     "answers": [
+      "<b><u>doll</u></b>s [accept Bobo <b><u>doll</u></b>s]",
+      "<b><u>stereotype</u></b>s [or word forms like <b><u>stereotyping</u></b>; accept <b><u>stereotype</u></b> threat]",
+      "<b><u>Aronson</u></b> [accept Elliot <b><u>Aronson</u></b>; accept Joshua <b><u>Aronson</u></b> or Joshua Michael <b><u>Aronson</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Social Science",
+     "subcategory": "Social Science"
+    },
+    {
+     "leadin": "Cáo Huī’s (“tsow hway’s) sculpture series <em>I Want To Play God</em> depicts hyperrealistic objects, such as armchairs, cut open to seemingly reveal this substance. For 10 points each:",
+     "parts": [
+      "Name this substance that hangs on either side of a screaming Pope Innocent X in a Francis Bacon painting.",
+      "This artist experimented with the visuals of flesh in “Shooting into the Corner,” in which blood-red wax cannonballs are fired into the opposite corner of a room. This artist also created a curved, oblong sculpture of mirror-like stainless steel for Chicago’s Millennium Park.",
+      "Adriana Varejão (“vah-ray-ZHAO”), an artist from this country, depicts ornamental ceramic tiles, or azulejos, (“ah-zoo-LAY-zhoos”) combined with viscera. Heitor (“ay-TOR”) da Silva Costa constructed this country’s <em>Christ the Redeemer</em> statue."
+     ],
+     "answers": [
+      "<b><u>meat</u></b> [accept specific types of meat, such as <b><u>flesh</u></b> or <b><u>organs</u></b> or <b><u>viscera</u></b> or <b><u>carcass</u></b>es; accept <em>Figure with</em> <em><b><u>Meat</u></b></em>; prompt on <u>bone</u>; reject “skin”]",
+      "Anish <b><u>Kapoor</u></b> [or Anish Mikhail <b><u>Kapoor</u></b>] (The sculpture is <em>Cloud Gate</em> or “the Bean.”)",
+      "<b><u>Brazil</u></b> [or <b><u>Brasil</u></b>; or Federative Republic of <b><u>Brazil</u></b> or República Federativa do <b><u>Brasil</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Visual Fine Arts"
+    },
+    {
+     "leadin": "Answer the following about a style of popular Russian print literature known as lubok, for 10 points each.",
+     "parts": [
+      "One of the most popular lubki was Vasily Koren’s illustrations of this text, which was the first book to be printed in Russian. Martin Luther translated this text into German at Wartburg Castle.",
+      "A famous lubok that possibly satirized Peter the Great is titled for a cat from this city. An icon known as “Our Lady in [this city]” was obtained during a 1579 siege in Tatarstan and is believed to have miracle-working powers.",
+      "This later tsar enforced strict censorship on lubki using secret police he established called the Third Section. The Decembrists opposed this tsar’s succession to the throne and instead promoted his brother, Constantine."
+     ],
+     "answers": [
+      "the <b><u>Bible</u></b> [accept Book of <b><u>Genesis</u></b> or <b><u>Bəreʾšīt</u></b>; accept Book of <b><u>Revelation</u></b> or <b><u>Apokalypsis</u></b>; accept Luther <b><u>Bible</u></b> or Luther<b><u>bibel</u></b>; accept <b><u>Old Testament</u></b> or <b><u>Altes Testament</u></b>; accept <b><u>New Testament</u></b> or <b><u>Neues Testament</u></b>; accept Koren Picture-<b><u>Bible</u></b>]",
+      "<b><u>Kazan</u></b> [accept Siege of <b><u>Kazan</u></b>; accept Khanate of <b><u>Kazan</u></b> or <b><u>Kazan</u></b> xanlıgı or <b><u>Kazanskoye</u></b> khanstvo; accept Our Lady of <b><u>Kazan</u></b> or Mother-of-God of <b><u>Kazan</u></b> or <b><u>Kazanskaya</u></b> Bogomater]",
+      "<b><u>Nicholas I</u></b> [or <b><u>Nikoláy I</u></b>; or <b><u>Nicholas Pavlovich</u></b> Romanov or <b><u>Nikoláy Pávlovich</u></b> Románov; prompt on <u>Nicholas</u> or <u>Nikoláy</u>; prompt on <u>Románov</u>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "European History"
+    },
+    {
+     "leadin": "Given <em>n</em> pairs of parentheses, the <em>n</em>th of these numbers is the number of ways they can be arranged so that the pairs correctly match. For 10 points each:",
+     "parts": [
+      "Name these numbers, the <em>n</em>th of which equals “2<em>n</em> choose <em>n</em>, all over <em>n</em> plus one.”",
+      "The <em>n</em>th Catalan number can be written as this function of 2<em>n</em> plus one, over this function of <em>n</em> times this function of <em>n</em> plus one. This function of <em>n</em> is the product of the integers from 1 through <em>n</em>.",
+      "An asymptotic approximation for the <em>n</em>th Catalan number can thus be found using this approximation, which states that the log of <em>n</em> factorial is roughly “<em>n</em> log <em>n</em> minus <em>n</em>.”"
+     ],
+     "answers": [
+      "<b><u>Catalan</u></b> numbers [prompt on <u>C</u> sub n]",
+      "<b><u>factorial</u></b> [or <em>n</em> <b><u>factorial</u></b>; prompt on <u>exclamation mark</u> or <u>bang</u>]",
+      "<b><u>Stirling</u></b>’s approximation [or <b><u>Stirling</u></b>’s formula]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Other Science"
+    },
+    {
+     "leadin": "A law partially named for this resource led the US to lay claim over Baker Island and Jarvis Island. For 10 points each:",
+     "parts": [
+      "Name this resource that was mined on many remote Pacific islands in the 19th century to produce fertilizer. Peru enjoyed a prosperous era named for this resource thanks to its deposits on the Chincha Islands.",
+      "While he was a senator, this politician introduced the Guano Islands Act. As a cabinet member, this politician negotiated a treaty with the British diplomat Richard Lyons to end the slave trade.",
+      "Many laborers who mined guano on American and Peruvian islands were kidnapped from this kingdom ruled by the Kamehameha dynasty. This kingdom was annexed by the US in 1898 and later became its fiftieth state."
+     ],
+     "answers": [
+      "<b><u>guano</u></b> [accept <b><u>Guano</u></b> Islands Act; accept <b><u>Guano</u></b> Era; prompt on bird <u>excrement</u> or bird <u>poop</u> or equivalents; prompt on <u>nitrogen</u> or <u>nitrate</u>s or <u>NO3</u>]",
+      "William <b><u>Seward</u></b> [or William Henry <b><u>Seward</u></b>; accept Lyons–<b><u>Seward</u></b> Treaty of 1862]",
+      "<b><u>Hawai’i</u></b> [or Kingdom of <b><u>Hawai’i</u></b>; accept <b><u>HI</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "American History"
+    },
+    {
+     "leadin": "Contacts between metals and these materials were the subject of the first studies of band-bending. For 10 points each:",
+     "parts": [
+      "Name these materials, exemplified by silicon, which have properties intermediate between insulators and conductors.",
+      "Metal-semiconductor contacts form a “barrier” named for this physicist, and can be used to make his namesake devices, which are very fast-switching and have a low voltage drop.",
+      "The Schottky–Mott rule predicts the “height” of the Schottky barrier to be this quantity minus electron affinity. This is the minimum energy needed to free an electron from a metal via the photoelectric effect."
+     ],
+     "answers": [
+      "<b><u>semiconductor</u></b>s",
+      "Walter H. <b><u>Schottky</u></b> [or Walter Hans <b><u>Schottky</u></b>; accept <b><u>Schottky</u></b> barrier or <b><u>Schottky</u></b> diodes; reject “Shockley” or “Shockley diodes”]",
+      "<b><u>work functio</u><u>n</u></b> [prompt on <u>phi</u>; reject “work”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Physics"
+    },
+    {
+     "leadin": "Zhū Yù’s performance piece entitled <em>Eating People</em>, in which he claimed to have eaten a human fetus, references a story by this author. For 10 points each:",
+     "parts": [
+      "Name this author who created a protagonist who sees the words “eat people” written between the lines of Confucian classics in his short story “Diary of a Madman.”",
+      "Demons attempt to eat the monk’s Táng Sānzàng’s flesh multiple times in this member of the Four Classic Chinese novels, in which Sūn Wùkōng and Pigsy join the title trip.",
+      "In a novel, this author wrote of the “special investigator” Dīng Gōu’er (“ding goh-arr”), who goes to investigate cannibalism and, like Zhū Yù, eats a dish that may be a real infant or a facsimile."
+     ],
+     "answers": [
+      "<b><u>Lǔ</u></b> Xùn (“loo shwin”) [or <b><u>Lu</u></b> Hsün; or <b><u>Zhōu</u></b> Shùrén or <b><u>Chou</u></b> Shu-jen; or <b><u>Zhōu</u></b> Zhāngshòu; prompt on <u>Yùshān</u> or <u>Yùcái</u>]",
+      "<em><b><u>Journey to the West</u></b></em> [or <em><b><u>Xī Yóu Jì</u></b></em>; accept <b></b><em><b><u>Monkey</u></b>: A Folk-Tale of China</em>]",
+      "<b><u>Mò</u></b> Yán [or <b><u>Guǎn</u></b> Móyè] (The novel is <em>The Republic of Wine.</em>)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "World Literature"
+    },
+    {
+     "leadin": "Molecules with high ratios of these atoms to carbon are extremely reactive. For 10 points each:",
+     "parts": [
+      "Non-carbon elements like nitrogen, sulfur, and oxygen in organic molecules are referred to by what general term? Aromatics with these elements include purine and furan and are desirable synthetic targets among biomolecules.",
+      "A highly reactive molecule with a seven-to-one heteroatom-to-carbon ratio has three of these functional groups. Acyl-substituted examples of this functional group can decompose into isocyanates in the Curtius rearrangement.",
+      "Azides (“AY-zides”) can be converted into amines with palladium-on-carbon catalysts, which often enable these reactions that add the lightest element. Partial versions of this process used by the food industry may produce trans fats."
+     ],
+     "answers": [
+      "<b><u>heteroatom</u></b>s [accept <b><u>heterocycle</u></b>s or <b><u>heteroarene</u></b>s]",
+      "<b><u>azide</u></b>s (“AY-zides”) [accept acyl <b><u>azide</u></b>s] (The highly reactive molecule is azidoazide azide, with formula C2N14.)",
+      "<b><u>hydrogenation</u></b> [or word forms like <b><u>hydrogenate</u></b>; accept partial <b><u>hydrogenation</u></b> or partially <b><u>hydrogenated</u></b> oils; prompt on <u>reduction</u> or word forms like <u>reduce</u>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Chemistry"
+    },
+    {
+     "leadin": "In Scandinavian historiography, this period precedes the Vendel period, when Sweden remained wealthy and escaped much of its turmoil despite a decline in bracteate (“BRACK-tee-ut”) production. For 10 points each:",
+     "parts": [
+      "Give this term for a phase of European late antiquity marked by the settlement of so-called “barbarians” like the Alemanni, Alans, Lombards, and Goths, who founded kingdoms in the former Western Roman Empire.",
+      "Frigeridus suggests that, during the Migration Period, these people lost a war to the Franks before the 406 CE crossing of the Rhine. These Germanic people sacked Rome in 455, inspiring a common term for property crime.",
+      "The Vandals used this technology to destroy the Roman fleet at the 468 Battle of Cape Bon. The<em> Madrid Skylitzes</em> depicts the Eastern Roman Empire using a lost weapon named for this technology against the Umayyads."
+     ],
+     "answers": [
+      "<b><u>Migration</u></b> Period [or <b><u>Migration</u></b> Age; or <b><u>Völkerwanderung</u></b>; prompt on early <u>medieval</u> period or Early <u>Middle Ages</u> or “<u>Dark Ages</u>”]",
+      "<b><u>Vandal</u></b>s [accept <b><u>vandal</u></b>ism; accept <b><u>Hasdingi</u></b> or <b><u>Silingi</u></b>; accept <b><u>Vandal</u></b> Kingdom or Kingdom of the <b><u>Vandal</u></b>s and Alans or Regnum <b><u>Vandalorum</u></b> et Alanorum]",
+      "<b><u>fire</u></b> [or <b><u>pŷr</u></b> or <b><u>ignis</u></b>; accept <b><u>fire</u></b> ships; accept Greek <b><u>fire</u></b> or sea <b><u>fire</u></b> or <b><u>pŷr</u></b> thalássion or Roman <b><u>fire</u></b> or <b><u>pŷr</u></b> rhōmaïkón or liquid <b><u>fire</u></b> or hygròn <b><u>pŷr</u></b> or sticky <b><u>fire</u></b> or <b><u>pŷr</u></b> kollētikón or manufactured <b><u>fire</u></b> or <b><u>pŷr</u></b> skeuastón]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "Other History"
+    },
+    {
+     "leadin": "The people of Thamud (“thah-MOOD”) asked the prophet Ṣāliḥ (“saw-LEE-HH”) for a very specific one of these animals and miraculously were given one, but then proceeded to hamstring and kill her. For 10 points each:",
+     "parts": [
+      "In the Surah al-Ghāšiyah, the Qur’an asks how nonbelievers can “not look at [what type of animal]—how they are created?” The Qur’an analogizes the difficulty of a sinner entering heaven to one of these animals.",
+      "During this journey, the Prophet Muhammad rode on his beloved camel al-Qaswa’ (“kuss-wah”), who starved herself after her owner died. Today, millions of Muslims perform this pilgrimage each year.",
+      "Camel meat is halal, provided that the camel has been slaughtered in this manner. In this type of killing, the name of Allah is invoked before a knife is used to slit the throat of the livestock so it will bleed out."
+     ],
+     "answers": [
+      "<b><u>camel</u></b>s [accept <b><u>dromedary</u></b> camels or Arabian <b><u>camel</u></b>s or one-humped <b><u>camel</u></b>s or <em><b><u>Camelus</u></b> dromedarius</em>; accept She-<b><u>camel</u></b> of Ṣāliḥ; prompt on even-toed <u>ungulate</u>s or <u>artiodactyl</u>s]",
+      "<b><u>Ḥajj</u></b> [prompt on going to <u>Mecca</u> or equivalents]",
+      "<b><u>dhabīḥah</u></b> (“thaw-BEE-hah”) [or <b><u>zabiha</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Religion",
+     "subcategory": "Religion"
+    },
+    {
+     "leadin": "This author claims, “only through time time is conquered” in a poem that ends “ridiculous the sad waste time / stretching before and after.” For 10 points each:",
+     "parts": [
+      "Name this poet who included “Burnt Norton” in his <em>Four Quartets</em>. This poet described the phrase “Jug Jug” and other “withered stumps of time” in his poem <em>The Waste Land</em>.",
+      "The <em>Four Quartets</em> poem “The Dry Salvages” (“sal-VAY-jizz”) refers to time as “destroyer and preserver,” paraphrasing this earlier poem, whose speaker exclaims, “I fall upon the thorns of life! I bleed!”",
+      "“The Dry Salvages” notes that “time is no healer” in a section that imagines a conversation from a book in this language. <em>The Waste Land</em> ends by repeating a word originally from this language three times."
+     ],
+     "answers": [
+      "T. S. <b><u>Eliot</u></b> [or Thomas Stearns <b><u>Eliot</u></b>]",
+      "“<b><u>Ode to the West Wind</u></b>” (by Percy Shelley)",
+      "<b><u>Sanskrit</u></b> [or <b><u>saṃskṛt</u></b>am] (<em>The Waste Land</em>’s last line is “Shantih shantih shantih.”)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "British Literature"
+    },
+    {
+     "leadin": "An Ursula K. Le Guin (“luh GWIN”) novel retells the <em>Aeneid</em> (“uh-NEE-id”) from the perspective of this character, who has no spoken lines in Virgil’s original poem. For 10 points each:",
+     "parts": [
+      "Name this daughter of King Latinus (“lah-TEE-nuhss”). After her hair catches fire, her father consults the oracle of Faunus (“FAW-nuhss”), who advises that her descendants will “raise our name to the stars.”",
+      "Though Dido considers herself married to Aeneas, Aeneas decides to leave her after this deity reminds him of his duty to the “soil of Rome.” In the <em>Odyssey</em>, this deity’s Greek equivalent gives Odysseus the herb moly.",
+      "Aeneas loses his first wife, Creusa (“kree-OOH-sah”), while fleeing Troy, but sees her ghost while visiting this location ruled by Pluto."
+     ],
+     "answers": [
+      "<b><u>Lavinia</u></b>",
+      "<b><u>Mercury</u></b> [or <b><u>Hermes</u></b>]",
+      "the <b><u>underworld</u></b> [or <b><u>Hades</u></b>; or <b><u>Dis</u></b>; accept <b><u>Hell</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Literature",
+     "subcategory": "European Literature"
+    },
+    {
+     "leadin": "This A minor piece begins with a deceptively simple [read slowly] E, E-E, E, F E C E <em>lento</em> melody before transitioning into a rapid <em>allegro con brio</em> section with a chaotically descending figure in the right hand. For 10 points each:",
+     "parts": [
+      "Name this étude that is nicknamed for the phenomenon its rapid scales and arpeggios in the right hand are said to imitate.",
+      "The <em>Winter Wind</em> étude is by this Polish Romantic composer, who also wrote the piece <em>Fantaisie-Impromptu</em>.",
+      "This other Chopin étude is nicknamed for its repeated theme of rapid minor seconds that seem dissonant before resolving."
+     ],
+     "answers": [
+      "<em><b><u>Winter Wind</u></b></em> étude [or Étude <b><u>Opus 25, No. 11</u></b>; accept, BUT DO NOT OTHERWISE REVEAL, Frédéric Chopin’s <b><u>Opus 25, No. 11</u></b>]",
+      "Frédéric <b><u>Chopin</u></b> (“shoh-PAHN”) [or Frédéric François <b><u>Chopin</u></b>; or Fryderyk Franciszek <b><u>Chopin</u></b>]",
+      "<em><b><u>Wrong Note</u></b></em> étude [or Étude <b><u>O</u><u>pus 25, No. 5</u></b>]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Fine Arts",
+     "subcategory": "Auditory Fine Arts"
+    },
+    {
+     "leadin": "David Lewis pioneered an “analytic” form of this theory, which argues that mental states are linked to the way we define the terms used to describe them. For 10 points each:",
+     "parts": [
+      "Name this theory from the philosophy of mind that holds that mental states are defined by their roles in a mental system in relation to other states. This theory emerged from behaviorist ideas of the mind.",
+      "Functionalist theories often invoke the ideas of this thinker and computer scientist, who analogized thoughts to states in a machine and developed a namesake test in which an AI tries to pass as human.",
+      "Ned Block criticized functionalism in a thought experiment in which people from this country form a functional mind. A man translates English into a language from this country in a famous argument against strong AI."
+     ],
+     "answers": [
+      "<b><u>functional</u></b>ism [or word forms like <b><u>functional</u></b>ist or <b><u>functional</u></b>ity; accept analytic <b><u>functional</u></b>ism]",
+      "Alan <b><u>Turing</u></b> [or Alan Mathison <b><u>Turing</u></b>; accept <b><u>Turing</u></b> Test]",
+      "<b><u>China</u></b> [or the <b><u>Chinese</u></b>; or <b><u>Zhōngguó</u></b>; or <b><u>PRC</u></b> or People’s Republic of <b><u>China</u></b> or <b><u>Zhōnghuá</u></b> Rénmín Gònghéguó; accept <b><u>Chinese</u></b> room thought experiment; accept <b><u>China</u></b> brain thought experiment]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Philosophy",
+     "subcategory": "Philosophy"
+    },
+    {
+     "leadin": "In 2016, al-Mourabitoun attacked the Splendid Hotel in this country, whose so-called “spring” was led by Le Balai Citoyen (“luh bah-leh see-twah-YEN”). For 10 points each:",
+     "parts": [
+      "Name this country whose longtime president Blaise Compaoré (“blaze kohm-pow-RAY”) defected to Côte d’Ivoire (“coat dee-VWAHR”) after 2014 protests. Thomas Sankara gave this country a Mossi name meaning “land of honest men” to replace the colonial name “Upper Volta.”",
+      "In 2014, Burkina Faso and other members of G5 Sahel joined Operation Barkhane (“bar-KON”) to combat Salafi jihadists like Algeria’s offshoot of this terrorist group “in the Islamic Maghreb.” It was once led by Osama Bin Laden.",
+      "This word and “sharīʿa” name al-Qaeda-affiliated militias in Libya, Tunisia, and Mauritania. Operation Serval opposed a group named for this word and “Dine” (“deen”), which vied with the MNLA for control of Azawad in Mali’s Tuareg (“TWAH-reg”) rebellion."
+     ],
+     "answers": [
+      "<b><u>Burkina</u></b> Faso [accept “<b><u>Burkinabè</u></b> Spring”; accept 2014 <b><u>Burkina</u></b> Faso uprising]",
+      "al-<b><u>Qaeda</u></b> [or al-<b><u>Qāʿidah</u></b> or <b><u>Qaedat</u></b> al-Jihad; accept al-<b><u>Qaeda</u></b> in the Islamic Maghreb or Tanẓīm al-<b><u>Qā'idah</u></b> fī Bilād al-Maghrib al-Islāmī or <b><u>AQIM</u></b>; prompt on “the <u>Base</u>” or “the <u>Foundation</u>”]",
+      "<b><u>Anṣār</u></b> [or al-<b><u>Anṣār</u></b>; or <b><u>supporter</u></b>s or <b><u>partisan</u></b>s or <b><u>helper</u></b>s; accept <b><u>Anṣār</u></b> al-Sharīʿa in Tunisia or <b><u>Anṣār</u></b> al-Sharīʿa Brigade in Benghazi or <b><u>Anṣār</u></b> al-Sharīʿa in Derna; accept <b><u>Anṣār</u></b> Dine or ʾ<b><u>Anṣār</u></b> ad-Dīn; prompt on <u>AAS</u> or <u>ASB</u> or <u>ASD</u> by asking “what does that stand for?”] (The MNLA is the National Movement for the Liberation of Azawad.)"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "History",
+     "subcategory": "World History"
+    },
+    {
+     "leadin": "Kinases are an important class of enzymes for all branches of life. For 10 points each:",
+     "parts": [
+      "Kinases catalyze the transfer of these high-energy functional groups onto a variety of substrates, such as histones and compounds like PEP. This group’s formula is PO4 3- (“P-O-four-three-minus”).",
+      "In pancreatic cells, glucokinase is the primary enzyme that converts glucose into glucose 6-phosphate. In most human cells, this kinase catalyzes the first step of glycolysis.",
+      "Mutations in glucokinase cause this specific form of diabetes in children. Unlike type 1 and type 2 diabetes, this form of diabetes is associated with a single genetic mutation."
+     ],
+     "answers": [
+      "<b><u>phosphate</u></b>s",
+      "<b><u>hexo</u></b>kinase",
+      "<b><u>MODY</u></b> [or <b><u>maturity-onset diabetes of the young</u></b> or <b><u>monogenic</u></b> diabetes; accept <b><u>MODY</u></b> type 2; reject “juvenile diabetes”]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Science",
+     "subcategory": "Biology"
+    },
+    {
+     "leadin": "Herbert Simon proposed that people exhibit a “bounded” form of this quality when placed under time limitations. For 10 points each:",
+     "parts": [
+      "Name this quality that people are assumed to have in traditional economic theories, meaning that they make logical, utility-maximizing decisions according to reason.",
+      "Simon coined this term to describe non-rational behavior in which people make decisions that satisfy basic adequacy criteria rather than determining the fully optimal decision.",
+      "Satisficing is one of these decision-making “rules of thumb.” Kahneman (“KAH-nuh-mun”) and Tversky (“t’VER-ski”) pioneered the study of these techniques in the paper “Judgement under Uncertainty,” which compares them with biases."
+     ],
+     "answers": [
+      "<b><u>rational</u></b>ity [accept bounded <b><u>rational</u></b>ity]",
+      "<b><u>satisficing</u></b> (“SAT-iss-FAI-seen”) [or word forms like <b><u>satisfice</u></b>]",
+      "<b><u>heuristic</u></b>s (“hyur-IST-icks”) [or <b><u>heuristic</u></b> techniques]"
+     ],
+     "values": [
+      10,
+      10,
+      10
+     ],
+     "category": "Social Science",
+     "subcategory": "Social Science"
     }
    ]
   }
@@ -1621,10 +4999,10 @@ export default {
     "name": "Demo Tournament",
     "registrations": [
      {
-      "name": "Summit",
+      "name": "Stanford",
       "teams": [
        {
-        "name": "Summit",
+        "name": "Stanford",
         "players": [
          {
           "name": "Ada"
@@ -1643,32 +5021,10 @@ export default {
       ]
      },
      {
-      "name": "Riverside",
+      "name": "UIUC",
       "teams": [
        {
-        "name": "Riverside",
-        "players": [
-         {
-          "name": "Elena"
-         },
-         {
-          "name": "Farid"
-         },
-         {
-          "name": "Grace"
-         },
-         {
-          "name": "Hugo"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "name": "Maple Grove",
-      "teams": [
-       {
-        "name": "Maple Grove",
+        "name": "UIUC",
         "players": [
          {
           "name": "Iris"
@@ -1684,10 +5040,10 @@ export default {
       ]
      },
      {
-      "name": "Harbor View",
+      "name": "ASU",
       "teams": [
        {
-        "name": "Harbor View",
+        "name": "ASU",
         "players": [
          {
           "name": "Leo"
@@ -1697,6 +5053,28 @@ export default {
          },
          {
           "name": "Noor"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "Berkeley",
+      "teams": [
+       {
+        "name": "Berkeley",
+        "players": [
+         {
+          "name": "Elena"
+         },
+         {
+          "name": "Farid"
+         },
+         {
+          "name": "Grace"
+         },
+         {
+          "name": "Hugo"
          }
         ]
        }
@@ -1711,16 +5089,16 @@ export default {
   "rooms": [
    {
     "name": "Room A",
-    "bucket": null
+    "bucket": 1
    },
    {
     "name": "Room B",
-    "bucket": null
+    "bucket": 2
    }
   ],
   "phases": [
    {
-    "name": "Round robin",
+    "name": "Round robin 1",
     "rounds": [
      {
       "round": 1,
@@ -1728,19 +5106,19 @@ export default {
        {
         "room": 0,
         "a": {
-         "team": "Riverside"
+         "team": "Stanford"
         },
         "b": {
-         "team": "Maple Grove"
+         "team": "Berkeley"
         }
        },
        {
         "room": 1,
         "a": {
-         "team": "Summit"
+         "team": "UIUC"
         },
         "b": {
-         "team": "Harbor View"
+         "team": "ASU"
         }
        }
       ],
@@ -1752,19 +5130,19 @@ export default {
        {
         "room": 0,
         "a": {
-         "team": "Riverside"
+         "team": "Stanford"
         },
         "b": {
-         "team": "Harbor View"
+         "team": "ASU"
         }
        },
        {
         "room": 1,
         "a": {
-         "team": "Summit"
+         "team": "Berkeley"
         },
         "b": {
-         "team": "Maple Grove"
+         "team": "UIUC"
         }
        }
       ],
@@ -1776,19 +5154,173 @@ export default {
        {
         "room": 0,
         "a": {
-         "team": "Riverside"
+         "team": "Stanford"
         },
         "b": {
-         "team": "Summit"
+         "team": "UIUC"
         }
        },
        {
         "room": 1,
         "a": {
-         "team": "Maple Grove"
+         "team": "ASU"
         },
         "b": {
-         "team": "Harbor View"
+         "team": "Berkeley"
+        }
+       }
+      ],
+      "byes": []
+     }
+    ]
+   },
+   {
+    "name": "Round robin 2",
+    "rounds": [
+     {
+      "round": 4,
+      "games": [
+       {
+        "room": 0,
+        "a": {
+         "team": "Stanford"
+        },
+        "b": {
+         "team": "Berkeley"
+        }
+       },
+       {
+        "room": 1,
+        "a": {
+         "team": "UIUC"
+        },
+        "b": {
+         "team": "ASU"
+        }
+       }
+      ],
+      "byes": []
+     },
+     {
+      "round": 5,
+      "games": [
+       {
+        "room": 0,
+        "a": {
+         "team": "Stanford"
+        },
+        "b": {
+         "team": "ASU"
+        }
+       },
+       {
+        "room": 1,
+        "a": {
+         "team": "Berkeley"
+        },
+        "b": {
+         "team": "UIUC"
+        }
+       }
+      ],
+      "byes": []
+     },
+     {
+      "round": 6,
+      "games": [
+       {
+        "room": 0,
+        "a": {
+         "team": "Stanford"
+        },
+        "b": {
+         "team": "UIUC"
+        }
+       },
+       {
+        "room": 1,
+        "a": {
+         "team": "ASU"
+        },
+        "b": {
+         "team": "Berkeley"
+        }
+       }
+      ],
+      "byes": []
+     }
+    ]
+   },
+   {
+    "name": "Round robin 3",
+    "rounds": [
+     {
+      "round": 7,
+      "games": [
+       {
+        "room": 0,
+        "a": {
+         "team": "Stanford"
+        },
+        "b": {
+         "team": "Berkeley"
+        }
+       },
+       {
+        "room": 1,
+        "a": {
+         "team": "UIUC"
+        },
+        "b": {
+         "team": "ASU"
+        }
+       }
+      ],
+      "byes": []
+     },
+     {
+      "round": 8,
+      "games": [
+       {
+        "room": 0,
+        "a": {
+         "team": "Stanford"
+        },
+        "b": {
+         "team": "ASU"
+        }
+       },
+       {
+        "room": 1,
+        "a": {
+         "team": "Berkeley"
+        },
+        "b": {
+         "team": "UIUC"
+        }
+       }
+      ],
+      "byes": []
+     },
+     {
+      "round": 9,
+      "games": [
+       {
+        "room": 0,
+        "a": {
+         "team": "Stanford"
+        },
+        "b": {
+         "team": "UIUC"
+        }
+       },
+       {
+        "room": 1,
+        "a": {
+         "team": "ASU"
+        },
+        "b": {
+         "team": "Berkeley"
         }
        }
       ],
@@ -1797,7 +5329,6 @@ export default {
     ]
    }
   ],
-  "pools": {},
   "updated": 1753500000000
  },
  "catmap": {
@@ -1805,12 +5336,40 @@ export default {
    "1": {
     "t": [
      {
+      "c": "Other Academic",
+      "s": "Other Academic"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
       "c": "History",
       "s": "World History"
      },
      {
       "c": "Science",
-      "s": "Other Science"
+      "s": "Chemistry"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
      },
      {
       "c": "Social Science",
@@ -1821,132 +5380,34 @@ export default {
       "s": "American Literature"
      },
      {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
       "c": "Fine Arts",
       "s": "Auditory Fine Arts"
-     },
-     {
-      "c": "Science",
-      "s": "Other Science"
-     },
-     {
-      "c": "Science",
-      "s": "Physics"
      },
      {
       "c": "Literature",
       "s": "World Literature"
      },
      {
-      "c": "History",
-      "s": "European History"
-     },
-     {
-      "c": "Current Events",
-      "s": "Current Events"
-     },
-     {
-      "c": "Literature",
-      "s": "British Literature"
-     },
-     {
-      "c": "History",
-      "s": "Other History"
-     },
-     {
-      "c": "Science",
-      "s": "Biology"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Other Fine Arts"
-     },
-     {
-      "c": "Mythology",
-      "s": "Mythology"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Visual Fine Arts"
-     },
-     {
-      "c": "Literature",
-      "s": "European Literature"
-     },
-     {
-      "c": "Science",
-      "s": "Chemistry"
-     },
-     {
-      "c": "History",
-      "s": "American History"
-     },
-     {
-      "c": "Religion",
-      "s": "Religion"
-     },
-     {
-      "c": "Science",
-      "s": "Physics"
-     }
-    ],
-    "b": [
-     {
-      "c": "Literature",
-      "s": "European Literature"
-     },
-     {
-      "c": "History",
-      "s": "American History"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Visual Fine Arts"
-     },
-     {
-      "c": "Science",
-      "s": "Chemistry"
-     },
-     {
-      "c": "Religion",
-      "s": "Religion"
-     },
-     {
-      "c": "History",
-      "s": "Ancient History"
-     },
-     {
-      "c": "Mythology",
-      "s": "Mythology"
-     },
-     {
-      "c": "Science",
-      "s": "Biology"
-     },
-     {
-      "c": "Literature",
-      "s": "British Literature"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Other Fine Arts"
-     },
-     {
-      "c": "History",
-      "s": "World History"
-     },
-     {
-      "c": "Current Events",
-      "s": "Current Events"
-     },
-     {
-      "c": "Literature",
-      "s": "Other Literature"
-     },
-     {
-      "c": "Science",
-      "s": "Physics"
-     },
-     {
       "c": "Science",
       "s": "Other Science"
      },
@@ -1955,8 +5416,14 @@ export default {
       "s": "European History"
      },
      {
-      "c": "Philosophy",
-      "s": "Philosophy"
+      "c": "Science",
+      "s": "Other Science"
+     }
+    ],
+    "b": [
+     {
+      "c": "Science",
+      "s": "Physics"
      },
      {
       "c": "Literature",
@@ -1967,76 +5434,202 @@ export default {
       "s": "Auditory Fine Arts"
      },
      {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
       "c": "Science",
       "s": "Biology"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Pop Culture",
+      "s": "Sports"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
      }
     ]
    },
    "2": {
     "t": [
      {
-      "c": "Science",
-      "s": "Biology"
-     },
-     {
       "c": "History",
-      "s": "American History"
-     },
-     {
-      "c": "Geography",
-      "s": "Geography"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Auditory Fine Arts"
-     },
-     {
-      "c": "Literature",
-      "s": "British Literature"
+      "s": "World History"
      },
      {
       "c": "Literature",
       "s": "European Literature"
      },
      {
-      "c": "History",
-      "s": "World History"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Other Fine Arts"
-     },
-     {
-      "c": "Mythology",
-      "s": "Mythology"
-     },
-     {
-      "c": "Science",
-      "s": "Chemistry"
+      "c": "Religion",
+      "s": "Religion"
      },
      {
       "c": "Science",
       "s": "Physics"
      },
      {
-      "c": "History",
-      "s": "Other History"
+      "c": "Literature",
+      "s": "World Literature"
      },
      {
-      "c": "Religion",
-      "s": "Religion"
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Current Events",
+      "s": "Current Events"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
      },
      {
       "c": "Fine Arts",
       "s": "Visual Fine Arts"
      },
      {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
       "c": "Literature",
       "s": "American Literature"
      },
      {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
       "c": "History",
-      "s": "European History"
+      "s": "Other History"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     }
+    ],
+    "b": [
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Other Academic",
+      "s": "Other Academic"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
      },
      {
       "c": "Philosophy",
@@ -2047,50 +5640,24 @@ export default {
       "s": "Biology"
      },
      {
-      "c": "Science",
-      "s": "Other Science"
-     },
-     {
-      "c": "Literature",
-      "s": "World Literature"
-     },
-     {
-      "c": "History",
-      "s": "Ancient History"
-     }
-    ],
-    "b": [
-     {
-      "c": "Literature",
-      "s": "Other Literature"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Visual Fine Arts"
+      "c": "Social Science",
+      "s": "Social Science"
      },
      {
       "c": "History",
       "s": "World History"
      },
      {
-      "c": "Science",
-      "s": "Physics"
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
      },
      {
-      "c": "Social Science",
-      "s": "Social Science"
+      "c": "Literature",
+      "s": "World Literature"
      },
      {
-      "c": "Science",
-      "s": "Other Science"
-     },
-     {
-      "c": "Science",
-      "s": "Other Science"
-     },
-     {
-      "c": "Religion",
-      "s": "Religion"
+      "c": "Mythology",
+      "s": "Mythology"
      },
      {
       "c": "Literature",
@@ -2101,20 +5668,8 @@ export default {
       "s": "European History"
      },
      {
-      "c": "Current Events",
-      "s": "Current Events"
-     },
-     {
       "c": "Science",
-      "s": "Biology"
-     },
-     {
-      "c": "History",
-      "s": "American History"
-     },
-     {
-      "c": "Literature",
-      "s": "European Literature"
+      "s": "Other Science"
      },
      {
       "c": "Fine Arts",
@@ -2122,31 +5677,387 @@ export default {
      },
      {
       "c": "Science",
-      "s": "Chemistry"
-     },
-     {
-      "c": "Literature",
-      "s": "British Literature"
-     },
-     {
-      "c": "Mythology",
-      "s": "Mythology"
-     },
-     {
-      "c": "History",
-      "s": "Ancient History"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Auditory Fine Arts"
+      "s": "Physics"
      }
     ]
    },
    "3": {
     "t": [
      {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
       "c": "Fine Arts",
       "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Geography",
+      "s": "Geography"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     }
+    ],
+    "b": [
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "Pop Culture",
+      "s": "Music"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     }
+    ]
+   },
+   "4": {
+    "t": [
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Current Events",
+      "s": "Current Events"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     }
+    ],
+    "b": [
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Geography",
+      "s": "Geography"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Geography",
+      "s": "Geography"
+     }
+    ]
+   },
+   "5": {
+    "t": [
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Other Academic",
+      "s": "Other Academic"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "History",
+      "s": "American History"
      },
      {
       "c": "Literature",
@@ -2157,32 +6068,62 @@ export default {
       "s": "Other Science"
      },
      {
-      "c": "Science",
-      "s": "Chemistry"
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
      },
      {
-      "c": "History",
-      "s": "American History"
+      "c": "Science",
+      "s": "Biology"
      },
      {
       "c": "History",
       "s": "European History"
      },
      {
-      "c": "Literature",
-      "s": "British Literature"
-     },
-     {
       "c": "Religion",
       "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
      },
      {
       "c": "Science",
       "s": "Physics"
      },
      {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
       "c": "Fine Arts",
       "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     }
+    ],
+    "b": [
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
      },
      {
       "c": "Science",
@@ -2193,12 +6134,52 @@ export default {
       "s": "Philosophy"
      },
      {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
       "c": "Literature",
-      "s": "American Literature"
+      "s": "European Literature"
      },
      {
       "c": "History",
-      "s": "Ancient History"
+      "s": "European History"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
      },
      {
       "c": "Current Events",
@@ -2209,8 +6190,126 @@ export default {
       "s": "Other Science"
      },
      {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     }
+    ]
+   },
+   "6": {
+    "t": [
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Pop Culture",
+      "s": "Sports"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
       "c": "Mythology",
       "s": "Mythology"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     }
+    ],
+    "b": [
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Other Academic",
+      "s": "Other Academic"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
      },
      {
       "c": "History",
@@ -2226,21 +6325,7 @@ export default {
      },
      {
       "c": "Science",
-      "s": "Other Science"
-     }
-    ],
-    "b": [
-     {
-      "c": "Geography",
-      "s": "Geography"
-     },
-     {
-      "c": "History",
-      "s": "Other History"
-     },
-     {
-      "c": "Literature",
-      "s": "European Literature"
+      "s": "Biology"
      },
      {
       "c": "Social Science",
@@ -2251,32 +6336,16 @@ export default {
       "s": "Physics"
      },
      {
-      "c": "Literature",
-      "s": "American Literature"
-     },
-     {
-      "c": "History",
-      "s": "World History"
-     },
-     {
-      "c": "Science",
-      "s": "Biology"
-     },
-     {
-      "c": "Fine Arts",
-      "s": "Other Fine Arts"
-     },
-     {
       "c": "Mythology",
       "s": "Mythology"
      },
      {
-      "c": "Fine Arts",
-      "s": "Auditory Fine Arts"
+      "c": "History",
+      "s": "European History"
      },
      {
-      "c": "History",
-      "s": "American History"
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
      },
      {
       "c": "Religion",
@@ -2284,7 +6353,11 @@ export default {
      },
      {
       "c": "Science",
-      "s": "Chemistry"
+      "s": "Other Science"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
      },
      {
       "c": "Literature",
@@ -2295,12 +6368,84 @@ export default {
       "s": "Visual Fine Arts"
      },
      {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Pop Culture",
+      "s": "Sports"
+     }
+    ]
+   },
+   "7": {
+    "t": [
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
       "c": "Science",
       "s": "Other Science"
      },
      {
+      "c": "History",
+      "s": "American History"
+     },
+     {
       "c": "Literature",
       "s": "British Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Current Events",
+      "s": "Current Events"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
      },
      {
       "c": "History",
@@ -2309,6 +6454,448 @@ export default {
      {
       "c": "Science",
       "s": "Physics"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     }
+    ],
+    "b": [
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Geography",
+      "s": "Geography"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     }
+    ]
+   },
+   "8": {
+    "t": [
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "Geography",
+      "s": "Geography"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     }
+    ],
+    "b": [
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Other Academic",
+      "s": "Other Academic"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     }
+    ]
+   },
+   "9": {
+    "t": [
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Pop Culture",
+      "s": "Music"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     }
+    ],
+    "b": [
+     {
+      "c": "Geography",
+      "s": "Geography"
+     },
+     {
+      "c": "Mythology",
+      "s": "Mythology"
+     },
+     {
+      "c": "Literature",
+      "s": "American Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Other Fine Arts"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Visual Fine Arts"
+     },
+     {
+      "c": "History",
+      "s": "European History"
+     },
+     {
+      "c": "Science",
+      "s": "Other Science"
+     },
+     {
+      "c": "History",
+      "s": "American History"
+     },
+     {
+      "c": "Science",
+      "s": "Physics"
+     },
+     {
+      "c": "Literature",
+      "s": "World Literature"
+     },
+     {
+      "c": "Science",
+      "s": "Chemistry"
+     },
+     {
+      "c": "History",
+      "s": "Other History"
+     },
+     {
+      "c": "Religion",
+      "s": "Religion"
+     },
+     {
+      "c": "Literature",
+      "s": "British Literature"
+     },
+     {
+      "c": "Literature",
+      "s": "European Literature"
+     },
+     {
+      "c": "Fine Arts",
+      "s": "Auditory Fine Arts"
+     },
+     {
+      "c": "Philosophy",
+      "s": "Philosophy"
+     },
+     {
+      "c": "History",
+      "s": "World History"
+     },
+     {
+      "c": "Science",
+      "s": "Biology"
+     },
+     {
+      "c": "Social Science",
+      "s": "Social Science"
      }
     ]
    }
@@ -2319,12 +6906,109 @@ export default {
    "id": 1,
    "round": 1,
    "room": "Room A",
-   "filename": "Round_1_Riverside_Maple_Grove.qbtd.json",
+   "filename": "Round_1_Stanford_Berkeley.qbj",
    "qbj": {
     "tossups_read": 20,
     "match_teams": [
      {
       "bonus_points": 190,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Ada"
+         },
+         {
+          "name": "Boris"
+         },
+         {
+          "name": "Camille"
+         },
+         {
+          "name": "Dev"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Ada"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 3
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Boris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 5
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Camille"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Dev"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Stanford",
+       "players": [
+        {
+         "name": "Ada"
+        },
+        {
+         "name": "Boris"
+        },
+        {
+         "name": "Camille"
+        },
+        {
+         "name": "Dev"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 100,
       "lineups": [
        {
         "first_question": 1,
@@ -2355,12 +7039,6 @@ export default {
            "value": 10
           },
           "number": 2
-         },
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 1
          }
         ],
         "tossups_heard": 20
@@ -2375,6 +7053,12 @@ export default {
            "value": 10
           },
           "number": 2
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
          }
         ],
         "tossups_heard": 20
@@ -2386,15 +7070,15 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": 15
+           "value": 10
           },
-          "number": 2
+          "number": 1
          },
          {
           "answer": {
-           "value": 10
+           "value": -5
           },
-          "number": 3
+          "number": 1
          }
         ],
         "tossups_heard": 20
@@ -2403,19 +7087,12 @@ export default {
         "player": {
          "name": "Hugo"
         },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 1
-         }
-        ],
+        "answer_counts": [],
         "tossups_heard": 20
        }
       ],
       "team": {
-       "name": "Riverside",
+       "name": "Berkeley",
        "players": [
         {
          "name": "Elena"
@@ -2428,94 +7105,6 @@ export default {
         },
         {
          "name": "Hugo"
-        }
-       ]
-      }
-     },
-     {
-      "bonus_points": 100,
-      "lineups": [
-       {
-        "first_question": 1,
-        "players": [
-         {
-          "name": "Iris"
-         },
-         {
-          "name": "Jonah"
-         },
-         {
-          "name": "Kira"
-         }
-        ]
-       }
-      ],
-      "match_players": [
-       {
-        "player": {
-         "name": "Iris"
-        },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 1
-         },
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 1
-         }
-        ],
-        "tossups_heard": 20
-       },
-       {
-        "player": {
-         "name": "Jonah"
-        },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 2
-         },
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 1
-         },
-         {
-          "answer": {
-           "value": -5
-          },
-          "number": 2
-         }
-        ],
-        "tossups_heard": 20
-       },
-       {
-        "player": {
-         "name": "Kira"
-        },
-        "answer_counts": [],
-        "tossups_heard": 20
-       }
-      ],
-      "team": {
-       "name": "Maple Grove",
-       "players": [
-        {
-         "name": "Iris"
-        },
-        {
-         "name": "Jonah"
-        },
-        {
-         "name": "Kira"
         }
        ]
       }
@@ -2536,22 +7125,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 64
+         "word_index": 85
         },
         "player": {
-         "name": "Iris"
+         "name": "Elena"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Iris"
+           "name": "Elena"
           },
           {
-           "name": "Jonah"
+           "name": "Farid"
           },
           {
-           "name": "Kira"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -2589,25 +7181,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 61
+         "word_index": 86
         },
         "player": {
-         "name": "Elena"
+         "name": "Ada"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Elena"
+           "name": "Ada"
           },
           {
-           "name": "Farid"
+           "name": "Boris"
           },
           {
-           "name": "Grace"
+           "name": "Camille"
           },
           {
-           "name": "Hugo"
+           "name": "Dev"
           }
          ]
         },
@@ -2645,30 +7237,30 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 54
+         "word_index": 60
         },
         "player": {
-         "name": "Elena"
+         "name": "Ada"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Elena"
+           "name": "Ada"
           },
           {
-           "name": "Farid"
+           "name": "Boris"
           },
           {
-           "name": "Grace"
+           "name": "Camille"
           },
           {
-           "name": "Hugo"
+           "name": "Dev"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -2701,25 +7293,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 77
+         "word_index": 102
         },
         "player": {
-         "name": "Farid"
+         "name": "Boris"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Elena"
+           "name": "Ada"
           },
           {
-           "name": "Farid"
+           "name": "Boris"
           },
           {
-           "name": "Grace"
+           "name": "Camille"
           },
           {
-           "name": "Hugo"
+           "name": "Dev"
           }
          ]
         },
@@ -2757,22 +7349,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 67
+         "word_index": 79
         },
         "player": {
-         "name": "Jonah"
+         "name": "Farid"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Iris"
+           "name": "Elena"
           },
           {
-           "name": "Jonah"
+           "name": "Farid"
           },
           {
-           "name": "Kira"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -2819,30 +7414,30 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 66
+         "word_index": 60
         },
         "player": {
-         "name": "Grace"
+         "name": "Boris"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Elena"
+           "name": "Ada"
           },
           {
-           "name": "Farid"
+           "name": "Boris"
           },
           {
-           "name": "Grace"
+           "name": "Camille"
           },
           {
-           "name": "Hugo"
+           "name": "Dev"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -2875,30 +7470,30 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 56
+         "word_index": 59
         },
         "player": {
-         "name": "Grace"
+         "name": "Camille"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Elena"
+           "name": "Ada"
           },
           {
-           "name": "Farid"
+           "name": "Boris"
           },
           {
-           "name": "Grace"
+           "name": "Camille"
           },
           {
-           "name": "Hugo"
+           "name": "Dev"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -2931,22 +7526,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 68
+         "word_index": 78
         },
         "player": {
-         "name": "Jonah"
+         "name": "Grace"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Iris"
+           "name": "Elena"
           },
           {
-           "name": "Jonah"
+           "name": "Farid"
           },
           {
-           "name": "Kira"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -2984,27 +7582,30 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 65
+         "word_index": 62
         },
         "player": {
-         "name": "Iris"
+         "name": "Elena"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Iris"
+           "name": "Elena"
           },
           {
-           "name": "Jonah"
+           "name": "Farid"
           },
           {
-           "name": "Kira"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -3037,13 +7638,7799 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
+         "word_index": 73
+        },
+        "player": {
+         "name": "Dev"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 79
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 72
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 14
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 77
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 64
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 17
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 54
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 90
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 51
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 89
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 1
+   }
+  },
+  {
+   "id": 2,
+   "round": 1,
+   "room": "Room B",
+   "filename": "Round_1_UIUC_ASU.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 280,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Iris"
+         },
+         {
+          "name": "Jonah"
+         },
+         {
+          "name": "Kira"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Iris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 9
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Jonah"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 4
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Kira"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "UIUC",
+       "players": [
+        {
+         "name": "Iris"
+        },
+        {
+         "name": "Jonah"
+        },
+        {
+         "name": "Kira"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 70,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Leo"
+         },
+         {
+          "name": "Mina"
+         },
+         {
+          "name": "Noor"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Leo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 3
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Mina"
+        },
+        "answer_counts": [],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Noor"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "ASU",
+       "players": [
+        {
+         "name": "Leo"
+        },
+        {
+         "name": "Mina"
+        },
+        {
+         "name": "Noor"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 104
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 85
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 99
+        },
+        "player": {
+         "name": "Noor"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 3
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 73
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 5
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 96
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 6
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 89
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 68
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 82
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 56
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 10
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 91
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 11
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 50
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 81
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 85
+        },
+        "player": {
+         "name": "Noor"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 72
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 14
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 86
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 86
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 81
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 17
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 73
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 83
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 1
+   }
+  },
+  {
+   "id": 3,
+   "round": 2,
+   "room": "Room A",
+   "filename": "Round_2_Stanford_ASU.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 240,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Ada"
+         },
+         {
+          "name": "Boris"
+         },
+         {
+          "name": "Camille"
+         },
+         {
+          "name": "Dev"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Ada"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 7
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Boris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Camille"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Dev"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Stanford",
+       "players": [
+        {
+         "name": "Ada"
+        },
+        {
+         "name": "Boris"
+        },
+        {
+         "name": "Camille"
+        },
+        {
+         "name": "Dev"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 130,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Leo"
+         },
+         {
+          "name": "Mina"
+         },
+         {
+          "name": "Noor"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Leo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Mina"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 3
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Noor"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "ASU",
+       "players": [
+        {
+         "name": "Leo"
+        },
+        {
+         "name": "Mina"
+        },
+        {
+         "name": "Noor"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 62
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 87
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 3
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 82
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 88
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 5
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 63
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 6
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 88
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 85
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 113
+        },
+        "player": {
+         "name": "Dev"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 10
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 96
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 81
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 86
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 62
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 78
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 14
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 109
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 77
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 68
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 17
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 53
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 69
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 87
+        },
+        "player": {
+         "name": "Noor"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 56
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 67
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 2
+   }
+  },
+  {
+   "id": 4,
+   "round": 2,
+   "room": "Room B",
+   "filename": "Round_2_Berkeley_UIUC.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 250,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Elena"
+         },
+         {
+          "name": "Farid"
+         },
+         {
+          "name": "Grace"
+         },
+         {
+          "name": "Hugo"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Elena"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 3
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Farid"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Grace"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 5
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Hugo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Berkeley",
+       "players": [
+        {
+         "name": "Elena"
+        },
+        {
+         "name": "Farid"
+        },
+        {
+         "name": "Grace"
+        },
+        {
+         "name": "Hugo"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 120,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Iris"
+         },
+         {
+          "name": "Jonah"
+         },
+         {
+          "name": "Kira"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Iris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Jonah"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Kira"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "UIUC",
+       "players": [
+        {
+         "name": "Iris"
+        },
+        {
+         "name": "Jonah"
+        },
+        {
+         "name": "Kira"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 73
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 55
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 90
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 3
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 69
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 78
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 5
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 83
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 93
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 107
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 66
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 79
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 11
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 81
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 101
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 109
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 14
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 64
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 44
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
          "word_index": 69
         },
         "player": {
          "name": "Hugo"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 86
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 17
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 86
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 104
+        },
+        "player": {
+         "name": "Hugo"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 2
+   }
+  },
+  {
+   "id": 5,
+   "round": 3,
+   "room": "Room A",
+   "filename": "Round_3_Stanford_UIUC.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 220,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Ada"
+         },
+         {
+          "name": "Boris"
+         },
+         {
+          "name": "Camille"
+         },
+         {
+          "name": "Dev"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Ada"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 6
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Boris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 7
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Camille"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Dev"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Stanford",
+       "players": [
+        {
+         "name": "Ada"
+        },
+        {
+         "name": "Boris"
+        },
+        {
+         "name": "Camille"
+        },
+        {
+         "name": "Dev"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 60,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Iris"
+         },
+         {
+          "name": "Jonah"
+         },
+         {
+          "name": "Kira"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Iris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Jonah"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 3
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Kira"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "UIUC",
+       "players": [
+        {
+         "name": "Iris"
+        },
+        {
+         "name": "Jonah"
+        },
+        {
+         "name": "Kira"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 75
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 98
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 56
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 3
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 80
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 106
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 75
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 5
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 81
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 6
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 69
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 60
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 98
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 114
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 11
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 91
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 69
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 65
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 14
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 56
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 106
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 95
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 112
+        },
+        "player": {
+         "name": "Dev"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 17
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 55
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 87
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 3
+   }
+  },
+  {
+   "id": 6,
+   "round": 3,
+   "room": "Room B",
+   "filename": "Round_3_ASU_Berkeley.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 100,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Leo"
+         },
+         {
+          "name": "Mina"
+         },
+         {
+          "name": "Noor"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Leo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 3
+         },
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 4
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Mina"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Noor"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "ASU",
+       "players": [
+        {
+         "name": "Leo"
+        },
+        {
+         "name": "Mina"
+        },
+        {
+         "name": "Noor"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 240,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Elena"
+         },
+         {
+          "name": "Farid"
+         },
+         {
+          "name": "Grace"
+         },
+         {
+          "name": "Hugo"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Elena"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 5
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Farid"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 3
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Grace"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 3
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Hugo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Berkeley",
+       "players": [
+        {
+         "name": "Elena"
+        },
+        {
+         "name": "Farid"
+        },
+        {
+         "name": "Grace"
+        },
+        {
+         "name": "Hugo"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 90
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 74
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 105
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 75
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 105
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 100
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 5
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 94
+        },
+        "player": {
+         "name": "Noor"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 6
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 75
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 92
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 85
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 10
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 77
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 11
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 76
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 39
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 65
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 82
+        },
+        "player": {
+         "name": "Hugo"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 14
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 98
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 83
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 17
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 55
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 66
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 63
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 97
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 100
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 3
+   }
+  },
+  {
+   "id": 7,
+   "round": 4,
+   "room": "Room A",
+   "filename": "Round_4_Stanford_Berkeley.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 160,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Ada"
+         },
+         {
+          "name": "Boris"
+         },
+         {
+          "name": "Camille"
+         },
+         {
+          "name": "Dev"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Ada"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Boris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 2
+         },
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Camille"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 4
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Dev"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Stanford",
+       "players": [
+        {
+         "name": "Ada"
+        },
+        {
+         "name": "Boris"
+        },
+        {
+         "name": "Camille"
+        },
+        {
+         "name": "Dev"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 200,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Elena"
+         },
+         {
+          "name": "Farid"
+         },
+         {
+          "name": "Grace"
+         },
+         {
+          "name": "Hugo"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Elena"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 8
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Farid"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Grace"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Hugo"
+        },
+        "answer_counts": [],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Berkeley",
+       "players": [
+        {
+         "name": "Elena"
+        },
+        {
+         "name": "Farid"
+        },
+        {
+         "name": "Grace"
+        },
+        {
+         "name": "Hugo"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 105
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 28
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 56
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 65
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 76
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 3
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 78
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 103
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 84
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 6
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 89
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 110
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 66
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 77
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 10
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 75
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 11
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 77
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -3093,13 +15480,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 72
+         "word_index": 92
         },
         "player": {
-         "name": "Grace"
+         "name": "Farid"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -3136,7 +15523,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
          "controlled_points": 10
@@ -3149,25 +15536,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 76
+         "word_index": 98
         },
         "player": {
-         "name": "Grace"
+         "name": "Dev"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Elena"
+           "name": "Ada"
           },
           {
-           "name": "Farid"
+           "name": "Boris"
           },
           {
-           "name": "Grace"
+           "name": "Camille"
           },
           {
-           "name": "Hugo"
+           "name": "Dev"
           }
          ]
         },
@@ -3195,32 +15582,23 @@ export default {
          "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
      },
      {
       "question_number": 15,
-      "buzzes": [],
-      "tossup_question": {
-       "parts": 1,
-       "type": "tossup",
-       "question_number": 15
-      }
-     },
-     {
-      "question_number": 16,
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 78
+         "word_index": 57
         },
         "player": {
          "name": "Elena"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -3244,6 +15622,62 @@ export default {
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 62
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
        "question_number": 16
       },
       "bonus": {
@@ -3254,13 +15688,13 @@ export default {
        },
        "parts": [
         {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
          "controlled_points": 10
-        },
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 0
         }
        ]
       }
@@ -3270,27 +15704,30 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 64
+         "word_index": 85
         },
         "player": {
-         "name": "Jonah"
+         "name": "Elena"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Iris"
+           "name": "Elena"
           },
           {
-           "name": "Jonah"
+           "name": "Farid"
           },
           {
-           "name": "Kira"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -3310,21 +15747,68 @@ export default {
          "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
      },
      {
       "question_number": 18,
-      "buzzes": [],
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 98
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
        "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
       }
      },
      {
@@ -3332,22 +15816,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 46
+         "word_index": 64
         },
         "player": {
-         "name": "Jonah"
+         "name": "Dev"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Iris"
+           "name": "Ada"
           },
           {
-           "name": "Jonah"
+           "name": "Boris"
           },
           {
-           "name": "Kira"
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
           }
          ]
         },
@@ -3357,13 +15844,13 @@ export default {
        },
        {
         "buzz_position": {
-         "word_index": 76
+         "word_index": 88
         },
         "player": {
-         "name": "Farid"
+         "name": "Elena"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -3397,10 +15884,10 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
@@ -3413,38 +15900,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 47
+         "word_index": 88
         },
         "player": {
-         "name": "Jonah"
+         "name": "Elena"
         },
         "team": {
-         "name": "Maple Grove",
-         "players": [
-          {
-           "name": "Iris"
-          },
-          {
-           "name": "Jonah"
-          },
-          {
-           "name": "Kira"
-          }
-         ]
-        },
-        "result": {
-         "value": -5
-        }
-       },
-       {
-        "buzz_position": {
-         "word_index": 81
-        },
-        "player": {
-         "name": "Grace"
-        },
-        "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -3484,25 +15946,1321 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
      }
     ],
-    "_round": 1
+    "_round": 4
    }
   },
   {
-   "id": 2,
-   "round": 1,
+   "id": 8,
+   "round": 4,
    "room": "Room B",
-   "filename": "Round_1_Summit_Harbor_View.qbtd.json",
+   "filename": "Round_4_UIUC_ASU.qbj",
    "qbj": {
     "tossups_read": 20,
     "match_teams": [
      {
-      "bonus_points": 280,
+      "bonus_points": 210,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Iris"
+         },
+         {
+          "name": "Jonah"
+         },
+         {
+          "name": "Kira"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Iris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 5
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Jonah"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 4
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Kira"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "UIUC",
+       "players": [
+        {
+         "name": "Iris"
+        },
+        {
+         "name": "Jonah"
+        },
+        {
+         "name": "Kira"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 110,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Leo"
+         },
+         {
+          "name": "Mina"
+         },
+         {
+          "name": "Noor"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Leo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 3
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Mina"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 4
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Noor"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "ASU",
+       "players": [
+        {
+         "name": "Leo"
+        },
+        {
+         "name": "Mina"
+        },
+        {
+         "name": "Noor"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 74
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 90
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 61
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 3
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 74
+        },
+        "player": {
+         "name": "Noor"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 69
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 5
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 61
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 6
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 67
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 99
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 91
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 41
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 58
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 96
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 10
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 87
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 11
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 96
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 86
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 92
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 81
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 61
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 95
+        },
+        "player": {
+         "name": "Noor"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 17
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 90
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 93
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 59
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 95
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 4
+   }
+  },
+  {
+   "id": 9,
+   "round": 5,
+   "room": "Room A",
+   "filename": "Round_5_Stanford_ASU.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 250,
       "lineups": [
        {
         "first_question": 1,
@@ -3530,15 +17288,15 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": 15
-          },
-          "number": 3
-         },
-         {
-          "answer": {
            "value": 10
           },
           "number": 7
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 2
          }
         ],
         "tossups_heard": 20
@@ -3552,12 +17310,6 @@ export default {
           "answer": {
            "value": 10
           },
-          "number": 1
-         },
-         {
-          "answer": {
-           "value": 15
-          },
           "number": 2
          }
         ],
@@ -3570,9 +17322,9 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": -5
+           "value": 10
           },
-          "number": 1
+          "number": 3
          }
         ],
         "tossups_heard": 20
@@ -3581,19 +17333,12 @@ export default {
         "player": {
          "name": "Dev"
         },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 1
-         }
-        ],
+        "answer_counts": [],
         "tossups_heard": 20
        }
       ],
       "team": {
-       "name": "Summit",
+       "name": "Stanford",
        "players": [
         {
          "name": "Ada"
@@ -3636,21 +17381,15 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": 10
+           "value": -5
           },
           "number": 2
          },
          {
           "answer": {
-           "value": -5
+           "value": 10
           },
-          "number": 1
-         },
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 1
+          "number": 3
          }
         ],
         "tossups_heard": 20
@@ -3659,7 +17398,20 @@ export default {
         "player": {
          "name": "Mina"
         },
-        "answer_counts": [],
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 2
+         }
+        ],
         "tossups_heard": 20
        },
        {
@@ -3671,14 +17423,14 @@ export default {
           "answer": {
            "value": 10
           },
-          "number": 2
+          "number": 1
          }
         ],
         "tossups_heard": 20
        }
       ],
       "team": {
-       "name": "Harbor View",
+       "name": "ASU",
        "players": [
         {
          "name": "Leo"
@@ -3699,13 +17451,38 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 77
+         "word_index": 54
         },
         "player": {
-         "name": "Dev"
+         "name": "Leo"
         },
         "team": {
-         "name": "Summit",
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 63
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -3739,13 +17516,13 @@ export default {
        },
        "parts": [
         {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
          "controlled_points": 10
-        },
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 0
         }
        ]
       }
@@ -3755,13 +17532,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 59
+         "word_index": 62
         },
         "player": {
-         "name": "Boris"
+         "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -3801,62 +17578,18 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
      },
      {
       "question_number": 3,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 67
-        },
-        "player": {
-         "name": "Noor"
-        },
-        "team": {
-         "name": "Harbor View",
-         "players": [
-          {
-           "name": "Leo"
-          },
-          {
-           "name": "Mina"
-          },
-          {
-           "name": "Noor"
-          }
-         ]
-        },
-        "result": {
-         "value": 10
-        }
-       }
-      ],
+      "buzzes": [],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
        "question_number": 3
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 3
-       },
-       "parts": [
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 10
-        }
-       ]
       }
      },
      {
@@ -3864,13 +17597,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 63
+         "word_index": 96
         },
         "player": {
          "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -3887,7 +17620,7 @@ export default {
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -3920,13 +17653,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 57
+         "word_index": 109
         },
         "player": {
          "name": "Boris"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -3943,7 +17676,7 @@ export default {
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -3976,13 +17709,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 68
+         "word_index": 61
         },
         "player": {
-         "name": "Ada"
+         "name": "Boris"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4032,13 +17765,147 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 68
+         "word_index": 64
         },
         "player": {
          "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 78
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 102
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 69
+        },
+        "player": {
+         "name": "Camille"
+        },
+        "team": {
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4062,119 +17929,25 @@ export default {
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
-       "question_number": 7
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 7
-       },
-       "parts": [
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 10
-        }
-       ]
-      }
-     },
-     {
-      "question_number": 8,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 65
-        },
-        "player": {
-         "name": "Ada"
-        },
-        "team": {
-         "name": "Summit",
-         "players": [
-          {
-           "name": "Ada"
-          },
-          {
-           "name": "Boris"
-          },
-          {
-           "name": "Camille"
-          },
-          {
-           "name": "Dev"
-          }
-         ]
-        },
-        "result": {
-         "value": 15
-        }
-       }
-      ],
-      "tossup_question": {
-       "parts": 1,
-       "type": "tossup",
-       "question_number": 8
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 8
-       },
-       "parts": [
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 0
-        }
-       ]
-      }
-     },
-     {
-      "question_number": 9,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 71
-        },
-        "player": {
-         "name": "Camille"
-        },
-        "team": {
-         "name": "Summit",
-         "players": [
-          {
-           "name": "Ada"
-          },
-          {
-           "name": "Boris"
-          },
-          {
-           "name": "Camille"
-          },
-          {
-           "name": "Dev"
-          }
-         ]
-        },
-        "result": {
-         "value": -5
-        }
-       }
-      ],
-      "tossup_question": {
-       "parts": 1,
-       "type": "tossup",
        "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
       }
      },
      {
@@ -4182,13 +17955,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 47
+         "word_index": 68
         },
         "player": {
-         "name": "Boris"
+         "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4205,7 +17978,7 @@ export default {
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -4222,10 +17995,10 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
          "controlled_points": 10
@@ -4238,13 +18011,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 87
+         "word_index": 88
         },
         "player": {
-         "name": "Leo"
+         "name": "Noor"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -4275,13 +18048,13 @@ export default {
        },
        "parts": [
         {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        },
+        {
          "controlled_points": 10
-        },
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 0
         }
        ]
       }
@@ -4291,13 +18064,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 43
+         "word_index": 60
         },
         "player": {
-         "name": "Leo"
+         "name": "Mina"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -4316,13 +18089,13 @@ export default {
        },
        {
         "buzz_position": {
-         "word_index": 70
+         "word_index": 104
         },
         "player": {
-         "name": "Ada"
+         "name": "Camille"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4362,7 +18135,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -4372,13 +18145,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 74
+         "word_index": 90
         },
         "player": {
-         "name": "Noor"
+         "name": "Leo"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -4409,13 +18182,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -4425,22 +18198,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 73
+         "word_index": 82
         },
         "player": {
-         "name": "Leo"
+         "name": "Ada"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Leo"
+           "name": "Ada"
           },
           {
-           "name": "Mina"
+           "name": "Boris"
           },
           {
-           "name": "Noor"
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
           }
          ]
         },
@@ -4468,7 +18244,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -4478,13 +18254,38 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 73
+         "word_index": 46
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 88
         },
         "player": {
          "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4524,7 +18325,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -4534,13 +18335,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 75
+         "word_index": 52
         },
         "player": {
          "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4553,6 +18354,31 @@ export default {
           },
           {
            "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 75
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
           }
          ]
         },
@@ -4574,13 +18400,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -4590,13 +18416,48 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 65
+         "word_index": 85
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 83
         },
         "player": {
          "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4613,60 +18474,7 @@ export default {
          ]
         },
         "result": {
-         "value": 15
-        }
-       }
-      ],
-      "tossup_question": {
-       "parts": 1,
-       "type": "tossup",
-       "question_number": 17
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 17
-       },
-       "parts": [
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        }
-       ]
-      }
-     },
-     {
-      "question_number": 18,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 56
-        },
-        "player": {
-         "name": "Leo"
-        },
-        "team": {
-         "name": "Harbor View",
-         "players": [
-          {
-           "name": "Leo"
-          },
-          {
-           "name": "Mina"
-          },
-          {
-           "name": "Noor"
-          }
-         ]
-        },
-        "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -4696,58 +18504,11 @@ export default {
      },
      {
       "question_number": 19,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 65
-        },
-        "player": {
-         "name": "Ada"
-        },
-        "team": {
-         "name": "Summit",
-         "players": [
-          {
-           "name": "Ada"
-          },
-          {
-           "name": "Boris"
-          },
-          {
-           "name": "Camille"
-          },
-          {
-           "name": "Dev"
-          }
-         ]
-        },
-        "result": {
-         "value": 10
-        }
-       }
-      ],
+      "buzzes": [],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
        "question_number": 19
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 19
-       },
-       "parts": [
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 0
-        }
-       ]
       }
      },
      {
@@ -4755,13 +18516,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 71
+         "word_index": 112
         },
         "player": {
-         "name": "Ada"
+         "name": "Camille"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -4807,19 +18568,19 @@ export default {
       }
      }
     ],
-    "_round": 1
+    "_round": 5
    }
   },
   {
-   "id": 3,
-   "round": 2,
-   "room": "Room A",
-   "filename": "Round_2_Riverside_Harbor_View.qbtd.json",
+   "id": 10,
+   "round": 5,
+   "room": "Room B",
+   "filename": "Round_5_Berkeley_UIUC.qbj",
    "qbj": {
     "tossups_read": 20,
     "match_teams": [
      {
-      "bonus_points": 240,
+      "bonus_points": 270,
       "lineups": [
        {
         "first_question": 1,
@@ -4849,13 +18610,7 @@ export default {
           "answer": {
            "value": 10
           },
-          "number": 4
-         },
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 2
+          "number": 8
          },
          {
           "answer": {
@@ -4876,6 +18631,12 @@ export default {
            "value": 10
           },
           "number": 3
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
          }
         ],
         "tossups_heard": 20
@@ -4898,19 +18659,12 @@ export default {
         "player": {
          "name": "Hugo"
         },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 1
-         }
-        ],
+        "answer_counts": [],
         "tossups_heard": 20
        }
       ],
       "team": {
-       "name": "Riverside",
+       "name": "Berkeley",
        "players": [
         {
          "name": "Elena"
@@ -4928,19 +18682,19 @@ export default {
       }
      },
      {
-      "bonus_points": 130,
+      "bonus_points": 50,
       "lineups": [
        {
         "first_question": 1,
         "players": [
          {
-          "name": "Leo"
+          "name": "Iris"
          },
          {
-          "name": "Mina"
+          "name": "Jonah"
          },
          {
-          "name": "Noor"
+          "name": "Kira"
          }
         ]
        }
@@ -4948,24 +18702,18 @@ export default {
       "match_players": [
        {
         "player": {
-         "name": "Leo"
+         "name": "Iris"
         },
         "answer_counts": [
          {
           "answer": {
-           "value": 15
+           "value": 10
           },
           "number": 1
          },
          {
           "answer": {
            "value": -5
-          },
-          "number": 2
-         },
-         {
-          "answer": {
-           "value": 10
           },
           "number": 1
          }
@@ -4974,7 +18722,7 @@ export default {
        },
        {
         "player": {
-         "name": "Mina"
+         "name": "Jonah"
         },
         "answer_counts": [
          {
@@ -4982,24 +18730,24 @@ export default {
            "value": 10
           },
           "number": 3
-         },
-         {
-          "answer": {
-           "value": -5
-          },
-          "number": 1
          }
         ],
         "tossups_heard": 20
        },
        {
         "player": {
-         "name": "Noor"
+         "name": "Kira"
         },
         "answer_counts": [
          {
           "answer": {
            "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
           },
           "number": 1
          }
@@ -5008,16 +18756,16 @@ export default {
        }
       ],
       "team": {
-       "name": "Harbor View",
+       "name": "UIUC",
        "players": [
         {
-         "name": "Leo"
+         "name": "Iris"
         },
         {
-         "name": "Mina"
+         "name": "Jonah"
         },
         {
-         "name": "Noor"
+         "name": "Kira"
         }
        ]
       }
@@ -5029,27 +18777,30 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 56
+         "word_index": 54
         },
         "player": {
-         "name": "Leo"
+         "name": "Elena"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Leo"
+           "name": "Elena"
           },
           {
-           "name": "Mina"
+           "name": "Farid"
           },
           {
-           "name": "Noor"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -5066,24 +18817,71 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
         }
        ]
       }
      },
      {
       "question_number": 2,
-      "buzzes": [],
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 75
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
        "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
       }
      },
      {
@@ -5091,22 +18889,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 72
+         "word_index": 71
         },
         "player": {
-         "name": "Mina"
+         "name": "Elena"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Leo"
+           "name": "Elena"
           },
           {
-           "name": "Mina"
+           "name": "Farid"
           },
           {
-           "name": "Noor"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -5131,10 +18932,10 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -5144,22 +18945,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 68
+         "word_index": 106
         },
         "player": {
-         "name": "Mina"
+         "name": "Farid"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Leo"
+           "name": "Elena"
           },
           {
-           "name": "Mina"
+           "name": "Farid"
           },
           {
-           "name": "Noor"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -5187,7 +18991,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -5197,13 +19001,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 87
+         "word_index": 68
         },
         "player": {
-         "name": "Elena"
+         "name": "Farid"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5237,7 +19041,7 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
@@ -5253,30 +19057,27 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 61
+         "word_index": 68
         },
         "player": {
-         "name": "Elena"
+         "name": "Iris"
         },
         "team": {
-         "name": "Riverside",
+         "name": "UIUC",
          "players": [
           {
-           "name": "Elena"
+           "name": "Iris"
           },
           {
-           "name": "Farid"
+           "name": "Jonah"
           },
           {
-           "name": "Grace"
-          },
-          {
-           "name": "Hugo"
+           "name": "Kira"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -5293,7 +19094,7 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
@@ -5309,25 +19110,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 77
+         "word_index": 83
         },
         "player": {
-         "name": "Grace"
+         "name": "Jonah"
         },
         "team": {
-         "name": "Riverside",
+         "name": "UIUC",
          "players": [
           {
-           "name": "Elena"
+           "name": "Iris"
           },
           {
-           "name": "Farid"
+           "name": "Jonah"
           },
           {
-           "name": "Grace"
-          },
-          {
-           "name": "Hugo"
+           "name": "Kira"
           }
          ]
         },
@@ -5352,10 +19150,10 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -5365,13 +19163,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 86
+         "word_index": 101
         },
         "player": {
-         "name": "Farid"
+         "name": "Elena"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5405,13 +19203,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        },
-        {
          "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
         }
        ]
       }
@@ -5421,13 +19219,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 86
+         "word_index": 88
         },
         "player": {
          "name": "Elena"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5477,25 +19275,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 86
+         "word_index": 66
         },
         "player": {
-         "name": "Hugo"
+         "name": "Jonah"
         },
         "team": {
-         "name": "Riverside",
+         "name": "UIUC",
          "players": [
           {
-           "name": "Elena"
+           "name": "Iris"
           },
           {
-           "name": "Farid"
+           "name": "Jonah"
           },
           {
-           "name": "Grace"
-          },
-          {
-           "name": "Hugo"
+           "name": "Kira"
           }
          ]
         },
@@ -5517,13 +19312,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -5533,22 +19328,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 72
+         "word_index": 91
         },
         "player": {
-         "name": "Leo"
+         "name": "Elena"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Leo"
+           "name": "Elena"
           },
           {
-           "name": "Mina"
+           "name": "Farid"
           },
           {
-           "name": "Noor"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -5568,13 +19366,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 71
+         "word_index": 50
         },
         "player": {
          "name": "Farid"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5587,6 +19385,31 @@ export default {
           },
           {
            "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 64
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
           }
          ]
         },
@@ -5624,13 +19447,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 73
+         "word_index": 55
         },
         "player": {
          "name": "Grace"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5670,7 +19493,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -5680,38 +19503,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 58
-        },
-        "player": {
-         "name": "Leo"
-        },
-        "team": {
-         "name": "Harbor View",
-         "players": [
-          {
-           "name": "Leo"
-          },
-          {
-           "name": "Mina"
-          },
-          {
-           "name": "Noor"
-          }
-         ]
-        },
-        "result": {
-         "value": -5
-        }
-       },
-       {
-        "buzz_position": {
-         "word_index": 73
+         "word_index": 52
         },
         "player": {
          "name": "Elena"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5761,25 +19559,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 81
+         "word_index": 92
         },
         "player": {
-         "name": "Farid"
+         "name": "Jonah"
         },
         "team": {
-         "name": "Riverside",
+         "name": "UIUC",
          "players": [
           {
-           "name": "Elena"
+           "name": "Iris"
           },
           {
-           "name": "Farid"
+           "name": "Jonah"
           },
           {
-           "name": "Grace"
-          },
-          {
-           "name": "Hugo"
+           "name": "Kira"
           }
          ]
         },
@@ -5801,7 +19596,7 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
@@ -5817,22 +19612,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 65
+         "word_index": 93
         },
         "player": {
-         "name": "Mina"
+         "name": "Farid"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Leo"
+           "name": "Elena"
           },
           {
-           "name": "Mina"
+           "name": "Farid"
           },
           {
-           "name": "Noor"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -5860,7 +19658,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -5870,13 +19668,38 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 60
+         "word_index": 54
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 102
         },
         "player": {
          "name": "Elena"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5893,7 +19716,7 @@ export default {
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -5910,13 +19733,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -5926,13 +19749,48 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 45
+         "word_index": 109
+        },
+        "player": {
+         "name": "Kira"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 62
         },
         "player": {
          "name": "Elena"
         },
         "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -5945,84 +19803,6 @@ export default {
           },
           {
            "name": "Hugo"
-          }
-         ]
-        },
-        "result": {
-         "value": -5
-        }
-       },
-       {
-        "buzz_position": {
-         "word_index": 59
-        },
-        "player": {
-         "name": "Leo"
-        },
-        "team": {
-         "name": "Harbor View",
-         "players": [
-          {
-           "name": "Leo"
-          },
-          {
-           "name": "Mina"
-          },
-          {
-           "name": "Noor"
-          }
-         ]
-        },
-        "result": {
-         "value": 10
-        }
-       }
-      ],
-      "tossup_question": {
-       "parts": 1,
-       "type": "tossup",
-       "question_number": 18
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 18
-       },
-       "parts": [
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        }
-       ]
-      }
-     },
-     {
-      "question_number": 19,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 79
-        },
-        "player": {
-         "name": "Noor"
-        },
-        "team": {
-         "name": "Harbor View",
-         "players": [
-          {
-           "name": "Leo"
-          },
-          {
-           "name": "Mina"
-          },
-          {
-           "name": "Noor"
           }
          ]
         },
@@ -6044,7 +19824,7 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
          "controlled_points": 10
@@ -6060,38 +19840,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 51
+         "word_index": 91
         },
         "player": {
-         "name": "Mina"
+         "name": "Grace"
         },
         "team": {
-         "name": "Harbor View",
-         "players": [
-          {
-           "name": "Leo"
-          },
-          {
-           "name": "Mina"
-          },
-          {
-           "name": "Noor"
-          }
-         ]
-        },
-        "result": {
-         "value": -5
-        }
-       },
-       {
-        "buzz_position": {
-         "word_index": 61
-        },
-        "player": {
-         "name": "Elena"
-        },
-        "team": {
-         "name": "Riverside",
+         "name": "Berkeley",
          "players": [
           {
            "name": "Elena"
@@ -6125,10 +19880,10 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
          "controlled_points": 0
@@ -6137,14 +19892,14 @@ export default {
       }
      }
     ],
-    "_round": 2
+    "_round": 5
    }
   },
   {
-   "id": 4,
-   "round": 2,
-   "room": "Room B",
-   "filename": "Round_2_Summit_Maple_Grove.qbtd.json",
+   "id": 11,
+   "round": 6,
+   "room": "Room A",
+   "filename": "Round_6_Stanford_UIUC.qbj",
    "qbj": {
     "tossups_read": 20,
     "match_teams": [
@@ -6177,13 +19932,13 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": 15
+           "value": 10
           },
-          "number": 2
+          "number": 8
          },
          {
           "answer": {
-           "value": 10
+           "value": -5
           },
           "number": 1
          }
@@ -6197,15 +19952,9 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": 15
-          },
-          "number": 1
-         },
-         {
-          "answer": {
            "value": 10
           },
-          "number": 2
+          "number": 3
          }
         ],
         "tossups_heard": 20
@@ -6219,7 +19968,7 @@ export default {
           "answer": {
            "value": 10
           },
-          "number": 4
+          "number": 3
          }
         ],
         "tossups_heard": 20
@@ -6228,19 +19977,12 @@ export default {
         "player": {
          "name": "Dev"
         },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 2
-         }
-        ],
+        "answer_counts": [],
         "tossups_heard": 20
        }
       ],
       "team": {
-       "name": "Summit",
+       "name": "Stanford",
        "players": [
         {
          "name": "Ada"
@@ -6258,7 +20000,7 @@ export default {
       }
      },
      {
-      "bonus_points": 120,
+      "bonus_points": 90,
       "lineups": [
        {
         "first_question": 1,
@@ -6283,21 +20025,15 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": 15
+           "value": 10
           },
-          "number": 1
+          "number": 4
          },
          {
           "answer": {
            "value": -5
           },
-          "number": 2
-         },
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 1
+          "number": 3
          }
         ],
         "tossups_heard": 20
@@ -6309,15 +20045,9 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": 10
-          },
-          "number": 1
-         },
-         {
-          "answer": {
            "value": -5
           },
-          "number": 1
+          "number": 2
          }
         ],
         "tossups_heard": 20
@@ -6326,25 +20056,12 @@ export default {
         "player": {
          "name": "Kira"
         },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 1
-         },
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 1
-         }
-        ],
+        "answer_counts": [],
         "tossups_heard": 20
        }
       ],
       "team": {
-       "name": "Maple Grove",
+       "name": "UIUC",
        "players": [
         {
          "name": "Iris"
@@ -6365,30 +20082,27 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 65
+         "word_index": 70
         },
         "player": {
-         "name": "Boris"
+         "name": "Iris"
         },
         "team": {
-         "name": "Summit",
+         "name": "UIUC",
          "players": [
           {
-           "name": "Ada"
+           "name": "Iris"
           },
           {
-           "name": "Boris"
+           "name": "Jonah"
           },
           {
-           "name": "Camille"
-          },
-          {
-           "name": "Dev"
+           "name": "Kira"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -6408,7 +20122,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
@@ -6424,24 +20138,27 @@ export default {
          "word_index": 54
         },
         "player": {
-         "name": "Iris"
+         "name": "Ada"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Iris"
+           "name": "Ada"
           },
           {
-           "name": "Jonah"
+           "name": "Boris"
           },
           {
-           "name": "Kira"
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -6461,10 +20178,10 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -6474,22 +20191,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 75
+         "word_index": 113
         },
         "player": {
-         "name": "Jonah"
+         "name": "Camille"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Iris"
+           "name": "Ada"
           },
           {
-           "name": "Jonah"
+           "name": "Boris"
           },
           {
-           "name": "Kira"
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
           }
          ]
         },
@@ -6511,10 +20231,10 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
@@ -6527,30 +20247,27 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 57
+         "word_index": 51
         },
         "player": {
-         "name": "Ada"
+         "name": "Iris"
         },
         "team": {
-         "name": "Summit",
+         "name": "UIUC",
          "players": [
           {
-           "name": "Ada"
+           "name": "Iris"
           },
           {
-           "name": "Boris"
+           "name": "Jonah"
           },
           {
-           "name": "Camille"
-          },
-          {
-           "name": "Dev"
+           "name": "Kira"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -6567,10 +20284,10 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
          "controlled_points": 10
@@ -6583,13 +20300,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 72
+         "word_index": 101
         },
         "player": {
-         "name": "Ada"
+         "name": "Boris"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -6623,20 +20340,46 @@ export default {
        },
        "parts": [
         {
+         "controlled_points": 10
+        },
+        {
          "controlled_points": 0
         },
         {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
      },
      {
       "question_number": 6,
-      "buzzes": [],
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 95
+        },
+        "player": {
+         "name": "Jonah"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
@@ -6648,13 +20391,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 78
+         "word_index": 84
         },
         "player": {
-         "name": "Camille"
+         "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -6691,7 +20434,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 10
@@ -6704,25 +20447,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 79
+         "word_index": 88
         },
         "player": {
-         "name": "Boris"
+         "name": "Iris"
         },
         "team": {
-         "name": "Summit",
+         "name": "UIUC",
          "players": [
           {
-           "name": "Ada"
+           "name": "Iris"
           },
           {
-           "name": "Boris"
+           "name": "Jonah"
           },
           {
-           "name": "Camille"
-          },
-          {
-           "name": "Dev"
+           "name": "Kira"
           }
          ]
         },
@@ -6744,13 +20484,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
          "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -6760,13 +20500,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 105
+         "word_index": 75
         },
         "player": {
-         "name": "Camille"
+         "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -6779,6 +20519,31 @@ export default {
           },
           {
            "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 96
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
           }
          ]
         },
@@ -6816,13 +20581,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 49
+         "word_index": 37
         },
         "player": {
          "name": "Iris"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -6838,12 +20603,58 @@ export default {
         "result": {
          "value": -5
         }
+       },
+       {
+        "buzz_position": {
+         "word_index": 53
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
        }
       ],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
        "question_number": 10
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 10
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
       }
      },
      {
@@ -6851,27 +20662,30 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 64
+         "word_index": 62
         },
         "player": {
-         "name": "Kira"
+         "name": "Ada"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Iris"
+           "name": "Ada"
           },
           {
-           "name": "Jonah"
+           "name": "Boris"
           },
           {
-           "name": "Kira"
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -6891,10 +20705,10 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -6904,22 +20718,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 71
+         "word_index": 78
         },
         "player": {
-         "name": "Iris"
+         "name": "Boris"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Iris"
+           "name": "Ada"
           },
           {
-           "name": "Jonah"
+           "name": "Boris"
           },
           {
-           "name": "Kira"
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
           }
          ]
         },
@@ -6957,22 +20774,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 85
+         "word_index": 68
         },
         "player": {
-         "name": "Kira"
+         "name": "Ada"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Stanford",
          "players": [
           {
-           "name": "Iris"
+           "name": "Ada"
           },
           {
-           "name": "Jonah"
+           "name": "Boris"
           },
           {
-           "name": "Kira"
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
           }
          ]
         },
@@ -7000,7 +20820,7 @@ export default {
          "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -7010,13 +20830,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 75
+         "word_index": 89
         },
         "player": {
          "name": "Iris"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -7032,16 +20852,26 @@ export default {
         "result": {
          "value": -5
         }
-       },
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
        {
         "buzz_position": {
-         "word_index": 97
+         "word_index": 73
         },
         "player": {
-         "name": "Camille"
+         "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -7059,62 +20889,6 @@ export default {
         },
         "result": {
          "value": 10
-        }
-       }
-      ],
-      "tossup_question": {
-       "parts": 1,
-       "type": "tossup",
-       "question_number": 14
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 14
-       },
-       "parts": [
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        }
-       ]
-      }
-     },
-     {
-      "question_number": 15,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 51
-        },
-        "player": {
-         "name": "Ada"
-        },
-        "team": {
-         "name": "Summit",
-         "players": [
-          {
-           "name": "Ada"
-          },
-          {
-           "name": "Boris"
-          },
-          {
-           "name": "Camille"
-          },
-          {
-           "name": "Dev"
-          }
-         ]
-        },
-        "result": {
-         "value": 15
         }
        }
       ],
@@ -7147,13 +20921,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 37
+         "word_index": 65
         },
         "player": {
          "name": "Jonah"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -7172,13 +20946,13 @@ export default {
        },
        {
         "buzz_position": {
-         "word_index": 58
+         "word_index": 112
         },
         "player": {
-         "name": "Dev"
+         "name": "Camille"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -7212,13 +20986,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 0
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -7228,13 +21002,38 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 72
+         "word_index": 51
         },
         "player": {
-         "name": "Boris"
+         "name": "Iris"
         },
         "team": {
-         "name": "Summit",
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 86
+        },
+        "player": {
+         "name": "Ada"
+        },
+        "team": {
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -7274,7 +21073,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -7284,13 +21083,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 73
+         "word_index": 104
         },
         "player": {
          "name": "Camille"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -7337,11 +21136,58 @@ export default {
      },
      {
       "question_number": 19,
-      "buzzes": [],
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 87
+        },
+        "player": {
+         "name": "Boris"
+        },
+        "team": {
+         "name": "Stanford",
+         "players": [
+          {
+           "name": "Ada"
+          },
+          {
+           "name": "Boris"
+          },
+          {
+           "name": "Camille"
+          },
+          {
+           "name": "Dev"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
        "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
       }
      },
      {
@@ -7349,13 +21195,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 90
+         "word_index": 51
         },
         "player": {
-         "name": "Dev"
+         "name": "Ada"
         },
         "team": {
-         "name": "Summit",
+         "name": "Stanford",
          "players": [
           {
            "name": "Ada"
@@ -7395,114 +21241,25 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
      }
     ],
-    "_round": 2
+    "_round": 6
    }
   },
   {
-   "id": 5,
-   "round": 3,
+   "id": 12,
+   "round": 6,
    "room": "Room B",
-   "filename": "Round_3_Maple_Grove_Harbor_View.qbtd.json",
+   "filename": "Round_6_ASU_Berkeley.qbj",
    "qbj": {
     "tossups_read": 20,
     "match_teams": [
      {
-      "bonus_points": 210,
-      "lineups": [
-       {
-        "first_question": 1,
-        "players": [
-         {
-          "name": "Iris"
-         },
-         {
-          "name": "Jonah"
-         },
-         {
-          "name": "Kira"
-         }
-        ]
-       }
-      ],
-      "match_players": [
-       {
-        "player": {
-         "name": "Iris"
-        },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 4
-         },
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 1
-         }
-        ],
-        "tossups_heard": 20
-       },
-       {
-        "player": {
-         "name": "Jonah"
-        },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 7
-         },
-         {
-          "answer": {
-           "value": 15
-          },
-          "number": 1
-         }
-        ],
-        "tossups_heard": 20
-       },
-       {
-        "player": {
-         "name": "Kira"
-        },
-        "answer_counts": [
-         {
-          "answer": {
-           "value": 10
-          },
-          "number": 2
-         }
-        ],
-        "tossups_heard": 20
-       }
-      ],
-      "team": {
-       "name": "Maple Grove",
-       "players": [
-        {
-         "name": "Iris"
-        },
-        {
-         "name": "Jonah"
-        },
-        {
-         "name": "Kira"
-        }
-       ]
-      }
-     },
-     {
-      "bonus_points": 60,
+      "bonus_points": 70,
       "lineups": [
        {
         "first_question": 1,
@@ -7529,7 +21286,13 @@ export default {
           "answer": {
            "value": 10
           },
-          "number": 2
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
          }
         ],
         "tossups_heard": 20
@@ -7543,13 +21306,7 @@ export default {
           "answer": {
            "value": 10
           },
-          "number": 1
-         },
-         {
-          "answer": {
-           "value": -5
-          },
-          "number": 3
+          "number": 2
          }
         ],
         "tossups_heard": 20
@@ -7561,7 +21318,7 @@ export default {
         "answer_counts": [
          {
           "answer": {
-           "value": -5
+           "value": 10
           },
           "number": 1
          }
@@ -7570,7 +21327,7 @@ export default {
        }
       ],
       "team": {
-       "name": "Harbor View",
+       "name": "ASU",
        "players": [
         {
          "name": "Leo"
@@ -7583,6 +21340,115 @@ export default {
         }
        ]
       }
+     },
+     {
+      "bonus_points": 340,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Elena"
+         },
+         {
+          "name": "Farid"
+         },
+         {
+          "name": "Grace"
+         },
+         {
+          "name": "Hugo"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Elena"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 8
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Farid"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 4
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Grace"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Hugo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "Berkeley",
+       "players": [
+        {
+         "name": "Elena"
+        },
+        {
+         "name": "Farid"
+        },
+        {
+         "name": "Grace"
+        },
+        {
+         "name": "Hugo"
+        }
+       ]
+      }
      }
     ],
     "match_questions": [
@@ -7591,13 +21457,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 74
+         "word_index": 68
         },
         "player": {
-         "name": "Leo"
+         "name": "Noor"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -7628,13 +21494,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 10
-        },
-        {
          "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
         }
        ]
       }
@@ -7644,22 +21510,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 83
+         "word_index": 54
         },
         "player": {
-         "name": "Jonah"
+         "name": "Elena"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Iris"
+           "name": "Elena"
           },
           {
-           "name": "Jonah"
+           "name": "Farid"
           },
           {
-           "name": "Kira"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -7681,13 +21550,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -7697,22 +21566,25 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 44
+         "word_index": 95
         },
         "player": {
-         "name": "Mina"
+         "name": "Elena"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "Berkeley",
          "players": [
           {
-           "name": "Leo"
+           "name": "Elena"
           },
           {
-           "name": "Mina"
+           "name": "Farid"
           },
           {
-           "name": "Noor"
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
           }
          ]
         },
@@ -7737,10 +21609,10 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         }
        ]
       }
@@ -7750,13 +21622,658 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 73
+         "word_index": 82
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 4
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 4
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 5,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 88
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 5
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 5
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 6,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 79
         },
         "player": {
          "name": "Mina"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 6
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 6
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 7,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 73
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 7
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 7
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 8,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 102
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 8
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 8
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 9,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 104
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 9
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 9
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 10,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 93
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 10
+      }
+     },
+     {
+      "question_number": 11,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 62
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 11
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 11
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 12,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 79
+        },
+        "player": {
+         "name": "Farid"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 12
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 12
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 13,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 97
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 13
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 13
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 14,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 80
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 14
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 64
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 15
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 15
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 16,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 70
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -7775,13 +22292,570 @@ export default {
        },
        {
         "buzz_position": {
-         "word_index": 97
+         "word_index": 122
         },
+        "player": {
+         "name": "Hugo"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 17,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 94
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 17
+      }
+     },
+     {
+      "question_number": 18,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 51
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 18
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 18
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 19,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 55
+        },
+        "player": {
+         "name": "Elena"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 19
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 19
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 20,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 70
+        },
+        "player": {
+         "name": "Grace"
+        },
+        "team": {
+         "name": "Berkeley",
+         "players": [
+          {
+           "name": "Elena"
+          },
+          {
+           "name": "Farid"
+          },
+          {
+           "name": "Grace"
+          },
+          {
+           "name": "Hugo"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 20
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 20
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     }
+    ],
+    "_round": 6
+   }
+  },
+  {
+   "id": 13,
+   "round": 7,
+   "room": "Room B",
+   "filename": "Round_7_UIUC_ASU.qbj",
+   "qbj": {
+    "tossups_read": 20,
+    "match_teams": [
+     {
+      "bonus_points": 100,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Iris"
+         },
+         {
+          "name": "Jonah"
+         },
+         {
+          "name": "Kira"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Iris"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 1
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Jonah"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
         "player": {
          "name": "Kira"
         },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "UIUC",
+       "players": [
+        {
+         "name": "Iris"
+        },
+        {
+         "name": "Jonah"
+        },
+        {
+         "name": "Kira"
+        }
+       ]
+      }
+     },
+     {
+      "bonus_points": 250,
+      "lineups": [
+       {
+        "first_question": 1,
+        "players": [
+         {
+          "name": "Leo"
+         },
+         {
+          "name": "Mina"
+         },
+         {
+          "name": "Noor"
+         }
+        ]
+       }
+      ],
+      "match_players": [
+       {
+        "player": {
+         "name": "Leo"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 7
+         },
+         {
+          "answer": {
+           "value": -5
+          },
+          "number": 1
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Mina"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 4
+         }
+        ],
+        "tossups_heard": 20
+       },
+       {
+        "player": {
+         "name": "Noor"
+        },
+        "answer_counts": [
+         {
+          "answer": {
+           "value": 10
+          },
+          "number": 2
+         }
+        ],
+        "tossups_heard": 20
+       }
+      ],
+      "team": {
+       "name": "ASU",
+       "players": [
+        {
+         "name": "Leo"
+        },
+        {
+         "name": "Mina"
+        },
+        {
+         "name": "Noor"
+        }
+       ]
+      }
+     }
+    ],
+    "match_questions": [
+     {
+      "question_number": 1,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 90
+        },
+        "player": {
+         "name": "Jonah"
+        },
         "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 1
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 1
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 2,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 58
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 2
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 2
+       },
+       "parts": [
+        {
+         "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
+      }
+     },
+     {
+      "question_number": 3,
+      "buzzes": [],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 3
+      }
+     },
+     {
+      "question_number": 4,
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 68
+        },
+        "player": {
+         "name": "Iris"
+        },
+        "team": {
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -7828,38 +22902,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 65
+         "word_index": 86
         },
         "player": {
-         "name": "Mina"
+         "name": "Jonah"
         },
         "team": {
-         "name": "Harbor View",
-         "players": [
-          {
-           "name": "Leo"
-          },
-          {
-           "name": "Mina"
-          },
-          {
-           "name": "Noor"
-          }
-         ]
-        },
-        "result": {
-         "value": -5
-        }
-       },
-       {
-        "buzz_position": {
-         "word_index": 73
-        },
-        "player": {
-         "name": "Iris"
-        },
-        "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -7893,7 +22942,7 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
          "controlled_points": 10
@@ -7906,22 +22955,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 83
+         "word_index": 103
         },
         "player": {
-         "name": "Iris"
+         "name": "Mina"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
@@ -7943,13 +22992,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -7959,22 +23008,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 61
+         "word_index": 93
         },
         "player": {
-         "name": "Jonah"
+         "name": "Leo"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
@@ -8012,27 +23061,27 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 51
+         "word_index": 99
         },
         "player": {
-         "name": "Jonah"
+         "name": "Noor"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -8052,10 +23101,10 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -8065,13 +23114,38 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 87
+         "word_index": 66
         },
         "player": {
-         "name": "Leo"
+         "name": "Iris"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "UIUC",
+         "players": [
+          {
+           "name": "Iris"
+          },
+          {
+           "name": "Jonah"
+          },
+          {
+           "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 81
+        },
+        "player": {
+         "name": "Mina"
+        },
+        "team": {
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -8105,21 +23179,65 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
      },
      {
       "question_number": 10,
-      "buzzes": [],
+      "buzzes": [
+       {
+        "buzz_position": {
+         "word_index": 105
+        },
+        "player": {
+         "name": "Leo"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
+          }
+         ]
+        },
+        "result": {
+         "value": 10
+        }
+       }
+      ],
       "tossup_question": {
        "parts": 1,
        "type": "tossup",
        "question_number": 10
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 10
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
       }
      },
      {
@@ -8127,13 +23245,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 75
+         "word_index": 111
         },
         "player": {
-         "name": "Jonah"
+         "name": "Kira"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -8164,13 +23282,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
-        },
-        {
          "controlled_points": 0
         },
         {
          "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
         }
        ]
       }
@@ -8183,10 +23301,10 @@ export default {
          "word_index": 77
         },
         "player": {
-         "name": "Jonah"
+         "name": "Kira"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -8217,7 +23335,7 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 0
@@ -8233,22 +23351,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 89
+         "word_index": 67
         },
         "player": {
-         "name": "Jonah"
+         "name": "Leo"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
@@ -8286,66 +23404,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 69
+         "word_index": 83
         },
         "player": {
-         "name": "Jonah"
+         "name": "Leo"
         },
         "team": {
-         "name": "Maple Grove",
-         "players": [
-          {
-           "name": "Iris"
-          },
-          {
-           "name": "Jonah"
-          },
-          {
-           "name": "Kira"
-          }
-         ]
-        },
-        "result": {
-         "value": 10
-        }
-       }
-      ],
-      "tossup_question": {
-       "parts": 1,
-       "type": "tossup",
-       "question_number": 14
-      },
-      "bonus": {
-       "question": {
-        "parts": 3,
-        "type": "bonus",
-        "question_number": 14
-       },
-       "parts": [
-        {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 10
-        },
-        {
-         "controlled_points": 0
-        }
-       ]
-      }
-     },
-     {
-      "question_number": 15,
-      "buzzes": [
-       {
-        "buzz_position": {
-         "word_index": 55
-        },
-        "player": {
-         "name": "Noor"
-        },
-        "team": {
-         "name": "Harbor View",
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -8361,16 +23426,26 @@ export default {
         "result": {
          "value": -5
         }
-       },
+       }
+      ],
+      "tossup_question": {
+       "parts": 1,
+       "type": "tossup",
+       "question_number": 14
+      }
+     },
+     {
+      "question_number": 15,
+      "buzzes": [
        {
         "buzz_position": {
-         "word_index": 104
+         "word_index": 80
         },
         "player": {
-         "name": "Jonah"
+         "name": "Iris"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "UIUC",
          "players": [
           {
            "name": "Iris"
@@ -8380,6 +23455,31 @@ export default {
           },
           {
            "name": "Kira"
+          }
+         ]
+        },
+        "result": {
+         "value": -5
+        }
+       },
+       {
+        "buzz_position": {
+         "word_index": 104
+        },
+        "player": {
+         "name": "Noor"
+        },
+        "team": {
+         "name": "ASU",
+         "players": [
+          {
+           "name": "Leo"
+          },
+          {
+           "name": "Mina"
+          },
+          {
+           "name": "Noor"
           }
          ]
         },
@@ -8401,13 +23501,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 0
-        },
-        {
          "controlled_points": 10
         },
         {
          "controlled_points": 0
+        },
+        {
+         "controlled_points": 10
         }
        ]
       }
@@ -8417,13 +23517,13 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 75
+         "word_index": 68
         },
         "player": {
-         "name": "Mina"
+         "name": "Leo"
         },
         "team": {
-         "name": "Harbor View",
+         "name": "ASU",
          "players": [
           {
            "name": "Leo"
@@ -8437,7 +23537,7 @@ export default {
          ]
         },
         "result": {
-         "value": -5
+         "value": 10
         }
        }
       ],
@@ -8445,6 +23545,24 @@ export default {
        "parts": 1,
        "type": "tossup",
        "question_number": 16
+      },
+      "bonus": {
+       "question": {
+        "parts": 3,
+        "type": "bonus",
+        "question_number": 16
+       },
+       "parts": [
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        },
+        {
+         "controlled_points": 10
+        }
+       ]
       }
      },
      {
@@ -8452,22 +23570,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 102
+         "word_index": 74
         },
         "player": {
-         "name": "Kira"
+         "name": "Leo"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
@@ -8492,10 +23610,10 @@ export default {
          "controlled_points": 10
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
@@ -8505,27 +23623,27 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 59
+         "word_index": 81
         },
         "player": {
-         "name": "Iris"
+         "name": "Mina"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
         "result": {
-         "value": 15
+         "value": 10
         }
        }
       ],
@@ -8542,13 +23660,13 @@ export default {
        },
        "parts": [
         {
-         "controlled_points": 10
-        },
-        {
          "controlled_points": 0
         },
         {
          "controlled_points": 10
+        },
+        {
+         "controlled_points": 0
         }
        ]
       }
@@ -8558,22 +23676,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 74
+         "word_index": 90
         },
         "player": {
-         "name": "Iris"
+         "name": "Leo"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
@@ -8598,7 +23716,7 @@ export default {
          "controlled_points": 0
         },
         {
-         "controlled_points": 10
+         "controlled_points": 0
         },
         {
          "controlled_points": 0
@@ -8611,22 +23729,22 @@ export default {
       "buzzes": [
        {
         "buzz_position": {
-         "word_index": 86
+         "word_index": 91
         },
         "player": {
-         "name": "Iris"
+         "name": "Leo"
         },
         "team": {
-         "name": "Maple Grove",
+         "name": "ASU",
          "players": [
           {
-           "name": "Iris"
+           "name": "Leo"
           },
           {
-           "name": "Jonah"
+           "name": "Mina"
           },
           {
-           "name": "Kira"
+           "name": "Noor"
           }
          ]
         },
@@ -8648,19 +23766,19 @@ export default {
        },
        "parts": [
         {
+         "controlled_points": 0
+        },
+        {
          "controlled_points": 10
         },
         {
-         "controlled_points": 0
-        },
-        {
-         "controlled_points": 0
+         "controlled_points": 10
         }
        ]
       }
      }
     ],
-    "_round": 3
+    "_round": 7
    }
   }
  ]

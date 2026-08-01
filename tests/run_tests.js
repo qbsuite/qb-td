@@ -1865,7 +1865,8 @@ test('roster names with commas and quotes round-trip our parser, MODAQ, and .yft
 /* ---------- demo tournament (app/js/demo.js + generated fixture) ----------
    The runner is synchronous, so the async demoPub flows run here at top
    level and the test() blocks assert on the collected results. Order
-   matters: the upload sequence is stateful (in-memory storage shim). */
+   matters: the upload/advance sequence is stateful (in-memory storage
+   shim). */
 
 const { demoPub, reset: demoReset } = await import('../app/js/demo.js');
 const demoFixture = (await import('../app/demo/fixture.js')).default;
@@ -1878,35 +1879,53 @@ globalThis.fetch = () => { throw new Error('demo flow called fetch()'); };
 demoReset();
 const demoState0 = await demoPub('/pub/demo');
 const demoBundle0 = await demoPub('/pub/demo/bundle');
-const demoBucket0 = await demoPub('/b/demo');
+const demoBucketA = await demoPub('/b/demo');
+const demoBucketB = await demoPub('/b/demo-b');
 const demoSched = await demoPub('/b/demo/schedule');
-const demoPacket3 = await demoPub('/b/demo/packet?round=3');
+const demoPacket7 = await demoPub('/b/demo/packet?round=7');
 const demoCats = await demoPub('/pub/demo/cats');
 let demoQpacketEarly = null;
-try { await demoPub('/pub/demo/qpacket?round=3'); }
+try { await demoPub('/pub/demo/qpacket?round=7'); }
 catch (e) { demoQpacketEarly = e.message; }
 
-// the visitor's game: round 3, Riverside vs Summit, uploaded like the
+// the TD hub's surface
+const demoAdmin0 = await demoPub('/a/demo');
+const demoAdminRoster = await demoPub('/a/demo/file?key=' + encodeURIComponent('t/1/roster.qbj'));
+const demoAdminSched = await demoPub('/a/demo/file?key=' + encodeURIComponent('t/1/schedule.json'));
+const demoAdminPacket = await demoPub('/a/demo/file?key=' + encodeURIComponent('t/1/packet/3.json'));
+const demoAdminGame = await demoPub('/a/demo/file?key=' + encodeURIComponent('t/1/file/1'));
+let demoAdminWrite = null;
+try { await demoPub('/a/demo/roster?name=x.qbj', { method: 'PUT', body: '{}' }); }
+catch (e) { demoAdminWrite = e.message; }
+
+// the visitor's game: round 7, Stanford vs Berkeley, uploaded like the
 // reader does (combined {qbj, game})
-const demoMatch = modaqMatch({ round: 3, tossupsRead: 10,
-  teamA: { name: 'Riverside', bonusPoints: 40,
-    players: [{ name: 'Elena', tuh: 10, counts: { 10: 3, '-5': 1 } }] },
-  teamB: { name: 'Summit', bonusPoints: 30,
-    players: [{ name: 'Ada', tuh: 10, counts: { 15: 1, 10: 2 } }] },
+const demoMatch = modaqMatch({ round: 7, tossupsRead: 20,
+  teamA: { name: 'Berkeley', bonusPoints: 40,
+    players: [{ name: 'Elena', tuh: 20, counts: { 10: 3, '-5': 1 } }] },
+  teamB: { name: 'Stanford', bonusPoints: 30,
+    players: [{ name: 'Ada', tuh: 20, counts: { 10: 3 } }] },
 });
 const demoUp1 = await demoPub(
-  '/b/demo/upload?round=3&name=Round_3_Riverside_Summit.qbtd.json',
-  { method: 'POST', body: combinedUpload(demoMatch, 3, null) });
+  '/b/demo/upload?round=7&name=Round_7_Berkeley_Stanford.qbtd.json',
+  { method: 'POST', body: combinedUpload(demoMatch, 7, null) });
 const demoStateAfter = await demoPub('/pub/demo');
-const demoQpacketLate = await demoPub('/pub/demo/qpacket?round=3');
+const demoQpacketLate = await demoPub('/pub/demo/qpacket?round=7');
 // a re-exported game replaces, not double-counts
 const demoUp2 = await demoPub(
-  '/b/demo/upload?round=3&name=Round_3_Riverside_Summit.qbtd.json',
-  { method: 'POST', body: combinedUpload(demoMatch, 3, null) });
+  '/b/demo/upload?round=7&name=Round_7_Berkeley_Stanford.qbtd.json',
+  { method: 'POST', body: combinedUpload(demoMatch, 7, null) });
 const demoBundle2 = await demoPub('/pub/demo/bundle');
 const demoBad = await demoPub(
-  '/b/demo/upload?round=3&name=broken.qbj', { method: 'POST', body: 'not json' });
-const demoBucket2 = await demoPub('/b/demo');
+  '/b/demo/upload?round=7&name=broken.qbj', { method: 'POST', body: 'not json' });
+const demoBucketA2 = await demoPub('/b/demo');
+
+// the TD hub's advance button, then deleting a visitor upload
+await demoPub('/a/demo', { method: 'POST', json: { current_round: 8 } });
+const demoStateAdv = await demoPub('/pub/demo');
+const demoBucketAdv = await demoPub('/b/demo');
+await demoPub('/a/demo/files/' + demoUp2.id, { method: 'DELETE' });
+const demoAdminAfter = await demoPub('/a/demo');
 demoReset();
 const demoStateReset = await demoPub('/pub/demo');
 globalThis.fetch = realFetch;
@@ -1918,13 +1937,15 @@ test('demo fixture: every game parses and the story holds', () => {
     m.fileId = e.id;
     return m;
   });
-  assert.equal(matches.length, 5);
+  assert.equal(matches.length, 13); // rounds 1-6 + round 7 Room B
   const agg = aggregate(matches, parseRoster(demoFixture.roster));
   const top = agg.teams.slice(0, 2).map((t) => t.name).sort();
-  assert.deepEqual(top, ['Riverside', 'Summit']);
-  for (const t of agg.teams.slice(0, 2)) { assert.equal(t.w, 2); assert.equal(t.l, 0); }
+  assert.deepEqual(top, ['Berkeley', 'Stanford']);
+  for (const t of agg.teams.slice(0, 2)) { assert.equal(t.w, 5); assert.equal(t.l, 1); }
+  // round 7 Room A (Stanford vs Berkeley) is the visitor's — not played
+  assert.deepEqual(agg.games.filter((g) => g.round === 7).map((g) => g.room), ['Room B']);
   // buzz + category views populate from the same entries
-  assert.ok(buzzSummary(dedupeEntries(demoFixture.entries)).length >= 8);
+  assert.ok(buzzSummary(dedupeEntries(demoFixture.entries)).length >= 10);
   const cats = categoryStats(dedupeEntries(demoFixture.entries), demoFixture.catmap);
   assert.ok(new Set(cats.map((r) => r.cat)).size >= 8, 'category spread');
 });
@@ -1933,12 +1954,14 @@ test('demo fixture: packets are reader-ready and fully categorized', () => {
   // MODAQ's own formatter must accept every string — it THROWS on unknown
   // tags, which is why the exporter converts qbreader's <i> to <em>.
   const { parseFormattedText } = createRequire(import.meta.url)('modaq/src/parser/FormattedTextParser.js');
-  for (const n of [1, 2, 3]) {
+  const rounds = Object.keys(demoFixture.packets).map(Number);
+  assert.equal(rounds.length, 9); // triple round robin, 4 teams
+  for (const n of rounds) {
     const p = normalizePacket(demoFixture.packets[n], 'round ' + n + '.json');
-    assert.equal(p.tossups.length, 21); // 2025 VAULT: 20 + tiebreaker
-    assert.equal(p.bonuses.length, 20);
+    assert.equal(p.tossups.length, 21); // 2022 ACF Winter: 20 + tiebreaker
+    assert.equal(p.bonuses.length, 21);
     for (const t of p.tossups) {
-      assert.ok(tokenizeQuestion(t.question).includes('(*)'), 'power mark');
+      assert.ok(!tokenizeQuestion(t.question).includes('(*)'), 'ACF: no power marks');
       parseFormattedText(t.question, { pronunciationGuideMarkers: ['("', '")'] });
       parseFormattedText(t.answer, { pronunciationGuideMarkers: ['("', '")'] });
     }
@@ -1949,47 +1972,76 @@ test('demo fixture: packets are reader-ready and fully categorized', () => {
     }
     const rc = demoCats.rounds[String(n)];
     assert.equal(rc.t.length, 21);
-    assert.equal(rc.b.length, 20);
+    assert.equal(rc.b.length, 21);
     for (const c of [...rc.t, ...rc.b]) assert.ok(c.c, 'category set');
+  }
+  // no 15s anywhere in the simulated games either
+  for (const e of demoFixture.entries) {
+    for (const mq of e.qbj.match_questions) {
+      for (const b of mq.buzzes) assert.ok(b.result.value <= 10, 'ACF: no powers scored');
+    }
   }
 });
 
-test('demo state: mid-tournament, round 3 open in the reader room', () => {
-  assert.equal(demoState0.current_round, 3);
-  assert.deepEqual(demoState0.buzz_done, [1, 2]);
-  assert.deepEqual(demoState0.packet_rounds, [1, 2, 3]);
-  assert.equal(demoState0.files.length, 5);
-  assert.equal(demoBundle0.entries.length, 5);
+test('demo state: mid-tournament, round 7 open in the reader room', () => {
+  assert.equal(demoState0.current_round, 7);
+  assert.deepEqual(demoState0.buzz_done, [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(demoState0.packet_rounds, [1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(demoState0.files.length, 13);
+  assert.equal(demoBundle0.entries.length, 13);
   assert.equal(demoQpacketEarly, 'round in progress');
-  assert.equal(demoBucket0.room, 'Room A');
-  assert.equal(demoBucket0.packets.length, 3);
-  assert.equal(demoBucket0.roster, true);
+  assert.equal(demoBucketA.room, 'Room A');
+  assert.equal(demoBucketB.room, 'Room B');
+  assert.equal(demoBucketA.packets.length, 7); // packets 8-9 stay locked
+  assert.equal(demoBucketA.roster, true);
   assert.equal(demoSched.room, demoFixture.readerRoom);
-  assert.equal(demoPacket3.tossups.length, 21);
+  assert.equal(demoPacket7.tossups.length, 21);
 });
 
-test('demo upload: lands in the bundle and completes round 3', () => {
+test('demo TD hub: detail, blobs, and writes behave like the Worker', () => {
+  const t = demoAdmin0.tournament;
+  assert.equal(t.slug, 'demo');
+  assert.equal(t.published, 1);
+  assert.equal(JSON.parse(t.settings).gameFormat, 'acf');
+  assert.deepEqual(demoAdmin0.buckets.map((b) => b.secret), ['demo', 'demo-b']);
+  assert.equal(demoAdmin0.rounds.length, 9); // the hub sees all packets
+  assert.equal(demoAdmin0.files.length, 13);
+  assert.deepEqual(parseRoster(demoAdminRoster).map((x) => x.name),
+    ['Stanford', 'UIUC', 'ASU', 'Berkeley']);
+  assert.equal(demoAdminSched.phases.length, 3); // triple round robin
+  assert.equal(demoAdminPacket.tossups.length, 21);
+  parseMatch(demoAdminGame, { filename: demoAdmin0.files.find((f) => f.id === 1).filename });
+  assert.equal(demoAdminWrite, 'not in the demo');
+});
+
+test('demo upload: lands in the bundle and completes round 7', () => {
   assert.equal(demoUp1.error, null);
   assert.equal(demoUp1.kind, 'combined');
-  assert.deepEqual(demoStateAfter.buzz_done, [1, 2, 3]);
-  assert.equal(demoStateAfter.files.length, 6);
+  assert.deepEqual(demoStateAfter.buzz_done, [1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(demoStateAfter.files.length, 14);
   assert.notEqual(demoStateAfter.version, demoState0.version);
   assert.equal(demoQpacketLate.tossups.length, 21, 'buzzpoints packet unlocked');
 });
 
-test('demo upload: re-export dedupes, junk is flagged, reset clears', () => {
+test('demo flow: re-export dedupes, advance works, reset clears', () => {
   assert.ok(demoUp2.id > demoUp1.id);
-  assert.equal(demoBundle2.entries.length, 7, 'raw bundle keeps both uploads');
+  assert.equal(demoBundle2.entries.length, 15, 'raw bundle keeps both uploads');
   const matches = demoBundle2.entries.map((e) => {
     const m = parseMatch(e.qbj, { filename: e.filename });
     m.fileId = e.id;
     return m;
   });
-  assert.equal(dedupeMatches(matches).length, 6, 'latest upload wins per game');
+  assert.equal(dedupeMatches(matches).length, 14, 'latest upload wins per game');
   assert.ok(demoBad.error, 'unparseable upload is flagged');
-  assert.equal(demoBucket2.uploads.length, 3);
-  assert.equal(demoBucket2.uploads[0].qbj, undefined, 'listing carries no qbj');
-  assert.equal(demoStateReset.files.length, 5, 'reset restores the fixture');
+  assert.equal(demoBucketA2.uploads.length, 3);
+  assert.equal(demoBucketA2.uploads[0].qbj, undefined, 'listing carries no qbj');
+  assert.equal(demoStateAdv.current_round, 8, 'advance persists');
+  assert.deepEqual(demoStateAdv.packet_rounds, [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.equal(demoBucketAdv.packets.length, 8, 'round 8 packet unlocked for mods');
+  assert.equal(demoAdminAfter.files.length, 14, 'delete removed one visitor upload');
+  assert.equal(demoStateReset.current_round, 7, 'reset restores the live round');
+  assert.equal(demoStateReset.files.length, 13, 'reset restores the fixture');
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
+
