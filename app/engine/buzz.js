@@ -178,16 +178,13 @@ export function buzzSummary(entries) {
 }
 
 /**
- * The first main answerline as display HTML: everything before the
- * first [accept ...] / (prompt ...) clause, with the packet's own
- * bold/underline formatting kept (only b/strong/u/i/em survive — all
- * other tags are dropped, all text is escaped, unclosed kept-tags are
- * closed so nothing leaks into surrounding markup).
+ * Packet text as display HTML with the packet's own bold/underline
+ * formatting kept: only b/strong/u/i/em survive — all other tags are
+ * dropped, all text is escaped, unclosed kept-tags are closed so
+ * nothing leaks into surrounding markup.
  */
-export function mainAnswerHtml(html) {
-  const s = String(html || '').replace(/^\s*ANSWER:\s*/i, '');
-  const cut = s.search(/[[(]/);
-  const head = (cut > 0 ? s.slice(0, cut) : s)
+export function sanitizeHtml(html) {
+  const head = String(html || '')
     .replace(/<(\/?)(b|strong|u|i|em)\b[^>]*>/gi, '<$1$2>')  // drop tag attributes
     .replace(/<(?!\/?(?:b|strong|u|i|em)>)[^>]*>/gi, ' ');   // drop other tags
   const KEEP = /^<\/?(?:b|strong|u|i|em)>$/i;
@@ -196,13 +193,23 @@ export function mainAnswerHtml(html) {
       : part.replace(/&(?!(?:amp|lt|gt|quot|#\d+|#x[\da-f]+|nbsp);)/gi, '&amp;')
         .replace(/</g, '&lt;').replace(/>/g, '&gt;'))
     .join('').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
-  // close anything the bracket cut left open
+  // close anything left open (e.g. by mainAnswerHtml's bracket cut)
   const open = [];
   for (const m of out.matchAll(/<(\/?)(b|strong|u|i|em)>/g)) {
     if (!m[1]) open.push(m[2]);
     else if (open.lastIndexOf(m[2]) !== -1) open.splice(open.lastIndexOf(m[2]), 1);
   }
   return out + open.reverse().map((t) => '</' + t + '>').join('');
+}
+
+/**
+ * The first main answerline as display HTML: everything before the
+ * first [accept ...] / (prompt ...) clause, sanitized.
+ */
+export function mainAnswerHtml(html) {
+  const s = String(html || '').replace(/^\s*ANSWER:\s*/i, '');
+  const cut = s.search(/[[(]/);
+  return sanitizeHtml(cut > 0 ? s.slice(0, cut) : s);
 }
 
 /**
@@ -216,4 +223,36 @@ export function tokenizeQuestion(text) {
     .replace(/&nbsp;/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
+}
+
+/**
+ * Question text -> per-word display HTML, aligned 1:1 with
+ * tokenizeQuestion's positions: every tag still acts as a word boundary
+ * (so buzz indices are unchanged), but b/strong/u/i/em formatting is
+ * kept — reopened and closed around each word, so every entry is
+ * self-contained and safe to wrap in its own span.
+ */
+export function tokenizeQuestionHtml(text) {
+  const words = [];
+  const open = [];
+  const parts = String(text || '').split(/(<[^>]*>)/);
+  for (let pi = 0; pi < parts.length; pi++) {
+    const part = parts[pi];
+    if (pi % 2) {  // captured tag — a word boundary, exactly like tokenizeQuestion
+      const m = /^<(\/?)(b|strong|u|i|em)\b[^>]*>$/i.exec(part);
+      if (!m) continue;
+      const tag = m[2].toLowerCase();
+      if (!m[1]) open.push(tag);
+      else if (open.lastIndexOf(tag) !== -1) open.splice(open.lastIndexOf(tag), 1);
+      continue;
+    }
+    for (const w of part.replace(/&nbsp;/g, ' ').split(/\s+/)) {
+      if (!w) continue;
+      const t = w.replace(/&(?!(?:amp|lt|gt|quot|#\d+|#x[\da-f]+);)/gi, '&amp;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      words.push(open.map((x) => '<' + x + '>').join('') + t
+        + open.slice().reverse().map((x) => '</' + x + '>').join(''));
+    }
+  }
+  return words;
 }

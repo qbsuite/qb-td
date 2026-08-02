@@ -9,7 +9,7 @@ import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
-import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestion, mainAnswerHtml, dedupeEntries } from '../engine/buzz.js';
+import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestionHtml, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../engine/cats.js';
 import { normalizePacket } from './read_core.js';
 import { buzzToken } from './buzzkey.js';
@@ -17,6 +17,7 @@ import { buzzToken } from './buzzkey.js';
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
 const CHECK_MS = 300000; // state check while visible; blobs refetch on stamp change
+let poll = null;           // the CHECK_MS timer, dropped once state.final
 
 let state = null;
 let lastVersion = null;    // stats bundle stamp
@@ -283,7 +284,6 @@ async function tryBuzzKey(pw) {
   render();
 }
 
-const stripTags = (s) => String(s || '').replace(/<[^>]*>/g, '');
 function buzzWordClass(hits) {
   if (hits.some((b) => b.value > 10)) return 'pow';
   if (hits.some((b) => b.value > 0)) return 'get';
@@ -315,7 +315,7 @@ function tossupHtml(tossup, buzzes, packet) {
   const tu = packet && packet.tossups && packet.tossups[tossup - 1];
   let qhtml = '';
   if (tu) {
-    const words = tokenizeQuestion(tu.question);
+    const words = tokenizeQuestionHtml(tu.question);
     const byPos = new Map();
     buzzes.forEach((b, i) => {
       const pos = Math.min(b.position, words.length - 1);
@@ -324,9 +324,9 @@ function tossupHtml(tossup, buzzes, packet) {
     });
     qhtml = '<div class="q">' + words.map((w, wi) => {
       const hits = byPos.get(wi);
-      if (!hits) return esc(w);
+      if (!hits) return w;
       const cls = buzzWordClass(hits.map((h) => h.b));
-      return `<span class="bw ${cls}">${esc(w)}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
+      return `<span class="bw ${cls}">${w}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
     }).join(' ') + '</div>';
   }
   const buzzChips = buzzes.map((b) => {
@@ -341,7 +341,7 @@ function tossupHtml(tossup, buzzes, packet) {
         <span class="qdmeta">${dead}${buzzChips}</span></summary>
       <div class="qdbody">
         ${qhtml}
-        ${tu ? `<div class="q muted">ANSWER: ${esc(stripTags(tu.answer))}</div>` : ''}
+        ${tu ? `<div class="q muted">ANSWER: ${sanitizeHtml(tu.answer)}</div>` : ''}
         ${buzzes.length ? `<div class="buzzlist">
           ${buzzes.map((b, i) => {
             const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
@@ -372,11 +372,11 @@ function bonusHtml(bonus, results, packet) {
           : '<span class="muted">(no packet text)</span>'}
         <span class="qdmeta">${avg.toFixed(1)} avg &middot; ${conv.map((c) => c + '/' + heard).join(' ')}</span></summary>
       <div class="qdbody">
-        ${bz && bz.leadin ? `<div class="q muted">${esc(stripTags(bz.leadin))}</div>` : ''}
+        ${bz && bz.leadin ? `<div class="q muted">${sanitizeHtml(bz.leadin)}</div>` : ''}
         ${conv.map((c, p) => `
           <div class="q"><span class="${c ? 'ok' : 'bad'}">${c}/${heard}</span>
-            ${answers[p] ? `<b style="text-transform:none">${esc(stripTags(answers[p]))}</b>` : ''}
-            ${partsText[p] ? `<span class="muted">— ${esc(stripTags(partsText[p]))}</span>` : ''}</div>`).join('')}
+            ${answers[p] ? `<b style="text-transform:none">${sanitizeHtml(answers[p])}</b>` : ''}
+            ${partsText[p] ? `<span class="muted">— ${sanitizeHtml(partsText[p])}</span>` : ''}</div>`).join('')}
         <div class="buzzlist">
           ${results.map((r) => `<div>
             <span class="${r.total > 20 ? 'pow-t' : r.total > 0 ? 'ok' : 'muted'}">${r.total}</span>
@@ -604,6 +604,10 @@ async function load(force = false) {
   try {
     const next = await pub('/pub/' + slug);
     state = next;
+    // Past every upload deadline the results can't move again: stop
+    // polling for good. The refresh button still works, and the Worker
+    // stops seeing traffic from tabs left open on old tournaments.
+    if (state.final && poll) { clearInterval(poll); poll = null; }
     const storedKey = buzzStored();
     if (storedKey && storedKey.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
@@ -667,5 +671,5 @@ $('refresh').onclick = () => load(true);
 if (!slug) say('bad link', true);
 else {
   load(true);
-  setInterval(() => { if (document.visibilityState === 'visible') load(); }, CHECK_MS);
+  poll = setInterval(() => { if (document.visibilityState === 'visible') load(); }, CHECK_MS);
 }

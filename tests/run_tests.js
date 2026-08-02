@@ -12,7 +12,7 @@ import { buildReport } from '../app/engine/report.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText } from '../app/engine/schedule.js';
 import { serializeYft } from '../app/engine/yft.js';
-import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, matchBonuses, roundBonuses, mainAnswerHtml, dedupeEntries } from '../app/engine/buzz.js';
+import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
 
@@ -1115,6 +1115,35 @@ test('tokenizeQuestion strips tags and splits on whitespace', () => {
   assert.deepEqual(tokenizeQuestion('For 10 points, name this <b>author</b> of&nbsp;<i>Faust</i>.'),
     ['For', '10', 'points,', 'name', 'this', 'author', 'of', 'Faust', '.']);
   assert.deepEqual(tokenizeQuestion(''), []);
+});
+
+test('sanitizeHtml keeps b/u/i/em, escapes the rest, closes dangling tags', () => {
+  assert.equal(sanitizeHtml('ANSWER: <b><u>Wuthering Heights</u></b> [accept <b><u>WH</u></b>]'),
+    'ANSWER: <b><u>Wuthering Heights</u></b> [accept <b><u>WH</u></b>]');
+  assert.equal(sanitizeHtml('<span class="x">a</span> <script>b</script> < 5 & six'),
+    'a b &lt; 5 &amp; six');
+  assert.equal(sanitizeHtml('<b><u>never closed'), '<b><u>never closed</u></b>');
+  assert.equal(sanitizeHtml(''), '');
+});
+
+test('tokenizeQuestionHtml keeps per-word formatting at tokenizeQuestion positions', () => {
+  assert.deepEqual(tokenizeQuestionHtml('name this <b>author of <i>Faust</i></b>.'),
+    ['name', 'this', '<b>author</b>', '<b>of</b>', '<b><i>Faust</i></b>', '.']);
+  // dropped tags, comments, and stray angle brackets still land on the
+  // same word positions tokenizeQuestion produces
+  const tricky = [
+    'plain <span class="x">spanned</span> tail',
+    'a<b>b</b>c &nbsp; d <!-- note --> e',
+    'x < 5 and <u>under lined</u> words',
+    '<em>open only',
+  ];
+  for (const q of tricky) {
+    assert.deepEqual(tokenizeQuestionHtml(q).map((w) => w.replace(/<[^>]*>/g, '')),
+      tokenizeQuestion(q).map((w) =>
+        w.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')),
+      q);
+  }
+  assert.deepEqual(tokenizeQuestionHtml(''), []);
 });
 
 /* ---------- category stats ---------- */
