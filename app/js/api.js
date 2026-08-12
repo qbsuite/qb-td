@@ -26,6 +26,14 @@ export function useFrozenData(map) {
   frozen = map;
 }
 
+/** True when pub() answers from local data (demo fixture or an archive
+    capture) rather than the network. Pages must then ignore any GitHub
+    snapshot pointers riding in that data — the frozen copy is already
+    the complete source, and the snapshot repo may have moved on. */
+export function usingStaticData() {
+  return DEMO || frozen !== null;
+}
+
 /** JSON call to any Worker route. Throws Error(message) on failure.
     Pass opts.json to send a JSON body. Non-JSON responses (blobs) return
     the raw Response. */

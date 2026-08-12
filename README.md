@@ -204,6 +204,21 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (~4 Worker requests per game — fewer than the manual bucket-page flow),
   and the 2 MB MODAQ bundle is a static asset on GitHub Pages, off
   Cloudflare entirely.
+- **Finished tournaments stop costing anything.** Rooms can only be
+  created while the admin link lives (48 h), and each room accepts
+  uploads for 48 h after its own creation, so nothing can change after
+  `created + 96 h` (`FINAL_TTL` in `worker.js`) — the data is provably
+  frozen, with no extra column or cron to say so. Past that point
+  `/pub/:slug` reports `final: true`, every public answer is served with
+  a week's `max-age` instead of a minute's, and `pubview.js` clears its
+  poll timer for good. A tab left open on last season's tournament stops
+  talking to the Worker, and a repeat visitor is served by their own
+  browser cache. This is what keeps the long tail flat: a finished
+  tournament costs about one request per visitor rather than one every
+  five minutes per open tab. Caching *inside* the Worker would not do
+  this — a `workers.dev` request invokes the Worker whether or not the
+  response is cached, so the saving has to come from the browser not
+  asking.
 
 ## Layout
 
@@ -259,12 +274,18 @@ Part of [qbsuite](https://qbsuite.github.io/).
 
 ```bash
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
+node tests/snapshot_publish.js   # GitHub snapshot publisher (D1/R2/GitHub mocked)
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
 npx wrangler dev --local --port 8799 &
 cd .. && node tests/e2e_worker.js
 ```
+
+`wrangler` is a pinned devDependency, so `npm install` puts the tested
+version on `npx` rather than leaving the suite on whatever the global npx
+cache last downloaded. `e2e_worker.js` backdates the tournament row at the
+end, which is also how it exercises the `final` caching path.
 
 ## Deploy (self-hosting)
 
@@ -279,6 +300,52 @@ cd .. && node tests/e2e_worker.js
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`.
+
+## Public snapshots on GitHub (optional)
+
+Makes public stat viewing free at any audience size. Without it, every
+viewer's blob refetches (the stats bundle, schedule, category map,
+roster) hit the Worker — and the bundle grows with the tournament, so a
+popular event spends the same 100k-requests/day budget the moderator
+rooms and TO dashboard run on. With it, the Worker publishes those blobs
+to a GitHub data repo (one atomic commit per change, at most one per
+minute per tournament) and `/pub/:slug` advertises the commit SHA; the
+public page then fetches `raw.githubusercontent.com/<repo>/<sha>/…` —
+immutable, CDN-served, zero Worker requests. Viewers still poll the tiny
+live state (round, broadcasts, stamps) every 5 minutes: that stays on
+the Worker on purpose — broadcasts are for *now*, and ~12 small
+requests/hour/viewer buys ~8,000 concurrent viewer-hours per day of
+headroom. Buzzpoints also stay on the Worker: packet text is
+password-gated per request, which a static host can't do.
+
+Every fetch falls back to the `/pub` routes, so a failed publish, a
+pruned repo, or turning the feature off just means Worker serving —
+exactly the behavior without this section. Archive captures ignore
+snapshots entirely (the capture is the data).
+
+Setup:
+
+1. Create a **public** data repo (e.g. `qbsuite/qb-td-live`) with an
+   initial commit (README is fine — the publisher can create the branch
+   but a non-empty repo avoids the edge).
+2. Credential with **contents:write on only that repo** — either a
+   GitHub App (create under the org: no webhook, Repository permissions →
+   Contents: Read and write, install on the data repo only; then fill
+   `GITHUB_APP_ID` + `GITHUB_INSTALLATION_ID` in `wrangler.toml` and
+   `npx wrangler secret put GITHUB_APP_KEY` with the private key
+   converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt -in app.pem`) or a
+   fine-grained PAT (`npx wrangler secret put GITHUB_TOKEN`).
+3. `npx wrangler d1 execute qb-td --remote --file migrate-pub.sql` (once).
+4. Set `SNAPSHOT_REPO = "owner/repo"` in `wrangler.toml`, `npx wrangler
+   deploy`. The cron trigger deploys with it; setting `SNAPSHOT_REPO`
+   back to `""` turns the whole feature off again.
+
+Freshness: a change is committed within ~a minute and viewers see it on
+their next 5-minute state poll — same worst-case cadence as before, one
+cron tick later. The data repo's history grows one small commit per
+change; old slugs can be deleted from the branch freely (archived pages
+don't read it, and SHA-pinned fetches of *recorded* snapshots still
+resolve through history).
 
 ## Buzzpoints password
 

@@ -118,9 +118,12 @@ async function capture(api, slug) {
   // The buzzpoints tab reads packet text through a password-gated route.
   // That can't be archived and shouldn't be, so switch the tab off rather
   // than leave it rendering empty questions. Broadcasts are live-only too.
+  // The GitHub snapshot pointer (pub) is dropped as well: the capture IS
+  // the complete data, and the snapshot repo may prune old slugs — the
+  // page also guards against this (usingStaticData), belt and braces.
   const data = {
     [`/pub/${slug}`]: {
-      ...state, buzz: null, buzz_v: null, buzz_done: [], packet_rounds: [], announce: [],
+      ...state, buzz: null, buzz_v: null, buzz_done: [], packet_rounds: [], announce: [], pub: null,
     },
     [`/pub/${slug}/bundle`]: bundle,
   };

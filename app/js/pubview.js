@@ -3,7 +3,7 @@
 // polls the tiny /pub/:slug state while visible and refetches the stats
 // bundle / schedule blob only when their stamps move.
 
-import { pub, esc } from './api.js';
+import { pub, esc, usingStaticData } from './api.js';
 import { annCards } from './announce.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
@@ -47,11 +47,39 @@ function say(text, bad = false) {
 
 const asJson = async (res) => (res instanceof Response ? JSON.parse(await res.text()) : res);
 
+/* ---------- GitHub snapshot fetches ----------
+   When /pub/:slug advertises a published snapshot (state.pub — the
+   Worker's "public snapshots on GitHub"), the heavy blobs are fetched
+   SHA-pinned from raw.githubusercontent.com: immutable (no CDN
+   staleness) and off the Worker's request budget, so viewer count stops
+   costing anything. Every fetch falls back to the /pub route, so a
+   missing repo, failed publish, or disabled feature just means Worker
+   serving — exactly the pre-snapshot behavior. Never used when pub()
+   answers from local data (demo / archive captures). */
+
+let snap = null; // state.pub when usable on this page; set by load()
+
+async function fetchSnap(name) {
+  const res = await fetch(
+    'https://raw.githubusercontent.com/' + snap.repo + '/' + snap.sha + '/' + slug + '/' + name);
+  if (!res.ok) throw new Error('snapshot HTTP ' + res.status);
+  return res.json();
+}
+
+// One stamped blob: the snapshot when it contains it, else the Worker
+// route when the live state says it exists, else null.
+async function fetchStamped(present, snapHas, name, route) {
+  if (snapHas) {
+    try { return await fetchSnap(name); } catch (e) { /* fall back */ }
+  }
+  if (!present) return null;
+  try { return await asJson(await pub('/pub/' + slug + route)); } catch (e) { return null; }
+}
+
 async function fetchRoster() {
-  if (!state.roster) return null;
-  try {
-    return parseRoster(await asJson(await pub('/pub/' + slug + '/roster')));
-  } catch (e) { return null; } // both tabs still render without it
+  const qbj = await fetchStamped(state.roster, snap && snap.roster, 'roster.json', '/roster');
+  if (!qbj) return null;
+  try { return parseRoster(qbj); } catch (e) { return null; } // both tabs still render without it
 }
 
 // One request for all games; per-file fetch only if the bundle is missing.
@@ -60,8 +88,7 @@ async function fetchRoster() {
 async function fetchMatches(errors) {
   const out = [];
   const raw = [];
-  try {
-    const bundle = await asJson(await pub('/pub/' + slug + '/bundle'));
+  const consume = (bundle) => {
     for (const entry of bundle.entries) {
       try {
         const m = parseMatch(entry.qbj, { filename: entry.filename });
@@ -73,6 +100,12 @@ async function fetchMatches(errors) {
     }
     rawEntries = dedupeEntries(raw);
     return out;
+  };
+  if (snap && snap.bundle) {
+    try { return consume(await fetchSnap('bundle.json')); } catch (e) { /* Worker fallback */ }
+  }
+  try {
+    return consume(await asJson(await pub('/pub/' + slug + '/bundle')));
   } catch (e) { /* no bundle yet: fall through */ }
 
   await Promise.all(state.files.map(async (f) => {
@@ -604,6 +637,11 @@ async function load(force = false) {
   try {
     const next = await pub('/pub/' + slug);
     state = next;
+    // Track the snapshot's stamps when one is advertised — its blobs are
+    // what we'll fetch, so refetch decisions must follow what IT holds
+    // (it may trail the Worker by up to a cron tick; the next poll
+    // converges). Frozen data (demo/archive) never uses snapshots.
+    snap = !usingStaticData() && state.pub && state.pub.sha ? state.pub : null;
     // Past every upload deadline the results can't move again: stop
     // polling for good. The refresh button still works, and the Worker
     // stops seeing traffic from tabs left open on old tournaments.
@@ -621,9 +659,12 @@ async function load(force = false) {
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);
     if (tab === 'cats' && !state.cats) setTab('stats', false);
 
-    const statsMoved = force || state.version !== lastVersion;
-    const schedMoved = force || state.schedule !== lastSched;
-    const catsMoved = force || state.cats !== lastCats;
+    const statsStamp = snap && snap.bundle ? snap.version : state.version;
+    const schedStamp = snap ? snap.schedule : state.schedule;
+    const catsStamp = snap ? snap.cats : state.cats;
+    const statsMoved = force || statsStamp !== lastVersion;
+    const schedMoved = force || schedStamp !== lastSched;
+    const catsMoved = force || catsStamp !== lastCats;
     if (!statsMoved && !schedMoved && !catsMoved) { say(''); return; }
     say('loading');
 
@@ -637,21 +678,21 @@ async function load(force = false) {
         statsErrors = errors;
         // an empty load that raced an upload must retry on the next
         // check, not stick on this version
-        if (matches.length) lastVersion = state.version;
+        if (matches.length) lastVersion = statsStamp;
       })());
     }
     if (schedMoved) {
       jobs.push((async () => {
-        try { schedule = await asJson(await pub('/pub/' + slug + '/schedule')); }
-        catch (e) { schedule = null; }
-        lastSched = state.schedule;
+        schedule = await fetchStamped(
+          state.schedule !== null, snap && snap.schedule !== null, 'schedule.json', '/schedule');
+        lastSched = schedStamp;
       })());
     }
     if (catsMoved) {
       jobs.push((async () => {
-        try { catmap = state.cats ? await asJson(await pub('/pub/' + slug + '/cats')) : null; }
-        catch (e) { catmap = null; }
-        lastCats = state.cats;
+        catmap = await fetchStamped(
+          Boolean(state.cats), snap && snap.cats !== null, 'cats.json', '/cats');
+        lastCats = catsStamp;
       })());
     }
     await Promise.all(jobs);

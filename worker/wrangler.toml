@@ -22,8 +22,28 @@ type = "ratelimit"
 namespace_id = "1001"
 simple = { limit = 30, period = 60 }
 
+# Public-snapshot publisher (worker.js "public snapshots on GitHub"):
+# publishes the public page's heavy blobs to a GitHub data repo every
+# minute so viewers fetch them from raw.githubusercontent.com instead of
+# this Worker. Apply migrate-pub.sql before enabling.
+[triggers]
+crons = ["* * * * *"]
+
 [vars]
 # Origin of the GitHub Pages site — used for CORS.
 ALLOWED_ORIGIN = "https://qbsuite.github.io"
 
-# No secrets: all access is via unguessable link secrets (see worker.js).
+# Snapshot publisher config — leave SNAPSHOT_REPO empty to disable the
+# whole feature (the cron then no-ops and /pub serves everything, exactly
+# as before). Credential: either a GitHub App with contents:write on ONLY
+# the data repo (fill the two ids below + `npx wrangler secret put
+# GITHUB_APP_KEY` with the PKCS#8-converted private key), or a
+# fine-grained PAT (`npx wrangler secret put GITHUB_TOKEN`). Setup steps:
+# ../README.md ("Public snapshots on GitHub").
+SNAPSHOT_REPO = "qbsuite/qb-td-live"
+SNAPSHOT_BRANCH = "main"
+GITHUB_APP_ID = "4565927"
+GITHUB_INSTALLATION_ID = "153087044"
+
+# The only secrets are the snapshot publisher's GitHub credential (above);
+# all request access is via unguessable link secrets (see worker.js).
