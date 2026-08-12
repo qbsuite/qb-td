@@ -347,6 +347,35 @@ change; old slugs can be deleted from the branch freely (archived pages
 don't read it, and SHA-pinned fetches of *recorded* snapshots still
 resolve through history).
 
+## Deleting a tournament (operator runbook)
+
+There is deliberately no delete API — nothing reachable from the
+internet can destroy a tournament. Normally none is needed: tournaments
+go final after 96 h and unpublished ones are invisible. To actually
+remove one (spam, a test that got published), do it with operator
+credentials from `worker/`:
+
+```bash
+# find the id and its uploaded blobs
+npx wrangler d1 execute qb-td --remote --command \
+  "SELECT id FROM tournaments WHERE slug='<slug>'"
+npx wrangler d1 execute qb-td --remote --command \
+  "SELECT r2_key FROM files WHERE tournament_id=<id>"
+
+# delete rows (all four tables key off the tournament), then each blob —
+# everything lives under the t/<id>/ prefix: the uploads from the query
+# above, packet keys from the rounds table, and the derived
+# combined.json / schedule.json / catmap.json / roster.qbj /
+# tiebreakers.json where present
+npx wrangler d1 execute qb-td --remote --command \
+  "DELETE FROM files WHERE tournament_id=<id>; DELETE FROM buckets WHERE tournament_id=<id>; DELETE FROM rounds WHERE tournament_id=<id>; DELETE FROM tournaments WHERE id=<id>"
+npx wrangler r2 object delete "qb-td-data/<r2_key>" --remote
+```
+
+If snapshots are enabled, also `git rm -r <slug>` in the data repo —
+harmless to skip (nothing points at it once `/pub/:slug` is gone), but
+tidy.
+
 ## Buzzpoints password
 
 The one place qb-td has a user-chosen secret rather than a generated one,
