@@ -84,16 +84,17 @@ function listTournaments() {
 
 /* ---------- capture ---------- */
 
-// The public bundle must never carry packet text. `notes` is the one long
-// free-text field a match qbj legitimately has (MODAQ writes "Tossup thrown
-// out on question N" into it); anything else long means question text
-// leaked into a file about to be committed and served forever.
+// The public bundle must never carry packet text. The Worker strips
+// `notes` (protest reasons — mod free text that quotes answers) from
+// every bundle entry, so nothing long belongs here at all: any long
+// string means question text leaked into a file about to be committed
+// and served forever. (A bundle from before the strip may still carry
+// short MODAQ notes like "Tossup thrown out on question N" — fine.)
 function assertNoQuestionText(bundle) {
   const long = [];
   (function walk(o, path) {
     if (!o || typeof o !== 'object') return;
     for (const [k, v] of Object.entries(o)) {
-      if (k === 'notes') continue;
       if (typeof v === 'string' && v.length > 120) long.push(path + '.' + k);
       else if (typeof v === 'object') walk(v, path + '.' + k);
     }

@@ -185,6 +185,32 @@ Part of [qbsuite](https://qbsuite.github.io/).
   tiebreaker pool (question text included) is served only through admin
   and bucket links — the same trust level as packets; only the
   bucket-side copy carries the usage log the reader panel shows.
+- **Question text is encrypted at rest — the operator can't read it
+  either.** Every question-text blob (packets, the tiebreaker pool, the
+  reader's combined game uploads) is AES-256-GCM-encrypted in R2 under a
+  random per-tournament content key, and that key is stored only wrapped
+  under keys derived from the link secrets — which D1 itself holds only
+  as SHA-256 hashes. Every request that legitimately needs plaintext
+  carries a secret in its URL (or the buzzpoints derived key in its
+  `Authorization` header); the Worker unwraps the content key per
+  request, in memory only. So browsing the R2 bucket or the database —
+  operator included — yields ciphertext and hashes, a D1 leak hands out
+  no working links, and once a tournament's links expire its question
+  text is cryptographically gone even though the blobs remain. The
+  honest limit: nothing can stop a malicious operator from *modifying
+  the running Worker* to capture secrets in flight — the Worker must
+  produce plaintext for moderators. What encryption removes is at-rest
+  and retroactive access. (`worker.js` "question text encryption",
+  `migrate-crypt.sql`.)
+- **Match `notes` never reach a public copy.** MODAQ writes protest
+  reasons — moderator free text that routinely quotes answers — into the
+  match qbj's `notes` field verbatim. The Worker strips `notes` from
+  every bundle entry (and the public per-game qbj downloads are served
+  from the bundle), so the live public page, the GitHub snapshot repo,
+  and archive captures never carry it; the TO's admin downloads keep it
+  for the `.yft`. Rooms likewise receive only the reader game format
+  from `settings` — never the buzzpoints config, whose stored hash would
+  otherwise invite an offline attack on the TO's password.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
   that leaks into a crawler or an outbound click doesn't spread.
 - **Request economics** (Cloudflare free tier): the public page
@@ -278,6 +304,8 @@ node tests/snapshot_publish.js   # GitHub snapshot publisher (D1/R2/GitHub mocke
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
+# an existing local DB from before at-rest encryption needs, once:
+#   npx wrangler d1 execute qb-td --local --file migrate-crypt.sql
 npx wrangler dev --local --port 8799 &
 cd .. && node tests/e2e_worker.js
 ```
@@ -295,7 +323,12 @@ end, which is also how it exercises the `final` caching path.
 4. `npx wrangler d1 execute qb-td --remote --file schema.sql`
    (a database created before broadcasts existed also needs
    `npx wrangler d1 execute qb-td --remote --file migrate-announce.sql`,
-   once — `schema.sql` is re-runnable and can't add a column)
+   and one from before at-rest encryption needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-crypt.sql`,
+   each once — `schema.sql` is re-runnable and can't add a column.
+   Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
+   tournaments created before the migration stay on the legacy
+   plaintext paths and age out within 48 h)
 5. `npx wrangler deploy`
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
@@ -304,24 +337,31 @@ end, which is also how it exercises the `final` caching path.
 ## Public snapshots on GitHub (optional)
 
 Makes public stat viewing free at any audience size. Without it, every
-viewer's blob refetches (the stats bundle, schedule, category map,
-roster) hit the Worker — and the bundle grows with the tournament, so a
-popular event spends the same 100k-requests/day budget the moderator
-rooms and TO dashboard run on. With it, the Worker publishes those blobs
-to a GitHub data repo (one atomic commit per change, at most one per
-minute per tournament) and `/pub/:slug` advertises the commit SHA; the
-public page then fetches `raw.githubusercontent.com/<repo>/<sha>/…` —
-immutable, CDN-served, zero Worker requests. Viewers still poll the tiny
-live state (round, broadcasts, stamps) every 5 minutes: that stays on
-the Worker on purpose — broadcasts are for *now*, and ~12 small
-requests/hour/viewer buys ~8,000 concurrent viewer-hours per day of
-headroom. Buzzpoints also stay on the Worker: packet text is
-password-gated per request, which a static host can't do.
+viewer's requests (the 5-minute state poll, plus blob refetches of the
+stats bundle, schedule, category map, roster) hit the Worker — and the
+bundle grows with the tournament, so a popular event spends the same
+100k-requests/day budget the moderator rooms and TO dashboard run on.
+With it, the Worker publishes to a GitHub data repo on every change (at
+most once per minute per tournament): first the blobs, one atomic
+commit, then `<slug>/state.json` — a frozen copy of the `/pub/:slug`
+response carrying that blob commit's SHA. The public page fetches blobs
+SHA-pinned from `raw.githubusercontent.com/<repo>/<sha>/…` (immutable,
+CDN-served) and polls `state.json` from the branch head, whose ~5-minute
+CDN cache matches the poll cadence — so a steady viewer sends the Worker
+*nothing*. The Worker answers one `/pub/:slug` per page load (that's how
+the page learns the repo and branch, and it beats the CDN's staleness on
+open) and keeps serving every route as the automatic fallback. Two
+things a frozen state can't compute travel as data: broadcasts carry
+their expiry (the page filters), and `final_after` tells the page when
+to stop polling on its own. Buzzpoints stay on the Worker: packet text
+is password-gated per request, which a static host can't do.
 
 Every fetch falls back to the `/pub` routes, so a failed publish, a
 pruned repo, or turning the feature off just means Worker serving —
-exactly the behavior without this section. Archive captures ignore
-snapshots entirely (the capture is the data).
+exactly the behavior without this section. Unpublishing a tournament
+makes the next cron tick delete its folder from the branch head, so the
+static poll stops finding it. Archive captures ignore snapshots
+entirely (the capture is the data).
 
 Setup:
 
@@ -340,12 +380,14 @@ Setup:
    deploy`. The cron trigger deploys with it; setting `SNAPSHOT_REPO`
    back to `""` turns the whole feature off again.
 
-Freshness: a change is committed within ~a minute and viewers see it on
-their next 5-minute state poll — same worst-case cadence as before, one
-cron tick later. The data repo's history grows one small commit per
-change; old slugs can be deleted from the branch freely (archived pages
-don't read it, and SHA-pinned fetches of *recorded* snapshots still
-resolve through history).
+Freshness: a change is committed within ~a minute; a viewer's next
+5-minute poll sees it as soon as the raw CDN's ~5-minute cache on the
+branch-head `state.json` turns over — worst case roughly two poll
+periods end to end, typically one. The refresh button skips all of that
+(it re-asks the Worker directly). The data repo's history grows two
+small commits per change; old slugs can be deleted from the branch
+freely (archived pages don't read it, and SHA-pinned fetches of
+*recorded* snapshots still resolve through history).
 
 ## Deleting a tournament (operator runbook)
 
@@ -374,7 +416,14 @@ npx wrangler r2 object delete "qb-td-data/<r2_key>" --remote
 
 If snapshots are enabled, also `git rm -r <slug>` in the data repo —
 harmless to skip (nothing points at it once `/pub/:slug` is gone), but
-tidy.
+tidy. Know what that does and doesn't remove: **git history is
+forever** on a public repo — deleting a folder from the branch head
+leaves every old commit fetchable by SHA. The snapshot repo only ever
+receives text-free public data (bundle, schedule, category map, roster,
+state), so normally this is fine — but a roster carries player names,
+and a true scrub of anything that should never have been published
+means rewriting history (`git filter-repo` + force push), not just
+`git rm`.
 
 ## Buzzpoints password
 
@@ -406,6 +455,14 @@ password. 30 attempts a minute is a wall for a wordlist but not for
 "stanford" as the third guess. Generating the password instead of letting
 the TD pick one would remove the problem rather than slow it; that is a
 deliberate open choice, not an oversight.
+
+**Setting a password also sends the derived key once** (`buzz_token`
+alongside the settings): the Worker wraps the tournament's content key
+under it (`buzz_wrap`) so the gated `qpacket` route can decrypt packets
+at request time, then discards it — it is stored on neither side. A
+password set by a client that skipped the token (or a wrap that
+predates the current password) leaves the route answering 409 "packets
+locked"; setting the password again repairs it.
 
 Tournaments whose password predates the KDF carry `{mode, salt, hash}`
 with no `kdf`, verified the old way (`sha256("salt:password")`, password

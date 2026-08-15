@@ -24,7 +24,7 @@ import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
   hasPlaceholders, poolStandings, fillPlaceholders } from '../engine/schedule.js';
 import { annLive, annTime } from './announce.js';
-import { buzzSettings } from './buzzkey.js';
+import { buzzCredentials } from './buzzkey.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -1543,8 +1543,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   };
   $('setround').onclick = () => goToRound(Number($('curround').value));
   if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
-  const saveSettings = async (next) => {
-    await pub(a, { method: 'POST', json: { settings: next } });
+  const saveSettings = async (next, extra) => {
+    await pub(a, { method: 'POST', json: { settings: next, ...extra } });
     settings = next;
   };
   $('gformat').onchange = async () => {
@@ -1623,9 +1623,12 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     if (!pw) { say('Enter a password', true); return; }
     try {
       // PBKDF2 at 600k iterations takes about a second here; the Worker
-      // only ever sees what comes back (buzzkey.js).
+      // only ever sees what comes back (buzzkey.js). The derived token
+      // rides along once so the Worker can wrap the content key for the
+      // gated packet route — it is not stored on either side.
       say('Setting password…');
-      await saveSettings({ ...settings, buzz: await buzzSettings(pw) });
+      const cred = await buzzCredentials(pw);
+      await saveSettings({ ...settings, buzz: cred.settings }, { buzz_token: cred.token });
       say('Buzzpoints password set');
       showDetail();
     } catch (e) { say(e.message, true); }

@@ -3,11 +3,20 @@
 
 -- No accounts: the unguessable admin_secret in the TO's link is the only
 -- credential, and it stops working 48h after creation (worker.js ADMIN_TTL).
+--
+-- Question-text encryption (worker.js "question text encryption"): rows
+-- with admin_wrap set store SHA-256 of the admin secret in admin_secret
+-- (64 hex chars — link secrets are 10-40 chars, so the two can never
+-- collide) and their question-text blobs in R2 are encrypted under a
+-- per-tournament content key held only in the wrap columns. Rows without
+-- admin_wrap are legacy: plaintext secret, plaintext blobs.
 CREATE TABLE IF NOT EXISTS tournaments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   slug TEXT NOT NULL UNIQUE,         -- public stats URL slug
   name TEXT NOT NULL,
-  admin_secret TEXT NOT NULL UNIQUE, -- the TO's admin link credential
+  admin_secret TEXT NOT NULL UNIQUE, -- the TO's admin link credential (hashed; see above)
+  admin_wrap TEXT,                   -- content key wrapped under the admin secret
+  buzz_wrap TEXT,                    -- content key wrapped under the buzzpoints derived key
   creator_ip TEXT,                   -- creation rate limiting only
   current_round INTEGER NOT NULL DEFAULT 1,
   published INTEGER NOT NULL DEFAULT 0,
@@ -28,7 +37,8 @@ CREATE TABLE IF NOT EXISTS buckets (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tournament_id INTEGER NOT NULL,
   room_name TEXT NOT NULL,
-  secret TEXT NOT NULL UNIQUE,
+  secret TEXT NOT NULL UNIQUE,       -- hashed when wrap is set (see tournaments)
+  wrap TEXT,                         -- content key wrapped under this room's secret
   created INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_buckets_tournament ON buckets(tournament_id);

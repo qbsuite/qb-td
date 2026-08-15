@@ -1,7 +1,9 @@
 // pubview.js — the public tournament page (t.html?t=<slug>): schedule +
 // stats tabs. Data comes from the publish-gated /pub routes; the page
-// polls the tiny /pub/:slug state while visible and refetches the stats
-// bundle / schedule blob only when their stamps move.
+// polls the tiny tournament state while visible — from the GitHub
+// snapshot's state.json when one is published, from /pub/:slug
+// otherwise — and refetches the stats bundle / schedule blob only when
+// their stamps move.
 
 import { pub, esc, usingStaticData } from './api.js';
 import { annCards } from './announce.js';
@@ -58,6 +60,27 @@ const asJson = async (res) => (res instanceof Response ? JSON.parse(await res.te
    answers from local data (demo / archive captures). */
 
 let snap = null; // state.pub when usable on this page; set by load()
+
+// Where the publisher keeps this tournament's state.json: learned from
+// /pub/:slug (whose pub field names repo + branch), remembered across
+// polls. With it set, the CHECK_MS poll fetches GitHub's branch head —
+// ~5-minute CDN cache, same as the poll cadence — instead of the
+// Worker, so steady viewers cost the Worker nothing. The first load and
+// the refresh button still go to the Worker: that's the discovery path,
+// it bypasses the CDN's staleness, and it keeps working when snapshots
+// are off.
+let statehome = null; // {repo, branch}
+
+async function fetchState(force) {
+  if (!force && statehome && !usingStaticData()) {
+    try {
+      const res = await fetch('https://raw.githubusercontent.com/' + statehome.repo + '/'
+        + statehome.branch + '/' + slug + '/state.json');
+      if (res.ok) return await res.json();
+    } catch (e) { /* fall through to the Worker */ }
+  }
+  return asJson(await pub('/pub/' + slug));
+}
 
 async function fetchSnap(name) {
   const res = await fetch(
@@ -635,25 +658,33 @@ function setTab(next, push = true) {
 
 async function load(force = false) {
   try {
-    const next = await pub('/pub/' + slug);
+    const next = await fetchState(force);
     state = next;
     // Track the snapshot's stamps when one is advertised — its blobs are
     // what we'll fetch, so refetch decisions must follow what IT holds
     // (it may trail the Worker by up to a cron tick; the next poll
     // converges). Frozen data (demo/archive) never uses snapshots.
     snap = !usingStaticData() && state.pub && state.pub.sha ? state.pub : null;
+    statehome = snap && snap.repo && snap.branch && snap.state
+      ? { repo: snap.repo, branch: snap.branch } : null;
     // Past every upload deadline the results can't move again: stop
     // polling for good. The refresh button still works, and the Worker
     // stops seeing traffic from tabs left open on old tournaments.
-    if (state.final && poll) { clearInterval(poll); poll = null; }
+    // (final_after covers a frozen state.json, which can't recompute
+    // final itself: past that moment this page flips on its own.)
+    const final = state.final || (state.final_after && Date.now() > state.final_after);
+    if (final && poll) { clearInterval(poll); poll = null; }
     const storedKey = buzzStored();
     if (storedKey && storedKey.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;
     // Broadcasts have no stamp of their own — they ride the state poll and
-    // must render before the no-change early return below.
-    $('ann').innerHTML = annCards(state.announce, 'announcement');
+    // must render before the no-change early return below. A frozen
+    // state.json can't drop expired ones, so filter here (Worker
+    // responses pre-filter; the extra check is a no-op there).
+    $('ann').innerHTML = annCards(
+      state.announce.filter((a) => !a.expires || a.expires > Date.now()), 'announcement');
     $('tab-buzz').hidden = !state.buzz;
     $('tab-cats').hidden = !state.cats;
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);

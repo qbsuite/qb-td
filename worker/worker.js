@@ -16,7 +16,9 @@
 //
 // Storage: metadata in D1 (schema.sql), blobs in R2 under t/<tid>/...
 // All blob reads stream through the Worker so the publish gate is enforced
-// in one place.
+// in one place. Question-text blobs are encrypted at rest under a
+// per-tournament key that only the link secrets can unwrap, and the
+// secrets themselves are stored hashed — see "question text encryption".
 
 // Admin and bucket links die 48h after their row's creation (question
 // security: a leaked link stops working soon after the tournament; a
@@ -104,6 +106,129 @@ function cleanName(s) {
   return String(s || '').trim().slice(0, MAX_NAME);
 }
 
+/* ---------- question text encryption ----------
+   Question-text blobs (packets, the tiebreaker pool, moderator game
+   uploads) are encrypted at rest with a random per-tournament content
+   key, and that key is stored only WRAPPED under keys derived from the
+   link secrets — which are themselves stored only as SHA-256 hashes. So
+   neither R2 nor D1 at rest can produce question text: every request
+   that legitimately needs plaintext carries a secret in its URL (or the
+   buzzpoints derived key in its Authorization header), and the Worker
+   unwraps the content key per request, in memory only.
+
+   What this is and is not: it makes question text unreadable to anyone
+   browsing the bucket or database (operator included), and once a
+   tournament's links expire the text is cryptographically gone even
+   though the blobs remain. It does NOT defend against a malicious
+   operator modifying the running Worker to capture secrets in flight —
+   nothing can, since the Worker must produce plaintext for moderators.
+
+   Mechanics: tournaments carry admin_wrap (content key wrapped under
+   the admin secret) and buzz_wrap (wrapped under the buzzpoints derived
+   key, written when the TO sets a password — the dashboard sends the
+   derived token once, purely for wrapping); each bucket carries wrap
+   (wrapped under its own secret). Credential columns hold SHA-256 of
+   the secret on new rows (64 hex chars; real secrets are 10-40 chars,
+   so lookups check both forms and the two can never collide). Encrypted
+   R2 objects are AES-256-GCM (iv || ciphertext) marked with
+   customMetadata {enc: '1', ct: <original content type>}; blobs without
+   the marker are legacy plaintext and serve as before. Rows without
+   admin_wrap are legacy throughout — the 48h TTL ages them out of every
+   write path within two days of the migration (migrate-crypt.sql).
+
+   Public blobs (bundle, schedule, catmap, roster) stay plaintext by
+   design: they are text-free and the whole point is serving them
+   without credentials. The cron publisher holds no secrets and needs
+   none. */
+
+const enc8 = (s) => new TextEncoder().encode(s);
+const b64ToBytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+// What credential columns store for new rows. Domain-separated so the
+// stored value can't double as anything else derived from the secret.
+function secretHash(secret) {
+  return sha256Hex('qbtd-cred:' + secret);
+}
+
+// AES-GCM key-encryption key for one role ('admin' | 'bucket' | 'buzz')
+// of one secret. HKDF, not PBKDF2: link secrets are ~99-bit random
+// values, so stretching would cost CPU and buy nothing.
+async function deriveKek(secret, role) {
+  const ikm = await crypto.subtle.importKey('raw', enc8(secret), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: enc8('qb-td-wrap-v1'), info: enc8(role) },
+    ikm, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+async function aesEncrypt(key, bytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
+  const out = new Uint8Array(iv.length + ct.length);
+  out.set(iv); out.set(ct, iv.length);
+  return out;
+}
+async function aesDecrypt(key, bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: u8.subarray(0, 12) }, key, u8.subarray(12));
+}
+
+// wrap/unwrap the raw 32-byte content key under a secret-derived KEK
+async function wrapKey(secret, role, rawKey) {
+  return b64bytes(await aesEncrypt(await deriveKek(secret, role), rawKey));
+}
+async function unwrapKey(secret, role, wrapped) {
+  return new Uint8Array(await aesDecrypt(await deriveKek(secret, role), b64ToBytes(wrapped)));
+}
+
+function contentKey(rawKey) {
+  return crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+function blobEnc(r2obj) {
+  return (r2obj.customMetadata || {}).enc === '1';
+}
+
+// R2 put that encrypts when the tournament has a content key. `opts`
+// may carry onlyIf (conditional writes keep working — the etag guards
+// the ciphertext exactly as it would the plaintext) and customMetadata.
+async function putBlob(env, key, body, contentType, rawKey, opts = {}) {
+  if (!rawKey) {
+    return env.DATA.put(key, body, {
+      httpMetadata: { contentType },
+      customMetadata: opts.customMetadata,
+      onlyIf: opts.onlyIf,
+    });
+  }
+  return env.DATA.put(key, await aesEncrypt(await contentKey(rawKey), typeof body === 'string' ? enc8(body) : new Uint8Array(body)), {
+    httpMetadata: { contentType: 'application/octet-stream' },
+    customMetadata: { ...(opts.customMetadata || {}), enc: '1', ct: contentType },
+    onlyIf: opts.onlyIf,
+  });
+}
+
+// The blob's plaintext bytes, whichever way it is stored. An encrypted
+// blob with no key available is a caller bug (the routes that reach one
+// always hold a secret); GCM auth failure on a wrong key throws.
+async function readBlob(r2obj, rawKey) {
+  const buf = await r2obj.arrayBuffer();
+  if (!blobEnc(r2obj)) return buf;
+  return aesDecrypt(await contentKey(rawKey), buf);
+}
+
+// blobResponse for maybe-encrypted objects.
+async function blobResponseDec(env, r2obj, rawKey, filename, cacheSeconds = 0) {
+  if (!blobEnc(r2obj)) return blobResponse(env, r2obj, filename, cacheSeconds);
+  const buf = await readBlob(r2obj, rawKey);
+  const headers = new Headers(corsHeaders(env));
+  headers.set('Content-Type', (r2obj.customMetadata || {}).ct || 'application/octet-stream');
+  if (filename) {
+    headers.set('Content-Disposition',
+      `attachment; filename="${filename.replace(/["\\\r\n]/g, '_')}"`);
+  }
+  if (cacheSeconds) headers.set('Cache-Control', 'public, max-age=' + cacheSeconds);
+  return new Response(buf, { status: 200, headers });
+}
+
 // The reader uploads ONE `.qbtd.json` per game: {qbj: <match>, game:
 // <MODAQ state>, tb?: {used: [ids]}}. The game half holds the full packet
 // text, so only the extracted qbj half may ever reach the bundle or a
@@ -129,6 +254,22 @@ function extractMatch(text) {
   // qbj: what the bundle stores (an {objects} wrapper is kept as-is —
   // the engine unwraps it — but a combined file contributes only .qbj).
   return { error: null, qbj: obj, root, teams: names };
+}
+
+// MODAQ writes protest reasons — moderator free text that routinely
+// quotes answers — verbatim into the match's `notes`. Nothing public
+// renders notes, so every public copy of a qbj (the bundle, and /pub
+// qbj downloads served from it) drops the field; the TO's admin
+// downloads keep it for the .yft. Mutates and returns its argument.
+function stripMatchNotes(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  delete obj.notes;
+  if (Array.isArray(obj.objects)) {
+    for (const o of obj.objects) {
+      if (o && typeof o === 'object') delete o.notes;
+    }
+  }
+  return obj;
 }
 
 /* ---------- broadcasts ----------
@@ -194,7 +335,9 @@ function visibleAnnounce(list) {
   const now = Date.now();
   return list
     .filter((a) => Number(a.expires) > now)
-    .map((a) => ({ id: a.id, text: a.text, level: a.level, created: a.created }))
+    // expires rides along for the GitHub-published state.json, whose
+    // reader must drop entries this filter can't see expire.
+    .map((a) => ({ id: a.id, text: a.text, level: a.level, created: a.created, expires: a.expires }))
     .sort((x, y) => (x.level === y.level
       ? y.created - x.created
       : x.level === 'alert' ? -1 : 1));
@@ -245,19 +388,33 @@ async function updateBundle(env, tid, mutate) {
    and /pub/:slug advertises the commit SHA. The page then fetches
    raw.githubusercontent.com/<repo>/<sha>/<slug>/*.json — SHA-pinned raw
    URLs are immutable (no CDN staleness) and don't touch the Worker, so
-   viewer count stops mattering to the request budget. The Worker keeps
-   serving the same routes as the fallback, plus everything live
-   (state poll, broadcasts) or gated (buzzpoints), which must not sit
-   behind a static host.
+   viewer count stops mattering to the request budget.
 
-   Mechanics: blob-affecting mutations set tournaments.pub_dirty
-   (markPub); a 1-minute cron publishes dirty published tournaments —
-   cron serializes the commits, so simultaneous room uploads can't race
-   two commits against each other. The publisher claims (dirty=0) before
-   it works and restores the flag on failure, so a mutation landing
-   mid-publish just schedules the next one. pub_snapshot records what
-   the last commit contained — the per-blob stamps mirror pubState's, so
-   the client's refetch-on-stamp-move logic works identically either way.
+   The poll rides GitHub too: each publish freezes the /pub/:slug body
+   into <slug>/state.json (a second commit, so it can carry the blob
+   commit's sha), and the page's 5-minute check fetches it from the
+   BRANCH-HEAD raw URL — mutable, ~5-minute CDN cache, which matches the
+   poll cadence. So steady-state viewers cost the Worker nothing at all;
+   the Worker answers one /pub/:slug per page load (discovery: it names
+   repo + branch) plus anything the fallback needs. It keeps serving
+   every route as that fallback, plus what's gated (buzzpoints packet
+   text — password-checked per request, must never sit in a public
+   repo). Broadcasts and round state ride state.json now, so EVERY
+   /pub-visible mutation must markPub, not just blob-affecting ones.
+
+   Mechanics: mutations set tournaments.pub_dirty (markPub); a 1-minute
+   cron publishes dirty published tournaments — cron serializes the
+   commits, so simultaneous room uploads can't race two commits against
+   each other — and retracts dirty unpublished ones (deletes the slug's
+   folder from the branch head, so the static poll stops finding them).
+   The publisher claims (dirty=0) before it works and restores the flag
+   on failure, so a mutation landing mid-publish just schedules the next
+   one. pub_snapshot records what the last commit contained — the
+   per-blob stamps mirror pubState's, so the client's
+   refetch-on-stamp-move logic works identically either way. Two things
+   a frozen state.json can't compute get shipped as data: announce
+   entries carry `expires` (the page filters), and `final_after` lets
+   the page flip itself final without asking anyone.
 
    Config (all optional — with SNAPSHOT_REPO unset this whole section is
    dead code): SNAPSHOT_REPO ("owner/repo") + SNAPSHOT_BRANCH vars, and a
@@ -342,12 +499,65 @@ async function github(env, method, path, body, bearer) {
 
 /* ----- the publisher ----- */
 
-// Build + commit one tournament's snapshot. Returns the descriptor that
-// pub_snapshot stores and /pub/:slug advertises: { sha, at, version,
-// schedule, cats, roster, bundle } — stamps mirror pubState, booleans say
-// which files the commit actually contains (the page falls back to the
-// Worker route for anything absent).
-async function publishSnapshot(env, t) {
+// One commit of [path, body, hadBefore] entries onto the branch head:
+// body is bytes to write, null means delete — but only when hadBefore
+// says the path was actually committed before, so sha:null can't point
+// at paths that never existed. A concurrent writer (overlapping cron,
+// manual push to the data repo) makes the ref update non-fast-forward;
+// retry from a fresh head once. Returns the new commit sha, or the
+// unchanged head when nothing needed committing.
+async function commitFiles(env, message, entries) {
+  const repo = env.SNAPSHOT_REPO;
+  const branch = env.SNAPSHOT_BRANCH || 'main';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ref = await github(env, 'GET', `/repos/${repo}/git/ref/heads/${branch}`);
+    const head = ref ? ref.object.sha : null;
+    const baseTree = head
+      ? (await github(env, 'GET', `/repos/${repo}/git/commits/${head}`)).tree.sha
+      : undefined;
+
+    const tree = [];
+    for (const [path, body, hadBefore] of entries) {
+      if (body !== null) {
+        const blob = await github(env, 'POST', `/repos/${repo}/git/blobs`,
+          { content: b64bytes(body), encoding: 'base64' });
+        tree.push({ path, mode: '100644', type: 'blob', sha: blob.sha });
+      } else if (hadBefore && head) {
+        tree.push({ path, mode: '100644', type: 'blob', sha: null });
+      }
+    }
+    if (!tree.length) return head; // nothing to commit (or delete)
+
+    const newTree = await github(env, 'POST', `/repos/${repo}/git/trees`,
+      baseTree ? { base_tree: baseTree, tree } : { tree });
+    const commit = await github(env, 'POST', `/repos/${repo}/git/commits`, {
+      message,
+      tree: newTree.sha,
+      parents: head ? [head] : [],
+    });
+    try {
+      if (head) {
+        await github(env, 'PATCH', `/repos/${repo}/git/refs/heads/${branch}`, { sha: commit.sha });
+      } else {
+        await github(env, 'POST', `/repos/${repo}/git/refs`,
+          { ref: `refs/heads/${branch}`, sha: commit.sha });
+      }
+      return commit.sha;
+    } catch (e) {
+      if (attempt === 1) throw e;
+    }
+  }
+  return null; // unreachable: attempt 1 either returned or threw
+}
+
+// Gather one tournament's publishable blobs. Returns { entries, snapOf }:
+// entries feed the tick's shared batch commit, and snapOf(batchSha)
+// builds the descriptor that pub_snapshot stores and /pub/:slug
+// advertises — { sha, at, version, schedule, cats, roster, roster_at,
+// bundle, branch, state } — once the batch's commit sha is known. Stamps
+// mirror pubState, booleans say which files the branch actually holds
+// (the page falls back to the Worker route for anything absent).
+async function buildPublish(env, t) {
   const prev = (() => {
     try { return JSON.parse(t.pub_snapshot) || null; } catch (e) { return null; }
   })();
@@ -380,93 +590,150 @@ async function publishSnapshot(env, t) {
   const bundleBody = bundleObj ? await bundleObj.arrayBuffer() : null;
   const bundleOk = bundleBody !== null && bundleBody.byteLength <= PUB_MAX_SNAPSHOT;
 
-  const wanted = [
-    ['bundle.json', bundleOk ? bundleBody : null, prev && prev.bundle],
-    ['schedule.json', schedObj ? await schedObj.arrayBuffer() : null, prev && prev.schedule !== null && prev.schedule !== undefined],
-    ['cats.json', catsBody, prev && prev.cats !== null && prev.cats !== undefined],
-    ['roster.json', rosterObj ? await rosterObj.arrayBuffer() : null, prev && prev.roster],
-  ];
+  const version = statsVersion(files.results);
+  const schedStamp = schedObj ? schedObj.uploaded.getTime() : null;
+  const rosterStamp = rosterObj ? rosterObj.uploaded.getTime() : null;
 
-  const repo = env.SNAPSHOT_REPO;
-  const branch = env.SNAPSHOT_BRANCH || 'main';
-
-  // Two attempts: a concurrent writer (overlapping cron, manual push to
-  // the data repo) makes the ref update non-fast-forward; retry from a
-  // fresh head once.
-  let sha = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const ref = await github(env, 'GET', `/repos/${repo}/git/ref/heads/${branch}`);
-    const head = ref ? ref.object.sha : null;
-    const baseTree = head
-      ? (await github(env, 'GET', `/repos/${repo}/git/commits/${head}`)).tree.sha
-      : undefined;
-
-    const tree = [];
-    for (const [name, body, hadBefore] of wanted) {
-      const path = `${t.slug}/${name}`;
-      if (body !== null) {
-        const blob = await github(env, 'POST', `/repos/${repo}/git/blobs`,
-          { content: b64bytes(body), encoding: 'base64' });
-        tree.push({ path, mode: '100644', type: 'blob', sha: blob.sha });
-      } else if (hadBefore && head) {
-        // Deleting only what the previous snapshot recorded keeps
-        // sha:null from pointing at paths that were never committed.
-        tree.push({ path, mode: '100644', type: 'blob', sha: null });
-      }
-    }
-    if (!tree.length) { sha = head; break; } // nothing to commit (or delete)
-
-    const newTree = await github(env, 'POST', `/repos/${repo}/git/trees`,
-      baseTree ? { base_tree: baseTree, tree } : { tree });
-    const commit = await github(env, 'POST', `/repos/${repo}/git/commits`, {
-      message: `publish ${t.slug}`,
-      tree: newTree.sha,
-      parents: head ? [head] : [],
-    });
-    try {
-      if (head) {
-        await github(env, 'PATCH', `/repos/${repo}/git/refs/heads/${branch}`, { sha: commit.sha });
-      } else {
-        await github(env, 'POST', `/repos/${repo}/git/refs`,
-          { ref: `refs/heads/${branch}`, sha: commit.sha });
-      }
-      sha = commit.sha;
-      break;
-    } catch (e) {
-      if (attempt === 1) throw e;
-    }
-  }
+  // A blob whose stamp matches the last publish is already at the branch
+  // head (base_tree carries it forward), so re-uploading it only spends
+  // GitHub API calls — the difference between a broadcast-only republish
+  // costing 6 calls and 13, and what keeps a 30-tournament day under the
+  // App's 5,000/hour rate limit. Skips need prev.sha: without a prior
+  // commit the stamps have nothing on the branch to vouch for.
+  const had = {
+    bundle: prev && prev.bundle,
+    schedule: prev && prev.schedule !== null && prev.schedule !== undefined,
+    cats: prev && prev.cats !== null && prev.cats !== undefined,
+    roster: prev && prev.roster,
+  };
+  const same = prev && prev.sha ? {
+    bundle: had.bundle && prev.version === version,
+    schedule: had.schedule && prev.schedule === schedStamp,
+    cats: had.cats && prev.cats === catsStamp,
+    roster: had.roster && prev.roster_at === rosterStamp,
+  } : {};
+  const entries = [];
+  const want = (name, body, key) => {
+    if (body !== null) { if (!same[key]) entries.push([`${t.slug}/${name}`, body, false]); }
+    else if (had[key]) entries.push([`${t.slug}/${name}`, null, true]);
+  };
+  want('bundle.json', bundleOk ? bundleBody : null, 'bundle');
+  want('schedule.json', schedObj ? await schedObj.arrayBuffer() : null, 'schedule');
+  want('cats.json', catsBody, 'cats');
+  want('roster.json', rosterObj ? await rosterObj.arrayBuffer() : null, 'roster');
 
   return {
-    sha,
-    at: Date.now(),
-    version: statsVersion(files.results),
-    schedule: schedObj ? schedObj.uploaded.getTime() : null,
-    cats: catsStamp,
-    roster: Boolean(rosterObj),
-    bundle: bundleOk && sha !== null,
+    entries,
+    snapOf: (batchSha) => {
+      // Nothing of this tournament's in the batch: keep advertising the
+      // commit that already holds its blobs (any commit whose tree
+      // contains them serves; the last one recorded certainly does).
+      const sha = entries.length === 0 && prev && prev.sha ? prev.sha : batchSha;
+      return {
+        sha,
+        at: Date.now(),
+        version,
+        schedule: schedStamp,
+        cats: catsStamp,
+        roster: Boolean(rosterObj),
+        roster_at: rosterStamp,
+        bundle: bundleOk && sha !== null,
+        branch: env.SNAPSHOT_BRANCH || 'main',
+        state: true,
+      };
+    },
   };
 }
 
-// Cron tick: publish dirty published tournaments, a few per minute so a
-// tick stays bounded (the rest carry their flag to the next tick).
+// Unpublish: deletion entries that remove the slug's folder from the
+// branch head, so the page's GitHub poll stops finding it (SHA-pinned
+// history keeps old commits fetchable, but nothing advertises them any
+// more). Only paths the last descriptor recorded are deleted.
+function retractEntries(t) {
+  let prev = null;
+  try { prev = JSON.parse(t.pub_snapshot) || null; } catch (e) { /* nothing recorded */ }
+  return [
+    [`${t.slug}/bundle.json`, null, prev && prev.bundle],
+    [`${t.slug}/schedule.json`, null, prev && prev.schedule !== null && prev.schedule !== undefined],
+    [`${t.slug}/cats.json`, null, prev && prev.cats !== null && prev.cats !== undefined],
+    [`${t.slug}/roster.json`, null, prev && prev.roster],
+    [`${t.slug}/state.json`, null, prev && prev.state],
+  ];
+}
+
+// Cron tick: publish dirty published tournaments — and retract dirty
+// unpublished ones that still have a snapshot on the branch — a few per
+// minute so a tick stays bounded (the rest carry their flag to the next
+// tick). The whole tick is TWO commits regardless of tournament count:
+// one batch of every tournament's changed blobs (and retractions), then
+// one batch of their state.json files pointing at it. Per-tournament
+// commits would spend the ~10-call Git-Data-API overhead once per
+// tournament; batching spends it once per tick, which is what keeps a
+// fully loaded cron inside GitHub's 5,000 requests/hour App limit.
 async function publishDirty(env) {
   if (!snapshotsEnabled(env)) return;
   const { results } = await env.DB.prepare(
-    'SELECT * FROM tournaments WHERE pub_dirty = 1 AND published = 1 ORDER BY created DESC LIMIT 4'
+    'SELECT * FROM tournaments WHERE pub_dirty = 1 AND (published = 1 OR pub_snapshot IS NOT NULL) ORDER BY created DESC LIMIT 4'
   ).all();
+  if (!results.length) return;
+  const reflag = (id) =>
+    env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(id).run();
+  // Claim before working: a mutation mid-publish re-sets the flag and
+  // the next tick picks it up, instead of the clear losing its write.
   for (const t of results) {
-    // Claim before working: a mutation mid-publish re-sets the flag and
-    // the next tick picks it up, instead of the clear losing its write.
     await env.DB.prepare('UPDATE tournaments SET pub_dirty = 0 WHERE id = ?1').bind(t.id).run();
+  }
+
+  const pubs = [];     // { t, entries, snapOf }
+  const retracts = []; // { t, entries }
+  for (const t of results) {
     try {
-      const snap = await publishSnapshot(env, t);
+      if (t.published) pubs.push({ t, ...(await buildPublish(env, t)) });
+      else retracts.push({ t, entries: retractEntries(t) });
+    } catch (e) {
+      console.log('snapshot build failed for', t.slug, e.message);
+      await reflag(t.id);
+    }
+  }
+  if (!pubs.length && !retracts.length) return;
+
+  try {
+    const batch = [...pubs, ...retracts].flatMap((p) => p.entries);
+    const message = [
+      pubs.length ? 'publish ' + pubs.map((p) => p.t.slug).join(', ') : '',
+      retracts.length ? 'unpublish ' + retracts.map((r) => r.t.slug).join(', ') : '',
+    ].filter(Boolean).join('; ');
+    const batchSha = batch.length ? await commitFiles(env, message, batch) : null;
+
+    // Second commit: every published tournament's <slug>/state.json, the
+    // page's poll target. Each mirrors its /pub/:slug response — with
+    // the descriptor made from this very batch, so its stamps and the
+    // blobs it advertises come from the same publish. It must come
+    // second: the descriptors need the batch commit's sha. A failure
+    // anywhere fails the whole tick (everything re-flags), so a stored
+    // descriptor always means a state.json is on the branch.
+    const snaps = pubs.map((p) => ({ t: p.t, snap: p.snapOf(batchSha) }));
+    const stateEntries = [];
+    for (const { t, snap } of snaps) {
+      const body = await pubStateBody(env, t, { repo: env.SNAPSHOT_REPO, ...snap });
+      stateEntries.push(
+        [`${t.slug}/state.json`, new TextEncoder().encode(JSON.stringify(body)).buffer, false]);
+    }
+    if (stateEntries.length) {
+      await commitFiles(env, 'state ' + snaps.map((s) => s.t.slug).join(', '), stateEntries);
+    }
+
+    for (const { t, snap } of snaps) {
       await env.DB.prepare('UPDATE tournaments SET pub_snapshot = ?2 WHERE id = ?1')
         .bind(t.id, JSON.stringify(snap)).run();
-    } catch (e) {
-      console.log('snapshot publish failed for', t.slug, e.message);
-      await env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(t.id).run();
     }
+    for (const r of retracts) {
+      await env.DB.prepare('UPDATE tournaments SET pub_snapshot = NULL WHERE id = ?1')
+        .bind(r.t.id).run();
+    }
+  } catch (e) {
+    console.log('snapshot batch failed:', e.message);
+    for (const p of [...pubs, ...retracts]) await reflag(p.t.id);
   }
 }
 
@@ -474,11 +741,17 @@ async function publishDirty(env) {
    The router resolves the admin secret and expiry once; every handler
    receives the tournament row `t`. */
 
+// Resolve an admin link. New rows store the secret's hash (and match on
+// it); legacy rows match on the raw value. When the row carries
+// admin_wrap, the raw secret from the URL unwraps the content key onto
+// t.ckey — per request, in memory only; getTournament strips it.
 async function getAdminTournament(env, secret) {
   const { results } = await env.DB.prepare(
-    'SELECT * FROM tournaments WHERE admin_secret = ?1'
-  ).bind(secret).all();
-  return results[0] || null;
+    'SELECT * FROM tournaments WHERE admin_secret = ?1 OR admin_secret = ?2'
+  ).bind(secret, await secretHash(secret)).all();
+  const t = results[0] || null;
+  if (t && t.admin_wrap) t.ckey = await unwrapKey(secret, 'admin', t.admin_wrap);
+  return t;
 }
 function adminClosed(t) {
   return Date.now() > t.created + ADMIN_TTL;
@@ -517,10 +790,14 @@ async function createTournament(request, env) {
 
   const adminSecret = randToken();
   const created = Date.now();
+  // Content key: minted here, stored only wrapped (see "question text
+  // encryption"). D1 gets the secret's hash, never the secret.
+  const rawKey = crypto.getRandomValues(new Uint8Array(32));
   try {
     const out = await env.DB.prepare(
-      'INSERT INTO tournaments (slug, name, admin_secret, creator_ip, settings, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
-    ).bind(slug, name, adminSecret, ip, JSON.stringify(body.settings || {}), created).run();
+      'INSERT INTO tournaments (slug, name, admin_secret, admin_wrap, creator_ip, settings, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)'
+    ).bind(slug, name, await secretHash(adminSecret), await wrapKey(adminSecret, 'admin', rawKey),
+      ip, JSON.stringify(body.settings || {}), created).run();
     return json(env, {
       id: out.meta.last_row_id, slug, name,
       admin_secret: adminSecret, closes: created + ADMIN_TTL,
@@ -530,12 +807,15 @@ async function createTournament(request, env) {
   }
 }
 
-// A leaked admin link mid-tournament: mint a new secret, the old link dies.
+// A leaked admin link mid-tournament: mint a new secret, the old link
+// dies. The content key is rewrapped under the new secret (the request
+// already unwrapped it), so the old link can no longer decrypt anything.
 async function rotateAdmin(env, t) {
   const adminSecret = randToken();
   await env.DB.prepare(
-    'UPDATE tournaments SET admin_secret = ?2 WHERE id = ?1'
-  ).bind(t.id, adminSecret).run();
+    'UPDATE tournaments SET admin_secret = ?2, admin_wrap = ?3 WHERE id = ?1'
+  ).bind(t.id, await secretHash(adminSecret),
+    t.ckey ? await wrapKey(adminSecret, 'admin', t.ckey) : null).run();
   return json(env, { admin_secret: adminSecret });
 }
 
@@ -552,9 +832,9 @@ async function getTournament(env, t, ctx) {
   // off the response path
   const staleCats = !catsHead || (catsHead.customMetadata || {}).v !== CATMAP_VERSION;
   if (staleCats && ctx && rounds.results.some((r) => /\.json$/i.test(r.packet_name))) {
-    ctx.waitUntil(rebuildCatmap(env, id));
+    ctx.waitUntil(rebuildCatmap(env, id, t.ckey));
   }
-  const { admin_secret, creator_ip, ...pub_t } = t;
+  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, ...pub_t } = t;
   return json(env, {
     tournament: { ...pub_t, closes: t.created + ADMIN_TTL },
     buckets: buckets.results,
@@ -588,6 +868,16 @@ async function updateTournament(request, env, t) {
     const s = JSON.stringify(body.settings);
     if (s.length > 4096) return err(env, 400, 'settings too large');
     sets.push('settings = ?'); binds.push(s);
+    // Setting a buzzpoints password: the dashboard sends the derived
+    // token once, purely so the content key can be wrapped under it —
+    // that wrap is what lets the password-gated qpacket route decrypt
+    // packets. The token is never stored; hash and wrap always move
+    // together, so an existing wrap is only replaced by a matching one.
+    if (typeof body.buzz_token === 'string' && body.buzz_token
+      && t.ckey && body.settings.buzz && body.settings.buzz.mode === 'password') {
+      sets.push('buzz_wrap = ?');
+      binds.push(await wrapKey(body.buzz_token, 'buzz', t.ckey));
+    }
   }
   if (body.announce !== undefined) {
     const cleaned = cleanAnnounce(body.announce, t);
@@ -599,10 +889,12 @@ async function updateTournament(request, env, t) {
   await env.DB.prepare(
     `UPDATE tournaments SET ${sets.join(', ')} WHERE id = ?`
   ).bind(...binds, id).run();
-  // Publishing (or re-publishing) makes the tournament snapshot-eligible;
-  // everything else here (round, broadcasts, settings) rides the live
-  // state and needs no snapshot.
-  if (body.published) await markPub(env, id);
+  // Every field this route can touch (name, round, published, settings,
+  // broadcasts) appears in the /pub state — which the publisher freezes
+  // into the GitHub state.json viewers poll — so any update re-publishes.
+  // Unpublishing flags too: the cron sees published = 0 and retracts the
+  // slug's folder from the branch.
+  await markPub(env, id);
   return json(env, { ok: true });
 }
 
@@ -620,8 +912,10 @@ async function createBucket(request, env, t) {
 
   const secret = randToken();
   const out = await env.DB.prepare(
-    'INSERT INTO buckets (tournament_id, room_name, secret, created) VALUES (?1, ?2, ?3, ?4)'
-  ).bind(id, roomName, secret, Date.now()).run();
+    'INSERT INTO buckets (tournament_id, room_name, secret, wrap, created) VALUES (?1, ?2, ?3, ?4, ?5)'
+  ).bind(id, roomName, await secretHash(secret),
+    t.ckey ? await wrapKey(secret, 'bucket', t.ckey) : null, Date.now()).run();
+  await markPub(env, id); // room names ride the published state (files[].room)
   return json(env, { id: out.meta.last_row_id, room_name: roomName, secret });
 }
 
@@ -630,6 +924,7 @@ async function deleteBucket(env, t, bucketId) {
   await env.DB.prepare(
     'DELETE FROM buckets WHERE id = ?1 AND tournament_id = ?2'
   ).bind(bucketId, t.id).run();
+  await markPub(env, t.id); // room count feeds buzz_done's expected-games math
   return json(env, { ok: true });
 }
 
@@ -846,7 +1141,7 @@ const CATMAP_VERSION = '2';
 // when the map is missing or version-stale; writes an empty {rounds:{}}
 // marker when nothing has categories so the attempt isn't repeated
 // every load.
-async function rebuildCatmap(env, tid) {
+async function rebuildCatmap(env, tid, rawKey) {
   const { results } = await env.DB.prepare(
     'SELECT number, packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1'
   ).bind(tid).all();
@@ -855,7 +1150,7 @@ async function rebuildCatmap(env, tid) {
     if (!/\.json$/i.test(row.packet_name)) continue;
     const obj = await env.DATA.get(row.packet_r2_key);
     if (!obj) continue;
-    const cats = packetCategories(await obj.arrayBuffer(), row.packet_name);
+    const cats = packetCategories(await readBlob(obj, rawKey), row.packet_name);
     if (cats) map.rounds[String(row.number)] = cats;
   }
   await env.DATA.put(`t/${tid}/catmap.json`, JSON.stringify(map), {
@@ -918,14 +1213,15 @@ async function uploadPacket(request, url, env, t) {
   if (body.byteLength > MAX_PACKET) return err(env, 413, 'packet too large');
 
   const key = `t/${id}/packet/${round}/${filename}`;
-  await env.DATA.put(key, body, {
-    httpMetadata: { contentType: request.headers.get('Content-Type') || 'application/octet-stream' },
-  });
+  // encrypted at rest; category extraction below reads the plaintext body
+  await putBlob(env, key, body,
+    request.headers.get('Content-Type') || 'application/octet-stream', t.ckey);
   await env.DB.prepare(
     'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
     'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4'
   ).bind(id, round, key, filename).run();
   await updateCatmap(env, id, round, packetCategories(body, filename));
+  await markPub(env, id); // packet_rounds rides the published state
   return json(env, { round, filename });
 }
 
@@ -953,12 +1249,14 @@ async function adminDownload(url, env, t) {
   if (!obj) return err(env, 404, 'no such file');
   const dl = url.searchParams.get('dl') || key.split('/').pop();
   const part = url.searchParams.get('part');
-  if (part !== 'qbj' && part !== 'game') return blobResponse(env, obj, dl);
+  if (part !== 'qbj' && part !== 'game') return blobResponseDec(env, obj, t.ckey, dl);
   // part=qbj|game splits a combined reader upload (.qbtd.json = {qbj,
   // game}) into the file consumers actually use. Admin-only: the game
   // half carries the packet text, which never leaves the TO side.
   let parsed;
-  try { parsed = JSON.parse(await obj.text()); } catch (e) { return err(env, 400, 'not a combined file'); }
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(await readBlob(obj, t.ckey)));
+  } catch (e) { return err(env, 400, 'not a combined file'); }
   const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
   if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
   const headers = new Headers(corsHeaders(env));
@@ -993,7 +1291,12 @@ async function putBundle(request, env, t) {
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return err(env, 400, 'bad json'); }
   if (!parsed || !Array.isArray(parsed.entries)) return err(env, 400, 'bad bundle');
-  await env.DATA.put(`t/${id}/combined.json`, body, {
+  // The dashboard rebuilds from admin downloads, which keep match notes;
+  // the public bundle must not (stripMatchNotes).
+  for (const e of parsed.entries) {
+    if (e && typeof e === 'object') stripMatchNotes(e.qbj);
+  }
+  await env.DATA.put(`t/${id}/combined.json`, JSON.stringify(parsed), {
     httpMetadata: { contentType: 'application/json' },
   });
   await markPub(env, id);
@@ -1081,10 +1384,11 @@ function emptyTbPool() {
   return { v: 1, seq: { t: 0, b: 0 }, tossups: [], bonuses: [], uses: [] };
 }
 
-async function readTbPool(env, tid) {
+async function readTbPool(env, tid, rawKey) {
   const obj = await env.DATA.get(TB_KEY(tid));
   if (!obj) return { cur: null, pool: emptyTbPool() };
-  const pool = await obj.json().catch(() => null);
+  const pool = await readBlob(obj, rawKey)
+    .then((buf) => JSON.parse(new TextDecoder().decode(buf))).catch(() => null);
   if (!pool || pool.v !== 1 || !Array.isArray(pool.tossups)) {
     return { cur: obj, pool: emptyTbPool() };
   }
@@ -1094,19 +1398,16 @@ async function readTbPool(env, tid) {
   return { cur: obj, pool };
 }
 
-async function writeTbPool(env, tid, mutate) {
+async function writeTbPool(env, tid, rawKey, mutate) {
   for (let attempt = 0; attempt < 4; attempt++) {
-    const { cur, pool } = await readTbPool(env, tid);
+    const { cur, pool } = await readTbPool(env, tid, rawKey);
     const out = mutate(pool);
     if (out && out.error) return out;
     const text = JSON.stringify(pool);
     if (text.length > MAX_TB_BLOB) return { error: 'tiebreaker pool too large' };
     const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
     try {
-      const put = await env.DATA.put(TB_KEY(tid), text, {
-        httpMetadata: { contentType: 'application/json' },
-        onlyIf,
-      });
+      const put = await putBlob(env, TB_KEY(tid), text, 'application/json', rawKey, { onlyIf });
       if (put) return { error: null, pool };
     } catch (e) { /* precondition failed -> retry */ }
   }
@@ -1142,7 +1443,7 @@ async function uploadTiebreakers(request, url, env, t) {
       return err(env, 400, 'a bonus is missing parts or answers');
     }
   }
-  const out = await writeTbPool(env, t.id, (pool) => {
+  const out = await writeTbPool(env, t.id, t.ckey, (pool) => {
     for (const q of parsed.tossups) {
       pool.tossups.push({ id: 'TU' + (++pool.seq.t), from: name, ...q });
     }
@@ -1172,18 +1473,18 @@ async function bucketTiebreakers(env, secret) {
   if (bucketClosed(b)) return err(env, 410, 'room closed');
   const obj = await env.DATA.get(TB_KEY(b.tournament_id));
   if (!obj) return err(env, 404, 'no tiebreakers');
-  return blobResponse(env, obj, null);
+  return blobResponseDec(env, obj, b.ckey, null);
 }
 
 // A reader upload reported which pool questions its game read. One game =
 // one log entry set: a re-export of the same game (same round + teams)
 // replaces its earlier entries instead of double-logging.
-async function logTbUses(env, tid, roomName, round, teams, usedIds) {
-  const { cur } = await readTbPool(env, tid);
+async function logTbUses(env, tid, rawKey, roomName, round, teams, usedIds) {
+  const { cur } = await readTbPool(env, tid, rawKey);
   if (!cur) return; // no pool: nothing to log against (and nothing to clear)
   const pairKey = (ts) => [...ts].sort().join('\n');
   const gameKey = round + '\n' + pairKey(teams);
-  await writeTbPool(env, tid, (pool) => {
+  await writeTbPool(env, tid, rawKey, (pool) => {
     const known = new Set([...pool.tossups, ...pool.bonuses].map((q) => q.id));
     const ids = [...new Set(usedIds.filter((id) => known.has(id)))];
     pool.uses = pool.uses.filter((u) =>
@@ -1198,13 +1499,17 @@ async function logTbUses(env, tid, roomName, round, teams, usedIds) {
 
 /* ---------- moderator bucket API (/b/*, secret-authed) ---------- */
 
+// Same raw-or-hash lookup as getAdminTournament; b.ckey is the unwrapped
+// content key when this bucket's tournament is encrypted.
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
-    'SELECT b.id, b.room_name, b.created, b.tournament_id, t.name AS tournament_name, ' +
+    'SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, ' +
     't.current_round, t.roster_r2_key, t.settings, t.announce ' +
-    'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1'
-  ).bind(secret).all();
-  return results[0] || null;
+    'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2'
+  ).bind(secret, await secretHash(secret)).all();
+  const b = results[0] || null;
+  if (b && b.wrap) b.ckey = await unwrapKey(secret, 'bucket', b.wrap);
+  return b;
 }
 
 // 410 keeps "expired" distinct from "never existed" so the mod's page can
@@ -1230,6 +1535,10 @@ async function bucketState(env, secret) {
   ]);
   let settings = {};
   try { settings = JSON.parse(b.settings) || {}; } catch (e) { /* keep {} */ }
+  // Rooms need the reader game format, nothing else — the buzzpoints
+  // config in particular carries the stored password hash, which must
+  // never leave the Worker (see "buzzpoints gate").
+  delete settings.buzz;
   const packets = rounds.results;
   return json(env, {
     tournament: b.tournament_name,
@@ -1283,8 +1592,11 @@ async function bucketUpload(request, url, env, secret) {
     }
   }
 
+  // Encrypted at rest: a combined upload's game half carries the full
+  // packet text. The extracted qbj half (text-free) goes to the public
+  // bundle below in plaintext — that is the only public copy.
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
-  await env.DATA.put(key, buf, { httpMetadata: { contentType: 'application/json' } });
+  await putBlob(env, key, buf, 'application/json', b.ckey);
   const out = await env.DB.prepare(
     'INSERT INTO files (tournament_id, bucket_id, round, kind, r2_key, filename, size, error, created) ' +
     'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)'
@@ -1295,13 +1607,13 @@ async function bucketUpload(request, url, env, secret) {
     await updateBundle(env, b.tournament_id, (bundle) => {
       bundle.entries = bundle.entries.filter((e) => e.id !== fileId);
       bundle.entries.push({
-        id: fileId, round, room: b.room_name, filename, qbj: qbjObj,
+        id: fileId, round, room: b.room_name, filename, qbj: stripMatchNotes(qbjObj),
       });
     });
     await markPub(env, b.tournament_id);
   }
   if (tbReport) {
-    await logTbUses(env, b.tournament_id, b.room_name, round, tbReport.teams, tbReport.used);
+    await logTbUses(env, b.tournament_id, b.ckey, b.room_name, round, tbReport.teams, tbReport.used);
   }
   // Broadcasts ride back on the upload response: it's how the reader page
   // (which never polls) picks up new messages, at exactly the between-rounds
@@ -1324,7 +1636,7 @@ async function bucketPacket(env, secret, url) {
   if (!results.length) return err(env, 404, 'no packet for round ' + round);
   const obj = await env.DATA.get(results[0].packet_r2_key);
   if (!obj) return err(env, 404, 'packet missing');
-  return blobResponse(env, obj, results[0].packet_name);
+  return blobResponseDec(env, obj, b.ckey, results[0].packet_name);
 }
 
 // The reader page (read.html) preloads the roster into its embedded MODAQ so
@@ -1490,14 +1802,30 @@ async function pubQPacket(request, url, env, slug) {
   if (!results.length) return err(env, 404, 'no packet for round ' + round);
   const obj = await env.DATA.get(results[0].packet_r2_key);
   if (!obj) return err(env, 404, 'packet missing');
-  const res = blobResponse(env, obj, results[0].packet_name);
+  // Encrypted packet: the verified token unwraps the content key via
+  // buzz_wrap (written when the TO set the password). A missing or
+  // mismatched wrap means the password was set by a client that never
+  // sent the token — setting it again repairs it.
+  let rawKey = null;
+  if (blobEnc(obj)) {
+    if (!t.buzz_wrap) return err(env, 409, 'packets locked — set the buzzpoints password again');
+    try {
+      rawKey = await unwrapKey((request.headers.get('Authorization') || '').slice(5), 'buzz', t.buzz_wrap);
+    } catch (e) {
+      return err(env, 409, 'packets locked — set the buzzpoints password again');
+    }
+  }
+  const res = await blobResponseDec(env, obj, rawKey, results[0].packet_name);
   res.headers.set('Cache-Control', 'private, max-age=60');
   return res;
 }
 
-async function pubState(env, slug) {
-  const t = await getPublishedTournament(env, slug);
-  if (!t) return err(env, 404, 'not found');
+// The /pub/:slug body, shared between the route and the snapshot
+// publisher (which freezes it into <slug>/state.json on GitHub — so the
+// two sources are byte-compatible and the page can't tell them apart).
+// `pub` is the snapshot descriptor to advertise: the route passes the
+// stored one, the publisher passes the one it just committed.
+async function pubStateBody(env, t, pub) {
   const [files, buckets, schedObj, packetRounds, catsHead] = await Promise.all([
     env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
@@ -1541,7 +1869,7 @@ async function pubState(env, slug) {
       return (inByRound.get(rn) || new Set()).size >= expected;
     }).sort((x, y) => x - y);
   }
-  return json(env, {
+  return {
     name: t.name,
     current_round: t.current_round,
     roster: !!t.roster_r2_key,
@@ -1565,20 +1893,30 @@ async function pubState(env, slug) {
     // Latest GitHub snapshot (see "public snapshots on GitHub"): the page
     // fetches its blobs SHA-pinned from raw.githubusercontent.com instead
     // of the /pub blob routes, falling back here when absent/stale.
-    pub: (() => {
-      if (!env.SNAPSHOT_REPO || !t.pub_snapshot) return null;
-      try {
-        const snap = JSON.parse(t.pub_snapshot);
-        return snap && snap.sha ? { repo: env.SNAPSHOT_REPO, ...snap } : null;
-      } catch (e) { return null; }
-    })(),
+    pub,
     files: rows.map((f) => ({
       id: f.id, round: f.round, filename: f.filename, room: rooms[f.bucket_id] || null,
     })),
     // Every write path has expired: nothing here can move again, so the
     // public page drops its poll and the answer caches for a week.
     final: tournamentFinal(t),
-  }, 200, pubCache(t));
+    // When that moment arrives — deterministic, so a frozen state.json
+    // can say it in advance and the page flips itself final on time.
+    final_after: t.created + FINAL_TTL,
+  };
+}
+
+async function pubState(env, slug) {
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const pub = (() => {
+    if (!env.SNAPSHOT_REPO || !t.pub_snapshot) return null;
+    try {
+      const snap = JSON.parse(t.pub_snapshot);
+      return snap && snap.sha ? { repo: env.SNAPSHOT_REPO, ...snap } : null;
+    } catch (e) { return null; }
+  })();
+  return json(env, await pubStateBody(env, t, pub), 200, pubCache(t));
 }
 
 async function pubBundle(env, slug) {
@@ -1589,26 +1927,26 @@ async function pubBundle(env, slug) {
   return blobResponse(env, obj, null, pubCache(t));
 }
 
+// Public per-game qbj download. Served from the bundle, not the stored
+// file: the bundle entry is exactly the public copy — validated match
+// qbj only (a combined file's game half carries the full packet text),
+// notes stripped, and readable without the content key that encrypts
+// the stored file at rest. A file missing from the bundle (validation
+// error, or drift the TO hasn't rebuilt) is simply not public.
 async function pubQbj(env, slug, fileId) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const { results } = await env.DB.prepare(
-    "SELECT r2_key, filename, kind FROM files WHERE id = ?1 AND tournament_id = ?2 AND kind IN ('qbj', 'combined')"
-  ).bind(fileId, t.id).all();
-  if (!results.length) return err(env, 404, 'no such file');
-  const obj = await env.DATA.get(results[0].r2_key);
-  if (!obj) return err(env, 404, 'file missing');
-  if (results[0].kind !== 'combined') return blobResponse(env, obj, results[0].filename, pubCache(t));
-  // A combined file's game half carries the full packet text — the public
-  // route serves only the extracted qbj half.
-  const parsed = extractMatch(await obj.text());
-  if (parsed.error) return err(env, 404, 'file unreadable');
+  const obj = await env.DATA.get(`t/${t.id}/combined.json`);
+  const bundle = obj ? await obj.json().catch(() => null) : null;
+  const entry = bundle && Array.isArray(bundle.entries)
+    ? bundle.entries.find((e) => e && e.id === fileId) : null;
+  if (!entry) return err(env, 404, 'no such file');
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Cache-Control', 'public, max-age=' + pubCache(t));
   headers.set('Content-Disposition',
-    `attachment; filename="${results[0].filename.replace(/\.qbtd\.json$/i, '.qbj').replace(/["\\\r\n]/g, '_')}"`);
-  return new Response(JSON.stringify(parsed.qbj), { status: 200, headers });
+    `attachment; filename="${String(entry.filename || 'game.qbj').replace(/\.qbtd\.json$/i, '.qbj').replace(/["\\\r\n]/g, '_')}"`);
+  return new Response(JSON.stringify(entry.qbj), { status: 200, headers });
 }
 
 async function pubRoster(env, slug) {

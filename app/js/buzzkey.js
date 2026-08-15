@@ -47,16 +47,25 @@ export async function buzzToken(password, kdf) {
   return hex(bits);
 }
 
-/** settings.buzz for a newly set password, with a fresh salt. */
-export async function buzzSettings(password) {
+/** settings.buzz for a newly set password, with a fresh salt — plus the
+    derived token itself. The token is sent to the Worker ONCE alongside
+    the settings (`buzz_token`) so it can wrap the tournament's content
+    key for the qpacket route (worker.js "question text encryption");
+    it is never stored anywhere. */
+export async function buzzCredentials(password) {
   const kdf = {
     kdf: 'pbkdf2',
     iters: BUZZ_ITERS,
     salt: hex(crypto.getRandomValues(new Uint8Array(12))),
   };
+  const token = await buzzToken(password, kdf);
   return {
-    mode: 'password',
-    ...kdf,
-    hash: await sha256Hex(await buzzToken(password, kdf)),
+    settings: { mode: 'password', ...kdf, hash: await sha256Hex(token) },
+    token,
   };
+}
+
+/** settings.buzz alone (buzzCredentials without the token). */
+export async function buzzSettings(password) {
+  return (await buzzCredentials(password)).settings;
 }

@@ -1,3 +1,4 @@
 node_modules/
 worker/.wrangler/
 worker/.dev.vars
+forum_post.txt

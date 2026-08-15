@@ -7,6 +7,8 @@
 
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
@@ -15,20 +17,65 @@ const WORKER_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..',
 
 const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
 
+// What credential columns hold for new rows (worker.js secretHash): the
+// backdating UPDATEs below match on it, and the at-rest checks assert it.
+const storedCred = (secret) =>
+  createHash('sha256').update('qbtd-cred:' + secret).digest('hex');
+
+// One row from the local D1 behind the dev Worker.
+function d1row(sql) {
+  const out = execSync(
+    `npx wrangler d1 execute qb-td --local --json --command "${sql}"`,
+    { cwd: WORKER_DIR },
+  ).toString();
+  return JSON.parse(out.slice(out.indexOf('[')))[0].results[0] || null;
+}
+
+// Raw bytes of an object in the local R2 behind the dev Worker — what an
+// operator browsing the bucket would see.
+function r2get(key) {
+  const tmp = path.join(tmpdir(), 'qbtd-e2e-' + Math.random().toString(36).slice(2));
+  execSync(`npx wrangler r2 object get qb-td-data/${key} --local --file "${tmp}"`,
+    { cwd: WORKER_DIR, stdio: 'ignore' });
+  const buf = readFileSync(tmp);
+  rmSync(tmp);
+  return buf;
+}
+
 async function call(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
   if (opts.json !== undefined) {
     headers['Content-Type'] = 'application/json';
     opts = { ...opts, body: JSON.stringify(opts.json) };
   }
-  const res = await fetch(BASE + path, { ...opts, headers });
+  // The wrangler CLI invocations in d1row/r2get reset the dev server's
+  // pooled keep-alive connections, so the next fetch can die with
+  // ECONNRESET on a stale socket; a fresh connection succeeds.
+  let res;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(BASE + path, { ...opts, headers });
+      break;
+    } catch (e) {
+      if (attempt >= 2) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
   const ct = res.headers.get('content-type') || '';
   const body = ct.includes('json') ? await res.json() : await res.text();
-  return { status: res.status, body };
+  return { status: res.status, body, cache: res.headers.get('cache-control') };
+}
+
+// max-age seconds from a Cache-Control header, or null.
+function maxAge(cc) {
+  const m = /max-age=(\d+)/.exec(cc || '');
+  return m ? Number(m[1]) : null;
 }
 
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
+  // protest reasons quote answers; public copies must drop notes
+  notes: 'Tossup protest on tossup #3. Team "Alpha" protested because of this reason: "PROTESTLEAKANSWER".',
   match_teams: [
     { team: { name: 'Alpha' }, bonus_points: 30,
       match_players: [{ player: { name: 'Ann' }, tossups_heard: 20,
@@ -57,6 +104,7 @@ ok('creation reports 48h expiry',
   r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
   r.body.closes);
 let A = '/a/' + r.body.admin_secret;
+const tid = r.body.id;
 
 r = await call('/api/tournaments', { method: 'POST', json: { name: 'dupe', slug } });
 ok('duplicate slug rejected', r.status === 409);
@@ -117,6 +165,21 @@ ok('bad secret rejected', r.status === 404);
 {
   const res = await fetch(`${BASE}/b/${secret}/roster`);
   ok('mod downloads roster', res.status === 200 && (await res.text()).includes('Alpha'));
+}
+
+// question security at rest: D1 holds only hashes of the link secrets
+// (nothing stored opens a page) and question-text blobs are ciphertext
+// in R2 — an operator browsing bucket or database sees no question text
+{
+  const trow = d1row(`SELECT admin_secret, admin_wrap FROM tournaments WHERE slug = '${slug}'`);
+  ok('admin secret stored hashed + key wrapped',
+    trow && trow.admin_secret === storedCred(A.slice(3)) && !!trow.admin_wrap, trow);
+  const brow = d1row(`SELECT wrap FROM buckets WHERE secret = '${storedCred(secret)}'`);
+  ok('bucket secret stored hashed + key wrapped', brow && !!brow.wrap, brow);
+  const packet = r2get(`t/${tid}/packet/1/Packet1.pdf`);
+  ok('packet is ciphertext at rest', !packet.includes('PDFBYTES'), packet.length);
+  const qbjKey = (await call(A)).body.files.find((f) => f.filename === 'Round_1_Alpha_Beta.qbj').r2_key;
+  ok('reader upload is ciphertext at rest', !r2get(qbjKey).includes('match_teams'));
 }
 
 // tournament settings flow through to the bucket state
@@ -196,14 +259,18 @@ r = await call('/pub/' + slug);
 ok('public state', r.status === 200 && r.body.name === 'E2E Open' && r.body.current_round === 2, r.body);
 ok('public lists only valid qbj', r.body.files.length === 1 && r.body.files[0].room === 'Room 1', r.body.files);
 ok('pub state carries schedule stamp', typeof r.body.schedule === 'number' && r.body.schedule > 0, r.body.schedule);
+// A live tournament caches briefly (refresh bursts collapse) and is not final.
+ok('live state is not final', r.body.final === false, r.body.final);
+ok('live state caches briefly', maxAge(r.cache) > 0 && maxAge(r.cache) <= 60, r.cache);
 
 {
   const res = await fetch(`${BASE}/pub/${slug}/schedule`);
   const sj = await res.json();
   ok('public schedule served', res.status === 200 && sj.rooms.length === 2
     && sj.phases[0].rounds[0].games[0].a.team === 'Alpha', sj);
+  const sCache = res.headers.get('cache-control');
   ok('public schedule briefly cacheable',
-    (res.headers.get('cache-control') || '').includes('max-age=60'));
+    maxAge(sCache) > 0 && maxAge(sCache) <= 60, sCache);
 }
 r = await call(A + '/schedule', { method: 'DELETE' });
 ok('schedule deleted', r.status === 200);
@@ -318,6 +385,22 @@ const buzzHash = createHash('sha256').update(buzzSalt + ':hunter2').digest('hex'
 r = await call(A, { method: 'POST', json: { settings: {
   gameFormat: 'acf', buzz: { mode: 'password', salt: buzzSalt, hash: buzzHash } } } });
 ok('buzz password set', r.status === 200);
+// set without the derived token (an out-of-date client): the password
+// checks out but nothing can unwrap the content key — locked, not text
+{
+  const locked = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`,
+    { headers: { Authorization: 'Buzz hunter2' } });
+  ok('qpacket locked without a key wrap', locked.status === 409, locked.status);
+}
+r = await call(A, { method: 'POST', json: { buzz_token: 'hunter2', settings: {
+  gameFormat: 'acf', buzz: { mode: 'password', salt: buzzSalt, hash: buzzHash } } } });
+ok('buzz key wrapped on re-set', r.status === 200);
+// rooms get the reader game format but never the buzz config (its hash
+// would enable an offline attack on the TO's password)
+r = await call('/b/' + secret);
+ok('bucket settings hide buzz config',
+  r.body.settings.gameFormat === 'acf' && r.body.settings.buzz === undefined,
+  r.body.settings);
 r = await call('/pub/' + slug);
 ok('pub state exposes only buzz mode',
   r.body.buzz === 'password' && !JSON.stringify(r.body).includes(buzzHash)
@@ -350,7 +433,7 @@ ok('buzz_done lists only finished rounds',
 }
 // new password (fresh salt) moves buzz_v and kills the old password
 const buzzHash2 = createHash('sha256').update('salt2:hunter3').digest('hex');
-r = await call(A, { method: 'POST', json: { settings: {
+r = await call(A, { method: 'POST', json: { buzz_token: 'hunter3', settings: {
   gameFormat: 'acf', buzz: { mode: 'password', salt: 'salt2', hash: buzzHash2 } } } });
 ok('buzz password rotated', r.status === 200);
 r = await call('/pub/' + slug);
@@ -371,7 +454,8 @@ ok('buzz_v moves with the password', /^[0-9a-f]{12}$/.test(r.body.buzz_v)
 const kdfSettings = await buzzSettings('hunter4');
 const kdfToken = await buzzToken('hunter4',
   { kdf: 'pbkdf2', iters: kdfSettings.iters, salt: kdfSettings.salt });
-r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: kdfSettings } } });
+r = await call(A, { method: 'POST',
+  json: { buzz_token: kdfToken, settings: { gameFormat: 'acf', buzz: kdfSettings } } });
 ok('pbkdf2 password set', r.status === 200);
 r = await call('/pub/' + slug);
 ok('pub state publishes kdf params but never the hash',
@@ -521,7 +605,6 @@ r = await call('/pub/' + slug + '/cats');
 
 // backfill: wipe the map (as if the packets predate extraction), then a
 // dashboard load rebuilds it off the response path
-const tid = (await call(A)).body.tournament.id;
 execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/catmap.json --local`,
   { cwd: WORKER_DIR, stdio: 'ignore' });
 r = await call('/pub/' + slug);
@@ -559,6 +642,7 @@ r = await call('/pub/' + slug);   // the sections below read files off this
   const res = await fetch(`${BASE}/pub/${slug}/qbj/${r.body.files[0].id}`);
   const text = await res.text();
   ok('public qbj download', res.status === 200 && JSON.parse(text).tossups_read === 20);
+  ok('public qbj drops protest notes', !text.includes('PROTESTLEAKANSWER'));
   const rr = await fetch(`${BASE}/pub/${slug}/roster`);
   ok('public roster download', rr.status === 200 && (await rr.text()).includes('Alpha'));
 }
@@ -572,6 +656,9 @@ ok('bundle served', r.status === 200 && r.body.entries.length === 1, r.body);
 ok('bundle entry carries room/round/qbj',
   r.body.entries[0].room === 'Room 1' && r.body.entries[0].round === 1
   && r.body.entries[0].qbj.tossups_read === 20, r.body.entries[0]);
+// protest reasons (match notes) quote answers; the public bundle — which
+// updates live and is committed to the snapshot repo — must drop them
+ok('bundle strips protest notes', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
 
 const MATCH2 = MATCH.replace('"_round": 1', '"_round": 2').replace('_round":1', '_round":2');
 r = await call(`/b/${secret}/upload?round=2&name=Round_2_Alpha_Beta.qbj`,
@@ -597,6 +684,9 @@ r = await call(`${A}/bundle`, {
 ok('bundle rebuild accepted', r.status === 200 && r.body.entries === 1, r.body);
 r = await call('/pub/' + slug + '/bundle');
 ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
+// the dashboard rebuilds from admin downloads, which keep notes — the
+// Worker must strip them again on the way back in
+ok('rebuild strips notes too', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
 
 // combined reader upload: one file carries qbj + game state; the game half
 // (full packet text) must never reach the bundle or a public route
@@ -633,6 +723,7 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
   const qtext = await qres.text();
   ok('admin part=qbj serves the bare match',
     qres.status === 200 && JSON.parse(qtext).tossups_read === 20 && !qtext.includes('SECRETQUESTIONTEXT'));
+  ok('admin qbj keeps notes for the .yft', qtext.includes('PROTESTLEAKANSWER'));
   ok('part=qbj named .qbj',
     (qres.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta.qbj'));
   const gres = await fetch(fileUrl('&part=game&dl=Round_3_Alpha_Beta_Game.json'));
@@ -681,6 +772,9 @@ ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
     r.status === 200 && r.body.tossups.length === 3
     && r.body.tossups[0].id === 'TU1' && r.body.tossups[2].id === 'TU3'
     && r.body.bonuses[0].id === 'B1' && r.body.uses.length === 0, r.body);
+  // tiebreakers are question text: ciphertext at rest like the packets
+  ok('tiebreaker pool is ciphertext at rest',
+    !r2get(`t/${tid}/tiebreakers.json`).includes('Mozart'));
 
   // a reader upload reports which pool questions its game read
   const q = JSON.parse(MATCH);
@@ -758,6 +852,13 @@ r = await call(oldA);
 ok('old admin link dead after rotate', r.status === 404);
 r = await call(A);
 ok('new admin link works', r.status === 200 && r.body.tournament.slug === slug);
+// rotation rewrapped the content key: the new link decrypts blobs the
+// old one wrote (and the old link, being dead, can't decrypt anything)
+{
+  const res = await fetch(`${BASE}${A}/file?key=${encodeURIComponent(`t/${tid}/packet/1/Packet1.pdf`)}`);
+  ok('rotated link still decrypts packets',
+    res.status === 200 && (await res.text()) === 'PDFBYTES', res.status);
+}
 
 // bucket state carries lifetime info
 r = await call('/b/' + secret);
@@ -768,7 +869,7 @@ ok('bucket upload count', r.body.upload_count === 7, r.body.upload_count);
 
 // bucket expiry: backdate the bucket, every mod route dies with "room closed"
 execSync(
-  `npx wrangler d1 execute qb-td --local --command "UPDATE buckets SET created = 1 WHERE secret = '${secret}'"`,
+  `npx wrangler d1 execute qb-td --local --command "UPDATE buckets SET created = 1 WHERE secret = '${storedCred(secret)}'"`,
   { cwd: WORKER_DIR, stdio: 'ignore' },
 );
 r = await call('/b/' + secret);
@@ -815,5 +916,12 @@ r = await call(A + '/rotate', { method: 'POST' });
 ok('expired admin cannot rotate', r.status === 410);
 r = await call('/pub/' + slug);
 ok('published stats survive admin expiry', r.status === 200 && r.body.name === 'E2E Open', r.body);
+
+// ...and being past every upload deadline marks the tournament final, so
+// the public page drops its poll and the answer caches for a week.
+ok('expired tournament is final', r.body.final === true, r.body.final);
+ok('final state caches for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
+r = await call('/pub/' + slug + '/bundle');
+ok('final bundle caches for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
 
 console.log(passed + ' e2e checks passed' + (process.exitCode ? ' (with failures)' : ''));
