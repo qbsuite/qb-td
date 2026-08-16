@@ -184,6 +184,17 @@ function contentKey(rawKey) {
   return crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
+// A short string encrypted under the content key, for D1 columns that
+// must be readable back through a link but not from the database alone
+// (buckets.secret_enc: the room secret, which the TO's dashboard renders
+// as the room's links — its credential column holds only the hash).
+async function encField(rawKey, text) {
+  return b64bytes(await aesEncrypt(await contentKey(rawKey), enc8(text)));
+}
+async function decField(rawKey, b64) {
+  return new TextDecoder().decode(await aesDecrypt(await contentKey(rawKey), b64ToBytes(b64)));
+}
+
 function blobEnc(r2obj) {
   return (r2obj.customMetadata || {}).enc === '1';
 }
@@ -822,7 +833,7 @@ async function rotateAdmin(env, t) {
 async function getTournament(env, t, ctx) {
   const id = t.id;
   const [buckets, rounds, files, catsHead] = await Promise.all([
-    env.DB.prepare('SELECT id, room_name, secret, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
+    env.DB.prepare('SELECT id, room_name, secret, secret_enc, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
     env.DATA.head(`t/${id}/catmap.json`),
@@ -834,10 +845,17 @@ async function getTournament(env, t, ctx) {
   if (staleCats && ctx && rounds.results.some((r) => /\.json$/i.test(r.packet_name))) {
     ctx.waitUntil(rebuildCatmap(env, id, t.ckey));
   }
+  // Room secrets go back to the TO in the clear — they ARE the room
+  // links — but the credential column holds only the hash on new rows;
+  // the plaintext travels encrypted under the content key this request
+  // just unwrapped (secret_enc). Legacy rows carry the secret itself.
+  const rooms = await Promise.all(buckets.results.map(async ({ secret_enc, ...b }) => ({
+    ...b, secret: secret_enc && t.ckey ? await decField(t.ckey, secret_enc) : b.secret,
+  })));
   const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, ...pub_t } = t;
   return json(env, {
     tournament: { ...pub_t, closes: t.created + ADMIN_TTL },
-    buckets: buckets.results,
+    buckets: rooms,
     rounds: rounds.results,
     files: files.results,
   });
@@ -910,11 +928,17 @@ async function createBucket(request, env, t) {
   ).bind(id).all();
   if (results[0].n >= MAX_BUCKETS) return err(env, 403, 'bucket cap reached');
 
+  // New-style tournaments store the hash plus the secret encrypted under
+  // the content key (getTournament hands it back to the TO). A legacy
+  // tournament has no content key, so its rooms stay legacy too —
+  // plaintext secret, plaintext blobs — rather than becoming rows whose
+  // links the dashboard could never render again.
   const secret = randToken();
   const out = await env.DB.prepare(
-    'INSERT INTO buckets (tournament_id, room_name, secret, wrap, created) VALUES (?1, ?2, ?3, ?4, ?5)'
-  ).bind(id, roomName, await secretHash(secret),
-    t.ckey ? await wrapKey(secret, 'bucket', t.ckey) : null, Date.now()).run();
+    'INSERT INTO buckets (tournament_id, room_name, secret, wrap, secret_enc, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+  ).bind(id, roomName, t.ckey ? await secretHash(secret) : secret,
+    t.ckey ? await wrapKey(secret, 'bucket', t.ckey) : null,
+    t.ckey ? await encField(t.ckey, secret) : null, Date.now()).run();
   await markPub(env, id); // room names ride the published state (files[].room)
   return json(env, { id: out.meta.last_row_id, room_name: roomName, secret });
 }

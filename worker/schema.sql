@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS buckets (
   room_name TEXT NOT NULL,
   secret TEXT NOT NULL UNIQUE,       -- hashed when wrap is set (see tournaments)
   wrap TEXT,                         -- content key wrapped under this room's secret
+  secret_enc TEXT,                   -- the secret itself, encrypted under the content key (for the TO's links)
   created INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_buckets_tournament ON buckets(tournament_id);

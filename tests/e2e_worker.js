@@ -174,8 +174,15 @@ ok('bad secret rejected', r.status === 404);
   const trow = d1row(`SELECT admin_secret, admin_wrap FROM tournaments WHERE slug = '${slug}'`);
   ok('admin secret stored hashed + key wrapped',
     trow && trow.admin_secret === storedCred(A.slice(3)) && !!trow.admin_wrap, trow);
-  const brow = d1row(`SELECT wrap FROM buckets WHERE secret = '${storedCred(secret)}'`);
+  const brow = d1row(`SELECT wrap, secret_enc FROM buckets WHERE secret = '${storedCred(secret)}'`);
   ok('bucket secret stored hashed + key wrapped', brow && !!brow.wrap, brow);
+  ok('bucket secret kept only encrypted for the dashboard',
+    brow && brow.secret_enc && !brow.secret_enc.includes(secret), brow);
+  // ...and the dashboard renders the room links from the admin detail,
+  // so the detail must hand back the real secret, not what D1 stores
+  const detail = (await call(A)).body;
+  ok('admin detail returns the working room secret',
+    detail.buckets.length === 1 && detail.buckets[0].secret === secret, detail.buckets);
   const packet = r2get(`t/${tid}/packet/1/Packet1.pdf`);
   ok('packet is ciphertext at rest', !packet.includes('PDFBYTES'), packet.length);
   const qbjKey = (await call(A)).body.files.find((f) => f.filename === 'Round_1_Alpha_Beta.qbj').r2_key;

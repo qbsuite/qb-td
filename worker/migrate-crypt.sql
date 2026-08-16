@@ -19,6 +19,9 @@
 --              password-gated /pub qpacket route decrypt packets.
 -- buckets.wrap — content key wrapped under that room's bucket secret;
 --              buckets.secret likewise holds the hash when wrap is set.
+-- buckets.secret_enc — the room secret encrypted under the content key, so
+--              the TO's dashboard (which unwraps the content key from the
+--              admin link) can still render the room links.
 --
 -- Legacy rows (all columns NULL) keep the plaintext-secret, plaintext-
 -- blob code paths; the 48h link TTL ages them out of every write path
@@ -26,3 +29,4 @@
 ALTER TABLE tournaments ADD COLUMN admin_wrap TEXT;
 ALTER TABLE tournaments ADD COLUMN buzz_wrap TEXT;
 ALTER TABLE buckets ADD COLUMN wrap TEXT;
+ALTER TABLE buckets ADD COLUMN secret_enc TEXT;
