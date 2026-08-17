@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qb-td — QoL mockups</title>
+<style>
+/* td.css subset, kept in sync by eye — this file is a throwaway mock */
+:root {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7;
+  --link: #1d4ed8; --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131316; --fg: #e7e7ea; --muted: #85858f; --line: #2a2a30;
+    --link: #7aa2f7; --hover-bg: #1b1b20; --ok: #4ade80; --bad: #f87171;
+  }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; overflow-wrap: anywhere;
+}
+.wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 64px; }
+header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+header .sub { color: var(--muted); }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h2 {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 8px;
+}
+button, .btn {
+  font: inherit; color: var(--link); background: none;
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px; cursor: pointer;
+}
+button:hover, .btn:hover { border-color: var(--link); text-decoration: none; }
+button:disabled { color: var(--muted); border-color: var(--line); cursor: default; }
+button.primary { font-weight: 600; }
+button.small { padding: 2px 10px; font-size: 13px; }
+input, select {
+  font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+}
+input:focus, select:focus { outline: none; border-color: var(--link); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+table { border-collapse: collapse; width: 100%; overflow-wrap: normal; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.muted { color: var(--muted); }
+.ok { color: var(--ok); }
+.bad { color: var(--bad); }
+.mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+#msg { min-height: 20px; color: var(--muted); margin: 8px 0; }
+#msg.bad { color: var(--bad); }
+.tablewrap { overflow-x: auto; }
+.pill {
+  display: inline-block; font-size: 12px; border: 1px solid var(--line);
+  border-radius: 99px; padding: 1px 9px; color: var(--muted); white-space: nowrap;
+}
+.pill.on { color: var(--ok); border-color: var(--ok); }
+.pill.warn { color: var(--bad); border-color: var(--bad); }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.tab {
+  font: inherit; background: none; border: none; border-bottom: 2px solid transparent;
+  border-radius: 0; color: var(--muted); padding: 7px 14px; cursor: pointer;
+}
+.tab.active { color: var(--fg); border-bottom-color: var(--link); font-weight: 600; }
+.tab:hover { color: var(--fg); }
+.tabs.bigtabs { margin-bottom: 10px; }
+.bigtabs .tab { font-size: 17px; padding: 8px 18px; }
+.bigtabs .ndot { color: var(--bad); font-weight: 700; }
+.chip {
+  border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px;
+  cursor: grab; user-select: none; display: inline-block;
+}
+.chip .muted { font-size: 12px; }
+.chiprow { display: flex; gap: 6px; flex-wrap: wrap; }
+.rchip {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px;
+  color: var(--fg); font-variant-numeric: tabular-nums;
+}
+.rchip.has { border-color: var(--ok); }
+.rchip .dot { width: 7px; height: 7px; border-radius: 99px; background: var(--line); flex: none; }
+.rchip.has .dot { background: var(--ok); }
+.slot.dragover, .rchip.dragover { border-color: var(--link); background: var(--hover-bg); }
+.slotchip {
+  display: inline-block; border: 1px solid var(--line); border-radius: 99px;
+  padding: 1px 10px; margin: 1px 0; cursor: pointer; user-select: none;
+}
+.slotchip:hover { background: var(--hover-bg); }
+.slotchip.empty { color: var(--muted); font-style: italic; }
+.slotchip.dragover { border-color: var(--link); background: var(--hover-bg); }
+.sched td { vertical-align: top; }
+.roundcell { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.statusbar {
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 10px;
+}
+.statusbar .big { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+details.drawer { border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+details.drawer > summary {
+  padding: 8px 14px; cursor: pointer;
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+}
+details.drawer > summary:hover { background: var(--hover-bg); border-radius: 9px; }
+details.drawer > summary .dtitle {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted);
+}
+details.drawer > .inner { padding: 4px 14px 14px; }
+details.rgroup summary { padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+details.rgroup summary:hover { background: var(--hover-bg); }
+details.rgroup summary .pill { margin: 0 4px; }
+
+/* mock-only bits */
+.explain {
+  border-left: 3px solid var(--line); padding: 4px 12px; margin: 10px 0 16px;
+  color: var(--muted); font-size: 14px;
+}
+.explain b { color: var(--fg); font-weight: 600; }
+.demo { font-size: 13px; }
+.pane[hidden], .bigview[hidden] { display: none; }
+.playerline { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+.playerline input { flex: 1; min-width: 160px; }
+.xbtn {
+  border: none; color: var(--muted); background: none; cursor: pointer;
+  font-size: 15px; padding: 2px 6px; border-radius: 6px;
+}
+.xbtn:hover { color: var(--bad); border: none; }
+.rowtools { display: inline-flex; gap: 2px; margin-left: 4px; visibility: hidden; }
+tr:hover .rowtools { visibility: visible; }
+.rowtools .xbtn { font-size: 13px; padding: 0 4px; }
+.byetray { min-width: 90px; min-height: 26px; border-radius: 8px; }
+.byetray.dragover { outline: 2px dashed var(--link); outline-offset: -2px; }
+th .xbtn { visibility: hidden; }
+th:hover .xbtn { visibility: visible; }
+th input { font-size: 13px; padding: 3px 8px; width: 11ch; }
+.tbmark {
+  font-size: 10px; font-weight: 700; letter-spacing: .05em; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 5px; padding: 0 4px;
+  cursor: pointer; user-select: none;
+}
+.tbmark.on { color: var(--bad); border-color: var(--bad); }
+pre.preview {
+  font: 12px/1.5 ui-monospace, Consolas, monospace; border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin-top: 8px;
+}
+.gamebox {
+  display: flex; align-items: center; gap: 2px; cursor: grab;
+  border: 1px solid transparent; border-radius: 8px; padding: 1px 3px;
+}
+.slotchip.ph { color: var(--muted); font-style: italic; }
+.seedmove { display: inline-flex; flex-direction: column; }
+.seedmove .xbtn { font-size: 9px; padding: 0 4px; line-height: 1.2; }
+.seedmove .xbtn:hover { color: var(--link); }
+.gamebox:hover { border-color: var(--line); }
+.gamebox.sel { border-color: var(--link); }
+.ghandle {
+  color: var(--muted); cursor: grab; user-select: none; padding: 2px 5px;
+  border-radius: 6px; font-size: 13px;
+}
+.ghandle:hover { color: var(--link); background: var(--hover-bg); }
+.gamebox.sel .ghandle { color: var(--link); }
+select.slotsel { padding: 2px 6px; font-size: 13px; max-width: 15ch; }
+.slotdrop {
+  border: 1px dashed var(--line); border-radius: 8px; padding: 6px 12px;
+  color: var(--muted); font-size: 13px;
+}
+.slotdrop.dragover { border-color: var(--link); background: var(--hover-bg); color: var(--fg); }
+.banner {
+  border: 1px solid var(--bad); border-radius: 10px; padding: 10px 14px;
+  margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.step {
+  display: inline-flex; gap: 6px; align-items: center; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px; font-size: 13px;
+}
+.step.done { border-color: var(--ok); }
+.step.done .mark { color: var(--ok); }
+.step .mark { color: var(--muted); font-weight: 700; }
+.step:hover { background: var(--hover-bg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>qb-td</h1>
+    <span class="sub">QoL mockups &mdash; everything runs in memory; nothing talks to a server</span>
+  </header>
+  <div class="tabs bigtabs" id="viewswitch"></div>
+  <div id="msg"></div>
+
+  <div id="view-setup" class="bigview">
+    <div class="explain" style="margin-top:6px">
+      <b>New structure:</b> these four steps are the <b>Tournament Setup</b> a
+      TD completes once at the start, separated from the Live Hub. Each step
+      shows its progress below; the Live Hub carries a clear notice until
+      setup is complete.
+    </div>
+    <div class="steps" id="steps"></div>
+    <div class="tabs" id="setuptabs"></div>
+    <div id="pane-rooms" class="pane"></div>
+    <div id="pane-packets" class="pane" hidden></div>
+    <div id="pane-roster" class="pane" hidden></div>
+    <div id="pane-sched" class="pane" hidden></div>
+  </div>
+
+  <div id="view-live" class="bigview" hidden></div>
+</div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let msgTimer = null;
+function say(text, bad = false) {
+  const m = $('msg');
+  m.textContent = text || '';
+  m.className = bad ? 'bad' : '';
+  clearTimeout(msgTimer);
+  if (text) msgTimer = setTimeout(() => { m.textContent = ''; }, 4000);
+}
+
+/* ---------- state ---------- */
+let curView = 'setup';
+let curTab = 'rooms';
+
+let rooms = [];   // {name}
+let roomSeq = 1;
+
+let roundCount = 10;
+let packets = {};     // round -> filename
+let staged = [];      // {name, guess}
+let tbQuestions = []; // {id, kind, from, answer, used: null|{round, room, teams}}
+let tbSeq = { tu: 0, b: 0 };
+let tbSim = 0;
+
+let teams = [];          // {name, players: []}
+let rosterEditorOpen = false;
+let rosterSaved = null;  // {source, teams, players}
+let previewOpen = false;
+
+let sched = null;    // {rooms: [name], rounds: [{games: [{a,b,tb}|null per room], byes: []}]}
+let schedSaved = false;
+let schedDirty = false;
+let slotEdit = null; // loc being edited via dropdown
+let gameSel = null;  // {r, room} selected for a game swap
+
+let liveRound = 5;
+
+/* ---------- setup progress ---------- */
+const STEPS = [
+  ['rooms', 'Rooms', () => rooms.length > 0,
+    () => rooms.length ? rooms.length + ' rooms' : 'None yet'],
+  ['packets', 'Packets', () => Object.keys(packets).length > 0,
+    () => Object.keys(packets).length + '/' + roundCount + ' rounds'],
+  ['roster', 'Roster', () => !!rosterSaved,
+    () => rosterSaved ? rosterSaved.teams + ' teams' : 'None yet'],
+  ['sched', 'Schedule', () => schedSaved,
+    () => schedSaved ? 'Saved' : 'Not saved'],
+];
+const setupMissing = () => STEPS.filter(([, , done]) => !done()).map(([, label]) => label);
+
+/* ---------- top-level views + setup tabs ---------- */
+function renderChrome() {
+  const missing = setupMissing();
+  $('viewswitch').innerHTML = `
+    <button class="tab ${curView === 'setup' ? 'active' : ''}" data-view="setup">Tournament Setup${
+      missing.length ? ' <span class="ndot">&bull;</span>' : ''}</button>
+    <button class="tab ${curView === 'live' ? 'active' : ''}" data-view="live">Live Hub</button>`;
+  $('viewswitch').querySelectorAll('button').forEach((b) => {
+    b.onclick = () => { curView = b.dataset.view; renderAll(); };
+  });
+  $('view-setup').hidden = curView !== 'setup';
+  $('view-live').hidden = curView !== 'live';
+  if (curView !== 'setup') return;
+  $('steps').innerHTML = STEPS.map(([key, label, done, detail]) => `
+    <span class="step ${done() ? 'done' : ''}" data-step="${key}">
+      <span class="mark">${done() ? '&#10003;' : '&#9675;'}</span>
+      ${label} <span class="muted">${detail()}</span>
+    </span>`).join('');
+  $('steps').querySelectorAll('.step').forEach((s) => {
+    s.onclick = () => { curTab = s.dataset.step; renderAll(); };
+  });
+  $('setuptabs').innerHTML = ['rooms', 'packets', 'roster', 'sched'].map((t) => `
+    <button class="tab ${curTab === t ? 'active' : ''}" data-tab="${t}">${
+      { rooms: 'Rooms', packets: 'Packets + Tiebreakers', roster: 'Roster', sched: 'Schedule' }[t]}</button>`).join('');
+  $('setuptabs').querySelectorAll('.tab').forEach((b) => {
+    b.onclick = () => { curTab = b.dataset.tab; renderAll(); };
+  });
+  document.querySelectorAll('.pane').forEach((p) => { p.hidden = p.id !== 'pane-' + curTab; });
+}
+
+function renderAll() {
+  renderChrome();
+  if (curView === 'live') { renderLive(); return; }
+  if (curTab === 'rooms') renderRooms();
+  if (curTab === 'packets') renderPackets();
+  if (curTab === 'roster') renderRoster();
+  if (curTab === 'sched') renderSched();
+}
+
+/* ================= 1. Rooms: create N at once, rename inline ============ */
+
+function renderRooms() {
+  const box = $('pane-rooms');
+  box.innerHTML = `
+    <div class="explain">
+      <b>What changes:</b> rooms are no longer added one by one. Pick how
+      many you need and they appear as <b>Room 1&hellip;N</b>, each renameable
+      right in the table (click a name, type, tab away). More can be added
+      later the same way; numbering continues from the highest default.
+    </div>
+    <h2>Rooms</h2>
+    ${rooms.length ? `<div class="tablewrap"><table>
+      <tr><th>Room</th><th>Links</th><th class="num">Files</th><th>Closes</th><th></th></tr>
+      ${rooms.map((r, i) => `<tr>
+        <td><input data-rn="${i}" value="${esc(r.name)}" size="16"></td>
+        <td><a href="#" onclick="return false">Reader</a> <button class="small">Copy</button>
+          &nbsp;<a href="#" onclick="return false">Bucket</a> <button class="small">Copy</button></td>
+        <td class="num">0</td>
+        <td><span class="muted">In 48 hours</span></td>
+        <td><button class="small" data-delroom="${i}">Remove</button></td>
+      </tr>`).join('')}
+    </table></div>` : '<div class="muted">No rooms yet</div>'}
+    <div class="row" style="margin-top:10px">
+      <label>${rooms.length ? 'Add' : 'Create'}
+        <input id="roomn" type="number" min="1" max="60" value="${rooms.length ? 2 : 8}" style="width:64px">
+        ${rooms.length ? 'more rooms' : 'rooms'}</label>
+      <button id="mkrooms" class="primary">${rooms.length ? 'Add rooms' : 'Create rooms'}</button>
+      <span class="muted">Named Room ${roomSeq}${'&ndash;'}&hellip; by default; rename any of them after</span>
+    </div>`;
+  $('mkrooms').onclick = () => {
+    const n = Math.max(1, Math.min(60, Number($('roomn').value) || 0));
+    if (!n) { say('How many rooms?', true); return; }
+    for (let i = 0; i < n; i++) rooms.push({ name: 'Room ' + roomSeq++ });
+    say(n + ' room' + (n === 1 ? '' : 's') + ' created');
+    renderAll();
+  };
+  box.querySelectorAll('[data-rn]').forEach((inp) => {
+    inp.onchange = () => {
+      const i = Number(inp.dataset.rn);
+      const name = inp.value.trim();
+      if (!name) { inp.value = rooms[i].name; return; }
+      rooms[i].name = name;
+      say('Renamed to ' + name);
+    };
+  });
+  box.querySelectorAll('[data-delroom]').forEach((b) => {
+    b.onclick = () => { rooms.splice(Number(b.dataset.delroom), 1); renderAll(); };
+  });
+}
+
+/* ====== 2. Packets: no "Choose File" — buttons open the picker. ========
+   ====== 3. Tiebreakers: split into questions, usage logged ============= */
+
+// guessRound, same rule as app/engine/qbj.js
+function guessRound(filename) {
+  const m = /round[ _-]?(\d+)/i.exec(filename || '');
+  if (m) return Number(m[1]);
+  const nums = (String(filename || '').match(/\d+/g) || [])
+    .map(Number).filter((n) => n >= 1 && n <= 99);
+  return nums.length === 1 ? nums[0] : null;
+}
+
+// Mock of the split step: the real app parses the packet json and lifts
+// each tossup/bonus out as an individually playable question.
+const TB_ANSWERS = [
+  ['Wolfgang Amadeus Mozart', 'the Krebs cycle', 'Treaty of Ghent'],
+  ['Toni Morrison', 'superconductivity', 'the Meiji Restoration'],
+  ['Lake Baikal', 'Rosalind Franklin', 'the Peace of Westphalia'],
+];
+function splitTbPacket(name) {
+  const answers = TB_ANSWERS[(tbSeq.tu / 3) % TB_ANSWERS.length | 0] || TB_ANSWERS[0];
+  for (let i = 0; i < 3; i++) {
+    tbQuestions.push({ id: 'TU' + (++tbSeq.tu), kind: 'Tossup', from: name,
+      answer: answers[i], uses: [] });
+    tbQuestions.push({ id: 'B' + (++tbSeq.b), kind: 'Bonus', from: name,
+      answer: answers[i] + ' (3 parts)', uses: [] });
+  }
+  say(name + ' split into 3 tossups + 3 bonuses');
+}
+
+function renderPackets() {
+  const box = $('pane-packets');
+  const slots = Array.from({ length: roundCount }, (_, i) => i + 1);
+  box.innerHTML = `
+    <div class="explain">
+      <b>What changes:</b> the bare <i>Choose File</i> inputs are gone.
+      Each upload is one button that opens the picker directly.
+      <b>Upload packet zip</b> is the lead action; <b>Upload packets</b>
+      takes one or more loose files. Everything picked lands in the same
+      staging row &mdash; drag chips onto round slots, or let
+      <i>Assign by filename</i> place the obvious ones (a chip whose guess
+      collides with an uploaded round stays staged instead of overwriting).
+    </div>
+
+    <h2>Packets</h2>
+    ${staged.length ? `
+    <div class="row" style="margin-bottom:8px">
+      ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
+        s.guess ? ` <span class="muted">&rarr; ${s.guess}</span>` : ''}</span>`).join('')}
+      <button id="stauto">Assign by filename</button>
+      <button id="stclear">Clear</button>
+    </div>` : ''}
+    <div class="chiprow">
+      ${slots.map((k) => `<span class="rchip slot ${packets[k] ? 'has' : ''}" data-round="${k}"
+        title="${esc(packets[k] || 'No packet')}"><span class="dot"></span>${k}</span>`).join('')}
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="pickzip" class="primary">Upload packet zip</button>
+      <button id="pickfiles">Upload packets</button>
+      <input id="fzip" type="file" accept=".zip" hidden>
+      <input id="ffiles" type="file" accept=".json,.docx" multiple hidden>
+      <span class="spacer" style="flex:1"></span>
+      <label>Rounds <input id="nrounds" type="number" min="1" max="999" value="${roundCount}" style="width:70px"></label>
+      <button id="setrounds">Set</button>
+    </div>
+    <div class="row demo" style="margin-top:6px">
+      <span class="muted">Mock helpers:</span>
+      <a href="#" id="demozip">Stage a sample zip</a>
+      <a href="#" id="demoloose">Stage loose files with odd names</a>
+    </div>
+
+    <h2>Tiebreakers</h2>
+    <div class="explain" style="margin-top:4px">
+      <b>Reworked:</b> a tiebreaker packet is <b>split into individual
+      questions</b> (tossups and bonuses), because in MODAQ a tiebreaker is
+      added to a game one question at a time &mdash; possibly several. Every
+      split question is <b>available in each room&rsquo;s MODAQ</b> to add
+      mid-game; the moderator checks with the TD about which one to read.
+      When one is played, the hub logs the match it was used for &mdash;
+      round, room, and <b>both team names</b> &mdash; so the TD always knows
+      exactly which teams have and have not heard each question before
+      approving it for another game. Answerlines show here for the
+      TD&rsquo;s reference.
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <button id="picktb" class="primary">Upload tiebreaker packet</button>
+      <input id="ftb" type="file" accept=".json,.docx" hidden>
+      <span class="slotdrop" id="tbdrop">Or drop a staged packet chip here to split it</span>
+    </div>
+    ${tbQuestions.length ? `<div class="tablewrap"><table>
+      <tr><th>Question</th><th>Kind</th><th>Answer</th><th>Status</th></tr>
+      ${tbQuestions.map((q) => `<tr>
+        <td class="mono">${esc(q.id)}</td>
+        <td>${esc(q.kind)}</td>
+        <td>${esc(q.answer)} <span class="muted" style="font-size:12px">(${esc(q.from)})</span></td>
+        <td>${q.uses.length
+          ? q.uses.map((u) => `<span class="bad">Heard by</span> <b>${
+              u.teams.map(esc).join(' &amp; ')}</b> <span class="muted">(Round ${u.round}, ${esc(u.room)})</span>`).join('<br>')
+          : '<span class="ok">Unused</span>'}</td>
+      </tr>`).join('')}
+    </table></div>` : '<div class="muted">No tiebreaker questions yet</div>'}
+    <div class="row demo" style="margin-top:6px">
+      <span class="muted">Mock helpers:</span>
+      <a href="#" id="demotb">Upload a sample tiebreaker packet</a>
+      <a href="#" id="demotbuse">Simulate a room playing a question</a>
+    </div>`;
+
+  const stage = (names) => {
+    for (const name of names) staged.push({ name, guess: guessRound(name) });
+    say(names.length + ' packet' + (names.length === 1 ? '' : 's') + ' staged');
+    renderAll();
+  };
+  $('pickzip').onclick = () => $('fzip').click();
+  $('pickfiles').onclick = () => $('ffiles').click();
+  $('picktb').onclick = () => $('ftb').click();
+  $('fzip').onchange = () => {
+    if (!$('fzip').files.length) return;
+    stage(slots.slice(0, 6).map((k) => 'Round ' + k + '.json'));
+    say('Zip read (mock): contents simulated as Rounds 1-6');
+  };
+  $('ffiles').onchange = () => {
+    if (!$('ffiles').files.length) return;
+    stage([...$('ffiles').files].map((f) => f.name));
+  };
+  $('ftb').onchange = () => {
+    if (!$('ftb').files.length) return;
+    splitTbPacket($('ftb').files[0].name);
+    renderAll();
+  };
+  $('demozip').onclick = (e) => {
+    e.preventDefault();
+    stage(['Packet_1.json', 'Packet_2.json', 'Packet_3.json', 'Packet_4.docx',
+      'Finals 1.json', 'Tiebreaker.json']);
+  };
+  $('demoloose').onclick = (e) => {
+    e.preventDefault();
+    stage(['2026 BHSAT Round 7.docx', 'editors-3.json', '2024 ACF Winter.json']);
+  };
+  $('demotb').onclick = (e) => {
+    e.preventDefault();
+    splitTbPacket('TB packet.json');
+    renderAll();
+  };
+  if ($('stauto')) {
+    $('stauto').onclick = () => {
+      const remaining = [];
+      let placed = 0;
+      for (const s of staged) {
+        // never overwrite silently — a colliding guess stays staged to drag
+        if (s.guess && s.guess <= roundCount && !packets[s.guess]) {
+          packets[s.guess] = s.name;
+          placed++;
+        } else remaining.push(s);
+      }
+      staged = remaining;
+      say(placed + ' assigned, ' + remaining.length + ' left to drag');
+      renderAll();
+    };
+    $('stclear').onclick = () => { staged = []; renderAll(); };
+  }
+  $('setrounds').onclick = () => {
+    roundCount = Math.max(1, Math.min(999, Number($('nrounds').value) || roundCount));
+    renderAll();
+  };
+  $('demotbuse').onclick = (e) => {
+    e.preventDefault();
+    if (!tbQuestions.length) { say('Upload a tiebreaker packet first', true); return; }
+    // prefer an unused question; wrap around to show multi-use tracking
+    const q = tbQuestions.find((x) => !x.uses.length) || tbQuestions[tbSim % tbQuestions.length];
+    const sims = [['Room 1', ['Ashland A', 'Belmont']], ['Room 2', ['Chester', 'Dunmore']],
+      ['Room 3', ['Everett', 'Ashland B']]];
+    const [room, matchup] = sims[tbSim++ % sims.length];
+    q.uses.push({ round: liveRound + (tbSim % 2), room, teams: matchup });
+    say('Logged: ' + matchup.join(' v ') + ' heard ' + q.id + ' in ' + room);
+    renderAll();
+  };
+
+  // drag staged chips onto round slots, or onto the tiebreaker splitter
+  box.querySelectorAll('[data-chip]').forEach((c) => {
+    c.ondragstart = (ev) => ev.dataTransfer.setData('text/plain', c.dataset.chip);
+  });
+  box.querySelectorAll('.slot').forEach((slot) => {
+    slot.ondragover = (ev) => { ev.preventDefault(); slot.classList.add('dragover'); };
+    slot.ondragleave = () => slot.classList.remove('dragover');
+    slot.ondrop = (ev) => {
+      ev.preventDefault();
+      slot.classList.remove('dragover');
+      const s = staged[Number(ev.dataTransfer.getData('text/plain'))];
+      if (!s) return;
+      packets[Number(slot.dataset.round)] = s.name;
+      staged.splice(staged.indexOf(s), 1);
+      say(s.name + ' → Round ' + slot.dataset.round);
+      renderAll();
+    };
+  });
+  const tbdrop = $('tbdrop');
+  tbdrop.ondragover = (ev) => { ev.preventDefault(); tbdrop.classList.add('dragover'); };
+  tbdrop.ondragleave = () => tbdrop.classList.remove('dragover');
+  tbdrop.ondrop = (ev) => {
+    ev.preventDefault();
+    tbdrop.classList.remove('dragover');
+    const s = staged[Number(ev.dataTransfer.getData('text/plain'))];
+    if (!s) return;
+    staged.splice(staged.indexOf(s), 1);
+    splitTbPacket(s.name);
+    renderAll();
+  };
+}
+
+/* ========== 4 + 5. Roster: structured editor, picker-less upload ======== */
+
+const TRICKY = [
+  { name: 'St. John’s "A"', players: ['Robert Smith, Jr.', 'Mary O’Brien'] },
+  { name: 'Hyphen-upon-Avon', players: ['Jean-Luc "JL" Picard', 'D’Arcy McNickle III'] },
+];
+
+function rosterQbj() {
+  return {
+    version: '2.1.1',
+    objects: [{
+      type: 'Tournament',
+      name: 'Mock Tournament',
+      registrations: teams.map((t) => ({
+        name: t.name,
+        teams: [{ name: t.name, players: t.players.map((p) => ({ name: p })) }],
+      })),
+    }],
+  };
+}
+
+function rosterProblems() {
+  const problems = [];
+  const seen = new Set();
+  teams.forEach((t, i) => {
+    const name = t.name.trim();
+    if (!name) problems.push('Team ' + (i + 1) + ' has no name');
+    else if (seen.has(name)) problems.push('Duplicate team: ' + name);
+    seen.add(name);
+    if (!t.players.some((p) => p.trim())) problems.push((name || 'Team ' + (i + 1)) + ' has no players');
+  });
+  return problems;
+}
+
+function renderRoster() {
+  const box = $('pane-roster');
+  const nPlayers = teams.reduce((n, t) => n + t.players.filter((p) => p.trim()).length, 0);
+  const problems = rosterEditorOpen ? rosterProblems() : [];
+  box.innerHTML = `
+    <div class="explain">
+      <b>What changes:</b> the freeform <span class="mono">Team: Player, Player</span>
+      textarea is gone. Each team is a card with one field per name, so a
+      comma in <i>Smith, Jr.</i> or quotes in <i>St. John&rsquo;s "A"</i> can never
+      split a name or break the file &mdash; names go straight into JSON
+      string fields. <b>Tab (or Enter) from the last player field adds the
+      next one</b>, so a whole team is typed without touching the mouse.
+      <b>Card order is seed order</b> &mdash; Seed 1 at the top &mdash; and it
+      drives pool assignments in the schedule; use the arrows on each card
+      to adjust seeding. Upload follows the same one-button convention: no
+      <i>Choose File</i>; the button opens the picker and shows what was
+      parsed before anything is saved.
+      <br><b>To verify at implementation time:</b> names with commas and
+      straight/curly quotes round-trip through MODAQ team pickers and the
+      YellowFruit .yft import (the mock helper below loads such names).
+    </div>
+
+    <h2>Roster</h2>
+    <div class="row">
+      ${rosterSaved
+        ? `<span>${esc(rosterSaved.source)}</span>
+           <span class="pill on">${rosterSaved.teams} teams &middot; ${rosterSaved.players} players</span>
+           <a href="#" onclick="return false">Download</a>`
+        : '<span class="muted">None yet</span>'}
+      <span class="spacer" style="flex:1"></span>
+      <button id="pickroster">Upload roster QBJ</button>
+      <input id="froster" type="file" accept=".qbj,.json" hidden>
+      <button id="editroster">${rosterSaved ? 'Edit roster' : 'Create roster'}</button>
+    </div>
+    <div id="upreview"></div>
+
+    <div id="rosteredit" ${rosterEditorOpen ? '' : 'hidden'} style="margin-top:12px">
+      ${teams.map((t, ti) => `
+      <div class="card">
+        <div class="row">
+          <span class="seedmove">
+            <button class="xbtn" data-seedup="${ti}" tabindex="-1"
+              title="Move up (stronger seed)" ${ti === 0 ? 'disabled' : ''}>&#9650;</button>
+            <button class="xbtn" data-seeddown="${ti}" tabindex="-1"
+              title="Move down (weaker seed)" ${ti === teams.length - 1 ? 'disabled' : ''}>&#9660;</button>
+          </span>
+          <span class="pill" title="Roster order is seed order">Seed ${ti + 1}</span>
+          <input data-tname="${ti}" value="${esc(t.name)}" placeholder="Team name" size="24">
+          <span class="muted" data-tcount="${ti}">${t.players.filter((p) => p.trim()).length} players</span>
+          <span class="spacer" style="flex:1"></span>
+          <button class="small" data-delteam="${ti}" tabindex="-1">Remove team</button>
+        </div>
+        ${t.players.map((p, pi) => `
+        <div class="playerline">
+          <input data-pname="${ti}.${pi}" value="${esc(p)}" placeholder="Player name">
+          <button class="xbtn" data-delplayer="${ti}.${pi}" title="Remove player" tabindex="-1">&times;</button>
+        </div>`).join('')}
+        <div class="row" style="margin-top:4px">
+          <button class="small" data-addplayer="${ti}" tabindex="-1">+ Player</button>
+        </div>
+      </div>`).join('')}
+      <div class="row" style="margin-top:8px">
+        <button id="addteam">+ Team</button>
+        <span class="muted" id="rostercount">${teams.length} teams &middot; ${nPlayers} players</span>
+        <span class="muted">&middot; Card order is seed order</span>
+        <span class="spacer" style="flex:1"></span>
+        <a href="#" id="tricky" class="demo">Mock helper: load tricky names</a>
+      </div>
+      <div class="bad" id="rosterproblems" style="margin-top:6px">${problems.map(esc).join(' &middot; ')}</div>
+      <div class="row" style="margin-top:8px">
+        <button id="rosterdl">Download roster QBJ</button>
+        <button id="rostersave" class="primary">Save as tournament roster</button>
+        <button id="rosterprev" class="small">${previewOpen ? 'Hide' : 'Preview'} QBJ</button>
+      </div>
+      <pre class="preview" ${previewOpen ? '' : 'hidden'} id="qbjprev"></pre>
+    </div>`;
+
+  if (previewOpen && teams.length) {
+    $('qbjprev').textContent = JSON.stringify(rosterQbj(), null, 2);
+  }
+  $('pickroster').onclick = () => $('froster').click();
+  $('froster').onchange = async () => {
+    const f = $('froster').files[0];
+    if (!f) return;
+    let parsed;
+    try {
+      const json = JSON.parse(await f.text());
+      parsed = [];
+      const collect = (o) => {
+        if (!o || typeof o !== 'object') return;
+        if (Array.isArray(o.teams)) o.teams.forEach(collect);
+        else if (Array.isArray(o.players) && o.name) {
+          parsed.push({ name: o.name, players: o.players.map((p) => p.name || p).filter(Boolean) });
+        }
+      };
+      (json.objects || [json]).forEach((o) => {
+        collect(o);
+        (o.registrations || []).forEach(collect);
+      });
+      if (!parsed.length) throw new Error('no teams found');
+    } catch (e) {
+      say('Roster: ' + e.message, true);
+      return;
+    }
+    $('upreview').innerHTML = `
+      <div class="card" style="margin-top:8px">
+        <div class="row">
+          <b>${esc(f.name)}</b>
+          <span class="pill">${parsed.length} teams &middot; ${parsed.reduce((n, t) => n + t.players.length, 0)} players</span>
+          <span class="spacer" style="flex:1"></span>
+          <button id="upconfirm" class="primary">Save as tournament roster</button>
+          <button id="upcancel">Cancel</button>
+        </div>
+        <div class="muted" style="font-size:13px;margin-top:4px">${
+          parsed.slice(0, 4).map((t) => esc(t.name)).join(' &middot; ')}${parsed.length > 4 ? ' &hellip;' : ''}</div>
+      </div>`;
+    $('upconfirm').onclick = () => {
+      teams = parsed;
+      rosterSaved = { source: f.name, teams: parsed.length,
+        players: parsed.reduce((n, t) => n + t.players.length, 0) };
+      say('Roster saved');
+      renderAll();
+    };
+    $('upcancel').onclick = () => { $('upreview').innerHTML = ''; };
+  };
+  $('editroster').onclick = () => {
+    rosterEditorOpen = !rosterEditorOpen;
+    if (rosterEditorOpen && !teams.length) teams.push({ name: '', players: ['', '', '', ''] });
+    renderAll();
+  };
+  $('addteam').onclick = () => { teams.push({ name: '', players: ['', '', '', ''] }); renderAll(); };
+  $('tricky').onclick = (e) => {
+    e.preventDefault();
+    teams = TRICKY.map((t) => ({ name: t.name, players: [...t.players] }));
+    renderAll();
+  };
+  // Typing never re-renders — a re-render would eat the focus mid-entry.
+  // State, the counters, and the problem line update in place instead.
+  const refreshMeta = () => {
+    teams.forEach((t, ti) => {
+      const el = box.querySelector(`[data-tcount="${ti}"]`);
+      if (el) el.textContent = t.players.filter((p) => p.trim()).length + ' players';
+    });
+    const total = teams.reduce((n, t) => n + t.players.filter((p) => p.trim()).length, 0);
+    const count = $('rostercount');
+    if (count) count.textContent = teams.length + ' teams · ' + total + ' players';
+    const prob = $('rosterproblems');
+    if (prob) prob.textContent = rosterProblems().join(' · ');
+  };
+  box.querySelectorAll('[data-tname]').forEach((inp) => {
+    inp.oninput = () => {
+      teams[Number(inp.dataset.tname)].name = inp.value;
+      refreshMeta();
+    };
+  });
+  box.querySelectorAll('[data-pname]').forEach((inp) => {
+    const [ti, pi] = inp.dataset.pname.split('.').map(Number);
+    inp.oninput = () => { teams[ti].players[pi] = inp.value; refreshMeta(); };
+    // Tab or Enter on the last field grows the list — hands stay on the keyboard
+    inp.onkeydown = (ev) => {
+      const last = pi === teams[ti].players.length - 1;
+      if (ev.key === 'Enter' || (ev.key === 'Tab' && !ev.shiftKey && last && inp.value.trim())) {
+        ev.preventDefault();
+        teams[ti].players[pi] = inp.value;
+        if (last) teams[ti].players.push('');
+        renderAll();
+        const next = document.querySelector(`[data-pname="${ti}.${pi + 1}"]`);
+        if (next) next.focus();
+      }
+    };
+  });
+  box.querySelectorAll('[data-delteam]').forEach((b) => {
+    b.onclick = () => { teams.splice(Number(b.dataset.delteam), 1); renderAll(); };
+  });
+  box.querySelectorAll('[data-seedup]').forEach((b) => {
+    b.onclick = () => {
+      const i = Number(b.dataset.seedup);
+      if (i > 0) {
+        [teams[i - 1], teams[i]] = [teams[i], teams[i - 1]];
+        say((teams[i - 1].name || 'Team') + ' is now Seed ' + i);
+        renderAll();
+      }
+    };
+  });
+  box.querySelectorAll('[data-seeddown]').forEach((b) => {
+    b.onclick = () => {
+      const i = Number(b.dataset.seeddown);
+      if (i < teams.length - 1) {
+        [teams[i], teams[i + 1]] = [teams[i + 1], teams[i]];
+        say((teams[i + 1].name || 'Team') + ' is now Seed ' + (i + 2));
+        renderAll();
+      }
+    };
+  });
+  box.querySelectorAll('[data-delplayer]').forEach((b) => {
+    b.onclick = () => {
+      const [ti, pi] = b.dataset.delplayer.split('.').map(Number);
+      teams[ti].players.splice(pi, 1);
+      renderAll();
+    };
+  });
+  const finish = (saved) => {
+    const problemsNow = rosterProblems();
+    if (problemsNow.length || !teams.length) {
+      $('rosterproblems').textContent = problemsNow.join(' · ') || 'No teams yet';
+      say('Fix the roster first', true);
+      return;
+    }
+    const clean = teams.map((t) => ({ name: t.name.trim(),
+      players: t.players.map((p) => p.trim()).filter(Boolean) }));
+    if (saved) {
+      teams = clean;
+      rosterSaved = { source: 'Created in editor', teams: clean.length,
+        players: clean.reduce((n, t) => n + t.players.length, 0) };
+      rosterEditorOpen = false;
+      say('Roster saved');
+    } else say('roster.qbj downloaded (mock)');
+    renderAll();
+  };
+  $('rosterdl').onclick = () => finish(false);
+  $('rostersave').onclick = () => finish(true);
+  $('rosterprev').onclick = () => { previewOpen = !previewOpen; renderAll(); };
+}
+
+/* ============ 6. Schedule: dropdown slots, game + team swaps ============ */
+
+function circleRounds(n) {
+  const ghost = n % 2 === 1 ? n : -1;
+  const m = ghost === -1 ? n : n + 1;
+  const seats = [...Array(m).keys()];
+  const out = [];
+  for (let r = 0; r < m - 1; r++) {
+    const pairs = [];
+    const byes = [];
+    for (let i = 0; i < m / 2; i++) {
+      const a = seats[i], b = seats[m - 1 - i];
+      if (a === ghost) byes.push(b);
+      else if (b === ghost) byes.push(a);
+      else pairs.push([a, b]);
+    }
+    out.push({ pairs, byes });
+    seats.splice(1, 0, seats.pop());
+  }
+  return out;
+}
+
+function sampleSched() {
+  const names = teams.length >= 4 ? teams.map((t) => t.name)
+    : ['Ashland A', 'Ashland B', 'Belmont', 'Chester', 'Dunmore', 'Everett'];
+  const roomNames = rooms.length ? rooms.map((r) => r.name).slice(0, Math.floor(names.length / 2))
+    : ['Room 1', 'Room 2', 'Room 3'];
+  while (roomNames.length < Math.floor(names.length / 2)) roomNames.push('Room ' + (roomNames.length + 1));
+  const rounds = circleRounds(names.length).map((rr) => ({
+    games: roomNames.map((_, i) => rr.pairs[i]
+      ? { a: names[rr.pairs[i][0]], b: names[rr.pairs[i][1]], tb: false } : null),
+    byes: rr.byes.map((i) => names[i]),
+  }));
+  return { rooms: roomNames, rounds };
+}
+
+function slotVal(loc) {
+  const round = sched.rounds[loc.r];
+  if (loc.bye !== undefined) return round.byes[loc.bye] ?? null;
+  const g = round.games[loc.room];
+  return g ? g[loc.side] : null;
+}
+function setSlotVal(loc, v) {
+  const round = sched.rounds[loc.r];
+  if (loc.bye !== undefined) {
+    if (v === null) round.byes.splice(loc.bye, 1);
+    else if (loc.bye >= round.byes.length) round.byes.push(v);
+    else round.byes[loc.bye] = v;
+    return;
+  }
+  if (!round.games[loc.room]) round.games[loc.room] = { a: null, b: null, tb: false };
+  round.games[loc.room][loc.side] = v;
+  const g = round.games[loc.room];
+  if (g.a === null && g.b === null && !g.tb) round.games[loc.room] = null;
+}
+function swapVals(l1, l2) {
+  const v1 = slotVal(l1), v2 = slotVal(l2);
+  setSlotVal(l1, v2);
+  setSlotVal(l2, v1);
+}
+function swapGames(g1, g2) {
+  const a = sched.rounds[g1.r].games[g1.room];
+  sched.rounds[g1.r].games[g1.room] = sched.rounds[g2.r].games[g2.room];
+  sched.rounds[g2.r].games[g2.room] = a;
+}
+function locKey(l) { return l.bye !== undefined ? `${l.r}b${l.bye}` : `${l.r}.${l.room}.${l.side}`; }
+
+// Playoff placeholders: "A1" = Pool A's 1st-place finisher, filled in
+// after prelims — by hand, or all at once from standings.
+const isPh = (v) => typeof v === 'string' && /^[A-D]\d+$/.test(v);
+
+function realTeamsIn(sched) {
+  return [...new Set([
+    ...(teams.length ? teams.map((t) => t.name) : []),
+    ...sched.rounds.flatMap((rd) => [...rd.games.flatMap((g) => g ? [g.a, g.b] : []), ...rd.byes]),
+  ].filter((v) => v && !isPh(v)))];
+}
+
+// Mock crossover: pools A/B by alternating standings order, every A team
+// meets every B team once (the real generator does this per format).
+function addPlayoffRounds() {
+  const m = Math.min(3, Math.floor(realTeamsIn(sched).length / 2));
+  if (!m) { say('Needs teams first', true); return; }
+  for (let t = 0; t < m; t++) {
+    const games = sched.rooms.map((_, i) => i < m
+      ? { a: 'A' + (i + 1), b: 'B' + (((i + t) % m) + 1), tb: false } : null);
+    sched.rounds.push({ games, byes: [] });
+  }
+  say(m + ' playoff rounds added with placeholder slots (A1 = Pool A 1st place)');
+}
+
+function fillFromStandings() {
+  // mock standings = current team order; snake into pools A and B
+  const standings = realTeamsIn(sched);
+  const map = {};
+  standings.forEach((name, i) => { map[(i % 2 ? 'B' : 'A') + (Math.floor(i / 2) + 1)] = name; });
+  let filled = 0;
+  for (const round of sched.rounds) {
+    for (const g of round.games) {
+      if (!g) continue;
+      if (isPh(g.a) && map[g.a]) { g.a = map[g.a]; filled++; }
+      if (isPh(g.b) && map[g.b]) { g.b = map[g.b]; filled++; }
+    }
+    round.byes = round.byes.map((b) => (isPh(b) && map[b] ? (filled++, map[b]) : b));
+  }
+  say(filled + ' playoff slots filled from standings (mock standings = roster order)');
+}
+
+function schedWarnings() {
+  const warnings = [];
+  sched.rounds.forEach((round, r) => {
+    const seen = new Set();
+    const all = [];
+    for (const g of round.games) if (g) all.push(g.a, g.b);
+    all.push(...round.byes);
+    for (const t of all) {
+      if (!t) continue;
+      if (seen.has(t)) warnings.push('Round ' + (r + 1) + ': ' + t + ' twice');
+      seen.add(t);
+    }
+  });
+  return warnings;
+}
+
+function renderSched() {
+  const box = $('pane-sched');
+  if (!sched) sched = sampleSched();
+  const warnings = schedWarnings();
+  const allTeams = realTeamsIn(sched);
+  const hasPh = sched.rounds.some((rd) =>
+    rd.games.some((g) => g && (isPh(g.a) || isPh(g.b))) || rd.byes.some(isPh));
+  const availFor = (r, current) => {
+    const inRound = new Set();
+    const round = sched.rounds[r];
+    for (const g of round.games) if (g) { if (g.a) inRound.add(g.a); if (g.b) inRound.add(g.b); }
+    for (const b of round.byes) inRound.add(b);
+    return allTeams.filter((t) => !inRound.has(t) || t === current);
+  };
+  const chip = (loc, v) => {
+    if (slotEdit && locKey(slotEdit) === locKey(loc)) {
+      const avail = availFor(loc.r, v);
+      return `<select class="slotsel" data-slotsel='${esc(JSON.stringify(loc))}'>
+        <option value="__keep" selected hidden>${v ? esc(v) : '&mdash;'}</option>
+        ${avail.filter((t) => t !== v).map((t) => `<option>${esc(t)}</option>`).join('')}
+        ${v ? '<option value="__clear">— Clear slot</option>' : ''}
+      </select>`;
+    }
+    return `<span class="slotchip ${v ? (isPh(v) ? 'ph' : '') : 'empty'}" draggable="${v ? 'true' : 'false'}"
+      data-loc='${esc(JSON.stringify(loc))}'>${v ? esc(v) : '&mdash;'}</span>`;
+  };
+  const selGame = gameSel ? sched.rounds[gameSel.r].games[gameSel.room] : null;
+  box.innerHTML = `
+    <div class="explain">
+      <b>What changes:</b> the grid is directly editable everywhere.
+      <b>Click a slot for a dropdown of the teams still free that round</b>
+      (with a clear option); drag any chip onto another slot to swap teams.
+      <b>Drag a whole game box to another room&rsquo;s cell to swap the
+      matches</b> &mdash; or click the &#8646; handle, then click the target
+      cell. Hover a round number to insert or delete rounds anywhere; rename
+      rooms in their headers, add with <i>+ Room</i>, remove from the header
+      &times; (that column&rsquo;s teams drop to the bye tray). The bye column
+      is a drag target; the small <b>TB</b> toggle marks a tiebreaker game.
+      <b>Seeding comes from roster order</b> (set on the Roster tab), and
+      playoff rounds use placeholder slots &mdash; <i>A1</i> is Pool A&rsquo;s
+      1st-place finisher &mdash; which <b>Fill playoff slots from
+      standings</b> replaces with the real teams once prelims are in.
+    </div>
+    <div class="row" style="margin-bottom:6px">
+      <button id="schedregen">Regenerate sample</button>
+      <button id="schedaddroom">+ Room</button>
+      <button id="schedplayoffs">Add playoff rounds</button>
+      ${hasPh ? '<button id="schedfill" class="primary">Fill playoff slots from standings</button>' : ''}
+      <span class="spacer" style="flex:1"></span>
+      ${schedDirty ? '<span class="pill warn">Unsaved</span>' : schedSaved ? '<span class="pill on">Saved</span>' : ''}
+      <button id="schedsave" class="primary" ${schedDirty || !schedSaved ? '' : 'disabled'}>Save</button>
+    </div>
+    ${warnings.length ? `<div class="bad">${warnings.map(esc).join(' &middot; ')}</div>` : ''}
+    ${gameSel ? `
+    <div class="row" style="margin:6px 0">
+      <span>Swapping <b>${esc(selGame && selGame.a || '—')} v ${esc(selGame && selGame.b || '—')}</b>
+        (Round ${gameSel.r + 1}, ${esc(sched.rooms[gameSel.room])}) &mdash; click another cell</span>
+      <button id="gunsel" class="small">Cancel</button>
+    </div>` : ''}
+    <div class="tablewrap">
+    <table class="sched">
+      <tr>
+        <th></th>
+        ${sched.rooms.map((name, i) => `<th>
+          <input data-schedroom="${i}" value="${esc(name)}">
+          <button class="xbtn" data-delcol="${i}" title="Remove room">&times;</button></th>`).join('')}
+        <th>Bye</th>
+      </tr>
+      ${sched.rounds.map((round, r) => `
+      <tr>
+        <td class="roundcell">${r + 1}
+          <span class="rowtools">
+            <button class="xbtn" data-insround="${r}" title="Insert round after">+</button>
+            <button class="xbtn" data-delround="${r}" title="Delete round">&times;</button>
+          </span>
+        </td>
+        ${sched.rooms.map((_, room) => {
+          const g = round.games[room];
+          const sel = gameSel && gameSel.r === r && gameSel.room === room;
+          return `<td><div class="gamebox ${sel ? 'sel' : ''}" draggable="true"
+            data-game='${esc(JSON.stringify({ r, room }))}'>
+            <div>
+              <div>${chip({ r, room, side: 'a' }, g ? g.a : null)}</div>
+              <div>${chip({ r, room, side: 'b' }, g ? g.b : null)}</div>
+            </div>
+            <span class="ghandle" draggable="true" data-ghandle='${esc(JSON.stringify({ r, room }))}'
+              title="${sel ? 'Cancel' : 'Swap this game with another room'}">&#8646;</span>
+            ${g && (g.a || g.b) ? `<span class="tbmark ${g.tb ? 'on' : ''}" data-tb="${r}.${room}"
+              title="Tiebreaker game">TB</span>` : ''}
+          </div></td>`;
+        }).join('')}
+        <td class="byetray" data-byetray="${r}">
+          ${round.byes.map((b, i) => chip({ r, bye: i }, b)).join('<br>')}
+        </td>
+      </tr>`).join('')}
+    </table>
+    </div>
+    <div class="muted" style="font-size:13px;margin-top:8px">
+      Click a slot for the team dropdown &middot; drag chips to swap teams &middot;
+      drag a game box (or use &#8646;) to swap matches between rooms &middot;
+      hover a round number to insert or delete rounds &middot; drop on the bye
+      column to bench a team</div>`;
+
+  const touch = () => { schedDirty = true; };
+  $('schedregen').onclick = () => {
+    sched = sampleSched();
+    slotEdit = null;
+    gameSel = null;
+    touch();
+    renderAll();
+  };
+  $('schedsave').onclick = () => {
+    schedSaved = true;
+    schedDirty = false;
+    say('Schedule saved');
+    renderAll();
+  };
+  $('schedaddroom').onclick = () => {
+    sched.rooms.push('Room ' + (sched.rooms.length + 1));
+    for (const round of sched.rounds) round.games.push(null);
+    touch();
+    renderAll();
+  };
+  $('schedplayoffs').onclick = () => {
+    addPlayoffRounds();
+    touch();
+    renderAll();
+  };
+  if ($('schedfill')) $('schedfill').onclick = () => {
+    fillFromStandings();
+    touch();
+    renderAll();
+  };
+  if ($('gunsel')) $('gunsel').onclick = () => { gameSel = null; renderAll(); };
+  box.querySelectorAll('[data-schedroom]').forEach((inp) => {
+    inp.onchange = () => {
+      sched.rooms[Number(inp.dataset.schedroom)] = inp.value.trim() || inp.value;
+      touch();
+    };
+  });
+  box.querySelectorAll('[data-delcol]').forEach((b) => {
+    b.onclick = () => {
+      const i = Number(b.dataset.delcol);
+      const filled = sched.rounds.some((rd) => rd.games[i] && (rd.games[i].a || rd.games[i].b));
+      if (filled && !confirm('Remove ' + sched.rooms[i] + '? Its teams drop to the bye column.')) return;
+      for (const round of sched.rounds) {
+        const g = round.games[i];
+        if (g) { if (g.a) round.byes.push(g.a); if (g.b) round.byes.push(g.b); }
+        round.games.splice(i, 1);
+      }
+      sched.rooms.splice(i, 1);
+      slotEdit = null;
+      gameSel = null;
+      touch();
+      renderAll();
+    };
+  });
+  box.querySelectorAll('[data-insround]').forEach((b) => {
+    b.onclick = () => {
+      sched.rounds.splice(Number(b.dataset.insround) + 1, 0,
+        { games: sched.rooms.map(() => null), byes: [] });
+      slotEdit = null;
+      gameSel = null;
+      touch();
+      renderAll();
+    };
+  });
+  box.querySelectorAll('[data-delround]').forEach((b) => {
+    b.onclick = () => {
+      const r = Number(b.dataset.delround);
+      const round = sched.rounds[r];
+      const filled = round.games.some((g) => g && (g.a || g.b)) || round.byes.length;
+      if (filled && !confirm('Delete Round ' + (r + 1) + '?')) return;
+      sched.rounds.splice(r, 1);
+      slotEdit = null;
+      gameSel = null;
+      touch();
+      renderAll();
+    };
+  });
+  box.querySelectorAll('[data-tb]').forEach((m) => {
+    m.onclick = () => {
+      const [r, room] = m.dataset.tb.split('.').map(Number);
+      sched.rounds[r].games[room].tb = !sched.rounds[r].games[room].tb;
+      touch();
+      renderAll();
+    };
+  });
+  // team chips: click opens the dropdown (or finishes a game swap); drag swaps
+  box.querySelectorAll('.slotchip').forEach((c) => {
+    const loc = JSON.parse(c.dataset.loc);
+    c.onclick = (ev) => {
+      ev.stopPropagation();
+      if (gameSel) {
+        if (loc.bye !== undefined) { gameSel = null; renderAll(); return; }
+        swapGames(gameSel, { r: loc.r, room: loc.room });
+        gameSel = null;
+        touch();
+        renderAll();
+        return;
+      }
+      slotEdit = loc;
+      renderAll();
+      const sel = box.querySelector('select.slotsel');
+      if (sel) sel.focus();
+    };
+    c.ondragstart = (ev) => {
+      ev.stopPropagation(); // the chip's team swap wins over the box's game swap
+      ev.dataTransfer.setData('text/plain', JSON.stringify({ slot: loc }));
+    };
+    c.ondragover = (ev) => { ev.preventDefault(); c.classList.add('dragover'); };
+    c.ondragleave = () => c.classList.remove('dragover');
+    c.ondrop = (ev) => {
+      ev.preventDefault();
+      const p = JSON.parse(ev.dataTransfer.getData('text/plain') || 'null');
+      if (!p || !p.slot || locKey(p.slot) === locKey(loc)) return; // game payloads bubble to the gamebox
+      ev.stopPropagation();
+      swapVals(p.slot, loc);
+      slotEdit = null;
+      touch();
+      renderAll();
+    };
+  });
+  box.querySelectorAll('select.slotsel').forEach((sel) => {
+    const loc = JSON.parse(sel.dataset.slotsel);
+    sel.onchange = () => {
+      const v = sel.value;
+      if (v !== '__keep') setSlotVal(loc, v === '__clear' ? null : v);
+      slotEdit = null;
+      touch();
+      renderAll();
+    };
+    sel.onblur = () => {
+      if (slotEdit && locKey(slotEdit) === locKey(loc)) { slotEdit = null; renderAll(); }
+    };
+  });
+  // game handles: click-click or drag to swap whole games between rooms
+  box.querySelectorAll('[data-ghandle]').forEach((h) => {
+    const g = JSON.parse(h.dataset.ghandle);
+    h.onclick = (ev) => {
+      ev.stopPropagation();
+      if (gameSel && gameSel.r === g.r && gameSel.room === g.room) { gameSel = null; renderAll(); return; }
+      if (gameSel) {
+        swapGames(gameSel, g);
+        gameSel = null;
+        touch();
+        renderAll();
+        return;
+      }
+      gameSel = g;
+      slotEdit = null;
+      renderAll();
+    };
+    h.ondragstart = (ev) => {
+      ev.stopPropagation();
+      ev.dataTransfer.setData('text/plain', JSON.stringify({ game: g }));
+    };
+  });
+  box.querySelectorAll('[data-game]').forEach((cell) => {
+    const g = JSON.parse(cell.dataset.game);
+    cell.ondragstart = (ev) =>
+      ev.dataTransfer.setData('text/plain', JSON.stringify({ game: g }));
+    cell.onclick = () => {
+      if (!gameSel) return;
+      if (gameSel.r === g.r && gameSel.room === g.room) { gameSel = null; renderAll(); return; }
+      swapGames(gameSel, g);
+      gameSel = null;
+      touch();
+      renderAll();
+    };
+    cell.ondragover = (ev) => ev.preventDefault();
+    cell.ondrop = (ev) => {
+      const p = JSON.parse(ev.dataTransfer.getData('text/plain') || 'null');
+      if (!p || !p.game) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (p.game.r === g.r && p.game.room === g.room) return;
+      swapGames(p.game, g);
+      gameSel = null;
+      touch();
+      renderAll();
+    };
+  });
+  box.querySelectorAll('[data-byetray]').forEach((tray) => {
+    tray.ondragover = (ev) => { ev.preventDefault(); tray.classList.add('dragover'); };
+    tray.ondragleave = () => tray.classList.remove('dragover');
+    tray.ondrop = (ev) => {
+      ev.preventDefault();
+      tray.classList.remove('dragover');
+      const p = JSON.parse(ev.dataTransfer.getData('text/plain') || 'null');
+      if (!p || !p.slot) return;
+      const r = Number(tray.dataset.byetray);
+      const v = slotVal(p.slot);
+      if (v === null) return;
+      setSlotVal(p.slot, null);
+      sched.rounds[r].byes.push(v);
+      slotEdit = null;
+      touch();
+      renderAll();
+    };
+  });
+}
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return;
+  if (slotEdit || gameSel) {
+    slotEdit = null;
+    gameSel = null;
+    if (curView === 'setup' && curTab === 'sched') renderAll();
+  }
+});
+
+/* ================== Live Hub: what stays on the day-of page ============= */
+
+function renderLive() {
+  const box = $('view-live');
+  const missing = setupMissing();
+  const packetUp = !!packets[liveRound];
+  const tbUsed = tbQuestions.filter((q) => q.uses.length).length;
+  box.innerHTML = `
+    <div class="explain" style="margin-top:6px">
+      <b>New structure:</b> the Live Hub is the day-of page &mdash; round
+      control, broadcasts, stats + export, uploads &mdash; with setup moved
+      out of the way once it is done. Below is a light sketch (most controls
+      inert); the real content is the setup notice and the renamed
+      <b>Customize MODAQ settings</b> button.
+    </div>
+    ${missing.length ? `
+    <div class="banner">
+      <span class="bad" style="font-weight:600">Tournament setup incomplete</span>
+      <span class="muted">Still to do: ${missing.join(', ')}</span>
+      <span class="spacer" style="flex:1"></span>
+      <button id="gosetup" class="primary">Open Tournament Setup</button>
+    </div>` : `
+    <div class="row" style="margin-top:10px">
+      <span class="pill on">Setup complete</span>
+      <button id="gosetup" class="small">Reopen Tournament Setup</button>
+    </div>`}
+    <div class="statusbar">
+      <span><span class="muted">Round</span> <span class="big">${liveRound}</span> <span class="muted">of ${roundCount}</span></span>
+      ${packetUp ? '<span class="ok">Packet up</span>' : '<span class="bad">No packet</span>'}
+      <span><span class="ok">2</span><span class="muted">/3 games in</span></span>
+      <span class="muted">Waiting: ${esc((rooms[0] || { name: 'Room 1' }).name)}</span>
+      ${tbQuestions.length ? `<span class="pill ${tbUsed ? 'warn' : ''}">Tiebreakers: ${tbUsed} used &middot; ${
+        tbQuestions.length - tbUsed} unused</span>` : ''}
+      <span class="spacer" style="flex:1"></span>
+      <label>Round <input type="number" min="1" max="999" value="${liveRound}" style="width:70px" disabled></label>
+      <button disabled>Set</button>
+      <button id="advround" class="primary">Advance to Round ${liveRound + 1}</button>
+    </div>
+    <details class="drawer">
+      <summary><span class="dtitle">Broadcasts</span>
+        <span class="muted">1 live &middot; Lunch until 1:15; Round 6 starts at 1:25</span></summary>
+      <div class="inner">
+        <div class="row" style="margin-top:8px">
+          <input maxlength="200" style="flex:1;min-width:240px" placeholder="A line for the rooms or the public page" disabled>
+          <select disabled><option>Public page + rooms</option></select>
+          <button disabled>Send</button>
+        </div>
+        <div class="muted" style="font-size:13px;margin-top:6px">(Inert in the mock — unchanged from the real hub)</div>
+      </div>
+    </details>
+    <h2>Settings</h2>
+    <div class="row" style="margin-bottom:6px">
+      <label class="row"><input type="checkbox" checked> Public page</label>
+    </div>
+    <div class="row" style="margin-bottom:6px">
+      <label class="row">Reader game format
+        <select><option>ACF</option><option>NAQT untimed</option><option selected>Custom&hellip;</option></select>
+      </label>
+      <span class="pill">Custom</span>
+      <button id="fmtedit">Customize MODAQ settings</button>
+      <span class="muted demo">&larr; renamed from &ldquo;customize&rdquo;</span>
+    </div>
+    <div id="fmtpanel" hidden class="card" style="margin-bottom:6px">
+      <div class="row">
+        <label>Tossups <input type="number" value="20" style="width:64px"></label>
+        <label>Neg <input type="number" value="-5" style="width:64px"></label>
+        <label>Powers <input value="(*)=15" size="10"></label>
+        <label class="row"><input type="checkbox" checked> Paired bonuses</label>
+        <span class="spacer" style="flex:1"></span>
+        <button class="small" disabled>Save format</button>
+      </div>
+      <div class="muted" style="font-size:13px;margin-top:4px">(Same fields as today's customize panel — only the button name changes)</div>
+    </div>
+    <div class="row">
+      <span class="muted">Admin link open until tomorrow, 9:41 PM</span>
+      <button class="small">New admin link</button>
+    </div>
+    <h2>Stats + Export</h2>
+    <div class="row">
+      <button class="primary">Compute stats</button>
+      <button disabled>Download .yft</button>
+      <button disabled>Download stat report</button>
+      <button disabled>Download QBJ bundle</button>
+      <span class="spacer" style="flex:1"></span>
+      <label class="row">Buzzpoints
+        <select disabled><option>Off</option></select>
+      </label>
+    </div>
+    <h2>Uploads</h2>
+    <details class="rgroup" open>
+      <summary><b>Round ${liveRound}</b> <span class="pill warn">2/3</span>
+        <span class="muted">Missing ${esc((rooms[0] || { name: 'Room 1' }).name)}</span></summary>
+      <div class="tablewrap"><table>
+        <tr><th>Room</th><th>File</th><th>Kind</th><th class="num">Size</th><th>Status</th></tr>
+        <tr><td>${esc((rooms[1] || { name: 'Room 2' }).name)}</td><td class="mono">Round_5_Ashland_A_Belmont.qbtd.json</td>
+          <td>Combined</td><td class="num">18.2 KB</td><td><span class="ok">OK</span></td></tr>
+        <tr><td>${esc((rooms[2] || { name: 'Room 3' }).name)}</td><td class="mono">Round_5_Chester_Dunmore.qbtd.json</td>
+          <td>Combined</td><td class="num">17.8 KB</td><td><span class="ok">OK</span></td></tr>
+      </table></div>
+    </details>`;
+  $('gosetup').onclick = () => { curView = 'setup'; renderAll(); };
+  $('advround').onclick = () => {
+    liveRound = Math.min(roundCount, liveRound + 1);
+    say('Round ' + liveRound);
+    renderAll();
+  };
+  $('fmtedit').onclick = () => { $('fmtpanel').hidden = !$('fmtpanel').hidden; };
+}
+
+/* ---------- boot ---------- */
+renderAll();
+</script>
+</body>
+</html>
