@@ -346,9 +346,13 @@ most once per minute per tournament): first the blobs, one atomic
 commit, then `<slug>/state.json` — a frozen copy of the `/pub/:slug`
 response carrying that blob commit's SHA. The public page fetches blobs
 SHA-pinned from `raw.githubusercontent.com/<repo>/<sha>/…` (immutable,
-CDN-served) and polls `state.json` from the branch head, whose ~5-minute
-CDN cache matches the poll cadence — so a steady viewer sends the Worker
-*nothing*. The Worker answers one `/pub/:slug` per page load (that's how
+CDN-served) and polls `state.json` from the branch head — so a steady
+viewer sends the Worker *nothing*. That poll revalidates
+(`cache: 'no-cache'`) rather than reading the browser's copy: the branch
+head is served `max-age=300`, exactly the poll period, so a plain fetch
+would let the poll race its own cache and silently skip a period.
+Revalidating is still free — a conditional request the CDN answers,
+normally a 304. The Worker answers one `/pub/:slug` per page load (that's how
 the page learns the repo and branch, and it beats the CDN's staleness on
 open) and keeps serving every route as the automatic fallback. Two
 things a frozen state can't compute travel as data: broadcasts carry
@@ -380,14 +384,26 @@ Setup:
    deploy`. The cron trigger deploys with it; setting `SNAPSHOT_REPO`
    back to `""` turns the whole feature off again.
 
-Freshness: a change is committed within ~a minute; a viewer's next
-5-minute poll sees it as soon as the raw CDN's ~5-minute cache on the
-branch-head `state.json` turns over — worst case roughly two poll
-periods end to end, typically one. The refresh button skips all of that
-(it re-asks the Worker directly). The data repo's history grows two
-small commits per change; old slugs can be deleted from the branch
-freely (archived pages don't read it, and SHA-pinned fetches of
-*recorded* snapshots still resolve through history).
+Freshness, and its honest cost: a change is committed within ~a minute,
+and a viewer sees it on their next 5-minute poll — plus whatever
+staleness the raw CDN still holds on the branch-head `state.json`
+(bounded by the same `max-age=300`). Worst case is roughly six minutes,
+which is what serving state from the Worker cost too; the difference is
+that the Worker's copy carried `max-age=60`, well under the poll period,
+so it could never be stale at poll time. Snapshots trade that certainty
+for a viewer who costs nothing. Anyone who wants the current answer now
+presses refresh: that re-asks the Worker directly and is unaffected by
+any of it, as is the first load of the page.
+
+Nothing here can push. An open viewer tab learns of a change only on its
+own next poll, so "instant for everyone" is not available at any cadence
+— see `CHECK_MS` in `pubview.js` if you want to trade politeness to
+GitHub for a shorter floor (those requests are free to us, not to them).
+
+The data repo's history grows two small commits per change; old slugs
+can be deleted from the branch freely (archived pages don't read it, and
+SHA-pinned fetches of *recorded* snapshots still resolve through
+history).
 
 ## Deleting a tournament (operator runbook)
 

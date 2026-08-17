@@ -63,19 +63,26 @@ let snap = null; // state.pub when usable on this page; set by load()
 
 // Where the publisher keeps this tournament's state.json: learned from
 // /pub/:slug (whose pub field names repo + branch), remembered across
-// polls. With it set, the CHECK_MS poll fetches GitHub's branch head —
-// ~5-minute CDN cache, same as the poll cadence — instead of the
-// Worker, so steady viewers cost the Worker nothing. The first load and
-// the refresh button still go to the Worker: that's the discovery path,
-// it bypasses the CDN's staleness, and it keeps working when snapshots
-// are off.
+// polls. With it set, the CHECK_MS poll fetches GitHub's branch head
+// instead of the Worker, so steady viewers cost the Worker nothing. The
+// first load and the refresh button still go to the Worker: that's the
+// discovery path, it bypasses the CDN's staleness, and it keeps working
+// when snapshots are off.
 let statehome = null; // {repo, branch}
 
 async function fetchState(force) {
   if (!force && statehome && !usingStaticData()) {
     try {
+      // cache: 'no-cache' revalidates instead of reading the browser's
+      // copy. raw.githubusercontent serves the branch head with
+      // max-age=300 — exactly CHECK_MS — so an ordinary fetch would let
+      // the poll race its own cache: fire a moment early and the browser
+      // answers it silently, deferring the change a further full period.
+      // Revalidating costs the Worker nothing either (it is a
+      // conditional request to the CDN, normally a 304), and leaves the
+      // CDN's own staleness as the only lag.
       const res = await fetch('https://raw.githubusercontent.com/' + statehome.repo + '/'
-        + statehome.branch + '/' + slug + '/state.json');
+        + statehome.branch + '/' + slug + '/state.json', { cache: 'no-cache' });
       if (res.ok) return await res.json();
     } catch (e) { /* fall through to the Worker */ }
   }
