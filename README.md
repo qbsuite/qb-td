@@ -406,6 +406,77 @@ can be deleted from the branch freely (archived pages don't read it, and
 SHA-pinned fetches of *recorded* snapshots still resolve through
 history).
 
+## Known scaling limits (none of this bites yet)
+
+Sized against a deliberately hard case: **30 simultaneous tournaments,
+16 teams each, full round robin** — 15 rounds x 8 rooms = 120 games per
+tournament, 3,600 games, 240 live rooms, over an ~8 hour day. At the
+handful of concurrent tournaments this actually runs today, every item
+below is inert. They are written down because the request budget is *not*
+the first thing that breaks, which is counterintuitive.
+
+Fixed Worker load at that scale is about 32k requests/day (reader pages
+~21.6k at ~6 per game, TO dashboards ~9k, cron 1.4k), leaving ~68k of
+the 100k/day free tier for public viewers at one request per page view.
+That part scales. What breaks first:
+
+1. **D1 rows read binds at roughly half the request budget.** Every
+   `/pub/:slug` re-derives the state from scratch, including a query that
+   returns **one row per game** (`worker.js:1838`) — 120 rows by the end
+   of a 16-team RR, plus buckets and rounds, ~145 rows per public page
+   view. Against D1's 5M-rows/day free tier that caps public views at
+   ~34k/day (~1,100 per tournament), well before the request budget runs
+   out. Note this is a *read*-side cost: writes are already incremental
+   (`combined.json` is materialized on upload, and the publisher only
+   commits blobs whose stamps moved), so "we only append on change" is
+   true and does not help here.
+
+   The fix that fits the existing design is to **materialize the
+   `/pub/:slug` body into a small R2 blob** on `markPub` — the same
+   pattern `combined.json` already uses — making the route O(1) instead
+   of O(games). `markPub` already fires on every mutation that can change
+   the state, so no new invalidation plumbing is needed and no staleness
+   is introduced. (A short Worker Cache API TTL is less work but
+   reintroduces exactly the staleness the no-poll design removed.)
+   Measure before committing to it: it trades D1 rows for an R2 read.
+
+2. **The cron cannot keep up, and starves the losers.**
+   `worker.js:683` takes `ORDER BY created DESC LIMIT 4`. With ~30
+   tournaments finishing rounds around the same time the dirty queue is
+   30 deep and drains at 4/minute, so the last tournament waits ~7-8
+   minutes — and because the ordering is newest-first, it is
+   systematically the *oldest* tournaments that wait, every round. This
+   matters more than it looks: `pubview.js` follows the **snapshot's**
+   stamps, so those viewers see stats that stale with no signal, even
+   though the `/pub/:slug` they just fetched knows about newer games.
+
+   Raising the limit is bounded by **memory, not GitHub** (GitHub is ~5+N
+   calls/tick against a 5,000/hour App limit). `buildPublish` holds every
+   blob of the batch in memory at once and base64 for the blob API
+   inflates ~1.33x. Real data is ~13KB/game (measured from
+   `app/archive/ug-nats-stanford.js`), so a finished 16-team RR bundle is
+   ~1.6MB and a batch of 16 is ~60MB against the 128MB Workers ceiling —
+   worst at the end of the day, exactly when every tournament is busiest.
+   So: **cap the batch by total bytes rather than count** (there is
+   already a per-blob cap, `PUB_MAX_SNAPSHOT`, `worker.js:440`) and make
+   the ordering fair so nothing can starve.
+
+3. **No fetch has a timeout anywhere** (`AbortSignal` appears zero times
+   in the tree). GitHub being *down* is handled — every snapshot fetch
+   falls back to the Worker (`pubview.js` `fetchStamped`/`fetchSnap`).
+   GitHub being *slow* is not: a hanging `raw.githubusercontent` request
+   stalls the blob fetch instead of falling back, because the fallback
+   only fires on error or non-OK status. Degraded availability is more
+   common than clean failure, so this is the cheapest real robustness win
+   here.
+
+4. **Small waste in the hot path.** `pubStateBody` does full
+   `env.DATA.get()` on the schedule and catmap (`worker.js:1843`,
+   `worker.js:1847`) when usually only their timestamps are wanted; the
+   catmap also gets parsed to test non-emptiness, which wants a cheap
+   stored marker instead. Also `pubStateBody` now has exactly one caller
+   and could fold into `pubState` (cosmetic).
+
 ## Deleting a tournament (operator runbook)
 
 There is deliberately no delete API — nothing reachable from the
