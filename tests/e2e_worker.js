@@ -316,6 +316,12 @@ ok('public page gets its broadcast',
 ok('public broadcast hides its audience',
   r.body.announce[0].pub === undefined && r.body.announce[0].rooms === undefined,
   r.body.announce[0]);
+// The Worker filters expiry itself now that no frozen copy has to, so the
+// expiry stops travelling to viewers at all.
+ok('public broadcast keeps its expiry to itself',
+  r.body.announce[0].expires === undefined, r.body.announce[0]);
+ok('public state advertises no self-expiry hint',
+  r.body.final_after === undefined && r.body.final === false, r.body.final_after);
 
 r = await call('/b/' + secret);
 ok('targeted room gets both, alert first',

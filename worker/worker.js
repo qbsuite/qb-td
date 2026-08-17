@@ -30,11 +30,14 @@ const BUCKET_TTL = 48 * 3600 * 1000;
 // Rooms can only be created while the admin link lives (ADMIN_TTL), and a
 // room accepts uploads for BUCKET_TTL after its own creation, so the last
 // possible upload lands at created + ADMIN_TTL + BUCKET_TTL. From then on
-// /pub answers can be cached hard and the public page stops polling: the
-// long tail of finished tournaments costs one request per visitor instead
-// of one every CHECK_MS forever.
+// /pub answers can be cached hard: the long tail of finished tournaments
+// costs one request per visitor, and a return visit costs none.
 const FINAL_TTL = ADMIN_TTL + BUCKET_TTL;
-const PUB_CACHE_LIVE = 60;               // seconds; collapses refresh bursts
+// Live state may be re-served briefly to anything that caches it. The
+// public page deliberately revalidates past this (pubview.js) so its
+// refresh button can't no-op; the value is here for other /pub consumers
+// and for a future CDN in front of the Worker.
+const PUB_CACHE_LIVE = 60;               // seconds
 const PUB_CACHE_FINAL = 7 * 24 * 3600;   // results can no longer move
 // Tournament creation is open; these are griefing backstops.
 const CREATE_PER_IP_DAY = 20;
@@ -346,9 +349,7 @@ function visibleAnnounce(list) {
   const now = Date.now();
   return list
     .filter((a) => Number(a.expires) > now)
-    // expires rides along for the GitHub-published state.json, whose
-    // reader must drop entries this filter can't see expire.
-    .map((a) => ({ id: a.id, text: a.text, level: a.level, created: a.created, expires: a.expires }))
+    .map((a) => ({ id: a.id, text: a.text, level: a.level, created: a.created }))
     .sort((x, y) => (x.level === y.level
       ? y.created - x.created
       : x.level === 'alert' ? -1 : 1));
@@ -401,31 +402,29 @@ async function updateBundle(env, tid, mutate) {
    URLs are immutable (no CDN staleness) and don't touch the Worker, so
    viewer count stops mattering to the request budget.
 
-   The poll rides GitHub too: each publish freezes the /pub/:slug body
-   into <slug>/state.json (a second commit, so it can carry the blob
-   commit's sha), and the page's 5-minute check fetches it from the
-   BRANCH-HEAD raw URL — mutable, ~5-minute CDN cache, which matches the
-   poll cadence. So steady-state viewers cost the Worker nothing at all;
-   the Worker answers one /pub/:slug per page load (discovery: it names
-   repo + branch) plus anything the fallback needs. It keeps serving
-   every route as that fallback, plus what's gated (buzzpoints packet
-   text — password-checked per request, must never sit in a public
-   repo). Broadcasts and round state ride state.json now, so EVERY
-   /pub-visible mutation must markPub, not just blob-affecting ones.
+   The small stuff stays here on purpose. /pub/:slug is one response per
+   page view — the page does not poll — so serving it from the Worker
+   costs almost nothing and, unlike a branch-head raw URL (mutable,
+   ~5-minute CDN cache), it is never stale: a refresh shows results as
+   soon as the cron has committed them. It also keeps what must stay
+   gated (buzzpoints packet text — password-checked per request, must
+   never sit in a public repo), and answers every published route as the
+   snapshot's fallback.
 
    Mechanics: mutations set tournaments.pub_dirty (markPub); a 1-minute
    cron publishes dirty published tournaments — cron serializes the
    commits, so simultaneous room uploads can't race two commits against
    each other — and retracts dirty unpublished ones (deletes the slug's
-   folder from the branch head, so the static poll stops finding them).
+   folder from the branch head; nothing points at it once /pub/:slug
+   stops advertising the sha, so this is tidiness, not correctness).
    The publisher claims (dirty=0) before it works and restores the flag
    on failure, so a mutation landing mid-publish just schedules the next
    one. pub_snapshot records what the last commit contained — the
    per-blob stamps mirror pubState's, so the client's
-   refetch-on-stamp-move logic works identically either way. Two things
-   a frozen state.json can't compute get shipped as data: announce
-   entries carry `expires` (the page filters), and `final_after` lets
-   the page flip itself final without asking anyone.
+   refetch-on-stamp-move logic works identically either way. Only blobs
+   are published, so a mutation that changes nothing a blob holds (a
+   broadcast, the round number) needs no publish at all — it reaches
+   viewers through /pub/:slug on their next refresh.
 
    Config (all optional — with SNAPSHOT_REPO unset this whole section is
    dead code): SNAPSHOT_REPO ("owner/repo") + SNAPSHOT_BRANCH vars, and a
@@ -649,8 +648,6 @@ async function buildPublish(env, t) {
         roster: Boolean(rosterObj),
         roster_at: rosterStamp,
         bundle: bundleOk && sha !== null,
-        branch: env.SNAPSHOT_BRANCH || 'main',
-        state: true,
       };
     },
   };
@@ -668,19 +665,18 @@ function retractEntries(t) {
     [`${t.slug}/schedule.json`, null, prev && prev.schedule !== null && prev.schedule !== undefined],
     [`${t.slug}/cats.json`, null, prev && prev.cats !== null && prev.cats !== undefined],
     [`${t.slug}/roster.json`, null, prev && prev.roster],
-    [`${t.slug}/state.json`, null, prev && prev.state],
   ];
 }
 
 // Cron tick: publish dirty published tournaments — and retract dirty
 // unpublished ones that still have a snapshot on the branch — a few per
 // minute so a tick stays bounded (the rest carry their flag to the next
-// tick). The whole tick is TWO commits regardless of tournament count:
-// one batch of every tournament's changed blobs (and retractions), then
-// one batch of their state.json files pointing at it. Per-tournament
-// commits would spend the ~10-call Git-Data-API overhead once per
-// tournament; batching spends it once per tick, which is what keeps a
-// fully loaded cron inside GitHub's 5,000 requests/hour App limit.
+// tick). The whole tick is ONE commit regardless of tournament count: a
+// single batch of every tournament's changed blobs and retractions.
+// Per-tournament commits would spend the ~10-call Git-Data-API overhead
+// once per tournament; batching spends it once per tick, which is what
+// keeps a fully loaded cron inside GitHub's 5,000 requests/hour App
+// limit.
 async function publishDirty(env) {
   if (!snapshotsEnabled(env)) return;
   const { results } = await env.DB.prepare(
@@ -716,24 +712,10 @@ async function publishDirty(env) {
     ].filter(Boolean).join('; ');
     const batchSha = batch.length ? await commitFiles(env, message, batch) : null;
 
-    // Second commit: every published tournament's <slug>/state.json, the
-    // page's poll target. Each mirrors its /pub/:slug response — with
-    // the descriptor made from this very batch, so its stamps and the
-    // blobs it advertises come from the same publish. It must come
-    // second: the descriptors need the batch commit's sha. A failure
-    // anywhere fails the whole tick (everything re-flags), so a stored
-    // descriptor always means a state.json is on the branch.
+    // Record what each tournament's blobs now are, so /pub/:slug can
+    // advertise the sha and the page's stamp comparisons line up with
+    // what the branch actually holds.
     const snaps = pubs.map((p) => ({ t: p.t, snap: p.snapOf(batchSha) }));
-    const stateEntries = [];
-    for (const { t, snap } of snaps) {
-      const body = await pubStateBody(env, t, { repo: env.SNAPSHOT_REPO, ...snap });
-      stateEntries.push(
-        [`${t.slug}/state.json`, new TextEncoder().encode(JSON.stringify(body)).buffer, false]);
-    }
-    if (stateEntries.length) {
-      await commitFiles(env, 'state ' + snaps.map((s) => s.t.slug).join(', '), stateEntries);
-    }
-
     for (const { t, snap } of snaps) {
       await env.DB.prepare('UPDATE tournaments SET pub_snapshot = ?2 WHERE id = ?1')
         .bind(t.id, JSON.stringify(snap)).run();
@@ -907,9 +889,11 @@ async function updateTournament(request, env, t) {
   await env.DB.prepare(
     `UPDATE tournaments SET ${sets.join(', ')} WHERE id = ?`
   ).bind(...binds, id).run();
-  // Every field this route can touch (name, round, published, settings,
-  // broadcasts) appears in the /pub state — which the publisher freezes
-  // into the GitHub state.json viewers poll — so any update re-publishes.
+  // Flagging on every field is deliberately broad. Most of these (name,
+  // round, broadcasts) only ever reach viewers through /pub/:slug, so
+  // they need no publish at all; settings can change what a blob holds,
+  // and publishing recomputes cheaply and idempotently, so one flag for
+  // the whole route beats reasoning about which fields matter.
   // Unpublishing flags too: the cron sees published = 0 and retracts the
   // slug's folder from the branch.
   await markPub(env, id);
@@ -1844,9 +1828,8 @@ async function pubQPacket(request, url, env, slug) {
   return res;
 }
 
-// The /pub/:slug body, shared between the route and the snapshot
-// publisher (which freezes it into <slug>/state.json on GitHub — so the
-// two sources are byte-compatible and the page can't tell them apart).
+// The /pub/:slug body. Served fresh on every page load or refresh: the
+// page never polls, so this stays on the Worker where it can't be stale.
 // `pub` is the snapshot descriptor to advertise: the route passes the
 // stored one, the publisher passes the one it just committed.
 async function pubStateBody(env, t, pub) {
@@ -1922,11 +1905,8 @@ async function pubStateBody(env, t, pub) {
       id: f.id, round: f.round, filename: f.filename, room: rooms[f.bucket_id] || null,
     })),
     // Every write path has expired: nothing here can move again, so the
-    // public page drops its poll and the answer caches for a week.
+    // answer caches for a week.
     final: tournamentFinal(t),
-    // When that moment arrives — deterministic, so a frozen state.json
-    // can say it in advance and the page flips itself final on time.
-    final_after: t.created + FINAL_TTL,
   };
 }
 

@@ -216,10 +216,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Request economics** (Cloudflare free tier): the public page
   reads one materialized `combined.json` bundle (maintained on
   upload/delete, TO-rebuildable) instead of fetching every game file, and
-  bucket pages poll only while visible, every 60 s. Broadcasts add no
-  requests at all: they live in a column on the tournament row and ride
-  out on those two state responses (so a room sees one within a minute,
-  the public page within five) plus the moderator upload response.
+  bucket pages poll only while visible, every 60 s. **The public page
+  does not poll at all** — a viewer gets the tournament as of when they
+  loaded it and refreshes for more, so an idle tab costs nothing and the
+  page's cost is per *view* rather than per open-tab-minute. Broadcasts
+  add no requests at all: they live in a column on the tournament row and
+  ride out on those state responses (so a room sees one within a minute,
+  a viewer on their next refresh) plus the moderator upload response.
   Stats data changes
   only when a file lands; clients compare the `version` stamp in
   `/pub/:slug` and refetch only on change. The schedule is one R2 blob
@@ -235,15 +238,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   uploads for 48 h after its own creation, so nothing can change after
   `created + 96 h` (`FINAL_TTL` in `worker.js`) — the data is provably
   frozen, with no extra column or cron to say so. Past that point
-  `/pub/:slug` reports `final: true`, every public answer is served with
-  a week's `max-age` instead of a minute's, and `pubview.js` clears its
-  poll timer for good. A tab left open on last season's tournament stops
-  talking to the Worker, and a repeat visitor is served by their own
-  browser cache. This is what keeps the long tail flat: a finished
-  tournament costs about one request per visitor rather than one every
-  five minutes per open tab. Caching *inside* the Worker would not do
-  this — a `workers.dev` request invokes the Worker whether or not the
-  response is cached, so the saving has to come from the browser not
+  `/pub/:slug` reports `final: true` and every public blob is served with
+  a week's `max-age` instead of a minute's, so a repeat visitor's blobs
+  come from their own browser cache. With nothing polling on the public
+  page, a tab left open on last season's tournament is already silent;
+  this makes returning to it nearly free as well. Caching *inside* the
+  Worker would not help — a `workers.dev` request invokes the Worker
+  whether or not the response is cached (verified: no `cf-cache-status`
+  on any response), so the saving has to come from the browser not
   asking.
 
 ## Layout
@@ -337,34 +339,34 @@ end, which is also how it exercises the `final` caching path.
 ## Public snapshots on GitHub (optional)
 
 Makes public stat viewing free at any audience size. Without it, every
-viewer's requests (the 5-minute state poll, plus blob refetches of the
-stats bundle, schedule, category map, roster) hit the Worker — and the
-bundle grows with the tournament, so a popular event spends the same
-100k-requests/day budget the moderator rooms and TO dashboard run on.
-With it, the Worker publishes to a GitHub data repo on every change (at
-most once per minute per tournament): first the blobs, one atomic
-commit, then `<slug>/state.json` — a frozen copy of the `/pub/:slug`
-response carrying that blob commit's SHA. The public page fetches blobs
-SHA-pinned from `raw.githubusercontent.com/<repo>/<sha>/…` (immutable,
-CDN-served) and polls `state.json` from the branch head — so a steady
-viewer sends the Worker *nothing*. That poll revalidates
-(`cache: 'no-cache'`) rather than reading the browser's copy: the branch
-head is served `max-age=300`, exactly the poll period, so a plain fetch
-would let the poll race its own cache and silently skip a period.
-Revalidating is still free — a conditional request the CDN answers,
-normally a 304. The Worker answers one `/pub/:slug` per page load (that's how
-the page learns the repo and branch, and it beats the CDN's staleness on
-open) and keeps serving every route as the automatic fallback. Two
-things a frozen state can't compute travel as data: broadcasts carry
-their expiry (the page filters), and `final_after` tells the page when
-to stop polling on its own. Buzzpoints stay on the Worker: packet text
-is password-gated per request, which a static host can't do.
+viewer's blob fetches (the stats bundle, schedule, category map, roster)
+hit the Worker — and the bundle grows with the tournament, so a popular
+event spends the same 100k-requests/day budget the moderator rooms and TO
+dashboard run on.
+With it, the Worker publishes those blobs to a GitHub data repo in one
+atomic commit per change (at most one per minute per tournament), and
+`/pub/:slug` advertises the commit SHA. The page then fetches
+`raw.githubusercontent.com/<repo>/<sha>/…` — SHA-pinned raw URLs are
+immutable, so there is no CDN staleness to reason about, and they never
+touch the Worker.
 
-Every fetch falls back to the `/pub` routes, so a failed publish, a
+The small state stays on the Worker deliberately. It is one response per
+page view — the page never polls — so it costs almost nothing, and going
+direct means it is never stale: a refresh shows results as soon as the
+cron has committed them. Publishing it to a branch-head raw URL instead
+would add GitHub's `max-age=300` to every update and save almost nothing.
+`pubview.js` requests it with `cache: 'no-cache'`, so the refresh button
+can't be silently answered from the browser's own copy — with no poll,
+that button is the only way a viewer gets newer data and it has to work
+every time. Buzzpoints stay on the Worker too: packet text is
+password-gated per request, which a static host can't do.
+
+Every blob fetch falls back to the `/pub` routes, so a failed publish, a
 pruned repo, or turning the feature off just means Worker serving —
 exactly the behavior without this section. Unpublishing a tournament
-makes the next cron tick delete its folder from the branch head, so the
-static poll stops finding it. Archive captures ignore snapshots
+makes the next cron tick delete its folder from the branch head; nothing
+points at it once `/pub/:slug` stops advertising the SHA, so that is
+tidiness rather than correctness. Archive captures ignore snapshots
 entirely (the capture is the data).
 
 Setup:
@@ -384,23 +386,12 @@ Setup:
    deploy`. The cron trigger deploys with it; setting `SNAPSHOT_REPO`
    back to `""` turns the whole feature off again.
 
-Freshness, and its honest cost: a change is committed within ~a minute,
-and a viewer sees it on their next 5-minute poll — plus whatever
-staleness the raw CDN still holds on the branch-head `state.json`
-(bounded by the same `max-age=300`). Worst case is roughly six minutes,
-which is what serving state from the Worker cost too; the difference is
-that the Worker's copy carried `max-age=60`, well under the poll period,
-so it could never be stale at poll time. Snapshots trade that certainty
-for a viewer who costs nothing. Anyone who wants the current answer now
-presses refresh: that re-asks the Worker directly and is unaffected by
-any of it, as is the first load of the page.
+Freshness: a refresh shows everything the cron has committed, so a
+viewer is at most one tick (~a minute) behind the moderators. Nothing
+pushes — an open tab does not update itself, by design — so what a viewer
+sees is always "as of when they last asked".
 
-Nothing here can push. An open viewer tab learns of a change only on its
-own next poll, so "instant for everyone" is not available at any cadence
-— see `CHECK_MS` in `pubview.js` if you want to trade politeness to
-GitHub for a shorter floor (those requests are free to us, not to them).
-
-The data repo's history grows two small commits per change; old slugs
+The data repo's history grows one small commit per change; old slugs
 can be deleted from the branch freely (archived pages don't read it, and
 SHA-pinned fetches of *recorded* snapshots still resolve through
 history).

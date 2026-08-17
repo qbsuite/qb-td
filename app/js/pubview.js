@@ -1,9 +1,14 @@
 // pubview.js — the public tournament page (t.html?t=<slug>): schedule +
-// stats tabs. Data comes from the publish-gated /pub routes; the page
-// polls the tiny tournament state while visible — from the GitHub
-// snapshot's state.json when one is published, from /pub/:slug
-// otherwise — and refetches the stats bundle / schedule blob only when
-// their stamps move.
+// stats tabs. Data comes from the publish-gated /pub routes: one small
+// /pub/:slug on load or refresh, then the stats bundle / schedule blob
+// only when their stamps move.
+//
+// Nothing polls. A viewer reads a snapshot of the tournament as of the
+// moment they loaded the page, and refreshes for a newer one — so an
+// idle tab costs nothing at all, and a refresh shows results as soon as
+// the cron has published them (no CDN layer in the state's path). The
+// tradeoff is deliberate: broadcasts reach whoever refreshes, not
+// whoever happens to be looking.
 
 import { pub, esc, usingStaticData } from './api.js';
 import { annCards } from './announce.js';
@@ -18,8 +23,6 @@ import { buzzToken } from './buzzkey.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
-const CHECK_MS = 300000; // state check while visible; blobs refetch on stamp change
-let poll = null;           // the CHECK_MS timer, dropped once state.final
 
 let state = null;
 let lastVersion = null;    // stats bundle stamp
@@ -60,34 +63,6 @@ const asJson = async (res) => (res instanceof Response ? JSON.parse(await res.te
    answers from local data (demo / archive captures). */
 
 let snap = null; // state.pub when usable on this page; set by load()
-
-// Where the publisher keeps this tournament's state.json: learned from
-// /pub/:slug (whose pub field names repo + branch), remembered across
-// polls. With it set, the CHECK_MS poll fetches GitHub's branch head
-// instead of the Worker, so steady viewers cost the Worker nothing. The
-// first load and the refresh button still go to the Worker: that's the
-// discovery path, it bypasses the CDN's staleness, and it keeps working
-// when snapshots are off.
-let statehome = null; // {repo, branch}
-
-async function fetchState(force) {
-  if (!force && statehome && !usingStaticData()) {
-    try {
-      // cache: 'no-cache' revalidates instead of reading the browser's
-      // copy. raw.githubusercontent serves the branch head with
-      // max-age=300 — exactly CHECK_MS — so an ordinary fetch would let
-      // the poll race its own cache: fire a moment early and the browser
-      // answers it silently, deferring the change a further full period.
-      // Revalidating costs the Worker nothing either (it is a
-      // conditional request to the CDN, normally a 304), and leaves the
-      // CDN's own staleness as the only lag.
-      const res = await fetch('https://raw.githubusercontent.com/' + statehome.repo + '/'
-        + statehome.branch + '/' + slug + '/state.json', { cache: 'no-cache' });
-      if (res.ok) return await res.json();
-    } catch (e) { /* fall through to the Worker */ }
-  }
-  return asJson(await pub('/pub/' + slug));
-}
 
 async function fetchSnap(name) {
   const res = await fetch(
@@ -663,35 +638,32 @@ function setTab(next, push = true) {
   render();
 }
 
-async function load(force = false) {
+async function load() {
   try {
-    const next = await fetchState(force);
-    state = next;
+    // The state always comes from the Worker (or frozen local data): it
+    // is one small response per page view, and going direct keeps it
+    // free of the snapshot's publish lag and CDN staleness. Only the
+    // heavy blobs below are served off GitHub.
+    //
+    // cache: 'no-cache' is load-bearing. /pub/:slug is served max-age=60,
+    // and refreshing is now the ONLY way a viewer gets newer data — read
+    // the browser's copy and the button silently does nothing for up to a
+    // minute. Revalidating costs one small request per press.
+    state = await asJson(await pub('/pub/' + slug, { cache: 'no-cache' }));
     // Track the snapshot's stamps when one is advertised — its blobs are
     // what we'll fetch, so refetch decisions must follow what IT holds
-    // (it may trail the Worker by up to a cron tick; the next poll
+    // (it can trail the Worker by up to a cron tick; the next refresh
     // converges). Frozen data (demo/archive) never uses snapshots.
     snap = !usingStaticData() && state.pub && state.pub.sha ? state.pub : null;
-    statehome = snap && snap.repo && snap.branch && snap.state
-      ? { repo: snap.repo, branch: snap.branch } : null;
-    // Past every upload deadline the results can't move again: stop
-    // polling for good. The refresh button still works, and the Worker
-    // stops seeing traffic from tabs left open on old tournaments.
-    // (final_after covers a frozen state.json, which can't recompute
-    // final itself: past that moment this page flips on its own.)
-    const final = state.final || (state.final_after && Date.now() > state.final_after);
-    if (final && poll) { clearInterval(poll); poll = null; }
     const storedKey = buzzStored();
     if (storedKey && storedKey.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'round ' + state.current_round;
-    // Broadcasts have no stamp of their own — they ride the state poll and
-    // must render before the no-change early return below. A frozen
-    // state.json can't drop expired ones, so filter here (Worker
-    // responses pre-filter; the extra check is a no-op there).
-    $('ann').innerHTML = annCards(
-      state.announce.filter((a) => !a.expires || a.expires > Date.now()), 'announcement');
+    // Broadcasts have no stamp of their own; they ride the state and must
+    // render before the no-change early return below. Expiry is applied
+    // by whoever produced the state (the Worker, or a frozen capture).
+    $('ann').innerHTML = annCards(state.announce, 'announcement');
     $('tab-buzz').hidden = !state.buzz;
     $('tab-cats').hidden = !state.cats;
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);
@@ -700,9 +672,14 @@ async function load(force = false) {
     const statsStamp = snap && snap.bundle ? snap.version : state.version;
     const schedStamp = snap ? snap.schedule : state.schedule;
     const catsStamp = snap ? snap.cats : state.cats;
-    const statsMoved = force || statsStamp !== lastVersion;
-    const schedMoved = force || schedStamp !== lastSched;
-    const catsMoved = force || catsStamp !== lastCats;
+    // Stamps alone decide what to refetch, for the first load and for the
+    // refresh button alike. The first load compares against the null /
+    // undefined initial values, so everything fetches; a refresh that
+    // finds nothing moved skips the heavy blobs entirely — the round
+    // number and broadcasts above have already been updated either way.
+    const statsMoved = statsStamp !== lastVersion;
+    const schedMoved = schedStamp !== lastSched;
+    const catsMoved = catsStamp !== lastCats;
     if (!statsMoved && !schedMoved && !catsMoved) { say(''); return; }
     say('loading');
 
@@ -746,9 +723,6 @@ async function load(force = false) {
 }
 
 document.querySelectorAll('.tab').forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });
-$('refresh').onclick = () => load(true);
+$('refresh').onclick = () => load();
 if (!slug) say('bad link', true);
-else {
-  load(true);
-  poll = setInterval(() => { if (document.visibilityState === 'visible') load(); }, CHECK_MS);
-}
+else load();
