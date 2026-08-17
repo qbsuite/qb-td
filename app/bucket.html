@@ -55,7 +55,6 @@ import { annCards } from './js/announce.js';
 
 const $ = (id) => document.getElementById(id);
 const secret = new URLSearchParams(location.search).get('b') || '';
-const POLL_MS = 60000; // only while the tab is visible
 let state = null;
 let closed = false;
 
@@ -154,10 +153,16 @@ if (!secret) say('bad link', true);
 else {
   $('readerlink').href = 'read.html?b=' + encodeURIComponent(secret);
   refresh();
-  // Poll only while visible: a backgrounded laptop tab costs nothing, and
-  // an immediate refresh on focus keeps the current round fresh exactly
-  // when the mod looks at the page.
-  setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, POLL_MS);
+  // No timer. This page refreshes when it loads, when the mod comes back
+  // to the tab, and after every upload — all demand-driven, so a room
+  // costs requests only when someone is actually looking. A 60s poll here
+  // was the single largest line item at scale (240 live rooms would have
+  // spent the whole daily budget on it) and it gave bucket-page users
+  // fresher broadcasts than the reader page, which has never polled.
+  //
+  // Focus refresh stays, unlike on the public page: a moderator must not
+  // miss the TD advancing the round, and returning to the tab is exactly
+  // when that matters. It fires per human glance, not per minute.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refresh();
   });

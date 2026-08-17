@@ -70,7 +70,12 @@ Part of [qbsuite](https://qbsuite.github.io/).
   mobile-first): shows the live current round, downloads any played
   round's packet (the live round is highlighted; future rounds stay
   locked), uploads the game's `.qbj` + MODAQ game file, and carries the
-  TD's broadcasts for this room (alerts first, then newest first).
+  TD's broadcasts for this room (alerts first, then newest first). It is
+  the fallback path, not the main one — the reader page below is — but it
+  is not redundant: it is the only way to hand a moderator a packet MODAQ
+  cannot open (a PDF), and the only way to submit a `.qbj` produced
+  elsewhere when a reader session is lost. It shares the reader's link
+  secret, so a mod can always reach it by editing the URL.
 - **Moderator reader page** (`app/read.html?b=<secret>`, same link secret):
   an embedded [MODAQ](https://github.com/alopezlago/MODAQ) preloaded with
   a round's packet (the live round by default; played rounds stay
@@ -216,21 +221,26 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Request economics** (Cloudflare free tier): the public page
   reads one materialized `combined.json` bundle (maintained on
   upload/delete, TO-rebuildable) instead of fetching every game file, and
-  bucket pages poll only while visible, every 60 s. **The public page
-  does not poll at all** — a viewer gets the tournament as of when they
-  loaded it and refreshes for more, so an idle tab costs nothing and the
-  page's cost is per *view* rather than per open-tab-minute. Broadcasts
-  add no requests at all: they live in a column on the tournament row and
-  ride out on those state responses (so a room sees one within a minute,
-  a viewer on their next refresh) plus the moderator upload response.
+  **nothing anywhere polls on a timer.** Every page fetches on load, on
+  an explicit refresh, and (for the two moderator pages) when the tab
+  regains focus — so cost is per *view*, never per open-tab-minute, and an
+  idle tab costs exactly nothing. That is what makes many simultaneous
+  tournaments affordable: 240 live rooms on a 60 s poll would have spent
+  the entire daily budget on polling alone. Broadcasts add no requests of
+  their own: they live in a column on the tournament row and ride out on
+  those state responses plus every moderator upload response, so a mod
+  sees one when they next touch the page and a viewer on their next
+  refresh. The public page has no focus refresh on purpose — viewers are
+  readers, and are expected to refresh; a moderator must not miss the TD
+  advancing the round.
   Stats data changes
   only when a file lands; clients compare the `version` stamp in
   `/pub/:slug` and refetch only on change. The schedule is one R2 blob
   (`t/<tid>/schedule.json`) with its own stamp in `/pub/:slug` (R2
   head), refetched only when it moves and served with `max-age=60`;
-  the reader fetches it once per load, never on the bucket poll. The reader page never polls:
-  one state + packet + roster fetch at load, one upload per export click
-  (~4 Worker requests per game — fewer than the manual bucket-page flow),
+  the reader fetches it once per load. The reader page costs a state +
+  schedule + tiebreakers + roster + packet fetch when a room link opens
+  and one upload per export click — about six Worker requests per game —
   and the 2 MB MODAQ bundle is a static asset on GitHub Pages, off
   Cloudflare entirely.
 - **Finished tournaments stop costing anything.** Rooms can only be
