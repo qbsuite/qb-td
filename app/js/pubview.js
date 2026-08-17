@@ -1,7 +1,9 @@
 // pubview.js — the public tournament page (t.html?t=<slug>): schedule +
 // stats tabs. Data comes from the publish-gated /pub routes: one small
-// /pub/:slug on load or refresh, then the stats bundle / schedule blob
-// only when their stamps move.
+// /pub/:slug on load or refresh, then a blob per round of games, plus
+// the schedule / category map, only when their stamps move. A round that
+// has finished never moves again, so refreshing late in a long day
+// fetches the round in progress and nothing else.
 //
 // Nothing polls. A viewer reads a snapshot of the tournament as of the
 // moment they loaded the page, and refreshes for a newer one — so an
@@ -34,6 +36,9 @@ let schedule = null;
 let tab = null;            // 'schedule' | 'stats' | 'buzz'
 let teamFilter = '';
 let rawEntries = [];       // {id, round, room, qbj}, deduped — buzz + category extraction read these
+const roundCache = new Map(); // round number (as a string) -> {v, entries} already fetched
+let loadedIds = new Set();    // file ids the fetched rounds actually contained
+let roundsComplete = true;    // false when a round failed to fetch this pass
 let buzzView = null;       // selected round number, or 'summary'
 let catmap = null;         // text-free per-tossup categories from /pub/:slug/cats
 let lastCats;              // its stamp
@@ -87,42 +92,96 @@ async function fetchRoster() {
   try { return parseRoster(qbj); } catch (e) { return null; } // both tabs still render without it
 }
 
-// One request for all games; per-file fetch only if the bundle is missing.
+// The games, one request per round whose stamp moved. Rounds already
+// held are reused, and a finished round's stamp never moves again — so
+// the first load of a finished tournament costs one request per round
+// and every refresh after it costs whatever is still being played.
+//
 // The raw qbj rows are kept too — the buzzpoints tab reads
 // match_questions, which parseMatch drops.
-async function fetchMatches(errors) {
-  const out = [];
-  const raw = [];
-  const consume = (bundle) => {
-    for (const entry of bundle.entries) {
-      try {
-        const m = parseMatch(entry.qbj, { filename: entry.filename });
-        m.room = entry.room;
-        m.fileId = entry.id;
-        out.push(m);
-        raw.push({ id: entry.id, round: m.round, room: entry.room, qbj: entry.qbj });
-      } catch (e) { errors.push(entry.filename + ': ' + e.message); }
-    }
-    rawEntries = dedupeEntries(raw);
-    return out;
+async function fetchRounds(errors) {
+  const wanted = state.rounds || {};
+  roundsComplete = true;
+  const hold = (n, shard) => {
+    // Stamp the copy with what the shard says it is, not with what the
+    // state said to expect: the cron may have rebuilt it since, and
+    // holding the newer stamp saves the next refresh a round trip.
+    roundCache.set(n, {
+      v: shard.v || wanted[n],
+      entries: Array.isArray(shard.entries) ? shard.entries : [],
+    });
   };
-  if (snap && snap.bundle) {
-    try { return consume(await fetchSnap('bundle.json')); } catch (e) { /* Worker fallback */ }
-  }
-  try {
-    return consume(await asJson(await pub('/pub/' + slug + '/bundle')));
-  } catch (e) { /* no bundle yet: fall through */ }
+  const stale = Object.keys(wanted).filter((n) => (roundCache.get(n) || {}).v !== wanted[n]);
 
-  await Promise.all(state.files.map(async (f) => {
+  // The snapshot is only worth asking when it holds the round at the
+  // stamp we're after — one SHA-pinned file per round, off the Worker
+  // entirely. Anything it can't answer falls to the Worker below.
+  const fromWorker = [];
+  await Promise.all(stale.map(async (n) => {
+    if (snap && snap.rounds && snap.rounds[n] === wanted[n]) {
+      try { hold(n, await fetchSnap('r' + n + '.json')); return; } catch (e) { /* fall back */ }
+    }
+    fromWorker.push(n);
+  }));
+
+  // Whatever is left goes in ONE request, so a first load of a long
+  // tournament costs two requests rather than one per round.
+  if (fromWorker.length) {
+    let got = null;
     try {
-      const qbj = await asJson(await pub('/pub/' + slug + '/qbj/' + f.id));
-      const m = parseMatch(qbj, { filename: f.filename });
-      m.room = f.room;
-      m.fileId = f.id;
-      out.push(m);
-      raw.push({ id: f.id, round: m.round, room: f.room, qbj });
+      got = await asJson(await pub('/pub/' + slug + '/rounds?n=' + fromWorker.sort().join(',')));
+    } catch (e) {
+      errors.push('games: ' + e.message);
+      roundsComplete = false;
+    }
+    const byRound = new Map(((got && got.rounds) || []).map((s) => [String(s.round), s]));
+    for (const n of fromWorker) {
+      const shard = byRound.get(n);
+      // Leaving a round unheld (and unstamped) is deliberate: it keeps
+      // last refresh's games on screen and retries on the next one,
+      // rather than emptying the table or pinning a stamp we never got.
+      if (shard) hold(n, shard);
+      else if (got) roundsComplete = false;
+    }
+  }
+
+  for (const n of [...roundCache.keys()]) {
+    if (wanted[n] === undefined) roundCache.delete(n);
+  }
+  return [...roundCache.values()].flatMap((r) => r.entries);
+}
+
+// Frozen data (the demo fixture, archive captures) predates the round
+// shards and carries every game in one bundle instead.
+async function fetchWholeBundle(errors) {
+  try {
+    const bundle = await asJson(await pub('/pub/' + slug + '/bundle'));
+    return Array.isArray(bundle.entries) ? bundle.entries : [];
+  } catch (e) { /* no bundle: fall back to one request per file */ }
+  const entries = [];
+  await Promise.all((state.files || []).map(async (f) => {
+    try {
+      entries.push({ id: f.id, round: f.round, room: f.room, filename: f.filename,
+        qbj: await asJson(await pub('/pub/' + slug + '/qbj/' + f.id)) });
     } catch (e) { errors.push(f.filename + ': ' + e.message); }
   }));
+  return entries;
+}
+
+async function fetchMatches(errors) {
+  const entries = state.rounds ? await fetchRounds(errors) : await fetchWholeBundle(errors);
+  loadedIds = new Set(entries.map((e) => e.id));
+  const out = [];
+  const raw = [];
+  for (const entry of entries) {
+    try {
+      const m = parseMatch(entry.qbj, { filename: entry.filename });
+      m.room = entry.room;
+      m.fileId = entry.id;
+      out.push(m);
+      raw.push({ id: entry.id, round: m.round, room: entry.room, qbj: entry.qbj });
+    } catch (e) { errors.push(entry.filename + ': ' + e.message); }
+  }
   rawEntries = dedupeEntries(raw);
   return out;
 }
@@ -610,14 +669,27 @@ function renderCats(box) {
 
 /* ---------- stats tab ---------- */
 
+// Games the Worker has accepted that the stats below don't include yet.
+// Normally this is the minute between a room uploading and the cron
+// folding that game into its round; a count that sticks around means a
+// game's public copy is missing, which the TO's rebuild button fixes.
+// Either way it beats silently showing fewer games than were played.
+function pendingNote() {
+  const n = (state.files || []).filter((f) => !loadedIds.has(f.id)).length;
+  if (!n) return '';
+  return `<div class="muted">${n} game${n === 1 ? '' : 's'} just in — `
+    + 'refresh in a minute to include them</div>';
+}
+
 function renderStatsTab(box) {
   if (!matches.length) {
     box.innerHTML = statsErrors.length
       ? statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')
-      : '<div class="muted">no games yet</div>';
+      : pendingNote() || '<div class="muted">no games yet</div>';
     return;
   }
   renderStats(box, aggregate(matches, roster), statsErrors);
+  box.insertAdjacentHTML('afterbegin', pendingNote());
 }
 
 /* ---------- shell ---------- */
@@ -669,7 +741,11 @@ async function load() {
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);
     if (tab === 'cats' && !state.cats) setTab('stats', false);
 
-    const statsStamp = snap && snap.bundle ? snap.version : state.version;
+    // Stats follow the live per-round stamps: fetchRounds picks the
+    // snapshot or the Worker per round, so unlike the single-blob stamps
+    // below there is nothing to gain from trailing the snapshot here.
+    // (Frozen data has no `rounds` and keeps the old whole-bundle stamp.)
+    const statsStamp = state.rounds ? JSON.stringify(state.rounds) : state.version;
     const schedStamp = snap ? snap.schedule : state.schedule;
     const catsStamp = snap ? snap.cats : state.cats;
     // Stamps alone decide what to refetch, for the first load and for the
@@ -691,9 +767,9 @@ async function load() {
         roster = r;
         matches = m;
         statsErrors = errors;
-        // an empty load that raced an upload must retry on the next
-        // check, not stick on this version
-        if (matches.length) lastVersion = statsStamp;
+        // an empty load that raced an upload — or a round that failed to
+        // fetch — must retry on the next check, not stick on this version
+        if (matches.length && roundsComplete) lastVersion = statsStamp;
       })());
     }
     if (schedMoved) {

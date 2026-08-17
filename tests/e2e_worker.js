@@ -72,6 +72,15 @@ function maxAge(cc) {
   return m ? Number(m[1]) : null;
 }
 
+// Run the cron by hand (wrangler dev --test-scheduled). It is what turns
+// uploaded games into the round shards the public page reads, so the
+// public assertions below tick first rather than waiting a minute.
+async function tick() {
+  const res = await fetch(BASE + '/__scheduled');
+  if (!res.ok) throw new Error('cron trigger failed (' + res.status + '): run wrangler dev with --test-scheduled');
+  await res.text();
+}
+
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
   // protest reasons quote answers; public copies must drop notes
@@ -660,18 +669,35 @@ r = await call('/pub/' + slug);   // the sections below read files off this
   ok('public roster download', rr.status === 200 && (await rr.text()).includes('Alpha'));
 }
 
-// combined stats bundle: built on upload, one entry per valid qbj
+// per-round shards: the upload writes only its own game blob, and the
+// cron folds it into the round the page reads
+r = await call('/pub/' + slug);
+ok('unmaterialized upload moves no stamp',
+  Object.keys(r.body.rounds).length === 0 && r.body.version === '0:0', r.body.rounds);
+await tick();
 r = await call('/pub/' + slug);
 const v1 = r.body.version;
-ok('pub state has version', typeof v1 === 'string' && v1.includes(':'), v1);
-r = await call('/pub/' + slug + '/bundle');
-ok('bundle served', r.status === 200 && r.body.entries.length === 1, r.body);
-ok('bundle entry carries room/round/qbj',
-  r.body.entries[0].room === 'Room 1' && r.body.entries[0].round === 1
-  && r.body.entries[0].qbj.tossups_read === 20, r.body.entries[0]);
-// protest reasons (match notes) quote answers; the public bundle — which
-// updates live and is committed to the snapshot repo — must drop them
-ok('bundle strips protest notes', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
+ok('tick materializes round 1', r.body.rounds['1'] && v1.includes(':'), r.body.rounds);
+r = await call('/pub/' + slug + '/rounds?n=1');
+ok('round shard served', r.status === 200 && r.body.rounds.length === 1
+  && r.body.rounds[0].entries.length === 1, r.body);
+ok('shard entry carries room/round/qbj',
+  r.body.rounds[0].entries[0].room === 'Room 1' && r.body.rounds[0].entries[0].round === 1
+  && r.body.rounds[0].entries[0].qbj.tossups_read === 20, r.body.rounds[0].entries[0]);
+ok('shard stamp matches the state',
+  r.body.rounds[0].v === (await call('/pub/' + slug)).body.rounds['1'], r.body.rounds[0].v);
+// protest reasons (match notes) quote answers; the public copies — which
+// are served live and committed to the snapshot repo — must drop them
+ok('shard strips protest notes', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
+// One request covers a whole first load, and rounds with no shard are
+// simply absent rather than failing the batch.
+r = await call('/pub/' + slug + '/rounds?n=1,7');
+ok('unplayed round is omitted, not an error',
+  r.status === 200 && r.body.rounds.length === 1 && r.body.rounds[0].round === 1, r.body);
+r = await call('/pub/' + slug + '/rounds');
+ok('rounds request needs an n', r.status === 400, r.body);
+r = await call('/pub/' + slug + '/rounds?n=' + Array.from({ length: 101 }, (_, i) => i + 1).join(','));
+ok('oversized rounds request rejected', r.status === 400 && /100/.test(r.body.error), r.body);
 
 const MATCH2 = MATCH.replace('"_round": 1', '"_round": 2').replace('_round":1', '_round":2');
 r = await call(`/b/${secret}/upload?round=2&name=Round_2_Alpha_Beta.qbj`,
@@ -679,24 +705,44 @@ r = await call(`/b/${secret}/upload?round=2&name=Round_2_Alpha_Beta.qbj`,
 ok('second qbj uploads', r.status === 200 && r.body.error === null, r.body);
 const secondQbjId = r.body.id;
 
+await tick();
 r = await call('/pub/' + slug);
 ok('version moves on upload', r.body.version !== v1, r.body.version);
-r = await call('/pub/' + slug + '/bundle');
-ok('bundle grows', r.body.entries.length === 2, r.body.entries.length);
+ok('a new round gets its own stamp, leaving round 1 alone',
+  r.body.rounds['2'] && r.body.rounds['1'] === v1.split(':')[0] + ':1', r.body.rounds);
 
 r = await call(`${A}/files/${secondQbjId}`, { method: 'DELETE' });
 ok('delete second qbj', r.status === 200);
-r = await call('/pub/' + slug + '/bundle');
-ok('bundle shrinks on delete', r.body.entries.length === 1, r.body.entries.length);
+await tick();
+r = await call('/pub/' + slug);
+ok('emptied round drops out', r.body.rounds['2'] === undefined, r.body.rounds);
+r = await call('/pub/' + slug + '/rounds?n=2');
+ok('emptied round shard deleted', r.status === 200 && r.body.rounds.length === 0, r.body);
 
-// TO bundle rebuild round-trip
+// TO rebuild round-trip: re-post public copies, next tick rebuilds shards
 r = await call(`${A}/bundle`, {
   method: 'POST',
   body: JSON.stringify({ entries: [{ id: 999, round: 1, room: 'Room 1', filename: 'x.qbj', qbj: JSON.parse(MATCH) }] }),
 });
-ok('bundle rebuild accepted', r.status === 200 && r.body.entries === 1, r.body);
-r = await call('/pub/' + slug + '/bundle');
-ok('rebuilt bundle served', r.body.entries[0].id === 999, r.body.entries[0]);
+ok('rebuild accepted', r.status === 200 && r.body.entries === 1, r.body);
+r = await call(`${A}/bundle`, {
+  method: 'POST',
+  body: JSON.stringify({ entries: Array.from({ length: 201 }, (_, i) => ({ id: i, qbj: {} })) }),
+});
+ok('oversized rebuild batch rejected', r.status === 400 && /200/.test(r.body.error), r.body);
+r = await call('/pub/' + slug + '/qbj/999');
+ok('rebuilt game served', r.status === 200 && r.body.tossups_read === 20, r.body);
+// A rebuild clears the manifest, which is also the state a tournament
+// published before the shards existed is in: games, no shards. The
+// state must flag itself for the next tick rather than sit there empty
+// — a finished tournament can't be mutated back into the queue — and
+// must not advertise the long cache while it's in that state.
+r = await call('/pub/' + slug);
+ok('unmaterialized state reports no rounds', Object.keys(r.body.rounds).length === 0, r.body.rounds);
+ok('unmaterialized state caches briefly', maxAge(r.cache) <= 60, r.cache);
+await tick();
+r = await call('/pub/' + slug);
+ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0, r.body.rounds);
 // the dashboard rebuilds from admin downloads, which keep notes — the
 // Worker must strip them again on the way back in
 ok('rebuild strips notes too', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
@@ -712,9 +758,10 @@ ok('rebuild strips notes too', !JSON.stringify(r.body).includes('PROTESTLEAKANSW
   ok('combined upload accepted', r.status === 200 && r.body.kind === 'combined' && r.body.error === null, r.body);
   const cid = r.body.id;
 
-  r = await call('/pub/' + slug + '/bundle');
-  const entry = r.body.entries.find((e) => e.id === cid);
-  ok('bundle stores only the qbj half',
+  await tick();
+  r = await call('/pub/' + slug + '/rounds?n=3');
+  const entry = r.body.rounds[0].entries.find((e) => e.id === cid);
+  ok('shard stores only the qbj half',
     entry && entry.qbj.tossups_read === 20 && !JSON.stringify(entry).includes('SECRETQUESTIONTEXT'), entry);
 
   const res = await fetch(`${BASE}/pub/${slug}/qbj/${cid}`);
@@ -934,7 +981,7 @@ ok('published stats survive admin expiry', r.status === 200 && r.body.name === '
 // the public page drops its poll and the answer caches for a week.
 ok('expired tournament is final', r.body.final === true, r.body.final);
 ok('final state caches for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
-r = await call('/pub/' + slug + '/bundle');
-ok('final bundle caches for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
+r = await call('/pub/' + slug + '/rounds?n=1');
+ok('final round shards cache for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
 
 console.log(passed + ' e2e checks passed' + (process.exitCode ? ' (with failures)' : ''));

@@ -45,7 +45,9 @@ const CREATE_GLOBAL_DAY = 300;
 const BUCKET_LIST_LIMIT = 20;            // recent uploads shown to the mod
 const MAX_UPLOAD = 8 * 1024 * 1024;      // moderator file cap
 const MAX_PACKET = 16 * 1024 * 1024;     // packet cap
-const MAX_BUNDLE = 32 * 1024 * 1024;     // combined stats blob cap
+const MAX_BUNDLE = 32 * 1024 * 1024;     // rebuild request body cap
+const MAX_REBUILD = 200;                 // games per rebuild request (each is its own blob)
+const MAX_ROUNDS_PER_FETCH = 100;        // round shards one /pub/:slug/rounds may ask for
 const MAX_SCHEDULE = 256 * 1024;         // schedule blob cap
 const MAX_BUCKETS = 60;
 // Sized for one shared bucket carrying a whole tournament (several mods on
@@ -139,10 +141,10 @@ function cleanName(s) {
    admin_wrap are legacy throughout — the 48h TTL ages them out of every
    write path within two days of the migration (migrate-crypt.sql).
 
-   Public blobs (bundle, schedule, catmap, roster) stay plaintext by
-   design: they are text-free and the whole point is serving them
-   without credentials. The cron publisher holds no secrets and needs
-   none. */
+   Public blobs (the per-game copies and the round shards built from
+   them, schedule, catmap, roster) stay plaintext by design: they are
+   text-free and the whole point is serving them without credentials.
+   The cron holds no secrets and needs none. */
 
 const enc8 = (s) => new TextEncoder().encode(s);
 const b64ToBytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -245,8 +247,8 @@ async function blobResponseDec(env, r2obj, rawKey, filename, cacheSeconds = 0) {
 
 // The reader uploads ONE `.qbtd.json` per game: {qbj: <match>, game:
 // <MODAQ state>, tb?: {used: [ids]}}. The game half holds the full packet
-// text, so only the extracted qbj half may ever reach the bundle or a
-// public route. `teams` (the two team names) and `root` (for the tb
+// text, so only the extracted qbj half may ever reach a public blob or
+// route. `teams` (the two team names) and `root` (for the tb
 // field) ride along for the tiebreaker usage log.
 function extractMatch(text) {
   let root;
@@ -265,16 +267,18 @@ function extractMatch(text) {
     const t = mt && mt.team;
     return typeof t === 'string' ? t : (t && typeof t.name === 'string' ? t.name : '');
   });
-  // qbj: what the bundle stores (an {objects} wrapper is kept as-is —
-  // the engine unwraps it — but a combined file contributes only .qbj).
+  // qbj: what the game's public blob stores (an {objects} wrapper is
+  // kept as-is — the engine unwraps it — but a combined file
+  // contributes only .qbj).
   return { error: null, qbj: obj, root, teams: names };
 }
 
 // MODAQ writes protest reasons — moderator free text that routinely
 // quotes answers — verbatim into the match's `notes`. Nothing public
-// renders notes, so every public copy of a qbj (the bundle, and /pub
-// qbj downloads served from it) drops the field; the TO's admin
-// downloads keep it for the .yft. Mutates and returns its argument.
+// renders notes, so every public copy of a qbj (the per-game blob, the
+// round shards built from it, and /pub qbj downloads) drops the field;
+// the TO's admin downloads keep it for the .yft. Mutates and returns its
+// argument.
 function stripMatchNotes(obj) {
   if (!obj || typeof obj !== 'object') return obj;
   delete obj.notes;
@@ -362,40 +366,163 @@ function roomAnnounce(row, bucketId) {
     a.rooms === true || (Array.isArray(a.rooms) && a.rooms.includes(bucketId))));
 }
 
-/* ---------- combined stats bundle ----------
-   t/<tid>/combined.json holds every valid match qbj (raw, with room/round
-   metadata) so the public stats page is 2 requests instead of one per
-   file. Maintained incrementally on upload/delete with R2 conditional
-   writes (retry on concurrent-writer conflict). Derived data: if it ever
-   drifts (e.g. writes exhausted retries), the TO dashboard's rebuild
-   button re-materializes it from the files themselves. */
+/* ---------- public game blobs and per-round shards ----------
+   The public copy of a game is its own object, t/<tid>/pub/<fileId>.json,
+   written once by the upload that produced it. Nothing is shared, so the
+   36 rooms of a big tournament never contend, and a moderator's upload
+   costs one small write however deep into the day it lands.
 
-async function updateBundle(env, tid, mutate) {
-  const key = `t/${tid}/combined.json`;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const cur = await env.DATA.get(key);
-    let bundle = { entries: [] };
-    if (cur) {
-      bundle = await cur.json().catch(() => ({ entries: [] }));
-      if (!Array.isArray(bundle.entries)) bundle = { entries: [] };
-    }
-    mutate(bundle);
-    const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
-    try {
-      const put = await env.DATA.put(key, JSON.stringify(bundle), {
-        httpMetadata: { contentType: 'application/json' },
-        onlyIf,
-      });
-      if (put) return true;
-    } catch (e) { /* precondition failed -> retry */ }
+   What the stats page reads is derived from those: one shard per round
+   (t/<tid>/round/<n>.json) plus a manifest of their stamps
+   (t/<tid>/rounds.json). The cron is their only writer — materialize()
+   below — so there is no concurrent-writer problem to lose a game to.
+   A shard is rebuilt, never mutated: D1's file rows say which games are
+   in the round and the per-game blobs hold their contents, so the only
+   way to drift is a missing blob, which the rebuild reports and retries
+   rather than silently baking in.
+
+   Finished rounds never change again, which is the other half of the
+   point: a viewer refreshing late in the day refetches the one round
+   that moved instead of every game of the tournament.
+
+   The cost is freshness. A game reaches the public page on the next tick
+   (~a minute) rather than the instant it lands — the lag snapshot
+   viewers already had, now shared by everyone. */
+
+// Legacy games seeded from the pre-shard bundle per tick (see
+// materialize): bounds the work when a tournament that was mid-flight at
+// deploy time first materializes.
+const PUB_BACKFILL_PER_TICK = 200;
+
+const pubGameKey = (tid, fileId) => `t/${tid}/pub/${fileId}.json`;
+const roundBlobKey = (tid, n) => `t/${tid}/round/${n}.json`;
+const manifestKey = (tid) => `t/${tid}/rounds.json`;
+
+// A stats stamp: newest file id + how many. Used per round (the client
+// refetches a round when its stamp moves) and, folded together, for the
+// tournament-wide `version` that predates the shards.
+function statsVersion(rows) {
+  return (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length;
+}
+
+function manifestVersion(manifest) {
+  let lastId = 0;
+  let count = 0;
+  for (const v of Object.values(manifest.rounds)) {
+    const [id, n] = String(v).split(':').map(Number);
+    if (id > lastId) lastId = id;
+    count += n || 0;
   }
-  console.log('bundle update lost the retry race for tournament', tid);
-  return false;
+  return lastId + ':' + count;
+}
+
+async function putPubGame(env, tid, entry) {
+  await env.DATA.put(pubGameKey(tid, entry.id), JSON.stringify(entry), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+}
+
+async function readManifest(env, tid) {
+  const obj = await env.DATA.get(manifestKey(tid));
+  const m = obj ? await obj.json().catch(() => null) : null;
+  return m && m.rounds && typeof m.rounds === 'object' ? m : { rounds: {} };
+}
+
+// The pre-shard whole-tournament bundle, as {fileId -> entry}. Only read
+// when a round is missing per-game blobs: tournaments that were already
+// running when this layout shipped have their games only in here, and
+// this is what moves them across.
+async function readLegacyBundle(env, tid) {
+  const obj = await env.DATA.get(`t/${tid}/combined.json`);
+  const bundle = obj ? await obj.json().catch(() => null) : null;
+  if (!bundle || !Array.isArray(bundle.entries)) return null;
+  return new Map(bundle.entries
+    .filter((e) => e && typeof e.id === 'number')
+    .map((e) => [e.id, e]));
+}
+
+/**
+ * Rebuild every round shard whose stamp no longer matches D1, and the
+ * manifest over them. Cron-only: one writer, no locking.
+ *
+ * A shard is stamped with what it actually contains, not with what D1
+ * says it should — so a rebuild that came up short (a blob not written
+ * yet, a backfill that ran out of budget) stamps differently from the
+ * round's D1 stamp and is retried on the next tick until it converges.
+ *
+ * @returns {manifest, changed: [round], removed: [round]}
+ */
+async function materialize(env, t) {
+  const tid = t.id;
+  const { results: rows } = await env.DB.prepare(
+    "SELECT id, round FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
+  ).bind(tid).all();
+
+  const byRound = new Map();
+  for (const f of rows) {
+    if (!byRound.has(f.round)) byRound.set(f.round, []);
+    byRound.get(f.round).push(f);
+  }
+
+  const prev = await readManifest(env, tid);
+  const manifest = { rounds: {}, at: Date.now() };
+  const changed = [];
+  const removed = [];
+  let legacy;             // undefined = not looked for yet, null = none
+  let backfill = PUB_BACKFILL_PER_TICK;
+
+  for (const [n, fs] of [...byRound].sort((a, b) => a[0] - b[0])) {
+    const want = statsVersion(fs);
+    if (prev.rounds[n] === want) { manifest.rounds[n] = want; continue; }
+
+    const entries = new Array(fs.length).fill(null);
+    await Promise.all(fs.map(async (f, i) => {
+      const obj = await env.DATA.get(pubGameKey(tid, f.id));
+      if (obj) entries[i] = await obj.json().catch(() => null);
+    }));
+
+    const gaps = entries.map((e, i) => (e ? -1 : i)).filter((i) => i >= 0);
+    if (gaps.length) {
+      if (legacy === undefined) legacy = await readLegacyBundle(env, tid);
+      for (const i of gaps) {
+        if (backfill <= 0) break;
+        const entry = legacy && legacy.get(fs[i].id);
+        if (!entry) continue;
+        entries[i] = entry;
+        backfill -= 1;
+        await putPubGame(env, tid, entry);
+      }
+    }
+
+    const kept = entries.filter(Boolean);
+    if (kept.length < fs.length) {
+      console.log('tournament', tid, 'round', n, 'is missing',
+        fs.length - kept.length, 'public game blobs; will retry next tick');
+    }
+    const got = (kept.length ? kept[kept.length - 1].id : 0) + ':' + kept.length;
+    await env.DATA.put(roundBlobKey(tid, n), JSON.stringify({ v: got, round: n, entries: kept }), {
+      httpMetadata: { contentType: 'application/json' },
+    });
+    manifest.rounds[n] = got;
+    changed.push(n);
+  }
+
+  for (const n of Object.keys(prev.rounds)) {
+    if (manifest.rounds[n] === undefined) {
+      await env.DATA.delete(roundBlobKey(tid, n));
+      removed.push(Number(n));
+    }
+  }
+  await env.DATA.put(manifestKey(tid), JSON.stringify(manifest), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+  return { manifest, changed, removed };
 }
 
 /* ---------- public snapshots on GitHub (optional) ----------
    Moves the audience-scaling bytes off the Worker: every blob the public
-   page refetches when stamps move (bundle / schedule / cats / roster) is
+   page refetches when stamps move (round shards / schedule / cats /
+   roster) is
    also published to a GitHub data repo, one atomic commit per change,
    and /pub/:slug advertises the commit SHA. The page then fetches
    raw.githubusercontent.com/<repo>/<sha>/<slug>/*.json — SHA-pinned raw
@@ -444,18 +571,13 @@ function snapshotsEnabled(env) {
     && (env.GITHUB_TOKEN || (env.GITHUB_APP_KEY && env.GITHUB_APP_ID && env.GITHUB_INSTALLATION_ID)));
 }
 
-// Flag a tournament for the next cron publish. Called from every
-// mutation that changes a snapshotted blob; a cheap single UPDATE, so
-// it's just awaited inline.
+// Flag a tournament for the next cron tick. Called from every mutation
+// that changes derived public data; a cheap single UPDATE, so it's just
+// awaited inline. Unconditional even with snapshots off — the tick also
+// materializes the round shards the public page reads, which is why
+// migrate-pub.sql is no longer optional.
 async function markPub(env, tid) {
-  if (!snapshotsEnabled(env)) return;
   await env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(tid).run();
-}
-
-// The stats stamp, shared verbatim between pubState and the publisher so
-// the page's refetch logic can't tell the two sources apart.
-function statsVersion(rows) {
-  return (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length;
 }
 
 /* ----- GitHub auth: App installation token (preferred) or PAT ----- */
@@ -563,21 +685,19 @@ async function commitFiles(env, message, entries) {
 // Gather one tournament's publishable blobs. Returns { entries, snapOf }:
 // entries feed the tick's shared batch commit, and snapOf(batchSha)
 // builds the descriptor that pub_snapshot stores and /pub/:slug
-// advertises — { sha, at, version, schedule, cats, roster, roster_at,
-// bundle, branch, state } — once the batch's commit sha is known. Stamps
-// mirror pubState, booleans say which files the branch actually holds
-// (the page falls back to the Worker route for anything absent).
-async function buildPublish(env, t) {
+// advertises — { sha, at, rounds, schedule, cats, roster, roster_at } —
+// once the batch's commit sha is known. Stamps mirror pubState, and
+// `rounds` names exactly the round shards the branch holds (the page
+// falls back to the Worker route for any round absent from it).
+//
+// Takes the manifest materialize() just wrote, so the publisher commits
+// the shards as they were built rather than re-deriving anything.
+async function buildPublish(env, t, manifest) {
   const prev = (() => {
     try { return JSON.parse(t.pub_snapshot) || null; } catch (e) { return null; }
   })();
 
-  // Same query ordering as pubState so the stamps agree.
-  const [files, bundleObj, schedObj, catsObj, rosterObj] = await Promise.all([
-    env.DB.prepare(
-      "SELECT id FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
-    ).bind(t.id).all(),
-    env.DATA.get(`t/${t.id}/combined.json`),
+  const [schedObj, catsObj, rosterObj] = await Promise.all([
     env.DATA.get(`t/${t.id}/schedule.json`),
     env.DATA.get(`t/${t.id}/catmap.json`),
     t.roster_r2_key ? env.DATA.get(t.roster_r2_key) : null,
@@ -597,10 +717,6 @@ async function buildPublish(env, t) {
       catsBody = buf;
     }
   }
-  const bundleBody = bundleObj ? await bundleObj.arrayBuffer() : null;
-  const bundleOk = bundleBody !== null && bundleBody.byteLength <= PUB_MAX_SNAPSHOT;
-
-  const version = statsVersion(files.results);
   const schedStamp = schedObj ? schedObj.uploaded.getTime() : null;
   const rosterStamp = rosterObj ? rosterObj.uploaded.getTime() : null;
 
@@ -611,13 +727,11 @@ async function buildPublish(env, t) {
   // App's 5,000/hour rate limit. Skips need prev.sha: without a prior
   // commit the stamps have nothing on the branch to vouch for.
   const had = {
-    bundle: prev && prev.bundle,
     schedule: prev && prev.schedule !== null && prev.schedule !== undefined,
     cats: prev && prev.cats !== null && prev.cats !== undefined,
     roster: prev && prev.roster,
   };
   const same = prev && prev.sha ? {
-    bundle: had.bundle && prev.version === version,
     schedule: had.schedule && prev.schedule === schedStamp,
     cats: had.cats && prev.cats === catsStamp,
     roster: had.roster && prev.roster_at === rosterStamp,
@@ -627,7 +741,29 @@ async function buildPublish(env, t) {
     if (body !== null) { if (!same[key]) entries.push([`${t.slug}/${name}`, body, false]); }
     else if (had[key]) entries.push([`${t.slug}/${name}`, null, true]);
   };
-  want('bundle.json', bundleOk ? bundleBody : null, 'bundle');
+
+  // Round shards: publish the ones whose stamp moved, carry the rest
+  // forward, and delete the ones that no longer exist. Same skip rule as
+  // the blobs above, one round at a time — which is the whole point, a
+  // round that finished hours ago is never uploaded again.
+  const prevRounds = (prev && prev.sha && prev.rounds) || {};
+  const rounds = {};
+  for (const [n, v] of Object.entries(manifest.rounds)) {
+    if (prevRounds[n] === v) { rounds[n] = v; continue; }
+    const obj = await env.DATA.get(roundBlobKey(t.id, n));
+    const body = obj ? await obj.arrayBuffer() : null;
+    if (body === null || body.byteLength > PUB_MAX_SNAPSHOT) continue; // page falls back to the Worker
+    entries.push([`${t.slug}/r${n}.json`, body, false]);
+    rounds[n] = v;
+  }
+  for (const n of Object.keys(prevRounds)) {
+    if (manifest.rounds[n] === undefined) entries.push([`${t.slug}/r${n}.json`, null, true]);
+  }
+  // One-time tidy: a tournament published under the pre-shard layout has
+  // a whole-tournament bundle.json at the branch head that nothing reads
+  // any more.
+  if (prev && prev.bundle) entries.push([`${t.slug}/bundle.json`, null, true]);
+
   want('schedule.json', schedObj ? await schedObj.arrayBuffer() : null, 'schedule');
   want('cats.json', catsBody, 'cats');
   want('roster.json', rosterObj ? await rosterObj.arrayBuffer() : null, 'roster');
@@ -642,12 +778,11 @@ async function buildPublish(env, t) {
       return {
         sha,
         at: Date.now(),
-        version,
+        rounds: sha === null ? {} : rounds,
         schedule: schedStamp,
         cats: catsStamp,
         roster: Boolean(rosterObj),
         roster_at: rosterStamp,
-        bundle: bundleOk && sha !== null,
       };
     },
   };
@@ -660,45 +795,58 @@ async function buildPublish(env, t) {
 function retractEntries(t) {
   let prev = null;
   try { prev = JSON.parse(t.pub_snapshot) || null; } catch (e) { /* nothing recorded */ }
-  return [
-    [`${t.slug}/bundle.json`, null, prev && prev.bundle],
+  const out = [
+    [`${t.slug}/bundle.json`, null, prev && prev.bundle], // pre-shard layout
     [`${t.slug}/schedule.json`, null, prev && prev.schedule !== null && prev.schedule !== undefined],
     [`${t.slug}/cats.json`, null, prev && prev.cats !== null && prev.cats !== undefined],
     [`${t.slug}/roster.json`, null, prev && prev.roster],
   ];
+  for (const n of Object.keys((prev && prev.rounds) || {})) {
+    out.push([`${t.slug}/r${n}.json`, null, true]);
+  }
+  return out;
 }
 
-// Cron tick: publish dirty published tournaments — and retract dirty
-// unpublished ones that still have a snapshot on the branch — a few per
-// minute so a tick stays bounded (the rest carry their flag to the next
-// tick). The whole tick is ONE commit regardless of tournament count: a
-// single batch of every tournament's changed blobs and retractions.
-// Per-tournament commits would spend the ~10-call Git-Data-API overhead
-// once per tournament; batching spends it once per tick, which is what
-// keeps a fully loaded cron inside GitHub's 5,000 requests/hour App
-// limit.
-async function publishDirty(env) {
-  if (!snapshotsEnabled(env)) return;
+// Cron tick: for dirty tournaments, rebuild the round shards the public
+// page reads (materialize) and then — if snapshots are configured —
+// publish what moved. Dirty unpublished ones with a snapshot on the
+// branch are retracted instead. A few per minute so a tick stays bounded
+// (the rest carry their flag to the next tick).
+//
+// Materializing is not optional: with snapshots off it is the only thing
+// that makes an uploaded game public, so it runs first and independently
+// of the GitHub half. The publish half is ONE commit regardless of
+// tournament count: a single batch of every tournament's changed shards
+// and retractions. Per-tournament commits would spend the ~10-call
+// Git-Data-API overhead once per tournament; batching spends it once per
+// tick, which is what keeps a fully loaded cron inside GitHub's
+// 5,000 requests/hour App limit.
+async function tickDirty(env) {
   const { results } = await env.DB.prepare(
     'SELECT * FROM tournaments WHERE pub_dirty = 1 AND (published = 1 OR pub_snapshot IS NOT NULL) ORDER BY created DESC LIMIT 4'
   ).all();
   if (!results.length) return;
   const reflag = (id) =>
     env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(id).run();
-  // Claim before working: a mutation mid-publish re-sets the flag and
-  // the next tick picks it up, instead of the clear losing its write.
+  // Claim before working: a mutation mid-tick re-sets the flag and the
+  // next tick picks it up, instead of the clear losing its write.
   for (const t of results) {
     await env.DB.prepare('UPDATE tournaments SET pub_dirty = 0 WHERE id = ?1').bind(t.id).run();
   }
 
   const pubs = [];     // { t, entries, snapOf }
   const retracts = []; // { t, entries }
+  const snapshots = snapshotsEnabled(env);
   for (const t of results) {
     try {
-      if (t.published) pubs.push({ t, ...(await buildPublish(env, t)) });
-      else retracts.push({ t, entries: retractEntries(t) });
+      if (t.published) {
+        const { manifest } = await materialize(env, t);
+        if (snapshots) pubs.push({ t, ...(await buildPublish(env, t, manifest)) });
+      } else if (snapshots) {
+        retracts.push({ t, entries: retractEntries(t) });
+      }
     } catch (e) {
-      console.log('snapshot build failed for', t.slug, e.message);
+      console.log('tick failed for', t.slug, e.message);
       await reflag(t.id);
     }
   }
@@ -952,8 +1100,9 @@ async function renameBucket(request, env, t, bucketId) {
    {"<n>": {t: [{c, s} | null, ...], b: [...]}}}), extracted from
    qbreader-format JSON packets at upload time. It powers the public
    categories tab without exposing any question text; docx packets carry
-   no category data, so their rounds simply stay absent. Maintained with
-   the same conditional-write retry as the stats bundle. */
+   no category data, so their rounds simply stay absent. One packet at a
+   time touches a round, but two rounds can land at once, so this one
+   keeps its conditional-write retry. */
 
 // Primary categories we recognize inside ACF/YAPP metadata strings
 // ("History - World, Author" / "Author, History - World" / "Physics,
@@ -1282,16 +1431,19 @@ async function deleteFile(env, t, fileId) {
   await env.DATA.delete(results[0].r2_key);
   await env.DB.prepare('DELETE FROM files WHERE id = ?1').bind(fileId).run();
   if ((results[0].kind === 'qbj' || results[0].kind === 'combined') && !results[0].error) {
-    await updateBundle(env, id, (bundle) => {
-      bundle.entries = bundle.entries.filter((e) => e.id !== fileId);
-    });
+    await env.DATA.delete(pubGameKey(id, fileId));
     await markPub(env, id);
   }
   return json(env, { ok: true });
 }
 
-// Escape hatch for bundle drift: the dashboard re-materializes the bundle
-// from the files it already fetched and posts it whole.
+// Escape hatch for drift: the dashboard re-posts the public copies of
+// games it fetched from the stored files, and the next tick rebuilds
+// every shard from them (deleting the manifest is what forces that —
+// otherwise unchanged round stamps would skip the rebuild).
+//
+// Posted in batches, because each entry is its own write: MAX_REBUILD
+// bounds one request's R2 traffic, and app/js/admin.js chunks to match.
 async function putBundle(request, env, t) {
   const id = t.id;
   const body = await request.arrayBuffer();
@@ -1299,16 +1451,18 @@ async function putBundle(request, env, t) {
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return err(env, 400, 'bad json'); }
   if (!parsed || !Array.isArray(parsed.entries)) return err(env, 400, 'bad bundle');
-  // The dashboard rebuilds from admin downloads, which keep match notes;
-  // the public bundle must not (stripMatchNotes).
-  for (const e of parsed.entries) {
-    if (e && typeof e === 'object') stripMatchNotes(e.qbj);
+  if (parsed.entries.length > MAX_REBUILD) {
+    return err(env, 400, `post at most ${MAX_REBUILD} games per request`);
   }
-  await env.DATA.put(`t/${id}/combined.json`, JSON.stringify(parsed), {
-    httpMetadata: { contentType: 'application/json' },
-  });
+  const entries = parsed.entries.filter((e) => e && typeof e === 'object' && Number.isInteger(e.id));
+  // The dashboard rebuilds from admin downloads, which keep match notes;
+  // no public copy may (stripMatchNotes).
+  await Promise.all(entries.map((e) => putPubGame(env, id, {
+    id: e.id, round: e.round, room: e.room, filename: e.filename, qbj: stripMatchNotes(e.qbj),
+  })));
+  await env.DATA.delete(manifestKey(id));
   await markPub(env, id);
-  return json(env, { entries: parsed.entries.length });
+  return json(env, { entries: entries.length });
 }
 
 /* ---------- schedule (R2 blob t/<tid>/schedule.json) ----------
@@ -1601,8 +1755,8 @@ async function bucketUpload(request, url, env, secret) {
   }
 
   // Encrypted at rest: a combined upload's game half carries the full
-  // packet text. The extracted qbj half (text-free) goes to the public
-  // bundle below in plaintext — that is the only public copy.
+  // packet text. The extracted qbj half (text-free) goes to this game's
+  // public blob below in plaintext — that is the only public copy.
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
   await putBlob(env, key, buf, 'application/json', b.ckey);
   const out = await env.DB.prepare(
@@ -1612,11 +1766,11 @@ async function bucketUpload(request, url, env, secret) {
   const fileId = out.meta.last_row_id;
 
   if (qbjObj && !error) {
-    await updateBundle(env, b.tournament_id, (bundle) => {
-      bundle.entries = bundle.entries.filter((e) => e.id !== fileId);
-      bundle.entries.push({
-        id: fileId, round, room: b.room_name, filename, qbj: stripMatchNotes(qbjObj),
-      });
+    // One small write of this game alone — no shared object to read back,
+    // re-serialize or lose a race on. The cron folds it into its round's
+    // shard on the next tick.
+    await putPubGame(env, b.tournament_id, {
+      id: fileId, round, room: b.room_name, filename, qbj: stripMatchNotes(qbjObj),
     });
     await markPub(env, b.tournament_id);
   }
@@ -1677,7 +1831,7 @@ async function getPublishedTournament(env, slug) {
 /* ---------- buzzpoints gate ----------
    Password is the ONLY mode: buzzpoints are off or gated, never open.
    The gated resource is packet text; buzz positions themselves ride in
-   the public stats bundle.
+   the public round shards.
 
    The TD's dashboard stores settings.buzz. Two shapes:
 
@@ -1833,7 +1987,7 @@ async function pubQPacket(request, url, env, slug) {
 // `pub` is the snapshot descriptor to advertise: the route passes the
 // stored one, the publisher passes the one it just committed.
 async function pubStateBody(env, t, pub) {
-  const [files, buckets, schedObj, packetRounds, catsHead] = await Promise.all([
+  const [files, buckets, schedObj, packetRounds, catsHead, manifest] = await Promise.all([
     env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
@@ -1845,6 +1999,7 @@ async function pubStateBody(env, t, pub) {
       'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     ).bind(t.id, t.current_round).all(),
     env.DATA.get(`t/${t.id}/catmap.json`),
+    readManifest(env, t.id),
   ]);
   // an empty map is a "checked, nothing found" backfill marker: the
   // tab stays hidden
@@ -1894,9 +2049,15 @@ async function pubStateBody(env, t, pub) {
     packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
     // categories tab: refetch the (text-free) category map when this moves
     cats: catsStamp,
-    // Stats only change when a file lands (or is deleted): clients compare
-    // this stamp and refetch the bundle only when it moves.
-    version: statsVersion(rows),
+    // Stats: one stamp per round shard, so a client refetches the round
+    // that moved and nothing else. These follow the materialized shards
+    // rather than the file rows above — a game that has landed but is not
+    // in a shard yet must not move a stamp, or the client would fetch,
+    // find nothing new, and stop looking.
+    rounds: manifest.rounds,
+    // Fold of the same stamps, kept for anything that just wants to know
+    // whether the stats moved at all.
+    version: manifestVersion(manifest),
     // Latest GitHub snapshot (see "public snapshots on GitHub"): the page
     // fetches its blobs SHA-pinned from raw.githubusercontent.com instead
     // of the /pub blob routes, falling back here when absent/stale.
@@ -1910,7 +2071,7 @@ async function pubStateBody(env, t, pub) {
   };
 }
 
-async function pubState(env, slug) {
+async function pubState(env, slug, ctx) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
   const pub = (() => {
@@ -1920,31 +2081,87 @@ async function pubState(env, slug) {
       return snap && snap.sha ? { repo: env.SNAPSHOT_REPO, ...snap } : null;
     } catch (e) { return null; }
   })();
-  return json(env, await pubStateBody(env, t, pub), 200, pubCache(t));
+  const body = await pubStateBody(env, t, pub);
+  // Games but no shards to serve them from: a tournament published
+  // before the round shards existed, or one whose manifest a rebuild
+  // just cleared. Flag it so the next tick materializes it — otherwise
+  // a finished tournament, which nothing can mutate any more, would
+  // have no way back. And don't let this answer cache for the week a
+  // finished tournament normally gets, because it is about to change.
+  const unbuilt = body.files.length > 0 && !Object.keys(body.rounds).length;
+  if (unbuilt && ctx) ctx.waitUntil(markPub(env, t.id));
+  return json(env, body, 200, unbuilt ? PUB_CACHE_LIVE : pubCache(t));
 }
 
-async function pubBundle(env, slug) {
+/* Games for the rounds asked for: ?n=3,4,5 -> {"rounds":[<shard>, ...]}.
+   The stamps in /pub/:slug `rounds` say which ones to ask for, and a
+   finished round's shard never changes again, so a refresh asks for the
+   round in progress and nothing else.
+
+   Batched on purpose. Snapshot viewers fetch one file per round from
+   GitHub, where per-round granularity is free; here, one request per
+   round would mean a first load of a 17-round tournament costing 18
+   Worker requests instead of 2 — and the Worker path is what serves
+   every viewer of a tournament that predates snapshots, or any
+   tournament while publishing is broken.
+
+   The shards are streamed back to back, bytes as stored: no parse, no
+   whole-tournament buffer, so serving all of a big tournament costs
+   about what serving one round does. */
+async function pubRounds(env, slug, url) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const obj = await env.DATA.get(`t/${t.id}/combined.json`);
-  if (!obj) return err(env, 404, 'no bundle');
-  return blobResponse(env, obj, null, pubCache(t));
+  const asked = [...new Set((url.searchParams.get('n') || '').split(',')
+    .map(Number).filter((n) => Number.isInteger(n) && n > 0 && n < 1000))];
+  if (!asked.length) return err(env, 400, 'no rounds requested');
+  if (asked.length > MAX_ROUNDS_PER_FETCH) {
+    return err(env, 400, `at most ${MAX_ROUNDS_PER_FETCH} rounds per request`);
+  }
+  const objs = (await Promise.all(asked.sort((a, b) => a - b)
+    .map((n) => env.DATA.get(roundBlobKey(t.id, n))))).filter(Boolean);
+
+  const enc = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  (async () => {
+    const w = writable.getWriter();
+    try {
+      await w.write(enc.encode('{"rounds":['));
+      for (let i = 0; i < objs.length; i++) {
+        if (i) await w.write(enc.encode(','));
+        const reader = objs[i].body.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          await w.write(value);
+        }
+      }
+      await w.write(enc.encode(']}'));
+      await w.close();
+    } catch (e) {
+      // Viewer navigated away mid-stream, or a blob read failed: the
+      // response is already committed, so all that's left is to end it.
+      await w.abort(e).catch(() => {});
+    }
+  })();
+
+  const headers = new Headers(corsHeaders(env));
+  headers.set('Content-Type', 'application/json');
+  headers.set('Cache-Control', 'public, max-age=' + pubCache(t));
+  return new Response(readable, { status: 200, headers });
 }
 
-// Public per-game qbj download. Served from the bundle, not the stored
-// file: the bundle entry is exactly the public copy — validated match
-// qbj only (a combined file's game half carries the full packet text),
-// notes stripped, and readable without the content key that encrypts
-// the stored file at rest. A file missing from the bundle (validation
-// error, or drift the TO hasn't rebuilt) is simply not public.
+// Public per-game qbj download, served from the game's public blob
+// rather than the stored file: that blob is exactly the public copy —
+// validated match qbj only (a combined file's game half carries the full
+// packet text), notes stripped, and readable without the content key
+// that encrypts the stored file at rest. A file with no public blob
+// (validation error, or a deletion) is simply not public.
 async function pubQbj(env, slug, fileId) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const obj = await env.DATA.get(`t/${t.id}/combined.json`);
-  const bundle = obj ? await obj.json().catch(() => null) : null;
-  const entry = bundle && Array.isArray(bundle.entries)
-    ? bundle.entries.find((e) => e && e.id === fileId) : null;
-  if (!entry) return err(env, 404, 'no such file');
+  const obj = await env.DATA.get(pubGameKey(t.id, fileId));
+  const entry = obj ? await obj.json().catch(() => null) : null;
+  if (!entry || !entry.qbj) return err(env, 404, 'no such file');
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Cache-Control', 'public, max-age=' + pubCache(t));
@@ -1985,8 +2202,8 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1]);
 
     // Public stats routes — publish-gated inside.
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1]);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/bundle$/)) && method === 'GET') return pubBundle(env, m[1]);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1], ctx);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubRounds(env, m[1], url);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
@@ -2024,9 +2241,9 @@ export default {
     return err(env, 404, 'not found');
   },
 
-  // Cron (wrangler.toml [triggers]): publishes dirty tournaments' public
-  // snapshots to the GitHub data repo. No-op unless configured.
+  // Cron (wrangler.toml [triggers]): rebuilds dirty tournaments' round
+  // shards and, when configured, publishes them to the GitHub data repo.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(publishDirty(env));
+    ctx.waitUntil(tickDirty(env));
   },
 };

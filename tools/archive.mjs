@@ -105,9 +105,20 @@ function assertNoQuestionText(bundle) {
   }
 }
 
+// Every game, from the live per-round shards. A capture is frozen and
+// tiny by tournament standards, so it keeps the whole-tournament shape
+// the archived page reads (`rounds` is dropped below) rather than
+// freezing a stamp scheme that only matters while a tournament is live.
+async function captureBundle(api, slug, state) {
+  const rounds = Object.keys(state.rounds || {}).sort((a, b) => Number(a) - Number(b));
+  if (!rounds.length) return { entries: [] };
+  const { rounds: shards } = await getJson(api, `/pub/${slug}/rounds?n=${rounds.join(',')}`);
+  return { entries: (shards || []).flatMap((s) => s.entries || []) };
+}
+
 async function capture(api, slug) {
   const state = await getJson(api, `/pub/${slug}`);
-  const bundle = await getJson(api, `/pub/${slug}/bundle`);
+  const bundle = await captureBundle(api, slug, state);
   assertNoQuestionText(bundle);
 
   const [schedule, cats, roster] = await Promise.all([
@@ -125,6 +136,9 @@ async function capture(api, slug) {
   const data = {
     [`/pub/${slug}`]: {
       ...state, buzz: null, buzz_v: null, buzz_done: [], packet_rounds: [], announce: [], pub: null,
+      // No `rounds`: the capture holds every game in one bundle, which is
+      // what the page falls back to when nothing advertises shards.
+      rounds: undefined,
     },
     [`/pub/${slug}/bundle`]: bundle,
   };

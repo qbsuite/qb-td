@@ -53,6 +53,8 @@ window.qtd = { copy }; // for inline onclick handlers
 /* ---------- this device's tournament list (localStorage) ---------- */
 
 const LINKS_KEY = 'qbtdAdminLinks';
+// Games per rebuild request; must not exceed the Worker's MAX_REBUILD.
+const REBUILD_BATCH = 200;
 
 function savedLinks() {
   try {
@@ -1763,16 +1765,22 @@ async function computeStats(a, t, buckets, files) {
   $('rebuild').disabled = false;
   $('rebuild').onclick = async () => {
     try {
-      const bundle = {
-        entries: raw.map((r) => ({
-          id: r.id, round: r.round, room: r.room, filename: r.filename,
-          qbj: JSON.parse(r.text),
-        })),
-      };
-      const posted = await pub(a + '/bundle', {
-        method: 'POST', body: JSON.stringify(bundle),
-      });
-      say('Stats data rebuilt (' + posted.entries + ' games)');
+      const entries = raw.map((r) => ({
+        id: r.id, round: r.round, room: r.room, filename: r.filename,
+        qbj: JSON.parse(r.text),
+      }));
+      // Each game is its own blob on the backend, so this posts in
+      // batches (worker.js MAX_REBUILD) rather than one huge body. The
+      // shards themselves are rebuilt by the next cron tick.
+      let posted = 0;
+      for (let i = 0; i < entries.length; i += REBUILD_BATCH) {
+        const res = await pub(a + '/bundle', {
+          method: 'POST', body: JSON.stringify({ entries: entries.slice(i, i + REBUILD_BATCH) }),
+        });
+        posted += res.entries;
+        say('Rebuilding stats data (' + posted + '/' + entries.length + ')');
+      }
+      say('Stats data rebuilt (' + posted + ' games); the public page picks it up within a minute');
     } catch (e) { say(e.message, true); }
   };
 }

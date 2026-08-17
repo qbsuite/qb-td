@@ -1,6 +1,7 @@
-// snapshot_publish.js — unit tests for the Worker's GitHub public-snapshot
-// publisher ("public snapshots on GitHub" in worker/worker.js), with D1,
-// R2, and the GitHub API all mocked. No wrangler, no network:
+// snapshot_publish.js — unit tests for the Worker's cron tick: the round
+// shards it materializes and the GitHub public-snapshot publisher
+// ("public snapshots on GitHub" in worker/worker.js), with D1, R2, and
+// the GitHub API all mocked. No wrangler, no network:
 //   node tests/snapshot_publish.js
 
 import worker from '../worker/worker.js';
@@ -21,7 +22,7 @@ function fakeDb(state) {
       if (/SELECT \* FROM tournaments WHERE pub_dirty = 1/.test(sql)) {
         return { results: state.tournaments.filter((t) => t.pub_dirty && (t.published || t.pub_snapshot)) };
       }
-      if (/SELECT id FROM files WHERE/.test(sql)) {
+      if (/SELECT id, round FROM files WHERE/.test(sql)) {
         return { results: state.files.filter((f) => f.tournament_id === args[0]) };
       }
       // pubStateBody's queries — still reachable through the /pub route
@@ -58,13 +59,27 @@ function r2obj(text, uploadedMs) {
   return {
     arrayBuffer: async () => buf,
     json: async () => JSON.parse(text),
+    textFor: () => text,
     uploaded: new Date(uploadedMs),
   };
 }
 
+// The cron writes as well as reads now (shards + their manifest), so the
+// fake keeps what it wrote and hands it back — assertions read the shards
+// straight out of it.
 function fakeR2(objects) {
-  return { get: async (key) => objects[key] || null };
+  return {
+    get: async (key) => objects[key] || null,
+    put: async (key, body) => { objects[key] = r2obj(String(body), Date.now()); },
+    delete: async (key) => { delete objects[key]; },
+  };
 }
+
+// The public copy of one game, as bucketUpload writes it.
+const pubGame = (id, round) => r2obj(JSON.stringify(
+  { id, round, room: 'Room 1', filename: 'r' + round + '.qbj', qbj: { tossups_read: 20 } }), 1000);
+
+const shardOf = (objects, tid, n) => JSON.parse(objects['t/' + tid + '/round/' + n + '.json'].textFor());
 
 // Minimal GitHub Git Data API: refs, commit lookup, blob/tree/commit
 // creation, ref update. Records trees + commits for assertions.
@@ -135,7 +150,8 @@ async function runCron(e) {
 
 const realFetch = globalThis.fetch;
 
-// 1. Fresh publish into an empty repo: bundle + schedule land in ONE
+// 1. Fresh publish into an empty repo: the tick materializes a shard per
+// round from the per-game blobs, and those plus the schedule land in ONE
 // commit, the ref advances once, the descriptor mirrors pubState's
 // stamps, dirty clears. Only blobs are published — viewers read the
 // tournament state from /pub/:slug, so nothing state-shaped is committed.
@@ -152,24 +168,35 @@ const realFetch = globalThis.fetch;
       { id: 'a3', text: 'rooms only', level: 'info', created: now, expires: now + 3600_000, rooms: true },
     ]),
   };
-  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1 }, { id: 7, tournament_id: 1 }] };
+  const state = {
+    tournaments: [t],
+    files: [{ id: 3, tournament_id: 1, round: 1 }, { id: 7, tournament_id: 1, round: 2 }],
+  };
   const objects = {
-    't/1/combined.json': r2obj('{"entries":[{"id":3}]}', 1000),
+    't/1/pub/3.json': pubGame(3, 1),
+    't/1/pub/7.json': pubGame(7, 2),
     't/1/schedule.json': r2obj('{"v":1,"rooms":[],"phases":[]}', 2000),
   };
   await runCron(env(state, objects, gh));
   const snap = JSON.parse(t.pub_snapshot);
   ok('fresh publish: one commit, ref advanced once',
     gh.refUpdates === 1 && snap.sha === 'commit-1' && gh.branchSha === 'commit-1');
-  ok('fresh publish: version stamp mirrors pubState', snap.version === '7:2');
+  ok('fresh publish: a shard per round, each holding its own game',
+    shardOf(objects, 1, 1).entries.length === 1 && shardOf(objects, 1, 1).entries[0].id === 3
+    && shardOf(objects, 1, 2).entries[0].id === 7);
+  ok('fresh publish: round stamps mirror pubState',
+    JSON.stringify(snap.rounds) === JSON.stringify({ 1: '3:1', 2: '7:1' }), snap.rounds);
+  ok('fresh publish: manifest records the same stamps',
+    JSON.stringify(JSON.parse(objects['t/1/rounds.json'].textFor()).rounds)
+    === JSON.stringify({ 1: '3:1', 2: '7:1' }));
   ok('fresh publish: schedule stamp is the R2 upload time', snap.schedule === 2000);
-  ok('fresh publish: bundle flagged, cats/roster absent',
-    snap.bundle === true && snap.cats === null && snap.roster === false);
+  ok('fresh publish: cats/roster absent', snap.cats === null && snap.roster === false);
   ok('fresh publish: descriptor carries no branch or state fields',
     snap.branch === undefined && snap.state === undefined);
   const paths = gh.trees[0].tree.map((e) => e.path).sort();
-  ok('fresh publish: blob tree holds exactly bundle + schedule',
-    JSON.stringify(paths) === JSON.stringify(['stanford-open/bundle.json', 'stanford-open/schedule.json']));
+  ok('fresh publish: blob tree holds exactly the two shards + schedule',
+    JSON.stringify(paths) === JSON.stringify(
+      ['stanford-open/r1.json', 'stanford-open/r2.json', 'stanford-open/schedule.json']), paths);
   ok('fresh publish: exactly one commit and one tree, no state.json anywhere',
     gh.commits.length === 1 && gh.trees.length === 1
     && !JSON.stringify(gh.trees).includes('state.json'));
@@ -184,33 +211,43 @@ const realFetch = globalThis.fetch;
   globalThis.fetch = gh.fetch;
   const t = {
     id: 1, slug: 'stanford-open', published: 1, pub_dirty: 1, roster_r2_key: null,
-    pub_snapshot: JSON.stringify({ sha: 'head-0', version: '7:2', schedule: 2000, cats: null, roster: false, bundle: true }),
+    pub_snapshot: JSON.stringify({ sha: 'head-0', rounds: { 1: '3:1' }, schedule: 2000, cats: null, roster: false }),
   };
-  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1 }, { id: 7, tournament_id: 1 }] };
-  const objects = { 't/1/combined.json': r2obj('{"entries":[]}', 1000) };
+  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }] };
+  const objects = {
+    't/1/pub/3.json': pubGame(3, 1),
+    't/1/rounds.json': r2obj('{"rounds":{"1":"3:1"}}', 1000),
+  };
   await runCron(env(state, objects, gh));
   const del = gh.trees[0].tree.find((e) => e.path === 'stanford-open/schedule.json');
   ok('deletion: schedule removed from the tree', del && del.sha === null);
+  ok('deletion: the unchanged round shard is not re-uploaded',
+    gh.trees[0].tree.every((e) => e.path !== 'stanford-open/r1.json'));
   ok('deletion: new descriptor has no schedule', JSON.parse(t.pub_snapshot).schedule === null);
   ok('deletion: commit parented on the old head', gh.commits[0].parents[0] === 'head-0');
 }
 
-// 3. Oversize bundle: skipped (bundle: false) while the rest publishes —
-// the page then Worker-falls-back for the bundle only.
+// 3. Oversize round shard: that round is left off the branch (the page
+// Worker-falls-back for it alone) while everything else publishes. One
+// round has to be enormous for this now, where the whole tournament used
+// to share the one cap.
 {
   const gh = fakeGithub();
   globalThis.fetch = gh.fetch;
   const t = { id: 1, slug: 'big-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: 't/1/roster.qbj' };
-  const state = { tournaments: [t], files: [] };
+  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1, round: 1 }] };
   const objects = {
-    't/1/combined.json': r2obj('x'.repeat(13 * 1024 * 1024), 1000),
+    't/1/pub/1.json': r2obj(JSON.stringify(
+      { id: 1, round: 1, room: 'A', filename: 'r1.qbj', qbj: { pad: 'x'.repeat(13 * 1024 * 1024) } }), 1000),
     't/1/roster.qbj': r2obj('{"objects":[]}', 500),
   };
   await runCron(env(state, objects, gh));
   const snap = JSON.parse(t.pub_snapshot);
-  ok('oversize: bundle skipped but roster published',
-    snap.bundle === false && snap.roster === true
-    && gh.trees[0].tree.every((e) => e.path !== 'big-open/bundle.json'));
+  ok('oversize: round left off the branch but roster published',
+    snap.rounds['1'] === undefined && snap.roster === true
+    && gh.trees[0].tree.every((e) => e.path !== 'big-open/r1.json'), snap.rounds);
+  ok('oversize: the shard itself is still materialized for the Worker route',
+    shardOf(objects, 1, 1).entries.length === 1);
 }
 
 // 4. GitHub down: dirty restored so the next tick retries. Needs a blob
@@ -219,10 +256,13 @@ const realFetch = globalThis.fetch;
 {
   globalThis.fetch = async () => { throw new Error('github unreachable'); };
   const t = { id: 1, slug: 'x-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null };
-  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1 }] };
-  await runCron(env(state, { 't/1/combined.json': r2obj('{"entries":[]}', 1000) }, null));
+  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1, round: 1 }] };
+  const objects = { 't/1/pub/1.json': pubGame(1, 1) };
+  await runCron(env(state, objects, null));
   ok('failure: dirty flag restored', t.pub_dirty === 1);
   ok('failure: no snapshot recorded', t.pub_snapshot === null);
+  ok('failure: the shard was still materialized, so the Worker route serves it',
+    shardOf(objects, 1, 1).entries.length === 1);
 }
 
 // 5. Non-fast-forward ref update: retried once from a fresh head.
@@ -232,19 +272,26 @@ const realFetch = globalThis.fetch;
   gh.failNextRefUpdate = true;
   globalThis.fetch = gh.fetch;
   const t = { id: 1, slug: 'retry-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null };
-  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1 }] };
-  const objects = { 't/1/combined.json': r2obj('{"entries":[]}', 1000) };
+  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1, round: 1 }] };
+  const objects = { 't/1/pub/1.json': pubGame(1, 1) };
   await runCron(env(state, objects, gh));
   ok('ref conflict: retried from a fresh head and landed',
     gh.refUpdates === 1 && JSON.parse(t.pub_snapshot).sha === 'commit-2');
 }
 
-// 6. Feature off (no SNAPSHOT_REPO): the cron must not even touch D1.
+// 6. Feature off (no SNAPSHOT_REPO): the shards are still built — they
+// are what the public page reads — and GitHub is never called. This is
+// the whole reason materializing is not part of the publisher.
 {
-  globalThis.fetch = async () => { throw new Error('no calls expected'); };
-  const db = { prepare: () => { throw new Error('D1 touched with snapshots disabled'); } };
-  await runCron({ DB: db, DATA: fakeR2({}), SNAPSHOT_REPO: '' });
-  ok('disabled: cron is a no-op', true);
+  globalThis.fetch = async () => { throw new Error('no GitHub calls expected'); };
+  const t = { id: 1, slug: 'local-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null };
+  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1, round: 1 }] };
+  const objects = { 't/1/pub/1.json': pubGame(1, 1) };
+  await runCron({ DB: fakeDb(state), DATA: fakeR2(objects), SNAPSHOT_REPO: '' });
+  ok('disabled: shard still materialized', shardOf(objects, 1, 1).entries[0].id === 1);
+  ok('disabled: manifest written, dirty cleared',
+    JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === '1:1' && t.pub_dirty === 0);
+  ok('disabled: nothing published', t.pub_snapshot === null);
 }
 
 // 7. Unpublish: the cron retracts the slug's folder — deletion entries
@@ -257,17 +304,16 @@ const realFetch = globalThis.fetch;
   const t = {
     id: 1, slug: 'gone-open', published: 0, pub_dirty: 1, roster_r2_key: null,
     pub_snapshot: JSON.stringify({
-      sha: 'head-0', version: '7:2', schedule: 2000, cats: null, roster: false,
-      bundle: true,
+      sha: 'head-0', rounds: { 1: '3:1', 2: '7:1' }, schedule: 2000, cats: null, roster: false,
     }),
   };
   const state = { tournaments: [t], files: [] };
   await runCron(env(state, {}, gh));
   const paths = gh.trees[0].tree.map((e) => e.path).sort();
-  ok('retract: deletes bundle + schedule, nothing else',
+  ok('retract: deletes every published shard + the schedule, nothing else',
     JSON.stringify(paths) === JSON.stringify(
-      ['gone-open/bundle.json', 'gone-open/schedule.json'])
-    && gh.trees[0].tree.every((e) => e.sha === null));
+      ['gone-open/r1.json', 'gone-open/r2.json', 'gone-open/schedule.json'])
+    && gh.trees[0].tree.every((e) => e.sha === null), paths);
   ok('retract: descriptor cleared, dirty cleared',
     t.pub_snapshot === null && t.pub_dirty === 0);
   ok('retract: commit says why', gh.commits[0].message === 'unpublish gone-open');
@@ -281,8 +327,8 @@ const realFetch = globalThis.fetch;
   globalThis.fetch = gh.fetch;
   gh.failRefUpdateFrom = 0; // every ref update fails, retry included
   const t = { id: 1, slug: 'half-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null, created: Date.now() };
-  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1 }] };
-  const objects = { 't/1/combined.json': r2obj('{"entries":[]}', 1000) };
+  const state = { tournaments: [t], files: [{ id: 1, tournament_id: 1, round: 1 }] };
+  const objects = { 't/1/pub/1.json': pubGame(1, 1) };
   await runCron(env(state, objects, gh));
   ok('ref update fails twice: no descriptor, dirty restored',
     t.pub_snapshot === null && t.pub_dirty === 1);
@@ -301,15 +347,17 @@ const realFetch = globalThis.fetch;
     id: 1, slug: 'stanford-open', name: 'Stanford Open', published: 1, pub_dirty: 1,
     roster_r2_key: null, current_round: 4, created: now,
     pub_snapshot: JSON.stringify({
-      sha: 'head-0', version: '3:1', schedule: null, cats: null, roster: false,
-      bundle: true,
+      sha: 'head-0', rounds: { 1: '3:1' }, schedule: null, cats: null, roster: false,
     }),
     announce: JSON.stringify([
       { id: 'b1', text: 'finals in room A', level: 'alert', created: now, expires: now + 3600_000, pub: true },
     ]),
   };
-  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1 }] };
-  const objects = { 't/1/combined.json': r2obj('{"entries":[{"id":3}]}', 1000) };
+  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }] };
+  const objects = {
+    't/1/pub/3.json': pubGame(3, 1),
+    't/1/rounds.json': r2obj('{"rounds":{"1":"3:1"}}', 1000),
+  };
   await runCron(env(state, objects, gh));
   ok('live-only republish: nothing committed, descriptor keeps the old sha',
     gh.commits.length === 0 && gh.trees.length === 0
@@ -318,9 +366,10 @@ const realFetch = globalThis.fetch;
   ok('live-only republish: dirty cleared', t.pub_dirty === 0);
 }
 
-// 10. One blob moved (a game landed), the rest unchanged: only the
-// bundle is re-uploaded; schedule rides forward via base_tree and the
-// new descriptor still records it.
+// 10. A game landed in a new round: only that round's shard is
+// uploaded. The rounds already played, and the schedule, ride forward
+// via base_tree and the new descriptor still records them — this is the
+// per-round layout's whole point on the publish side.
 {
   const gh = fakeGithub();
   gh.branchSha = 'head-0';
@@ -329,21 +378,28 @@ const realFetch = globalThis.fetch;
     id: 1, slug: 'stanford-open', published: 1, pub_dirty: 1, roster_r2_key: null,
     created: Date.now(),
     pub_snapshot: JSON.stringify({
-      sha: 'head-0', version: '3:1', schedule: 2000, cats: null, roster: false,
-      bundle: true, branch: 'main', state: true,
+      sha: 'head-0', rounds: { 1: '3:1' }, schedule: 2000, cats: null, roster: false,
+      branch: 'main', state: true,
     }),
   };
-  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1 }, { id: 9, tournament_id: 1 }] };
+  const state = {
+    tournaments: [t],
+    files: [{ id: 3, tournament_id: 1, round: 1 }, { id: 9, tournament_id: 1, round: 2 }],
+  };
   const objects = {
-    't/1/combined.json': r2obj('{"entries":[{"id":3},{"id":9}]}', 3000),
+    't/1/pub/3.json': pubGame(3, 1),
+    't/1/pub/9.json': pubGame(9, 2),
+    't/1/rounds.json': r2obj('{"rounds":{"1":"3:1"}}', 1000),
     't/1/schedule.json': r2obj('{"v":1,"rooms":[],"phases":[]}', 2000),
   };
   await runCron(env(state, objects, gh));
-  ok('partial republish: blob commit carries only the bundle',
-    gh.trees[0].tree.map((e) => e.path).join() === 'stanford-open/bundle.json');
+  ok('partial republish: blob commit carries only the new round',
+    gh.trees[0].tree.map((e) => e.path).join() === 'stanford-open/r2.json',
+    gh.trees[0].tree.map((e) => e.path));
   const snap = JSON.parse(t.pub_snapshot);
-  ok('partial republish: descriptor advances and still records the schedule',
-    snap.sha === 'commit-1' && snap.version === '9:2' && snap.schedule === 2000);
+  ok('partial republish: descriptor advances, keeps round 1 and the schedule',
+    snap.sha === 'commit-1' && snap.rounds['1'] === '3:1' && snap.rounds['2'] === '9:1'
+    && snap.schedule === 2000, snap);
 }
 
 // 11. Roster re-upload moves its stamp: the roster is re-published even
@@ -356,13 +412,14 @@ const realFetch = globalThis.fetch;
     id: 1, slug: 'stanford-open', published: 1, pub_dirty: 1, roster_r2_key: 't/1/roster.qbj',
     created: Date.now(),
     pub_snapshot: JSON.stringify({
-      sha: 'head-0', version: '3:1', schedule: null, cats: null, roster: true, roster_at: 500,
-      bundle: true, branch: 'main', state: true,
+      sha: 'head-0', rounds: { 1: '3:1' }, schedule: null, cats: null, roster: true, roster_at: 500,
+      branch: 'main', state: true,
     }),
   };
-  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1 }] };
+  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }] };
   const objects = {
-    't/1/combined.json': r2obj('{"entries":[{"id":3}]}', 1000),
+    't/1/pub/3.json': pubGame(3, 1),
+    't/1/rounds.json': r2obj('{"rounds":{"1":"3:1"}}', 1000),
     't/1/roster.qbj': r2obj('{"objects":[]}', 4000), // re-uploaded since
   };
   await runCron(env(state, objects, gh));
@@ -386,18 +443,19 @@ const realFetch = globalThis.fetch;
   });
   const state = {
     tournaments: [mk(1), mk(2), mk(3)],
-    files: [{ id: 1, tournament_id: 1 }, { id: 2, tournament_id: 2 }, { id: 3, tournament_id: 3 }],
+    files: [{ id: 1, tournament_id: 1, round: 1 }, { id: 2, tournament_id: 2, round: 1 },
+      { id: 3, tournament_id: 3, round: 1 }],
   };
   const objects = {
-    't/1/combined.json': r2obj('{"entries":[{"id":1}]}', 1000),
-    't/2/combined.json': r2obj('{"entries":[{"id":2}]}', 1000),
-    't/3/combined.json': r2obj('{"entries":[{"id":3}]}', 1000),
+    't/1/pub/1.json': pubGame(1, 1),
+    't/2/pub/2.json': pubGame(2, 1),
+    't/3/pub/3.json': pubGame(3, 1),
   };
   await runCron(env(state, objects, gh));
   ok('batch: one commit for three tournaments', gh.commits.length === 1);
-  ok('batch: blob commit carries all three bundles',
+  ok('batch: blob commit carries all three shards',
     JSON.stringify(gh.trees[0].tree.map((e) => e.path).sort())
-    === JSON.stringify(['t1/bundle.json', 't2/bundle.json', 't3/bundle.json']));
+    === JSON.stringify(['t1/r1.json', 't2/r1.json', 't3/r1.json']));
   ok('batch: one tree, nothing state-shaped in it',
     gh.trees.length === 1 && !JSON.stringify(gh.trees).includes('state.json'));
   ok('batch: every descriptor advertises the shared blob commit',
@@ -417,20 +475,74 @@ const realFetch = globalThis.fetch;
     tournaments: [
       { id: 1, slug: 'alive', name: 'Alive', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null, current_round: 1, created: now },
       { id: 2, slug: 'dead', published: 0, pub_dirty: 1, roster_r2_key: null, created: now,
-        pub_snapshot: JSON.stringify({ sha: 'head-0', version: '1:1', schedule: null, cats: null, roster: false, bundle: true }) },
+        pub_snapshot: JSON.stringify({ sha: 'head-0', rounds: { 1: '1:1' }, schedule: null, cats: null, roster: false }) },
     ],
-    files: [{ id: 1, tournament_id: 1 }],
+    files: [{ id: 1, tournament_id: 1, round: 1 }],
   };
-  const objects = { 't/1/combined.json': r2obj('{"entries":[{"id":1}]}', 1000) };
+  const objects = { 't/1/pub/1.json': pubGame(1, 1) };
   await runCron(env(state, objects, gh));
   ok('mixed tick: one batch adds alive and deletes dead',
     gh.commits.length === 1
     && JSON.stringify(gh.trees[0].tree.map((e) => e.path).sort())
-    === JSON.stringify(['alive/bundle.json', 'dead/bundle.json'])
+    === JSON.stringify(['alive/r1.json', 'dead/r1.json'])
     && gh.commits[0].message === 'publish alive; unpublish dead');
   ok('mixed tick: descriptors settle right',
     JSON.parse(state.tournaments[0].pub_snapshot).sha === 'commit-1'
     && state.tournaments[1].pub_snapshot === null);
+}
+
+// 14. A tournament that was mid-day when this layout shipped: its games
+// exist only inside the pre-shard whole-tournament bundle, with no
+// per-game blobs. The first tick seeds the blobs from it and builds the
+// shards, so nothing a moderator already uploaded goes missing.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = { id: 1, slug: 'mid-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null, created: Date.now() };
+  const state = {
+    tournaments: [t],
+    files: [{ id: 3, tournament_id: 1, round: 1 }, { id: 7, tournament_id: 1, round: 2 }],
+  };
+  const objects = {
+    't/1/combined.json': r2obj(JSON.stringify({ entries: [
+      { id: 3, round: 1, room: 'Room 1', filename: 'r1.qbj', qbj: { tossups_read: 20 } },
+      { id: 7, round: 2, room: 'Room 2', filename: 'r2.qbj', qbj: { tossups_read: 20 } },
+    ] }), 1000),
+  };
+  await runCron(env(state, objects, gh));
+  ok('migration: shards built from the old bundle',
+    shardOf(objects, 1, 1).entries[0].id === 3 && shardOf(objects, 1, 2).entries[0].room === 'Room 2');
+  ok('migration: per-game blobs seeded, so the old bundle is read once and never again',
+    JSON.parse(objects['t/1/pub/3.json'].textFor()).id === 3
+    && JSON.parse(objects['t/1/pub/7.json'].textFor()).id === 7);
+  ok('migration: stamps come out as if the games had always been sharded',
+    JSON.stringify(JSON.parse(t.pub_snapshot).rounds) === JSON.stringify({ 1: '3:1', 2: '7:1' }));
+}
+
+// 15. A game whose public blob is missing with nothing to seed it from:
+// the shard is stamped with what it actually holds, not with what D1
+// says, so the next tick tries again instead of baking the gap in.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = { id: 1, slug: 'gap-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null, created: Date.now() };
+  const state = {
+    tournaments: [t],
+    files: [{ id: 3, tournament_id: 1, round: 1 }, { id: 4, tournament_id: 1, round: 1 }],
+  };
+  const objects = { 't/1/pub/3.json': pubGame(3, 1) };
+  await runCron(env(state, objects, gh));
+  const manifest = JSON.parse(objects['t/1/rounds.json'].textFor());
+  ok('gap: shard holds the game it could read', shardOf(objects, 1, 1).entries.length === 1);
+  ok('gap: stamp reflects the shard, not the file rows', manifest.rounds['1'] === '3:1');
+
+  // the blob turns up (or the TO rebuilds); the next tick heals the round
+  objects['t/1/pub/4.json'] = pubGame(4, 1);
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('gap: the next tick picks the missing game up',
+    shardOf(objects, 1, 1).entries.length === 2
+    && JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === '4:2');
 }
 
 globalThis.fetch = realFetch;

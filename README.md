@@ -209,18 +209,18 @@ Part of [qbsuite](https://qbsuite.github.io/).
   `migrate-crypt.sql`.)
 - **Match `notes` never reach a public copy.** MODAQ writes protest
   reasons — moderator free text that routinely quotes answers — into the
-  match qbj's `notes` field verbatim. The Worker strips `notes` from
-  every bundle entry (and the public per-game qbj downloads are served
-  from the bundle), so the live public page, the GitHub snapshot repo,
-  and archive captures never carry it; the TO's admin downloads keep it
+  match qbj's `notes` field verbatim. The Worker strips `notes` when it
+  writes a game's public copy — the only copy the round shards, the
+  per-game qbj downloads, the GitHub snapshot repo and archive captures
+  are ever built from — so none of them carry it; the TO's admin downloads keep it
   for the `.yft`. Rooms likewise receive only the reader game format
   from `settings` — never the buzzpoints config, whose stored hash would
   otherwise invite an offline attack on the TO's password.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
   that leaks into a crawler or an outbound click doesn't spread.
-- **Request economics** (Cloudflare free tier): the public page
-  reads one materialized `combined.json` bundle (maintained on
-  upload/delete, TO-rebuildable) instead of fetching every game file, and
+- **Request economics** (Cloudflare free tier): the public page reads
+  one materialized blob per round (`t/<tid>/round/<n>.json`, rebuilt by
+  the cron, TO-rebuildable) instead of fetching every game file, and
   **nothing anywhere polls on a timer.** Every page fetches on load, on
   an explicit refresh, and (for the two moderator pages) when the tab
   regains focus — so cost is per *view*, never per open-tab-minute, and an
@@ -233,9 +233,15 @@ Part of [qbsuite](https://qbsuite.github.io/).
   refresh. The public page has no focus refresh on purpose — viewers are
   readers, and are expected to refresh; a moderator must not miss the TD
   advancing the round.
-  Stats data changes
-  only when a file lands; clients compare the `version` stamp in
-  `/pub/:slug` and refetch only on change. The schedule is one R2 blob
+  Stats data changes only when a file lands; `/pub/:slug` carries a
+  stamp per round and clients refetch only the rounds that moved — a
+  round that has finished never moves again, so a viewer arriving late
+  in a long day pays for the round in progress, not for the tournament.
+  Request *count* stays flat as rounds multiply: whatever the snapshot
+  can't answer is fetched from the Worker in a single
+  `/pub/:slug/rounds?n=…` (the shards streamed back to back), so a first
+  load is two requests and a refresh is two, whether the tournament has
+  three rounds or seventeen. The schedule is one R2 blob
   (`t/<tid>/schedule.json`) with its own stamp in `/pub/:slug` (R2
   head), refetched only when it moves and served with `max-age=60`;
   the reader fetches it once per load. The reader page costs a state +
@@ -312,14 +318,22 @@ Part of [qbsuite](https://qbsuite.github.io/).
 
 ```bash
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
-node tests/snapshot_publish.js   # GitHub snapshot publisher (D1/R2/GitHub mocked)
+node tests/snapshot_publish.js   # cron tick: round shards + GitHub publisher (D1/R2/GitHub mocked)
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
 # an existing local DB from before at-rest encryption needs, once:
 #   npx wrangler d1 execute qb-td --local --file migrate-crypt.sql
-npx wrangler dev --local --port 8799 &
+# --test-scheduled is required: the cron builds the round shards the
+# public routes serve, and the tests trigger it via /__scheduled
+npx wrangler dev --local --port 8799 --test-scheduled &
 cd .. && node tests/e2e_worker.js
+
+# optional, and slow: a full-size tournament end to end (72 teams, 36
+# rooms, 17 rounds by default; TEAMS/ROOMS/ROUNDS/CONC override) against
+# the same dev Worker, reporting upload latency, tick cost, and what a
+# viewer downloads per refresh
+node tests/stress_worker.js
 ```
 
 `wrangler` is a pinned devDependency, so `npm install` puts the tested
@@ -337,10 +351,21 @@ end, which is also how it exercises the `final` caching path.
    `npx wrangler d1 execute qb-td --remote --file migrate-announce.sql`,
    and one from before at-rest encryption needs
    `npx wrangler d1 execute qb-td --remote --file migrate-crypt.sql`,
+   and one from before the cron's derived-data queue needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-pub.sql`,
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy
-   plaintext paths and age out within 48 h)
+   plaintext paths and age out within 48 h. `migrate-pub.sql` is
+   required whether or not you enable snapshots: its `pub_dirty` column
+   is the queue the cron rebuilds round shards from)
+   (upgrading a database that predates the round shards: queue every
+   published tournament for one rebuild with
+   `npx wrangler d1 execute qb-td --remote --command "UPDATE tournaments
+   SET pub_dirty = 1 WHERE published = 1"`, then let the cron drain it.
+   Skipping this is not fatal — `pubState` flags a tournament that has
+   games but no shards the first time anyone views it — but the bulk
+   flag converges everything in a few ticks instead of on demand)
 5. `npx wrangler deploy`
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
@@ -349,10 +374,9 @@ end, which is also how it exercises the `final` caching path.
 ## Public snapshots on GitHub (optional)
 
 Makes public stat viewing free at any audience size. Without it, every
-viewer's blob fetches (the stats bundle, schedule, category map, roster)
-hit the Worker — and the bundle grows with the tournament, so a popular
-event spends the same 100k-requests/day budget the moderator rooms and TO
-dashboard run on.
+viewer's blob fetches (the round shards, schedule, category map, roster)
+hit the Worker, so a popular event spends the same 100k-requests/day
+budget the moderator rooms and TO dashboard run on.
 With it, the Worker publishes those blobs to a GitHub data repo in one
 atomic commit per change (at most one per minute per tournament), and
 `/pub/:slug` advertises the commit SHA. The page then fetches
@@ -391,10 +415,11 @@ Setup:
    `npx wrangler secret put GITHUB_APP_KEY` with the private key
    converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt -in app.pem`) or a
    fine-grained PAT (`npx wrangler secret put GITHUB_TOKEN`).
-3. `npx wrangler d1 execute qb-td --remote --file migrate-pub.sql` (once).
-4. Set `SNAPSHOT_REPO = "owner/repo"` in `wrangler.toml`, `npx wrangler
-   deploy`. The cron trigger deploys with it; setting `SNAPSHOT_REPO`
-   back to `""` turns the whole feature off again.
+3. Set `SNAPSHOT_REPO = "owner/repo"` in `wrangler.toml`, `npx wrangler
+   deploy`. Setting `SNAPSHOT_REPO` back to `""` turns the GitHub half
+   off again; the cron keeps running either way, because it also
+   materializes the round shards the public page reads.
+   (`migrate-pub.sql` is part of the base deploy, not this section.)
 
 Freshness: a refresh shows everything the cron has committed, so a
 viewer is at most one tick (~a minute) behind the moderators. Nothing
@@ -427,39 +452,44 @@ That part scales. What breaks first:
    view. Against D1's 5M-rows/day free tier that caps public views at
    ~34k/day (~1,100 per tournament), well before the request budget runs
    out. Note this is a *read*-side cost: writes are already incremental
-   (`combined.json` is materialized on upload, and the publisher only
-   commits blobs whose stamps moved), so "we only append on change" is
-   true and does not help here.
+   (a game's public copy is one blob written by its upload, the cron
+   rebuilds only the round that moved, and the publisher only commits
+   blobs whose stamps moved), so "we only append on change" is true and
+   does not help here.
 
    The fix that fits the existing design is to **materialize the
-   `/pub/:slug` body into a small R2 blob** on `markPub` — the same
-   pattern `combined.json` already uses — making the route O(1) instead
-   of O(games). `markPub` already fires on every mutation that can change
+   `/pub/:slug` body into a small R2 blob** in the cron tick — the same
+   pattern the round shards already use — making the route O(1) instead
+   of O(games). Its stamps would then come from the same rebuild that
+   writes the shards, so there is nothing new to invalidate. `markPub` already fires on every mutation that can change
    the state, so no new invalidation plumbing is needed and no staleness
    is introduced. (A short Worker Cache API TTL is less work but
    reintroduces exactly the staleness the no-poll design removed.)
    Measure before committing to it: it trades D1 rows for an R2 read.
 
-2. **The cron cannot keep up, and starves the losers.**
-   `worker.js:683` takes `ORDER BY created DESC LIMIT 4`. With ~30
-   tournaments finishing rounds around the same time the dirty queue is
-   30 deep and drains at 4/minute, so the last tournament waits ~7-8
-   minutes — and because the ordering is newest-first, it is
-   systematically the *oldest* tournaments that wait, every round. This
-   matters more than it looks: `pubview.js` follows the **snapshot's**
-   stamps, so those viewers see stats that stale with no signal, even
-   though the `/pub/:slug` they just fetched knows about newer games.
+2. **The cron cannot keep up, and starves the losers.** The tick takes
+   `ORDER BY created DESC LIMIT 4`. With ~30 tournaments finishing rounds
+   around the same time the dirty queue is 30 deep and drains at 4/minute,
+   so the last tournament waits ~7-8 minutes — and because the ordering is
+   newest-first, it is systematically the *oldest* tournaments that wait,
+   every round. This binds harder than it used to: the tick is what
+   materializes the round shards, so a tournament at the back of the
+   queue has games that are uploaded, safe, and simply not public yet.
+   The public page says so (`pendingNote` in `pubview.js` counts games
+   the state knows about that the shards don't hold), which turns the
+   symptom from silence into a number, but the fix is the queue:
+   **order by how long a tournament has been dirty, not by age**, and
+   raise the limit — materializing is R2-bounded and cheap, so the two
+   halves of the tick want different limits.
 
-   Raising the limit is bounded by **memory, not GitHub** (GitHub is ~5+N
-   calls/tick against a 5,000/hour App limit). `buildPublish` holds every
-   blob of the batch in memory at once and base64 for the blob API
-   inflates ~1.33x. Real data is ~13KB/game (measured from
-   `app/archive/ug-nats-stanford.js`), so a finished 16-team RR bundle is
-   ~1.6MB and a batch of 16 is ~60MB against the 128MB Workers ceiling —
-   worst at the end of the day, exactly when every tournament is busiest.
-   So: **cap the batch by total bytes rather than count** (there is
-   already a per-blob cap, `PUB_MAX_SNAPSHOT`, `worker.js:440`) and make
-   the ordering fair so nothing can starve.
+   Raising the *publish* limit is bounded by **memory, not GitHub**
+   (GitHub is ~5+N calls/tick against a 5,000/hour App limit).
+   `buildPublish` holds the batch's blobs in memory at once and base64
+   for the blob API inflates ~1.33x. Per-round shards made this much
+   smaller — a round of a 16-team RR is ~100KB where the whole
+   tournament's bundle was ~1.6MB — but the shape of the risk is the
+   same, so: **cap the batch by total bytes rather than count** (there is
+   already a per-blob cap, `PUB_MAX_SNAPSHOT`).
 
 3. **No fetch has a timeout anywhere** (`AbortSignal` appears zero times
    in the tree). GitHub being *down* is handled — every snapshot fetch
@@ -494,8 +524,9 @@ npx wrangler d1 execute qb-td --remote --command \
 
 # delete rows (all four tables key off the tournament), then each blob —
 # everything lives under the t/<id>/ prefix: the uploads from the query
-# above, packet keys from the rounds table, and the derived
-# combined.json / schedule.json / catmap.json / roster.qbj /
+# above, packet keys from the rounds table, the public game copies
+# (pub/<file id>.json) and their round shards (round/<n>.json,
+# rounds.json), and schedule.json / catmap.json / roster.qbj /
 # tiebreakers.json where present
 npx wrangler d1 execute qb-td --remote --command \
   "DELETE FROM files WHERE tournament_id=<id>; DELETE FROM buckets WHERE tournament_id=<id>; DELETE FROM rounds WHERE tournament_id=<id>; DELETE FROM tournaments WHERE id=<id>"
@@ -507,8 +538,8 @@ harmless to skip (nothing points at it once `/pub/:slug` is gone), but
 tidy. Know what that does and doesn't remove: **git history is
 forever** on a public repo — deleting a folder from the branch head
 leaves every old commit fetchable by SHA. The snapshot repo only ever
-receives text-free public data (bundle, schedule, category map, roster,
-state), so normally this is fine — but a roster carries player names,
+receives text-free public data (round shards, schedule, category map,
+roster), so normally this is fine — but a roster carries player names,
 and a true scrub of anything that should never have been published
 means rewriting history (`git filter-repo` + force push), not just
 `git rm`.

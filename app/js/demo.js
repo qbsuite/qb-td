@@ -313,7 +313,11 @@ export async function demoPub(path, opts = {}) {
       return adminUpdate(body);
     }
     if (rest === '/file') return adminFile(query.get('key'));
-    if (rest === '/bundle' && method === 'POST') return { ok: true }; // always materialized here
+    if (rest === '/bundle' && method === 'POST') {           // always materialized here
+      let body = null;
+      try { body = JSON.parse(opts.body); } catch (e) { /* count nothing */ }
+      return { entries: (body && body.entries || []).length };
+    }
     const del = /^\/files\/(\d+)$/.exec(rest);
     if (del && method === 'DELETE') return adminDeleteFile(Number(del[1]));
     err('not in the demo'); // rooms/packets/roster/schedule edits, rotate

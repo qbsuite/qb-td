@@ -27,7 +27,13 @@ CREATE TABLE IF NOT EXISTS tournaments (
   announce TEXT NOT NULL DEFAULT '[]',
   roster_r2_key TEXT,                -- single roster qbj per tournament
   roster_name TEXT,
-  created INTEGER NOT NULL
+  created INTEGER NOT NULL,
+  -- Derived-data queue (worker.js tickDirty): set by markPub() on every
+  -- mutation that changes what the public page reads, cleared when the
+  -- cron has rebuilt the round shards (and published them, if snapshots
+  -- are configured). Existing databases get these from migrate-pub.sql.
+  pub_dirty INTEGER NOT NULL DEFAULT 0,
+  pub_snapshot TEXT                  -- descriptor of the last published commit
 );
 CREATE INDEX IF NOT EXISTS idx_tournaments_created ON tournaments(created);
 
