@@ -70,6 +70,7 @@ function r2obj(text, uploadedMs) {
 function fakeR2(objects) {
   return {
     get: async (key) => objects[key] || null,
+    head: async (key) => (objects[key] ? { key } : null),
     put: async (key, body) => { objects[key] = r2obj(String(body), Date.now()); },
     delete: async (key) => { delete objects[key]; },
   };
@@ -543,6 +544,36 @@ const realFetch = globalThis.fetch;
   ok('gap: the next tick picks the missing game up',
     shardOf(objects, 1, 1).entries.length === 2
     && JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === '4:2');
+}
+
+// 16. The TO's rebuild re-posts games under their existing ids, so no
+// stamp moves; its marker is what makes the tick rebuild every round —
+// and it is consumed, so the tick after that leaves the shards alone.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = { id: 1, slug: 'rebuild-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null, created: Date.now() };
+  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }] };
+  const objects = { 't/1/pub/3.json': pubGame(3, 1) };
+  await runCron(env(state, objects, gh));
+  ok('rebuild: baseline shard', shardOf(objects, 1, 1).entries[0].room === 'Room 1');
+
+  // content changes under the same id, no marker: the round's stamp
+  // matches, so the tick skips it
+  objects['t/1/pub/3.json'] = r2obj(JSON.stringify(
+    { id: 3, round: 1, room: 'Rebuilt', filename: 'r1.qbj', qbj: { tossups_read: 20 } }), 2000);
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('rebuild: an unchanged stamp is not rebuilt', shardOf(objects, 1, 1).entries[0].room === 'Room 1');
+
+  // with the marker (what putBundle writes) every round is rebuilt and
+  // the marker is gone afterwards; the manifest never went away
+  objects['t/1/rebuild.json'] = r2obj('{}', 3000);
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('rebuild: the marker forces the round', shardOf(objects, 1, 1).entries[0].room === 'Rebuilt');
+  ok('rebuild: marker consumed', objects['t/1/rebuild.json'] === undefined);
+  ok('rebuild: stamp unchanged', JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === '3:1');
 }
 
 globalThis.fetch = realFetch;

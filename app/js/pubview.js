@@ -69,9 +69,15 @@ const asJson = async (res) => (res instanceof Response ? JSON.parse(await res.te
 
 let snap = null; // state.pub when usable on this page; set by load()
 
+// A snapshot fetch that hangs must fall back to the Worker like one that
+// fails: the fallback only fires on an error, and a degraded GitHub is
+// more common than a down one.
+const SNAP_TIMEOUT_MS = 8000;
+
 async function fetchSnap(name) {
   const res = await fetch(
-    'https://raw.githubusercontent.com/' + snap.repo + '/' + snap.sha + '/' + slug + '/' + name);
+    'https://raw.githubusercontent.com/' + snap.repo + '/' + snap.sha + '/' + slug + '/' + name,
+    { signal: AbortSignal.timeout(SNAP_TIMEOUT_MS) });
   if (!res.ok) throw new Error('snapshot HTTP ' + res.status);
   return res.json();
 }
@@ -125,11 +131,17 @@ async function fetchRounds(errors) {
   }));
 
   // Whatever is left goes in ONE request, so a first load of a long
-  // tournament costs two requests rather than one per round.
+  // tournament costs two requests rather than one per round. Each round
+  // rides with the stamp we're after (n=5@<stamp>): the Worker ignores
+  // it, but it keeps the URL — and so the browser's cache key — from
+  // ever matching a copy fetched before the round moved. The state
+  // itself is fetched cache-busted; this is the same guarantee for the
+  // shards it points at.
   if (fromWorker.length) {
     let got = null;
+    const q = fromWorker.sort((a, b) => a - b).map((n) => n + '@' + wanted[n]).join(',');
     try {
-      got = await asJson(await pub('/pub/' + slug + '/rounds?n=' + fromWorker.sort().join(',')));
+      got = await asJson(await pub('/pub/' + slug + '/rounds?n=' + q));
     } catch (e) {
       errors.push('games: ' + e.message);
       roundsComplete = false;
@@ -142,6 +154,10 @@ async function fetchRounds(errors) {
       // rather than emptying the table or pinning a stamp we never got.
       if (shard) hold(n, shard);
       else if (got) roundsComplete = false;
+      // Held, but not at the stamp the state advertised (older: a shard
+      // still being rebuilt; newer: fine, but the state should confirm
+      // it): don't pin this pass as done, so the next refresh checks.
+      if (shard && (roundCache.get(n) || {}).v !== wanted[n]) roundsComplete = false;
     }
   }
 

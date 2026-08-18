@@ -241,7 +241,12 @@ Part of [qbsuite](https://qbsuite.github.io/).
   can't answer is fetched from the Worker in a single
   `/pub/:slug/rounds?n=…` (the shards streamed back to back), so a first
   load is two requests and a refresh is two, whether the tournament has
-  three rounds or seventeen. The schedule is one R2 blob
+  three rounds or seventeen. Each round in that request carries the
+  stamp the page expects (`n=5@<stamp>`, ignored by the Worker) so the
+  URL — and with it the browser's cache key — changes whenever the
+  round does; the response is `max-age=60` like every public blob, and
+  without the stamp a second refresh inside that minute would be served
+  the pre-move shard. The schedule is one R2 blob
   (`t/<tid>/schedule.json`) with its own stamp in `/pub/:slug` (R2
   head), refetched only when it moves and served with `max-age=60`;
   the reader fetches it once per load. The reader page costs a state +
@@ -491,14 +496,14 @@ That part scales. What breaks first:
    same, so: **cap the batch by total bytes rather than count** (there is
    already a per-blob cap, `PUB_MAX_SNAPSHOT`).
 
-3. **No fetch has a timeout anywhere** (`AbortSignal` appears zero times
-   in the tree). GitHub being *down* is handled — every snapshot fetch
-   falls back to the Worker (`pubview.js` `fetchStamped`/`fetchSnap`).
-   GitHub being *slow* is not: a hanging `raw.githubusercontent` request
-   stalls the blob fetch instead of falling back, because the fallback
-   only fires on error or non-OK status. Degraded availability is more
-   common than clean failure, so this is the cheapest real robustness win
-   here.
+3. ~~**No fetch has a timeout anywhere.**~~ Fixed: the page's snapshot
+   fetches (`pubview.js` `fetchSnap`, 8s) and the cron's GitHub API
+   calls (`worker.js` `github()`, 15s) carry `AbortSignal.timeout`, so a
+   *slow* GitHub now takes the same fallback path a *down* one always
+   did — the viewer falls to the Worker route, the tick fails and
+   re-flags the tournament for the next minute. The tick's total time is
+   what matters: a tick that outlives its minute overlaps the next one,
+   which is the only way the shards could ever have two writers.
 
 4. **Small waste in the hot path.** `pubStateBody` does full
    `env.DATA.get()` on the schedule and catmap (`worker.js:1843`,

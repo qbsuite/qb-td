@@ -152,6 +152,7 @@ ok('bucket sees packet', r.body.packet && r.body.packet.packet_name === 'Packet1
 r = await call(`/b/${secret}/upload?round=1&name=Round_1_Alpha_Beta.qbj`,
   { method: 'POST', body: MATCH });
 ok('mod uploads qbj', r.status === 200 && r.body.kind === 'qbj' && r.body.error === null, r.body);
+const firstQbjId = r.body.id;
 
 r = await call(`/b/${secret}/upload?round=1&name=Round_1_Alpha_Beta_Game.json`,
   { method: 'POST', body: '{"cycles":[]}' });
@@ -694,6 +695,11 @@ ok('shard strips protest notes', !JSON.stringify(r.body).includes('PROTESTLEAKAN
 r = await call('/pub/' + slug + '/rounds?n=1,7');
 ok('unplayed round is omitted, not an error',
   r.status === 200 && r.body.rounds.length === 1 && r.body.rounds[0].round === 1, r.body);
+// The page keys each round with the stamp it expects, so the browser
+// cache can't serve a pre-move copy; the Worker ignores the stamp.
+r = await call('/pub/' + slug + '/rounds?n=1@' + v1 + ',7@0:0');
+ok('stamp-keyed rounds request served the same',
+  r.status === 200 && r.body.rounds.length === 1 && r.body.rounds[0].round === 1, r.body);
 r = await call('/pub/' + slug + '/rounds');
 ok('rounds request needs an n', r.status === 400, r.body);
 r = await call('/pub/' + slug + '/rounds?n=' + Array.from({ length: 101 }, (_, i) => i + 1).join(','));
@@ -732,20 +738,55 @@ r = await call(`${A}/bundle`, {
 ok('oversized rebuild batch rejected', r.status === 400 && /200/.test(r.body.error), r.body);
 r = await call('/pub/' + slug + '/qbj/999');
 ok('rebuilt game served', r.status === 200 && r.body.tossups_read === 20, r.body);
-// A rebuild clears the manifest, which is also the state a tournament
-// published before the shards existed is in: games, no shards. The
-// state must flag itself for the next tick rather than sit there empty
-// — a finished tournament can't be mutated back into the queue — and
-// must not advertise the long cache while it's in that state.
+// A rebuild must not blank the public page while it waits for the tick:
+// the state keeps advertising the shards it has (id 999 has no file
+// row, so the stamps don't move either), and only the marker tells the
+// tick to rebuild every round regardless.
+r = await call('/pub/' + slug);
+ok('rebuild leaves the current shards advertised',
+  r.body.rounds['1'] === v1.split(':')[0] + ':1', r.body.rounds);
+r = await call('/pub/' + slug + '/rounds?n=1');
+ok('rebuild leaves the current shard served', r.status === 200
+  && r.body.rounds.length === 1 && r.body.rounds[0].entries.length === 1, r.body);
+// Plant a stale copy of an existing game with the same id: its stamp is
+// unchanged, so only a forced rebuild would pick the new content up.
+r = await call(`${A}/bundle`, {
+  method: 'POST',
+  body: JSON.stringify({ entries: [{ id: firstQbjId, round: 1, room: 'Rebuilt Room', filename: 'x.qbj', qbj: JSON.parse(MATCH) }] }),
+});
+ok('rebuild of an existing game accepted', r.status === 200 && r.body.entries === 1, r.body);
+await tick();
+r = await call('/pub/' + slug + '/rounds?n=1');
+ok('forced rebuild refreshes an unchanged-stamp round',
+  r.status === 200 && r.body.rounds[0].entries[0].room === 'Rebuilt Room', r.body);
+r = await call('/pub/' + slug);
+ok('rebuild leaves the stamps where they were', r.body.rounds['1'] === v1.split(':')[0] + ':1', r.body.rounds);
+// the dashboard rebuilds from admin downloads, which keep notes — the
+// Worker must strip them again on the way back in
+ok('rebuild strips notes too', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
+// The marker is consumed: the next tick, if nothing changed, does not
+// rewrite the shard (its stamp stays, and the round survives untouched).
+r = await call(`${A}/bundle`, {
+  method: 'POST',
+  body: JSON.stringify({ entries: [{ id: firstQbjId, round: 1, room: 'Room 1', filename: 'x.qbj', qbj: JSON.parse(MATCH) }] }),
+});
+await tick();
+r = await call('/pub/' + slug + '/rounds?n=1');
+ok('second rebuild restores the room', r.body.rounds[0].entries[0].room === 'Room 1', r.body);
+
+// A tournament published before the shards existed is in the state
+// "games, no manifest". The state must flag itself for the next tick
+// rather than sit there empty — a finished tournament can't be mutated
+// back into the queue — and must not advertise the long cache while it
+// is in that state.
+execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/rounds.json --local`,
+  { cwd: WORKER_DIR, stdio: 'ignore' });
 r = await call('/pub/' + slug);
 ok('unmaterialized state reports no rounds', Object.keys(r.body.rounds).length === 0, r.body.rounds);
 ok('unmaterialized state caches briefly', maxAge(r.cache) <= 60, r.cache);
 await tick();
 r = await call('/pub/' + slug);
 ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0, r.body.rounds);
-// the dashboard rebuilds from admin downloads, which keep notes — the
-// Worker must strip them again on the way back in
-ok('rebuild strips notes too', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
 
 // combined reader upload: one file carries qbj + game state; the game half
 // (full packet text) must never reach the bundle or a public route

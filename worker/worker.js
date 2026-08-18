@@ -397,6 +397,11 @@ const PUB_BACKFILL_PER_TICK = 200;
 const pubGameKey = (tid, fileId) => `t/${tid}/pub/${fileId}.json`;
 const roundBlobKey = (tid, n) => `t/${tid}/round/${n}.json`;
 const manifestKey = (tid) => `t/${tid}/rounds.json`;
+// Written by the TO's rebuild (putBundle), consumed by the next
+// materialize: "rebuild every shard, whether or not its stamp moved".
+// A separate object rather than a flag inside the manifest so that
+// setting it is a bare put — no read-modify-write to race the cron on.
+const rebuildKey = (tid) => `t/${tid}/rebuild.json`;
 
 // A stats stamp: newest file id + how many. Used per round (the client
 // refetches a round when its stamp moves) and, folded together, for the
@@ -465,6 +470,13 @@ async function materialize(env, t) {
   }
 
   const prev = await readManifest(env, tid);
+  // A pending TO rebuild re-posted the games' public copies under their
+  // existing ids, so the D1 stamps did not move: rebuild every round
+  // regardless. The marker is cleared BEFORE the blobs are read, so a
+  // rebuild request landing mid-tick either has its blobs read here or
+  // leaves a fresh marker for the next tick — never neither.
+  const forced = Boolean(await env.DATA.head(rebuildKey(tid)));
+  if (forced) await env.DATA.delete(rebuildKey(tid));
   const manifest = { rounds: {}, at: Date.now() };
   const changed = [];
   const removed = [];
@@ -473,7 +485,7 @@ async function materialize(env, t) {
 
   for (const [n, fs] of [...byRound].sort((a, b) => a[0] - b[0])) {
     const want = statsVersion(fs);
-    if (prev.rounds[n] === want) { manifest.rounds[n] = want; continue; }
+    if (!forced && prev.rounds[n] === want) { manifest.rounds[n] = want; continue; }
 
     const entries = new Array(fs.length).fill(null);
     await Promise.all(fs.map(async (f, i) => {
@@ -613,9 +625,16 @@ async function githubToken(env) {
   return data.token;
 }
 
+// A slow GitHub must fail the tick — which re-flags the tournament and
+// tries again next minute — rather than hang it: a hung tick outlives
+// the minute and the next one starts on top of it. GitHub being down
+// was always handled; this is for it being merely degraded.
+const GITHUB_TIMEOUT_MS = 15000;
+
 async function github(env, method, path, body, bearer) {
   const res = await fetch('https://api.github.com' + path, {
     method,
+    signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
     headers: {
       Authorization: `Bearer ${bearer || await githubToken(env)}`,
       Accept: 'application/vnd.github+json',
@@ -1439,8 +1458,10 @@ async function deleteFile(env, t, fileId) {
 
 // Escape hatch for drift: the dashboard re-posts the public copies of
 // games it fetched from the stored files, and the next tick rebuilds
-// every shard from them (deleting the manifest is what forces that —
-// otherwise unchanged round stamps would skip the rebuild).
+// every shard from them. The rebuild marker is what forces that —
+// otherwise unchanged round stamps would skip the rebuild. The manifest
+// itself is left alone, so viewers keep the current shards until the
+// rebuilt ones exist rather than getting an empty page for a tick.
 //
 // Posted in batches, because each entry is its own write: MAX_REBUILD
 // bounds one request's R2 traffic, and app/js/admin.js chunks to match.
@@ -1460,7 +1481,8 @@ async function putBundle(request, env, t) {
   await Promise.all(entries.map((e) => putPubGame(env, id, {
     id: e.id, round: e.round, room: e.room, filename: e.filename, qbj: stripMatchNotes(e.qbj),
   })));
-  await env.DATA.delete(manifestKey(id));
+  // After the blobs, so a materialize that sees the marker sees them too.
+  await env.DATA.put(rebuildKey(id), '{}', { httpMetadata: { contentType: 'application/json' } });
   await markPub(env, id);
   return json(env, { entries: entries.length });
 }
@@ -2083,8 +2105,8 @@ async function pubState(env, slug, ctx) {
   })();
   const body = await pubStateBody(env, t, pub);
   // Games but no shards to serve them from: a tournament published
-  // before the round shards existed, or one whose manifest a rebuild
-  // just cleared. Flag it so the next tick materializes it — otherwise
+  // before the round shards existed. Flag it so the next tick
+  // materializes it — otherwise
   // a finished tournament, which nothing can mutate any more, would
   // have no way back. And don't let this answer cache for the week a
   // finished tournament normally gets, because it is about to change.
@@ -2097,6 +2119,13 @@ async function pubState(env, slug, ctx) {
    The stamps in /pub/:slug `rounds` say which ones to ask for, and a
    finished round's shard never changes again, so a refresh asks for the
    round in progress and nothing else.
+
+   Each round may carry the stamp the caller expects, ?n=3@120:36,4@...,
+   which this route ignores: it exists to make the URL differ whenever
+   the stamp does, so the browser's HTTP cache (this response is
+   max-age'd like every public blob) can never hand back the shard from
+   before the round moved. Without it a viewer refreshing twice inside
+   the cache window would hold a stale round while believing it current.
 
    Batched on purpose. Snapshot viewers fetch one file per round from
    GitHub, where per-round granularity is free; here, one request per
@@ -2112,7 +2141,8 @@ async function pubRounds(env, slug, url) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
   const asked = [...new Set((url.searchParams.get('n') || '').split(',')
-    .map(Number).filter((n) => Number.isInteger(n) && n > 0 && n < 1000))];
+    .map((s) => Number(s.split('@')[0]))
+    .filter((n) => Number.isInteger(n) && n > 0 && n < 1000))];
   if (!asked.length) return err(env, 400, 'no rounds requested');
   if (asked.length > MAX_ROUNDS_PER_FETCH) {
     return err(env, 400, `at most ${MAX_ROUNDS_PER_FETCH} rounds per request`);
