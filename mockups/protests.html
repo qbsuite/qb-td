@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protest Desk</title>
+<style>
+/* td.css subset, kept in sync by eye — this file is a throwaway mock */
+:root {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7;
+  --link: #1d4ed8; --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c;
+  --warn-bg: #fff7ed; --warn-line: #fdba74;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131316; --fg: #e7e7ea; --muted: #85858f; --line: #2a2a30;
+    --link: #7aa2f7; --hover-bg: #1b1b20; --ok: #4ade80; --bad: #f87171;
+    --warn-bg: #2a1f14; --warn-line: #9a5b1f;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131316; --fg: #e7e7ea; --muted: #85858f; --line: #2a2a30;
+  --link: #7aa2f7; --hover-bg: #1b1b20; --ok: #4ade80; --bad: #f87171;
+  --warn-bg: #2a1f14; --warn-line: #9a5b1f;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; overflow-wrap: anywhere;
+}
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 28px 64px; padding-inline: 16px; }
+header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+header .sub { color: var(--muted); }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h2 {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 8px;
+}
+button, .btn {
+  font: inherit; color: var(--link); background: none;
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px; cursor: pointer;
+}
+button:hover, .btn:hover { border-color: var(--link); text-decoration: none; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--link); outline-offset: 2px;
+}
+button:disabled { color: var(--muted); border-color: var(--line); cursor: default; }
+button.primary { font-weight: 600; }
+button.small { padding: 2px 10px; font-size: 13px; }
+input, select {
+  font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+}
+input:focus, select:focus { outline: none; border-color: var(--link); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+table { border-collapse: collapse; width: 100%; overflow-wrap: normal; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.muted { color: var(--muted); }
+.ok { color: var(--ok); }
+.bad { color: var(--bad); }
+.mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+#msg { min-height: 20px; color: var(--muted); margin: 8px 0; }
+#msg.bad { color: var(--bad); }
+.tablewrap { overflow-x: auto; }
+.pill {
+  display: inline-block; font-size: 12px; border: 1px solid var(--line);
+  border-radius: 99px; padding: 1px 9px; color: var(--muted); white-space: nowrap;
+}
+.pill.on { color: var(--ok); border-color: var(--ok); }
+.pill.warn { color: var(--bad); border-color: var(--bad); }
+.pill.link { cursor: pointer; }
+.pill.link:hover { border-color: var(--link); color: var(--link); }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.tab {
+  font: inherit; background: none; border: none; border-bottom: 2px solid transparent;
+  border-radius: 0; color: var(--muted); padding: 7px 14px; cursor: pointer;
+}
+.tab.active { color: var(--fg); border-bottom-color: var(--link); font-weight: 600; }
+.tabs.bigtabs { margin-bottom: 10px; }
+.bigtabs .tab { font-size: 17px; padding: 8px 18px; }
+.statusbar {
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 10px;
+}
+.statusbar .big { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+details.drawer { border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+details.drawer > summary {
+  padding: 8px 14px; cursor: pointer;
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+}
+details.drawer > summary:hover { background: var(--hover-bg); border-radius: 9px; }
+details.drawer > summary .dtitle {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted);
+}
+details.drawer > .inner { padding: 4px 14px 14px; }
+details.drawer > .inner > h2:first-of-type { margin-top: 10px; }
+details.rgroup summary { padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+details.rgroup summary:hover { background: var(--hover-bg); }
+details.rgroup summary .pill { margin: 0 4px; }
+
+/* protests — the new bits */
+.protest td { padding-block: 9px; }
+.protest .q { font-weight: 600; white-space: nowrap; }
+.protest .given { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.protest .reason { display: block; color: var(--fg); max-width: 34ch; }
+.protest .score { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.protest .swing { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; margin-top: 2px; }
+.protest.ruled td { color: var(--muted); }
+.protest.ruled .reason { color: var(--muted); }
+.ruling { display: flex; flex-direction: column; gap: 4px; min-width: 190px; }
+.ruling input { font-size: 13px; padding: 3px 8px; }
+.ruling .who { font-size: 12px; color: var(--muted); }
+.followup {
+  font-size: 13px; color: var(--fg); background: var(--warn-bg);
+  border: 1px solid var(--warn-line); border-radius: 8px; padding: 4px 8px; margin-top: 4px;
+}
+
+/* mock-only bits */
+.explain {
+  border-left: 3px solid var(--line); padding: 4px 12px; margin: 10px 0 16px;
+  color: var(--muted); font-size: 14px;
+}
+.explain b { color: var(--fg); font-weight: 600; }
+.explain ul { padding-left: 18px; margin-top: 4px; }
+.explain li { margin: 2px 0; }
+.demo { font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>qb-td</h1>
+    <span class="sub">Live Hub mock &mdash; protests as the TD would see them; everything runs in memory</span>
+  </header>
+  <div class="tabs bigtabs">
+    <button class="tab">Tournament Setup</button>
+    <button class="tab active">Live Hub</button>
+  </div>
+  <div id="msg"></div>
+
+  <div class="explain" style="margin-top:6px">
+    <b>Today:</b> a moderator's protest lives only in MODAQ. It rides along in
+    the uploaded game as free text in the match's <span class="mono">notes</span>,
+    which the hub never renders &mdash; the TD first sees it by opening the
+    downloaded qbj, or in YellowFruit after the .yft export.
+    <b>This mock:</b> a <b>Protests</b> drawer between the status strip and
+    Broadcasts, a count in the status strip, and a marker on each upload row
+    that carries one. Rulings are recorded here and stay on the TO side.
+  </div>
+
+  <div id="live"></div>
+
+  <div class="explain">
+    <b>What it would take:</b>
+    <ul>
+      <li>The game half of every <span class="mono">.qbtd.json</span> already
+        carries MODAQ's structured protests (team, question, word position,
+        answer given, reason). The Worker parses each upload for tiebreaker
+        usage today; protests come out of the same parse and are stored as
+        JSON on the file row, returned with the admin file list.</li>
+      <li>"Can flip the result" and the "if upheld" score are MODAQ's own
+        arithmetic (its <span class="mono">protestSwings</span>): the
+        protester gets its neg back, the tossup at its buzz position under
+        the game format's power tiers (super-powers included), and the whole
+        bonus; the team that converted the tossup instead loses its tossup
+        points and the bonus points it earned. A bonus-part protest moves
+        only that part's value. The reader would capture these numbers at
+        upload from MODAQ's game object rather than re-deriving them.</li>
+      <li>Rulings are a small TO-side map keyed by upload + question, saved
+        the way broadcasts are. They are not sent to rooms &mdash; the TD
+        reaches the moderator by whatever messaging they already use. Nothing
+        here is public &mdash; same rule as the notes the Worker already
+        strips from every public copy.</li>
+      <li>A ruling never edits a score. The moderator applies it in MODAQ and
+        uploads again; the newest upload per round + team pair already
+        replaces the earlier one, so the hub can show when the corrected game
+        has landed.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let msgTimer = null;
+function say(text, bad = false) {
+  const m = $('msg');
+  m.textContent = text || '';
+  m.className = bad ? 'bad' : '';
+  clearTimeout(msgTimer);
+  if (text) msgTimer = setTimeout(() => { m.textContent = ''; }, 4000);
+}
+
+/* ---------- sample state (example data) ---------- */
+const liveRound = 5;
+const roundCount = 9;
+const uploads = [
+  { id: 41, round: 5, room: 'Room 2', file: 'Round_5_UIUC_ASU.qbtd.json', size: '18.2 KB', a: 'UIUC', b: 'ASU', score: [275, 280] },
+  { id: 42, round: 5, room: 'Room 3', file: 'Round_5_Caltech_UCLA.qbtd.json', size: '17.8 KB', a: 'Caltech', b: 'UCLA', score: [340, 215] },
+  { id: 33, round: 4, room: 'Room 1', file: 'Round_4_Stanford_UCLA.qbtd.json', size: '17.5 KB', a: 'Stanford', b: 'UCLA', score: [310, 190] },
+  { id: 34, round: 4, room: 'Room 2', file: 'Round_4_Berkeley_Caltech.qbtd.json', size: '18.0 KB', a: 'Berkeley', b: 'Caltech', score: [265, 240] },
+  { id: 35, round: 4, room: 'Room 3', file: 'Round_4_UIUC_ASU.qbtd.json', size: '17.9 KB', a: 'UIUC', b: 'ASU', score: [255, 230] },
+  { id: 25, round: 3, room: 'Room 1', file: 'Round_3_Stanford_ASU.qbtd.json', size: '17.7 KB', a: 'Stanford', b: 'ASU', score: [250, 245] },
+  { id: 26, round: 3, room: 'Room 2', file: 'Round_3_UIUC_Berkeley.qbtd.json', size: '18.1 KB', a: 'UIUC', b: 'Berkeley', score: [225, 230] },
+  { id: 27, round: 3, room: 'Room 3', file: 'Round_3_Caltech_UCLA.qbtd.json', size: '17.6 KB', a: 'Caltech', b: 'UCLA', score: [300, 205] },
+];
+// One row per protest MODAQ logged in the uploaded game. `swing` follows
+// MODAQ's protestSwings: if the protest is upheld the protester gets its
+// neg back, the tossup at its buzz position (power tier per the game
+// format, super-powers included) and the whole bonus; the team that then
+// converted the tossup loses its tossup points and the bonus points it
+// earned. A bonus-part protest moves only that part's value.
+const protests = [
+  { id: 'p41-tu7', upload: 41, kind: 'tu', num: 7, team: 'UIUC', word: 41, given: 'Juárez',
+    reason: 'Negged on "Juárez". The answerline is El Paso, but the second clue says the city is named for a Zapotec president, so "Juárez" should at least draw a prompt.',
+    swing: { neg: 5, tu: 10, bonus: 30, opp: 'ASU', oppTu: 10, oppBonus: 20 },
+    ruling: 'open', note: '', ruledAt: '' },
+  { id: 'p42-b12', upload: 42, kind: 'b', num: 12, part: 2, team: 'UCLA', given: 'London Mission Society',
+    reason: 'Said "London Mission Society" and was marked wrong without a prompt. The answerline accepts LMS.',
+    swing: { part: 10 },
+    ruling: 'open', note: '', ruledAt: '' },
+  { id: 'p26-tu3', upload: 26, kind: 'tu', num: 3, team: 'UIUC', word: 58, given: 'the Emergency',
+    reason: 'Moderator asked for a "leader" and rejected "the Emergency"; the clue read was about the period, not the person.',
+    swing: { neg: 5, tu: 15, bonus: 30, opp: 'Berkeley', oppTu: 10, oppBonus: 10 },
+    ruling: 'upheld', note: 'Accept on the clue as read. Room 2 to fix TU 3 and upload again.', ruledAt: '11:52 AM' },
+  { id: 'p25-tu14', upload: 25, kind: 'tu', num: 14, team: 'ASU', word: 77, given: 'Pulaski',
+    reason: 'Prompted on "Pulaski", then answered "Polish" after the prompt and was negged.',
+    swing: { neg: 5, tu: 10, bonus: 30, opp: 'Stanford', oppTu: 10, oppBonus: 30 },
+    ruling: 'denied', note: 'The prompt was given; the post-prompt answer was wrong.', ruledAt: '11:47 AM' },
+];
+// Uploads that arrived after a ruling on the same pairing (corrected games).
+const corrected = new Set();
+
+const RULINGS = [['open', 'Open'], ['upheld', 'Upheld'], ['denied', 'Denied'], ['withdrawn', 'Withdrawn']];
+const rulingLabel = (r) => (RULINGS.find(([v]) => v === r) || [])[1] || r;
+const uploadOf = (p) => uploads.find((u) => u.id === p.upload);
+const qLabel = (p) => p.kind === 'tu' ? `TU ${p.num}` : `B ${p.num}, part ${p.part}`;
+// What the score becomes if the protest is upheld, and whether that
+// changes who wins (MODAQ's protestsMatter: a flipped or tied result).
+function ifUpheld(p) {
+  const u = uploadOf(p);
+  const s = p.swing;
+  const me = u.a === p.team ? 0 : 1;
+  const gain = s.part != null ? s.part : s.neg + s.tu + s.bonus;
+  const loss = s.part != null ? 0 : s.oppTu + s.oppBonus;
+  const score = [...u.score];
+  score[me] += gain;
+  score[1 - me] -= loss;
+  const before = Math.sign(u.score[0] - u.score[1]);
+  const after = Math.sign(score[0] - score[1]);
+  const parts = s.part != null
+    ? [`+${s.part} ${p.team}: bonus part`]
+    : [`+${gain} ${p.team}: ${s.neg} neg back, ${s.tu} tossup, ${s.bonus} bonus`,
+       `−${loss} ${s.opp}: ${s.oppTu} tossup, ${s.oppBonus} bonus`];
+  return { score, flips: after !== before, parts };
+}
+const flips = (p) => ifUpheld(p).flips;
+const openOnes = () => protests.filter((p) => p.ruling === 'open');
+const byUpload = (id) => protests.filter((p) => p.upload === id);
+
+function summaryLine() {
+  const open = openOnes();
+  if (!open.length) return protests.length ? 'Nothing open' : 'None logged';
+  const p = open[0];
+  const u = uploadOf(p);
+  return `${open.length} open &middot; R${u.round} ${esc(u.room)}: ${esc(p.team)} protests ${qLabel(p)}${
+    flips(p) ? ' &middot; can flip the result' : ''}`;
+}
+
+function render() {
+  const open = openOnes();
+  // open first, then newest round first
+  const rows = [...protests].sort((x, y) => (x.ruling === 'open' ? 0 : 1) - (y.ruling === 'open' ? 0 : 1)
+    || uploadOf(y).round - uploadOf(x).round);
+  $('live').innerHTML = `
+    <div class="statusbar">
+      <span><span class="muted">Round</span> <span class="big">${liveRound}</span> <span class="muted">of ${roundCount}</span></span>
+      <span class="ok">Packet up</span>
+      <span><span class="bad">2</span><span class="muted">/3 games in</span></span>
+      <span class="muted">Waiting: Room 1</span>
+      <span class="pill">Tiebreakers: 0 used &middot; 6 unused</span>
+      ${protests.length ? `<span class="pill link ${open.length ? 'warn' : ''}" data-goto="protests">${
+        open.length ? `${open.length} open protest${open.length === 1 ? '' : 's'}` : 'Protests: none open'}</span>` : ''}
+      <span class="spacer" style="flex:1"></span>
+      <label>Round <input id="curround" type="number" min="1" max="999" value="${liveRound}" style="width:70px" disabled></label>
+      <button disabled>Set</button>
+      <button class="primary" disabled>Advance to Round ${liveRound + 1}</button>
+    </div>
+
+    <details class="drawer" id="protests" open>
+      <summary><span class="dtitle">Protests</span>
+        <span class="muted">${summaryLine()}</span>
+      </summary>
+      <div class="inner">
+        <div class="tablewrap" style="margin-top:8px"><table>
+          <tr><th>Round</th><th>Room</th><th>Question</th><th>Protest</th><th>Score</th><th>Ruling</th></tr>
+          ${rows.map((p) => {
+            const u = uploadOf(p);
+            const fixed = corrected.has(u.id);
+            return `<tr class="protest ${p.ruling === 'open' ? '' : 'ruled'}" data-pid="${p.id}">
+              <td class="num">${u.round}</td>
+              <td>${esc(u.room)}<br><span class="muted demo">${esc(u.a)} v ${esc(u.b)}</span></td>
+              <td><span class="q">${qLabel(p)}</span>${p.kind === 'tu' ? `<br><span class="muted demo">word ${p.word}</span>` : ''}</td>
+              <td><b>${esc(p.team)}</b> answered <span class="given">${esc(p.given)}</span>
+                <span class="reason">${esc(p.reason)}</span></td>
+              <td>${(() => {
+                const w = ifUpheld(p);
+                return `<span class="score">${esc(u.a)} ${u.score[0]}<br>${esc(u.b)} ${u.score[1]}</span><br>
+                ${w.flips ? `<span class="pill warn">Can flip the result</span>` : `<span class="pill">Result stands</span>`}
+                <span class="swing">If upheld: ${esc(u.a)} ${w.score[0]} &ndash; ${esc(u.b)} ${w.score[1]}</span>
+                ${w.parts.map((x) => `<span class="swing">${esc(x)}</span>`).join('')}`;
+              })()}</td>
+              <td><div class="ruling">
+                <select id="rule-${p.id}" data-rule="${p.id}">${RULINGS.map(([v, l]) =>
+                  `<option value="${v}" ${p.ruling === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                <input id="note-${p.id}" data-note="${p.id}" placeholder="Ruling note (stays on the hub)" value="${esc(p.note)}">
+                ${p.ruledAt ? `<span class="who">${rulingLabel(p.ruling)} ${esc(p.ruledAt)}</span>` : ''}
+                ${p.ruling === 'upheld' ? (fixed
+                  ? `<span class="who ok">Corrected game received</span>`
+                  : `<span class="followup">Waiting for ${esc(u.room)} to upload the corrected game
+                      <button class="small" data-fixed="${u.id}" style="margin-left:6px">Simulate upload</button></span>`) : ''}
+              </div></td>
+            </tr>`;
+          }).join('')}
+        </table></div>
+        <div class="muted" style="font-size:13px;margin-top:8px">
+          A ruling is recorded for you only; nothing is sent to the room. Tell the moderator however you reach them; they apply it in MODAQ and upload the game again.
+        </div>
+      </div>
+    </details>
+
+    <details class="drawer">
+      <summary><span class="dtitle">Broadcasts</span>
+        <span class="muted">1 live &middot; Lunch until 1:15; Round 6 starts at 1:25</span></summary>
+      <div class="inner">
+        <div class="row" style="margin-top:8px">
+          <input id="anntext" maxlength="200" style="flex:1;min-width:240px" placeholder="A line for the rooms or the public page" disabled>
+          <select id="annto" disabled><option>Public page + rooms</option></select>
+          <button disabled>Send</button>
+        </div>
+        <div class="muted" style="font-size:13px;margin-top:6px">(Inert in the mock &mdash; unchanged from the real hub)</div>
+      </div>
+    </details>
+
+    <h2>Settings</h2>
+    <div class="row muted" style="margin-bottom:6px">(Unchanged &mdash; collapsed in the mock)</div>
+
+    <h2>Stats + Export</h2>
+    <div class="row">
+      <button class="primary" disabled>Compute stats</button>
+      <button disabled>Download .yft</button>
+      <button disabled>Download stat report</button>
+      <button disabled>Download QBJ bundle</button>
+    </div>
+
+    <h2>Uploads</h2>
+    ${[5, 4, 3].map((rn) => {
+      const group = uploads.filter((u) => u.round === rn);
+      const got = group.length;
+      return `<details class="rgroup" ${rn === liveRound ? 'open' : ''}>
+        <summary><b>Round ${rn}</b> <span class="pill ${got >= 3 ? 'on' : 'warn'}">${got}/3</span>
+          ${got < 3 ? '<span class="muted">Missing Room 1</span>' : ''}</summary>
+        <div class="tablewrap"><table>
+          <tr><th>Room</th><th>File</th><th>Kind</th><th class="num">Size</th><th>Status</th><th></th></tr>
+          ${group.map((u) => {
+            const ps = byUpload(u.id);
+            const openN = ps.filter((p) => p.ruling === 'open').length;
+            const marker = !ps.length ? '' : openN
+              ? `<span class="pill warn link" data-goto="protests">${openN} protest${openN === 1 ? '' : 's'} open</span>`
+              : `<span class="pill link" data-goto="protests">${ps.length} protest${ps.length === 1 ? '' : 's'} &middot; ruled</span>`;
+            return `<tr>
+              <td>${esc(u.room)}</td>
+              <td class="mono">${esc(u.file)}</td>
+              <td>combined</td>
+              <td class="num">${u.size}</td>
+              <td><span class="ok">OK</span> ${marker}</td>
+              <td class="row"><a href="#">qbj</a> <a href="#">game</a> <button class="small" disabled>Delete</button></td>
+            </tr>`;
+          }).join('')}
+        </table></div>
+      </details>`;
+    }).join('')}`;
+
+  $('live').querySelectorAll('[data-goto]').forEach((el) => {
+    el.onclick = () => {
+      const d = $('protests');
+      d.open = true;
+      d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
+  $('live').querySelectorAll('[data-rule]').forEach((sel) => {
+    sel.onchange = () => {
+      const p = protests.find((x) => x.id === sel.dataset.rule);
+      p.ruling = sel.value;
+      p.ruledAt = sel.value === 'open' ? '' : new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      say(sel.value === 'open' ? 'Reopened' : `Ruling saved: ${rulingLabel(sel.value)}`);
+      render();
+    };
+  });
+  $('live').querySelectorAll('[data-note]').forEach((inp) => {
+    inp.onchange = () => {
+      protests.find((x) => x.id === inp.dataset.note).note = inp.value;
+      say('Note saved');
+    };
+  });
+  $('live').querySelectorAll('[data-fixed]').forEach((b) => {
+    b.onclick = () => {
+      corrected.add(Number(b.dataset.fixed));
+      say('Corrected game received');
+      render();
+    };
+  });
+}
+
+render();
+</script>
+</body>
+</html>

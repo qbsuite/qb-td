@@ -28,6 +28,8 @@ import {
   staleGameKeys, roundRows, normalizeTbPool, tbUsedIds, tbPanelRows,
 } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
+import { protestReport } from './protests.js';
+import { Tossup } from 'modaq/src/state/PacketState.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
@@ -157,10 +159,15 @@ function mountMODAQ(id, meta, isNew) {
         try {
           const name = matchFilenames(meta.round, meta.a, meta.b).combined;
           // games with appended tiebreakers report which ones were read,
-          // so the TD's usage log stays exact (worker logTbUses)
-          const body = combinedUpload(match, meta.round,
-            localStorage.getItem(gameKey(secret, id)),
-            meta.tb ? tbUsedIds(match, meta.tb) : null);
+          // so the TD's usage log stays exact (worker logTbUses); logged
+          // protests go up structured, swing included, for the hub's
+          // Protests drawer (the qbj's notes carry them as text only)
+          const storeText = localStorage.getItem(gameKey(secret, id));
+          let protests = null;
+          try { protests = protestReport(JSON.parse(storeText), props.gameFormat || null, Tossup); }
+          catch (e) { /* the Worker falls back to the qbj's notes */ }
+          const body = combinedUpload(match, meta.round, storeText,
+            meta.tb ? tbUsedIds(match, meta.tb) : null, protests);
           const out = await pub(
             `/b/${secret}/upload?round=${meta.round}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body });

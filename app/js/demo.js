@@ -25,9 +25,11 @@
 
 import fixture from '../demo/fixture.js';
 import { parseMatch, matchPayload } from '../engine/qbj.js';
+import { protestsFromNotes } from './protests.js';
 
 const UPLOADS_KEY = 'qbtdDemoUploads';
 const ROUND_KEY = 'qbtdDemoRound'; // TD-hub advance-round override
+const RULINGS_KEY = 'qbtdDemoRulings'; // TD-hub protest rulings
 const BUZZ_KEY = 'qbtdBuzzKey:demo'; // pubview's sessionStorage slot for slug 'demo'
 const FIRST_LOCAL_ID = 1000; // sorts after every fixture id, so re-reads win dedupe
 
@@ -71,6 +73,7 @@ function currentRound() {
 export function reset() {
   local.removeItem(UPLOADS_KEY);
   local.removeItem(ROUND_KEY);
+  local.removeItem(RULINGS_KEY);
   const stale = [];
   for (let i = 0; i < local.length; i++) {
     const k = local.key(i);
@@ -92,8 +95,22 @@ function allEntries() {
     ...fixture.entries,
     ...uploads().filter((u) => u.qbj && !u.error).map((u) => ({
       id: u.id, round: u.round, room: u.room, filename: u.filename, qbj: u.qbj,
+      protests: u.protests || null,
     })),
   ];
+}
+
+// What the Worker stores as files.summary (worker.js matchSummary): the
+// hub's Protests drawer reads teams, score, and protests from it.
+function summaryOf(e) {
+  try {
+    const m = parseMatch(e.qbj);
+    return JSON.stringify({
+      teams: m.teams.map((t) => t.name),
+      score: m.teams.map((t) => t.points),
+      protests: e.protests || protestsFromNotes(e.qbj.notes),
+    });
+  } catch (err_) { return null; }
 }
 
 function scheduledGames(round) {
@@ -158,10 +175,13 @@ async function upload(room, query, opts) {
       : /_game\.json$/i.test(filename) ? 'game' : 'other';
   let error = null;
   let qbj = null;
+  let protests = null; // the reader's structured report, when it sent one
   if (isMatch) {
     try {
-      qbj = matchPayload(JSON.parse(body));
+      const root = JSON.parse(body);
+      qbj = matchPayload(root);
       parseMatch(qbj, { filename });
+      if (Array.isArray(root.protests)) protests = root.protests;
     } catch (e) {
       error = e.message;
       qbj = null;
@@ -172,7 +192,7 @@ async function upload(room, query, opts) {
   const id = list.reduce((n, u) => Math.max(n, u.id), FIRST_LOCAL_ID - 1) + 1;
   list.push({
     id, round, kind, filename, size: body.length, error,
-    created: Date.now(), qbj, room: fixture.rooms[room],
+    created: Date.now(), qbj, room: fixture.rooms[room], protests,
   });
   saveUploads(list);
   return { id, filename, round, kind, error, announce: [] };
@@ -218,6 +238,7 @@ function adminDetail() {
       published: 1,
       settings: JSON.stringify(fixture.settings),
       announce: '[]',
+      rulings: local.getItem(RULINGS_KEY) || '{}',
       roster_r2_key: 't/1/roster.qbj',
       roster_name: 'roster.qbj',
       created,
@@ -239,6 +260,7 @@ function adminDetail() {
       size: JSON.stringify(e.qbj).length,
       error: null,
       created: e.id >= FIRST_LOCAL_ID ? e.id : fixtureBase + e.id * 60000,
+      summary: summaryOf(e),
     })).sort((x, y) => y.created - x.created),
   };
 }
@@ -268,6 +290,11 @@ function adminUpdate(body) {
   }
   // published is already on; flipping it off would just break the demo
   if (body && body.published !== undefined) return { ok: true };
+  if (body && body.rulings !== undefined) {
+    if (!body.rulings || typeof body.rulings !== 'object') err('bad rulings');
+    local.setItem(RULINGS_KEY, JSON.stringify(body.rulings));
+    return { ok: true };
+  }
   err('not in the demo');
 }
 

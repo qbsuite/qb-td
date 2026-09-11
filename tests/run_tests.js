@@ -20,6 +20,7 @@ import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzke
 // roster builder's output must satisfy it, since read.html feeds the
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
+import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
 import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows } from '../app/js/read_core.js';
 
 let passed = 0;
@@ -2070,6 +2071,213 @@ test('demo flow: re-export dedupes, advance works, reset clears', () => {
   assert.equal(demoAdminAfter.files.length, 14, 'delete removed one visitor upload');
   assert.equal(demoStateReset.current_round, 7, 'reset restores the live round');
   assert.equal(demoStateReset.files.length, 13, 'reset restores the fixture');
+});
+
+/* ---------- protests: the reader's report and the hub's rows ---------- */
+
+// MODAQ's Tossup supplies the points at a buzz word; the report mirrors
+// GameState.protestSwings per protest.
+const { Tossup } = createRequire(import.meta.url)('modaq/src/state/PacketState.js');
+const PFMT = {
+  powers: [{ marker: '(*)', points: 15 }], negValue: -5, pairTossupsBonuses: true,
+  pronunciationGuideMarkers: ['("', '")'],
+};
+const pBonus = (v = 10) => ({ leadin: 'L', parts: [1, 2, 3].map(() => ({ question: 'q', answer: 'a', value: v })) });
+const pStore = (cycles, format = PFMT) => ({ game: {
+  packet: {
+    tossups: [
+      { question: 'Alpha beta gamma (*) delta epsilon zeta.', answer: 'one' },
+      { question: 'Eta theta (*) iota kappa.', answer: 'two' },
+      { question: 'Lambda mu nu.', answer: 'three' },
+    ],
+    bonuses: [pBonus(10), pBonus(10), pBonus(5)],
+  },
+  players: [{ name: 'Ann', teamName: 'Alpha' }, { name: 'Bob', teamName: 'Beta' }],
+  gameFormat: format,
+  cycles,
+} });
+const pBuzz = (team, tossupIndex, position) => ({
+  tossupIndex, marker: { player: { name: team[0], teamName: team }, position, isLastWord: false },
+});
+const pParts = (team, ...pts) => pts.map((p) => (p ? { teamName: team, points: p } : { teamName: '', points: 0 }));
+
+test('protestReport: neg, then the other team converts with bonus points', () => {
+  const rep = protestReport(pStore([{
+    wrongBuzzes: [pBuzz('Alpha', 0, 1)],
+    correctBuzz: pBuzz('Beta', 0, 4),
+    bonusAnswer: { bonusIndex: 0, receivingTeamName: 'Beta', correctParts: [], parts: pParts('Beta', 10, 10, 0) },
+    tossupProtests: [{ teamName: 'Alpha', questionIndex: 0, position: 1, givenAnswer: 'foo', reason: 'prompt me' }],
+  }]), null, Tossup);
+  assert.equal(rep.length, 1);
+  const p = rep[0];
+  assert.equal(p.kind, 'tu'); assert.equal(p.q, 1); assert.equal(p.word, 2);
+  assert.equal(p.team, 'Alpha'); assert.equal(p.given, 'foo'); assert.equal(p.reason, 'prompt me');
+  assert.equal(p.to, 'Alpha'); assert.equal(p.from, 'Beta');
+  // in power: 15 back + the 5 neg + the whole 30 bonus
+  assert.deepEqual([p.detail.tu, p.detail.neg, p.detail.bonus, p.gain], [15, 5, 30, 50]);
+  // MODAQ charges the converter's tossup at the protester's word (15), plus the 20 it earned
+  assert.deepEqual([p.detail.oppTu, p.detail.oppBonus, p.loss], [15, 20, 35]);
+});
+
+test('protestReport: bounceback points count against the converter', () => {
+  const [p] = protestReport(pStore([{
+    wrongBuzzes: [pBuzz('Alpha', 0, 5)],
+    correctBuzz: pBuzz('Beta', 0, 5),
+    bonusAnswer: { bonusIndex: 0, receivingTeamName: 'Beta', correctParts: [], parts: [...pParts('Beta', 10), ...pParts('Alpha', 10), ...pParts('', 0)] },
+    tossupProtests: [{ teamName: 'Alpha', questionIndex: 0, position: 5, givenAnswer: '', reason: 'r' }],
+  }]), null, Tossup);
+  assert.deepEqual([p.detail.tu, p.gain], [10, 45], 'past the power mark: 10');
+  assert.deepEqual([p.detail.oppTu, p.detail.oppBonus, p.loss], [10, 0, 10]);
+});
+
+test('protestReport: dead tossup — only the protester moves', () => {
+  const [p] = protestReport(pStore([
+    { correctBuzz: pBuzz('Beta', 0, 4) },
+    { wrongBuzzes: [pBuzz('Alpha', 1, 3)],
+      tossupProtests: [{ teamName: 'Alpha', questionIndex: 1, position: 3, givenAnswer: 'x', reason: 'r' }] },
+  ]), null, Tossup);
+  assert.equal(p.q, 2);
+  assert.deepEqual([p.detail.tu, p.detail.neg, p.detail.bonus, p.gain, p.loss], [10, 5, 30, 45, 0]);
+  assert.equal(p.detail.oppTu, undefined);
+});
+
+test('protestReport: a buzz after the question ends carries no neg', () => {
+  // MODAQ's words end with an end-of-question marker: position 3 of a
+  // three-word tossup is "after the last word", where a wrong answer is 0
+  const [p] = protestReport(pStore([{
+    wrongBuzzes: [pBuzz('Alpha', 2, 3)],
+    tossupProtests: [{ teamName: 'Alpha', questionIndex: 2, position: 3, givenAnswer: 'x', reason: 'r' }],
+  }]), null, Tossup);
+  assert.deepEqual([p.detail.tu, p.detail.neg, p.gain], [10, 0, 40]);
+  const [q] = protestReport(pStore([{
+    wrongBuzzes: [pBuzz('Alpha', 2, 2)],
+    tossupProtests: [{ teamName: 'Alpha', questionIndex: 2, position: 2, givenAnswer: 'x', reason: 'r' }],
+  }]), null, Tossup);
+  assert.equal(q.detail.neg, 5, 'on the last word itself the neg still stands');
+});
+
+test('protestReport: both teams wrong — MODAQ gives the protester nothing when the other team converted after a neg', () => {
+  // the converter (Beta) also negged first: MODAQ's `c` flag drops the "for" side
+  const [p] = protestReport(pStore([{
+    wrongBuzzes: [pBuzz('Beta', 0, 0), pBuzz('Alpha', 0, 2)],
+    correctBuzz: pBuzz('Alpha', 0, 5),
+    bonusAnswer: { bonusIndex: 0, receivingTeamName: 'Alpha', correctParts: [], parts: pParts('Alpha', 10, 0, 0) },
+    tossupProtests: [{ teamName: 'Beta', questionIndex: 0, position: 0, givenAnswer: 'x', reason: 'r' }],
+  }]), null, Tossup);
+  assert.equal(p.gain, 0);
+  assert.deepEqual([p.to, p.from, p.loss], ['Beta', 'Alpha', 15 + 10]);
+});
+
+test('protestReport: unpaired bonuses follow conversions and thrown-out bonuses', () => {
+  const rep = protestReport(pStore([
+    { correctBuzz: pBuzz('Beta', 0, 4) },                       // uses bonus 0
+    { thrownOutBonuses: [{ questionIndex: 1 }],                  // bonus 1 thrown out
+      wrongBuzzes: [pBuzz('Alpha', 1, 3)],
+      tossupProtests: [{ teamName: 'Alpha', questionIndex: 1, position: 3, givenAnswer: '', reason: 'r' }] },
+  ], { ...PFMT, pairTossupsBonuses: false }), null, Tossup);
+  assert.equal(rep[0].detail.bonus, 15, 'bonus 2 (3 x 5) is next');
+});
+
+test('protestReport: bonus-part protests', () => {
+  const rep = protestReport(pStore([{
+    correctBuzz: pBuzz('Beta', 0, 4),
+    bonusAnswer: { bonusIndex: 0, receivingTeamName: 'Beta', correctParts: [], parts: pParts('Beta', 10, 0, 0) },
+    bonusProtests: [
+      { teamName: 'Beta', questionIndex: 0, partIndex: 2, givenAnswer: 'LMS', reason: 'accept' },
+      { teamName: 'Alpha', questionIndex: 0, partIndex: 1, givenAnswer: '', reason: 'bounceback' },
+      { teamName: 'Beta', questionIndex: 9, partIndex: 0, givenAnswer: '', reason: 'no such bonus' },
+    ],
+  }]), null, Tossup);
+  assert.equal(rep.length, 2);
+  assert.deepEqual([rep[0].kind, rep[0].q, rep[0].part, rep[0].to, rep[0].from, rep[0].gain, rep[0].loss], ['b', 1, 3, 'Beta', 'Alpha', 10, 0]);
+  assert.deepEqual([rep[1].part, rep[1].to, rep[1].from, rep[1].gain, rep[1].loss], [2, 'Alpha', 'Beta', 0, 10]);
+});
+
+test('protestReport: legacy persisted shapes (negBuzz, correctParts)', () => {
+  const [p] = protestReport(pStore([{
+    negBuzz: pBuzz('Alpha', 0, 1),
+    correctBuzz: pBuzz('Beta', 0, 4),
+    bonusAnswer: { bonusIndex: 0, receivingTeamName: 'Beta', correctParts: [{ index: 0, points: 10 }, { index: 1, points: 10 }] },
+    tossupProtests: [{ teamName: 'Alpha', questionIndex: 0, position: 1, givenAnswer: 'foo', reason: 'r' }],
+  }]), null, Tossup);
+  assert.deepEqual([p.gain, p.loss], [50, 35]);
+});
+
+test('protestReport: tolerates junk and falls back to the reader format', () => {
+  assert.deepEqual(protestReport(null, PFMT, Tossup), []);
+  assert.deepEqual(protestReport({ game: {} }, PFMT, Tossup), []);
+  const s = pStore([{ tossupProtests: [{ teamName: 'Alpha', questionIndex: 7, position: 1, reason: 'r' },
+    { teamName: 'Alpha', questionIndex: 0, position: 'x', reason: 'r' }] }]);
+  assert.deepEqual(protestReport(s, null, Tossup), [], 'missing tossup / bad position skipped');
+  const noFmt = pStore([{ wrongBuzzes: [pBuzz('Alpha', 0, 1)],
+    tossupProtests: [{ teamName: 'Alpha', questionIndex: 0, position: 1, reason: 'r' }] }], null);
+  assert.deepEqual(protestReport(noFmt, null, Tossup), [], 'no format anywhere');
+  assert.equal(protestReport(noFmt, PFMT, Tossup)[0].gain, 50, 'reader format fills in');
+  assert.deepEqual(protestReport(noFmt.game, PFMT, Tossup).length, 1, 'a bare game works too');
+});
+
+test('protestsFromNotes: MODAQ\'s two note templates', () => {
+  const notes = 'Tossup protest on tossup #3. Team "St. John\'s "A"" protested because of this reason: "said "Juárez", got prompt".\n'
+    + 'Bonus protest on bonus #12. Team "UCLA" protested part 2 because of this reason: "LMS".\n'
+    + 'Tossup protest on tossup #1. Team "UCLA" protested because of this reason: "x".';
+  const ps = protestsFromNotes(notes);
+  assert.deepEqual(ps.map((p) => [p.kind, p.q, p.part, p.team]),
+    [['tu', 1, undefined, 'UCLA'], ['tu', 3, undefined, 'St. John\'s "A"'], ['b', 12, 2, 'UCLA']]);
+  assert.equal(ps[1].reason, 'said "Juárez", got prompt');
+  assert.equal(ps[0].gain, undefined, 'no swing from a note');
+  assert.deepEqual(protestsFromNotes(undefined), []);
+});
+
+test('protestRows: newest upload per game, rulings keyed by game + question, corrected detection', () => {
+  const sum = (teams, score, protests) => JSON.stringify({ teams, score, protests });
+  const tu7 = { kind: 'tu', q: 7, team: 'UIUC', word: 41, given: 'J', reason: 'r', to: 'UIUC', from: 'ASU', gain: 45, loss: 30, detail: { tu: 10, neg: 5, bonus: 30, oppTu: 10, oppBonus: 20 } };
+  const b12 = { kind: 'b', q: 12, part: 2, team: 'UCLA', given: '', reason: 'r', to: 'UCLA', from: 'Caltech', gain: 10, loss: 0, detail: { part: 10 } };
+  const noteOnly = { kind: 'tu', q: 3, team: 'Alpha', given: '', reason: 'r' };
+  const tu7b = { ...tu7, from: 'Berkeley' };
+  const files = [
+    { id: 41, bucket_id: 2, round: 5, kind: 'combined', error: null, created: 1000, summary: sum(['UIUC', 'ASU'], [275, 280], [tu7]) },
+    { id: 42, bucket_id: 3, round: 5, kind: 'combined', error: null, created: 1100, summary: sum(['Caltech', 'UCLA'], [340, 215], [b12]) },
+    { id: 26, bucket_id: 2, round: 3, kind: 'combined', error: null, created: 500, summary: sum(['UIUC', 'Berkeley'], [225, 230], [tu7b]) },
+    { id: 30, bucket_id: 2, round: 3, kind: 'combined', error: null, created: 900, summary: sum(['Berkeley', 'UIUC'], [240, 235], [tu7b]) },
+    { id: 12, bucket_id: 1, round: 1, kind: 'qbj', error: null, created: 100, summary: sum(['Alpha', 'Beta'], [60, 10], [noteOnly]) },
+    { id: 13, bucket_id: 1, round: 1, kind: 'qbj', error: 'bad', created: 120, summary: null },
+    { id: 14, bucket_id: 1, round: 2, kind: 'other', error: null, created: 130, summary: null },
+  ];
+  const key = rulingKey(3, ['UIUC', 'Berkeley'], tu7);
+  assert.equal(key, '3/tu7/Berkeley/UIUC');
+  assert.equal(rulingKey(3, ['Berkeley', 'UIUC'], tu7), key, 'team order does not matter');
+  assert.equal(rulingKey(5, ['a/b', 'c'], b12), '5/b12.2/a%2Fb/c');
+  const rulings = { [key]: { r: 'upheld', note: 'fix it', at: 700 }, '5/b12.2/Caltech/UCLA': { r: 'denied', note: '', at: 1200 } };
+  const { rows, byFile } = protestRows(files, rulings, (b) => 'Room ' + b);
+  assert.deepEqual(rows.map((r) => [r.file.id, r.ruling]),
+    [[41, 'open'], [12, 'open'], [42, 'denied'], [30, 'upheld'], [26, 'upheld']],
+    'open first, then ruled, then the ruled history of superseded uploads');
+  const r26 = rows.find((r) => r.file.id === 26);
+  assert.deepEqual([r26.superseded, r26.corrected, r26.score], [true, true, [225, 230]],
+    'a superseded upload keeps its ruled protest, on the score it was ruled on');
+  // ...but an unruled protest on a superseded upload is gone with it
+  const gone = protestRows(files, {}, () => 'x').rows;
+  assert.deepEqual(gone.map((r) => r.file.id).sort(), [12, 30, 41, 42]);
+  const r30 = rows.find((r) => r.file.id === 30);
+  assert.equal(r30.corrected, true, 'file 30 landed after the ruling at 700');
+  assert.equal(r30.note, 'fix it');
+  assert.deepEqual([r30.upheld, r30.flips], [[210, 280], true]);
+  const r41 = rows.find((r) => r.file.id === 41);
+  assert.deepEqual([r41.room, r41.upheld, r41.flips, r41.known], ['Room 2', [320, 250], true, true]);
+  const r42 = rows.find((r) => r.file.id === 42);
+  assert.deepEqual([r42.upheld, r42.flips, r42.corrected], [[340, 225], false, false]);
+  const r12 = rows.find((r) => r.file.id === 12);
+  assert.deepEqual([r12.known, r12.flips], [false, false]);
+  assert.deepEqual(byFile.get(26), { n: 1, open: 0, superseded: true });
+  assert.deepEqual(byFile.get(41), { n: 1, open: 1, superseded: false });
+  assert.deepEqual(byFile.get(42), { n: 1, open: 0, superseded: false });
+  assert.equal(byFile.has(13), false);
+  assert.deepEqual(swingLines(r41), ['+45 UIUC: 5 neg back, 10 tossup, 30 bonus', '−30 ASU: 10 tossup, 20 bonus']);
+  assert.deepEqual(swingLines(r42), ['+10 UCLA: bonus part']);
+  assert.match(swingLines(r12)[0], /Swing unknown/);
+  assert.equal(qLabel(b12), 'B 12, part 2');
+  // a tied game: any swing matters
+  assert.equal(projectUpheld({ teams: ['A', 'B'], score: [200, 200], protests: [] }, { to: 'B', from: 'A', gain: 0, loss: 10 }).flips, true);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

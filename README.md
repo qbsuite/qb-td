@@ -48,7 +48,16 @@ Part of [qbsuite](https://qbsuite.github.io/).
   alert, with a mandatory expiry from 30 minutes to the tournament's own
   close; a table of what's live, each removable, and the drawer's
   summary carries the newest one so a collapsed drawer still answers
-  "what did I tell people?"); settings (public page, reader game
+  "what did I tell people?"); the **protests** drawer (every protest
+  moderators logged in MODAQ, from the newest upload of each game — round,
+  room, question and buzz word, the answer given, the reason, and the
+  score an upheld ruling would produce, computed the way MODAQ's own
+  protest-swing check does it, flagged when it can flip the result; the
+  TD records a ruling and a note per row, for the hub only — nothing is
+  sent to the room, and a ruling never edits a score: the moderator
+  applies it in MODAQ and uploads again, which the row reports as the
+  corrected game arriving; a count sits in the status strip and each
+  upload row carries a marker); settings (public page, reader game
   format — a MODAQ preset plus every field of MODAQ's own customize
   dialog, stored as overrides so it applies to every room — and
   admin-link rotation for leaks); stats + export with the buzzpoints
@@ -213,7 +222,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   writes a game's public copy — the only copy the round shards, the
   per-game qbj downloads, the GitHub snapshot repo and archive captures
   are ever built from — so none of them carry it; the TO's admin downloads keep it
-  for the `.yft`. Rooms likewise receive only the reader game format
+  for the `.yft`. The structured protest list the reader sends with each
+  upload (`files.summary`, with the teams and score) and the TD's rulings
+  (`tournaments.rulings`) ride on the admin route only. Rooms likewise receive only the reader game format
   from `settings` — never the buzzpoints config, whose stored hash would
   otherwise invite an offline attack on the TO's password.
 - The bucket and admin pages carry `noindex` + `no-referrer` so a link
@@ -291,7 +302,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   selector `js/tb_add_dialog.js`, bridged to the page by
   `js/tb_bridge.js` — after editing `js/read_main.js` /
   `js/read_core.js` / `js/tb_add_dialog.js` or bumping the `modaq` dep;
-  `read_core.js` holds the pure, unit-tested helpers).
+  `read_core.js` holds the pure, unit-tested helpers; `js/protests.js`,
+  shared with the hub, turns MODAQ's game state into the protest list
+  the upload carries and builds the hub's Protests drawer from it).
 - `worker/` — Cloudflare Worker (D1 metadata + R2 blobs). Auth model:
   admin link secret for the TO API (48h lifetime), bucket secret for
   moderator routes, publish flag gating all public reads. No secrets to
@@ -329,6 +342,8 @@ cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
 # an existing local DB from before at-rest encryption needs, once:
 #   npx wrangler d1 execute qb-td --local --file migrate-crypt.sql
+# ...and one from before protests reached the hub:
+#   npx wrangler d1 execute qb-td --local --file migrate-protests.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled
 npx wrangler dev --local --port 8799 --test-scheduled &
@@ -358,6 +373,8 @@ end, which is also how it exercises the `final` caching path.
    `npx wrangler d1 execute qb-td --remote --file migrate-crypt.sql`,
    and one from before the cron's derived-data queue needs
    `npx wrangler d1 execute qb-td --remote --file migrate-pub.sql`,
+   and one from before protests reached the hub needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-protests.sql`,
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy

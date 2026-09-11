@@ -25,6 +25,7 @@ import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   hasPlaceholders, poolStandings, fillPlaceholders } from '../engine/schedule.js';
 import { annLive, annTime } from './announce.js';
 import { buzzCredentials } from './buzzkey.js';
+import { protestRows, swingLines, qLabel, RULINGS, rulingLabel } from './protests.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -141,6 +142,7 @@ let rosterUpload = null; // parsed upload awaiting confirmation
 let fmtOpen = false;     // Customize MODAQ settings panel
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let annOpen = null;      // Broadcasts drawer; null = auto: open when something is live
+let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
 // the composer, so a re-render mid-compose doesn't eat what was typed
 let annForm = { text: '', to: 'both', rooms: [], mins: '240', alert: false };
 
@@ -1284,6 +1286,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         .filter((q) => (tbPool.uses || []).some((u) => u && u.q === q.id)).length
     : 0;
   const tbTotal = tbPool ? (tbPool.tossups || []).length + (tbPool.bonuses || []).length : 0;
+  // protests: every upload's summary joined with the TD's rulings
+  let rulings = {};
+  try { rulings = JSON.parse(t.rulings || '{}') || {}; } catch (e) { /* keep {} */ }
+  const roomOf = (bid) => { const b = buckets.find((x) => x.id === bid); return b ? b.room_name : '#' + bid; };
+  const { rows: prows, byFile: pfiles } = protestRows(files, rulings, roomOf);
+  const popen = prows.filter((r) => r.ruling === 'open');
+  const openProt = protOpen === null ? !!popen.length : protOpen;
 
   box.innerHTML = `
     ${missing.length ? `
@@ -1300,12 +1309,15 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       ${intake.expected ? `<span><span class="${intake.got >= intake.expected ? 'ok' : 'bad'}">${intake.got}</span><span class="muted">/${intake.expected} games in</span></span>` : ''}
       ${intake.missing.length ? `<span class="muted">Waiting: ${esc(intake.missing.join(', '))}</span>` : ''}
       ${tbTotal ? `<span class="pill ${tbUsed ? 'warn' : ''}">Tiebreakers: ${tbUsed} used &middot; ${tbTotal - tbUsed} unused</span>` : ''}
+      ${prows.length ? `<span class="pill link ${popen.length ? 'warn' : ''}" data-goto="protdrawer">${
+        popen.length ? `${popen.length} open protest${popen.length === 1 ? '' : 's'}` : 'Protests: none open'}</span>` : ''}
       <span class="spacer" style="flex:1"></span>
       <label>Round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
       <button id="setround">Set</button>
       ${t.current_round < totalRounds
         ? `<button id="advround" class="primary">Advance to Round ${t.current_round + 1}</button>` : ''}
     </div>
+    ${renderProtests(prows, popen, openProt)}
     <details class="drawer" id="anndrawer" ${openAnn ? 'open' : ''}>
       <summary><span class="dtitle">Broadcasts</span>
         <span class="muted">${live.length
@@ -1447,12 +1459,19 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
               ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
                 + link(`part=game&dl=${encodeURIComponent(base + '_Game.json')}`, 'game')
               : link(`dl=${encodeURIComponent(f.filename)}`, 'Download');
+            const ps = pfiles.get(f.id);
+            const plural = (n) => `${n} protest${n === 1 ? '' : 's'}`;
+            const marker = !ps ? '' : ps.superseded
+              ? `<span class="pill">${plural(ps.n)} &middot; superseded</span>`
+              : ps.open
+                ? `<span class="pill warn link" data-goto="protdrawer">${plural(ps.open)} open</span>`
+                : `<span class="pill link" data-goto="protdrawer">${plural(ps.n)} &middot; ruled</span>`;
             return `<tr>
               <td>${esc(room ? room.room_name : '#' + f.bucket_id)}</td>
               <td class="brk">${esc(f.filename)}</td>
               <td>${f.kind}</td>
               <td class="num">${fmtBytes(f.size)}</td>
-              <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">OK</span>'}</td>
+              <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">OK</span>'} ${marker}</td>
               <td class="row">
                 ${links}
                 <button data-delfile="${f.id}">Delete</button>
@@ -1471,6 +1490,41 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     };
   });
   $('anndrawer').ontoggle = () => { annOpen = $('anndrawer').open; };
+
+  /* protests: rulings are the TD's record only — a whole-map write, like
+     broadcasts. Nothing goes to the room; the moderator applies an
+     upheld ruling in MODAQ and uploads the game again. */
+  $('protdrawer').ontoggle = () => { protOpen = $('protdrawer').open; };
+  box.querySelectorAll('[data-goto]').forEach((el) => {
+    el.onclick = () => {
+      const d = $(el.dataset.goto);
+      d.open = true;
+      d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
+  const saveRuling = async (key, r, note) => {
+    const next = { ...rulings };
+    const prev = rulings[key];
+    note = note.trim();
+    if (r === 'open' && !note) delete next[key];
+    // the timestamp marks the ruling, not the note: a later re-upload of
+    // the game counts as the correction only against the ruling's time
+    else next[key] = { r, note, at: prev && prev.r === r ? prev.at : Date.now() };
+    try {
+      await pub(a, { method: 'POST', json: { rulings: next } });
+      t.rulings = JSON.stringify(next);
+      say(r === 'open' && !note ? 'Reopened' : `Saved: ${rulingLabel(r)}`);
+      render();
+    } catch (e) { say(e.message, true); }
+  };
+  box.querySelectorAll('[data-rule]').forEach((sel) => {
+    sel.onchange = () => saveRuling(sel.dataset.rule, sel.value,
+      box.querySelector(`[data-rnote="${CSS.escape(sel.dataset.rule)}"]`).value);
+  });
+  box.querySelectorAll('[data-rnote]').forEach((inp) => {
+    inp.onchange = () => saveRuling(inp.dataset.rnote,
+      box.querySelector(`[data-rule="${CSS.escape(inp.dataset.rnote)}"]`).value, inp.value);
+  });
 
   /* broadcasts: every write sends the whole live list, so removals and
      expiries prune themselves */
@@ -1651,6 +1705,57 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     };
   });
   $('calc').onclick = () => computeStats(a, t, buckets, files);
+}
+
+/* ---------- protests ----------
+   What moderators log in MODAQ, from the newest upload of each game,
+   with the swing an upheld ruling would produce (protests.js) and the
+   TD's ruling per row. The collapsed summary names the newest open one,
+   like the broadcasts drawer names its newest message. */
+
+function renderProtests(rows, open, isOpen) {
+  const first = open[0];
+  const summary = first
+    ? `${open.length} open &middot; R${first.round} ${esc(first.room)}: ${esc(first.p.team)} protests ${
+      qLabel(first.p)}${first.flips ? ' &middot; can flip the result' : ''}`
+    : rows.length ? 'Nothing open' : 'None logged';
+  return `
+    <details class="drawer" id="protdrawer" ${isOpen ? 'open' : ''}>
+      <summary><span class="dtitle">Protests</span><span class="muted">${summary}</span></summary>
+      <div class="inner">
+        ${rows.length ? `<div class="tablewrap" style="margin-top:8px"><table>
+          <tr><th>Round</th><th>Room</th><th>Question</th><th>Protest</th><th>Score</th><th>Ruling</th></tr>
+          ${rows.map((r) => `<tr class="protest ${r.ruling === 'open' && !r.superseded ? '' : 'ruled'}">
+            <td class="num">${r.round}</td>
+            <td>${esc(r.room)}<br><span class="muted" style="font-size:13px">${esc(r.teams[0])} v ${esc(r.teams[1])}</span>${
+              r.superseded ? '<br><span class="pill">Before the correction</span>' : ''}</td>
+            <td><span class="q">${qLabel(r.p)}</span>${r.p.word ? `<br><span class="muted" style="font-size:13px">word ${r.p.word}</span>` : ''}</td>
+            <td><b>${esc(r.p.team)}</b>${r.p.given ? ` answered <span class="given">${esc(r.p.given)}</span>` : ''}
+              <span class="reason">${esc(r.p.reason)}</span></td>
+            <td><span class="score">${esc(r.teams[0])} ${r.score[0]}<br>${esc(r.teams[1])} ${r.score[1]}</span><br>
+              ${!r.known ? '' : r.flips
+                ? '<span class="pill warn">Can flip the result</span>'
+                : '<span class="pill">Result stands</span>'}
+              ${r.known ? `<span class="swing">If upheld: ${esc(r.teams[0])} ${r.upheld[0]} &ndash; ${esc(r.teams[1])} ${r.upheld[1]}</span>` : ''}
+              ${swingLines(r).map((x) => `<span class="swing">${esc(x)}</span>`).join('')}</td>
+            <td><div class="ruling">
+              <select data-rule="${esc(r.key)}">${RULINGS.map(([v, l]) =>
+                `<option value="${v}" ${r.ruling === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+              <input data-rnote="${esc(r.key)}" maxlength="300" placeholder="Ruling note (stays on the hub)" value="${esc(r.note)}">
+              ${r.at && r.ruling !== 'open' ? `<span class="who">${rulingLabel(r.ruling)} ${esc(annTime(r.at))}</span>` : ''}
+              ${r.ruling === 'upheld' || r.superseded ? (r.corrected
+                ? '<span class="who ok">Corrected game received</span>'
+                : `<span class="followup wait">Waiting for ${esc(r.room)} to upload the corrected game</span>`) : ''}
+            </div></td>
+          </tr>`).join('')}
+        </table></div>` : ''}
+        <div class="muted" style="font-size:13px;margin-top:8px">
+          ${rows.length
+            ? 'A ruling is recorded for you only; nothing is sent to the room. Tell the moderator however you reach them; they apply it in MODAQ and upload the game again.'
+            : 'Protests moderators log in MODAQ show up here with each upload, with the score swing an upheld ruling would produce.'}
+        </div>
+      </div>
+    </details>`;
 }
 
 /* ---------- stats + export ---------- */

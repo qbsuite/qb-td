@@ -59,6 +59,11 @@ const MAX_ANNOUNCE_TEXT = 200;
 const MAX_ANNOUNCE_JSON = 2048;
 const MAX_TB_BLOB = 8 * 1024 * 1024;     // tiebreaker pool blob cap
 const MAX_TB_USES = 500;                 // usage log cap (griefing backstop)
+const MAX_PROTESTS = 50;                 // protests kept per uploaded game
+const MAX_PROTEST_TEXT = 500;            // reason / given-answer text cap
+const MAX_RULINGS = 500;                 // TD rulings per tournament
+const MAX_RULING_NOTE = 300;
+const MAX_RULINGS_JSON = 64 * 1024;
 
 /* ---------- responses ---------- */
 function corsHeaders(env) {
@@ -270,7 +275,112 @@ function extractMatch(text) {
   // qbj: what the game's public blob stores (an {objects} wrapper is
   // kept as-is — the engine unwraps it — but a combined file
   // contributes only .qbj).
-  return { error: null, qbj: obj, root, teams: names };
+  return { error: null, qbj: obj, root, teams: names, match };
+}
+
+/* ---------- protests ----------
+   MODAQ logs a protest in its game state and repeats it as free text in
+   the match's `notes`. The reader page turns the game state into a
+   structured list at upload (app/js/protests.js protestReport — swing
+   included, computed the way MODAQ does) and sends it as the .qbtd.json's
+   `protests`; the Worker keeps it on the file row as `summary`, with the
+   teams and final score, so the hub's Protests drawer needs no blob
+   reads. A bare .qbj (bucket page, or a file produced elsewhere) has only
+   the notes, so those are parsed instead — no swing, since the buzz
+   position isn't in the note. Summaries ride only on the admin route;
+   public copies carry neither notes nor summaries. */
+
+// A team's final score from its match_team (MODAQ writes no total).
+function teamScore(mt) {
+  let pts = 0;
+  for (const mp of (mt && (mt.match_players || mt.matchPlayers)) || []) {
+    for (const ac of (mp && (mp.answer_counts || mp.answerCounts)) || []) {
+      const v = ac && ac.answer ? Number(ac.answer.value) : NaN;
+      const n = ac ? Number(ac.number) : NaN;
+      if (Number.isFinite(v) && Number.isFinite(n)) pts += v * n;
+    }
+  }
+  pts += Number((mt && (mt.bonus_points ?? mt.bonusPoints)) || 0);
+  pts += Number((mt && (mt.bonus_bounceback_points ?? mt.bonusBouncebackPoints)) || 0);
+  return pts;
+}
+
+// MODAQ's two note templates (qbj/QBJ.js): "Tossup protest on tossup #N.
+// Team "X" protested because of this reason: "R"." and "Bonus protest on
+// bonus #N. Team "X" protested part P because of this reason: "R"."
+function protestsFromNotes(notes) {
+  if (typeof notes !== 'string' || !notes) return [];
+  const out = [];
+  const tu = /Tossup protest on tossup #(\d+)\. Team "(.*?)" protested because of this reason: "([\s\S]*?)"\.(?=\n|$)/g;
+  const bo = /Bonus protest on bonus #(\d+)\. Team "(.*?)" protested part (\d+) because of this reason: "([\s\S]*?)"\.(?=\n|$)/g;
+  let m;
+  while ((m = tu.exec(notes))) {
+    out.push({ kind: 'tu', q: Number(m[1]), team: m[2], given: '', reason: m[3] });
+  }
+  while ((m = bo.exec(notes))) {
+    out.push({ kind: 'b', q: Number(m[1]), part: Number(m[3]), team: m[2], given: '', reason: m[4] });
+  }
+  return out.sort((x, y) => x.q - y.q);
+}
+
+// The reader's report, bounded. Shape: app/js/protests.js protestReport.
+function cleanProtests(list) {
+  if (!Array.isArray(list)) return null;
+  const text = (s) => String(s ?? '').slice(0, MAX_PROTEST_TEXT);
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const out = [];
+  for (const p of list.slice(0, MAX_PROTESTS)) {
+    if (!p || typeof p !== 'object') continue;
+    const kind = p.kind === 'b' ? 'b' : p.kind === 'tu' ? 'tu' : null;
+    const q = Number(p.q);
+    if (!kind || !Number.isInteger(q) || q < 1 || q > 999) continue;
+    const detail = {};
+    for (const k of ['tu', 'neg', 'bonus', 'oppTu', 'oppBonus', 'part']) {
+      if (p.detail && p.detail[k] !== undefined) detail[k] = num(p.detail[k]);
+    }
+    out.push({
+      kind, q,
+      ...(kind === 'b' ? { part: Math.max(1, Math.min(99, Number(p.part) || 1)) } : {}),
+      team: text(p.team), given: text(p.given), reason: text(p.reason),
+      ...(kind === 'tu' && Number.isInteger(p.word) ? { word: p.word } : {}),
+      to: text(p.to), from: text(p.from), gain: num(p.gain), loss: num(p.loss), detail,
+    });
+  }
+  return out;
+}
+
+// files.summary for a valid match upload: JSON text or null.
+function matchSummary(match, reported) {
+  if (!match) return null;
+  const teams = (match.match_teams || match.matchTeams || []).map((mt) => {
+    const t = mt && mt.team;
+    return typeof t === 'string' ? t : (t && typeof t.name === 'string' ? t.name : '');
+  });
+  const score = (match.match_teams || match.matchTeams || []).map(teamScore);
+  const protests = cleanProtests(reported) || protestsFromNotes(match.notes);
+  const json = JSON.stringify({ teams, score, protests });
+  return json.length > 64 * 1024 ? JSON.stringify({ teams, score, protests: [] }) : json;
+}
+
+// Whole-map write (POST /a/:secret with `rulings`): {key: {r, note, at}},
+// keyed by the hub (round + question + team pair). Returns {error} or {json}.
+function cleanRulings(map) {
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return { error: 'bad rulings' };
+  const keys = Object.keys(map);
+  if (keys.length > MAX_RULINGS) return { error: `too many rulings (${MAX_RULINGS} max)` };
+  const out = {};
+  for (const k of keys) {
+    const v = map[k];
+    if (!v || typeof v !== 'object' || k.length > 400) return { error: 'bad ruling' };
+    const r = ['open', 'upheld', 'denied', 'withdrawn'].includes(v.r) ? v.r : null;
+    if (!r) return { error: 'bad ruling' };
+    const note = String(v.note ?? '').trim().slice(0, MAX_RULING_NOTE);
+    if (r === 'open' && !note) continue; // an open protest with nothing to say has no entry
+    out[k] = { r, note, at: Number.isInteger(v.at) ? v.at : Date.now() };
+  }
+  const json = JSON.stringify(out);
+  if (json.length > MAX_RULINGS_JSON) return { error: 'rulings too large' };
+  return { error: null, json };
 }
 
 // MODAQ writes protest reasons — moderator free text that routinely
@@ -984,7 +1094,7 @@ async function getTournament(env, t, ctx) {
   const [buckets, rounds, files, catsHead] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, secret_enc, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
-    env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
+    env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created, summary FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
     env.DATA.head(`t/${id}/catmap.json`),
   ]);
   // packets from before category extraction existed — or from before
@@ -1050,6 +1160,11 @@ async function updateTournament(request, env, t) {
     const cleaned = cleanAnnounce(body.announce, t);
     if (cleaned.error) return err(env, 400, cleaned.error);
     sets.push('announce = ?'); binds.push(cleaned.json);
+  }
+  if (body.rulings !== undefined) {
+    const cleaned = cleanRulings(body.rulings);
+    if (cleaned.error) return err(env, 400, cleaned.error);
+    sets.push('rulings = ?'); binds.push(cleaned.json);
   }
   if (!sets.length) return err(env, 400, 'nothing to update');
 
@@ -1762,11 +1877,13 @@ async function bucketUpload(request, url, env, secret) {
   const kind = isQbj ? 'qbj' : isCombined ? 'combined' : /_game\.json$/i.test(filename) ? 'game' : 'other';
   let error = null;
   let qbjObj = null;
+  let summary = null;  // files.summary: teams, score, protests (matchSummary)
   let tbReport = null; // {teams, used} from a reader upload's tb field
   if (isQbj || isCombined) {
     const parsed = extractMatch(new TextDecoder().decode(buf));
     error = parsed.error;
     qbjObj = parsed.qbj || null;
+    if (!error) summary = matchSummary(parsed.match, isCombined && parsed.root ? parsed.root.protests : null);
     if (!error && isCombined && parsed.root && parsed.root.tb
       && Array.isArray(parsed.root.tb.used) && parsed.teams.every(Boolean)) {
       tbReport = {
@@ -1782,9 +1899,9 @@ async function bucketUpload(request, url, env, secret) {
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
   await putBlob(env, key, buf, 'application/json', b.ckey);
   const out = await env.DB.prepare(
-    'INSERT INTO files (tournament_id, bucket_id, round, kind, r2_key, filename, size, error, created) ' +
-    'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)'
-  ).bind(b.tournament_id, b.id, round, kind, key, filename, buf.byteLength, error, Date.now()).run();
+    'INSERT INTO files (tournament_id, bucket_id, round, kind, r2_key, filename, size, error, created, summary) ' +
+    'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)'
+  ).bind(b.tournament_id, b.id, round, kind, key, filename, buf.byteLength, error, Date.now(), summary).run();
   const fileId = out.meta.last_row_id;
 
   if (qbjObj && !error) {

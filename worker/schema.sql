@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- not a settings key: a long game-format override must not be able to
   -- crowd out announcements, or the reverse.
   announce TEXT NOT NULL DEFAULT '[]',
+  -- JSON map of the TD's protest rulings (worker.js cleanRulings), keyed
+  -- by the hub (round + question + team pair). Admin route only.
+  -- Existing databases get it from migrate-protests.sql.
+  rulings TEXT NOT NULL DEFAULT '{}',
   roster_r2_key TEXT,                -- single roster qbj per tournament
   roster_name TEXT,
   created INTEGER NOT NULL,
@@ -71,7 +75,11 @@ CREATE TABLE IF NOT EXISTS files (
   filename TEXT NOT NULL,
   size INTEGER NOT NULL,
   error TEXT,                        -- qbj validation error, if any
-  created INTEGER NOT NULL
+  created INTEGER NOT NULL,
+  -- JSON {teams, score, protests} for a valid match (worker.js
+  -- matchSummary): what the hub's Protests drawer reads. Never public.
+  -- Existing databases get it from migrate-protests.sql.
+  summary TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_files_tournament ON files(tournament_id);
 CREATE INDEX IF NOT EXISTS idx_files_bucket ON files(bucket_id);

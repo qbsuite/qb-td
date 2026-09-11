@@ -833,6 +833,69 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     gres.status === 200 && JSON.parse(gtext).cycles.length === 0 && gtext.includes('SECRETQUESTIONTEXT'));
   ok('part=game named _Game.json',
     (gres.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta_Game.json'));
+
+  // protests: the file row's summary (teams, score, protests) is what the
+  // hub's Protests drawer reads. This upload had no structured report, so
+  // the protest comes from the qbj's notes — no swing.
+  const sum = JSON.parse(cfile.summary);
+  ok('summary carries teams and score',
+    sum.teams.join(',') === 'Alpha,Beta' && sum.score.join(',') === '60,10', sum);
+  ok('protest parsed from the notes', sum.protests.length === 1
+    && sum.protests[0].kind === 'tu' && sum.protests[0].q === 3 && sum.protests[0].team === 'Alpha'
+    && sum.protests[0].reason === 'PROTESTLEAKANSWER' && sum.protests[0].gain === undefined, sum.protests);
+
+  // a reader upload's structured report (swing included) wins over the notes
+  const q2 = JSON.parse(MATCH);
+  q2._round = 3;
+  r = await call(`/b/${secret}/upload?round=3&name=Round_3_Alpha_Beta.qbtd.json`, {
+    method: 'POST',
+    body: JSON.stringify({ qbj: q2, game: { cycles: [] }, protests: [
+      { kind: 'tu', q: 3, team: 'Alpha', word: 12, given: 'PROTESTLEAKANSWER', reason: 'PROTESTLEAKANSWER',
+        to: 'Alpha', from: 'Beta', gain: 45, loss: 30, detail: { tu: 10, neg: 5, bonus: 30, oppTu: 10, oppBonus: 20 } },
+      { kind: 'zzz', q: 1 },
+      { kind: 'b', q: 4, part: 2, team: 'Beta', reason: 'x'.repeat(2000), to: 'Beta', from: 'Alpha', gain: 10, loss: 0, detail: { part: 10 } },
+    ] }),
+  });
+  ok('reader report upload accepted', r.status === 200 && r.body.error === null, r.body);
+  const cid2 = r.body.id;
+  r = await call(A);
+  const sum2 = JSON.parse(r.body.files.find((f) => f.id === cid2).summary);
+  ok('reader report stored with its swing', sum2.protests.length === 2
+    && sum2.protests[0].gain === 45 && sum2.protests[0].loss === 30 && sum2.protests[0].word === 12
+    && sum2.protests[0].detail.oppBonus === 20 && sum2.protests[1].part === 2
+    && sum2.protests[1].reason.length === 500, sum2);
+
+  await tick();
+  r = await call('/pub/' + slug + '/rounds?n=3');
+  ok('round shard carries no summary', !JSON.stringify(r.body).includes('"summary"')
+    && !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
+  r = await call('/pub/' + slug);
+  ok('public state carries neither rulings nor summaries',
+    r.body.rulings === undefined && !JSON.stringify(r.body).includes('summary'), r.body);
+  r = await call('/b/' + secret);
+  ok('room state carries no summaries', !JSON.stringify(r.body).includes('"summary"')
+    && !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
+
+  // rulings: the TD's own record — whole-map writes on the admin route,
+  // like broadcasts
+  const rkey = '3/tu3/Alpha/Beta';
+  r = await call(A, { method: 'POST', json: { rulings: {
+    [rkey]: { r: 'upheld', note: '  Accept it  ', at: 5 },
+    'x/open': { r: 'open', note: '' },
+  } } });
+  ok('rulings saved', r.status === 200, r.body);
+  r = await call(A);
+  const rul = JSON.parse(r.body.tournament.rulings);
+  ok('rulings round-trip; note trimmed; empty open entry dropped',
+    rul[rkey].r === 'upheld' && rul[rkey].note === 'Accept it' && rul[rkey].at === 5
+    && rul['x/open'] === undefined, rul);
+  r = await call(A, { method: 'POST', json: { rulings: { k: { r: 'maybe' } } } });
+  ok('unknown ruling rejected', r.status === 400, r.body);
+  r = await call(A, { method: 'POST', json: { rulings: [] } });
+  ok('rulings must be a map', r.status === 400, r.body);
+
+  // clean up so the later file counts hold
+  await call(`${A}/files/${cid2}`, { method: 'DELETE' });
   const noPart = await fetch(fileUrl('&dl=x.qbtd.json'));
   ok('no part still serves the raw blob', noPart.status === 200 && (await noPart.text()).includes('"qbj"'));
   const badPart = await fetch(`${BASE}${A}/file?key=${encodeURIComponent(cfile.r2_key.replace(/^t\/\d+/, 't/999999'))}&part=qbj`);

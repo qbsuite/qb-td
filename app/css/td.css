@@ -119,6 +119,23 @@ table.box th:first-child {
 }
 .pill.on { color: var(--ok); border-color: var(--ok); }
 .pill.warn { color: var(--bad); border-color: var(--bad); }
+.pill.link { cursor: pointer; }
+.pill.link:hover { border-color: var(--link); color: var(--link); }
+/* Live Hub: protests drawer */
+.protest td { padding-block: 9px; vertical-align: top; }
+.protest .q { font-weight: 600; white-space: nowrap; }
+.protest .given { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.protest .reason { display: block; min-width: 22ch; max-width: 40ch; }
+.protest .score { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.protest .swing { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.protest.ruled td, .protest.ruled .reason { color: var(--muted); }
+.ruling { display: flex; flex-direction: column; gap: 4px; min-width: 190px; }
+.ruling input { font-size: 13px; padding: 3px 8px; }
+.ruling .who { font-size: 12px; color: var(--muted); }
+.followup {
+  font-size: 13px; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px;
+}
+.followup.wait { border-color: var(--bad); }
 .statusbar {
   border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
   display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 10px;

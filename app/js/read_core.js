@@ -59,13 +59,16 @@ export function matchFilenames(round, nameA, nameB) {
     packet carried appended tiebreakers (meta.tb) also report which pool
     questions were read — always, even when the list is empty, so a
     re-export that no longer reaches the tiebreakers clears its old log. */
-export function combinedUpload(match, round, storeText, tbUsed = null) {
+export function combinedUpload(match, round, storeText, tbUsed = null, protests = null) {
   let game = null;
   try { game = JSON.parse(storeText); } catch (e) { /* upload the qbj anyway */ }
   return JSON.stringify({
     qbj: withRound(match, round),
     game,
     ...(tbUsed ? { tb: { used: tbUsed } } : {}),
+    // the game's protests, structured (protests.js protestReport); the
+    // Worker falls back to the qbj's notes when absent
+    ...(Array.isArray(protests) && protests.length ? { protests } : {}),
   });
 }
 
