@@ -26,7 +26,7 @@ export function catCompare(a, b) {
 
 // One round's category lists. Maps written before bonus extraction store
 // a bare tossup array; current maps store {t, b}.
-function roundCats(catmap, round) {
+export function roundCats(catmap, round) {
   const r = catmap && catmap.rounds && typeof catmap.rounds === 'object'
     ? catmap.rounds[String(round)] : null;
   if (Array.isArray(r)) return { t: r, b: [] };
@@ -36,7 +36,7 @@ function roundCats(catmap, round) {
   return null;
 }
 
-function catInfo(list, number) {
+export function catInfo(list, number) {
   const info = list[number - 1];
   if (!info || typeof info.c !== 'string' || !info.c) return null;
   return { cat: info.c, sub: typeof info.s === 'string' ? info.s : '' };

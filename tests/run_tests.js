@@ -15,6 +15,9 @@ import { serializeYft } from '../app/engine/yft.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
+import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
+import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
+import { checkPacket } from '../app/engine/packetcheck.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -2278,6 +2281,354 @@ test('protestRows: newest upload per game, rulings keyed by game + question, cor
   assert.equal(qLabel(b12), 'B 12, part 2');
   // a tied game: any swing matters
   assert.equal(projectUpheld({ teams: ['A', 'B'], score: [200, 200], protests: [] }, { to: 'B', from: 'A', gain: 0, loss: 10 }).flips, true);
+});
+
+/* ---------- set-wide stats (setstats.js) ---------- */
+
+// One game as a round-shard entry: a 2-tossup packet, `buzzes` a list of
+// [tossup, team, player, word, value], `bonus` = [bonus number, points]
+// for the team whose correct buzz earned it.
+function setGame(id, round, a, b, buzzes, bonus) {
+  const counts = (team) => {
+    const out = {};
+    for (const [, tm, pl, , v] of buzzes) {
+      if (tm !== team) continue;
+      out[pl] = out[pl] || {};
+      out[pl][v] = (out[pl][v] || 0) + 1;
+    }
+    return out;
+  };
+  const mt = (team) => ({
+    team: { name: team },
+    bonus_points: bonus && buzzes.some(([, tm, , , v]) => tm === team && v > 0) ? bonus[1] : 0,
+    match_players: Object.entries(counts(team)).map(([name, c]) => ({
+      player: { name }, tossups_heard: 2,
+      answer_counts: Object.entries(c).map(([v, n]) => ({ number: n, answer: { value: Number(v) } })),
+    })),
+  });
+  return {
+    id, round, room: 'Room ' + id, filename: 'g' + id + '.qbj',
+    qbj: {
+      tossups_read: 2, _round: round, match_teams: [mt(a), mt(b)],
+      match_questions: [1, 2].map((n) => {
+        const mine = buzzes.filter(([t]) => t === n);
+        const right = mine.find(([, , , , v]) => v > 0);
+        return {
+          question_number: n, tossup_question: { question_number: n },
+          buzzes: mine.map(([, tm, pl, word, v]) => ({
+            team: { name: tm }, player: { name: pl }, buzz_position: { word_index: word }, result: { value: v } })),
+          ...(right && bonus ? { bonus: { question: { question_number: bonus[0] },
+            parts: [{ controlled_points: bonus[1] }, { controlled_points: 0 }, { controlled_points: 0 }] } } : {}),
+        };
+      }),
+    },
+  };
+}
+
+// Packet 1 has two versions: v2 swapped its two tossups and reworded
+// what is now T2 (question 1: rev 2). Question ids say which is which.
+const SET_CATMAP = { packets: { 1: {
+  1: { t: [{ c: 'History', s: 'American' }, { c: 'Science', s: 'Physics' }], b: [{ c: 'History', s: 'American' }],
+    q: { t: [[1, 1], [2, 1]], b: [[3, 1]] } },
+  2: { t: [{ c: 'Science', s: 'Physics' }, { c: 'History', s: 'American' }], b: [{ c: 'Science', s: 'Physics' }],
+    q: { t: [[2, 1], [1, 2]], b: [[4, 1]] } },
+} } };
+
+// Two sites with the SAME team names; site B ran packet 1 on the fixed
+// version — and as its round 3, not its round 1. Site C has not
+// finished its round.
+const SITE_A = buildSite({ id: 1, label: 'North', vmap: { 1: [1, 1] }, done: [1] }, [
+  setGame(1, 1, 'Team A', 'Team B', [[1, 'Team A', 'Ann', 10, 15], [2, 'Team B', 'Bob', 30, -5], [2, 'Team A', 'Ann', 40, 10]], [1, 10]),
+]);
+const SITE_B = buildSite({ id: 2, label: 'South', vmap: { 3: [1, 2] }, done: [3] }, [
+  setGame(7, 3, 'Team A', 'Team B', [[1, 'Team B', 'Bea', 20, 10]], [1, 30]),
+]);
+const SITE_C = buildSite({ id: 3, label: 'East', vmap: { 1: [1, 2], 2: null }, done: [] }, [
+  setGame(9, 1, 'Team C', 'Team D', [[1, 'Team C', 'Cy', 5, 15]], [1, 20]),
+]);
+
+test('buildSite: parses, dedupes re-uploads inside one site only', () => {
+  const again = buildSite({ id: 1, label: 'North', vmap: {}, done: [] }, [
+    setGame(1, 1, 'Team A', 'Team B', [[1, 'Team A', 'Ann', 10, 15]], [1, 10]),
+    setGame(4, 1, 'Team B', 'Team A', [[1, 'Team A', 'Ann', 10, 10]], [1, 10]),
+  ]);
+  assert.equal(again.entries.length, 1);
+  assert.equal(again.entries[0].id, 4);
+  const errors = [];
+  const bad = buildSite({ id: 5, label: 'West' }, [{ id: 1, filename: 'x.qbj', qbj: { match_teams: [] } }], errors);
+  assert.equal(bad.matches.length, 0);
+  assert.match(errors[0], /^West · x\.qbj: /);
+});
+
+test('setStandings: same team name at two sites stays two rows', () => {
+  const s = setStandings([SITE_A, SITE_B]);
+  const teamAs = s.teams.filter((t) => t.name === 'Team A');
+  assert.deepEqual(teamAs.map((t) => t.site).sort(), ['North', 'South']);
+  assert.equal(teamAs.find((t) => t.site === 'North').w, 1);
+  assert.equal(teamAs.find((t) => t.site === 'South').l, 1);
+  assert.deepEqual(s.sites.map((x) => [x.label, x.teams, x.games]), [['North', 2, 1], ['South', 2, 1]]);
+  // ranked by PP20TUH across sites, not by record
+  assert.ok(s.teams[0].pp20tuh >= s.teams[1].pp20tuh);
+  assert.deepEqual(s.values, [15, 10, -5]);
+  const ann = s.players.find((pl) => pl.name === 'Ann');
+  assert.equal(ann.site, 'North');
+  assert.equal(ann.points, 25);
+});
+
+test('setCategories: each site reads the packet version it played', () => {
+  const c = setCategories([SITE_A, SITE_B], SET_CATMAP);
+  // tossup 1 was History at North (v1) but Science at South (v2)
+  const ann = c.players.filter((r) => r.player === 'Ann');
+  assert.deepEqual(ann.map((r) => [r.cat, r.powers, r.gets]).sort(), [['History', 1, 0], ['Science', 0, 1]]);
+  const bea = c.players.find((r) => r.player === 'Bea');
+  assert.deepEqual([bea.cat, bea.site, bea.gets], ['Science', 'South', 1]);
+  // bonus 1 likewise: History at North, Science at South
+  const southBonus = c.teams.find((r) => r.site === 'South' && r.bh);
+  assert.deepEqual([southBonus.cat, southBonus.bpts], ['Science', 30]);
+
+  const sci = c.questions.find((q) => q.cat === 'Science');
+  // Science heard: North T2 (neg then get), South T1 (get)
+  assert.deepEqual([sci.heard, sci.powers, sci.gets, sci.negs, sci.dead], [2, 0, 2, 1, 0]);
+  const hist = c.questions.find((q) => q.cat === 'History');
+  // History heard: North T1 (power), South T2 (dead)
+  assert.deepEqual([hist.heard, hist.powers, hist.dead], [2, 1, 1]);
+});
+
+test('setCategories: a TD\'s own packet contributes nothing', () => {
+  const own = buildSite({ id: 8, label: 'Own', vmap: { 1: null }, done: [1] },
+    [setGame(2, 1, 'X', 'Y', [[1, 'X', 'Xi', 3, 15]], [1, 30])]);
+  const c = setCategories([own], SET_CATMAP);
+  assert.deepEqual([c.players.length, c.teams.length, c.questions.length], [0, 0, 0]);
+});
+
+test('setCatLines / setQuestionLines: filtered, per site, canonical order', () => {
+  const c = setCategories([SITE_A, SITE_B], SET_CATMAP);
+  const sci = setCatLines(c.players, 'Science', '', 'player');
+  assert.deepEqual(sci.map((l) => [l.player, l.site, l.pts]), [['Ann', 'North', 10], ['Bea', 'South', 10], ['Bob', 'North', -5]]);
+  const teams = setCatLines(c.teams, '', '', 'team');
+  // Team B buzzed at both sites: two lines, never one merged
+  assert.deepEqual(teams.filter((l) => l.team === 'Team B').map((l) => l.site).sort(), ['North', 'South']);
+  // sites are told apart by mirror id, not by label: two mirrors both
+  // called "Online" keep their same-named teams on separate lines
+  const twin = setCategories([{ ...SITE_A, label: 'Online' }, { ...SITE_B, label: 'Online' }], SET_CATMAP);
+  assert.equal(setCatLines(twin.teams, '', '', 'team').filter((l) => l.team === 'Team B').length, 2);
+  assert.deepEqual(setQuestionLines(c.questions, '').map((l) => l.name), ['History', 'Science']);
+  const subs = setQuestionLines(c.questions, 'Science');
+  assert.deepEqual(subs.map((l) => [l.name, l.heard, l.ppb]), [['Physics', 2, 30]]);
+});
+
+test('setQuestionPlays: a question keeps its plays across versions, rounds and rewording', () => {
+  const index = setQuestionPlays([SITE_A, SITE_B, SITE_C], SET_CATMAP);
+  // question 2 (Science): North's T2 on v1, South's T1 on v2 — same wording, so ONE group
+  const q2 = index.get('q2');
+  assert.deepEqual([...q2.revs.keys()], [1]);
+  assert.equal(q2.revs.get(1).heard, 2);
+  assert.deepEqual(q2.revs.get(1).buzzes.map((b) => [b.player, b.room]),
+    [['Bea', 'South · Room 7'], ['Bob', 'North · Room 1'], ['Ann', 'North · Room 1']]);
+  assert.deepEqual(q2.revs.get(1).homes.map((h) => [h.p, h.v, h.pos]), [[1, 1, 2], [1, 2, 1]]);
+  // question 1 (History) was reworded: North's power sits on rev 1, South heard rev 2 (dead)
+  const q1 = index.get('q1');
+  assert.deepEqual([...q1.revs.keys()].sort(), [1, 2]);
+  assert.equal(q1.revs.get(1).buzzes[0].player, 'Ann');
+  assert.deepEqual([q1.revs.get(2).heard, q1.revs.get(2).buzzes.length], [1, 0]);
+  // East is mid-round: nothing of it counts yet
+  assert.ok(![...index.values()].some(({ revs }) => [...revs.values()].some((g) => g.buzzes.some((b) => b.player === 'Cy'))));
+  // bonuses follow the same identities: v1's bonus (q3) and v2's (q4) are different questions
+  assert.equal(index.get('q3').revs.get(1).results[0].total, 10);
+  assert.equal(index.get('q4').revs.get(1).results[0].total, 30);
+});
+
+test('setPacketRows: the current packet, each question with every play of it', () => {
+  const index = setQuestionPlays([SITE_A, SITE_B], SET_CATMAP);
+  const rows = setPacketRows(index, SET_CATMAP, 1, 2);
+  assert.deepEqual(rows.map((r) => r.kind + r.pos), ['t1', 'b1', 't2']);
+  const [t1, b1, t2] = rows;
+  // T1 = question 2, unedited: both sites' plays on one wording
+  assert.deepEqual([t1.ident, t1.heard, t1.same.heard, t1.others.length], ['q2', 2, 2, 0]);
+  // T2 = question 1 reworded: South's play is on this wording, North's power on the earlier one
+  assert.deepEqual([t2.ident, t2.rev, t2.heard, t2.same.heard], ['q1', 2, 2, 1]);
+  assert.deepEqual(t2.others.map((g) => [g.rev, g.buzzes[0].player, g.homes[0].p, g.homes[0].v, g.homes[0].pos]),
+    [[1, 'Ann', 1, 1, 1]]);
+  assert.deepEqual([b1.ident, b1.heard], ['q4', 1]);
+});
+
+test('setBuzzNav / setEarlierRows: questions no current packet holds stay reachable', () => {
+  const index = setQuestionPlays([SITE_A, SITE_B], SET_CATMAP);
+  const nav = setBuzzNav(index, SET_CATMAP, { 1: 2 });
+  assert.deepEqual(nav.packets, [1]);
+  // v1's bonus (q3) is not in v2: it lives on under the version that had it
+  assert.deepEqual(nav.earlier, [[1, 1]]);
+  const rows = setEarlierRows(index, SET_CATMAP, { 1: 2 }, 1, 1);
+  assert.deepEqual(rows.map((r) => [r.kind + r.pos, r.ident]), [['b1', 'q3']]);
+});
+
+test('setQuestionTable / setBonusLines: one line per question, bonus parts ranked by conversion', () => {
+  const index = setQuestionPlays([SITE_A, SITE_B], SET_CATMAP);
+  const { tossups, bonuses } = setQuestionTable(index, SET_CATMAP, { 1: 2 });
+  const q1 = tossups.find((t) => t.ident === 'q1');
+  // History at its current home (packet 1 v2 T2); heard at both sites on two wordings; North's power
+  assert.deepEqual([q1.cat, q1.home.pos, q1.heard, q1.powers, q1.gets, q1.dead, q1.wordings], ['History', 2, 2, 1, 1, 1, 2]);
+  assert.equal(q1.avgWord, 11); // on the wording most rooms heard (both heard once: the first group wins)
+  const q2 = tossups.find((t) => t.ident === 'q2');
+  assert.deepEqual([q2.cat, q2.heard, q2.gets, q2.negs], ['Science', 2, 2, 1]);
+  // North's bonus (the fixture reads it after both of its correct buzzes): 10 on
+  // part 1 both times; South's bonus is another question, converted for 30
+  const b3 = bonuses.find((b) => b.ident === 'q3');
+  assert.deepEqual([b3.cat, b3.heard, b3.ppb, b3.dist, b3.ranked], ['History', 2, 10, [0, 2, 0, 0], [2, 0, 0]]);
+  const lines = setBonusLines(bonuses, '');
+  assert.deepEqual(lines.map((l) => [l.name, l.bonuses, l.heard, l.ppb, l.easy, l.mid, l.hard]),
+    [['History', 1, 2, 10, 1, 0, 0], ['Science', 1, 1, 30, 1, 0, 0]]);
+  assert.deepEqual(setBonusLines(bonuses, 'Science').map((l) => [l.name, l.dist]), [['Physics', [0, 0, 0, 1]]]);
+});
+
+test('setQuestionPlays: a version nobody matched stands alone', () => {
+  const bare = { packets: { 1: { 1: SET_CATMAP.packets[1][1], 2: { t: [], b: [] } } } };
+  const index = setQuestionPlays([SITE_A, SITE_B], bare);
+  assert.ok(index.has('u1.2.t1'));
+  assert.equal(index.get('q2').revs.get(1).heard, 1); // South's play of it is not claimed
+  const nav = setBuzzNav(index, bare, { 1: 2 });
+  assert.deepEqual([nav.packets, nav.earlier], [[1], [[1, 1]]]);
+  assert.deepEqual(setPacketRows(index, bare, 1, 2).map((r) => r.ident), ['u1.2.t1', 'u1.2.b1', 'u1.2.t2']);
+});
+
+test('setBuzzSummary: finished set rounds only, tagged by site', () => {
+  const rows = setBuzzSummary([SITE_A, SITE_B, SITE_C]);
+  assert.deepEqual(rows.map((r) => [r.player, r.site]), [['Ann', 'North'], ['Bea', 'South'], ['Bob', 'North']]);
+  assert.equal(rows[0].correct, 2);
+});
+
+/* ---------- question identity across packet versions (qmatch.js) ---------- */
+
+// Distinct questions share a giveaway formula and nothing else, as real
+// ones do: each body is its own run of words.
+const body = (n, from, to) => Array.from({ length: to - from }, (_, i) => `clue${n}x${from + i}`).join(' ');
+const TU = (n, extra = '') => ({
+  question: `This <b>author</b> ${body(n, 0, 12)} ${extra}${body(n, 12, 30)}. (*) For 10 points, name this writer ${body(n, 30, 34)}.`,
+  answer: `<b><u>Author ${n}</u></b> [accept Writer ${n}]` });
+const BN = (n) => ({ leadin: `Answer these about topic ${n}.`, parts: [`Part one of ${n}`, `Part two of ${n}`, `Part three of ${n}`],
+  answers: [`A${n}`, `B${n}`, `C${n}`] });
+const pkt = (tossups, bonuses = []) => packetQuestions({ tossups, bonuses });
+
+test('matchPacket: a first upload numbers its questions', () => {
+  const m = matchPacket(null, 1, pkt([TU(1), TU(2)], [BN(1)]));
+  assert.deepEqual(m.q, { t: [[1, 1], [2, 1]], b: [[3, 1]] });
+  assert.ok(m.report.every((r) => r.isNew && !r.edited && !r.from));
+  assert.deepEqual(m.ledger.questions[2].at, [1, 2]);
+  assert.equal(matchSummary(m, 1), 'all 3 questions new');
+});
+
+test('matchPacket: unchanged, reworded, reordered, new and dropped in one re-upload', () => {
+  const v1 = matchPacket(null, 1, pkt([TU(1), TU(2), TU(3)], [BN(1)]));
+  // T1 and T2 swap, the old T1 gains a clause, T3 is replaced, the bonus is untouched
+  const v2 = matchPacket(v1.ledger, 1, pkt([TU(2), TU(1, 'and its servants '), TU(9)], [BN(1)]));
+  assert.deepEqual(v2.q, { t: [[2, 1], [1, 2], [5, 1]], b: [[4, 1]] });
+  const by = Object.fromEntries(v2.report.map((r) => [r.kind + r.pos, r]));
+  assert.deepEqual([by.t1.edited, by.t1.from], [false, [1, 2]]);
+  assert.deepEqual([by.t2.edited, by.t2.rev, by.t2.from], [true, 2, [1, 1]]);
+  assert.equal(by.t3.isNew, true);
+  assert.deepEqual([by.b1.isNew, by.b1.edited, by.b1.from], [false, false, null]);
+  assert.deepEqual(v2.dropped, [{ kind: 't', id: 3, was: [1, 3] }]);
+  assert.equal(v2.ledger.questions[3].at, null);
+  assert.equal(matchSummary(v2, 1), '1 unchanged · 1 reworded (T2) · 2 in a new position · 1 new (T3) · 1 no longer in the set');
+  // the input ledger is not touched
+  assert.equal(v1.ledger.questions[1].revs.length, 1);
+});
+
+test('matchPacket: a question keeps its id when it moves to another packet, in either upload order', () => {
+  const p1 = matchPacket(null, 1, pkt([TU(1), TU(2)]));
+  const p2 = matchPacket(p1.ledger, 2, pkt([TU(3), TU(4)]));
+  // repacketize: question 2 goes to packet 2. Upload the receiving packet first...
+  const into = matchPacket(p2.ledger, 2, pkt([TU(3), TU(4), TU(2)]));
+  assert.deepEqual(into.q.t, [[3, 1], [4, 1], [2, 1]]);
+  assert.deepEqual(into.report[2].from, [1, 2]);
+  assert.equal(matchSummary(into, 2), '2 unchanged · 1 moved in (T3 from packet 1 T2)');
+  const outOf = matchPacket(into.ledger, 1, pkt([TU(1)]));
+  assert.deepEqual(outOf.dropped, []); // it already lives in packet 2
+  // ...or the packet it left first: it is dropped, then recognized on arrival
+  const left = matchPacket(p2.ledger, 1, pkt([TU(1)]));
+  assert.deepEqual(left.dropped.map((d) => d.id), [2]);
+  const arrived = matchPacket(left.ledger, 2, pkt([TU(3), TU(4), TU(2)]));
+  assert.deepEqual([arrived.q.t[2], arrived.report[2].from, arrived.report[2].isNew], [[2, 1], [1, 2], false]);
+});
+
+test('matchPacket: wording is what MODAQ indexes — markup and answerlines are not', () => {
+  const v1 = matchPacket(null, 1, pkt([TU(1)]));
+  const restyled = { ...TU(1), question: TU(1).question.replace('<b>author</b>', '<u>AUTHOR,</u>'), answer: 'Author 1 [or anything]' };
+  assert.deepEqual(matchPacket(v1.ledger, 1, pkt([restyled])).q.t, [[1, 1]]);
+  // dropping the power mark shifts every later word index: a new wording
+  const unpowered = { ...TU(1), question: TU(1).question.replace('(*) ', '') };
+  const m = matchPacket(v1.ledger, 1, pkt([unpowered]));
+  assert.deepEqual([m.q.t, m.report[0].edited], [[[1, 2]], true]);
+  // reverting to the first wording is the first wording again
+  assert.deepEqual(matchPacket(m.ledger, 1, pkt([TU(1)])).q.t, [[1, 1]]);
+});
+
+test('matchPacket: same answer but a rewritten question is a new question; back-fills leave places alone', () => {
+  const v1 = matchPacket(null, 1, pkt([TU(1)]));
+  const rewritten = { question: 'A wholly different set of clues about something else entirely, with nothing shared. For 10 points, who?', answer: TU(1).answer };
+  const m = matchPacket(v1.ledger, 1, pkt([rewritten]));
+  assert.deepEqual([m.q.t, m.report[0].isNew], [[[2, 1]], true]);
+  // two tossups on one subject share words, not phrasing: never one question
+  const sibling = { question: `This author ${body(7, 0, 30)}. For 10 points, name this writer ${body(1, 30, 34)}.`, answer: 'Someone Else' };
+  assert.equal(matchPacket(v1.ledger, 2, pkt([sibling])).report[0].isNew, true);
+  const back = matchPacket(m.ledger, 1, pkt([TU(1)]), false);
+  assert.deepEqual(back.q.t, [[1, 1]]);
+  assert.deepEqual([back.ledger.questions[1].at, back.ledger.questions[2].at, back.dropped], [null, [1, 1], []]);
+});
+
+test('assignQuestion: the editor overrides a match, and the ledger follows', () => {
+  const p1 = matchPacket(null, 1, pkt([TU(1), TU(2)]));
+  // a rewrite the matcher could not recognize came in as a new question 3...
+  const rewritten = { question: `Entirely ${body(5, 0, 30)}. For 10 points, name this writer ${body(1, 30, 34)}.`, answer: TU(1).answer };
+  const v2 = matchPacket(p1.ledger, 1, pkt([rewritten, TU(2)]));
+  assert.deepEqual(v2.q.t, [[3, 1], [2, 1]]);
+  // ...and the editor says T1 is question 1 after all
+  const fixed = assignQuestion(v2.ledger, 1, pkt([rewritten, TU(2)]), v2.q, 't', 1, 1);
+  assert.deepEqual(fixed.q.t, [[1, 2], [2, 1]]);
+  assert.deepEqual(fixed.ledger.questions[1].at, [1, 1]);
+  assert.equal(fixed.ledger.questions[1].revs.length, 2);
+  assert.equal(fixed.ledger.questions[3].at, null); // the false new question sits nowhere now
+  // the other way: split what the matcher merged
+  const split = assignQuestion(fixed.ledger, 1, pkt([rewritten, TU(2)]), fixed.q, 't', 2, null);
+  assert.deepEqual(split.q.t[1], [4, 1]);
+  assert.equal(split.ledger.questions[2].at, null);
+  assert.throws(() => assignQuestion(fixed.ledger, 1, pkt([rewritten, TU(2)]), fixed.q, 'b', 1, 1));
+  const choices = ledgerChoices(split.ledger, 't');
+  assert.deepEqual(choices.map((c) => [c.id, !!c.at]), [[1, true], [4, true], [2, false], [3, false]]);
+  assert.equal(choices[0].label, 'Author 1');
+});
+
+/* ---------- parse review (packetcheck.js) ---------- */
+
+test('checkPacket: lays a packet out for a reviewer and flags what looks off', () => {
+  const good = { tossups: [TU(1), TU(2)], bonuses: [BN(1), BN(2)] };
+  good.tossups.forEach((t) => { t.category = 'History'; });
+  const r = checkPacket(good);
+  assert.equal(r.count, 0);
+  assert.deepEqual([r.tossups[0].n, r.tossups[1].n, r.bonuses[1].n], [1, 2, 2]);
+  assert.deepEqual([r.tossups[0].answer, r.tossups[0].words > 30, r.tossups[0].power], ['Author 1', true, true]);
+  assert.equal(checkPacket({ tossups: [{ ...TU(1), answer: '<b><u>kite</u></b>s [accept x]' }] }).tossups[0].answer, 'kites');
+  assert.match(r.tossups[0].head, /^This author clue1x0/);
+  assert.match(r.tossups[0].tail, /clue1x33\.$/);
+  assert.deepEqual(r.bonuses[1].answers, ['A2', 'B2', 'C2']);
+
+  const bad = { tossups: [
+    { question: 'Too short. For 10 points, what?', answer: 'x', category: 'History' },
+    { question: TU(3).question + ' ANSWER: leaked ' + TU(4).question, answer: TU(1).answer },
+    { question: TU(1).question, answer: TU(1).answer },
+  ], bonuses: [
+    { leadin: '', parts: ['[10] still marked', 'ok part here yes'], answers: ['a', 'b', 'c'], values: [10, 10] },
+  ] };
+  const b = checkPacket(bad);
+  assert.deepEqual(b.tossups[0].warnings, ['very short (6 words)']);
+  assert.ok(b.tossups[1].warnings.includes('"ANSWER:" inside the question text'));
+  assert.ok(b.tossups[1].warnings.some((w) => /power marks/.test(w)));
+  assert.deepEqual(b.bonuses[0].warnings.sort(), [
+    '2 parts', '3 answers for 2 parts', 'no lead-in', 'part 1 still carries its "[10]" marker'].sort());
+  assert.ok(b.warnings.includes('3 tossups but 1 bonuses'));
+  assert.ok(b.warnings.some((w) => /share an answerline \(Author 1\)/.test(w)));
+  assert.ok(b.warnings.some((w) => /2 tossups without category data/.test(w)));
+  assert.equal(b.count, b.warnings.length + b.tossups.flatMap((t) => t.warnings).length + b.bonuses[0].warnings.length);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

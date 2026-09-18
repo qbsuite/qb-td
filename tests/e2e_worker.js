@@ -7,79 +7,8 @@
 
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-
-const WORKER_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'worker');
-
-const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
-
-// What credential columns hold for new rows (worker.js secretHash): the
-// backdating UPDATEs below match on it, and the at-rest checks assert it.
-const storedCred = (secret) =>
-  createHash('sha256').update('qbtd-cred:' + secret).digest('hex');
-
-// One row from the local D1 behind the dev Worker.
-function d1row(sql) {
-  const out = execSync(
-    `npx wrangler d1 execute qb-td --local --json --command "${sql}"`,
-    { cwd: WORKER_DIR },
-  ).toString();
-  return JSON.parse(out.slice(out.indexOf('[')))[0].results[0] || null;
-}
-
-// Raw bytes of an object in the local R2 behind the dev Worker — what an
-// operator browsing the bucket would see.
-function r2get(key) {
-  const tmp = path.join(tmpdir(), 'qbtd-e2e-' + Math.random().toString(36).slice(2));
-  execSync(`npx wrangler r2 object get qb-td-data/${key} --local --file "${tmp}"`,
-    { cwd: WORKER_DIR, stdio: 'ignore' });
-  const buf = readFileSync(tmp);
-  rmSync(tmp);
-  return buf;
-}
-
-async function call(path, opts = {}) {
-  const headers = { ...(opts.headers || {}) };
-  if (opts.json !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    opts = { ...opts, body: JSON.stringify(opts.json) };
-  }
-  // The wrangler CLI invocations in d1row/r2get reset the dev server's
-  // pooled keep-alive connections, so the next fetch can die with
-  // ECONNRESET on a stale socket; a fresh connection succeeds.
-  let res;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      res = await fetch(BASE + path, { ...opts, headers });
-      break;
-    } catch (e) {
-      if (attempt >= 2) throw e;
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    }
-  }
-  const ct = res.headers.get('content-type') || '';
-  const body = ct.includes('json') ? await res.json() : await res.text();
-  return { status: res.status, body, cache: res.headers.get('cache-control') };
-}
-
-// max-age seconds from a Cache-Control header, or null.
-function maxAge(cc) {
-  const m = /max-age=(\d+)/.exec(cc || '');
-  return m ? Number(m[1]) : null;
-}
-
-// Run the cron by hand (wrangler dev --test-scheduled). It is what turns
-// uploaded games into the round shards the public page reads, so the
-// public assertions below tick first rather than waiting a minute.
-async function tick() {
-  const res = await fetch(BASE + '/__scheduled');
-  if (!res.ok) throw new Error('cron trigger failed (' + res.status + '): run wrangler dev with --test-scheduled');
-  await res.text();
-}
+import { WORKER_DIR, BASE, storedCred, d1row, r2get, call, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
@@ -94,12 +23,6 @@ const MATCH = JSON.stringify({
         answer_counts: [{ number: 1, answer: { value: 10 } }] }] },
   ],
 });
-
-let passed = 0;
-function ok(name, cond, extra) {
-  if (cond) { passed++; console.log('  ok', name); }
-  else { console.error('FAIL', name, extra ?? ''); process.exitCode = 1; }
-}
 
 // bad admin link is a uniform 404
 let r = await call('/a/abcdefghjkmnpqrstuvw');
@@ -1088,4 +1011,4 @@ ok('final state caches for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
 r = await call('/pub/' + slug + '/rounds?n=1');
 ok('final round shards cache for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
 
-console.log(passed + ' e2e checks passed' + (process.exitCode ? ' (with failures)' : ''));
+summary('e2e');

@@ -19,8 +19,47 @@ function fakeDb(state) {
   // else explodes so a new query can't silently no-op in tests.
   const make = (sql, args) => ({
     async all() {
-      if (/SELECT \* FROM tournaments WHERE pub_dirty = 1/.test(sql)) {
-        return { results: state.tournaments.filter((t) => t.pub_dirty && (t.published || t.pub_snapshot)) };
+      if (/FROM tournaments t LEFT JOIN sets s .* WHERE t\.pub_dirty = 1/.test(sql)) {
+        const setOf = (t) => (state.sets || []).find((s) => s.id === t.set_id);
+        const mirrorOf = (t) => (state.mirrors || []).find((m) => m.tournament_id === t.id);
+        return {
+          results: state.tournaments
+            .filter((t) => t.pub_dirty && (t.published || t.pub_snapshot || t.set_id))
+            .map((t) => ({ ...t,
+              set_published: setOf(t) ? Number(setOf(t).published && !(mirrorOf(t) || {}).hidden) : null })),
+        };
+      }
+      if (/SELECT id FROM sets WHERE state_dirty = 1/.test(sql)) {
+        return { results: (state.sets || []).filter((s) => s.state_dirty).map((s) => ({ id: s.id })) };
+      }
+      // rebuildSetState: the set's visible mirrors, then its packet versions
+      if (/FROM set_mirrors m JOIN tournaments t/.test(sql)) {
+        return {
+          results: (state.mirrors || []).filter((m) => m.set_id === args[0] && !m.hidden).map((m) => {
+            const t = state.tournaments.find((x) => x.id === m.tournament_id);
+            return { mirror_id: m.tournament_id, state_dirty: m.state_dirty || 0,
+              label: m.name, host: m.host ?? null, event_date: m.event_date ?? null,
+              id: t.id, slug: t.slug, name: t.name, published: t.published,
+              created: t.created, pub_snapshot: t.pub_snapshot };
+          }),
+        };
+      }
+      if (/FROM set_packets WHERE set_id/.test(sql)) {
+        return { results: (state.packets || []).filter((x) => x.set_id === args[0]) };
+      }
+      // mirrorState — counted, so tests can see which mirrors paid for it
+      if (/SELECT number, packet_r2_key FROM rounds/.test(sql)) {
+        state.mirrorStateReads = (state.mirrorStateReads || []).concat(args[0]);
+        return { results: (state.rounds || []).filter((r) => r.tournament_id === args[0]) };
+      }
+      if (/SELECT round, bucket_id FROM files/.test(sql)) {
+        return {
+          results: state.files.filter((f) => f.tournament_id === args[0])
+            .map((f) => ({ round: f.round, bucket_id: f.bucket_id ?? 1 })),
+        };
+      }
+      if (/SELECT COUNT\(\*\) AS n FROM buckets/.test(sql)) {
+        return { results: [{ n: (state.buckets || []).filter((b) => b.tournament_id === args[0]).length || 1 }] };
       }
       if (/SELECT id, round FROM files WHERE/.test(sql)) {
         return { results: state.files.filter((f) => f.tournament_id === args[0]) };
@@ -43,6 +82,25 @@ function fakeDb(state) {
       throw new Error('unexpected all(): ' + sql);
     },
     async run() {
+      if (/UPDATE set_mirrors SET state_dirty = 1 WHERE set_id/.test(sql)) {
+        for (const m of state.mirrors || []) if (m.set_id === args[0] && m.tournament_id) m.state_dirty = 1;
+        return;
+      }
+      if (/UPDATE set_mirrors SET state_dirty = 1 WHERE tournament_id/.test(sql)) {
+        const m = (state.mirrors || []).find((x) => x.tournament_id === args[0]);
+        if (m) m.state_dirty = 1;
+        return;
+      }
+      if (/UPDATE set_mirrors SET state_dirty = 0 WHERE id/.test(sql)) {
+        // the mock's mirror_id is the tournament id
+        if (state.failMirrorClear) throw new Error('d1 unavailable');
+        (state.mirrors || []).find((x) => x.tournament_id === args[0]).state_dirty = 0;
+        return;
+      }
+      if (/UPDATE sets SET state_dirty/.test(sql)) {
+        state.sets.find((x) => x.id === args[0]).state_dirty = /state_dirty = 1/.test(sql) ? 1 : 0;
+        return;
+      }
       const t = state.tournaments.find((x) => x.id === args[0]);
       if (/SET pub_dirty = 1/.test(sql)) { t.pub_dirty = 1; return; }
       if (/SET pub_dirty = 0/.test(sql)) { t.pub_dirty = 0; return; }
@@ -574,6 +632,159 @@ const realFetch = globalThis.fetch;
   ok('rebuild: the marker forces the round', shardOf(objects, 1, 1).entries[0].room === 'Rebuilt');
   ok('rebuild: marker consumed', objects['t/1/rebuild.json'] === undefined);
   ok('rebuild: stamp unchanged', JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === '3:1');
+}
+
+// 17. A set's mirror whose own page is off, in a set that is not public
+// either: the tick still materializes it (its set's editors read those
+// shards) and writes the set's state blob, but nothing goes to GitHub.
+// Publishing the SET then publishes the mirror's blobs; unpublishing it
+// retracts them — the mirror's own flag never moved.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = {
+    id: 5, slug: 'mirror-a', name: 'Mirror A', published: 0, pub_dirty: 1,
+    pub_snapshot: null, roster_r2_key: null, current_round: 1, created: Date.now(), set_id: 9,
+  };
+  const set = { id: 9, published: 0, state_dirty: 0 };
+  const state = {
+    tournaments: [t], sets: [set],
+    mirrors: [{ set_id: 9, tournament_id: 5, name: 'Site A', host: 'A Univ', event_date: '2026-10-12' }],
+    packets: [{ set_id: 9, packet: 1, version: 1, r2_key: 's/9/packet/1/v1-abc/p.json', retired: 1 },
+      { set_id: 9, packet: 1, version: 2, r2_key: 's/9/packet/1/v2-def/p.json', retired: 0 },
+      { set_id: 9, packet: 4, version: 1, r2_key: 's/9/packet/4/v1-ghi/p.json', retired: 0 }],
+    // round 1 on the version it played, round 2 the TD's own packet,
+    // round 3 the set's packet FOUR — which round reads what is the TD's call
+    rounds: [{ tournament_id: 5, number: 1, packet_r2_key: 's/9/packet/1/v1-abc/p.json' },
+      { tournament_id: 5, number: 2, packet_r2_key: 't/5/packet/2/own.json' },
+      { tournament_id: 5, number: 3, packet_r2_key: 's/9/packet/4/v1-ghi/p.json' }],
+    files: [{ id: 3, tournament_id: 5, round: 1 }],
+  };
+  const objects = { 't/5/pub/3.json': pubGame(3, 1) };
+  await runCron(env(state, objects, gh));
+  ok('set mirror: materialized though unpublished', shardOf(objects, 5, 1).entries.length === 1);
+  ok('set mirror: nothing committed while neither flag is on',
+    gh.commits.length === 0 && t.pub_snapshot === null && t.pub_dirty === 0);
+  let setState = JSON.parse(objects['s/9/state.json'].textFor());
+  ok('set state: the mirror, its stamps and its label',
+    setState.mirrors.length === 1 && setState.mirrors[0].id === 5 && setState.mirrors[0].label === 'Site A'
+    && setState.mirrors[0].rounds['1'] === '3:1' && setState.mirrors[0].page === false, setState);
+  ok('set state: each round names the set packet + version it ran, own packet null',
+    JSON.stringify(setState.mirrors[0].vmap) === JSON.stringify({ 1: [1, 1], 2: null, 3: [4, 1] }), setState.mirrors[0].vmap);
+  ok('set state: finished rounds', JSON.stringify(setState.mirrors[0].done) === '[1]');
+  ok('set state: current versions only', JSON.stringify(setState.packets) === JSON.stringify({ 1: 2, 4: 1 }));
+  ok('set state: no snapshot yet', setState.mirrors[0].pub === null);
+
+  // the editor publishes the set (updateSet flags every mirror). The
+  // mirror has a schedule and a roster, but its own page is off: only
+  // its games belong to the set, so only the shards are committed.
+  objects['t/5/schedule.json'] = r2obj('{"v":1,"rooms":[],"phases":[]}', 2000);
+  objects['t/5/roster.qbj'] = r2obj('{"objects":[]}', 2000);
+  t.roster_r2_key = 't/5/roster.qbj';
+  set.published = 1; set.state_dirty = 1; t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('set published: mirror blobs committed under its slug',
+    gh.commits.length === 1 && gh.trees[0].tree.some((e) => e.path === 'mirror-a/r1.json'), gh.trees[0]);
+  ok('set published: a mirror whose own page is off publishes its games only',
+    JSON.stringify(gh.trees[0].tree.map((e) => e.path)) === '["mirror-a/r1.json"]', gh.trees[0].tree);
+  setState = JSON.parse(objects['s/9/state.json'].textFor());
+  ok('set published: state advertises the commit',
+    setState.mirrors[0].pub && setState.mirrors[0].pub.sha === 'commit-1'
+    && setState.mirrors[0].pub.rounds['1'] === '3:1', setState.mirrors[0].pub);
+  ok('set published: set flag cleared', set.state_dirty === 0);
+
+  // the TD turns the mirror's own page on: now the rest goes out too...
+  t.published = 1; t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('mirror page on: schedule and roster join the shards',
+    gh.trees[1].tree.map((e) => e.path).sort().join() === 'mirror-a/roster.json,mirror-a/schedule.json', gh.trees[1].tree);
+  // ...and off again: they come back down while the games stay up
+  t.published = 0; t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('mirror page off again: schedule and roster retracted, games kept',
+    gh.trees[2].tree.every((e) => e.sha === null)
+    && gh.trees[2].tree.map((e) => e.path).sort().join() === 'mirror-a/roster.json,mirror-a/schedule.json'
+    && JSON.parse(t.pub_snapshot).rounds['1'] === '3:1', gh.trees[2].tree);
+
+  // hidden from the set's stats: the set no longer makes it public
+  state.mirrors[0].hidden = 1; t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('hidden mirror: its games are retracted though the set is public',
+    gh.trees[3].tree.some((e) => e.path === 'mirror-a/r1.json' && e.sha === null) && t.pub_snapshot === null,
+    gh.trees[3].tree);
+  state.mirrors[0].hidden = 0; t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+
+  const before = gh.commits.length;
+  set.published = 0; t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('set unpublished: mirror folder retracted',
+    gh.commits.length === before + 1
+    && gh.trees[gh.trees.length - 1].tree.some((e) => e.path === 'mirror-a/r1.json' && e.sha === null)
+    && t.pub_snapshot === null, gh.trees[gh.trees.length - 1]);
+  ok('set unpublished: shards stay for the editors', shardOf(objects, 5, 1).entries.length === 1);
+}
+
+// 18. Two mirrors, one moves: only that one pays for mirrorState — the
+// other's half of the state is carried forward from the last blob.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const mk = (id, slug) => ({ id, slug, name: slug, published: 0, pub_dirty: 1, pub_snapshot: null,
+    roster_r2_key: null, current_round: 1, created: Date.now(), set_id: 4 });
+  const a = mk(11, 'site-a');
+  const b = mk(12, 'site-b');
+  const state = {
+    tournaments: [a, b], sets: [{ id: 4, published: 0, state_dirty: 0 }],
+    mirrors: [{ set_id: 4, tournament_id: 11, name: 'A' }, { set_id: 4, tournament_id: 12, name: 'B' }],
+    packets: [], rounds: [],
+    files: [{ id: 1, tournament_id: 11, round: 1 }, { id: 2, tournament_id: 12, round: 1 }],
+  };
+  const objects = { 't/11/pub/1.json': pubGame(1, 1), 't/12/pub/2.json': pubGame(2, 1) };
+  await runCron(env(state, objects, gh));
+  ok('carry-forward: first build reads both mirrors',
+    JSON.stringify([...state.mirrorStateReads].sort()) === '[11,12]', state.mirrorStateReads);
+
+  state.mirrorStateReads = [];
+  state.files.push({ id: 5, tournament_id: 12, round: 2 });
+  objects['t/12/pub/5.json'] = pubGame(5, 2);
+  b.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  const setState = JSON.parse(objects['s/4/state.json'].textFor());
+  ok('carry-forward: only the mirror that moved is re-read',
+    JSON.stringify(state.mirrorStateReads) === '[12]', state.mirrorStateReads);
+  ok('carry-forward: both mirrors still in the state, the mover updated',
+    setState.mirrors.length === 2 && setState.mirrors[0].rounds['1'] === '1:1'
+    && setState.mirrors[1].rounds['2'] === '5:1', setState.mirrors);
+
+  // A rebuild that fails part-way must not lose track of what moved:
+  // the flag lives in D1, so the next tick re-reads the same mirror.
+  state.files.push({ id: 6, tournament_id: 11, round: 2 });
+  objects['t/11/pub/6.json'] = pubGame(6, 2);
+  a.pub_dirty = 1;
+  state.failMirrorClear = true;
+  state.mirrorStateReads = [];
+  await runCron(env(state, objects, gh));
+  ok('failed rebuild: set and mirror stay flagged',
+    state.sets[0].state_dirty === 1 && state.mirrors[0].state_dirty === 1);
+  state.failMirrorClear = false;
+  state.mirrorStateReads = [];
+  await runCron(env(state, objects, gh)); // no tournament is dirty this time
+  // a failed rebuild cannot know which of its claims it got to, so every
+  // mirror of the set is re-read once — over-reading, never staleness
+  ok('failed rebuild: the next tick re-reads every mirror of the set and clears the flags',
+    JSON.stringify([...state.mirrorStateReads].sort()) === '[11,12]'
+    && state.sets[0].state_dirty === 0 && state.mirrors[0].state_dirty === 0
+    && JSON.parse(objects['s/4/state.json'].textFor()).mirrors[0].rounds['2'] === '6:1', state.mirrorStateReads);
+
+  // a hidden mirror drops out on the set's own flag, no tournament dirty
+  state.mirrorStateReads = [];
+  state.mirrors[0].hidden = 1;
+  state.sets[0].state_dirty = 1;
+  await runCron(env(state, objects, gh));
+  const after = JSON.parse(objects['s/4/state.json'].textFor());
+  ok('set-only change: rebuilt from the flag, nothing re-read',
+    after.mirrors.length === 1 && after.mirrors[0].id === 12 && state.mirrorStateReads.length === 0, after.mirrors);
 }
 
 globalThis.fetch = realFetch;

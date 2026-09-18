@@ -18,9 +18,9 @@ import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { renderStats } from './statsview.js';
 import { slotText } from '../engine/schedule.js';
-import { roundTossupBuzzes, roundBonuses, buzzSummary, tokenizeQuestionHtml, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../engine/buzz.js';
+import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries } from '../engine/buzz.js';
+import { roundHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../engine/cats.js';
-import { normalizePacket } from './read_core.js';
 import { buzzToken } from './buzzkey.js';
 
 const $ = (id) => document.getElementById(id);
@@ -47,7 +47,6 @@ let catSel = '';
 let catSubSel = '';
 let catPlayerSel = null;   // {team, player}
 const buzzPackets = {};    // round -> Promise<normalized packet>
-const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 const BUZZ_KEY = 'qbtdBuzzKey:' + slug;
 
 function say(text, bad = false) {
@@ -354,14 +353,8 @@ function buzzAuthHeaders() {
 function fetchBuzzPacket(round) {
   if (!buzzPackets[round]) {
     buzzPackets[round] = (async () => {
-      const res = await pub('/pub/' + slug + '/qpacket?round=' + round,
-        { headers: buzzAuthHeaders() });
-      if (!(res instanceof Response)) return normalizePacket(res, 'round ' + round);
-      // non-JSON packet (docx): parse in-browser via the same public
-      // YAPP service the reader uses
-      const yapp = await fetch(YAPP, { method: 'POST', body: await res.arrayBuffer(), mode: 'cors' });
-      if (!yapp.ok) throw new Error('packet parser failed (' + yapp.status + ')');
-      return normalizePacket(await yapp.json(), 'round ' + round);
+      return readPacket(await pub('/pub/' + slug + '/qpacket?round=' + round,
+        { headers: buzzAuthHeaders() }), 'round ' + round);
     })().catch((e) => { delete buzzPackets[round]; throw e; });
   }
   return buzzPackets[round];
@@ -397,13 +390,6 @@ async function tryBuzzKey(pw) {
   render();
 }
 
-function buzzWordClass(hits) {
-  if (hits.some((b) => b.value > 10)) return 'pow';
-  if (hits.some((b) => b.value > 0)) return 'get';
-  if (hits.some((b) => b.value < 0)) return 'neg';
-  return 'zero';
-}
-
 const buzzDoneSet = () => new Set(state.buzz_done || []);
 const buzzEntries = () => {
   const done = buzzDoneSet();
@@ -411,94 +397,7 @@ const buzzEntries = () => {
 };
 
 function renderBuzzSummary(box) {
-  const rows = buzzSummary(buzzEntries());
-  if (!rows.length) { box.innerHTML = '<div class="muted">no buzzes yet</div>'; return; }
-  box.innerHTML = `<div class="tablewrap"><table>
-    <tr><th class="name">player</th><th class="name">team</th><th class="num">15</th><th class="num">10</th>
-      <th class="num">neg</th><th class="num">avg buzz</th><th class="num">best</th></tr>
-    ${rows.map((p) => `<tr>
-      <td class="name">${esc(p.player)}</td><td class="name muted">${esc(p.team)}</td>
-      <td class="num">${p.powers}</td><td class="num">${p.gets}</td><td class="num">${p.negs}</td>
-      <td class="num">${p.avg === null ? '–' : (p.avg + 1).toFixed(1)}</td>
-      <td class="num">${p.best === null ? '–' : p.best + 1}</td></tr>`).join('')}
-  </table></div>`;
-}
-
-function tossupHtml(tossup, buzzes, packet) {
-  const tu = packet && packet.tossups && packet.tossups[tossup - 1];
-  let qhtml = '';
-  if (tu) {
-    const words = tokenizeQuestionHtml(tu.question);
-    const byPos = new Map();
-    buzzes.forEach((b, i) => {
-      const pos = Math.min(b.position, words.length - 1);
-      if (!byPos.has(pos)) byPos.set(pos, []);
-      byPos.get(pos).push({ i, b });
-    });
-    qhtml = '<div class="q">' + words.map((w, wi) => {
-      const hits = byPos.get(wi);
-      if (!hits) return w;
-      const cls = buzzWordClass(hits.map((h) => h.b));
-      return `<span class="bw ${cls}">${w}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
-    }).join(' ') + '</div>';
-  }
-  const buzzChips = buzzes.map((b) => {
-    const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
-    return `<span class="${cls}">${b.position + 1}</span>`;
-  }).join(' ');
-  const dead = buzzes.some((b) => b.value > 0) ? '' : '<span class="bad">dead</span> ';
-  return `
-    <details class="qd">
-      <summary><span class="roundcell">T${tossup}</span>
-        ${tu ? mainAnswerHtml(tu.answer) : '<span class="muted">(no packet text)</span>'}
-        <span class="qdmeta">${dead}${buzzChips}</span></summary>
-      <div class="qdbody">
-        ${qhtml}
-        ${tu ? `<div class="q muted">ANSWER: ${sanitizeHtml(tu.answer)}</div>` : ''}
-        ${buzzes.length ? `<div class="buzzlist">
-          ${buzzes.map((b, i) => {
-            const cls = b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0 ? 'bad' : 'muted';
-            return `<div><span class="${cls}">${i + 1} ${b.value > 0 ? '+' : ''}${b.value}</span>
-              ${esc(b.player)} (${esc(b.team)}) &middot; word ${b.position + 1}${b.room ? ' &middot; ' + esc(b.room) : ''}</div>`;
-          }).join('')}
-        </div>` : '<div class="buzzlist">no buzzes</div>'}
-      </div>
-    </details>`;
-}
-
-function bonusHtml(bonus, results, packet) {
-  const bz = packet && Array.isArray(packet.bonuses) && packet.bonuses[bonus - 1];
-  const heard = results.length;
-  const nParts = Math.max(...results.map((r) => r.parts.length));
-  const conv = [];
-  for (let p = 0; p < nParts; p++) {
-    conv.push(results.filter((r) => r.parts[p] > 0).length);
-  }
-  const avg = results.reduce((n, r) => n + r.total, 0) / heard;
-  const answers = bz && Array.isArray(bz.answers) ? bz.answers : [];
-  const partsText = bz && Array.isArray(bz.parts) ? bz.parts : [];
-  return `
-    <details class="qd bonus">
-      <summary><span class="roundcell">B${bonus}</span>
-        ${answers.length
-          ? answers.map((a) => mainAnswerHtml(a)).join(' <span class="muted">/</span> ')
-          : '<span class="muted">(no packet text)</span>'}
-        <span class="qdmeta">${avg.toFixed(1)} avg &middot; ${conv.map((c) => c + '/' + heard).join(' ')}</span></summary>
-      <div class="qdbody">
-        ${bz && bz.leadin ? `<div class="q muted">${sanitizeHtml(bz.leadin)}</div>` : ''}
-        ${conv.map((c, p) => `
-          <div class="q"><span class="${c ? 'ok' : 'bad'}">${c}/${heard}</span>
-            ${answers[p] ? `<b style="text-transform:none">${sanitizeHtml(answers[p])}</b>` : ''}
-            ${partsText[p] ? `<span class="muted">— ${sanitizeHtml(partsText[p])}</span>` : ''}</div>`).join('')}
-        <div class="buzzlist">
-          ${results.map((r) => `<div>
-            <span class="${r.total > 20 ? 'pow-t' : r.total > 0 ? 'ok' : 'muted'}">${r.total}</span>
-            ${r.team ? esc(r.team) : '<span class="muted">?</span>'}
-            &middot; ${r.parts.join(' ')}${r.bounceTotal ? ` &middot; +${r.bounceTotal} bounce` : ''}${r.room ? ' &middot; ' + esc(r.room) : ''}
-          </div>`).join('')}
-        </div>
-      </div>
-    </details>`;
+  box.innerHTML = buzzSummaryHtml(buzzSummary(buzzEntries()));
 }
 
 async function renderBuzzRound(box, round) {
@@ -523,16 +422,7 @@ async function renderBuzzRound(box, round) {
     } // packet unreadable: numbers still render without text
   }
   if (tab !== 'buzz' || buzzView !== round) return; // user moved on mid-fetch
-  // interleave by packet position: tossup N, then the bonus N read with it
-  const tossupByNo = new Map(tossups.map((t) => [t.tossup, t]));
-  const bonusByNo = new Map(bonuses.map((b) => [b.bonus, b]));
-  const numbers = [...new Set([...tossupByNo.keys(), ...bonusByNo.keys()])].sort((a, b) => a - b);
-  box.innerHTML = numbers.map((n) => {
-    let html = '';
-    if (tossupByNo.has(n)) html += tossupHtml(n, tossupByNo.get(n).buzzes, packet);
-    if (bonusByNo.has(n)) html += bonusHtml(n, bonusByNo.get(n).results, packet);
-    return html;
-  }).join('');
+  box.innerHTML = roundHtml(tossups, bonuses, packet);
 }
 
 function renderBuzz(box) {

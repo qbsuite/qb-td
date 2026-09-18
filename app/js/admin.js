@@ -4,6 +4,11 @@
 // remembered in localStorage so the list view survives a closed tab —
 // but the link itself is the source of truth.
 //
+// A third way in: index.html?i=<invite>. A question set's editor mints
+// one invite per mirror (set.html); opening it here shows what it is and
+// starts it — which creates an ordinary tournament, 48h clock and all,
+// with the set's rounds already in place (showInvite).
+//
 // The dashboard is two views. Tournament Setup is the before-the-day
 // work — Rooms, Packets + Tiebreakers, Roster, Schedule — with a progress
 // pill per step. The Live Hub is the day-of page — round control,
@@ -11,15 +16,14 @@
 // until setup is complete.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
-import { parseMatch, parseRoster, matchPayload, buildRosterQbj,
-  guessRound } from '../engine/qbj.js';
+import { parseMatch, parseRoster, matchPayload, buildRosterQbj } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { buildReport } from '../engine/report.js';
-import { makeZip, readZip } from '../engine/zip.js';
+import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
-import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrides,
-  parsePowersText, powersText } from './read_core.js';
+import { renderPacketsUi, stagedBlob } from './packetsui.js';
+import { formatHtml, wireFormat } from './formatui.js';
 import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
   hasPlaceholders, poolStandings, fillPlaceholders } from '../engine/schedule.js';
@@ -31,6 +35,7 @@ const $ = (id) => document.getElementById(id);
 const view = $('view');
 const msg = $('msg');
 const adminSecret = new URLSearchParams(location.search).get('a') || '';
+const inviteSecret = new URLSearchParams(location.search).get('i') || '';
 
 function say(text, bad = false) {
   msg.textContent = text || '';
@@ -44,6 +49,7 @@ function adminLink(secret) { return pageDir() + '/index.html?a=' + secret; }
 function bucketLink(secret) { return pageDir() + '/bucket.html?b=' + secret; }
 function readLink(secret) { return pageDir() + '/read.html?b=' + secret; }
 function statsLink(slug) { return pageDir() + '/t.html?t=' + slug; }
+function setLink(slug) { return pageDir() + '/s.html?s=' + slug; }
 
 async function copy(text, label) {
   await navigator.clipboard.writeText(text);
@@ -106,6 +112,9 @@ function showList() {
       <input id="newslug" placeholder="Slug (public URL)" size="18">
       <button id="newbtn" class="primary">Create</button>
     </div>
+    <h2>Question sets</h2>
+    <div><a href="set.html">Set editors</a>
+      <span class="muted">upload a set once, hand each mirror a link, read set-wide stats</span></div>
     <h2>Archive</h2>
     <div><a href="archive.html">Past tournaments</a></div>
     <h2>Demo</h2>
@@ -125,6 +134,65 @@ function showList() {
   };
 }
 
+/* ---------- starting a mirror from an invite ----------
+   The invite is not the tournament: nothing exists, and no clock runs,
+   until the TD presses Start. So the page says exactly that — an editor
+   sends these out weeks ahead, and a TD who starts one on the spot has
+   spent their 48 hours before the event. */
+
+async function showInvite() {
+  let inv;
+  try { inv = await pub('/i/' + inviteSecret); }
+  catch (e) {
+    say(e.message === 'bad link' ? 'This invite link is not valid (it may have been revoked)'
+      : e.message === 'set closed' ? 'This set has closed' : e.message, true);
+    view.innerHTML = '<div class="row"><a href="index.html">All tournaments</a></div>';
+    return;
+  }
+  if (inv.started) {
+    say('This mirror was already started on ' + new Date(inv.started).toLocaleString()
+      + '. Its admin link was shown then — ask the set\u2019s editors for a new invite if it is lost.', true);
+    view.innerHTML = '<div class="row"><a href="index.html">All tournaments</a></div>';
+    return;
+  }
+  view.innerHTML = `
+    <h2>Mirror of ${esc(inv.set)}</h2>
+    <div class="card">
+      <div><b>${esc(inv.name)}</b>${inv.host ? ` <span class="muted">${esc(inv.host)}</span>` : ''}${
+        inv.event_date ? ` <span class="muted">${esc(inv.event_date)}</span>` : ''}</div>
+      <div class="muted" style="margin-top:6px">${inv.packets} packet${inv.packets === 1 ? '' : 's'},
+        the set&rsquo;s backup questions and the reader&rsquo;s game format come with it — which round
+        reads which packet stays up to you. Everything the rooms upload here, results and
+        game files (MODAQ&rsquo;s included), is shared with the set&rsquo;s editors for set-wide stats.</div>
+    </div>
+    <p style="margin:12px 0"><b>Starting creates the tournament and starts its 48-hour clock</b> —
+      the admin link, and every room link made from it, stops working 48 hours after you press
+      Start. Start within a day of the event, not when the invite arrives. It can be used once.
+      Already made your tournament? Don&rsquo;t start a second one: open it, and paste this page&rsquo;s link
+      under Tournament Setup &rarr; Packets &rarr; Join a set.</p>
+    <div class="row">
+      <input id="invname" placeholder="Name" size="24" value="${esc(inv.name)}">
+      <input id="invslug" placeholder="Slug (public URL)" size="18" value="${esc(inv.slug || '')}">
+      <button id="invstart" class="primary">Start tournament</button>
+    </div>`;
+  $('invstart').onclick = async () => {
+    $('invstart').disabled = true;
+    try {
+      const out = await pub('/i/' + inviteSecret, { method: 'POST', json: {
+        name: $('invname').value, slug: $('invslug').value,
+      } });
+      saveLink({ secret: out.admin_secret, slug: out.slug, name: out.name,
+        closes: out.closes, created: Date.now() });
+      showLinkModal(adminLink(out.admin_secret), out.closes, () => {
+        location.href = adminLink(out.admin_secret);
+      });
+    } catch (e) {
+      say(e.message, true);
+      $('invstart').disabled = false;
+    }
+  };
+}
+
 /* ---------- tournament detail: shared state ----------
    Survives render() re-renders (which happen after every action). */
 
@@ -132,7 +200,7 @@ let lastDetail = null;  // cached /a/:secret response for local re-renders
 let curView = null;     // 'setup' | 'live'; null = auto until the user picks
 let setupTab = 'rooms'; // active Tournament Setup sub-tab
 
-let staged = [];        // packets staged from a zip or loose files
+const staged = [];      // packets staged from a zip or loose files (packetsui.js)
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
 
 let rosterOpen = false;
@@ -195,7 +263,9 @@ async function showDetail() {
   saveLink({ secret: adminSecret, slug: t.slug, name: t.name,
     closes: t.closes, created: t.created });
   await ensureSched(a, t);
-  try { tbPool = await fetchOwnedJson(a, `t/${t.id}/tiebreakers.json`); }
+  // the route, not the blob: on a set's mirror the pool is the set's
+  // backup questions (read live) followed by this tournament's own
+  try { tbPool = await pub(a + '/tiebreakers'); }
   catch (e) { tbPool = null; }
   lastDetail = detail;
   render();
@@ -237,6 +307,12 @@ function render() {
       <b style="font-size:18px">${esc(t.name)}</b>
       <span class="mono muted">${esc(t.slug)}</span>
     </div>
+    ${t.set ? `<div class="muted" style="font-size:13px;margin-top:4px">Mirror of
+      <b>${esc(t.set.name)}</b>. Its packets come from the set, and every game collected here —
+      results and game files, MODAQ&rsquo;s included — is shared with the set&rsquo;s editors for set-wide stats${t.set.published
+        ? ` — shown on the <a href="${esc(setLink(t.set.slug))}" target="_blank">set&rsquo;s public page</a>`
+        : ', which they may publish'}. The Public page switch below governs only this
+      tournament&rsquo;s own page.</div>` : ''}
     <div class="tabs bigtabs" style="margin-top:10px">
       <button class="tab ${v === 'setup' ? 'active' : ''}" data-view="setup">Tournament Setup${
         missing.length ? ' <span class="ndot">&bull;</span>' : ''}</button>
@@ -358,198 +434,123 @@ function renderRoomsSec(a, t, buckets, files) {
 
 /* ---------- Packets + Tiebreakers ---------- */
 
-function stripTags(s) { return String(s || '').replace(/<[^>]*>/g, ''); }
+// A mirror's rounds against its set's packets: which packet (and version)
+// each round reads, with a picker to put any packet on any round.
+function setPacketsHtml(slots, rounds, files) {
+  const versions = lastDetail.set_packets || [];
+  const current = versions.filter((v) => !v.retired);
+  const played = new Set(files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error).map((f) => f.round));
+  const rows = Array.from({ length: slots }, (_, i) => i + 1).map((n) => {
+    const r = rounds.find((x) => x.number === n);
+    const v = r && versions.find((x) => x.r2_key === r.packet_r2_key);
+    const newer = v && current.find((x) => x.packet === v.packet && x.version !== v.version);
+    // the same packet on two rounds is almost always a leftover of a reshuffle
+    const twice = v ? rounds.filter((x) => x.number !== n
+      && (versions.find((y) => y.r2_key === x.packet_r2_key) || {}).packet === v.packet).map((x) => x.number) : [];
+    const what = !r ? '<span class="muted">—</span>'
+      : !v ? 'Your own packet <span class="muted">(not part of the set&rsquo;s stats)</span>'
+        : `Packet ${v.packet} <span class="muted">v${v.version}${
+          newer ? ` — the set is on v${newer.version}; this round stays on what it was opened with` : ''}</span>${
+          twice.length ? ` <span class="bad">also on round ${twice.join(', ')}</span>` : ''}`;
+    return `<tr><td class="roundcell">${n}</td><td class="name">${what}</td>
+      <td>${played.has(n) ? '<span class="muted">Played</span>' : `
+        <select data-setpacket="${n}">
+          <option value="">Change…</option>
+          ${current.map((c) => `<option value="${c.packet}">Packet ${c.packet}</option>`).join('')}
+          ${r ? '<option value="none">No packet</option>' : ''}
+        </select>`}</td></tr>`;
+  }).join('');
+  return `
+    <details style="margin-top:10px" open>
+      <summary class="muted">Which packet each round reads</summary>
+      <div class="muted" style="font-size:13px;margin:6px 0">The set numbers its packets; the rounds are yours. Put any packet
+        on any round — skip one, reorder them, keep some for playoffs. Set-wide stats follow the packet, not the round.</div>
+      <div class="tablewrap"><table>
+        <tr><th>Round</th><th class="name">Reads</th><th></th></tr>${rows}
+      </table></div>
+    </details>`;
+}
+
+const JOIN_HTML = `
+  <details style="margin-top:10px"><summary class="muted">Join a set</summary>
+    <div class="muted" style="font-size:13px;margin:6px 0">Mirroring a set whose editors use qb-td? Paste the invite
+      link they sent. This tournament becomes the set&rsquo;s mirror as it stands: packets you have uploaded stay,
+      the set fills the rounds still empty, and everything the rooms upload — results and game files,
+      MODAQ&rsquo;s included — is shared with the set&rsquo;s editors. It cannot be undone.</div>
+    <div class="row">
+      <input id="joininvite" placeholder="Invite link" size="44">
+      <button id="joinbtn">Join set</button>
+    </div>
+  </details>`;
 
 function renderPacketsSec(a, t, buckets, rounds, settings) {
-  const box = $('setupsec');
-  const totalRounds = Math.max(Number(settings.rounds) || 1, t.current_round,
-    ...rounds.map((r) => r.number));
-  const slots = Array.from({ length: totalRounds }, (_, i) => i + 1);
-  const tbQuestions = tbPool
-    ? [...(tbPool.tossups || []).map((q) => ({ ...q, kind: 'Tossup', answer: stripTags(q.answer) })),
-       ...(tbPool.bonuses || []).map((b) => ({ ...b, kind: 'Bonus',
-         answer: (b.answers || []).map(stripTags).join(' / ') }))]
-    : [];
-  const usesFor = (id) => ((tbPool && tbPool.uses) || []).filter((u) => u && u.q === id);
-  box.innerHTML = `
-    <h2>Packets</h2>
-    ${staged.length ? `
-    <div class="row" style="margin-bottom:8px">
-      ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
-        s.guess ? ` <span class="muted">&rarr; ${s.guess}</span>` : ''}</span>`).join('')}
-      <button id="zipauto">Assign by filename</button>
-      <button id="zipclear">Clear</button>
-    </div>` : ''}
-    <div class="chiprow">
-      ${slots.map((k) => {
-        const r = rounds.find((x) => x.number === k);
-        return r
-          ? `<a class="rchip has slot" data-round="${k}" title="${esc(r.packet_name)}"
-               href="${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}"
-               download><span class="dot"></span>${k}</a>`
-          : `<span class="rchip slot" data-round="${k}"><span class="dot"></span>${k}</span>`;
-      }).join('')}
-    </div>
-    <div class="row" style="margin-top:10px">
-      <button id="pickzip" class="primary">Upload packet zip</button>
-      <button id="pickfiles">Upload packets</button>
-      <input id="zipfile" type="file" accept=".zip" hidden>
-      <input id="pfiles" type="file" accept=".json,.docx" multiple hidden>
-      <span class="spacer" style="flex:1"></span>
-      <label>Rounds <input id="numrounds" type="number" min="1" max="999" value="${totalRounds}" style="width:70px"></label>
-      <button id="setrounds">Set</button>
-    </div>
-    <div class="muted" style="font-size:13px;margin-top:6px">
-      Staged packets are dragged onto their round slots; Assign by filename places
-      the obvious ones and never overwrites a round that already has a packet.</div>
-
-    <h2>Tiebreakers</h2>
-    <div class="muted" style="font-size:13px;margin-bottom:8px">
-      A tiebreaker packet is split into individual questions. In every
+  const fromSet = (r) => t.set && r.packet_r2_key.startsWith('s/');
+  const slots = Math.max(Number(settings.rounds) || 1, t.current_round, ...rounds.map((r) => r.number));
+  renderPacketsUi($('setupsec'), {
+    staged,
+    slots,
+    afterPackets: t.set ? setPacketsHtml(slots, rounds, lastDetail.files) : JOIN_HTML,
+    rounds: rounds.map((r) => ({
+      number: r.number,
+      name: r.packet_name + (fromSet(r) ? ' (from ' + t.set.name + ')' : ''),
+      href: `${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}`,
+    })),
+    setSlots: (n) => pub(a, { method: 'POST', json: { settings: { ...settings, rounds: n } } }),
+    uploadPacket: (s, round) => pub(`${a}/packet?round=${round}&name=${encodeURIComponent(s.name)}`,
+      { method: 'POST', body: stagedBlob(s) }),
+    uploadTb: async (name, data) => {
+      try {
+        const out = await pub(`${a}/tiebreakers?name=${encodeURIComponent(name)}`,
+          { method: 'POST', body: new Blob([data], { type: 'application/json' }) });
+        say(`${name} split into ${out.added.tossups} tossups + ${out.added.bonuses} bonuses`);
+        return true;
+      } catch (e) { say(e.message, true); return false; }
+    },
+    clearTb: () => pub(a + '/tiebreakers', { method: 'DELETE' }),
+    pool: tbPool,
+    showUses: true,
+    packetsNote: (t.set ? `The rounds of <b>${esc(t.set.name)}</b> are already here, and a fix its
+      editors upload reaches every round no room here has opened yet. A packet you
+      upload yourself replaces that round for good — the set stops updating it, and its
+      games drop out of the set&rsquo;s category stats and buzzpoints. ` : '')
+      + `Staged packets are dragged onto their round slots; Assign by filename places
+      the obvious ones and never overwrites a round that already has a packet.`,
+    tbTitle: t.set ? 'Backup questions + tiebreakers' : 'Tiebreakers',
+    tbNote: (t.set ? `The set&rsquo;s own backup questions are listed first, and its editors may add to them
+      during the day; anything you upload here is added after them, for this tournament only, and Delete pool
+      removes only yours. ` : '') + `A tiebreaker packet is split into individual questions. In every
       room&rsquo;s MODAQ, <b>Actions &rarr; Add questions&hellip;</b> lists this
       pool — the moderator checks with you which one to read and appends
       exactly that question — and each finished game reports which questions
-      it read, so the log below always says which teams have heard what.</div>
-    <div class="row" style="margin-bottom:8px">
-      <button id="picktb" class="primary">Upload tiebreaker packet</button>
-      <input id="tbfile" type="file" accept=".json" hidden>
-      <span class="slotdrop" id="tbdrop">Or drop a staged .json packet chip here to split it</span>
-      ${tbQuestions.length ? '<span class="spacer" style="flex:1"></span><button id="tbclear" class="small">Delete pool</button>' : ''}
-    </div>
-    ${tbQuestions.length ? `<div class="tablewrap"><table>
-      <tr><th>Question</th><th>Kind</th><th>Answer</th><th>Status</th></tr>
-      ${tbQuestions.map((q) => {
-        const uses = usesFor(q.id);
-        return `<tr>
-          <td class="mono">${esc(q.id)}</td>
-          <td>${esc(q.kind)}</td>
-          <td>${esc(q.answer)} <span class="muted" style="font-size:12px">(${esc(q.from || '')})</span></td>
-          <td>${uses.length
-            ? uses.map((u) => `<span class="bad">Heard by</span> <b>${
-                (u.teams || []).map(esc).join(' &amp; ')}</b> <span class="muted">(Round ${
-                esc(String(u.round))}, ${esc(u.room || '')})</span>`).join('<br>')
-            : '<span class="ok">Unused</span>'}</td>
-        </tr>`;
-      }).join('')}
-    </table></div>` : '<div class="muted">No tiebreaker questions yet</div>'}`;
-
-  const stageFiles = async (fileList) => {
-    for (const f of fileList) {
-      staged.push({ name: f.name, data: new Uint8Array(await f.arrayBuffer()),
-        guess: guessRound(f.name) });
-    }
-    say(fileList.length + ' packet' + (fileList.length === 1 ? '' : 's') + ' staged');
-    render();
-  };
-  $('pickzip').onclick = () => $('zipfile').click();
-  $('pickfiles').onclick = () => $('pfiles').click();
-  $('picktb').onclick = () => $('tbfile').click();
-  $('zipfile').onchange = async () => {
-    const f = $('zipfile').files[0];
-    if (!f) return;
-    try {
-      const entries = await readZip(new Uint8Array(await f.arrayBuffer()));
-      const picked = entries
-        .filter((e) => /\.(json|docx)$/i.test(e.name) && !/__MACOSX|\/\./.test('/' + e.name))
-        .map((e) => {
-          const name = e.name.split('/').pop();
-          return { name, data: e.data, guess: guessRound(name) };
-        });
-      if (!picked.length) { say('No .json or .docx files in the zip', true); return; }
-      staged.push(...picked);
-      say(picked.length + ' packets staged');
-      render();
-    } catch (e) { say(e.message, true); }
-  };
-  $('pfiles').onchange = () => {
-    if ($('pfiles').files.length) stageFiles([...$('pfiles').files]);
-  };
-  const uploadStagedPacket = async (s, round) => {
-    const type = /\.json$/i.test(s.name) ? 'application/json'
-      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    await pub(`${a}/packet?round=${round}&name=${encodeURIComponent(s.name)}`,
-      { method: 'POST', body: new Blob([s.data], { type }) });
-  };
-  const uploadTbPacket = async (name, data) => {
-    if (!/\.json$/i.test(name)) { say('Tiebreaker packets must be .json', true); return false; }
-    try {
-      const out = await pub(`${a}/tiebreakers?name=${encodeURIComponent(name)}`,
-        { method: 'POST', body: new Blob([data], { type: 'application/json' }) });
-      say(`${name} split into ${out.added.tossups} tossups + ${out.added.bonuses} bonuses`);
-      return true;
-    } catch (e) { say(e.message, true); return false; }
-  };
-  $('tbfile').onchange = async () => {
-    const f = $('tbfile').files[0];
-    if (!f) return;
-    if (await uploadTbPacket(f.name, await f.arrayBuffer())) showDetail();
-  };
-  if ($('tbclear')) {
-    $('tbclear').onclick = async () => {
-      if (!confirm('Delete the tiebreaker pool? The usage log goes with it.')) return;
+      it read, so the log below always says which teams have heard what.`,
+    say, rerender: render, refresh: showDetail,
+  });
+  const box = $('setupsec');
+  box.querySelectorAll('[data-setpacket]').forEach((sel) => {
+    sel.onchange = async () => {
+      if (!sel.value) return;
       try {
-        await pub(a + '/tiebreakers', { method: 'DELETE' });
+        const round = Number(sel.dataset.setpacket);
+        await pub(a + '/setpacket', { method: 'POST',
+          json: { round, packet: sel.value === 'none' ? null : Number(sel.value) } });
+        say(sel.value === 'none' ? `Round ${round} has no packet now` : `Round ${round} reads packet ${sel.value}`);
+        showDetail();
+      } catch (e) { say(e.message, true); sel.value = ''; }
+    };
+  });
+  if ($('joinbtn')) {
+    $('joinbtn').onclick = async () => {
+      // the link as pasted (…?i=<invite>), or the bare invite
+      const pasted = $('joininvite').value.trim();
+      const invite = (/[?&]i=([a-z0-9]+)/.exec(pasted) || [null, pasted])[1];
+      if (!confirm('Join this set? Everything the rooms upload here will be shared with its editors.')) return;
+      try {
+        const out = await pub(a + '/join', { method: 'POST', json: { invite } });
+        say(`Joined ${out.set}: ${out.rounds} empty round${out.rounds === 1 ? '' : 's'} filled from the set`);
         showDetail();
       } catch (e) { say(e.message, true); }
     };
   }
-  if ($('zipauto')) {
-    $('zipauto').onclick = async () => {
-      const remaining = [];
-      let placed = 0;
-      for (const s of staged) {
-        // never overwrite silently — a colliding guess stays staged to drag
-        const occupied = rounds.some((r) => r.number === s.guess);
-        if (!s.guess || s.guess > totalRounds || occupied) { remaining.push(s); continue; }
-        try { await uploadStagedPacket(s, s.guess); placed++; }
-        catch (e) { say(s.name + ': ' + e.message, true); remaining.push(s); }
-      }
-      staged = remaining;
-      say(placed + ' assigned, ' + remaining.length + ' left to drag');
-      showDetail();
-    };
-    $('zipclear').onclick = () => { staged = []; render(); };
-    box.querySelectorAll('[data-chip]').forEach((c) => {
-      c.ondragstart = (e) => e.dataTransfer.setData('text/plain', c.dataset.chip);
-    });
-  }
-  box.querySelectorAll('.slot').forEach((slot) => {
-    slot.ondragover = (e) => { e.preventDefault(); slot.classList.add('dragover'); };
-    slot.ondragleave = () => slot.classList.remove('dragover');
-    slot.ondrop = async (e) => {
-      e.preventDefault();
-      slot.classList.remove('dragover');
-      const s = staged[Number(e.dataTransfer.getData('text/plain'))];
-      if (!s) return;
-      try {
-        await uploadStagedPacket(s, Number(slot.dataset.round));
-        staged.splice(staged.indexOf(s), 1);
-        showDetail();
-      } catch (err) { say(err.message, true); }
-    };
-  });
-  const tbdrop = $('tbdrop');
-  tbdrop.ondragover = (e) => { e.preventDefault(); tbdrop.classList.add('dragover'); };
-  tbdrop.ondragleave = () => tbdrop.classList.remove('dragover');
-  tbdrop.ondrop = async (e) => {
-    e.preventDefault();
-    tbdrop.classList.remove('dragover');
-    const s = staged[Number(e.dataTransfer.getData('text/plain'))];
-    if (!s) return;
-    if (await uploadTbPacket(s.name, s.data)) {
-      staged.splice(staged.indexOf(s), 1);
-      showDetail();
-    }
-  };
-  $('setrounds').onclick = async () => {
-    const n = Number($('numrounds').value);
-    if (!Number.isInteger(n) || n < 1 || n > 999) { say('Rounds must be 1-999', true); return; }
-    try {
-      const next = { ...settings, rounds: n };
-      await pub(a, { method: 'POST', json: { settings: next } });
-      showDetail();
-    } catch (e) { say(e.message, true); }
-  };
 }
 
 /* ---------- Roster: structured editor, seed order ---------- */
@@ -580,7 +581,7 @@ function renderRosterSec(a, t) {
     <div class="row">
       ${t.roster_name
         ? `<span>${esc(t.roster_name)}</span>
-           <a href="${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}" download>Download</a>`
+           <a href="${esc(`${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}`)}" download>Download</a>`
         : '<span class="muted">None yet</span>'}
       <span class="spacer" style="flex:1"></span>
       <button id="pickroster">Upload roster QBJ</button>
@@ -1269,7 +1270,6 @@ document.addEventListener('keydown', (ev) => {
 
 function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const box = $('viewbody');
-  const fmt = effectiveFormat(settings); // prefills the customize panel
   // expired broadcasts are simply dropped: the next write prunes them for good
   let live = [];
   try { live = annLive(JSON.parse(t.announce || '[]')); } catch (e) { /* keep [] */ }
@@ -1380,35 +1380,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     <div class="row" style="margin-bottom:6px">
       <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Public page</label>
     </div>
-    <div class="row" style="margin-bottom:6px">
-      <label class="row">Reader game format
-        <select id="gformat">${GAME_FORMAT_OPTIONS.map((o) =>
-          `<option value="${o.value}" ${o.value === (settings.gameFormat || '') ? 'selected' : ''}>${o.label}</option>`).join('')}
-        </select>
-      </label>
-      ${Object.keys(cleanOverrides(settings.formatOverrides)).length ? '<span class="pill">Custom</span>' : ''}
-      <button id="fmtedit">Customize MODAQ settings</button>
-    </div>
-    <div id="fmtpanel" ${fmtOpen ? '' : 'hidden'} class="card" style="margin-bottom:6px">
-      <div class="row">
-        <label>Tossups <input id="fmttossups" type="number" min="1" max="999" value="${fmt.regulationTossupCount}" style="width:64px"></label>
-        <label>Neg <input id="fmtneg" type="number" min="-100" max="0" value="${fmt.negValue}" style="width:64px"></label>
-        <label>Powers <input id="fmtpowers" placeholder="(*)=15" value="${esc(powersText(fmt.powers))}" size="16"></label>
-        <label>Overtime tossups <input id="fmtot" type="number" min="1" max="99" value="${fmt.minimumOvertimeQuestionCount}" style="width:56px"></label>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <label class="row"><input type="checkbox" id="fmtpaired" ${fmt.pairTossupsBonuses ? 'checked' : ''}> Paired bonuses</label>
-        <label class="row"><input type="checkbox" id="fmtbounce" ${fmt.bonusesBounceBack ? 'checked' : ''}> Bouncebacks</label>
-        <label class="row"><input type="checkbox" id="fmtotbonus" ${fmt.overtimeIncludesBonuses ? 'checked' : ''}> Overtime bonuses</label>
-        <label>Pronunciation marks
-          <input id="fmtpron1" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[0])}" size="4">
-          <input id="fmtpron2" value="${esc((fmt.pronunciationGuideMarkers || ['', ''])[1])}" size="4">
-        </label>
-        <span class="spacer" style="flex:1"></span>
-        <button id="fmtreset">Reset to preset</button>
-        <button id="fmtsave" class="primary">Save format</button>
-      </div>
-    </div>
+    ${formatHtml(settings, fmtOpen)}
     <div class="row">
       <span class="muted">Admin link open until ${new Date(t.closes).toLocaleString()}</span>
       <button id="rotate" class="small">New admin link</button>
@@ -1423,7 +1395,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       <button id="rebuild" disabled>Rebuild stats data</button>
       <span class="spacer" style="flex:1"></span>
       <label class="row">Buzzpoints
-        <select id="buzzmode">
+        <select id="buzzmode" ${t.set && t.set.lock_buzz ? 'disabled' : ''}>
           <option value="">Off</option>
           <option value="password" ${(settings.buzz || {}).mode === 'password' ? 'selected' : ''}>On (password)</option>
         </select>
@@ -1433,6 +1405,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>
       <button id="buzzset" ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>Set password</button>
     </div>
+    ${t.set && t.set.lock_buzz ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
+      <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
+      played elsewhere, so this page shows none, whatever is set here.</div>` : ''}
     <div id="statsout" style="margin-top:12px"></div>
 
     <h2>Uploads</h2>
@@ -1453,7 +1428,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
             // A combined reader upload downloads as its two real files — the
             // match .qbj and the MODAQ game file — not the raw wrapper JSON.
             const link = (params, label) =>
-              `<a href="${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}" download>${label}</a>`;
+              `<a href="${esc(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}`)}" download>${label}</a>`;
             const base = f.filename.replace(/\.qbtd\.json$/i, '');
             const links = f.kind === 'combined' && !f.error
               ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
@@ -1603,54 +1578,10 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     await pub(a, { method: 'POST', json: { settings: next, ...extra } });
     settings = next;
   };
-  $('gformat').onchange = async () => {
-    try {
-      const next = { ...settings };
-      if ($('gformat').value) next.gameFormat = $('gformat').value;
-      else delete next.gameFormat;
-      await saveSettings(next);
-      say('Game format saved');
-      showDetail(); // overrides sit on the new preset; refresh the panel
-    } catch (e) { say(e.message, true); }
-  };
-  $('fmtedit').onclick = () => {
-    fmtOpen = $('fmtpanel').hidden;
-    $('fmtpanel').hidden = !fmtOpen;
-  };
-  $('fmtsave').onclick = async () => {
-    try {
-      const p1 = $('fmtpron1').value.trim(), p2 = $('fmtpron2').value.trim();
-      if (!!p1 !== !!p2) { say('Pronunciation marks: fill both or neither', true); return; }
-      const want = {
-        regulationTossupCount: Number($('fmttossups').value),
-        negValue: Number($('fmtneg').value),
-        powers: parsePowersText($('fmtpowers').value),
-        minimumOvertimeQuestionCount: Number($('fmtot').value),
-        pairTossupsBonuses: $('fmtpaired').checked,
-        bonusesBounceBack: $('fmtbounce').checked,
-        overtimeIncludesBonuses: $('fmtotbonus').checked,
-        pronunciationGuideMarkers: p1 ? [p1, p2] : null,
-      };
-      const ov = formatOverridesFrom(settings.gameFormat || '', want);
-      const bad = Object.keys(ov).filter((k) => !(k in cleanOverrides(ov)));
-      if (bad.length) { say('Bad value: ' + bad.join(', '), true); return; }
-      const next = { ...settings };
-      if (Object.keys(ov).length) next.formatOverrides = ov;
-      else delete next.formatOverrides;
-      await saveSettings(next);
-      say('Game format saved');
-      showDetail();
-    } catch (e) { say(e.message, true); }
-  };
-  $('fmtreset').onclick = async () => {
-    try {
-      const next = { ...settings };
-      delete next.formatOverrides;
-      await saveSettings(next);
-      say('Game format reset');
-      showDetail();
-    } catch (e) { say(e.message, true); }
-  };
+  wireFormat(box, {
+    settings: () => settings, save: saveSettings, say, refresh: showDetail,
+    onToggle: (open) => { fmtOpen = open; },
+  });
   $('buzzmode').onchange = async () => {
     const mode = $('buzzmode').value;
     try {
@@ -1893,4 +1824,5 @@ async function computeStats(a, t, buckets, files) {
 /* ---------- boot ---------- */
 
 if (adminSecret) showDetail();
+else if (inviteSecret) showInvite();
 else showList();

@@ -13,8 +13,15 @@
 //   /pub/*  — the public stats API. No auth, but only serves tournaments
 //             the TO has published, and only match qbj + roster blobs —
 //             never packets, never admin metadata, never secrets.
+// Question sets add three more on the same idiom (see "question sets"):
+//   /s/*      — a set editor's API; the set link lives a year (SET_TTL).
+//   /i/*      — a mirror invite: the editor mints one per mirror, and the
+//               TD who starts it gets an ordinary /a/ tournament whose
+//               rounds are the set's packets.
+//   /pubset/* — the public set page, gated by the set's own publish flag.
 //
 // Storage: metadata in D1 (schema.sql), blobs in R2 under t/<tid>/...
+// (a set's under s/<sid>/...).
 // All blob reads stream through the Worker so the publish gate is enforced
 // in one place. Question-text blobs are encrypted at rest under a
 // per-tournament key that only the link secrets can unwrap, and the
@@ -64,6 +71,22 @@ const MAX_PROTEST_TEXT = 500;            // reason / given-answer text cap
 const MAX_RULINGS = 500;                 // TD rulings per tournament
 const MAX_RULING_NOTE = 300;
 const MAX_RULINGS_JSON = 64 * 1024;
+// A set is mirrored for a season, not played in a day: its editor link
+// lives a year. What it guards is the packets and the power to mint
+// mirrors; every mirror it starts still runs on the 48h clocks above.
+const SET_TTL = 365 * 24 * 3600 * 1000;
+const SET_CREATE_PER_IP_DAY = 5;
+const SET_CREATE_GLOBAL_DAY = 50;
+const MAX_SET_MIRRORS = 200;
+// Mirrors started from invites, per day. Their own budget: an editor's
+// invites must not be able to spend the open-creation quota above (and
+// lock every TD out), nor be a way around it.
+const START_PER_IP_DAY = 20;
+const START_GLOBAL_DAY = 300;
+// A claimed invite whose tournament never got linked (the Worker died
+// between the two) becomes startable again after this long.
+const INVITE_CLAIM_TTL = 5 * 60 * 1000;
+const MAX_SET_PACKETS = 400;             // packet versions per set, retired ones included
 
 /* ---------- responses ---------- */
 function corsHeaders(env) {
@@ -149,7 +172,17 @@ function cleanName(s) {
    Public blobs (the per-game copies and the round shards built from
    them, schedule, catmap, roster) stay plaintext by design: they are
    text-free and the whole point is serving them without credentials.
-   The cron holds no secrets and needs none. */
+   The cron holds no secrets and needs none.
+
+   Question sets use the same scheme one level up: a set has its own
+   content key (wrapped under the editor's link, each mirror invite, and
+   the set's buzzpoints key), and its packets are encrypted under that. A
+   mirror's rounds rows point at those blobs rather than copying them, so
+   the mirror carries the set's key encrypted under its own content key
+   (tournaments.set_key_enc) — every credential that opens the mirror's
+   key opens the set's through it (blobKey below). The cost, stated
+   plainly: a mirror's packets stop being "cryptographically gone" when
+   its own links expire; they go when the set's link does. */
 
 const enc8 = (s) => new TextEncoder().encode(s);
 const b64ToBytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -234,6 +267,20 @@ async function readBlob(r2obj, rawKey) {
   const buf = await r2obj.arrayBuffer();
   if (!blobEnc(r2obj)) return buf;
   return aesDecrypt(await contentKey(rawKey), buf);
+}
+
+// The key that opens one blob for one credential holder — a tournament
+// or bucket row carrying ckey (and, on a set's mirror, set_key_enc). A
+// set's blobs live under s/ and open with the set's key, recovered
+// through the holder's own; everything else is the holder's own. Cached
+// on the holder, so a request pays for the unwrap once.
+async function blobKey(holder, r2key) {
+  if (!String(r2key).startsWith('s/')) return holder.ckey || null;
+  if (holder.skey === undefined) {
+    holder.skey = holder.ckey && holder.set_key_enc
+      ? b64ToBytes(await decField(holder.ckey, holder.set_key_enc)) : null;
+  }
+  return holder.skey;
 }
 
 // blobResponse for maybe-encrypted objects.
@@ -821,12 +868,16 @@ async function commitFiles(env, message, entries) {
 //
 // Takes the manifest materialize() just wrote, so the publisher commits
 // the shards as they were built rather than re-deriving anything.
-async function buildPublish(env, t, manifest) {
+//
+// shardsOnly: a set's mirror whose own page is off. The set page reads
+// its round shards and nothing else, so nothing else is committed — and
+// anything a previous full publish left on the branch is deleted.
+async function buildPublish(env, t, manifest, shardsOnly = false) {
   const prev = (() => {
     try { return JSON.parse(t.pub_snapshot) || null; } catch (e) { return null; }
   })();
 
-  const [schedObj, catsObj, rosterObj] = await Promise.all([
+  const [schedObj, catsObj, rosterObj] = shardsOnly ? [null, null, null] : await Promise.all([
     env.DATA.get(`t/${t.id}/schedule.json`),
     env.DATA.get(`t/${t.id}/catmap.json`),
     t.roster_r2_key ? env.DATA.get(t.roster_r2_key) : null,
@@ -950,9 +1001,24 @@ function retractEntries(t) {
 // Git-Data-API overhead once per tournament; batching spends it once per
 // tick, which is what keeps a fully loaded cron inside GitHub's
 // 5,000 requests/hour App limit.
+//
+// A set's mirror is in the queue whether or not its own page is public:
+// its shards are what the set's editors (and, once the set is published,
+// the set page) read. Its blobs go to GitHub when either flag says
+// public — the mirror's own, or its set's.
 async function tickDirty(env) {
+  await tickTournaments(env);
+  await tickSets(env);
+}
+
+async function tickTournaments(env) {
   const { results } = await env.DB.prepare(
-    'SELECT * FROM tournaments WHERE pub_dirty = 1 AND (published = 1 OR pub_snapshot IS NOT NULL) ORDER BY created DESC LIMIT 4'
+    // set_published: the set's page shows this mirror — the set is public
+    // and the editor has not hidden the mirror from it
+    'SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t ' +
+    'LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id ' +
+    'WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ' +
+    'ORDER BY t.created DESC LIMIT 4'
   ).all();
   if (!results.length) return;
   const reflag = (id) =>
@@ -961,6 +1027,13 @@ async function tickDirty(env) {
   // next tick picks it up, instead of the clear losing its write.
   for (const t of results) {
     await env.DB.prepare('UPDATE tournaments SET pub_dirty = 0 WHERE id = ?1').bind(t.id).run();
+    // A mirror that moved makes its half of the set's state blob stale.
+    // Recorded in D1, not handed to tickSets in memory, so a rebuild that
+    // fails (or a tick that dies in between) still knows what to re-read.
+    if (t.set_id) {
+      await env.DB.prepare('UPDATE set_mirrors SET state_dirty = 1 WHERE tournament_id = ?1').bind(t.id).run();
+      await markSet(env, t.set_id);
+    }
   }
 
   const pubs = [];     // { t, entries, snapOf }
@@ -968,12 +1041,13 @@ async function tickDirty(env) {
   const snapshots = snapshotsEnabled(env);
   for (const t of results) {
     try {
-      if (t.published) {
-        const { manifest } = await materialize(env, t);
-        if (snapshots) pubs.push({ t, ...(await buildPublish(env, t, manifest)) });
-      } else if (snapshots) {
-        retracts.push({ t, entries: retractEntries(t) });
-      }
+      const isPublic = t.published || t.set_published;
+      const { manifest } = isPublic || t.set_id ? await materialize(env, t) : {};
+      if (!snapshots) continue;
+      // public only through its set: the games go out, the mirror's own
+      // page (schedule, roster, category map) stays its TD's call
+      if (isPublic) pubs.push({ t, ...(await buildPublish(env, t, manifest, !t.published)) });
+      else if (t.pub_snapshot) retracts.push({ t, entries: retractEntries(t) });
     } catch (e) {
       console.log('tick failed for', t.slug, e.message);
       await reflag(t.id);
@@ -1037,27 +1111,24 @@ function pubCache(t) {
   return tournamentFinal(t) ? PUB_CACHE_FINAL : PUB_CACHE_LIVE;
 }
 
-async function createTournament(request, env) {
-  let body;
-  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
-  const slug = String(body.slug || '').trim().toLowerCase();
-  const name = cleanName(body.name);
+const cleanSlug = (s) => String(s || '').trim().toLowerCase();
+
+// {status, message} for a slug + name pair that can't be created, else
+// null. Shared by tournaments, sets, and mirrors started from an invite.
+function slugNameError(slug, name) {
   if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(slug)) {
-    return err(env, 400, 'slug must be 3-40 chars: a-z, 0-9, hyphens');
+    return { status: 400, message: 'slug must be 3-40 chars: a-z, 0-9, hyphens' };
   }
   // the in-browser demo tournament owns t.html?t=demo
-  if (slug === 'demo') return err(env, 409, 'slug is reserved');
-  if (!name) return err(env, 400, 'name required');
+  if (slug === 'demo') return { status: 409, message: 'slug is reserved' };
+  if (!name) return { status: 400, message: 'name required' };
+  return null;
+}
 
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const since = Date.now() - 24 * 3600 * 1000;
-  const { results } = await env.DB.prepare(
-    'SELECT SUM(creator_ip = ?1) AS mine, COUNT(*) AS all_ips FROM tournaments WHERE created > ?2'
-  ).bind(ip, since).all();
-  if ((results[0].mine || 0) >= CREATE_PER_IP_DAY || results[0].all_ips >= CREATE_GLOBAL_DAY) {
-    return err(env, 429, 'creation limit reached, try again tomorrow');
-  }
-
+// The tournament row and its credentials. `set` ({id, key}) makes it a
+// set's mirror: it records the set and carries the set's content key
+// under its own (see blobKey). Returns null when the slug is taken.
+async function insertTournament(env, { slug, name, ip, settings, set }) {
   const adminSecret = randToken();
   const created = Date.now();
   // Content key: minted here, stored only wrapped (see "question text
@@ -1065,16 +1136,41 @@ async function createTournament(request, env) {
   const rawKey = crypto.getRandomValues(new Uint8Array(32));
   try {
     const out = await env.DB.prepare(
-      'INSERT INTO tournaments (slug, name, admin_secret, admin_wrap, creator_ip, settings, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)'
+      'INSERT INTO tournaments (slug, name, admin_secret, admin_wrap, creator_ip, settings, created, set_id, set_key_enc) ' +
+      'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)'
     ).bind(slug, name, await secretHash(adminSecret), await wrapKey(adminSecret, 'admin', rawKey),
-      ip, JSON.stringify(body.settings || {}), created).run();
-    return json(env, {
-      id: out.meta.last_row_id, slug, name,
-      admin_secret: adminSecret, closes: created + ADMIN_TTL,
-    });
+      ip, JSON.stringify(settings || {}), created,
+      set ? set.id : null, set ? await encField(rawKey, b64bytes(set.key)) : null).run();
+    return { id: out.meta.last_row_id, adminSecret, created, rawKey };
   } catch (e) {
-    return err(env, 409, 'slug already taken');
+    return null;
   }
+}
+
+async function createTournament(request, env) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const slug = cleanSlug(body.slug);
+  const name = cleanName(body.name);
+  const bad = slugNameError(slug, name);
+  if (bad) return err(env, bad.status, bad.message);
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const since = Date.now() - 24 * 3600 * 1000;
+  // set mirrors are counted against their own budget (startInvite)
+  const { results } = await env.DB.prepare(
+    'SELECT SUM(creator_ip = ?1) AS mine, COUNT(*) AS all_ips FROM tournaments WHERE created > ?2 AND set_id IS NULL'
+  ).bind(ip, since).all();
+  if ((results[0].mine || 0) >= CREATE_PER_IP_DAY || results[0].all_ips >= CREATE_GLOBAL_DAY) {
+    return err(env, 429, 'creation limit reached, try again tomorrow');
+  }
+
+  const made = await insertTournament(env, { slug, name, ip, settings: body.settings });
+  if (!made) return err(env, 409, 'slug already taken');
+  return json(env, {
+    id: made.id, slug, name,
+    admin_secret: made.adminSecret, closes: made.created + ADMIN_TTL,
+  });
 }
 
 // A leaked admin link mid-tournament: mint a new secret, the old link
@@ -1091,18 +1187,26 @@ async function rotateAdmin(env, t) {
 
 async function getTournament(env, t, ctx) {
   const id = t.id;
-  const [buckets, rounds, files, catsHead] = await Promise.all([
+  const [buckets, rounds, files, catsHead, sets, setPackets] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, secret_enc, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created, summary FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
     env.DATA.head(`t/${id}/catmap.json`),
+    t.set_id
+      ? env.DB.prepare('SELECT slug, name, published, settings FROM sets WHERE id = ?1').bind(t.set_id).all()
+      : { results: [] },
+    t.set_id
+      ? env.DB.prepare(
+        'SELECT packet, version, name, r2_key, retired FROM set_packets WHERE set_id = ?1 ORDER BY packet, version'
+      ).bind(t.set_id).all()
+      : { results: [] },
   ]);
   // packets from before category extraction existed — or from before
   // the current parser (version in R2 custom metadata): backfill once,
   // off the response path
   const staleCats = !catsHead || (catsHead.customMetadata || {}).v !== CATMAP_VERSION;
   if (staleCats && ctx && rounds.results.some((r) => /\.json$/i.test(r.packet_name))) {
-    ctx.waitUntil(rebuildCatmap(env, id, t.ckey));
+    ctx.waitUntil(rebuildCatmap(env, t));
   }
   // Room secrets go back to the TO in the clear — they ARE the room
   // links — but the credential column holds only the hash on new rows;
@@ -1111,9 +1215,20 @@ async function getTournament(env, t, ctx) {
   const rooms = await Promise.all(buckets.results.map(async ({ secret_enc, ...b }) => ({
     ...b, secret: secret_enc && t.ckey ? await decField(t.ckey, secret_enc) : b.secret,
   })));
-  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, ...pub_t } = t;
+  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, skey, set_key_enc, ...pub_t } = t;
   return json(env, {
-    tournament: { ...pub_t, closes: t.created + ADMIN_TTL },
+    // `set` is what the dashboard's mirror notice reads: whose packets
+    // these are, that the games are shared with that set's editors, and
+    // whether those editors have switched mirror buzzpoints off.
+    // set_packets lets the TD put any of the set's packets on any round.
+    tournament: {
+      ...pub_t, closes: t.created + ADMIN_TTL,
+      set: sets.results[0] ? {
+        slug: sets.results[0].slug, name: sets.results[0].name, published: sets.results[0].published,
+        lock_buzz: mirrorBuzzLocked(sets.results[0].settings),
+      } : null,
+    },
+    set_packets: setPackets.results,
     buckets: rooms,
     rounds: rounds.results,
     files: files.results,
@@ -1432,7 +1547,8 @@ const CATMAP_VERSION = '2';
 // when the map is missing or version-stale; writes an empty {rounds:{}}
 // marker when nothing has categories so the attempt isn't repeated
 // every load.
-async function rebuildCatmap(env, tid, rawKey) {
+async function rebuildCatmap(env, t) {
+  const tid = t.id;
   const { results } = await env.DB.prepare(
     'SELECT number, packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1'
   ).bind(tid).all();
@@ -1441,7 +1557,8 @@ async function rebuildCatmap(env, tid, rawKey) {
     if (!/\.json$/i.test(row.packet_name)) continue;
     const obj = await env.DATA.get(row.packet_r2_key);
     if (!obj) continue;
-    const cats = packetCategories(await readBlob(obj, rawKey), row.packet_name);
+    const cats = packetCategories(
+      await readBlob(obj, await blobKey(t, row.packet_r2_key)), row.packet_name);
     if (cats) map.rounds[String(row.number)] = cats;
   }
   await env.DATA.put(`t/${tid}/catmap.json`, JSON.stringify(map), {
@@ -1534,19 +1651,32 @@ async function uploadRoster(request, url, env, t) {
 
 async function adminDownload(url, env, t) {
   const key = url.searchParams.get('key') || '';
-  // Ownership boundary: only this tournament's prefix is reachable.
-  if (!key.startsWith(`t/${t.id}/`)) return err(env, 403, 'bad key');
+  // Ownership boundary: only this tournament's prefix is reachable —
+  // plus, on a set's mirror, the set packets its own rounds point at.
+  if (!key.startsWith(`t/${t.id}/`)) {
+    const { results } = t.set_id && key.startsWith(`s/${t.set_id}/packet/`)
+      ? await env.DB.prepare(
+        'SELECT 1 AS ok FROM rounds WHERE tournament_id = ?1 AND packet_r2_key = ?2'
+      ).bind(t.id, key).all()
+      : { results: [] };
+    if (!results.length) return err(env, 403, 'bad key');
+  }
   const obj = await env.DATA.get(key);
   if (!obj) return err(env, 404, 'no such file');
   const dl = url.searchParams.get('dl') || key.split('/').pop();
-  const part = url.searchParams.get('part');
-  if (part !== 'qbj' && part !== 'game') return blobResponseDec(env, obj, t.ckey, dl);
-  // part=qbj|game splits a combined reader upload (.qbtd.json = {qbj,
-  // game}) into the file consumers actually use. Admin-only: the game
-  // half carries the packet text, which never leaves the TO side.
+  return storedFileResponse(env, obj, await blobKey(t, key), dl, url.searchParams.get('part'));
+}
+
+// A stored blob as a download, decrypted with `rawKey`. part=qbj|game
+// splits a combined reader upload (.qbtd.json = {qbj, game}) into the
+// file consumers actually use. Only ever behind a credential that holds
+// the tournament's key — the TO's link, or the link of the set it
+// mirrors: the game half carries the packet text.
+async function storedFileResponse(env, obj, rawKey, dl, part) {
+  if (part !== 'qbj' && part !== 'game') return blobResponseDec(env, obj, rawKey, dl);
   let parsed;
   try {
-    parsed = JSON.parse(new TextDecoder().decode(await readBlob(obj, t.ckey)));
+    parsed = JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey)));
   } catch (e) { return err(env, 400, 'not a combined file'); }
   const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
   if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
@@ -1678,13 +1808,16 @@ async function bucketSchedule(env, secret) {
    same trust level as packets. */
 
 const TB_KEY = (tid) => `t/${tid}/tiebreakers.json`;
+// A set's pool: same blob shape, under the set's key. Starting a mirror
+// copies it (without the usage log) into the new tournament's own pool.
+const SET_TB_KEY = (sid) => `s/${sid}/tiebreakers.json`;
 
 function emptyTbPool() {
   return { v: 1, seq: { t: 0, b: 0 }, tossups: [], bonuses: [], uses: [] };
 }
 
-async function readTbPool(env, tid, rawKey) {
-  const obj = await env.DATA.get(TB_KEY(tid));
+async function readTbPool(env, key, rawKey) {
+  const obj = await env.DATA.get(key);
   if (!obj) return { cur: null, pool: emptyTbPool() };
   const pool = await readBlob(obj, rawKey)
     .then((buf) => JSON.parse(new TextDecoder().decode(buf))).catch(() => null);
@@ -1697,28 +1830,28 @@ async function readTbPool(env, tid, rawKey) {
   return { cur: obj, pool };
 }
 
-async function writeTbPool(env, tid, rawKey, mutate) {
+async function writeTbPool(env, key, rawKey, mutate) {
   for (let attempt = 0; attempt < 4; attempt++) {
-    const { cur, pool } = await readTbPool(env, tid, rawKey);
+    const { cur, pool } = await readTbPool(env, key, rawKey);
     const out = mutate(pool);
     if (out && out.error) return out;
     const text = JSON.stringify(pool);
     if (text.length > MAX_TB_BLOB) return { error: 'tiebreaker pool too large' };
     const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
     try {
-      const put = await putBlob(env, TB_KEY(tid), text, 'application/json', rawKey, { onlyIf });
+      const put = await putBlob(env, key, text, 'application/json', rawKey, { onlyIf });
       if (put) return { error: null, pool };
     } catch (e) { /* precondition failed -> retry */ }
   }
-  console.log('tiebreaker update lost the retry race for tournament', tid);
+  console.log('tiebreaker update lost the retry race for', key);
   return { error: 'concurrent update, try again' };
 }
 
-// POST /a/:secret/tiebreakers?name=... — split a packet JSON into pool
-// questions. Repeated uploads append (ids keep counting); the same rules
-// as the reader's own packet validation, so a pool question is guaranteed
-// to load in MODAQ.
-async function uploadTiebreakers(request, url, env, t) {
+// POST /a/:secret/tiebreakers?name=... (and /s/:secret/tiebreakers, for a
+// set's pool) — split a packet JSON into pool questions. Repeated uploads
+// append (ids keep counting); the same rules as the reader's own packet
+// validation, so a pool question is guaranteed to load in MODAQ.
+async function uploadTiebreakers(request, url, env, poolKey, rawKey) {
   const name = cleanFilename(url.searchParams.get('name') || 'tiebreakers.json');
   if (!/\.json$/i.test(name)) {
     return err(env, 400, 'tiebreaker packets must be .json (docx cannot be split server-side)');
@@ -1742,7 +1875,7 @@ async function uploadTiebreakers(request, url, env, t) {
       return err(env, 400, 'a bonus is missing parts or answers');
     }
   }
-  const out = await writeTbPool(env, t.id, t.ckey, (pool) => {
+  const out = await writeTbPool(env, poolKey, rawKey, (pool) => {
     for (const q of parsed.tossups) {
       pool.tossups.push({ id: 'TU' + (++pool.seq.t), from: name, ...q });
     }
@@ -1758,9 +1891,44 @@ async function uploadTiebreakers(request, url, env, t) {
   });
 }
 
-async function deleteTiebreakers(env, t) {
-  await env.DATA.delete(TB_KEY(t.id));
+async function deleteTiebreakers(env, poolKey) {
+  await env.DATA.delete(poolKey);
   return json(env, { ok: true });
+}
+
+// A set's pool is emptied, not deleted: its id counter must survive, or a
+// re-upload would hand out TU1 again and every mirror's "heard by" log
+// would attach to a different question.
+async function clearSetTiebreakers(env, s) {
+  const out = await writeTbPool(env, SET_TB_KEY(s.id), s.ckey, (pool) => {
+    pool.tossups = [];
+    pool.bonuses = [];
+  });
+  if (out.error) return err(env, 400, out.error);
+  return json(env, { ok: true });
+}
+
+// The pool a tournament's rooms and dashboard see. On a set's mirror that
+// is the SET's pool — read live, so questions the editors add mid-season
+// reach mirrors already running — followed by the TD's own; the set's
+// ids are prefixed so the two counters can't collide, and the usage log
+// (the mirror's alone) refers to the merged ids. `holder` is a tournament
+// or bucket row ({ckey, set_key_enc}); returns null when there is nothing.
+async function mergedTbPool(env, holder, tid, setId) {
+  const own = await readTbPool(env, TB_KEY(tid), holder.ckey);
+  const pool = own.pool;
+  if (setId) {
+    const fromSet = await readTbPool(env, SET_TB_KEY(setId), await blobKey(holder, SET_TB_KEY(setId)));
+    const tag = (q) => ({ ...q, id: 'S-' + q.id, set: true });
+    pool.tossups = [...fromSet.pool.tossups.map(tag), ...pool.tossups];
+    pool.bonuses = [...fromSet.pool.bonuses.map(tag), ...pool.bonuses];
+  }
+  return pool.tossups.length || pool.bonuses.length ? pool : null;
+}
+
+async function adminTiebreakers(env, t) {
+  const pool = await mergedTbPool(env, t, t.id, t.set_id);
+  return pool ? json(env, pool) : err(env, 404, 'no tiebreakers');
 }
 
 // GET /b/:secret/tiebreakers — the reader's copy of the pool: full
@@ -1770,21 +1938,25 @@ async function bucketTiebreakers(env, secret) {
   const b = await getBucketRow(env, secret);
   if (!b) return err(env, 404, 'bad link');
   if (bucketClosed(b)) return err(env, 410, 'room closed');
-  const obj = await env.DATA.get(TB_KEY(b.tournament_id));
-  if (!obj) return err(env, 404, 'no tiebreakers');
-  return blobResponseDec(env, obj, b.ckey, null);
+  const pool = await mergedTbPool(env, b, b.tournament_id, b.set_id);
+  return pool ? json(env, pool) : err(env, 404, 'no tiebreakers');
 }
 
 // A reader upload reported which pool questions its game read. One game =
 // one log entry set: a re-export of the same game (same round + teams)
 // replaces its earlier entries instead of double-logging.
-async function logTbUses(env, tid, rawKey, roomName, round, teams, usedIds) {
-  const { cur } = await readTbPool(env, tid, rawKey);
-  if (!cur) return; // no pool: nothing to log against (and nothing to clear)
+async function logTbUses(env, b, roomName, round, teams, usedIds) {
+  const tid = b.tournament_id;
+  const rawKey = b.ckey;
+  // the ids a game may report: the merged pool's. On a mirror with only
+  // the set's questions the log still lives in the mirror's own blob,
+  // which this write creates.
+  const merged = await mergedTbPool(env, b, tid, b.set_id);
+  if (!merged) return; // no pool: nothing to log against (and nothing to clear)
+  const known = new Set([...merged.tossups, ...merged.bonuses].map((q) => q.id));
   const pairKey = (ts) => [...ts].sort().join('\n');
   const gameKey = round + '\n' + pairKey(teams);
-  await writeTbPool(env, tid, rawKey, (pool) => {
-    const known = new Set([...pool.tossups, ...pool.bonuses].map((q) => q.id));
+  await writeTbPool(env, TB_KEY(tid), rawKey, (pool) => {
     const ids = [...new Set(usedIds.filter((id) => known.has(id)))];
     pool.uses = pool.uses.filter((u) =>
       u.round + '\n' + pairKey(u.teams || []) !== gameKey);
@@ -1803,7 +1975,7 @@ async function logTbUses(env, tid, rawKey, roomName, round, teams, usedIds) {
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, ' +
-    't.current_round, t.roster_r2_key, t.settings, t.announce ' +
+    't.current_round, t.roster_r2_key, t.settings, t.announce, t.set_id, t.set_key_enc ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2'
   ).bind(secret, await secretHash(secret)).all();
   const b = results[0] || null;
@@ -1914,7 +2086,7 @@ async function bucketUpload(request, url, env, secret) {
     await markPub(env, b.tournament_id);
   }
   if (tbReport) {
-    await logTbUses(env, b.tournament_id, b.ckey, b.room_name, round, tbReport.teams, tbReport.used);
+    await logTbUses(env, b, b.room_name, round, tbReport.teams, tbReport.used);
   }
   // Broadcasts ride back on the upload response: it's how the reader page
   // (which never polls) picks up new messages, at exactly the between-rounds
@@ -1937,7 +2109,16 @@ async function bucketPacket(env, secret, url) {
   if (!results.length) return err(env, 404, 'no packet for round ' + round);
   const obj = await env.DATA.get(results[0].packet_r2_key);
   if (!obj) return err(env, 404, 'packet missing');
-  return blobResponseDec(env, obj, b.ckey, results[0].packet_name);
+  // On a set's mirror, the first room to be handed a round pins it: from
+  // here on some moderator is reading this text, so a fix the editors
+  // upload must not swap the round underneath the others (mirrorsOpenFor).
+  // A write only the first time; the WHERE makes every later one a no-op.
+  if (b.set_key_enc) {
+    await env.DB.prepare(
+      'UPDATE rounds SET served = 1 WHERE tournament_id = ?1 AND number = ?2 AND served = 0'
+    ).bind(b.tournament_id, round).run();
+  }
+  return blobResponseDec(env, obj, await blobKey(b, results[0].packet_r2_key), results[0].packet_name);
 }
 
 // The reader page (read.html) preloads the roster into its embedded MODAQ so
@@ -1962,7 +2143,9 @@ async function getPublishedTournament(env, slug) {
     // column simply reads as undefined and `pub` stays null.
     // (created rides along for tournamentFinal(): it decides how long
     // public answers cache and whether the page keeps polling.)
-    'SELECT * FROM tournaments WHERE slug = ?1 AND published = 1'
+    // set_settings: see buzzConfig.
+    'SELECT t.*, s.settings AS set_settings FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id ' +
+    'WHERE t.slug = ?1 AND t.published = 1'
   ).bind(slug).all();
   return results[0] || null;
 }
@@ -1996,7 +2179,18 @@ async function getPublishedTournament(env, slug) {
 
 const MIN_BUZZ_ITERS = 100000;
 
+// A set's editors may not want question text shown anywhere while later
+// mirrors are still to play: settings.lockMirrorBuzz on the SET switches
+// its mirrors' own buzzpoints off, whatever their TDs have configured.
+function mirrorBuzzLocked(setSettings) {
+  try { return Boolean((JSON.parse(setSettings || '{}') || {}).lockMirrorBuzz); } catch (e) { return false; }
+}
+
+// `t` is any row with a settings column — a tournament or a set. A
+// tournament row from getPublishedTournament carries its set's settings
+// (set_settings), which can veto the tournament's own.
 function buzzConfig(t) {
+  if (t.set_settings && mirrorBuzzLocked(t.set_settings)) return null;
   try {
     const b = (JSON.parse(t.settings) || {}).buzz;
     if (!b || b.mode !== 'password') return null;
@@ -2007,6 +2201,11 @@ function buzzConfig(t) {
     return b;
   } catch (e) { /* fall through */ }
   return null;
+}
+
+// buzz_v: a one-way stamp that moves with the password (see above).
+async function buzzStamp(b) {
+  return (await sha256Hex('buzzv:' + b.salt)).slice(0, 12);
 }
 
 // The KDF parameters a viewer's browser needs, and nothing else.
@@ -2052,6 +2251,23 @@ function scheduledGames(sched, round) {
   return null;
 }
 
+// Rounds every room has turned in, from the clean game rows ({round,
+// bucket_id}), the room count, the schedule (or null) and any extra
+// candidate rounds. The rule roundDone applies to one round, over all of
+// them at once: the /pub state's buzz_done, and a set's per-mirror copy.
+function doneRounds(rows, roomCount, sched, candidates = []) {
+  const inByRound = new Map();
+  for (const f of rows) {
+    if (!inByRound.has(f.round)) inByRound.set(f.round, new Set());
+    inByRound.get(f.round).add(f.bucket_id);
+  }
+  return [...new Set([...inByRound.keys(), ...candidates])].filter((rn) => {
+    const scheduled = scheduledGames(sched, rn);
+    const expected = scheduled !== null ? scheduled : roomCount;
+    return (inByRound.get(rn) || new Set()).size >= expected;
+  }).sort((x, y) => x - y);
+}
+
 // A round is done when every scheduled game (every bucket room, without
 // a schedule) has a clean game file. Buzzpoints stay hidden for a round
 // until nobody is still playing it — a lagging room's teams must not
@@ -2072,14 +2288,10 @@ async function roundDone(env, t, round) {
   return files.results.length >= expected;
 }
 
-// Packet text for the buzzpoints tab: publish-gated, buzz-gated, and —
-// same question-security rule as the moderator route — played rounds
-// only, where played means every room has turned the round in.
-async function pubQPacket(request, url, env, slug) {
-  const t = await getPublishedTournament(env, slug);
-  if (!t) return err(env, 404, 'not found');
-  const b = buzzConfig(t);
-  if (!b) return err(env, 404, 'not found');
+// The password gate itself, for a tournament's qpacket route and a set's:
+// null when the request may proceed, else the response to send. `scope`
+// keys the attempt counter (a set's slugs are their own namespace).
+async function buzzGate(request, env, scope, b) {
   // Guessing the password is an online attack, so cap attempts per IP.
   // Generous enough for a viewer opening every round of a long tournament,
   // tight enough that a wordlist is hopeless. Two limits of what this is:
@@ -2089,10 +2301,44 @@ async function pubQPacket(request, url, env, slug) {
   // layer for that (README).
   if (env.BUZZ_LIMIT) {
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-    const { success } = await env.BUZZ_LIMIT.limit({ key: slug + ':' + ip });
+    const { success } = await env.BUZZ_LIMIT.limit({ key: scope + ':' + ip });
     if (!success) return err(env, 429, 'too many attempts, wait a minute');
   }
   if (!(await buzzAllowed(request, b))) return err(env, 401, 'bad password');
+  return null;
+}
+
+// A gated packet, decrypted with the key the verified token unwraps from
+// `wrap` (buzz_wrap, written when the password was set). `holderOf` turns
+// that key into blobKey's holder. A missing or mismatched wrap means the
+// password was set by a client that never sent the token — setting it
+// again repairs it.
+async function gatedPacket(request, env, obj, key, name, wrap, holderOf) {
+  let rawKey = null;
+  if (blobEnc(obj)) {
+    if (!wrap) return err(env, 409, 'packets locked — set the buzzpoints password again');
+    try {
+      const unwrapped = await unwrapKey((request.headers.get('Authorization') || '').slice(5), 'buzz', wrap);
+      rawKey = await blobKey(holderOf(unwrapped), key);
+    } catch (e) {
+      return err(env, 409, 'packets locked — set the buzzpoints password again');
+    }
+  }
+  const res = await blobResponseDec(env, obj, rawKey, name);
+  res.headers.set('Cache-Control', 'private, max-age=60');
+  return res;
+}
+
+// Packet text for the buzzpoints tab: publish-gated, buzz-gated, and —
+// same question-security rule as the moderator route — played rounds
+// only, where played means every room has turned the round in.
+async function pubQPacket(request, url, env, slug) {
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const b = buzzConfig(t);
+  if (!b) return err(env, 404, 'not found');
+  const denied = await buzzGate(request, env, slug, b);
+  if (denied) return denied;
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) return err(env, 400, 'bad round');
   if (round > t.current_round) return err(env, 403, 'not the live round yet');
@@ -2103,22 +2349,9 @@ async function pubQPacket(request, url, env, slug) {
   if (!results.length) return err(env, 404, 'no packet for round ' + round);
   const obj = await env.DATA.get(results[0].packet_r2_key);
   if (!obj) return err(env, 404, 'packet missing');
-  // Encrypted packet: the verified token unwraps the content key via
-  // buzz_wrap (written when the TO set the password). A missing or
-  // mismatched wrap means the password was set by a client that never
-  // sent the token — setting it again repairs it.
-  let rawKey = null;
-  if (blobEnc(obj)) {
-    if (!t.buzz_wrap) return err(env, 409, 'packets locked — set the buzzpoints password again');
-    try {
-      rawKey = await unwrapKey((request.headers.get('Authorization') || '').slice(5), 'buzz', t.buzz_wrap);
-    } catch (e) {
-      return err(env, 409, 'packets locked — set the buzzpoints password again');
-    }
-  }
-  const res = await blobResponseDec(env, obj, rawKey, results[0].packet_name);
-  res.headers.set('Cache-Control', 'private, max-age=60');
-  return res;
+  // the token opens the tournament's key; on a mirror that opens the set's
+  return gatedPacket(request, env, obj, results[0].packet_r2_key, results[0].packet_name,
+    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }));
 }
 
 // The /pub/:slug body. Served fresh on every page load or refresh: the
@@ -2156,19 +2389,10 @@ async function pubStateBody(env, t, pub) {
   let buzzDone = [];
   let buzzV = null;
   if (buzz) {
-    buzzV = (await sha256Hex('buzzv:' + buzz.salt)).slice(0, 12);
+    buzzV = await buzzStamp(buzz);
     const sched = schedObj ? await schedObj.json().catch(() => null) : null;
-    const inByRound = new Map();
-    for (const f of rows) {
-      if (!inByRound.has(f.round)) inByRound.set(f.round, new Set());
-      inByRound.get(f.round).add(f.bucket_id);
-    }
-    const candidates = new Set([...inByRound.keys(), ...packetRounds.results.map((r) => r.number)]);
-    buzzDone = [...candidates].filter((rn) => {
-      const scheduled = scheduledGames(sched, rn);
-      const expected = scheduled !== null ? scheduled : buckets.results.length;
-      return (inByRound.get(rn) || new Set()).size >= expected;
-    }).sort((x, y) => x - y);
+    buzzDone = doneRounds(rows, buckets.results.length, sched,
+      packetRounds.results.map((r) => r.number));
   }
   return {
     name: t.name,
@@ -2257,6 +2481,10 @@ async function pubState(env, slug, ctx) {
 async function pubRounds(env, slug, url) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
+  return streamRounds(env, t.id, url, pubCache(t));
+}
+
+async function streamRounds(env, tid, url, cacheSeconds) {
   const asked = [...new Set((url.searchParams.get('n') || '').split(',')
     .map((s) => Number(s.split('@')[0]))
     .filter((n) => Number.isInteger(n) && n > 0 && n < 1000))];
@@ -2265,7 +2493,7 @@ async function pubRounds(env, slug, url) {
     return err(env, 400, `at most ${MAX_ROUNDS_PER_FETCH} rounds per request`);
   }
   const objs = (await Promise.all(asked.sort((a, b) => a - b)
-    .map((n) => env.DATA.get(roundBlobKey(t.id, n))))).filter(Boolean);
+    .map((n) => env.DATA.get(roundBlobKey(tid, n))))).filter(Boolean);
 
   const enc = new TextEncoder();
   const { readable, writable } = new TransformStream();
@@ -2293,7 +2521,7 @@ async function pubRounds(env, slug, url) {
 
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
-  headers.set('Cache-Control', 'public, max-age=' + pubCache(t));
+  if (cacheSeconds) headers.set('Cache-Control', 'public, max-age=' + cacheSeconds);
   return new Response(readable, { status: 200, headers });
 }
 
@@ -2324,6 +2552,1113 @@ async function pubRoster(env, slug) {
   const obj = await env.DATA.get(t.roster_r2_key);
   if (!obj) return err(env, 404, 'roster missing');
   return blobResponse(env, obj, 'roster.qbj', pubCache(t));
+}
+
+/* ---------- question sets (/s/*, /i/*, /pubset/*) ----------
+   A set is the editor's side of a mirrored tournament: the packets are
+   uploaded once, each mirror's TD gets an invite, and the games every
+   mirror collects come back as set-wide stats, category stats and
+   buzzpoints.
+
+   Lifetimes. The set link lives a year (SET_TTL) — it is mirrored for a
+   season. Nothing else changes clocks: an invite is NOT a tournament. It
+   is a one-time, revocable credential the editor can mint weeks ahead.
+   The TD either starts it when the event is close — which creates an
+   ordinary tournament on the ordinary 48h clocks (ADMIN_TTL, BUCKET_TTL,
+   FINAL_TTL), its rounds and reader game format already filled in — or
+   uses it to join a tournament they have already made (joinSet).
+
+   Packets, not rounds. The set numbers its PACKETS; which round a mirror
+   plays a packet in is its TD's business (chooseSetPacket) — a site
+   short on time skips one, a site with playoffs reorders them. A mirror
+   starts with packet N on round N, and everything set-wide is keyed by
+   the packet a game was read from, never by the round it was played in.
+
+   Packets are referenced, not copied. A mirror's rounds rows point at
+   the set's blobs (s/<sid>/packet/<packet>/v<version>-<token>/<name>),
+   and the mirror carries the set's content key under its own (blobKey).
+   Every upload is a new immutable version; the one before it is retired,
+   never deleted. A fix therefore reaches the mirrors that have not
+   started that packet yet — live ones only, skipping any round a TD gave
+   a packet of their own — while a mirror whose rooms have opened it
+   stays pinned to the text its buzz positions are recorded against.
+
+   Questions keep their identity across all of that. Editors fix wording,
+   move questions between packets, repacketize. Each packet version can
+   carry a question map — per position, [question id, text revision] —
+   so the set page follows a QUESTION wherever it was read: every play of
+   it counts towards its conversion, buzz positions are laid only over
+   the wording they were recorded against, and a question that moved or
+   was reworded says so. The map is text-free and public (it lives in the
+   category map blob). It is computed in the editor's browser, which has
+   the text and no CPU budget to respect (app/engine/qmatch.js), against
+   a ledger of every question the set has held — that one is question
+   text, so it is stored under the set's key and only the set link reads
+   it (getLedger / putQmap). A version without a map simply stands alone.
+
+   Reading the games back needs no keys at all. A mirror's public copies
+   and round shards are text-free plaintext (see "public game blobs"), so
+   the set routes simply stream the mirrors' shards. The cron keeps one
+   small state blob per set (s/<sid>/state.json: which mirrors, their
+   shard stamps and snapshot shas, which packet version each round ran,
+   which rounds each has finished) so the set page costs one D1 row and
+   one R2 read however many mirrors there are — it is rebuilt only for
+   the mirrors a tick actually touched, the rest carried forward.
+
+   The stored game files are another matter: a reader upload's game half
+   is MODAQ's full state, encrypted under the MIRROR's key. Editors get
+   them too — a mirror hands its set its key when it starts or joins
+   (set_mirrors.mirror_key_enc, the mirror's content key under the set's)
+   — and the invite page and the mirror's dashboard both say so.
+
+   Who sees what. The editor's link reads everything, always. The public
+   set page exists while the set's own `published` flag is on, and then
+   shows every mirror's results — a mirror TD's publish switch governs
+   only that mirror's own page (schedule, broadcasts). Set-wide buzzpoint
+   text is password-gated exactly like a tournament's (buzzGate), served
+   for a packet version once any mirror has finished a round on it; when
+   to hand that password out, with later mirrors still to play, is the
+   editor's call — and the same editors can switch their mirrors' own
+   buzzpoints off altogether (mirrorBuzzLocked). */
+
+const setPacketPrefix = (sid) => `s/${sid}/packet/`;
+const setCatmapKey = (sid) => `s/${sid}/catmap.json`;
+const setStateKey = (sid) => `s/${sid}/state.json`;
+const setLedgerKey = (sid) => `s/${sid}/ledger.json`;
+const MAX_LEDGER = 8 * 1024 * 1024;
+const MAX_QMAP = 500;                    // questions per packet side in a question map
+
+// Flag a set's state blob for the next tick (the cron is its only writer).
+async function markSet(env, sid) {
+  await env.DB.prepare('UPDATE sets SET state_dirty = 1 WHERE id = ?1').bind(sid).run();
+}
+
+// Resolve a set link: s.ckey is the set's content key, per request.
+async function getAdminSet(env, secret) {
+  const { results } = await env.DB.prepare(
+    'SELECT * FROM sets WHERE admin_secret = ?1'
+  ).bind(await secretHash(secret)).all();
+  const s = results[0] || null;
+  if (s) s.ckey = await unwrapKey(secret, 'set', s.admin_wrap);
+  return s;
+}
+function setClosed(s) {
+  return Date.now() > s.created + SET_TTL;
+}
+
+async function createSet(request, env) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const slug = cleanSlug(body.slug);
+  const name = cleanName(body.name);
+  const bad = slugNameError(slug, name);
+  if (bad) return err(env, bad.status, bad.message);
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const { results } = await env.DB.prepare(
+    'SELECT SUM(creator_ip = ?1) AS mine, COUNT(*) AS all_ips FROM sets WHERE created > ?2'
+  ).bind(ip, Date.now() - 24 * 3600 * 1000).all();
+  if ((results[0].mine || 0) >= SET_CREATE_PER_IP_DAY || results[0].all_ips >= SET_CREATE_GLOBAL_DAY) {
+    return err(env, 429, 'creation limit reached, try again tomorrow');
+  }
+
+  const adminSecret = randToken();
+  const created = Date.now();
+  const rawKey = crypto.getRandomValues(new Uint8Array(32));
+  try {
+    const out = await env.DB.prepare(
+      'INSERT INTO sets (slug, name, admin_secret, admin_wrap, creator_ip, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+    ).bind(slug, name, await secretHash(adminSecret), await wrapKey(adminSecret, 'set', rawKey),
+      ip, created).run();
+    return json(env, {
+      id: out.meta.last_row_id, slug, name,
+      admin_secret: adminSecret, closes: created + SET_TTL,
+    });
+  } catch (e) {
+    return err(env, 409, 'slug already taken');
+  }
+}
+
+// A leaked set link: same move as rotateAdmin. Invites and mirrors are
+// untouched — they hold the content key under their own secrets.
+async function rotateSet(env, s) {
+  const adminSecret = randToken();
+  await env.DB.prepare(
+    'UPDATE sets SET admin_secret = ?2, admin_wrap = ?3 WHERE id = ?1'
+  ).bind(s.id, await secretHash(adminSecret), await wrapKey(adminSecret, 'set', s.ckey)).run();
+  return json(env, { admin_secret: adminSecret });
+}
+
+async function getSet(env, s, ctx) {
+  const [packets, mirrors, games, catsHead, tbHead] = await Promise.all([
+    env.DB.prepare(
+      'SELECT packet, version, name, retired, created, warnings, checked FROM set_packets WHERE set_id = ?1 ORDER BY packet, version'
+    ).bind(s.id).all(),
+    env.DB.prepare(
+      'SELECT m.id, m.name, m.slug, m.host, m.event_date, m.invite_enc, m.created, m.revoked, m.hidden, m.started, ' +
+      'm.tournament_id, m.mirror_key_enc IS NOT NULL AS files, t.slug AS t_slug, t.name AS t_name, ' +
+      't.created AS t_created, t.current_round AS t_round, t.published AS t_published ' +
+      'FROM set_mirrors m LEFT JOIN tournaments t ON t.id = m.tournament_id WHERE m.set_id = ?1 ORDER BY m.id'
+    ).bind(s.id).all(),
+    env.DB.prepare(
+      "SELECT tournament_id, COUNT(*) AS n FROM files WHERE kind IN ('qbj', 'combined') AND error IS NULL " +
+      'AND tournament_id IN (SELECT tournament_id FROM set_mirrors WHERE set_id = ?1 AND tournament_id IS NOT NULL) ' +
+      'GROUP BY tournament_id'
+    ).bind(s.id).all(),
+    env.DATA.head(setCatmapKey(s.id)),
+    env.DATA.head(SET_TB_KEY(s.id)),
+  ]);
+  // same lazy backfill as a tournament's map: a parser bump re-reads the
+  // stored packets, off the response path
+  const staleCats = !catsHead || (catsHead.customMetadata || {}).v !== CATMAP_VERSION;
+  if (staleCats && ctx && packets.results.some((r) => /\.json$/i.test(r.name))) {
+    ctx.waitUntil(rebuildSetCatmap(env, s));
+  }
+  const gamesBy = new Map(games.results.map((g) => [g.tournament_id, g.n]));
+  const { admin_secret, admin_wrap, buzz_wrap, creator_ip, ckey, ...pub_s } = s;
+  return json(env, {
+    set: { ...pub_s, closes: s.created + SET_TTL },
+    packets: packets.results,
+    tiebreakers: !!tbHead,
+    mirrors: await Promise.all(mirrors.results.map(async ({ invite_enc, t_slug, t_name, t_created, t_round, t_published, ...m }) => ({
+      ...m,
+      // an invite is only worth showing while it can still be used
+      invite: !m.tournament_id && !m.revoked ? await decField(s.ckey, invite_enc) : null,
+      tournament: m.tournament_id ? {
+        id: m.tournament_id, slug: t_slug, name: t_name, created: t_created,
+        current_round: t_round, published: !!t_published,
+        closes: t_created + ADMIN_TTL, games: gamesBy.get(m.tournament_id) || 0,
+        // until then its rooms can still upload — and a packet fix still
+        // reaches its unplayed rounds (mirrorsOpenFor uses the same window)
+        final: t_created + FINAL_TTL,
+      } : null,
+    }))),
+  });
+}
+
+async function updateSet(request, env, s) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const sets = [];
+  const binds = [];
+  if (body.name !== undefined) {
+    const name = cleanName(body.name);
+    if (!name) return err(env, 400, 'bad name');
+    sets.push('name = ?'); binds.push(name);
+  }
+  if (body.published !== undefined) {
+    sets.push('published = ?'); binds.push(body.published ? 1 : 0);
+  }
+  if (body.settings !== undefined) {
+    if (typeof body.settings !== 'object' || body.settings === null) return err(env, 400, 'bad settings');
+    const text = JSON.stringify(body.settings);
+    if (text.length > 4096) return err(env, 400, 'settings too large');
+    sets.push('settings = ?'); binds.push(text);
+    // same one-time token handoff as updateTournament: hash and wrap move together
+    if (typeof body.buzz_token === 'string' && body.buzz_token
+      && body.settings.buzz && body.settings.buzz.mode === 'password') {
+      sets.push('buzz_wrap = ?');
+      binds.push(await wrapKey(body.buzz_token, 'buzz', s.ckey));
+    }
+  }
+  if (!sets.length) return err(env, 400, 'nothing to update');
+  await env.DB.prepare(`UPDATE sets SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, s.id).run();
+  if (body.published !== undefined) {
+    // The set's flag decides whether its mirrors' blobs belong on GitHub:
+    // queue them all, and the cron publishes or retracts each.
+    await env.DB.prepare(
+      'UPDATE tournaments SET pub_dirty = 1 WHERE id IN ' +
+      '(SELECT tournament_id FROM set_mirrors WHERE set_id = ?1 AND tournament_id IS NOT NULL)'
+    ).bind(s.id).run();
+  }
+  await markSet(env, s.id);
+  return json(env, { ok: true });
+}
+
+/* ----- packets ----- */
+
+// The set's category map: like a tournament's, keyed one level deeper —
+// {packets: {"<packet>": {"<version>": {t, b, q}}}} — because mirrors of
+// one set can have played different versions of a packet. `q` is the
+// version's question map ({t: [[qid, rev] | null, ...], b: [...]}, see
+// putQmap); t/b are absent for a packet with no category data. `patch`
+// is merged into the version's entry. Text-free, so public.
+async function updateSetCatmap(env, sid, packet, version, patch) {
+  const key = setCatmapKey(sid);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await env.DATA.get(key);
+    let map = { packets: {} };
+    if (cur) {
+      map = await cur.json().catch(() => ({ packets: {} }));
+      if (!map || typeof map.packets !== 'object') map = { packets: {} };
+    }
+    const p = String(packet);
+    if (!map.packets[p] || typeof map.packets[p] !== 'object') map.packets[p] = {};
+    map.packets[p][String(version)] = { ...(map.packets[p][String(version)] || {}), ...patch };
+    // an older parser's map stays marked old (see updateCatmap)
+    const v = cur ? (cur.customMetadata || {}).v || '1' : CATMAP_VERSION;
+    const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
+    try {
+      const put = await env.DATA.put(key, JSON.stringify(map), {
+        httpMetadata: { contentType: 'application/json' },
+        customMetadata: { v },
+        onlyIf,
+      });
+      if (put) return true;
+    } catch (e) { /* precondition failed -> retry */ }
+  }
+  console.log('catmap update lost the retry race for set', sid);
+  return false;
+}
+
+// Recompute every version's categories from the stored packets (a parser
+// bump). Question maps are the editor's work, not derivable here, so
+// they are carried over from the map being replaced.
+async function rebuildSetCatmap(env, s) {
+  const [{ results }, prevObj] = await Promise.all([
+    env.DB.prepare('SELECT packet, version, r2_key, name FROM set_packets WHERE set_id = ?1').bind(s.id).all(),
+    env.DATA.get(setCatmapKey(s.id)),
+  ]);
+  const prev = (prevObj && await prevObj.json().catch(() => null)) || { packets: {} };
+  const map = { packets: {} };
+  for (const row of results) {
+    const old = ((prev.packets || {})[String(row.packet)] || {})[String(row.version)] || {};
+    let cats = null;
+    if (/\.json$/i.test(row.name)) {
+      const obj = await env.DATA.get(row.r2_key);
+      if (obj) cats = packetCategories(await readBlob(obj, s.ckey), row.name);
+    }
+    const entry = { ...(cats || {}), ...(old.q ? { q: old.q } : {}) };
+    if (!Object.keys(entry).length) continue;
+    if (!map.packets[String(row.packet)]) map.packets[String(row.packet)] = {};
+    map.packets[String(row.packet)][String(row.version)] = entry;
+  }
+  // conditional on the map this rebuild started from: a question map
+  // recorded meanwhile (putQmap) must not be rebuilt away — the next
+  // dashboard load simply rebuilds again from the newer map
+  try {
+    await env.DATA.put(setCatmapKey(s.id), JSON.stringify(map), {
+      httpMetadata: { contentType: 'application/json' },
+      customMetadata: { v: CATMAP_VERSION },
+      onlyIf: prevObj ? { etagMatches: prevObj.etag } : { etagDoesNotMatch: '*' },
+    });
+  } catch (e) { return; }
+  await markSet(env, s.id);
+}
+
+// A version's {t, b} categories from the set's map, or null.
+function versionCats(setCats, packet, version) {
+  const e = setCats && setCats.packets && setCats.packets[String(packet)]
+    && setCats.packets[String(packet)][String(version)];
+  return e && (Array.isArray(e.t) || Array.isArray(e.b)) ? { t: e.t || [], b: e.b || [] } : null;
+}
+
+// Where a change to one packet still reaches: [{tid, round}] — every
+// round, in a started mirror still inside its own write window, that
+// points at some version of the packet, has no clean game yet, and has
+// not been handed to a room (rounds.served, set by bucketPacket). Once
+// one moderator is reading a version the whole site stays on it, or that
+// site's buzz positions would be recorded against two different texts.
+// A round the TD gave a packet of their own never matches the prefix.
+//
+// `offer`: the packet is brand new to the set, so mirrors that have
+// neither it nor anything on the round of the same number get it there —
+// the default a mirror would have started with.
+async function mirrorsOpenFor(env, sid, packet, offer) {
+  const prefix = `${setPacketPrefix(sid)}${packet}/%`;
+  const since = Date.now() - FINAL_TTL;
+  const mirrors = '(SELECT tournament_id FROM set_mirrors WHERE set_id = ?1 AND tournament_id IS NOT NULL)';
+  const played = "SELECT 1 FROM files f WHERE f.tournament_id = t.id AND f.kind IN ('qbj', 'combined') AND f.error IS NULL AND f.round = ";
+  const { results: open } = await env.DB.prepare(
+    'SELECT r.tournament_id AS tid, r.number AS round FROM rounds r JOIN tournaments t ON t.id = r.tournament_id ' +
+    `WHERE t.created > ?2 AND t.id IN ${mirrors} AND r.served = 0 AND r.packet_r2_key LIKE ?3 ` +
+    `AND NOT EXISTS (${played}r.number)`
+  ).bind(sid, since, prefix).all();
+  if (!offer) return open;
+  const { results: fresh } = await env.DB.prepare(
+    `SELECT t.id AS tid, ?4 AS round FROM tournaments t WHERE t.created > ?2 AND t.id IN ${mirrors} ` +
+    'AND NOT EXISTS (SELECT 1 FROM rounds r WHERE r.tournament_id = t.id AND (r.number = ?4 OR r.packet_r2_key LIKE ?3)) ' +
+    `AND NOT EXISTS (${played}?4)`
+  ).bind(sid, since, prefix, packet).all();
+  return [...open, ...fresh];
+}
+
+async function uploadSetPacket(request, url, env, s) {
+  const packet = Number(url.searchParams.get('packet'));
+  if (!Number.isInteger(packet) || packet < 1 || packet > 999) return err(env, 400, 'bad packet number');
+  const filename = cleanFilename(url.searchParams.get('name'));
+  const body = await request.arrayBuffer();
+  if (!body.byteLength) return err(env, 400, 'empty body');
+  if (body.byteLength > MAX_PACKET) return err(env, 413, 'packet too large');
+
+  const { results } = await env.DB.prepare(
+    'SELECT COUNT(*) AS n, MAX(CASE WHEN packet = ?2 THEN version END) AS v, ' +
+    'SUM(packet = ?2 AND retired = 0) AS live FROM set_packets WHERE set_id = ?1'
+  ).bind(s.id, packet).all();
+  if (results[0].n >= MAX_SET_PACKETS) return err(env, 403, 'packet cap reached');
+  const version = (results[0].v || 0) + 1;
+  // new to the set, or back after being removed: offered to mirrors
+  // that have nothing on its round
+  const offer = !results[0].live;
+
+  // the token keeps two racing uploads of one packet from sharing a blob
+  const key = `${setPacketPrefix(s.id)}${packet}/v${version}-${randToken(6)}/${filename}`;
+  await putBlob(env, key, body,
+    request.headers.get('Content-Type') || 'application/octet-stream', s.ckey);
+  try {
+    await env.DB.batch([
+      env.DB.prepare('UPDATE set_packets SET retired = 1 WHERE set_id = ?1 AND packet = ?2').bind(s.id, packet),
+      env.DB.prepare(
+        'INSERT INTO set_packets (set_id, packet, version, r2_key, name, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+      ).bind(s.id, packet, version, key, filename, Date.now()),
+    ]);
+  } catch (e) {
+    // two uploads of one packet raced for the same version number
+    return err(env, 409, 'concurrent upload, try again');
+  }
+  const cats = packetCategories(body, filename);
+  if (cats) await updateSetCatmap(env, s.id, packet, version, cats);
+
+  const open = await mirrorsOpenFor(env, s.id, packet, offer);
+  for (const { tid, round } of open) {
+    await env.DB.prepare(
+      'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
+      'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4 WHERE served = 0'
+    ).bind(tid, round, key, filename).run();
+    await updateCatmap(env, tid, round, cats);
+    await markPub(env, tid);
+  }
+  await markSet(env, s.id);
+  return json(env, { packet, version, filename, mirrors: new Set(open.map((o) => o.tid)).size });
+}
+
+// DELETE /s/:secret/packet?packet=N — take a packet out of the set (one
+// dropped on the wrong slot, or merged away in a repacketizing). Its
+// versions are retired, not deleted: a mirror that played one still
+// points at it, and its questions keep their plays.
+async function retireSetPacket(url, env, s) {
+  const packet = Number(url.searchParams.get('packet'));
+  if (!Number.isInteger(packet) || packet < 1 || packet > 999) return err(env, 400, 'bad packet number');
+  const open = await mirrorsOpenFor(env, s.id, packet, false);
+  await env.DB.prepare(
+    'UPDATE set_packets SET retired = 1 WHERE set_id = ?1 AND packet = ?2'
+  ).bind(s.id, packet).run();
+  for (const { tid, round } of open) {
+    await env.DB.prepare(
+      'DELETE FROM rounds WHERE tournament_id = ?1 AND number = ?2 AND served = 0 AND packet_r2_key LIKE ?3'
+    ).bind(tid, round, `${setPacketPrefix(s.id)}${packet}/%`).run();
+    await updateCatmap(env, tid, round, null);
+    await markPub(env, tid);
+  }
+  await markSet(env, s.id);
+  return json(env, { ok: true, mirrors: new Set(open.map((o) => o.tid)).size });
+}
+
+// POST /s/:secret/packet/status {packet, v, warnings?, checked?} — the
+// parse review's verdict on one version: how many warnings the browser's
+// check raised, and whether a person has signed the packet off (checked:
+// true stamps now, false clears). Display state, nothing reads it.
+async function setPacketStatus(request, env, s) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const packet = Number(body.packet);
+  const version = Number(body.v);
+  const sets = [];
+  const binds = [];
+  if (body.warnings !== undefined) {
+    const n = Number(body.warnings);
+    if (!Number.isInteger(n) || n < 0 || n > 9999) return err(env, 400, 'bad warnings');
+    sets.push('warnings = ?'); binds.push(n);
+  }
+  if (body.checked !== undefined) { sets.push('checked = ?'); binds.push(body.checked ? Date.now() : null); }
+  if (!sets.length) return err(env, 400, 'nothing to update');
+  const out = await env.DB.prepare(
+    `UPDATE set_packets SET ${sets.join(', ')} WHERE set_id = ? AND packet = ? AND version = ?`
+  ).bind(...binds, s.id, packet, version).run();
+  if (!out.meta.changes) return err(env, 404, 'no such packet');
+  return json(env, { ok: true });
+}
+
+async function setPacketRow(env, sid, url) {
+  const packet = Number(url.searchParams.get('packet'));
+  const version = Number(url.searchParams.get('v'));
+  if (!Number.isInteger(packet) || !Number.isInteger(version)) return null;
+  const { results } = await env.DB.prepare(
+    'SELECT r2_key, name FROM set_packets WHERE set_id = ?1 AND packet = ?2 AND version = ?3'
+  ).bind(sid, packet, version).all();
+  return results[0] || null;
+}
+
+// GET /s/:secret/file?packet=&v= — any version, decrypted. Also what the
+// editor's own buzzpoints view reads: the link is the key, no password.
+async function setPacketFile(url, env, s) {
+  const row = await setPacketRow(env, s.id, url);
+  const obj = row ? await env.DATA.get(row.r2_key) : null;
+  if (!obj) return err(env, 404, 'no such packet');
+  return blobResponseDec(env, obj, s.ckey, row.name);
+}
+
+async function setTiebreakers(env, s) {
+  const obj = await env.DATA.get(SET_TB_KEY(s.id));
+  if (!obj) return err(env, 404, 'no tiebreakers');
+  return blobResponseDec(env, obj, s.ckey, null);
+}
+
+/* ----- question identity: the ledger and the per-version question map ----- */
+
+// GET /s/:secret/ledger — every question the set has held, with its text
+// revisions: what the editor's browser matches a new upload against
+// (app/engine/qmatch.js). Question text, so encrypted under the set's
+// key and served to the set link alone. The Worker never parses it —
+// a season's ledger is a megabyte, and the free tier's CPU budget is
+// 10 ms — so the body is the blob's etag on the first line and the
+// ledger's bytes after it (both empty when there is none), and the
+// write below takes the same shape back. The etag lets that write
+// refuse to overwrite a ledger someone else moved.
+async function getLedger(env, s) {
+  const obj = await env.DATA.get(setLedgerKey(s.id));
+  const headers = new Headers(corsHeaders(env));
+  headers.set('Content-Type', 'text/plain; charset=utf-8');
+  headers.set('Cache-Control', 'no-store');
+  if (!obj) return new Response('\n', { status: 200, headers });
+  const buf = await readBlob(obj, s.ckey);
+  return new Response(new Blob([obj.etag + '\n', buf]), { status: 200, headers });
+}
+
+// {error} or a cleaned question-map side: [[qid, rev] | null, ...]
+function cleanQmapSide(list) {
+  if (!Array.isArray(list) || list.length > MAX_QMAP) return { error: 'bad question map' };
+  const out = [];
+  for (const e of list) {
+    if (e === null) { out.push(null); continue; }
+    if (!Array.isArray(e) || e.length !== 2 || !e.every((n) => Number.isInteger(n) && n > 0 && n < 1e9)) {
+      return { error: 'bad question map' };
+    }
+    out.push([e[0], e[1]]);
+  }
+  return { list: out };
+}
+
+// POST /s/:secret/qmap — record one version's question map together
+// with the ledger it was matched into. Body: one line of JSON {packet,
+// v, q: {t, b}, etag}, then the ledger's bytes, which are stored as they
+// come (see getLedger). The ledger goes first and conditionally: two
+// editors matching at once must not both extend the same ledger (the
+// second would reuse question ids the first just handed out) — the
+// loser gets 409, refetches, and matches again.
+async function putQmap(request, env, s) {
+  const raw = new Uint8Array(await request.arrayBuffer());
+  if (raw.byteLength > MAX_LEDGER) return err(env, 413, 'ledger too large');
+  const nl = raw.indexOf(10);
+  let body;
+  try { body = JSON.parse(new TextDecoder().decode(raw.subarray(0, nl < 0 ? raw.length : nl))); }
+  catch (e) { return err(env, 400, 'bad json'); }
+  const ledger = nl < 0 ? new Uint8Array(0) : raw.subarray(nl + 1);
+  const row = await setPacketRow(env, s.id, new URL(
+    `http://x/?packet=${Number(body.packet)}&v=${Number(body.v)}`));
+  if (!row) return err(env, 404, 'no such packet');
+  const t = cleanQmapSide(body.q && body.q.t);
+  const b = cleanQmapSide(body.q && body.q.b);
+  if (t.error || b.error) return err(env, 400, t.error || b.error);
+  // an object, by its first and last bytes — the contents are the browser's
+  if (ledger.byteLength < 2 || ledger[0] !== 123 || ledger[ledger.byteLength - 1] !== 125) return err(env, 400, 'bad ledger');
+
+  const onlyIf = body.etag ? { etagMatches: String(body.etag) } : { etagDoesNotMatch: '*' };
+  let put = null;
+  try {
+    put = await putBlob(env, setLedgerKey(s.id), ledger, 'application/json', s.ckey, { onlyIf });
+  } catch (e) { /* precondition failed */ }
+  if (!put) return err(env, 409, 'ledger moved, match again');
+  if (!(await updateSetCatmap(env, s.id, Number(body.packet), Number(body.v), { q: { t: t.list, b: b.list } }))) {
+    return err(env, 409, 'concurrent update, try again');
+  }
+  await markSet(env, s.id);
+  return json(env, { ok: true, etag: put.etag });
+}
+
+/* ----- mirrors and their invites ----- */
+
+// {error} or the cleaned fields present in `body`.
+function cleanMirrorFields(body) {
+  const out = {};
+  if (body.name !== undefined) {
+    out.name = cleanName(body.name);
+    if (!out.name) return { error: 'name required' };
+  }
+  if (body.slug !== undefined) {
+    out.slug = cleanSlug(body.slug) || null;
+    if (out.slug && slugNameError(out.slug, 'x')) return { error: slugNameError(out.slug, 'x').message };
+  }
+  if (body.host !== undefined) out.host = cleanName(body.host) || null;
+  if (body.event_date !== undefined) {
+    out.event_date = String(body.event_date || '').trim() || null;
+    if (out.event_date && !/^\d{4}-\d{2}-\d{2}$/.test(out.event_date)) return { error: 'date must be YYYY-MM-DD' };
+  }
+  return out;
+}
+
+async function createMirror(request, env, s) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const f = cleanMirrorFields({ name: body.name, slug: body.slug, host: body.host, event_date: body.event_date });
+  if (f.error) return err(env, 400, f.error);
+  if (!f.name) return err(env, 400, 'name required');
+  const { results } = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM set_mirrors WHERE set_id = ?1'
+  ).bind(s.id).all();
+  if (results[0].n >= MAX_SET_MIRRORS) return err(env, 403, 'mirror cap reached');
+
+  const secret = randToken();
+  const out = await env.DB.prepare(
+    'INSERT INTO set_mirrors (set_id, name, slug, host, event_date, invite_secret, invite_wrap, invite_enc, created) ' +
+    'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)'
+  ).bind(s.id, f.name, f.slug ?? null, f.host ?? null, f.event_date ?? null,
+    await secretHash(secret), await wrapKey(secret, 'invite', s.ckey),
+    await encField(s.ckey, secret), Date.now()).run();
+  return json(env, { id: out.meta.last_row_id, name: f.name, invite: secret });
+}
+
+// POST /s/:secret/mirrors/:id — relabel, revoke an unused invite, or
+// hide a mirror from the set-wide stats (a test run). Nothing here
+// reaches into the mirror's tournament: that belongs to its TD.
+async function updateMirror(request, env, s, mirrorId) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const { results } = await env.DB.prepare(
+    'SELECT id, started, tournament_id FROM set_mirrors WHERE id = ?1 AND set_id = ?2'
+  ).bind(mirrorId, s.id).all();
+  if (!results.length) return err(env, 404, 'no such mirror');
+  const f = cleanMirrorFields(body);
+  if (f.error) return err(env, 400, f.error);
+  if (body.revoked !== undefined) {
+    if (results[0].tournament_id && body.revoked) return err(env, 409, 'already started');
+    f.revoked = body.revoked ? 1 : 0;
+  }
+  if (body.hidden !== undefined) f.hidden = body.hidden ? 1 : 0;
+  const cols = Object.keys(f);
+  if (!cols.length) return err(env, 400, 'nothing to update');
+  await env.DB.prepare(
+    `UPDATE set_mirrors SET ${cols.map((c) => c + ' = ?').join(', ')} WHERE id = ?`
+  ).bind(...cols.map((c) => f[c]), mirrorId).run();
+  // hidden decides whether the set makes this mirror's games public, so
+  // the cron must look at the mirror again (publish or retract)
+  if (f.hidden !== undefined && results[0].tournament_id) await markPub(env, results[0].tournament_id);
+  await markSet(env, s.id);
+  return json(env, { ok: true });
+}
+
+// Resolve an invite link. 404 for unknown and revoked alike; the set's
+// own expiry closes its invites with it.
+async function getInviteRow(env, secret) {
+  const { results } = await env.DB.prepare(
+    'SELECT m.*, s.name AS set_name, s.slug AS set_slug, s.settings AS set_settings, s.created AS set_created ' +
+    'FROM set_mirrors m JOIN sets s ON s.id = m.set_id WHERE m.invite_secret = ?1 AND m.revoked = 0'
+  ).bind(await secretHash(secret)).all();
+  return results[0] || null;
+}
+
+// Used for good (its tournament is linked), or claimed moments ago by a
+// start still in flight. A claim that never got its tournament — the
+// Worker died in between — lapses, so the invite is not lost with it.
+function inviteTaken(m) {
+  return Boolean(m.tournament_id) || (m.started && m.started > Date.now() - INVITE_CLAIM_TTL);
+}
+
+async function getInvite(env, secret) {
+  const m = await getInviteRow(env, secret);
+  if (!m) return err(env, 404, 'bad link');
+  if (Date.now() > m.set_created + SET_TTL) return err(env, 410, 'set closed');
+  const { results } = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM set_packets WHERE set_id = ?1 AND retired = 0'
+  ).bind(m.set_id).all();
+  return json(env, {
+    set: m.set_name, name: m.name, slug: m.slug, host: m.host, event_date: m.event_date,
+    packets: results[0].n, started: inviteTaken(m) ? m.started : null,
+  });
+}
+
+// An invite, checked and claimed for one use: {error: Response} or {m,
+// setKey, release}. The claim re-checks everything that could have
+// changed since the row was read — a revoke, or another use, racing
+// this one — so two clicks can't make (or join) two tournaments.
+async function claimInvite(env, secret) {
+  const m = await getInviteRow(env, secret);
+  if (!m) return { error: err(env, 404, 'bad link') };
+  if (Date.now() > m.set_created + SET_TTL) return { error: err(env, 410, 'set closed') };
+  if (inviteTaken(m)) return { error: err(env, 409, 'this mirror has already been started') };
+  const setKey = await unwrapKey(secret, 'invite', m.invite_wrap);
+  const now = Date.now();
+  const claim = await env.DB.prepare(
+    'UPDATE set_mirrors SET started = ?2 WHERE id = ?1 AND revoked = 0 AND tournament_id IS NULL ' +
+    'AND (started IS NULL OR started <= ?3)'
+  ).bind(m.id, now, now - INVITE_CLAIM_TTL).run();
+  if (!claim.meta.changes) return { error: err(env, 409, 'this mirror has already been started') };
+  return {
+    m, setKey, claimedAt: now,
+    release: () => env.DB.prepare(
+      'UPDATE set_mirrors SET started = NULL, tournament_id = NULL, mirror_key_enc = NULL WHERE id = ?1 AND started = ?2'
+    ).bind(m.id, now).run(),
+  };
+}
+
+// Tie a tournament to a claimed invite's mirror row, then give it the
+// set's current packets: packet N on round N, wherever the tournament
+// has nothing on that round yet and is not already using that packet.
+// Returns the rounds it filled.
+//
+// Link first, THEN read the packets. From the link on, a packet the
+// editor uploads reaches this mirror through mirrorsOpenFor; anything
+// uploaded before it is in the read below. Either order is covered, and
+// where both apply the upload's row wins (DO NOTHING here, an upsert
+// there) — it is never the older version. mirror_key_enc is the
+// mirror's content key under the set's: what lets the set's editors
+// open this mirror's stored game files (setMirrorFile).
+//
+// The link holds only for the claim that authorized it: a claim that
+// lapsed and was re-claimed by someone else, or an invite revoked while
+// this start was in flight, links nothing (and the caller undoes its
+// tournament).
+async function linkMirror(env, m, setKey, tid, mirrorKey, claimedAt) {
+  const linked = await env.DB.prepare(
+    'UPDATE set_mirrors SET tournament_id = ?2, mirror_key_enc = ?3 ' +
+    'WHERE id = ?1 AND tournament_id IS NULL AND revoked = 0 AND started = ?4'
+  ).bind(m.id, tid, await encField(setKey, b64bytes(mirrorKey)), claimedAt).run();
+  if (!linked.meta.changes) throw new Error('invite no longer valid');
+  const [{ results: packets }, { results: have }] = await Promise.all([
+    env.DB.prepare(
+      'SELECT packet, version, r2_key, name FROM set_packets WHERE set_id = ?1 AND retired = 0'
+    ).bind(m.set_id).all(),
+    env.DB.prepare('SELECT number, packet_r2_key FROM rounds WHERE tournament_id = ?1').bind(tid).all(),
+  ]);
+  const taken = new Set(have.map((r) => r.number));
+  const using = (p) => have.some((r) => r.packet_r2_key.startsWith(`${setPacketPrefix(m.set_id)}${p.packet}/`));
+  const fill = packets.filter((p) => !taken.has(p.packet) && !using(p));
+  if (fill.length) {
+    await env.DB.batch(fill.map((p) => env.DB.prepare(
+      'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
+      'ON CONFLICT(tournament_id, number) DO NOTHING'
+    ).bind(tid, p.packet, p.r2_key, p.name)));
+  }
+  return { packets, fill };
+}
+
+// Best effort after linkMirror: the filled rounds' categories, from the
+// set's map into the mirror's, in one conditional write. A mirror works
+// without it — the dashboard's own backfill (rebuildCatmap) rebuilds a
+// missing or stale map from the packets.
+async function fillMirrorCatmap(env, setId, tid, fill) {
+  const catsObj = await env.DATA.get(setCatmapKey(setId));
+  const setCats = catsObj ? await catsObj.json().catch(() => null) : null;
+  const add = fill.map((p) => [String(p.packet), versionCats(setCats, p.packet, p.version)]).filter(([, c]) => c);
+  if (!add.length) return;
+  const key = `t/${tid}/catmap.json`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await env.DATA.get(key);
+    const map = (cur && await cur.json().catch(() => null)) || { rounds: {} };
+    if (!map.rounds || typeof map.rounds !== 'object') map.rounds = {};
+    for (const [round, cats] of add) map.rounds[round] = cats;
+    const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
+    try {
+      const put = await env.DATA.put(key, JSON.stringify(map), {
+        httpMetadata: { contentType: 'application/json' },
+        customMetadata: { v: cur ? (cur.customMetadata || {}).v || '1' : (catsObj.customMetadata || {}).v || '1' },
+        onlyIf,
+      });
+      if (put) return;
+    } catch (e) { /* precondition failed -> retry */ }
+  }
+}
+
+// POST /i/:secret {name, slug} — start the mirror: an ordinary tournament
+// (the 48h clocks start now), prefilled from the set.
+async function startInvite(request, env, secret) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const slug = cleanSlug(body.slug);
+  const name = cleanName(body.name);
+  const bad = slugNameError(slug, name);
+  if (bad) return err(env, bad.status, bad.message);
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const { results: quota } = await env.DB.prepare(
+    'SELECT SUM(creator_ip = ?1) AS mine, COUNT(*) AS all_ips FROM tournaments WHERE created > ?2 AND set_id IS NOT NULL'
+  ).bind(ip, Date.now() - 24 * 3600 * 1000).all();
+  if ((quota[0].mine || 0) >= START_PER_IP_DAY || quota[0].all_ips >= START_GLOBAL_DAY) {
+    return err(env, 429, 'creation limit reached, try again tomorrow');
+  }
+
+  const claimed = await claimInvite(env, secret);
+  if (claimed.error) return claimed.error;
+  const { m, setKey, release, claimedAt } = claimed;
+
+  // settings are filled in below, once the packets are known
+  const made = await insertTournament(env, {
+    slug, name, settings: {}, ip, set: { id: m.set_id, key: setKey },
+  });
+  if (!made) {
+    await release();
+    return err(env, 409, 'slug already taken');
+  }
+  let linked;
+  try {
+    linked = await linkMirror(env, m, setKey, made.id, made.rawKey, claimedAt);
+    // The reader format is the set's; the round count is the editor's
+    // planned one, or however far the packets go if that is further.
+    // Never the set's buzzpoints config: that password is the editor's,
+    // and a mirror's is its TD's to set.
+    let setSettings = {};
+    try { setSettings = JSON.parse(m.set_settings) || {}; } catch (e) { /* keep {} */ }
+    const planned = Number(setSettings.rounds);
+    const settings = {
+      rounds: Math.max(1, Number.isInteger(planned) && planned <= 999 ? planned : 1,
+        ...linked.packets.map((p) => p.packet)),
+    };
+    for (const k of ['gameFormat', 'formatOverrides']) {
+      if (setSettings[k] !== undefined) settings[k] = setSettings[k];
+    }
+    await env.DB.prepare('UPDATE tournaments SET settings = ?2 WHERE id = ?1')
+      .bind(made.id, JSON.stringify(settings)).run();
+  } catch (e) {
+    // no rounds, no mirror: undo, and the invite can be started again
+    await env.DB.prepare('DELETE FROM rounds WHERE tournament_id = ?1').bind(made.id).run();
+    await env.DB.prepare('DELETE FROM tournaments WHERE id = ?1').bind(made.id).run();
+    await release();
+    return err(env, 500, 'could not start the mirror, try again');
+  }
+  try { await fillMirrorCatmap(env, m.set_id, made.id, linked.fill); } catch (e) {
+    console.log('mirror category map incomplete for tournament', made.id, e.message);
+  }
+  await markPub(env, made.id);
+  await markSet(env, m.set_id);
+  return json(env, {
+    id: made.id, slug, name, admin_secret: made.adminSecret,
+    closes: made.created + ADMIN_TTL, set: m.set_name, rounds: linked.fill.length,
+  });
+}
+
+// POST /a/:secret/join {invite} — a TD who made their tournament before
+// the invite reached them uses it on that tournament instead: it becomes
+// the set's mirror as it stands. Its own packets stay where they are
+// (the set only fills the rounds still empty), its games start counting
+// for the set, and its clocks are the ones it already had.
+async function joinSet(request, env, t) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const secret = String(body.invite || '').trim();
+  if (!/^[a-z0-9]{10,40}$/.test(secret)) return err(env, 400, 'bad invite');
+  if (t.set_id) return err(env, 409, 'this tournament already mirrors a set');
+  // legacy (pre-encryption) tournaments have no key to hold the set's under
+  if (!t.ckey) return err(env, 409, 'this tournament cannot join a set');
+
+  const claimed = await claimInvite(env, secret);
+  if (claimed.error) return claimed.error;
+  const { m, setKey, release, claimedAt } = claimed;
+  // Two joins racing on one tournament: the second finds set_id taken
+  // and must not touch what the first did — so the join is claimed
+  // first, and only a claim that stuck is ever rolled back.
+  const keyEnc = await encField(t.ckey, b64bytes(setKey));
+  const joined = await env.DB.prepare(
+    'UPDATE tournaments SET set_id = ?2, set_key_enc = ?3 WHERE id = ?1 AND set_id IS NULL'
+  ).bind(t.id, m.set_id, keyEnc).run();
+  if (!joined.meta.changes) {
+    await release();
+    return err(env, 409, 'this tournament already mirrors a set');
+  }
+  let linked;
+  try {
+    linked = await linkMirror(env, m, setKey, t.id, t.ckey, claimedAt);
+  } catch (e) {
+    // rounds the link may have filled point at blobs this tournament
+    // can no longer open once the key goes: they go with it
+    await env.DB.prepare('DELETE FROM rounds WHERE tournament_id = ?1 AND packet_r2_key LIKE ?2')
+      .bind(t.id, setPacketPrefix(m.set_id) + '%').run();
+    await env.DB.prepare(
+      'UPDATE tournaments SET set_id = NULL, set_key_enc = NULL WHERE id = ?1 AND set_key_enc = ?2'
+    ).bind(t.id, keyEnc).run();
+    await release();
+    return err(env, 500, 'could not join the set, try again');
+  }
+  try { await fillMirrorCatmap(env, m.set_id, t.id, linked.fill); } catch (e) {
+    console.log('mirror category map incomplete for tournament', t.id, e.message);
+  }
+  await markPub(env, t.id);
+  await markSet(env, m.set_id);
+  return json(env, { ok: true, set: m.set_name, rounds: linked.fill.length });
+}
+
+// POST /a/:secret/setpacket {round, packet} — the TD's choice of which
+// of the set's packets a round reads (packet: null clears the round).
+// Always the packet's current version. Refused once the round has a
+// game: that game was read from what is there now.
+async function chooseSetPacket(request, env, t) {
+  if (!t.set_id) return err(env, 409, 'not a mirror of a set');
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const round = Number(body.round);
+  if (!Number.isInteger(round) || round < 1 || round > 999) return err(env, 400, 'bad round');
+  const { results: played } = await env.DB.prepare(
+    "SELECT 1 AS ok FROM files WHERE tournament_id = ?1 AND round = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL LIMIT 1"
+  ).bind(t.id, round).all();
+  if (played.length) return err(env, 409, 'round ' + round + ' already has games');
+
+  if (body.packet === null) {
+    await env.DB.prepare('DELETE FROM rounds WHERE tournament_id = ?1 AND number = ?2').bind(t.id, round).run();
+    await updateCatmap(env, t.id, round, null);
+    await markPub(env, t.id);
+    return json(env, { round, packet: null });
+  }
+  const packet = Number(body.packet);
+  const { results } = Number.isInteger(packet) ? await env.DB.prepare(
+    'SELECT version, r2_key, name FROM set_packets WHERE set_id = ?1 AND packet = ?2 AND retired = 0'
+  ).bind(t.set_id, packet).all() : { results: [] };
+  if (!results.length) return err(env, 404, 'no such packet in the set');
+  const p = results[0];
+  // served resets with the packet: nobody has been handed THIS one here
+  // — unless it is the one already there, whose pin stays
+  await env.DB.prepare(
+    'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
+    'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_name = ?4, ' +
+    'served = CASE WHEN packet_r2_key = ?3 THEN served ELSE 0 END, packet_r2_key = ?3'
+  ).bind(t.id, round, p.r2_key, p.name).run();
+  const catsObj = await env.DATA.get(setCatmapKey(t.set_id));
+  await updateCatmap(env, t.id, round,
+    versionCats(catsObj ? await catsObj.json().catch(() => null) : null, packet, p.version));
+  await markPub(env, t.id);
+  return json(env, { round, packet, version: p.version });
+}
+
+/* ----- a mirror's stored game files, for the set's editors ----- */
+
+// The mirror's content key, through the set's. null: not this set's
+// mirror, or one from before mirrors handed their key over.
+async function mirrorKeyFor(env, s, tid) {
+  const { results } = Number.isInteger(tid) ? await env.DB.prepare(
+    'SELECT mirror_key_enc FROM set_mirrors WHERE set_id = ?1 AND tournament_id = ?2'
+  ).bind(s.id, tid).all() : { results: [] };
+  if (!results.length || !results[0].mirror_key_enc) return null;
+  return b64ToBytes(await decField(s.ckey, results[0].mirror_key_enc));
+}
+
+// GET /s/:secret/files?m=<tournament id> — that mirror's uploads, as the
+// TD's own dashboard lists them.
+async function setMirrorFiles(env, s, url) {
+  const tid = Number(url.searchParams.get('m'));
+  if (!(await mirrorKeyFor(env, s, tid))) return err(env, 404, 'no such mirror');
+  const { results } = await env.DB.prepare(
+    'SELECT f.id, f.round, f.kind, f.filename, f.size, f.error, f.created, b.room_name AS room ' +
+    'FROM files f LEFT JOIN buckets b ON b.id = f.bucket_id WHERE f.tournament_id = ?1 ORDER BY f.round, f.id'
+  ).bind(tid).all();
+  return json(env, { files: results });
+}
+
+// GET /s/:secret/gamefile?m=&id=&part=qbj|game — one of them, decrypted:
+// the match qbj, or the MODAQ game file a reader upload carries.
+async function setMirrorFile(env, s, url) {
+  const tid = Number(url.searchParams.get('m'));
+  const rawKey = await mirrorKeyFor(env, s, tid);
+  if (!rawKey) return err(env, 404, 'no such mirror');
+  const fileId = Number(url.searchParams.get('id'));
+  const { results } = Number.isInteger(fileId) ? await env.DB.prepare(
+    'SELECT r2_key, filename FROM files WHERE id = ?1 AND tournament_id = ?2'
+  ).bind(fileId, tid).all() : { results: [] };
+  const obj = results.length ? await env.DATA.get(results[0].r2_key) : null;
+  if (!obj) return err(env, 404, 'no such file');
+  return storedFileResponse(env, obj, rawKey, results[0].filename, url.searchParams.get('part'));
+}
+
+/* ----- the set's state blob and the routes that read the games ----- */
+
+// One mirror's heavy half of the state: what its shards hold, which set
+// packet + version each of its rounds ran ([packet, version], or null
+// for a packet of the TD's own), and which rounds every room has turned in.
+async function mirrorState(env, tid, packetOf) {
+  const [manifest, rounds, files, buckets, schedObj] = await Promise.all([
+    readManifest(env, tid),
+    env.DB.prepare('SELECT number, packet_r2_key FROM rounds WHERE tournament_id = ?1').bind(tid).all(),
+    env.DB.prepare(
+      "SELECT round, bucket_id FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL"
+    ).bind(tid).all(),
+    env.DB.prepare('SELECT COUNT(*) AS n FROM buckets WHERE tournament_id = ?1').bind(tid).all(),
+    env.DATA.get(`t/${tid}/schedule.json`),
+  ]);
+  const sched = schedObj ? await schedObj.json().catch(() => null) : null;
+  return {
+    rounds: manifest.rounds,
+    vmap: Object.fromEntries(rounds.results.map((r) => [r.number, packetOf.get(r.packet_r2_key) ?? null])),
+    done: doneRounds(files.results, buckets.results[0].n, sched),
+  };
+}
+
+/**
+ * Rebuild s/<sid>/state.json. Cron-only: one writer. Only the mirrors the
+ * tick flagged (set_mirrors.state_dirty, set when the tick works on the
+ * mirror's tournament) and mirrors the previous blob has never seen pay
+ * for mirrorState; everything else is carried forward, so a busy Saturday
+ * costs D1 reads in proportion to the mirrors that moved, not to the
+ * mirrors that exist. The flags clear only after the blob is written —
+ * a rebuild that fails re-reads the same mirrors next tick.
+ */
+async function rebuildSetState(env, sid) {
+  const [prevObj, mirrors, packets, catsObj] = await Promise.all([
+    env.DATA.get(setStateKey(sid)),
+    env.DB.prepare(
+      'SELECT m.id AS mirror_id, m.state_dirty, m.name AS label, m.host, m.event_date, ' +
+      't.id, t.slug, t.name, t.published, t.created, t.pub_snapshot ' +
+      'FROM set_mirrors m JOIN tournaments t ON t.id = m.tournament_id ' +
+      'WHERE m.set_id = ?1 AND m.hidden = 0 ORDER BY m.id'
+    ).bind(sid).all(),
+    env.DB.prepare('SELECT packet, version, r2_key, retired FROM set_packets WHERE set_id = ?1').bind(sid).all(),
+    env.DATA.get(setCatmapKey(sid)),
+  ]);
+  const prev = prevObj ? await prevObj.json().catch(() => null) : null;
+  const prevBy = new Map(((prev && prev.mirrors) || []).map((m) => [m.id, m]));
+  const packetOf = new Map(packets.results.map((p) => [p.r2_key, [p.packet, p.version]]));
+
+  let cats = null;
+  if (catsObj) {
+    const parsed = await catsObj.json().catch(() => null);
+    if (parsed && parsed.packets && Object.keys(parsed.packets).length) cats = catsObj.uploaded.getTime();
+  }
+
+  // Claim the flags before the work, like the tournament half: a flag
+  // set by an overlapping tick while this one reads stays set. A rebuild
+  // that fails puts the claimed ones back (tickSets).
+  const reread = mirrors.results.filter((t) => !prevBy.get(t.id) || t.state_dirty).map((t) => t.mirror_id);
+  for (const id of reread) {
+    await env.DB.prepare('UPDATE set_mirrors SET state_dirty = 0 WHERE id = ?1').bind(id).run();
+  }
+  const out = [];
+  for (const t of mirrors.results) {
+    const old = prevBy.get(t.id);
+    const heavy = old && !reread.includes(t.mirror_id)
+      ? { rounds: old.rounds, vmap: old.vmap, done: old.done }
+      : await mirrorState(env, t.id, packetOf);
+    // the snapshot descriptor is on the row, so it is always current
+    let pub = null;
+    try {
+      const snap = env.SNAPSHOT_REPO && t.pub_snapshot ? JSON.parse(t.pub_snapshot) : null;
+      if (snap && snap.sha) pub = { sha: snap.sha, rounds: snap.rounds || {} };
+    } catch (e) { /* no usable snapshot */ }
+    out.push({
+      id: t.id, label: t.label, host: t.host, date: t.event_date,
+      slug: t.slug, name: t.name, page: !!t.published, created: t.created,
+      ...heavy, pub,
+    });
+  }
+  await env.DATA.put(setStateKey(sid), JSON.stringify({
+    v: 2, at: Date.now(), cats,
+    packets: Object.fromEntries(packets.results.filter((p) => !p.retired).map((p) => [p.packet, p.version])),
+    mirrors: out,
+  }), { httpMetadata: { contentType: 'application/json' } });
+  return reread;
+}
+
+// The second half of the tick: state blobs for flagged sets — by their
+// own mutations, or by the first half having worked on one of their
+// mirrors.
+async function tickSets(env) {
+  const { results } = await env.DB.prepare(
+    'SELECT id FROM sets WHERE state_dirty = 1 ORDER BY id LIMIT 8'
+  ).all();
+  for (const s of results) {
+    // claim before working, as the tournament half does
+    await env.DB.prepare('UPDATE sets SET state_dirty = 0 WHERE id = ?1').bind(s.id).run();
+    try {
+      await rebuildSetState(env, s.id);
+    } catch (e) {
+      console.log('set state failed for set', s.id, e.message);
+      // whatever mirrors this rebuild had claimed are stale again
+      await env.DB.prepare(
+        'UPDATE set_mirrors SET state_dirty = 1 WHERE set_id = ?1 AND tournament_id IS NOT NULL'
+      ).bind(s.id).run();
+      await markSet(env, s.id);
+    }
+  }
+}
+
+// The set page's state: the cron's blob plus what lives on the row. The
+// same body serves the editor (always) and the public route (published).
+async function setStateBody(env, s) {
+  const obj = await env.DATA.get(setStateKey(s.id));
+  const blob = (obj && await obj.json().catch(() => null)) || { at: null, cats: null, packets: {}, mirrors: [] };
+  const buzz = buzzConfig(s);
+  return {
+    name: s.name, slug: s.slug,
+    buzz: buzz ? buzz.mode : null,
+    buzz_kdf: buzzKdf(buzz),
+    buzz_v: buzz ? await buzzStamp(buzz) : null,
+    // where mirrors[].pub shas resolve (see "public snapshots on GitHub")
+    repo: env.SNAPSHOT_REPO || null,
+    at: blob.at, cats: blob.cats, packets: blob.packets, mirrors: blob.mirrors,
+  };
+}
+
+async function getPublishedSet(env, slug) {
+  const { results } = await env.DB.prepare(
+    'SELECT * FROM sets WHERE slug = ?1 AND published = 1'
+  ).bind(slug).all();
+  return results[0] || null;
+}
+
+async function pubSetState(env, slug) {
+  const s = await getPublishedSet(env, slug);
+  if (!s) return err(env, 404, 'not found');
+  return json(env, await setStateBody(env, s), 200, PUB_CACHE_LIVE);
+}
+
+// One mirror's round shards, ?m=<tournament id>&n=3,4 — pubRounds for a
+// mirror whose own page may be off. Hidden mirrors are not served.
+async function setRounds(env, s, url, cacheSeconds) {
+  const tid = Number(url.searchParams.get('m'));
+  const { results } = Number.isInteger(tid) ? await env.DB.prepare(
+    'SELECT 1 AS ok FROM set_mirrors WHERE set_id = ?1 AND tournament_id = ?2 AND hidden = 0'
+  ).bind(s.id, tid).all() : { results: [] };
+  if (!results.length) return err(env, 404, 'no such mirror');
+  return streamRounds(env, tid, url, cacheSeconds);
+}
+
+async function pubSetRounds(env, slug, url) {
+  const s = await getPublishedSet(env, slug);
+  if (!s) return err(env, 404, 'not found');
+  return setRounds(env, s, url, PUB_CACHE_LIVE);
+}
+
+async function setCats(env, s, cacheSeconds) {
+  const obj = await env.DATA.get(setCatmapKey(s.id));
+  if (!obj) return err(env, 404, 'no categories');
+  return blobResponse(env, obj, null, cacheSeconds);
+}
+
+async function pubSetCats(env, slug) {
+  const s = await getPublishedSet(env, slug);
+  if (!s) return err(env, 404, 'not found');
+  return setCats(env, s, PUB_CACHE_LIVE);
+}
+
+// Set-wide buzzpoint text: ?packet=&v=. Same gate as a tournament's, and
+// the same played-rounds-only rule one level up — a version of a packet
+// is served once some mirror has every room in for a round it ran it on.
+async function pubSetQPacket(request, url, env, slug) {
+  const s = await getPublishedSet(env, slug);
+  if (!s) return err(env, 404, 'not found');
+  const b = buzzConfig(s);
+  if (!b) return err(env, 404, 'not found');
+  const denied = await buzzGate(request, env, 'set:' + slug, b);
+  if (denied) return denied;
+  const packet = Number(url.searchParams.get('packet'));
+  const version = Number(url.searchParams.get('v'));
+  if (!Number.isInteger(packet) || packet < 1 || !Number.isInteger(version)) return err(env, 400, 'bad packet');
+  const stateObj = await env.DATA.get(setStateKey(s.id));
+  const state = stateObj ? await stateObj.json().catch(() => null) : null;
+  const played = ((state && state.mirrors) || []).some((m) => (m.done || []).some((round) => {
+    const pv = (m.vmap || {})[round];
+    return Array.isArray(pv) && pv[0] === packet && pv[1] === version;
+  }));
+  if (!played) return err(env, 403, 'not played yet');
+  const row = await setPacketRow(env, s.id, url);
+  const obj = row ? await env.DATA.get(row.r2_key) : null;
+  if (!obj) return err(env, 404, 'no such packet');
+  return gatedPacket(request, env, obj, row.r2_key, row.name, s.buzz_wrap, (skey) => ({ skey }));
 }
 
 /* ---------- router ---------- */
@@ -2357,9 +3692,48 @@ export default {
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubQPacket(request, url, env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubCats(env, m[1]);
 
+    // Public set routes — gated by the set's own publish flag inside.
+    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubSetState(env, m[1]);
+    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubSetRounds(env, m[1], url);
+    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubSetCats(env, m[1]);
+    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubSetQPacket(request, url, env, m[1]);
+
     // Open (rate-limited) tournament creation; the response carries the
     // admin secret, shown to the TO exactly once by the dashboard.
     if (path === '/api/tournaments' && method === 'POST') return createTournament(request, env);
+    if (path === '/api/sets' && method === 'POST') return createSet(request, env);
+
+    // A mirror invite: read what it is, or start it (once).
+    if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'GET') return getInvite(env, m[1]);
+    if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'POST') return startInvite(request, env, m[1]);
+
+    // Set editor routes — the set link is the credential (SET_TTL).
+    if ((m = path.match(/^\/s\/([a-z0-9]{10,40})(\/.*)?$/))) {
+      const s = await getAdminSet(env, m[1]);
+      if (!s) return err(env, 404, 'bad link');
+      if (setClosed(s)) return err(env, 410, 'set closed');
+      const sub = m[2] || '';
+      let mm;
+      if (sub === '' && method === 'GET') return getSet(env, s, ctx);
+      if (sub === '' && method === 'POST') return updateSet(request, env, s);
+      if (sub === '/rotate' && method === 'POST') return rotateSet(env, s);
+      if (sub === '/packet' && method === 'POST') return uploadSetPacket(request, url, env, s);
+      if (sub === '/packet' && method === 'DELETE') return retireSetPacket(url, env, s);
+      if (sub === '/packet/status' && method === 'POST') return setPacketStatus(request, env, s);
+      if (sub === '/ledger' && method === 'GET') return getLedger(env, s);
+      if (sub === '/qmap' && method === 'POST') return putQmap(request, env, s);
+      if (sub === '/files' && method === 'GET') return setMirrorFiles(env, s, url);
+      if (sub === '/gamefile' && method === 'GET') return setMirrorFile(env, s, url);
+      if (sub === '/file' && method === 'GET') return setPacketFile(url, env, s);
+      if (sub === '/tiebreakers' && method === 'GET') return setTiebreakers(env, s);
+      if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, SET_TB_KEY(s.id), s.ckey);
+      if (sub === '/tiebreakers' && method === 'DELETE') return clearSetTiebreakers(env, s);
+      if (sub === '/mirrors' && method === 'POST') return createMirror(request, env, s);
+      if ((mm = sub.match(/^\/mirrors\/(\d+)$/)) && method === 'POST') return updateMirror(request, env, s, Number(mm[1]));
+      if (sub === '/state' && method === 'GET') return json(env, await setStateBody(env, s));
+      if (sub === '/rounds' && method === 'GET') return setRounds(env, s, url, 0);
+      if (sub === '/cats' && method === 'GET') return setCats(env, s, 0);
+    }
 
     // Admin routes — the admin secret is the credential, and it expires.
     if ((m = path.match(/^\/a\/([a-z0-9]{10,40})(\/.*)?$/))) {
@@ -2374,8 +3748,9 @@ export default {
       if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
-      if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, t);
-      if (sub === '/tiebreakers' && method === 'DELETE') return deleteTiebreakers(env, t);
+      if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
+      if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey);
+      if (sub === '/tiebreakers' && method === 'DELETE') return deleteTiebreakers(env, TB_KEY(t.id));
       if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
       if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
       if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
@@ -2383,6 +3758,8 @@ export default {
       if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
       if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
       if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);
+      if (sub === '/setpacket' && method === 'POST') return chooseSetPacket(request, env, t);
+      if (sub === '/join' && method === 'POST') return joinSet(request, env, t);
     }
 
     return err(env, 404, 'not found');

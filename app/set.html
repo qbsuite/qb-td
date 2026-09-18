@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>qb-td sets</title>
+<link rel="stylesheet" href="css/td.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>qb-td</h1>
+    <span class="sub">question sets</span>
+  </header>
+  <div id="msg"></div>
+  <div id="view"></div>
+</div>
+<div id="linkmodal" class="modalback" hidden>
+  <div class="modal">
+    <h2 style="margin-top:0">Save this link</h2>
+    <div class="mono linkbox" id="modallink"></div>
+    <p>This device keeps the set in its list here. The link is the only way
+    to open it from another device or after clearing browser data — and
+    anyone holding it can read the packets and start mirrors, so share it
+    only with the set&rsquo;s editors.</p>
+    <p>It works for a year, until <b id="modalcloses"></b>.</p>
+    <div class="row" style="margin-top:12px">
+      <button id="modalcopy" class="primary">Copy link</button>
+      <button id="modalok">Saved it</button>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/setadmin.js"></script>
+</body>
+</html>

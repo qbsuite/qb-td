@@ -163,6 +163,20 @@ Part of [qbsuite](https://qbsuite.github.io/).
   are generated client-side in the dashboard. Combined reader uploads are
   never handed out raw: the dashboard's per-file downloads (Worker
   `part=qbj|game`) and the zip both split them into those two real files.
+- **Question sets** (`app/set.html`, no account): the editor's side of a
+  mirrored tournament. A set's packets, tiebreakers and reader game
+  format are uploaded once; each mirror gets an **invite link** the
+  editor can send weeks ahead, and the TD who opens it
+  (`index.html?i=<invite>`) presses Start to get an ordinary tournament —
+  the 48-hour clock starts then, not when the invite was made — with the
+  packets, the backup questions and the format already in place (or
+  pastes it into a tournament they already made). Which round reads
+  which packet stays the TD's choice. The games every mirror collects
+  come back as **set-wide stats, category stats and buzzpoints** that
+  follow each question through packet fixes and repacketizing: in the
+  editor's dashboard always, and on a **public set page**
+  (`app/s.html?s=<slug>`) once the editor switches it on. See "Question
+  sets" below.
 - **Archive** (`app/archive.html`): a curated list of past tournaments, and
   with `?t=<slug>` any one of them. An archived tournament runs the real
   `pubview.js` against a committed capture of its `/pub` responses
@@ -172,6 +186,154 @@ Part of [qbsuite](https://qbsuite.github.io/).
   six-page stat report as static HTML. Buzzpoints is switched off in a
   capture: that tab needs the gated packet-text route, which isn't
   archived. See "Archiving a tournament" below.
+
+## Question sets
+
+A set is mirrored for a season, so its editor link lives a **year**
+(`SET_TTL`); everything a mirror does still runs on the 48-hour clocks.
+That works because **an invite is not a tournament**: it is a one-time,
+revocable credential that creates nothing until its TD uses it — either
+to start a tournament (Start on the invite page) or to join one they
+have already made (Tournament Setup → Packets → Join a set, which fills
+the rounds still empty and leaves their own packets alone). Editors can
+line mirrors up as early as they like, and the question-security story
+of a running tournament (links dead 48 h after creation) is exactly what
+it was. An invite can start the mirror and therefore read the packets,
+so it should travel the way the packets themselves would; the set
+dashboard shows which invites are still unused, and revokes them.
+
+- **Packets, not rounds.** The set numbers its packets; which round a
+  mirror reads a packet in is its TD's call (a mirror starts with packet
+  N on round N, and the dashboard's Packets tab puts any packet on any
+  round — skip one, reorder them, keep some for playoffs). Everything
+  set-wide is keyed by the packet a game was read from, never by the
+  round it was played in.
+- **Packets are referenced, not copied.** A mirror's rounds point at the
+  set's packet blobs. Every upload of a packet is a new immutable
+  **version** and the one before it is retired, never deleted. So a fix
+  uploaded mid-season reaches every *running* mirror that has not
+  opened that packet yet, while a mirror that has stays pinned to the
+  text its buzz positions belong to. "Opened" means the first room was
+  handed the packet (`rounds.served`), not the first game coming back:
+  once one moderator is reading a version the whole site stays on it,
+  because two versions inside one site's round could never be told apart
+  afterwards. A TD may still upload their own packet for a round; the
+  set then stops updating that round there, and its games drop out of
+  the set's category stats and buzzpoints (its scores still count).
+  Removing a packet from the set takes it out of running mirrors that
+  have not opened it.
+- **Questions keep their identity through rewording and repacketizing.**
+  Editors fix wording, move questions between packets, split and merge
+  packets. Each packet version can carry a *question map* — per
+  position, `[question id, wording revision]` — computed in the editor's
+  browser at upload (`app/engine/qmatch.js`, against a ledger of every
+  question the set has held; the ledger is question text, so it lives
+  encrypted under the set's key and only the set link reads it) and
+  stored, text-free, beside the categories in the set's public map. The
+  editor is told what each upload did ("41 unchanged · 1 reworded (T1)",
+  "1 moved in (T3 from packet 2 T5)", "1 no longer in the set"), and a
+  version that was never matched — a packet the browser could not read —
+  is labelled so and offered a Match button. On the buzzpoints tab this
+  means: a packet's page lists its *current* questions, each with every
+  play of it anywhere (whatever round, whatever packet it sat in then);
+  plays on the current wording are drawn over the current text, plays on
+  an earlier wording get their own block over the text those rooms
+  actually heard ("2 wordings", "moved" badges say which); and questions
+  that are in no current packet any more stay reachable under the
+  version that last held them. Set-wide category stats read each site's
+  version of each packet, so a question counts under the category it
+  had where it was played.
+- **A person checks every packet.** The set dashboard's Review panel
+  (Packets → Versions → Review) lays a version out the way a reviewer
+  reads it — answerline, length, how each tossup opens and ends, each
+  bonus's parts with their answers and values — and flags what looks
+  mis-parsed (`app/engine/packetcheck.js`: a two-part bonus, a stray
+  `[10]`, "ANSWER:" inside a question, two tossups sharing an answerline,
+  missing category data…). Warnings are hints, never verdicts; a packet
+  chip stays red until someone marks the version **checked**. The same
+  panel shows what the matcher decided each question is and lets the
+  editor overrule it — "this is packet 2 T5" or "this is new" — and the
+  buzzpoints follow the correction (`qmatch.js` `assignQuestion`).
+- **Conversion statistics.** The categories tab has a tossups view (per
+  category or subcategory: heard, power / conversion / dead rates, negs,
+  bonus PPB), a bonuses view (PPB, the 0/10/20/30 split, and how each
+  bonus's easiest, middle and hardest part converted — ranked by how the
+  parts actually converted, since nothing in a packet says which was
+  meant to be easy), players and teams. The buzzpoints tab adds an
+  all-tossups table, hardest first, with each question's answer,
+  category, and its numbers pooled over every site that heard it.
+- **Mirrors in or out.** A row of site pills above every set-wide view
+  toggles mirrors in and out; excluded ones are struck through there and
+  marked in the sites table, and the count says how many are in.
+- **Backup questions.** The set's tiebreaker / replacement pool is read
+  *live* by every mirror's rooms (`mergedTbPool`) — questions the editors
+  add mid-season reach mirrors already running — with the set's ids
+  prefixed (`S-TU1`) so a TD's own additions can't collide, and the usage
+  log stays the mirror's own. A set's pool is emptied, never deleted, so
+  its id counter survives.
+- **Encryption, one level up.** A set has its own content key, wrapped
+  under the editor's link, each invite, and the set's buzzpoints key. A
+  mirror carries that key encrypted under its *own* content key, so every
+  credential that opens the mirror (admin link, room links, its
+  buzzpoints password) opens the set's packets through it, and nothing
+  else does. The honest cost: a mirror's question text is no longer
+  cryptographically gone when the mirror's links expire — it goes when
+  the set's link does. And the mirror hands its own key to the set the
+  same way (`set_mirrors.mirror_key_enc`): its editors can download the
+  mirror's stored game files, MODAQ game files included, from the set
+  dashboard — the invite page and the mirror's dashboard both say so.
+- **Reading the games back needs no keys.** A mirror's public game copies
+  and round shards are text-free, so the set routes simply serve the
+  mirrors' shards. A mirror is materialized by the cron whether or not
+  its own page is public, because its set's editors read those shards.
+- **Who sees what.** The editor's link reads everything, always. The
+  public set page exists while the *set's* publish switch is on, and then
+  shows every mirror not hidden from stats — including mirrors whose TD
+  left their own page off. A mirror TD's publish switch governs only
+  that mirror's own page (schedule, broadcasts). Set-wide buzzpoint
+  **text** is password-gated exactly like a tournament's, and served for
+  a packet version once any one mirror has every room in for a round
+  that read it. Whoever holds that password can read those questions
+  while later mirrors are still to play: when to hand it out is the
+  editor's call, and the dashboard says so. The same editors can switch
+  their **mirrors' own buzzpoints off** (Settings → "Mirrors may run
+  their own buzzpoints"): while unticked no mirror of the set shows any
+  question text, whatever its TD configured, and the TD's dashboard says
+  why. The editor's own Stats tab needs no password — the set link
+  already is the key.
+- **Set-wide stats are per site, side by side.** Team names mean
+  something only inside their own mirror ("Team A" plays at three
+  sites), and so does the re-upload rule. So the engine runs once per
+  site (`app/engine/setstats.js`) and the rows are tagged with their
+  site; across sites, teams and players are ranked by PP20TUH rather than
+  by records earned against different fields. The categories tab adds
+  the editors' view — per category or subcategory, tossups heard,
+  power / conversion / dead rates, negs, and bonus PPB over every site.
+- **Request economics.** The set page costs one Worker request per view:
+  `/pubset/:slug` is one D1 row plus one small R2 blob
+  (`s/<sid>/state.json`) that the cron keeps — which mirrors, their
+  shard stamps and snapshot SHAs, which packet version each round read,
+  which rounds each has finished. A tick rebuilds it only for the mirrors
+  it actually touched and carries the rest forward, so a busy Saturday
+  costs D1 reads in proportion to the mirrors that moved. The games
+  themselves come SHA-pinned from the mirrors' own GitHub snapshot
+  folders, with one Worker request per mirror as the fallback. A
+  mirror's round shards are published when *either* flag says public —
+  its own, or its set's (unless the editor hid it); its schedule, roster
+  and category map only when its *own* page is on, so a TD who never
+  published does not find those in a public repo whose history is
+  forever. Nothing polls.
+- **Hiding a mirror** (a test run, a junk start) takes it out of the
+  set-wide views; nothing the editor can do reaches into a mirror's
+  tournament, which belongs to its TD.
+- **Abuse backstops.** Set creation is open and rate-limited like
+  tournament creation (tighter: 5 per IP per day). Mirrors started from
+  invites draw on their own daily budget rather than the open-creation
+  one, so an editor's invites can neither lock TDs out of creating
+  tournaments nor be a way around that limit. An invite is claimed
+  before anything is created — two clicks can't make two tournaments —
+  and a claim whose tournament never materialized lapses after five
+  minutes instead of stranding the invite.
 
 ## Link lifetime + question security
 
@@ -188,6 +350,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   "room open until ..." and the dashboard shows each room's close time;
   after that every moderator route returns "room closed". A leaked link
   stops serving packets and accepting uploads soon after the tournament.
+- **Set links live a year; invites live until started, revoked, or the
+  set closes.** See "Question sets" above — a mirror started from an
+  invite is an ordinary tournament on the clocks in this section.
 - **Packets are only reachable through a bucket link, and only for rounds
   up to the live one** — moderators can't pull future packets, and the
   public routes never serve packets (only match qbj + roster, and only
@@ -291,9 +456,16 @@ Part of [qbsuite](https://qbsuite.github.io/).
   serialization, contract verified against YellowFruit 4.0.18 source),
   `report.js` (the six-page HTML stat report, ported from YellowFruit
   4.0.18's `HTMLReports.ts` / `StatSummaries.ts`), `zip.js` (store-only
-  zip).
+  zip), `cats.js` (category slices), `setstats.js` (the same engine run
+  per mirror and put side by side, for a question set, and its
+  buzzpoints gathered per question), `qmatch.js` (question identity
+  across a set's packet versions).
 - `app/` — the static pages + `js/` page code (`announce.js` renders
-  the TD's broadcasts on all three read surfaces). Deployable on any
+  the TD's broadcasts on all three read surfaces; `buzzview.js`,
+  `statsview.js`, `packetsui.js` and `formatui.js` are the pieces the
+  tournament pages share with the set pages — `set.html` + `setadmin.js`
+  for editors, `s.html` + `setpub.js` for the public, both over
+  `setview.js`). Deployable on any
   static host; served at `qbsuite.github.io/qb-td/app/`. `archive.html` +
   `archive/` are the archive page and its committed captures. The reader page
   is `read.html` + `js/read.bundle.js`, a committed esbuild bundle of
@@ -310,7 +482,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   moderator routes, publish flag gating all public reads. No secrets to
   provision.
 - `tests/` — `run_tests.js` (engine unit tests), `e2e_worker.js` (full
-  TO -> moderator -> public flow against `wrangler dev`).
+  TO -> moderator -> public flow against `wrangler dev`), `e2e_sets.js`
+  (editor -> invite -> mirror -> set-wide reads, same dev Worker;
+  `e2e_lib.js` is what the two share), `snapshot_publish.js` (the cron
+  tick, mocked).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
 - `app/demo.html` + `js/demo.js` + `demo/fixture.js` — the demo
@@ -344,10 +519,13 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-crypt.sql
 # ...and one from before protests reached the hub:
 #   npx wrangler d1 execute qb-td --local --file migrate-protests.sql
+# ...and one from before question sets (re-run schema.sql first: it
+# creates the three set tables):
+#   npx wrangler d1 execute qb-td --local --file migrate-sets.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled
 npx wrangler dev --local --port 8799 --test-scheduled &
-cd .. && node tests/e2e_worker.js
+cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js
 
 # optional, and slow: a full-size tournament end to end (72 teams, 36
 # rooms, 17 rounds by default; TEAMS/ROOMS/ROUNDS/CONC override) against
@@ -375,6 +553,11 @@ end, which is also how it exercises the `final` caching path.
    `npx wrangler d1 execute qb-td --remote --file migrate-pub.sql`,
    and one from before protests reached the hub needs
    `npx wrangler d1 execute qb-td --remote --file migrate-protests.sql`,
+   and one from before question sets needs `schema.sql` run again (it
+   creates the set tables) and then
+   `npx wrangler d1 execute qb-td --remote --file migrate-sets.sql`
+   BEFORE the Worker that expects it is deployed — the cron's queue query
+   names `set_id`,
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy
@@ -469,7 +652,7 @@ That part scales. What breaks first:
 
 1. **D1 rows read binds at roughly half the request budget.** Every
    `/pub/:slug` re-derives the state from scratch, including a query that
-   returns **one row per game** (`worker.js:1838`) — 120 rows by the end
+   returns **one row per game** (`pubStateBody`'s `files` query) — 120 rows by the end
    of a 16-team RR, plus buckets and rounds, ~145 rows per public page
    view. Against D1's 5M-rows/day free tier that caps public views at
    ~34k/day (~1,100 per tournament), well before the request budget runs
@@ -501,7 +684,11 @@ That part scales. What breaks first:
    the state knows about that the shards don't hold), which turns the
    symptom from silence into a number, but the fix is the queue:
    **order by how long a tournament has been dirty, not by age**, and
-   raise the limit — materializing is R2-bounded and cheap, so the two
+   raise the limit (question sets add to this queue: a set's mirror is
+   materialized whether or not its own page is public, so an unpublished
+   mirror now takes a slot that only published tournaments used to; a
+   set's own state blob is already the materialized pattern item 1 asks
+   for, rebuilt per touched mirror) — materializing is R2-bounded and cheap, so the two
    halves of the tick want different limits.
 
    Raising the *publish* limit is bounded by **memory, not GitHub**
@@ -523,8 +710,8 @@ That part scales. What breaks first:
    which is the only way the shards could ever have two writers.
 
 4. **Small waste in the hot path.** `pubStateBody` does full
-   `env.DATA.get()` on the schedule and catmap (`worker.js:1843`,
-   `worker.js:1847`) when usually only their timestamps are wanted; the
+   `env.DATA.get()` on the schedule and catmap (the third and fifth
+   entries of its `Promise.all`) when usually only their timestamps are wanted; the
    catmap also gets parsed to test non-emptiness, which wants a cheap
    stored marker instead. Also `pubStateBody` now has exactly one caller
    and could fold into `pubState` (cosmetic).
@@ -544,7 +731,12 @@ npx wrangler d1 execute qb-td --remote --command \
 npx wrangler d1 execute qb-td --remote --command \
   "SELECT r2_key FROM files WHERE tournament_id=<id>"
 
-# delete rows (all four tables key off the tournament), then each blob —
+# delete rows (all four tables key off the tournament; a set's mirror
+# also has a set_mirrors row — DELETE FROM set_mirrors WHERE
+# tournament_id=<id> — and its packets are the SET's blobs under s/, which
+# stay). A whole set: its sets / set_packets / set_mirrors rows and every
+# blob under s/<sid>/ (packet versions, tiebreakers, catmap, ledger,
+# state). Then each blob —
 # everything lives under the t/<id>/ prefix: the uploads from the query
 # above, packet keys from the rounds table, the public game copies
 # (pub/<file id>.json) and their round shards (round/<n>.json,

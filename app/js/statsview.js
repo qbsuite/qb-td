@@ -1,6 +1,9 @@
 // statsview.js — render an aggregate() result as standings + individuals +
-// per-round games with expandable box scores. Shared by the TO dashboard
-// and the public stats page.
+// per-round games with expandable box scores. Shared by the TO dashboard,
+// the public stats page, and the set page — which passes {site: true,
+// games: false}: its rows come from several mirrors (setstats.js
+// setStandings), so each carries the site it played at, and the game
+// lists stay on the mirrors' own pages.
 //
 // Column layout follows YellowFruit's reports: W/L as a tight pair, then a
 // rule before every stat column (PP20TUH, each point value, TUH, PPB). The
@@ -49,16 +52,18 @@ function gameRow(g, vals) {
   </details>`;
 }
 
-export function renderStats(out, agg, errors = []) {
+export function renderStats(out, agg, errors = [], opts = {}) {
+  const site = opts.site ? (row) => `<td class="name muted">${esc(row.site || '')}</td>` : () => '';
+  const siteHead = opts.site ? '<th class="name">site</th>' : '';
   const vals = agg.values.filter((v) => v !== 0);
   const ties = agg.teams.some((t) => t.t > 0);
-  const rounds = [...new Set(agg.games.map((g) => g.round))];
+  const rounds = [...new Set((agg.games || []).map((g) => g.round))];
 
   out.innerHTML = `
     ${errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')}
     <h2>standings</h2>
     <div class="tablewrap"><table>
-      <tr><th></th><th class="name">team</th>
+      <tr><th></th><th class="name">team</th>${siteHead}
         <th class="num sep">W</th><th class="num">L</th>${ties ? '<th class="num">T</th>' : ''}
         <th class="num sep">PP20TUH</th>
         ${vals.map((v) => `<th class="num sep">${v}</th>`).join('')}
@@ -66,6 +71,7 @@ export function renderStats(out, agg, errors = []) {
       ${agg.teams.map((tm, i) => `<tr>
         <td class="num">${i + 1}</td>
         <td class="name">${esc(tm.name)}${tm.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
+        ${site(tm)}
         <td class="num sep">${tm.w}</td><td class="num">${tm.l}</td>${ties ? `<td class="num">${tm.t}</td>` : ''}
         <td class="num sep">${tm.pp20tuh}</td>
         ${valCells(vals, tm.counts)}
@@ -74,7 +80,7 @@ export function renderStats(out, agg, errors = []) {
     </table></div>
     <h2>individuals</h2>
     <div class="tablewrap"><table>
-      <tr><th></th><th class="name">player</th><th class="name">team</th>
+      <tr><th></th><th class="name">player</th><th class="name">team</th>${siteHead}
         <th class="num sep">GP</th>
         ${vals.map((v) => `<th class="num sep">${v}</th>`).join('')}
         <th class="num sep">TUH</th><th class="num sep">pts</th>
@@ -83,15 +89,16 @@ export function renderStats(out, agg, errors = []) {
         <td class="num">${i + 1}</td>
         <td class="name">${esc(p.name)}${p.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
         <td class="name">${esc(p.team)}</td>
+        ${site(p)}
         <td class="num sep">${p.gp}</td>
         ${valCells(vals, p.counts)}
         <td class="num sep">${p.tuh}</td><td class="num sep">${p.points}</td>
         <td class="num sep">${p.pp20tuh}</td>
       </tr>`).join('')}
     </table></div>
-    <h2>games</h2>
+    ${opts.games === false ? '' : `<h2>games</h2>
     ${rounds.map((rn) => `
       <div class="rhead">round ${rn}</div>
       ${agg.games.filter((g) => g.round === rn).map((g) => gameRow(g, vals)).join('')}
-    `).join('')}`;
+    `).join('')}`}`;
 }

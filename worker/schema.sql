@@ -37,7 +37,16 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- cron has rebuilt the round shards (and published them, if snapshots
   -- are configured). Existing databases get these from migrate-pub.sql.
   pub_dirty INTEGER NOT NULL DEFAULT 0,
-  pub_snapshot TEXT                  -- descriptor of the last published commit
+  pub_snapshot TEXT,                 -- descriptor of the last published commit
+  -- Mirrors of a question set (worker.js "question sets"): the set this
+  -- tournament was started from, and the set's content key encrypted
+  -- under this tournament's own — its rounds rows point at the set's
+  -- packet blobs, which only that key opens. NULL on a TD's own
+  -- tournament. Deliberately unindexed — a set's mirrors are found through
+  -- set_mirrors.tournament_id. Existing databases get these from
+  -- migrate-sets.sql.
+  set_id INTEGER,
+  set_key_enc TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tournaments_created ON tournaments(created);
 
@@ -61,6 +70,10 @@ CREATE TABLE IF NOT EXISTS rounds (
   number INTEGER NOT NULL,
   packet_r2_key TEXT NOT NULL,
   packet_name TEXT NOT NULL,
+  -- A set's mirror only (worker.js mirrorsOpenFor): 1 once a room has been
+  -- handed this round's packet, after which a fix uploaded to the set no
+  -- longer re-points it. Existing databases get it from migrate-sets.sql.
+  served INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (tournament_id, number)
 );
 
@@ -83,3 +96,77 @@ CREATE TABLE IF NOT EXISTS files (
 );
 CREATE INDEX IF NOT EXISTS idx_files_tournament ON files(tournament_id);
 CREATE INDEX IF NOT EXISTS idx_files_bucket ON files(bucket_id);
+
+-- Question sets (worker.js "question sets"): a set editor uploads the
+-- packets once and hands each mirror's TD an invite; starting the invite
+-- creates an ordinary 48h tournament whose rounds point at the set's
+-- packets. Same credential idiom as tournaments — admin_secret holds the
+-- hash, admin_wrap the set's content key wrapped under the link secret —
+-- but the link lives a year (SET_TTL), because a set is mirrored for a
+-- season rather than played in a day.
+CREATE TABLE IF NOT EXISTS sets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,         -- public set page slug (own namespace)
+  name TEXT NOT NULL,
+  admin_secret TEXT NOT NULL UNIQUE, -- the editor's link credential (hashed)
+  admin_wrap TEXT NOT NULL,          -- content key wrapped under the admin secret
+  buzz_wrap TEXT,                    -- content key wrapped under the buzzpoints derived key
+  creator_ip TEXT,                   -- creation rate limiting only
+  published INTEGER NOT NULL DEFAULT 0,
+  settings TEXT NOT NULL DEFAULT '{}', -- JSON: reader gameFormat (copied into mirrors), buzz
+  created INTEGER NOT NULL,
+  -- set by every mutation that changes the set page's state blob
+  -- (s/<sid>/state.json); the cron is that blob's only writer
+  state_dirty INTEGER NOT NULL DEFAULT 0
+);
+
+-- Every version of every packet. Blobs are immutable and rows are never
+-- deleted: a mirror's rounds row pins the exact version it played, which
+-- is what keeps set-wide buzzpoints honest after a packet is fixed
+-- mid-season. At most one version per packet has retired = 0 — the one
+-- new mirrors start with.
+CREATE TABLE IF NOT EXISTS set_packets (
+  set_id INTEGER NOT NULL,
+  packet INTEGER NOT NULL,           -- the set's own numbering; a mirror's TD decides the round
+  version INTEGER NOT NULL,
+  r2_key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  retired INTEGER NOT NULL DEFAULT 0,
+  created INTEGER NOT NULL,
+  -- the editor's parse review (app/engine/packetcheck.js, run in the
+  -- browser): how many things looked off, and when a person signed it
+  -- off. Display state only; nothing reads it.
+  warnings INTEGER,
+  checked INTEGER,
+  PRIMARY KEY (set_id, packet, version)
+);
+
+-- One row per mirror: an invite until its TD starts it (or uses it to
+-- join a tournament they already made), then the link to that tournament. The invite secret is a credential like any
+-- other (hashed; wraps the set's content key so starting the mirror can
+-- hand that key to the new tournament); invite_enc is the secret under
+-- the set's content key, so the editor's dashboard can show the link again.
+CREATE TABLE IF NOT EXISTS set_mirrors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  set_id INTEGER NOT NULL,
+  name TEXT NOT NULL,                -- the editor's label, prefilled as the tournament name
+  slug TEXT,                         -- suggested tournament slug (the TD may change it)
+  host TEXT,
+  event_date TEXT,                   -- YYYY-MM-DD, display only
+  invite_secret TEXT NOT NULL UNIQUE,
+  invite_wrap TEXT NOT NULL,
+  invite_enc TEXT NOT NULL,
+  created INTEGER NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0,
+  hidden INTEGER NOT NULL DEFAULT 0, -- left out of set-wide stats (a test run, a junk mirror)
+  started INTEGER,                   -- when the TD started it; claims the invite
+  tournament_id INTEGER,
+  -- the mirror's content key under the set's, written when it starts or
+  -- joins: what lets the set's editors open its stored game files
+  mirror_key_enc TEXT,
+  -- the cron worked on this mirror's tournament since the set's state
+  -- blob last re-read it (worker.js rebuildSetState)
+  state_dirty INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_set_mirrors_set ON set_mirrors(set_id);
+CREATE INDEX IF NOT EXISTS idx_set_mirrors_tournament ON set_mirrors(tournament_id);
