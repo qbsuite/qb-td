@@ -1464,7 +1464,8 @@ test('report pages carry YellowFruit\'s titles and generator line', () => {
     assert.ok(f.text.includes(`<h1 id="top">${titles[i]}</h1>`), f.name);
     // the nav label stays the short one, as in YF
     assert.ok(f.text.includes('>Standings</a>'), f.name);
-    assert.match(f.text, /Made with .*qb-td.*YellowFruit/, f.name + ' names its format');
+    assert.match(f.text, /YellowFruit<\/a> 4\.0\.18 report format/, f.name + ' names its format');
+    assert.ok(!/Made with|qb-td/.test(f.text), f.name + ' carries no generator credit');
   });
 });
 

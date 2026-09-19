@@ -199,12 +199,11 @@ function headerWithDivider(m, text, pageFile, { noTopLink, sticky } = {}) {
 }
 
 // YF's document shape (uppercase HTML/HEAD/BODY included) plus a charset,
-// which YF leaves out. The generator line says what wrote the file and
-// names the format it follows, where YF's says "Made with YellowFruit".
+// which YF leaves out. Where YF's footer says "Made with YellowFruit",
+// this one names only the format the files follow.
 function htmlPage(m, title, data) {
-  const footer = '<div style="font-size:x-small; margin-top: 10px">Made with '
-    + '<a href="https://qbsuite.github.io/qb-td/" target="_blank">qb-td</a>'
-    + ' in the <a href="https://github.com/ANadig/YellowFruit/releases" target="_blank">YellowFruit</a>'
+  const footer = '<div style="font-size:x-small; margin-top: 10px">'
+    + '<a href="https://github.com/ANadig/YellowFruit/releases" target="_blank">YellowFruit</a>'
     + ` ${YF_VERSION} report format</div>`;
   return `<HTML>\n<HEAD>\n<meta charset="utf-8">\n<title>${esc(title)}</title>\n</HEAD>\n<BODY>\n`
     + `${topLinks(m)}\n<h1 id="top">${esc(title)}</h1>\n${PAGE_STYLE}\n`
