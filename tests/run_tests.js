@@ -410,6 +410,61 @@ test('.yft path drops superseded uploads via dedupeMatches', () => {
 });
 
 /* ---------- zip ---------- */
+// The three below are what `npm run yf-parity` checks against YellowFruit's
+// own code; they pin the facts here so the unit suite notices without it.
+
+test('every team sits in the one pool (YF builds standings pool by pool)', () => {
+  const t = YFT.objects[0];
+  const [pool, ...others] = t.phases[0].pools;
+  assert.equal(others.length, 0);
+  assert.equal(pool.YfData.size, t.registrations.flatMap((r) => r.teams).length);
+  assert.deepEqual(pool.pool_teams.map((pt) => pt.team.$ref), t.YfData.seeds.map((s) => s.$ref));
+  assert.ok(pool.pool_teams.length >= 3);
+});
+
+test('"School A" / "School B" share a registration, lettered, like a YF import', () => {
+  const y = buildYft({
+    name: 'X', matches: [parseMatch(M1)],
+    roster: [
+      { name: 'Penn B', players: ['Bea'] }, { name: 'Alpha', players: ['Ann', 'Abe'] },
+      { name: 'Penn A', players: ['Pat'] }, { name: 'Beta', players: ['Bob'] },
+      { name: 'Vitamin C', players: ['Cal'] },
+    ],
+  }).objects[0];
+  assert.deepEqual(y.registrations.map((r) => r.name), ['Alpha', 'Beta', 'Penn', 'Vitamin']);
+  const penn = y.registrations[2];
+  assert.deepEqual(penn.teams.map((tm) => [tm.name, tm.YfData.letter, tm.id]),
+    [['Penn B', 'B', 'Team_Penn B'], ['Penn A', 'A', 'Team_Penn A']]);
+  // seeds keep roster order
+  assert.deepEqual(y.YfData.seeds.map((s) => s.$ref),
+    ['Team_Penn B', 'Team_Alpha', 'Team_Penn A', 'Team_Beta', 'Team_Vitamin C']);
+});
+
+test('overtime is split out of tossups read, with each team\'s overtime buzzes', () => {
+  // MODAQ folds overtime into tossups_read; YF reads a 21-tossup
+  // regulation as an error and leaves the game out of its stats
+  const raw = modaqMatch({
+    round: 3, tossupsRead: 21,
+    teamA: { name: 'Alpha', bonusPoints: 30, players: [{ name: 'Ann', counts: { 10: 3 } }] },
+    teamB: { name: 'Beta', bonusPoints: 40, players: [{ name: 'Bob', counts: { 10: 2, '-5': 2 } }] },
+  });
+  const buzz = (team, player, value) => ({ team: { name: team }, player: { name: player }, result: { value } });
+  raw.match_questions = Array.from({ length: 21 }, (_, i) => ({ question_number: i + 1, buzzes: [] }));
+  raw.match_questions[2].buzzes.push(buzz('Alpha', 'Ann', 10));
+  raw.match_questions[20].buzzes.push(buzz('Beta', 'Bob', -5), buzz('Alpha', 'Ann', 10));
+  const game = buildYft({ name: 'X', matches: [parseMatch(raw)] }).objects[0].phases[0].rounds[0].matches[0];
+  assert.equal(game.tossups_read, 21);
+  assert.equal(game.overtime_tossups_read, 1);
+  const ot = (mt) => Object.fromEntries(mt.YfData.overTimeBuzzes.map((b) => [b.answer_type.$ref, b.number]));
+  assert.deepEqual(ot(game.match_teams[0]), { AnswerType_10: 1, 'AnswerType_-5': 0 });
+  assert.deepEqual(ot(game.match_teams[1]), { AnswerType_10: 0, 'AnswerType_-5': 1 });
+  assert.equal(game.match_teams[0].correct_tossups_without_bonuses, 1);
+  assert.equal(game.match_teams[1].correct_tossups_without_bonuses, 0);
+  // a regulation game says nothing about overtime
+  const plain = YFT.objects[0].phases[0].rounds[0].matches[0];
+  assert.ok(!('overtime_tossups_read' in plain));
+});
+
 
 console.log('zip');
 

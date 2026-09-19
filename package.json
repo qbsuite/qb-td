@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node tests/run_tests.js",
     "archive": "node tools/archive.mjs",
-    "build:read": "node tools/build_read.mjs"
+    "build:read": "node tools/build_read.mjs",
+    "yf-parity": "node tools/yf_parity.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

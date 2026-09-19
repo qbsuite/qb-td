@@ -490,6 +490,9 @@ dashboard shows which invites are still unused, and revokes them.
   tick, mocked).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
+- `tools/yf_parity.mjs` + `tools/yf_parity/` — `npm run yf-parity`: the
+  `.yft` export checked against YellowFruit's own import and save code
+  (see "YellowFruit fidelity").
 - `app/demo.html` + `js/demo.js` + `demo/fixture.js` — the demo
   tournament. Opening any page with `?t=demo`, `?a=demo`, or
   `?b=demo` / `?b=demo-b` (the slug is reserved; real bucket secrets are
@@ -845,11 +848,31 @@ actually got committed, along with manifest-to-capture agreement.
 Two exports mirror YellowFruit's own output and are checked against its
 source rather than guessed at.
 
-The generated `.yft` replicates YellowFruit's serialization
-(FileParsing.ts / CaseConversion.ts contracts, `YfVersion` 4.0.18). After
-any change to `app/engine/yft.js`: generate a file from real MODAQ games,
-open it in YellowFruit, confirm no version/schema errors and that YF's
-report matches the stats page.
+The generated `.yft` is the file YellowFruit 4.0.18 itself saves after a TD
+imports the same roster `.qbj` and game `.qbj`s into a custom one-stage
+schedule: one stage, one pool holding every team (YF builds standings pool
+by pool — a file with no pool opens to an empty standings page), lettered
+teams (`Penn A`, `Penn B`) under their school's registration, YF's id
+schemes, the standard rule set when the scored values fit one. Overtime is
+the one place it does better than YF's own importer: the reader's files
+fold overtime into `tossups_read`, which YF rejects as an over-long
+regulation and drops from the stats, so the `.yft` splits the overtime
+tossups out and lists each team's overtime buzzes, as a TD would have to
+by hand.
+
+`npm run yf-parity` (`tools/yf_parity.mjs`) checks all of that against
+YellowFruit's own code rather than against a reading of it. It clones YF
+at the pinned tag into `.cache/` (nothing of YF's, AGPL-3.0, enters this
+repo), runs its data model headless to import each scenario's files and
+save a `.yft`, builds qb-td's from the same files, and fails unless the
+two are the same tournament once YF has opened and re-saved each — in
+practice they are byte-identical before that too — with no game YF flags
+as an error and the same six report pages rendered from both. Scenarios
+(`tools/yf_parity/scenarios.mjs`): the demo tournament, and a college-style
+event with A/B teams, powers, a substitution, a rostered player who never
+plays, punctuation and accents in names, and an overtime game. Run it
+after any change to `app/engine/yft.js` or `parseMatch`; it needs git and
+network the first time. The unit suite pins the same facts without it.
 
 The HTML stat report (`app/engine/report.js`) is a port of YellowFruit
 4.0.18's `HTMLReports.ts` — same six filenames (bare for the in-page

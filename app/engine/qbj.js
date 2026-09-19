@@ -49,7 +49,7 @@ export function matchPayload(json) {
  * {objects: [...]} wrapper containing a Match). Throws Error with a
  * user-facing message on anything the stats engine can't work with.
  *
- * Returns {round, tossupsRead, packets, notes, teams: [
+ * Returns {round, tossupsRead, tossupBuzzes, packets, notes, teams: [
  *   {name, points, tossupPoints, bonusPoints, players: [
  *     {name, tossupsHeard, counts: [{value, n}]}]}]}
  */
@@ -108,9 +108,21 @@ export function parseMatch(json, opts = {}) {
 
   if (teams[0].name === teams[1].name) throw new Error('Both match_teams have the same name');
 
+  // Who scored what on each tossup, in the order read — only when the file
+  // has a question for every tossup read (the reader's always do). It is
+  // what tells an overtime buzz from a regulation one.
+  const questions = pick(obj, 'match_questions', 'matchQuestions');
+  const tossupBuzzes = Array.isArray(questions) && questions.length === tossupsRead
+    ? questions.map((q) => (pick(q, 'buzzes') || []).map((b) => ({
+      team: asName(pick(b, 'team')),
+      value: Number(pick(pick(b, 'result') || {}, 'value')),
+    })).filter((b) => b.team && Number.isFinite(b.value)))
+    : undefined;
+
   return {
     round,
     tossupsRead,
+    tossupBuzzes,
     packets: pick(obj, 'packets') || undefined,
     notes: pick(obj, 'notes') || undefined,
     teams,

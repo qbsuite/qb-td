@@ -1687,6 +1687,9 @@ function renderProtests(rows, open, isOpen) {
         </div>
       </div>
     </details>`;
+      // the name this game's .qbj carries in the QBJ bundle, which the
+      // .yft records the way YellowFruit notes an imported file
+      m.filename = f.filename.replace(/\.qbtd\.json$/i, '.qbj');
 }
 
 /* ---------- stats + export ---------- */
@@ -1725,7 +1728,7 @@ async function collectMatches(a, t, buckets, files) {
       matches.push(m);
       raw.push({
         id: f.id, round: m.round, room: m.room,
-        filename: f.filename.replace(/\.qbtd\.json$/i, '.qbj'),
+        filename: m.filename,
         text: JSON.stringify(payload),
       });
       if (f.kind === 'combined' && full.game && typeof full.game === 'object') {
