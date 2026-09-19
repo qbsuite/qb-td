@@ -1763,11 +1763,13 @@ async function computeStats(a, t, buckets, files) {
     catch (e) { say(e.message, true); }
   };
   // YellowFruit-style six-page HTML report, zipped so the interlinked
-  // files land as one folder ready to host.
+  // files land as one folder ready to host. Named <slug>_standings.html
+  // etc., as YellowFruit saves them: the hsquizbowl.org tournament
+  // database refuses report files without that prefix.
   $('dlreport').disabled = false;
   $('dlreport').onclick = () => {
     try {
-      const pages = buildReport(exportOpts);
+      const pages = buildReport({ ...exportOpts, prefix: t.slug });
       download(t.slug + '-report.zip',
         makeZip(pages.map((f) => ({ name: f.name, data: f.text }))), 'application/zip');
     } catch (e) { say(e.message, true); }

@@ -6,9 +6,12 @@
 // reduced to qb-td's model: one phase, no pools/finals, no SS/JV/UG/D2
 // tracking, no lightning rounds, bouncebacks folded into bonus points.
 //
-// buildReport({name, matches, roster}) -> [{name, text}] — the six files
-// (standings/individuals/games/teamdetail/playerdetail/rounds .html),
-// interlinked by those exact filenames, ready to zip or host as a folder.
+// buildReport({name, matches, roster, prefix}) -> [{name, text}] — the six
+// files (standings/individuals/games/teamdetail/playerdetail/rounds .html),
+// interlinked by filename, ready to zip or host as a folder. With a prefix
+// they are named and linked `<prefix>_standings.html` etc., which is how
+// YellowFruit saves a report to disk and what the hsquizbowl.org tournament
+// database expects to be handed; the bare names are YF's in-app preview.
 
 import { aggregate } from './stats.js';
 
@@ -16,13 +19,18 @@ import { aggregate } from './stats.js';
 // across qb-td (and YellowFruit's default regulation tossup count).
 const REG_TUH = 20;
 
+// The YellowFruit release whose HTMLReports.ts this is a port of.
+const YF_VERSION = '4.0.18';
+
+// `title` is the nav label, `heading` the page's <title> and <h1> — YF
+// differs between the two only for the standings page.
 const PAGES = [
-  { file: 'standings.html', title: 'Standings' },
-  { file: 'individuals.html', title: 'Individuals' },
-  { file: 'games.html', title: 'Scoreboard' },
-  { file: 'teamdetail.html', title: 'Team Detail' },
-  { file: 'playerdetail.html', title: 'Player Detail' },
-  { file: 'rounds.html', title: 'Round Report' },
+  { file: 'standings.html', title: 'Standings', heading: 'Team Standings' },
+  { file: 'individuals.html', title: 'Individuals', heading: 'Individuals' },
+  { file: 'games.html', title: 'Scoreboard', heading: 'Scoreboard' },
+  { file: 'teamdetail.html', title: 'Team Detail', heading: 'Team Detail' },
+  { file: 'playerdetail.html', title: 'Player Detail', heading: 'Player Detail' },
+  { file: 'rounds.html', title: 'Round Report', heading: 'Round Report' },
 ];
 
 const MDASH = '&mdash;';
@@ -141,13 +149,16 @@ const playerPoints = (p) => p.counts.reduce((s, c) => s + c.value * c.n, 0);
 
 /* ---------- link + anchor scheme ---------- */
 
+// Every link takes the report model `m` for its filePrefix ('' or
+// '<prefix>_', YF's setFilePrefix), so a saved report links to its own
+// prefixed files.
 const gameAnchor = (g) =>
   `R${g.round}-${alphaOnly(g.teams[0].name)}-${alphaOnly(g.teams[1].name)}`;
-const teamLink = (name) => aTag(`teamdetail.html#${alphaOnly(name)}`, esc(name));
-const playerLink = (team, player) =>
-  aTag(`playerdetail.html#${alphaOnly(team)}-${alphaOnly(player)}`, esc(player));
-const gameLink = (g, text) => aTag(`games.html#${gameAnchor(g)}`, text);
-const roundLink = (round, text) => aTag(`games.html#Round-${round}`, text);
+const teamLink = (m, name) => aTag(`${m.filePrefix}teamdetail.html#${alphaOnly(name)}`, esc(name));
+const playerLink = (m, team, player) =>
+  aTag(`${m.filePrefix}playerdetail.html#${alphaOnly(team)}-${alphaOnly(player)}`, esc(player));
+const gameLink = (m, g, text) => aTag(`${m.filePrefix}games.html#${gameAnchor(g)}`, text);
+const roundLink = (m, round, text) => aTag(`${m.filePrefix}games.html#Round-${round}`, text);
 
 /* ---------- page skeleton ---------- */
 
@@ -172,35 +183,40 @@ ul{margin: 0;}
 @media screen and (min-width: 800px) {.fwBelow800px{width: 60%;}}
 </style>`;
 
-function topLinks() {
-  const cells = PAGES.map((p) => tdTag({}, aTag(p.file, p.title)));
+function topLinks(m) {
+  const cells = PAGES.map((p) => tdTag({}, aTag(m.filePrefix + p.file, p.title)));
   return tableTag([trTag(cells)], { width: '100%', border: '0' });
 }
 
-function headerWithDivider(text, pageFile, { noTopLink, sticky } = {}) {
+function headerWithDivider(m, text, pageFile, { noTopLink, sticky } = {}) {
   const cls = sticky ? 'headerAndDivider scoreboardRoundHeader' : 'headerAndDivider';
   const pieces = [`<h2>${text}${NBSP}</h2>`, '<div class="inlineDivider"></div>'];
   if (!noTopLink) {
     pieces.push(`<span>${NBSP}</span>`,
-      aTag(`${pageFile}#top`, `<span class="smallText">&#x2191;Top</span>`));
+      aTag(`${m.filePrefix}${pageFile}#top`, `<span class="smallText">&#x2191;Top</span>`));
   }
   return `<div class="${cls}">\n${pieces.join('\n')}\n</div>`;
 }
 
-function htmlPage(title, data) {
+// YF's document shape (uppercase HTML/HEAD/BODY included) plus a charset,
+// which YF leaves out. The generator line says what wrote the file and
+// names the format it follows, where YF's says "Made with YellowFruit".
+function htmlPage(m, title, data) {
   const footer = '<div style="font-size:x-small; margin-top: 10px">Made with '
-    + '<a href="https://qbsuite.github.io/qb-td/" target="_blank">qb-td</a></div>';
-  return `<html>\n<head>\n<meta charset="utf-8">\n<title>${esc(title)}</title>\n</head>\n<body>\n`
-    + `${topLinks()}\n<h1 id="top">${esc(title)}</h1>\n${PAGE_STYLE}\n`
+    + '<a href="https://qbsuite.github.io/qb-td/" target="_blank">qb-td</a>'
+    + ' in the <a href="https://github.com/ANadig/YellowFruit/releases" target="_blank">YellowFruit</a>'
+    + ` ${YF_VERSION} report format</div>`;
+  return `<HTML>\n<HEAD>\n<meta charset="utf-8">\n<title>${esc(title)}</title>\n</HEAD>\n<BODY>\n`
+    + `${topLinks(m)}\n<h1 id="top">${esc(title)}</h1>\n${PAGE_STYLE}\n`
     + `<div style="font-size: 11pt; text-size-adjust: none;">\n${data}\n${footer}\n</div>\n`
-    + `</body>\n</html>\n`;
+    + `</BODY>\n</HTML>\n`;
 }
 
 /* ---------- report model ---------- */
 
 // One derived bundle every page reads: YF-ordered team rows, player rows
 // with fractional games played, per-round game lists.
-function reportModel({ name, matches, roster }) {
+function reportModel({ name, matches, roster, prefix }) {
   const agg = aggregate(matches, roster);
   const vals = agg.values.filter((v) => v !== 0);
   const anyTies = agg.teams.some((t) => t.t > 0);
@@ -242,7 +258,7 @@ function reportModel({ name, matches, roster }) {
   const hasNegs = vals.some((v) => v < 0);
 
   return {
-    name, vals, anyTies, teams, teamRanks, players, playerRanks,
+    name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks,
     games: agg.games, rounds, perTeam, hasPowers, hasNegs,
   };
 }
@@ -275,7 +291,7 @@ function standingsHtml(m) {
   m.teams.forEach((t, i) => {
     rows.push(trTag([
       tdTag({}, m.teamRanks[i]),
-      textCell(teamLink(t.name)),
+      textCell(teamLink(m, t.name)),
       numCell(String(t.w)),
       numCell(String(t.l)),
       ...(m.anyTies ? [numCell(String(t.t))] : []),
@@ -287,7 +303,7 @@ function standingsHtml(m) {
     ]));
   });
   const meta = `<span>${esc(m.name)}</span>`;
-  const header = headerWithDivider('All Games', 'standings.html', { noTopLink: true });
+  const header = headerWithDivider(m, 'All Games', 'standings.html', { noTopLink: true });
   return `${meta}\n${header}\n${tableTag(rows, { cssClass: 'fwBelow1000px' })}<br/>`;
 }
 
@@ -306,15 +322,15 @@ function individualsHtml(m) {
   m.players.forEach((p, i) => {
     rows.push(trTag([
       tdTag({}, m.playerRanks[i]),
-      textCell(playerLink(p.team, p.name)),
-      textCell(teamLink(p.team)),
+      textCell(playerLink(m, p.team, p.name)),
+      textCell(teamLink(m, p.team)),
       numCell(p.gp.toFixed(1)),
       ...valCells(p.counts, m.vals),
       numCell(String(p.tuh)),
       numCell(((p.points / p.tuh) * REG_TUH).toFixed(2)),
     ]));
   });
-  const header = headerWithDivider('All Games', 'individuals.html', { noTopLink: true });
+  const header = headerWithDivider(m, 'All Games', 'individuals.html', { noTopLink: true });
   return `${header}\n${tableTag(rows, { cssClass: 'fwBelow1000px' })}`;
 }
 
@@ -388,13 +404,13 @@ function boxScore(g) {
 
 function scoreboardHtml(m) {
   const toc = `<div class="floatingTOC">\n<ul>\n${m.rounds.map((r) =>
-    `<li>${roundLink(r, `Round ${r}`)}</li>`).join('\n')}\n</ul>\n</div>`;
+    `<li>${roundLink(m, r, `Round ${r}`)}</li>`).join('\n')}\n</ul>\n</div>`;
   const sections = m.rounds.map((r, i) => {
     const games = m.games.filter((g) => g.round === r);
     return '<div>\n' + [
       ...(i > 0 ? ['<br /><br />'] : []),
       `<div id="Round-${r}"></div>`,
-      headerWithDivider(`Round ${r}`, 'games.html', { noTopLink: i === 0, sticky: true }),
+      headerWithDivider(m, `Round ${r}`, 'games.html', { noTopLink: i === 0, sticky: true }),
       ...games.map(boxScore),
     ].join('\n') + '\n</div>';
   });
@@ -419,9 +435,9 @@ function teamDetailMatchTable(m, t) {
     const heard = teamBonusesHeard(mt);
     rows.push(trTag([
       textCell(String(g.round)),
-      textCell(teamLink(opp.name)),
+      textCell(teamLink(m, opp.name)),
       textCell(resultLetter(mt, opp)),
-      textCell(gameLink(g, scoreOnly(mt, opp))),
+      textCell(gameLink(m, g, scoreOnly(mt, opp))),
       ...valCells(teamCounts(mt), m.vals),
       numCell(String(g.tossupsRead)),
       numCell(String(heard)),
@@ -455,7 +471,7 @@ function teamDetailPlayerTable(m, t) {
   ])];
   for (const p of onTeam) {
     rows.push(trTag([
-      textCell(playerLink(p.team, p.name)),
+      textCell(playerLink(m, p.team, p.name)),
       numCell(p.gp.toFixed(1)),
       ...valCells(p.counts, m.vals),
       numCell(String(p.tuh)),
@@ -495,9 +511,9 @@ function playerDetailTable(m, p) {
     const counts = Object.fromEntries(mp.counts.map((c) => [c.value, c.n]));
     rows.push(trTag([
       textCell(String(g.round)),
-      textCell(teamLink(opp.name)),
+      textCell(teamLink(m, opp.name)),
       textCell(resultLetter(mt, opp)),
-      textCell(gameLink(g, scoreOnly(mt, opp))),
+      textCell(gameLink(m, g, scoreOnly(mt, opp))),
       numCell((mp.tossupsHeard / g.tossupsRead).toFixed(1)),
       ...valCells(counts, m.vals),
       numCell(String(mp.tossupsHeard)),
@@ -577,7 +593,7 @@ function roundReportHtml(m) {
 
   for (const r of m.rounds) {
     rows.push(trTag([
-      textCell(roundLink(r, String(r))),
+      textCell(roundLink(m, r, String(r))),
       ...statCells(roundTotals(m.games.filter((g) => g.round === r)), asNum),
     ]));
   }
@@ -588,8 +604,9 @@ function roundReportHtml(m) {
 /* ---------- entry point ---------- */
 
 /**
- * @param opts {name, matches, roster} — same shape the .yft export takes:
- *   parsed matches (deduping is applied via aggregate) + optional roster.
+ * @param opts {name, matches, roster, prefix} — the shape the .yft export
+ *   takes (parsed matches, deduped via aggregate, + optional roster), and
+ *   an optional filename prefix for a report that will be saved to disk.
  * @returns [{name, text}] — the six report files.
  */
 export function buildReport(opts) {
@@ -603,5 +620,8 @@ export function buildReport(opts) {
     'playerdetail.html': playerDetailHtml(m),
     'rounds.html': roundReportHtml(m),
   };
-  return PAGES.map((p) => ({ name: p.file, text: htmlPage(p.title, contents[p.file]) }));
+  return PAGES.map((p) => ({
+    name: m.filePrefix + p.file,
+    text: htmlPage(m, p.heading, contents[p.file]),
+  }));
 }

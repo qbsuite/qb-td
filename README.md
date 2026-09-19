@@ -155,8 +155,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   has publish switched on; fully decoupled from the admin side.
 - **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18); the
   **HTML stat report** as a zip of the same six interlinked pages
-  YellowFruit publishes (`standings.html`, `individuals.html`, `games.html`,
-  `teamdetail.html`, `playerdetail.html`, `rounds.html`) — unzip and host
+  YellowFruit publishes, named the way YellowFruit saves them
+  (`<slug>_standings.html`, `_individuals`, `_games`, `_teamdetail`,
+  `_playerdetail`, `_rounds`) — unzip and upload the files to the
+  hsquizbowl.org tournament database, which wants that prefix, or host
   the folder anywhere, no YellowFruit in the loop; and a zip of
   every game's separated files — the match `.qbj` (imports via YellowFruit's
   MODAQ game-file import) and the MODAQ game file — plus the roster. All
@@ -850,8 +852,11 @@ open it in YellowFruit, confirm no version/schema errors and that YF's
 report matches the stats page.
 
 The HTML stat report (`app/engine/report.js`) is a port of YellowFruit
-4.0.18's `HTMLReports.ts` — same six filenames, page order, table columns,
-CSS, anchor scheme, and the `StatSummaries.ts` formulas (win % counts ties
+4.0.18's `HTMLReports.ts` — same six filenames (bare for the in-page
+view, as in YF's own preview; `<prefix>_` on files and links alike for the
+download, as in YF's save-to-disk), document shape, page titles, page
+order, table columns, CSS, anchor scheme, and the `StatSummaries.ts`
+formulas (win % counts ties
 as half a win, PP20TUH, fractional games played, `N=` tie ranks). It covers
 what qb-td models: one phase, no pools or finals, no small-school/JV/UG/D2
 tracking, no lightning rounds, bouncebacks folded into bonus points. Its

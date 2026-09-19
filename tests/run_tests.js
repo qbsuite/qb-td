@@ -1427,14 +1427,47 @@ test('report emits YellowFruit six-page set', () => {
     'teamdetail.html', 'playerdetail.html', 'rounds.html',
   ]);
   for (const f of REPORT) {
-    assert.match(f.text, /^<html>/, f.name + ' is a full document');
-    assert.match(f.text, /<\/html>\s*$/, f.name + ' is closed');
+    assert.match(f.text, /^<HTML>\n<HEAD>/, f.name + ' is a full document');
+    assert.match(f.text, /<\/HTML>\s*$/, f.name + ' is closed');
     // every page carries the same nav to the other five
     for (const other of REPORT) assert.ok(f.text.includes(`href="${other.name}"`));
   }
 });
 
 test('standings: YF ordering, win pct, PP20TUH, PPB', () => {
+// What a TD uploads to the hsquizbowl.org tournament database: YellowFruit
+// saves its report as <prefix>_standings.html etc., and the database wants
+// exactly that. Bare filenames are only YF's in-app preview.
+test('report with a prefix is named and interlinked like a YellowFruit export', () => {
+  const files = buildReport({
+    name: 'Test Tournament',
+    matches: [parseMatch(M1), parseMatch(M2)],
+    roster: parseRoster(ROSTER),
+    prefix: 'penn-bowl',
+  });
+  assert.deepEqual(files.map((f) => f.name), [
+    'penn-bowl_standings.html', 'penn-bowl_individuals.html', 'penn-bowl_games.html',
+    'penn-bowl_teamdetail.html', 'penn-bowl_playerdetail.html', 'penn-bowl_rounds.html',
+  ]);
+  const names = new Set(files.map((f) => f.name));
+  for (const f of files) {
+    const hrefs = [...f.text.matchAll(/href="([^"#]*\.html)(?:#[^"]*)?"/g)].map((m) => m[1]);
+    assert.ok(hrefs.length >= 6, f.name + ' has its nav');
+    for (const h of hrefs) assert.ok(names.has(h), `${f.name} links to ${h}, which is not in the set`);
+  }
+});
+
+test('report pages carry YellowFruit\'s titles and generator line', () => {
+  const titles = ['Team Standings', 'Individuals', 'Scoreboard', 'Team Detail', 'Player Detail', 'Round Report'];
+  REPORT.forEach((f, i) => {
+    assert.ok(f.text.includes(`<title>${titles[i]}</title>`), f.name);
+    assert.ok(f.text.includes(`<h1 id="top">${titles[i]}</h1>`), f.name);
+    // the nav label stays the short one, as in YF
+    assert.ok(f.text.includes('>Standings</a>'), f.name);
+    assert.match(f.text, /Made with .*qb-td.*YellowFruit/, f.name + ' names its format');
+  });
+});
+
   const rows = flat(page('standings.html'));
   assert.ok(rows.includes('Rank Team W L Pct PP20TUH 15 10 -5 TUH PPB'));
   // Gamma (1.000) above Alpha (.500) above Beta (.000)
