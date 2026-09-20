@@ -307,13 +307,12 @@ function render() {
     <div class="row" style="margin-top:6px">
       <b style="font-size:18px">${esc(t.name)}</b>
       <span class="mono muted">${esc(t.slug)}</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="muted">Admin link open until ${new Date(t.closes).toLocaleString()}</span>
+      <button id="rotate" class="small">New admin link</button>
     </div>
-    ${t.set ? `<div class="muted" style="font-size:13px;margin-top:4px">Mirror of
-      <b>${esc(t.set.name)}</b>. Its packets come from the set, and every game collected here —
-      results and game files, MODAQ&rsquo;s included — is shared with the set&rsquo;s editors for set-wide stats${t.set.published
-        ? ` — shown on the <a href="${esc(setLink(t.set.slug))}" target="_blank">set&rsquo;s public page</a>`
-        : ', which they may publish'}. The Public page switch below governs only this
-      tournament&rsquo;s own page.</div>` : ''}
+    ${t.set ? `<div class="muted" style="font-size:13px;margin-top:4px">Mirror of <b>${esc(t.set.name)}</b>${
+      t.set.published ? ` &middot; <a href="${esc(setLink(t.set.slug))}" target="_blank">set page</a>` : ''}</div>` : ''}
     <div class="tabs bigtabs" style="margin-top:10px">
       <button class="tab ${v === 'setup' ? 'active' : ''}" data-view="setup">Tournament Setup${
         missing.length ? ' <span class="ndot">&bull;</span>' : ''}</button>
@@ -323,6 +322,16 @@ function render() {
   view.querySelectorAll('[data-view]').forEach((b) => {
     b.onclick = () => { curView = b.dataset.view; render(); };
   });
+  $('rotate').onclick = async () => {
+    if (!confirm('Mint a new admin link? The current link stops working.')) return;
+    try {
+      const out = await pub(a + '/rotate', { method: 'POST' });
+      saveLink({ secret: out.admin_secret, slug: t.slug, name: t.name,
+        closes: t.closes, created: t.created });
+      history.replaceState(null, '', 'index.html?a=' + out.admin_secret);
+      showLinkModal(adminLink(out.admin_secret), t.closes, () => location.reload());
+    } catch (e) { say(e.message, true); }
+  };
   if (v === 'setup') renderSetup(a, t, buckets, rounds, files, settings, steps);
   else renderLive(a, t, buckets, rounds, files, settings, missing);
   window.scrollTo(0, scrollWas);
@@ -1434,25 +1443,11 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       </div>
     </details>
 
-    <h2>Settings</h2>
-    <div class="row" style="margin-bottom:6px">
-      <span class="muted">Public page is
-        <b>${t.published ? 'on' : 'off'}</b>, reader format is
-        <b>${esc(effectiveFormat(settings).displayName)}</b> at
-        <b>${effectiveFormat(settings).regulationTossupCount} tossups</b></span>
-      <button class="small" data-goto-setup="stats">Stats settings</button>
-      <button class="small" data-goto-setup="modaq">MODAQ Settings</button>
-    </div>
-    <div class="row">
-      <span class="muted">Admin link open until ${new Date(t.closes).toLocaleString()}</span>
-      <button id="rotate" class="small">New admin link</button>
-    </div>
 
     <h2>Stats + Export</h2>
     <div class="row">
       <button id="calc" class="primary">Compute stats</button>
-      <button id="dlyft" disabled title="Opens in YellowFruit 4.0.18 or newer. An older 4.x refuses the file: it is stamped 4.0.18, and YellowFruit will not open a file from a build newer than itself.">.yft for YellowFruit 4.0.18+</button>
-      <button id="dlyft3" disabled title="For the older YellowFruit 3 app, which cannot read a YellowFruit 4 file at all — handed one it does nothing, not even show an error.">.yft for YellowFruit 3.0.2</button>
+      <button id="dlyft" disabled>YellowFruit (.yft)&hellip;</button>
       <button id="dlreport" disabled>Download stat report</button>
       <button id="dlzip" disabled>Download QBJ bundle</button>
       <button id="rebuild" disabled>Rebuild stats data</button>
@@ -1471,6 +1466,28 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     ${t.set && t.set.lock_buzz ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
       <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
       played elsewhere, so this page shows none, whatever is set here.</div>` : ''}
+    <!-- The two YellowFruits share an extension and nothing else, and
+         neither says so when handed the other's file: YellowFruit 4
+         refuses a file stamped newer than itself, and YellowFruit 3 throws
+         before it can show an error — the app simply does nothing. So the
+         choice is made here, in front of the TD, rather than left to two
+         similar-looking buttons. -->
+    <div id="yftpick" hidden class="card" style="margin-top:6px">
+      <div class="row"><b>Which YellowFruit will open this?</b>
+        <span class="spacer" style="flex:1"></span>
+        <button id="yftclose" class="small">Cancel</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="dlyft4" class="primary">YellowFruit 4</button>
+        <span class="muted">Needs <b>4.0.18 or newer</b> &mdash; an older 4.x refuses the file,
+          because it will not open one stamped by a build newer than itself.</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="dlyft3">YellowFruit 3</button>
+        <span class="muted">For the old <b>3.0.2</b> app, which cannot read a YellowFruit 4
+          file at all &mdash; handed one it does nothing, not even show an error.</span>
+      </div>
+    </div>
     <div id="statsout" style="margin-top:12px"></div>
 
     <h2>Uploads</h2>
@@ -1635,16 +1652,6 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       } catch (e) { say(e.message, true); }
     };
   });
-  $('rotate').onclick = async () => {
-    if (!confirm('Mint a new admin link? The current link stops working.')) return;
-    try {
-      const out = await pub(a + '/rotate', { method: 'POST' });
-      saveLink({ secret: out.admin_secret, slug: t.slug, name: t.name,
-        closes: t.closes, created: t.created });
-      history.replaceState(null, '', 'index.html?a=' + out.admin_secret);
-      showLinkModal(adminLink(out.admin_secret), t.closes, () => location.reload());
-    } catch (e) { say(e.message, true); }
-  };
   const goToRound = async (n) => {
     try {
       await pub(a, { method: 'POST', json: { current_round: n } });
@@ -1697,9 +1704,6 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       showDetail();
     } catch (e) { say(e.message, true); }
   };
-  box.querySelectorAll('[data-goto-setup]').forEach((b) => {
-    b.onclick = () => { setupTab = b.dataset.gotoSetup; curView = 'setup'; render(); };
-  });
   box.querySelectorAll('[data-delfile]').forEach((b) => {
     b.onclick = async () => {
       if (!confirm('Delete this file?')) return;
@@ -1937,19 +1941,17 @@ async function computeStats(a, t, buckets, files, settings) {
     name: t.name, matches: dedupeMatches(matches), roster,
     settings: effectiveFormat(settings),
   };
+  // One .yft button, then the version question (the #yftpick panel). The
+  // files are still named apart, so both can sit in one folder.
   $('dlyft').disabled = false;
-  $('dlyft').onclick = () => {
-    try { download(t.slug + '-yf4.yft', serializeYft(exportOpts), 'application/json'); }
+  $('dlyft').onclick = () => { $('yftpick').hidden = !$('yftpick').hidden; };
+  $('yftclose').onclick = () => { $('yftpick').hidden = true; };
+  const yft = (name, text) => {
+    try { download(name, text, 'application/json'); $('yftpick').hidden = true; }
     catch (e) { say(e.message, true); }
   };
-  // The two YellowFruits share an extension and nothing else: YF 3 handed
-  // a YF 4 file does nothing at all, not even an error. Named apart so the
-  // two downloads can sit in one folder.
-  $('dlyft3').disabled = false;
-  $('dlyft3').onclick = () => {
-    try { download(t.slug + '-yf3.yft', serializeYft3(exportOpts), 'application/json'); }
-    catch (e) { say(e.message, true); }
-  };
+  $('dlyft4').onclick = () => yft(t.slug + '-yf4.yft', serializeYft(exportOpts));
+  $('dlyft3').onclick = () => yft(t.slug + '-yf3.yft', serializeYft3(exportOpts));
   // YellowFruit-style six-page HTML report, zipped so the interlinked
   // files land as one folder ready to host. Named <slug>_standings.html
   // etc., as YellowFruit saves them: the hsquizbowl.org tournament
