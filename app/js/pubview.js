@@ -585,8 +585,8 @@ function renderCats(box) {
 function pendingNote() {
   const n = (state.files || []).filter((f) => !loadedIds.has(f.id)).length;
   if (!n) return '';
-  return `<div class="muted">${n} game${n === 1 ? '' : 's'} just in — `
-    + 'refresh in a minute to include them</div>';
+  return `<div class="muted">${n} game${n === 1 ? '' : 's'} just in. `
+    + 'Please wait for a minute before refreshing.</div>';
 }
 
 // The stats tab is the YellowFruit-style report (engine/report.js): the

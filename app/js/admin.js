@@ -116,12 +116,11 @@ function showList() {
     </div>
     <h2>Question sets</h2>
     <div><a href="set.html">Set editors</a>
-      <span class="muted">upload a set once, hand each mirror a link, read set-wide stats</span></div>
+      <span class="muted">upload a set to generate mirror links and aggregate set-wide stats</span></div>
     <h2>Archive</h2>
     <div><a href="archive.html">Past tournaments</a></div>
     <h2>Demo</h2>
-    <div><a href="demo.html">Simulated tournament</a>
-      <span class="muted">try the reader and the public pages without creating anything</span></div>`;
+    <div><a href="demo.html">Simulated tournament</a></div>`;
   $('newbtn').onclick = async () => {
     try {
       const out = await pub('/api/tournaments', { method: 'POST', json: {
@@ -379,11 +378,7 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
 
 function renderModaqSec(a, t, settings) {
   const box = $('setupsec');
-  box.innerHTML = `
-    <p class="muted" style="margin:0 0 10px">The format rooms read under, and the rules
-      every export states. Tossup count, answer values and overtime here decide what
-      the .yft hands YellowFruit and how the stat report scales its rate stats.</p>
-    ${formatHtml(settings, true)}`;
+  box.innerHTML = formatHtml(settings, true);
   wireFormat(box, {
     settings: () => settings,
     save: async (next) => { await pub(a, { method: 'POST', json: { settings: next } }); },
@@ -399,8 +394,8 @@ function renderStatsSec(a, t) {
     <div class="row" style="margin-bottom:6px">
       <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Public page</label>
     </div>
-    <p class="muted" style="margin:0">While this is off the public stats page stays hidden,
-      and public broadcasts wait with it.</p>
+    <p class="muted" style="margin:0">Turn on for schedule, semi-live stats, category stats,
+      and buzzpoints (if enabled) to be accessible to players.</p>
     <div class="row" style="margin-top:10px">
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
       <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy</button>
@@ -455,7 +450,6 @@ function renderRoomsSec(a, t, buckets, files) {
         <input id="roomn" type="number" min="1" max="60" value="${buckets.length ? 2 : 8}" style="width:64px">
         ${buckets.length ? 'more rooms' : 'rooms'}</label>
       <button id="mkrooms" class="primary">${buckets.length ? 'Add rooms' : 'Create rooms'}</button>
-      <span class="muted">Named Room ${next}&hellip; by default — rename any of them in the table</span>
     </div>`;
   $('mkrooms').onclick = async () => {
     const n = Math.max(1, Math.min(60, Number($('roomn').value) || 0));
@@ -754,7 +748,7 @@ function renderRosterEditor(a, t) {
     <div class="row" style="margin-top:8px">
       <button id="addteam">+ Team</button>
       <span class="muted" id="rostercount">${rosterTeams.length} teams &middot; ${nPlayers} players</span>
-      <span class="muted">&middot; Card order is seed order (drives pool assignments)</span>
+      <span class="muted">&middot; Card order is seed order</span>
     </div>
     <div class="bad" id="rosterproblems" style="margin-top:6px">${problems.map(esc).join(' &middot; ')}</div>
     <div class="row" style="margin-top:8px">
@@ -940,7 +934,7 @@ function renderSchedule(a, t, buckets, files) {
   const box = $('schedsec');
   if (!box) return;
   if (!t.roster_r2_key) {
-    box.innerHTML = '<div class="muted">Needs a roster first — create one on the Roster tab</div>';
+    box.innerHTML = '<div class="muted">Needs a roster first. Please create one on the Roster tab.</div>';
     return;
   }
   const rerender = () => renderSchedule(a, t, buckets, files);
@@ -1479,13 +1473,11 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       </div>
       <div class="row" style="margin-top:8px">
         <button id="dlyft4" class="primary">YellowFruit 4</button>
-        <span class="muted">Needs <b>4.0.18 or newer</b> &mdash; an older 4.x refuses the file,
-          because it will not open one stamped by a build newer than itself.</span>
+        <span class="muted">Needs <b>4.0.18 or newer</b>.</span>
       </div>
       <div class="row" style="margin-top:8px">
         <button id="dlyft3">YellowFruit 3</button>
-        <span class="muted">For the old <b>3.0.2</b> app, which cannot read a YellowFruit 4
-          file at all &mdash; handed one it does nothing, not even show an error.</span>
+        <span class="muted">Needs <b>3.0.2</b>.</span>
       </div>
     </div>
     <div id="statsout" style="margin-top:12px"></div>
@@ -1503,9 +1495,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         <button id="addgame" class="primary">Upload</button>
       </div>
       <div class="muted" style="padding:0 10px 8px;font-size:13px">A reader upload
-        (<span class="mono">.qbtd.json</span>) or a plain match <span class="mono">.qbj</span>.
-        It lands as if the room had turned it in, so it counts everywhere the room's
-        own games do. A closed room is reopened first.</div>
+        (<span class="mono">.qbtd.json</span>) or a plain match <span class="mono">.qbj</span>.</div>
     </details>
     ${uploadRounds.map((rn) => {
       const group = files.filter((f) => f.round === rn);
