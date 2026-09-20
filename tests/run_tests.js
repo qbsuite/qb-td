@@ -1705,6 +1705,32 @@ test('in-page report frame: links are frame-local and resolve', () => {
   assert.ok(!doc.includes('hashchange'), 'nothing depends on the browser navigating');
 });
 
+test('in-page report frame follows the reader theme; the report itself never does', () => {
+  const doc = reportSrcdoc(REPORT);
+  // the tab tracks the reader's theme...
+  assert.match(doc, /@media \(prefers-color-scheme: dark\)/);
+  assert.match(doc, /color-scheme:dark/);
+  // ...overriding every colour YellowFruit's own stylesheet sets, so no
+  // light-mode swatch is left stranded on a dark page
+  for (const sel of ['tr:nth-child(even)', '.scoreboardRoundHeader', '.pseudoTFoot',
+    '.floatingTOC', '.inlineDivider']) {
+    const inDark = doc.slice(doc.indexOf('prefers-color-scheme: dark'));
+    assert.ok(inDark.includes(sel), sel + ' keeps its light colour in dark mode');
+  }
+  // ...and the frame paints its own background rather than letting the
+  // page show through
+  assert.match(doc, /body\{[^}]*background:#fff/);
+
+  // The files a TD downloads are YellowFruit's white report, untouched:
+  // engine/report.js must not gain any of this. tools/yf_parity.mjs checks
+  // them byte for byte against YellowFruit's own, which this guards in the
+  // suite that runs on every change.
+  for (const page of REPORT) {
+    assert.ok(!/prefers-color-scheme/.test(page.text), page.name + ' must not carry a theme');
+    assert.ok(!/color-scheme/.test(page.text), page.name + ' must not set a colour scheme');
+  }
+});
+
 test('report links resolve to anchors that exist', () => {
   const anchors = new Map(REPORT.map((f) =>
     [f.name, new Set([...f.text.matchAll(/\bid=#?([^\s>]+)/g)].map((m) => m[1]))]));

@@ -53,15 +53,39 @@ export function reportSrcdoc(pages) {
     });
     window.addEventListener('load', function () { show(current); });
     show('');`;
+  // Dark mode lives HERE, never in engine/report.js. The report YF writes
+  // is a white page, and the files a TD downloads must stay exactly that —
+  // byte-identical to YellowFruit's own (tools/yf_parity.mjs), and legible
+  // when they are hosted or printed. This stylesheet is only ever added to
+  // the in-page copy, on top of YF's, so the tab can follow the reader's
+  // theme while the export stays the report everyone else expects.
+  // Overrides are only the rules YF sets a colour in (its stylesheet is
+  // reproduced rule for rule above), plus the defaults a white page gets
+  // for free: canvas, text and links.
+  const dark = `
+    @media (prefers-color-scheme: dark) {
+      html{color-scheme:dark}
+      body{background:#131316;color:#e7e7ea}
+      a{color:#7aa2f7}
+      a:visited{color:#a78bfa}
+      tr:nth-child(even){background-color:#1b1b20}
+      .scoreboardRoundHeader{background-color:#131316}
+      .pseudoTFoot{border-top-color:#3a3a42;background-color:#131316 !important}
+      .floatingTOC{background-color:#1b1b20;box-shadow:none}
+      .inlineDivider{background-color:#3a3a42}
+    }`;
   return `<!doctype html><html><head><meta charset="utf-8">${styleOf(pages[0].text)}
-    <style>body{margin:0 8px 8px} .floatingTOC{position:static;box-shadow:none;margin:8px 0}
-    .html-rpt-hide-in-yft-app{display:none}</style></head>
+    <style>body{margin:0 8px 8px;background:#fff}
+    .floatingTOC{position:static;box-shadow:none;margin:8px 0}
+    .html-rpt-hide-in-yft-app{display:none}${dark}</style></head>
     <body>${sections.join('\n')}<script>${script}</script></body></html>`;
 }
 
 /** Mount the report in `box`; the frame grows to its content. */
 export function mountReport(box, pages) {
-  box.innerHTML = '<iframe class="report" title="stat report" style="width:100%;border:0;min-height:60vh;background:#fff"></iframe>';
+  // transparent, not white: the frame's own document paints its background
+  // (light or dark), so a dark reader gets no white flash before it loads
+  box.innerHTML = '<iframe class="report" title="stat report" style="width:100%;border:0;min-height:60vh;background:transparent"></iframe>';
   const frame = box.querySelector('iframe');
   frame.srcdoc = reportSrcdoc(pages);
   const onMessage = (e) => {
