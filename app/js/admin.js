@@ -19,6 +19,7 @@ import { API, pub, esc, fmtBytes, download } from './api.js';
 import { parseMatch, parseRoster, matchPayload, buildRosterQbj } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
+import { serializeYft3 } from '../engine/yft3.js';
 import { buildReport } from '../engine/report.js';
 import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
@@ -1389,7 +1390,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     <h2>Stats + Export</h2>
     <div class="row">
       <button id="calc" class="primary">Compute stats</button>
-      <button id="dlyft" disabled>Download .yft</button>
+      <button id="dlyft" disabled title="Opens in YellowFruit 4.0.18 or newer">Download .yft (YellowFruit 4)</button>
+      <button id="dlyft3" disabled title="For the older YellowFruit 3 app, which cannot read a YellowFruit 4 file">.yft for YellowFruit 3</button>
       <button id="dlreport" disabled>Download stat report</button>
       <button id="dlzip" disabled>Download QBJ bundle</button>
       <button id="rebuild" disabled>Rebuild stats data</button>
@@ -1687,9 +1689,6 @@ function renderProtests(rows, open, isOpen) {
         </div>
       </div>
     </details>`;
-      // the name this game's .qbj carries in the QBJ bundle, which the
-      // .yft records the way YellowFruit notes an imported file
-      m.filename = f.filename.replace(/\.qbtd\.json$/i, '.qbj');
 }
 
 /* ---------- stats + export ---------- */
@@ -1725,6 +1724,9 @@ async function collectMatches(a, t, buckets, files) {
       const room = buckets.find((b) => b.id === f.bucket_id);
       m.room = room ? room.room_name : '';
       m.fileId = f.id;
+      // the name this game's .qbj carries in the QBJ bundle, which the
+      // .yft records the way YellowFruit notes an imported file
+      m.filename = f.filename.replace(/\.qbtd\.json$/i, '.qbj');
       matches.push(m);
       raw.push({
         id: f.id, round: m.round, room: m.room,
@@ -1763,6 +1765,14 @@ async function computeStats(a, t, buckets, files) {
   $('dlyft').disabled = false;
   $('dlyft').onclick = () => {
     try { download(t.slug + '.yft', serializeYft(exportOpts), 'application/json'); }
+    catch (e) { say(e.message, true); }
+  };
+  // The two YellowFruits share an extension and nothing else: YF 3 handed
+  // a YF 4 file does nothing at all, not even an error. Named apart so the
+  // two downloads can sit in one folder.
+  $('dlyft3').disabled = false;
+  $('dlyft3').onclick = () => {
+    try { download(t.slug + '-yf3.yft', serializeYft3(exportOpts), 'application/json'); }
     catch (e) { say(e.message, true); }
   };
   // YellowFruit-style six-page HTML report, zipped so the interlinked

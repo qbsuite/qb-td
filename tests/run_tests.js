@@ -12,6 +12,7 @@ import { buildReport } from '../app/engine/report.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText } from '../app/engine/schedule.js';
 import { serializeYft } from '../app/engine/yft.js';
+import { serializeYft3 } from '../app/engine/yft3.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
@@ -464,8 +465,61 @@ test('overtime is split out of tossups read, with each team\'s overtime buzzes',
   assert.ok(!('overtime_tossups_read' in plain));
 });
 
+/* ---------- yft for YellowFruit 3 ---------- */
+
+console.log('yft (YellowFruit 3)');
+
+// YF 3's file is six JSON values, one per line; `npm run yf-parity` checks
+// the whole thing against YF 3.0.2's own importer. These pin the shape.
+const YFT3 = serializeYft3({ matches: [parseMatch(M1), parseMatch(M2)], roster: parseRoster(ROSTER) });
+
+test('yf3: six lines — version, packets, settings, divisions, teams, games', () => {
+  const lines = YFT3.split('\n');
+  assert.equal(lines.length, 6, 'YF 3 splits on newlines and parses each piece');
+  const [meta, packets, settings, divisions, teams, games] = lines.map((l) => JSON.parse(l));
+  assert.deepEqual(meta, { version: '3.0.2' });
+  assert.deepEqual([packets, divisions], [{}, {}]);
+  assert.deepEqual(settings, {
+    powers: '15pts', negs: true, bonuses: true, bonusesBounce: false, lightning: false,
+    playersPerTeam: 4, defaultPhases: [], rptConfig: 'YF Defaults',
+  });
+  assert.ok(Array.isArray(teams) && Array.isArray(games));
+  assert.equal(games.length, 2);
+});
+
+test('yf3: teams carry a roster keyed by player name', () => {
+  const teams = JSON.parse(YFT3.split('\n')[4]);
+  const alpha = teams.find((t) => t.teamName === 'Alpha');
+  assert.deepEqual(Object.keys(alpha.roster).slice(0, 2), ['Ann', 'Abe']);
+  assert.deepEqual(alpha.roster.Ann, { year: '', undergrad: false, div2: false });
+  assert.deepEqual([alpha.divisions, alpha.rank, alpha.smallSchool], [{}, null, false]);
+});
+
+test('yf3: a game is powers / tens / negs per player, scores and tossups read', () => {
+  const g = JSON.parse(YFT3.split('\n')[5])[0];
+  assert.deepEqual([g.round, g.team1, g.team2, g.score1, g.score2, g.tuhtot, g.ottu], [1, 'Alpha', 'Beta', 125, 55, 20, 0]);
+  assert.deepEqual(g.players1.Ann, { negs: 1, powers: 2, tens: 2, tuh: 20 });
+  assert.deepEqual(g.players2.Bob, { negs: 2, powers: 1, tens: 2, tuh: 20 });
+  assert.deepEqual([g.forfeit, g.tiebreaker, g.invalid, g.phases, g.notes], [false, false, false, [], '']);
+});
+
+test('yf3: 10/-5 play is written with powers off; overtime buzzes are split out', () => {
+  const raw = modaqMatch({
+    round: 1, tossupsRead: 21,
+    teamA: { name: 'Alpha', bonusPoints: 30, players: [{ name: 'Ann', counts: { 10: 3 } }] },
+    teamB: { name: 'Beta', bonusPoints: 40, players: [{ name: 'Bob', counts: { 10: 2, '-5': 2 } }] },
+  });
+  const buzz = (team, player, value) => ({ team: { name: team }, player: { name: player }, result: { value } });
+  raw.match_questions = Array.from({ length: 21 }, (_, i) => ({ question_number: i + 1, buzzes: [] }));
+  raw.match_questions[20].buzzes.push(buzz('Beta', 'Bob', -5), buzz('Alpha', 'Ann', 10));
+  const lines = serializeYft3({ matches: [parseMatch(raw)] }).split('\n').map((l) => JSON.parse(l));
+  assert.equal(lines[2].powers, 'none');
+  const g = lines[5][0];
+  assert.deepEqual([g.tuhtot, g.ottu, g.otTen1, g.otNeg1, g.otTen2, g.otNeg2, g.otPwr1], [21, 1, 1, 0, 0, 1, 0]);
+});
 
 /* ---------- zip ---------- */
+
 console.log('zip');
 
 test('store-only zip structure', () => {
@@ -1530,8 +1584,8 @@ test('report pages carry YellowFruit\'s titles, markup and generator line', () =
   });
 });
 
-  const rows = flat(page('standings.html'));
 test('standings: YF ordering, win pct, PP20TUH, PPB', () => {
+  const rows = flat(page('standings.html'));
   assert.ok(rows.includes('Rank Team W L Pct PP20TUH 15 10 -5 TUH PPB'));
   // Gamma (1.000) above Alpha (.500) above Beta (.000)
   assert.ok(rows.indexOf('Gamma') < rows.indexOf('Alpha'));

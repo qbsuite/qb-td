@@ -153,7 +153,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   room otherwise), so a lagging room's teams can't read answers
   mid-round. Only exists while the TO
   has publish switched on; fully decoupled from the admin side.
-- **Exports**: a native `.yft` (opens in YellowFruit >= 4.0.18); the
+- **Exports**: a native `.yft` for each YellowFruit generation — one for
+  YellowFruit 4 (opens in >= 4.0.18) and one for the older YellowFruit 3
+  app, whose format is unrelated and which does nothing at all, not even
+  an error, when handed a YellowFruit 4 file; the
   **HTML stat report** as a zip of the same six interlinked pages
   YellowFruit publishes, named the way YellowFruit saves them
   (`<slug>_standings.html`, `_individuals`, `_games`, `_teamdetail`,
@@ -845,7 +848,7 @@ actually got committed, along with manifest-to-capture agreement.
 
 ## YellowFruit fidelity
 
-Two exports mirror YellowFruit's own output and are checked against its
+Three exports mirror YellowFruit's own output and are checked against its
 source rather than guessed at.
 
 The generated `.yft` is the file YellowFruit 4.0.18 itself saves after a TD
@@ -860,6 +863,18 @@ regulation and drops from the stats, so the `.yft` splits the overtime
 tossups out and lists each team's overtime buzzes, as a TD would have to
 by hand.
 
+The YellowFruit 3 file (`app/engine/yft3.js`, downloaded as
+`<slug>-yf3.yft`) is the other generation's format entirely: six JSON
+values, one per line — version, packets, settings, divisions, teams,
+games — where YF 4's is one tournament-schema object. YF 3 splits a file
+on newlines and parses each piece before it looks at anything, so a YF 4
+file makes it throw before it can show an error. The file is what YF 3.0.2
+(the last 3.x) saves after a TD adds the same teams and imports the same
+game `.qbj`s: tossups as powers / tens / negs only (anything over 10 is a
+power, anything negative a neg, as YF 3's own importer has it), powers
+off for 10/-5 play, and — again better than that importer — overtime
+tossups and each team's overtime powers, tens and negs filled in.
+
 `npm run yf-parity` (`tools/yf_parity.mjs`) checks all of that against
 YellowFruit's own code rather than against a reading of it. It clones YF
 at the pinned tag into `.cache/` (nothing of YF's, AGPL-3.0, enters this
@@ -867,11 +882,13 @@ repo), runs its data model headless to import each scenario's files and
 save a `.yft`, builds qb-td's from the same files, and fails unless the
 two are the same tournament once YF has opened and re-saved each — in
 practice they are byte-identical before that too — with no game YF flags
-as an error and the same six report pages rendered from both. Scenarios
+as an error and the same six report pages rendered from both. For YF 3 it
+runs 3.0.2's own game importer and validator on the same files and
+requires a byte-identical file with no game marked invalid. Scenarios
 (`tools/yf_parity/scenarios.mjs`): the demo tournament, and a college-style
 event with A/B teams, powers, a substitution, a rostered player who never
 plays, punctuation and accents in names, and an overtime game. Run it
-after any change to `app/engine/yft.js` or `parseMatch`; it needs git and
+after any change to `app/engine/yft.js`, `yft3.js` or `parseMatch`; it needs git and
 network the first time. The unit suite pins the same facts without it.
 
 The HTML stat report (`app/engine/report.js`) writes the six pages

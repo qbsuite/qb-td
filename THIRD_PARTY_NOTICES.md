@@ -35,13 +35,20 @@ comments of MODAQ's own dependencies (React and others) in a
 
 ## YellowFruit — file-format interoperability only
 
-The `.yft` export (`app/engine/yft.js`) writes files readable by
-[YellowFruit](https://github.com/ANadig/YellowFruit) (AGPL-3.0). No
-YellowFruit code is redistributed here: yft.js is an independent
-implementation of the `.yft` JSON file format, whose structure and
-snake_case key names were verified against YellowFruit 4.0.18 to ensure
-the generated files open cleanly. The key names themselves follow the
-community tournament-schema (qbj) conventions.
+The `.yft` exports (`app/engine/yft.js` for YellowFruit 4, `yft3.js` for
+YellowFruit 3) and the HTML stat report (`report.js`) write files in the
+formats of [YellowFruit](https://github.com/ANadig/YellowFruit)
+(AGPL-3.0). No YellowFruit code is redistributed here: each is an
+independent implementation of a file format, whose structure, key names
+and markup were verified against YellowFruit 4.0.18 and 3.0.2 so the
+generated files open cleanly and upload where YellowFruit's do. The 4.x
+key names themselves follow the community tournament-schema (qbj)
+conventions.
+
+`npm run yf-parity` checks those outputs against YellowFruit itself. It
+clones YellowFruit at pinned tags into a git-ignored `.cache/` on the
+machine running it and executes that code there; nothing of YellowFruit's
+is committed to, bundled into, or served from this repository.
 
 ## packet-parser — category spelling vocabulary
 
