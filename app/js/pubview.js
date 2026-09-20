@@ -15,13 +15,15 @@
 import { pub, esc, usingStaticData } from './api.js';
 import { annCards } from './announce.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
-import { aggregate, dedupeMatches } from '../engine/stats.js';
-import { renderStats } from './statsview.js';
+import { dedupeMatches } from '../engine/stats.js';
+import { buildReport } from '../engine/report.js';
+import { mountReport } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries } from '../engine/buzz.js';
 import { roundHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
+import { effectiveFormat } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
@@ -587,15 +589,24 @@ function pendingNote() {
     + 'refresh in a minute to include them</div>';
 }
 
+// The stats tab is the YellowFruit-style report (engine/report.js): the
+// same six pages the TO can download, shown in place.
+let unmountReport = null;
 function renderStatsTab(box) {
+  if (unmountReport) { unmountReport(); unmountReport = null; }
   if (!matches.length) {
     box.innerHTML = statsErrors.length
       ? statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')
       : pendingNote() || '<div class="muted">no games yet</div>';
     return;
   }
-  renderStats(box, aggregate(matches, roster), statsErrors);
-  box.insertAdjacentHTML('afterbegin', pendingNote());
+  box.innerHTML = statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('') + pendingNote()
+    + '<div class="reportbox"></div>';
+  unmountReport = mountReport(box.querySelector('.reportbox'),
+    buildReport({ name: state.name, matches: dedupeMatches(matches), roster,
+      // same rules the TO's own download uses: the report is scaled and
+      // its overtime split by the tournament's regulation tossup count
+      settings: effectiveFormat(state.format) }));
 }
 
 /* ---------- shell ---------- */

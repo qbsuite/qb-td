@@ -9,6 +9,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
+import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText } from '../app/engine/schedule.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -1684,6 +1685,24 @@ test('round report: per-round rates and a tournament total', () => {
   assert.ok(rows.includes('1 1 90.0 15% 45% 1.5 10.00'), rows);
   // total: 380 pts, 40 TUH -> 95.0
   assert.ok(rows.includes('Total 2 95.0'), rows);
+});
+
+// The public stats tab shows the six pages in one srcdoc frame. A srcdoc
+// document's base URL is its parent's, so a "#x" link the browser follows
+// loads the surrounding page inside the frame: every link must be
+// frame-local and followed by the frame's own click handler.
+test('in-page report frame: links are frame-local and resolve', () => {
+  const doc = reportSrcdoc(REPORT);
+  const ids = new Set([...doc.matchAll(/\bid="([^"]*)"/g)].map((m) => m[1]));
+  const hrefs = [...doc.matchAll(/<a href="([^"]*)"/g)].map((m) => m[1])
+    .filter((h) => !/^https?:/.test(h));
+  assert.ok(hrefs.length > 20);
+  for (const h of hrefs) {
+    assert.match(h, /^#/, h + ' would navigate the frame');
+    assert.ok(ids.has(h.slice(1)), h + ' has no target');
+  }
+  assert.ok(doc.includes('preventDefault'), 'the frame follows its links itself');
+  assert.ok(!doc.includes('hashchange'), 'nothing depends on the browser navigating');
 });
 
 test('report links resolve to anchors that exist', () => {
