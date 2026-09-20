@@ -574,16 +574,14 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
       editors upload reaches every round no room here has opened yet. A packet you
       upload yourself replaces that round for good — the set stops updating it, and its
       games drop out of the set&rsquo;s category stats and buzzpoints. ` : '')
-      + `Staged packets are dragged onto their round slots; Assign by filename places
-      the obvious ones and never overwrites a round that already has a packet.`,
+      + `Upload a zip of the packets or upload individually. Then, link the
+      uploads to the corresponding round where they will be read.`,
     tbTitle: t.set ? 'Backup questions + tiebreakers' : 'Tiebreakers',
     tbNote: (t.set ? `The set&rsquo;s own backup questions are listed first, and its editors may add to them
       during the day; anything you upload here is added after them, for this tournament only, and Delete pool
-      removes only yours. ` : '') + `A tiebreaker packet is split into individual questions. In every
-      room&rsquo;s MODAQ, <b>Actions &rarr; Add questions&hellip;</b> lists this
-      pool — the moderator checks with you which one to read and appends
-      exactly that question — and each finished game reports which questions
-      it read, so the log below always says which teams have heard what.`,
+      removes only yours. ` : '') + `Upload a tiebreaker packet to split individual questions. Tiebreaker
+      questions will appear in every room&rsquo;s MODAQ via
+      <b>Actions &rarr; Add questions</b>.`,
     say, rerender: render, refresh: showDetail,
   });
   const box = $('setupsec');
