@@ -162,8 +162,15 @@ const FORMAT_KEYS = {
   'macf-powers': 'StandardPowersMACFGameFormat',
   'pace': 'PACEGameFormat',
 };
+// The format a tournament plays under when its TO has picked none. mACF
+// rather than MODAQ's UndefinedGameFormat: "no format" left the reader
+// enforcing nothing (999 tossups) and, worse, gave the .yft and the stat
+// report no honest regulation tossup count to scale by — every export
+// silently fell back to 20. A real preset is a statement about the rules;
+// UndefinedGameFormat is the absence of one.
+export const DEFAULT_FORMAT = 'macf-powers';
+
 export const GAME_FORMAT_OPTIONS = [
-  { value: '', label: 'default' },
   { value: 'acf', label: 'ACF (no powers)' },
   { value: 'macf-powers', label: 'mACF with powers' },
   { value: 'pace', label: 'PACE NSC' },
@@ -224,9 +231,18 @@ export function cleanOverrides(ov) {
 
 /** The full format a reader in this tournament plays under: preset base
     plus any cleaned overrides. Always returns a complete IGameFormat. */
+/** The preset a settings object names, or DEFAULT_FORMAT. A stored ''
+    (legacy: "MODAQ's own default") resolves to the default preset too —
+    PRESET_FORMATS[''] stays only as the mirror of UndefinedGameFormat that
+    tests/run_tests.js locks against the modaq package. */
+export function formatKey(settings) {
+  const key = (settings || {}).gameFormat;
+  return key && key in PRESET_FORMATS ? key : DEFAULT_FORMAT;
+}
+
 export function effectiveFormat(settings) {
   const s = settings || {};
-  const base = PRESET_FORMATS[s.gameFormat in PRESET_FORMATS ? s.gameFormat : ''];
+  const base = PRESET_FORMATS[formatKey(s)];
   const ov = cleanOverrides(s.formatOverrides);
   if (!Object.keys(ov).length) return base;
   const out = { ...base, ...ov, displayName: base.displayName + ' (custom)' };
@@ -240,10 +256,10 @@ export function effectiveFormat(settings) {
     supplied. */
 export function resolveGameFormat(settings, GameFormats) {
   const s = typeof settings === 'string' ? { gameFormat: settings } : (settings || {});
-  const key = s.gameFormat in FORMAT_KEYS ? s.gameFormat : '';
+  const key = formatKey(s);
   const ov = cleanOverrides(s.formatOverrides);
   if (!Object.keys(ov).length) {
-    if (!key) return undefined;
+    if (!(key in FORMAT_KEYS)) return undefined;
     return (GameFormats && GameFormats[FORMAT_KEYS[key]]) || PRESET_FORMATS[key];
   }
   return effectiveFormat({ gameFormat: key, formatOverrides: ov });
@@ -252,7 +268,7 @@ export function resolveGameFormat(settings, GameFormats) {
 /** Only the fields of `want` that differ from the preset — what the
     dashboard stores as settings.formatOverrides. */
 export function formatOverridesFrom(presetKey, want) {
-  const base = PRESET_FORMATS[presetKey in PRESET_FORMATS ? presetKey : ''];
+  const base = PRESET_FORMATS[formatKey({ gameFormat: presetKey })];
   const ov = {};
   for (const k of OVERRIDE_FIELDS) {
     const baseVal = k === 'pronunciationGuideMarkers' ? (base[k] || null) : base[k];

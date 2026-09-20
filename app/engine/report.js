@@ -14,11 +14,15 @@
 // database expects to be handed; the bare names are YF's in-app preview.
 
 import { aggregate } from './stats.js';
-import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME } from './yft.js';
+import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME,
+  REGULATION_TOSSUPS } from './yft.js';
 
-// Stat display scaling: points per 20 tossups heard, the convention used
-// across qb-td (and YellowFruit's default regulation tossup count).
-const REG_TUH = 20;
+// Stat display scaling. YellowFruit scales its rate stats by the
+// tournament's own regulation tossup count, not by a constant
+// (StatReportDataTypes.ts): a 22-tossup event's report is headed PP22TUH,
+// and its per-team rates divide by 22. m.regTossups carries that count
+// through the model; REGULATION_TOSSUPS is only the fallback for a caller
+// that hands over no game format.
 
 // The YellowFruit release whose HTMLReports.ts this is a port of.
 const YF_VERSION = '4.0.18';
@@ -236,14 +240,16 @@ function htmlPage(m, title, data, withVersion) {
 
 // One derived bundle every page reads: YF-ordered team rows, player rows
 // with fractional games played, per-round game lists.
-function reportModel({ name, matches, roster, prefix }) {
+function reportModel({ name, matches, roster, prefix, settings }) {
+  const rules = settings || {};
+  const regTossups = rules.regulationTossupCount ?? REGULATION_TOSSUPS;
   const agg = aggregate(matches, roster);
   // the columns, game order and match ids of the .yft YF would hold
-  const vals = answerTypes(matches).values;
+  const vals = answerTypes(matches, rules).values;
   const games = importOrder(agg.games);
   games.forEach((g, i) => {
     g.id = matchId(g, i);
-    g.overtime = overtimeOf(matches.find((src) => src.teams === g.teams) || g);
+    g.overtime = overtimeOf(matches.find((src) => src.teams === g.teams) || g, regTossups);
   });
   const anyTies = agg.teams.some((t) => t.t > 0);
 
@@ -303,7 +309,7 @@ function reportModel({ name, matches, roster, prefix }) {
 
   return {
     name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks,
-    games, rounds, perTeam, hasPowers, hasNegs,
+    games, rounds, perTeam, hasPowers, hasNegs, regTossups,
   };
 }
 
@@ -328,7 +334,7 @@ function standingsHtml(m) {
     th('L', true, '3%'),
     ...(m.anyTies ? [th('T', true, '3%')] : []),
     th(abbr('Pct', 'Win percentage'), true, '7%'),
-    th(abbr(`PP${REG_TUH}TUH`, `Points scored in regulation per ${REG_TUH} regulation tossups heard`), true, '8%'),
+    th(abbr(`PP${m.regTossups}TUH`, `Points scored in regulation per ${m.regTossups} regulation tossups heard`), true, '8%'),
     ...valHeaders(m.vals),
     th(abbr('TUH', 'Tossups heard in regulation'), true, '6%'),
     th(abbr('PPB', 'Points per bonus'), true, '7%'),
@@ -341,7 +347,7 @@ function standingsHtml(m) {
       numCell(String(t.l)),
       ...(m.anyTies ? [numCell(String(t.t))] : []),
       numCell(fmtWinPct(winPct(t))),
-      numCell(t.regTuh ? (pptuh(t) * REG_TUH).toFixed(1) : MDASH),
+      numCell(t.regTuh ? (pptuh(t) * m.regTossups).toFixed(1) : MDASH),
       ...valCells(t.counts, m.vals),
       numCell(String(t.regTuh)),
       numCell(fmtPpb(t.bonusPoints, t.bonusesHeard)),
@@ -364,7 +370,7 @@ function individualsHtml(m) {
     th(abbr('GP', 'Games played'), true),
     ...valHeaders(m.vals),
     th(abbr('TUH', 'Tossups heard'), true),
-    th(abbr(`PP${REG_TUH}TUH`, `Points per ${REG_TUH} tossups heard`), true),
+    th(abbr(`PP${m.regTossups}TUH`, `Points per ${m.regTossups} tossups heard`), true),
   ])];
   m.players.forEach((p, i) => {
     rows.push(trTag([
@@ -374,7 +380,7 @@ function individualsHtml(m) {
       numCell(p.gp.toFixed(1)),
       ...valCells(p.counts, m.vals),
       numCell(String(p.tuh)),
-      numCell(((p.points / p.tuh) * REG_TUH).toFixed(2)),
+      numCell(((p.points / p.tuh) * m.regTossups).toFixed(2)),
     ]));
   });
   const header = headerWithDivider(m, 'All Games', 'individuals.html', { noTopLink: true });
@@ -511,7 +517,7 @@ function teamDetailPlayerTable(m, t) {
     th(abbr('GP', 'Games played'), true),
     ...valHeaders(m.vals),
     th(abbr('TUH', 'Tossups heard'), true, '10%'),
-    th(abbr(`PP${REG_TUH}TUH`, `Points per ${REG_TUH} tossups heard`), true, '12%'),
+    th(abbr(`PP${m.regTossups}TUH`, `Points per ${m.regTossups} tossups heard`), true, '12%'),
   ])];
   for (const p of onTeam) {
     rows.push(trTag([
@@ -519,7 +525,7 @@ function teamDetailPlayerTable(m, t) {
       numCell(p.gp.toFixed(1)),
       ...valCells(p.counts, m.vals),
       numCell(String(p.tuh)),
-      numCell(((p.points / p.tuh) * REG_TUH).toFixed(2)),
+      numCell(((p.points / p.tuh) * m.regTossups).toFixed(2)),
     ]));
   }
   return tableTag(rows, { cssClass: 'fwBelow800px' });
@@ -597,11 +603,11 @@ function roundReportHtml(m) {
   const rows = [trTag([
     th('Round', false, '10%'),
     th('Games', true, cw),
-    th(abbr(`Pts/Tm/${REG_TUH}TUH`, `Points per team per ${REG_TUH} tossups heard`), true, cw),
+    th(abbr(`Pts/Tm/${m.regTossups}TUH`, `Points per team per ${m.regTossups} tossups heard`), true, cw),
     ...(m.hasPowers ? [th(abbr('TU Powered', 'Percentage of tossups powered by either team'), true, cw)] : []),
     th(abbr('TU Converted', 'Percentage of tossups answered correctly by either team'), true, cw),
-    ...(m.hasNegs ? [th(abbr(`Negs/Tm/${REG_TUH}TUH`,
-      `Incorrect tossup interrupts per team per ${REG_TUH} tossups heard`), true, cw)] : []),
+    ...(m.hasNegs ? [th(abbr(`Negs/Tm/${m.regTossups}TUH`,
+      `Incorrect tossup interrupts per team per ${m.regTossups} tossups heard`), true, cw)] : []),
     th(abbr('PPB', 'Points per bonus'), true, cw),
   ])];
 
@@ -630,10 +636,10 @@ function roundReportHtml(m) {
 
   const statCells = (s, cell) => [
     cell(String(s.games)),
-    cell(s.regTuh ? ((REG_TUH * s.points) / s.regTuh / 2).toFixed(1) : MDASH),
+    cell(s.regTuh ? ((m.regTossups * s.points) / s.regTuh / 2).toFixed(1) : MDASH),
     ...(m.hasPowers ? [cell(s.tuh ? `${((100 * s.powers) / s.tuh).toFixed(0)}%` : MDASH)] : []),
     cell(s.tuh ? `${((100 * s.gets) / s.tuh).toFixed(0)}%` : MDASH),
-    ...(m.hasNegs ? [cell(s.regTuh ? ((REG_TUH * s.negs) / s.regTuh / 2).toFixed(1) : MDASH)] : []),
+    ...(m.hasNegs ? [cell(s.regTuh ? ((m.regTossups * s.negs) / s.regTuh / 2).toFixed(1) : MDASH)] : []),
     cell(s.bonusesHeard ? (s.bonusPts / s.bonusesHeard).toFixed(2) : MDASH),
   ];
   const asNum = (text) => numCell(text);

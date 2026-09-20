@@ -6,7 +6,7 @@
 
 import { esc } from './api.js';
 import { GAME_FORMAT_OPTIONS, effectiveFormat, formatOverridesFrom, cleanOverrides,
-  parsePowersText, powersText } from './read_core.js';
+  formatKey, parsePowersText, powersText } from './read_core.js';
 
 /** The control's markup; `open` = the customize panel is showing. */
 export function formatHtml(settings, open) {
@@ -15,7 +15,7 @@ export function formatHtml(settings, open) {
     <div class="row" style="margin-bottom:6px">
       <label class="row">Reader game format
         <select id="gformat">${GAME_FORMAT_OPTIONS.map((o) =>
-          `<option value="${o.value}" ${o.value === (settings.gameFormat || '') ? 'selected' : ''}>${o.label}</option>`).join('')}
+          `<option value="${o.value}" ${o.value === formatKey(settings) ? 'selected' : ''}>${o.label}</option>`).join('')}
         </select>
       </label>
       ${Object.keys(cleanOverrides(settings.formatOverrides)).length ? '<span class="pill">Custom</span>' : ''}
@@ -62,10 +62,10 @@ export function wireFormat(box, { settings: current, save, say, refresh, onToggl
     } catch (e) { say(e.message, true); }
   };
   $('gformat').onchange = () => {
-    const next = { ...current() };
-    if ($('gformat').value) next.gameFormat = $('gformat').value;
-    else delete next.gameFormat;
-    commit(next, 'Game format saved');
+    // Always stored now: there is no "no format" option to fall back to,
+    // and an absent key would read as the default preset rather than as
+    // the one the TO just picked.
+    commit({ ...current(), gameFormat: $('gformat').value }, 'Game format saved');
   };
   $('fmtedit').onclick = () => {
     $('fmtpanel').hidden = !$('fmtpanel').hidden;
@@ -85,7 +85,7 @@ export function wireFormat(box, { settings: current, save, say, refresh, onToggl
       pronunciationGuideMarkers: p1 ? [p1, p2] : null,
     };
     const settings = current();
-    const ov = formatOverridesFrom(settings.gameFormat || '', want);
+    const ov = formatOverridesFrom(formatKey(settings), want);
     const bad = Object.keys(ov).filter((k) => !(k in cleanOverrides(ov)));
     if (bad.length) { say('Bad value: ' + bad.join(', '), true); return; }
     const next = { ...settings };

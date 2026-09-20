@@ -21,7 +21,7 @@
 // never sees it in a MODAQ file: `ottu` and each team's overtime powers,
 // tens and negs are filled in from the per-tossup record.
 
-import { answerTypes, importOrder, overtimeOf } from './yft.js';
+import { answerTypes, importOrder, overtimeOf, REGULATION_TOSSUPS } from './yft.js';
 
 // Files say which YF wrote them; YF refuses one from a later minor version.
 const YF3_VERSION = '3.0.2';
@@ -36,6 +36,7 @@ const DEFAULT_RPT = 'YF Defaults';
  * @returns {metadata, packets, settings, divisions, teams, games}
  */
 export function buildYft3(opts) {
+  const rules = opts.settings || {}; // the MODAQ game format (see yft.js)
   if (!opts.matches || !opts.matches.length) throw new Error('No matches to export');
   const matches = importOrder(opts.matches);
 
@@ -49,13 +50,15 @@ export function buildYft3(opts) {
     for (const p of t.players) if (!entry.players.includes(p.name)) entry.players.push(p.name);
   }
 
-  const { values } = answerTypes(matches);
+  const { values } = answerTypes(matches, rules);
+  // the tournament's own regulation length, as in yft.js — not a constant
+  const regulation = rules.regulationTossupCount ?? REGULATION_TOSSUPS;
   const top = Math.max(...values);
   const settings = {
     powers: top >= 20 ? '20pts' : top > 10 ? '15pts' : 'none',
     negs: values.some((v) => v < 0),
     bonuses: matches.some((m) => m.teams.some((t) => t.bonusPoints > 0)),
-    bonusesBounce: false,
+    bonusesBounce: rules.bonusesBounceBack ?? false,
     lightning: false,
     playersPerTeam: 4,
     defaultPhases: [],
@@ -86,7 +89,7 @@ export function buildYft3(opts) {
   // validateGame adds it
   const games = matches.map((m) => {
     const [a, b] = m.teams;
-    const ot = overtimeOf(m);
+    const ot = overtimeOf(m, regulation);
     const otCount = (t, test) => values.reduce((n, v) => n + (test(v) ? ot.count(t.name, v) : 0), 0);
     return {
       bbPts1: 0,

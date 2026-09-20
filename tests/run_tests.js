@@ -25,7 +25,7 @@ import { checkPacket } from '../app/engine/packetcheck.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -674,10 +674,25 @@ test('resolveGameFormat maps settings keys', () => {
   assert.equal(resolveGameFormat('acf', GameFormats), GameFormats.ACFGameFormat);
   assert.equal(resolveGameFormat('macf-powers', GameFormats), GameFormats.StandardPowersMACFGameFormat);
   assert.equal(resolveGameFormat('pace', GameFormats), GameFormats.PACEGameFormat);
-  assert.equal(resolveGameFormat('', GameFormats), undefined);
-  assert.equal(resolveGameFormat('nonsense', GameFormats), undefined);
   assert.equal(resolveGameFormat({ gameFormat: 'acf' }, GameFormats), GameFormats.ACFGameFormat);
-  assert.equal(resolveGameFormat({}, GameFormats), undefined);
+  // No format picked, or an unrecognized one, is mACF with powers — not
+  // MODAQ's UndefinedGameFormat. "No format" used to leave the reader
+  // enforcing nothing (999 tossups) and gave the exports no honest
+  // regulation count to scale by; DEFAULT_FORMAT is a real rule set.
+  assert.equal(resolveGameFormat('', GameFormats), GameFormats.StandardPowersMACFGameFormat);
+  assert.equal(resolveGameFormat('nonsense', GameFormats), GameFormats.StandardPowersMACFGameFormat);
+  assert.equal(resolveGameFormat({}, GameFormats), GameFormats.StandardPowersMACFGameFormat);
+});
+
+test('formatKey: a stored preset wins, anything else is the default', () => {
+  assert.equal(formatKey({ gameFormat: 'acf' }), 'acf');
+  assert.equal(formatKey({ gameFormat: 'pace' }), 'pace');
+  assert.equal(formatKey({}), DEFAULT_FORMAT);
+  assert.equal(formatKey({ gameFormat: '' }), DEFAULT_FORMAT);
+  assert.equal(formatKey({ gameFormat: 'nonsense' }), DEFAULT_FORMAT);
+  assert.equal(formatKey(null), DEFAULT_FORMAT);
+  // the option list no longer offers "no format"
+  assert.ok(!GAME_FORMAT_OPTIONS.some((o) => o.value === ''));
 });
 
 test('PRESET_FORMATS mirror the installed MODAQ package', () => {
@@ -722,10 +737,14 @@ test('effectiveFormat + resolveGameFormat layer overrides on the preset', () => 
   assert.equal(f.displayName, 'ACF (custom)');
   assert.equal(f.version, PRESET_FORMATS.acf.version);
   assert.deepEqual(effectiveFormat(s), f);
-  // no preset: overrides sit on MODAQ's default (freeform) format
+  // no preset: overrides sit on the default preset, mACF with powers.
+  // This is the QUARTZ 2026 shape — a TO who only ticked one box and
+  // never picked a format — and the reason the number below is 20 and
+  // not 999: a tournament always exports an honest regulation count now.
   const d = resolveGameFormat({ formatOverrides: { negValue: 0 } });
   assert.equal(d.negValue, 0);
-  assert.equal(d.regulationTossupCount, 999);
+  assert.equal(d.regulationTossupCount, 20);
+  assert.deepEqual(d.powers, PRESET_FORMATS['macf-powers'].powers);
   // pronunciation markers can be cleared outright
   const noPron = resolveGameFormat({ gameFormat: 'pace', formatOverrides: { pronunciationGuideMarkers: null } });
   assert.equal('pronunciationGuideMarkers' in noPron, false);

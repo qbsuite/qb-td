@@ -81,7 +81,14 @@ export function matchId(m, index) {
 // bonus, so they come out of bonuses heard). Which buzzes were overtime
 // comes from the per-tossup record; without one the tossups are still
 // split, and the buzzes are left for the TD to enter.
-const REGULATION_TOSSUPS = 20;
+//
+// `regulation` is the tournament's own regulation tossup count, from its
+// MODAQ game format (read_core.js effectiveFormat) — NOT a constant. Get
+// it wrong and every game of a 22-tossup event reports two tossups of
+// overtime that were never played, which moves regulation points, TUH and
+// bonuses heard on every page of the stat report. The fallback is YF's
+// own default, for a caller with no format to hand over.
+export const REGULATION_TOSSUPS = 20;
 export function overtimeOf(m, regulation = REGULATION_TOSSUPS) {
   const tossups = Math.max(0, m.tossupsRead - regulation);
   const late = tossups && m.tossupBuzzes ? m.tossupBuzzes.slice(regulation).flat() : [];
@@ -91,17 +98,50 @@ export function overtimeOf(m, regulation = REGULATION_TOSSUPS) {
   };
 }
 
-/** The tournament's answer types: a standard rule set's when the values
- *  scored fit one, else the values seen (YF sortAnswerTypes order), with a
- *  bare 10 as the fallback so the file always validates. */
-export function answerTypes(matches) {
+/** The values a MODAQ game format scores: its powers, a plain ten, and its
+ *  neg (PACE negs zero, which is no answer type at all). */
+export function formatValues(rules) {
+  const vals = new Set([10]);
+  for (const p of (rules && rules.powers) || []) if (p && p.points) vals.add(p.points);
+  if (rules && rules.negValue) vals.add(rules.negValue);
+  return vals;
+}
+
+/** The tournament's answer types: a standard rule set's when the values fit
+ *  one, else the values in play (YF sortAnswerTypes order), with a bare 10
+ *  as the fallback so the file always validates.
+ *
+ *  `rules` is the tournament's MODAQ format. Its values are unioned with
+ *  the ones actually scored rather than replacing them: the format alone
+ *  would drop a value some room really did score (and YF rejects a file
+ *  whose games reference an answer type it has no column for), while the
+ *  games alone silently lose the power column from an event where nobody
+ *  happened to power. */
+export function answerTypes(matches, rules) {
   const seen = new Set();
   for (const m of matches) for (const t of m.teams) for (const p of t.players)
     for (const c of p.counts) if (c.n) seen.add(c.value);
+  if (rules) for (const v of formatValues(rules)) seen.add(v);
   seen.delete(0); // a zero-point buzz is not an answer type
   const ruleSet = RULE_SETS.find((rs) => [...seen].every((v) => rs.values.includes(v)));
   if (!ruleSet && ![...seen].some((v) => v > 0)) seen.add(10);
   return { ruleSet, values: ruleSet ? ruleSet.values : [...seen].sort((a, b) => b - a) };
+}
+
+/** YF's own Acf/AcfPowers presets, field for field (ScoringRules.applyRuleSet):
+ *  20 regulation tossups, one overtime tossup minimum, bonuses on, no
+ *  bouncebacks, no overtime bonuses. A tournament that differs in ANY of
+ *  them is not that rule set, whatever its tossup values look like, so it
+ *  goes out with no standardRuleSet label — YF then shows "Custom", which
+ *  is the truth. Stamping the label on a 22-tossup event would leave the
+ *  file saying mACF while holding rules mACF does not have, and re-picking
+ *  the preset in YF would silently snap the count back to 20. */
+function standardRuleSetKey(ruleSet, rules, useBonuses) {
+  if (!ruleSet || !useBonuses) return undefined;
+  const matches = (rules.regulationTossupCount ?? REGULATION_TOSSUPS) === 20
+    && (rules.minimumOvertimeQuestionCount ?? 1) === 1
+    && !rules.bonusesBounceBack && !rules.overtimeIncludesBonuses;
+  return matches ? ruleSet.key : undefined;
 }
 
 // The fixed set of keys YF's CaseConversion.ts snake_cases — format facts
@@ -161,8 +201,14 @@ const ref = ($ref) => ({ $ref });
  * Build the .yft file object.
  * @param opts {name, questionSet, startDate, endDate, matches, roster,
  *   settings} — matches from qbj.parseMatch, roster from qbj.parseRoster
- *   (falls back to teams/players observed in matches). settings may carry
- *   the YfData tracking flags (trackPlayerYear etc.).
+ *   (falls back to teams/players observed in matches). settings is the
+ *   tournament's effective MODAQ game format (read_core.js
+ *   effectiveFormat) — regulationTossupCount, powers, negValue,
+ *   minimumOvertimeQuestionCount, overtimeIncludesBonuses,
+ *   bonusesBounceBack — and may carry the YfData tracking flags
+ *   (trackPlayerYear etc.) alongside. Everything YF's scoring rules hold
+ *   that MODAQ's format does not (max players, max bonus score, lightning)
+ *   stays at YF's own defaults.
  * @returns the whole-file object; JSON.stringify it for the .yft bytes.
  */
 export function buildYft(opts) {
@@ -191,7 +237,7 @@ export function buildYft(opts) {
     }
   }
 
-  const { ruleSet, values } = answerTypes(matches);
+  const { ruleSet, values } = answerTypes(matches, settings);
   const answerTypeId = (v) => `AnswerType_${v}`;
 
   const useBonuses = settings.useBonuses ?? matches.some((m) => m.teams.some((t) => t.bonusPoints > 0));
@@ -271,9 +317,9 @@ export function buildYft(opts) {
     YfData: { timed: false },
     name: '',
     maximumPlayersPerTeam: settings.maximumPlayersPerTeam ?? 4,
-    maximumRegulationTossupCount: settings.regulationTossupCount ?? 20,
-    minimumOvertimeQuestionCount: 1,
-    overtimeIncludesBonuses: false,
+    maximumRegulationTossupCount: regulation,
+    minimumOvertimeQuestionCount: settings.minimumOvertimeQuestionCount ?? 1,
+    overtimeIncludesBonuses: settings.overtimeIncludesBonuses ?? false,
     totalDivisor: values.some((v) => v % 5 !== 0) ? 1 : (anyMod5 ? 5 : 10),
     ...(useBonuses ? {
       maximumBonusScore: settings.maximumBonusScore ?? 30,
@@ -281,7 +327,7 @@ export function buildYft(opts) {
       minimumPartsPerBonus: 3,
       maximumPartsPerBonus: 3,
       pointsPerBonusPart: 10,
-      bonusesBounceBack: false,
+      bonusesBounceBack: settings.bonusesBounceBack ?? false,
     } : {}),
     lightningCountPerTeam: 0,
     answerTypes: values.map((v) => ({ value: v, id: answerTypeId(v) })),
@@ -290,7 +336,7 @@ export function buildYft(opts) {
   const tournament = {
     YfData: {
       YfVersion: YF_VERSION,
-      standardRuleSet: ruleSet ? ruleSet.key : undefined,
+      standardRuleSet: standardRuleSetKey(ruleSet, settings, useBonuses),
       seeds: allTeamRefs,
       trackPlayerYear: settings.trackPlayerYear ?? false,
       trackSmallSchool: settings.trackSmallSchool ?? false,

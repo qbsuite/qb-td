@@ -25,12 +25,13 @@ import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
+import { effectiveFormat, metaKey, gameKey, storeIntact } from './read_core.js';
 import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
   hasPlaceholders, poolStandings, fillPlaceholders } from '../engine/schedule.js';
 import { annLive, annTime } from './announce.js';
 import { buzzCredentials } from './buzzkey.js';
-import { protestRows, swingLines, qLabel, RULINGS, rulingLabel } from './protests.js';
+import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -208,7 +209,6 @@ let rosterOpen = false;
 let rosterTeams = null; // structured editor working copy [{name, players}]
 let rosterUpload = null; // parsed upload awaiting confirmation
 
-let fmtOpen = false;     // Customize MODAQ settings panel
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let annOpen = null;      // Broadcasts drawer; null = auto: open when something is live
 let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
@@ -342,7 +342,8 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
     </div>
     <div class="tabs">
       ${[['rooms', 'Rooms'], ['packets', 'Packets + Tiebreakers'],
-        ['roster', 'Roster'], ['sched', 'Schedule']].map(([key, label]) => `
+        ['roster', 'Roster'], ['sched', 'Schedule'],
+        ['modaq', 'MODAQ Settings'], ['stats', 'Stats settings']].map(([key, label]) => `
       <button class="tab ${setupTab === key ? 'active' : ''}" data-tab="${key}">${label}</button>`).join('')}
     </div>
     <div id="setupsec"></div>`;
@@ -355,7 +356,53 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
   if (setupTab === 'rooms') renderRoomsSec(a, t, buckets, files);
   else if (setupTab === 'packets') renderPacketsSec(a, t, buckets, rounds, settings);
   else if (setupTab === 'roster') renderRosterSec(a, t);
+  else if (setupTab === 'modaq') renderModaqSec(a, t, settings);
+  else if (setupTab === 'stats') renderStatsSec(a, t);
   else renderScheduleSec(a, t, buckets, files);
+}
+
+/* ---------- MODAQ Settings: the format every room reads under ----------
+   Setup rather than the live view because it is a decision about the
+   tournament's rules, made once before the first game — and because the
+   exports read it: the regulation tossup count here is what the .yft's
+   scoring rules carry and what the stat report scales by. A TD running
+   22-tossup rounds sets it here and everything downstream follows. */
+
+function renderModaqSec(a, t, settings) {
+  const box = $('setupsec');
+  box.innerHTML = `
+    <p class="muted" style="margin:0 0 10px">The format rooms read under, and the rules
+      every export states. Tossup count, answer values and overtime here decide what
+      the .yft hands YellowFruit and how the stat report scales its rate stats.</p>
+    ${formatHtml(settings, true)}`;
+  wireFormat(box, {
+    settings: () => settings,
+    save: async (next) => { await pub(a, { method: 'POST', json: { settings: next } }); },
+    say, refresh: showDetail, onToggle: () => {},
+  });
+}
+
+/* ---------- Stats settings: what the public stats page shows ---------- */
+
+function renderStatsSec(a, t) {
+  const box = $('setupsec');
+  box.innerHTML = `
+    <div class="row" style="margin-bottom:6px">
+      <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Public page</label>
+    </div>
+    <p class="muted" style="margin:0">While this is off the public stats page stays hidden,
+      and public broadcasts wait with it.</p>
+    <div class="row" style="margin-top:10px">
+      <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
+      <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy</button>
+    </div>`;
+  $('pub').onchange = async () => {
+    try {
+      await pub(a, { method: 'POST', json: { published: $('pub').checked } });
+      say($('pub').checked ? 'Public page on' : 'Public page off');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
 }
 
 /* ---------- Rooms: create N at once, rename inline ---------- */
@@ -377,8 +424,8 @@ function renderRoomsSec(a, t, buckets, files) {
     ${buckets.length ? `<div class="tablewrap"><table>
       <tr><th>Room</th><th>Links</th><th class="num">Files</th><th>Closes</th><th></th></tr>
       ${buckets.map((b) => {
-        const closes = b.created + 48 * 3600 * 1000;
-        const open = Date.now() < closes;
+        const closes = b.created + BUCKET_TTL;
+        const open = !roomClosed(b);
         return `<tr>
           <td><input data-roomrename="${b.id}" value="${esc(b.room_name)}" size="16"></td>
           <td><a href="${esc(readLink(b.secret))}" target="_blank">Reader</a>
@@ -389,7 +436,8 @@ function renderRoomsSec(a, t, buckets, files) {
           <td>${open
             ? `<span class="muted">${new Date(closes).toLocaleString()}</span>`
             : '<span class="pill">Closed</span>'}</td>
-          <td><button class="small" data-delbucket="${b.id}">Remove</button></td>
+          <td class="row">${open ? '' : `<button class="small" data-reopen="${b.id}" title="Give this room another 48 hours so it can take uploads again">Reopen</button>`}
+            <button class="small" data-delbucket="${b.id}">Remove</button></td>
         </tr>`;
       }).join('')}
     </table></div>` : '<div class="muted">No rooms yet</div>'}
@@ -427,6 +475,15 @@ function renderRoomsSec(a, t, buckets, files) {
       if (!confirm('Remove this room? Its link stops working. Uploaded files stay.')) return;
       try {
         await pub(a + '/buckets/' + b.dataset.delbucket, { method: 'DELETE' });
+        showDetail();
+      } catch (e) { say(e.message, true); }
+    };
+  });
+  box.querySelectorAll('[data-reopen]').forEach((b) => {
+    b.onclick = async () => {
+      try {
+        await pub(`${a}/buckets/${b.dataset.reopen}/reopen`, { method: 'POST' });
+        say('Room reopened for 48 hours');
         showDetail();
       } catch (e) { say(e.message, true); }
     };
@@ -1379,9 +1436,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
 
     <h2>Settings</h2>
     <div class="row" style="margin-bottom:6px">
-      <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Public page</label>
+      <span class="muted">Public page is
+        <b>${t.published ? 'on' : 'off'}</b>, reader format is
+        <b>${esc(effectiveFormat(settings).displayName)}</b> at
+        <b>${effectiveFormat(settings).regulationTossupCount} tossups</b></span>
+      <button class="small" data-goto-setup="stats">Stats settings</button>
+      <button class="small" data-goto-setup="modaq">MODAQ Settings</button>
     </div>
-    ${formatHtml(settings, fmtOpen)}
     <div class="row">
       <span class="muted">Admin link open until ${new Date(t.closes).toLocaleString()}</span>
       <button id="rotate" class="small">New admin link</button>
@@ -1390,8 +1451,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     <h2>Stats + Export</h2>
     <div class="row">
       <button id="calc" class="primary">Compute stats</button>
-      <button id="dlyft" disabled title="Opens in YellowFruit 4.0.18 or newer">Download .yft (YellowFruit 4)</button>
-      <button id="dlyft3" disabled title="For the older YellowFruit 3 app, which cannot read a YellowFruit 4 file">.yft for YellowFruit 3</button>
+      <button id="dlyft" disabled title="Opens in YellowFruit 4.0.18 or newer. An older 4.x refuses the file: it is stamped 4.0.18, and YellowFruit will not open a file from a build newer than itself.">.yft for YellowFruit 4.0.18+</button>
+      <button id="dlyft3" disabled title="For the older YellowFruit 3 app, which cannot read a YellowFruit 4 file at all — handed one it does nothing, not even show an error.">.yft for YellowFruit 3.0.2</button>
       <button id="dlreport" disabled>Download stat report</button>
       <button id="dlzip" disabled>Download QBJ bundle</button>
       <button id="rebuild" disabled>Rebuild stats data</button>
@@ -1413,6 +1474,22 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     <div id="statsout" style="margin-top:12px"></div>
 
     <h2>Uploads</h2>
+    <details class="rgroup" style="margin-bottom:8px">
+      <summary><span class="dtitle">Add a game</span>
+        <span class="muted">for a room that never turned one in</span></summary>
+      <div class="row" style="padding:8px 10px">
+        <label>Room <select id="addroom">${buckets.map((b) =>
+          `<option value="${b.id}">${esc(b.room_name)}${roomClosed(b) ? ' (closed)' : ''}</option>`).join('')}</select></label>
+        <label>Round <input id="addround" type="number" min="1" max="999"
+          value="${t.current_round}" style="width:64px"></label>
+        <input id="addfile" type="file" accept=".json,.qbj">
+        <button id="addgame" class="primary">Upload</button>
+      </div>
+      <div class="muted" style="padding:0 10px 8px;font-size:13px">A reader upload
+        (<span class="mono">.qbtd.json</span>) or a plain match <span class="mono">.qbj</span>.
+        It lands as if the room had turned it in, so it counts everywhere the room's
+        own games do. A closed room is reopened first.</div>
+    </details>
     ${uploadRounds.map((rn) => {
       const group = files.filter((f) => f.round === rn);
       const ri = rn === t.current_round ? intake : roundIntake(sched, rn, buckets, files);
@@ -1451,6 +1528,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
               <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">OK</span>'} ${marker}</td>
               <td class="row">
                 ${links}
+                ${f.kind === 'combined' && !f.error && fileSummary(f)
+                  ? `<button data-editfile="${f.id}" title="Reopen this game in the reader to correct it">Edit</button>` : ''}
                 <button data-delfile="${f.id}">Delete</button>
               </td>
             </tr>`;
@@ -1580,10 +1659,6 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     await pub(a, { method: 'POST', json: { settings: next, ...extra } });
     settings = next;
   };
-  wireFormat(box, {
-    settings: () => settings, save: saveSettings, say, refresh: showDetail,
-    onToggle: (open) => { fmtOpen = open; },
-  });
   $('buzzmode').onchange = async () => {
     const mode = $('buzzmode').value;
     try {
@@ -1622,12 +1697,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       showDetail();
     } catch (e) { say(e.message, true); }
   };
-  $('pub').onchange = async () => {
-    try {
-      await pub(a, { method: 'POST', json: { published: $('pub').checked } });
-      say($('pub').checked ? 'Page is public' : 'Page is private');
-    } catch (e) { say(e.message, true); }
-  };
+  box.querySelectorAll('[data-goto-setup]').forEach((b) => {
+    b.onclick = () => { setupTab = b.dataset.gotoSetup; curView = 'setup'; render(); };
+  });
   box.querySelectorAll('[data-delfile]').forEach((b) => {
     b.onclick = async () => {
       if (!confirm('Delete this file?')) return;
@@ -1637,7 +1709,101 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       } catch (e) { say(e.message, true); }
     };
   });
-  $('calc').onclick = () => computeStats(a, t, buckets, files);
+  box.querySelectorAll('[data-editfile]').forEach((b) => {
+    b.onclick = () => editGame(a, buckets, files, Number(b.dataset.editfile));
+  });
+  $('addgame').onclick = () => addGame(a, buckets);
+  $('calc').onclick = () => computeStats(a, t, buckets, files, settings);
+}
+
+/* ---------- editing a game a room already turned in ----------
+
+   A moderator's combined upload carries MODAQ's whole persisted store, so
+   the game can simply be handed back to MODAQ: the reader's game link
+   resumes from localStorage and fetches nothing (read_main.js boot), which
+   means the TD gets the real game — packet, buzzes, bonuses, protests —
+   and not a form that approximates it.
+
+   The correction goes back up the room's own upload route, as an ordinary
+   re-upload. Nothing new has to store it: stats.js dedupeMatches keys a
+   game on its round and team names and keeps the highest file id, so the
+   corrected file supersedes the original everywhere — the dashboard, the
+   stat report, the exports and the public page — exactly as a room
+   re-uploading its own fixed game already does. The original file stays
+   in the uploads list, which is what makes the fix reversible: delete the
+   correction and the first upload is live again.
+
+   It goes back through the room that played it, never some other room.
+   files.pv stamps the set packet version from the uploading room's
+   room_packets row, and doneRounds counts distinct rooms per round
+   against the room count — a correction from a stand-in room would
+   mis-stamp a set mirror's buzzpoints and skew which rounds read as
+   finished. */
+
+// worker.js BUCKET_TTL: a room takes uploads for 48h from its own creation.
+const BUCKET_TTL = 48 * 3600 * 1000;
+const roomClosed = (b) => Date.now() > b.created + BUCKET_TTL;
+
+async function editGame(a, buckets, files, fileId) {
+  const f = files.find((x) => x.id === fileId);
+  const room = f && buckets.find((b) => b.id === f.bucket_id);
+  const sum = f && fileSummary(f);
+  if (!f || !room || !sum) { say('That game cannot be edited', true); return; }
+
+  try {
+    // The room has to be open: the correction is an upload like any other.
+    if (roomClosed(room)) {
+      if (!confirm(`${room.room_name} is closed, so it cannot accept the correction.\n\n`
+        + 'Reopen it for another 48 hours?')) return;
+      await pub(`${a}/buckets/${room.id}/reopen`, { method: 'POST' });
+    }
+    say('Loading the game…');
+    // The MODAQ half of the stored upload, decrypted by the Worker under
+    // the admin link's key — the same download the "game" link offers.
+    const res = await fetch(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&part=game`);
+    if (!res.ok) throw new Error('could not load the game file (' + res.status + ')');
+    const storeText = await res.text();
+    if (!storeIntact(storeText)) throw new Error('this upload has no MODAQ game in it');
+
+    // A fresh game id under the room's own secret, so the reader resumes
+    // it without touching the room's other games.
+    const gid = 'fix' + Date.now().toString(36);
+    const [aName, bName] = sum.teams;
+    localStorage.setItem(gameKey(room.secret, gid), storeText);
+    localStorage.setItem(metaKey(room.secret, gid), JSON.stringify({
+      a: aName, b: bName, round: f.round, t: '', room: room.room_name, started: Date.now(),
+    }));
+    say('');
+    // A new tab: the dashboard keeps its place, and the TD can flip back.
+    window.open(readLink(room.secret) + '&g=' + encodeURIComponent(gid), '_blank');
+  } catch (e) { say(e.message, true); }
+}
+
+/** Put a game into a room the TD picks, through that room's own upload
+    route — the same path, validation and bookkeeping a moderator's upload
+    takes, so the game counts everywhere the room's own games do. For a
+    round a room never turned in at all; a game that IS there is corrected
+    with Edit instead, which keeps MODAQ's question-level record. */
+async function addGame(a, buckets) {
+  const room = buckets.find((b) => b.id === Number($('addroom').value));
+  const round = Number($('addround').value);
+  const file = $('addfile').files[0];
+  if (!room) { say('Pick a room', true); return; }
+  if (!Number.isInteger(round) || round < 1) { say('Pick a round', true); return; }
+  if (!file) { say('Choose a file', true); return; }
+  try {
+    if (roomClosed(room)) await pub(`${a}/buckets/${room.id}/reopen`, { method: 'POST' });
+    say('Uploading…');
+    const out = await pub(
+      `/b/${room.secret}/upload?round=${round}&name=${encodeURIComponent(file.name)}`,
+      { method: 'POST', body: await file.text() });
+    // The Worker stores an unparseable game with its error rather than
+    // rejecting it, the same as for a room — say so instead of "done".
+    if (out && out.error) say(file.name + ': ' + out.error, true);
+    else say(`${file.name} added to ${room.room_name}, round ${round}`);
+    $('addfile').value = '';
+    showDetail();
+  } catch (e) { say(e.message, true); }
 }
 
 /* ---------- protests ----------
@@ -1747,7 +1913,7 @@ async function collectMatches(a, t, buckets, files) {
   return { roster, matches, raw, games, errors };
 }
 
-async function computeStats(a, t, buckets, files) {
+async function computeStats(a, t, buckets, files, settings) {
   const out = $('statsout');
   out.innerHTML = '<div class="muted">Loading files…</div>';
   const { roster, matches, raw, games, errors } = await collectMatches(a, t, buckets, files);
@@ -1761,10 +1927,19 @@ async function computeStats(a, t, buckets, files) {
   const agg = aggregate(matches, roster);
   renderStats(out, agg, errors);
 
-  const exportOpts = { name: t.name, matches: dedupeMatches(matches), roster };
+  // The tournament's own rules reach every export: the .yft's scoring
+  // rules, the overtime split, and the stat report's rate-stat scaling all
+  // come from the regulation tossup count and answer values the TO set
+  // under Tournament Setup -> MODAQ Settings. Without them the exports
+  // silently assumed 20 tossups, which turned the last two tossups of
+  // every game at a longer event into overtime nobody played.
+  const exportOpts = {
+    name: t.name, matches: dedupeMatches(matches), roster,
+    settings: effectiveFormat(settings),
+  };
   $('dlyft').disabled = false;
   $('dlyft').onclick = () => {
-    try { download(t.slug + '.yft', serializeYft(exportOpts), 'application/json'); }
+    try { download(t.slug + '-yf4.yft', serializeYft(exportOpts), 'application/json'); }
     catch (e) { say(e.message, true); }
   };
   // The two YellowFruits share an extension and nothing else: YF 3 handed

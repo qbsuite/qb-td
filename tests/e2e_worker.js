@@ -8,7 +8,7 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-import { WORKER_DIR, BASE, storedCred, d1row, r2get, call, maxAge, tick, ok, summary } from './e2e_lib.js';
+import { WORKER_DIR, BASE, storedCred, d1row, d1exec, r2get, call, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
@@ -974,6 +974,33 @@ ok('expired bucket upload 410', r.status === 410);
 // the TO's own access is unaffected by room expiry
 r = await call(A);
 ok('TO access survives room expiry', r.status === 200);
+
+// reopen: the TO gives the closed room another 48h, and it takes uploads
+// again on its existing link — what the dashboard's Edit and Add a game
+// need, because a correction is an ordinary re-upload from the room that
+// played the game.
+{
+  const bid = (await call(A)).body.buckets[0].id;
+  r = await call(`${A}/buckets/${bid}/reopen`, { method: 'POST' });
+  ok('reopen room', r.status === 200 && r.body.ok === true, r.body);
+  ok('reopen reports a fresh 48h',
+    r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
+    r.body.closes);
+  r = await call('/b/' + secret);
+  ok('reopened room is live again', r.status === 200, r);
+  r = await call(`/b/${secret}/upload?round=1&name=reopened.qbj`, { method: 'POST', body: MATCH });
+  ok('reopened room takes an upload', r.status === 200, r);
+  r = await call(`${A}/files/${(await call(A)).body.files.find((f) => f.filename === 'reopened.qbj').id}`,
+    { method: 'DELETE' });
+  ok('clean up the reopen upload', r.status === 200);
+  r = await call(`${A}/buckets/999999/reopen`, { method: 'POST' });
+  ok('reopen unknown room 404', r.status === 404, r);
+  // back to closed for the checks that follow
+  d1exec(`UPDATE buckets SET created = 1 WHERE secret = '${storedCred(secret)}'`);
+  r = await call('/b/' + secret);
+  ok('room closed again', r.status === 410, r);
+  r = await call(A); // the checks below read this detail out of `r`
+}
 
 // admin detail reflects everything (rounds 1-3 + the label-packet round 4)
 ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 4, r.body.files);

@@ -20,6 +20,7 @@ import { StatsValidity } from 'yf/DataModel/Match';
 import { collectRefTargets } from 'yf/DataModel/QbjUtils2';
 import { snakeCaseToCamelCase, camelCaseToSnakeCase } from 'yf/DataModel/CaseConversion';
 import { CommonRuleSets } from 'yf/DataModel/ScoringRules';
+import AnswerType from 'yf/DataModel/AnswerType';
 
 const [, , inDir, outFile] = process.argv;
 const cfg = JSON.parse(fs.readFileSync(`${inDir}/config.json`, 'utf8'));
@@ -27,6 +28,31 @@ const cfg = JSON.parse(fs.readFileSync(`${inDir}/config.json`, 'utf8'));
 const tourn = new Tournament(cfg.name);
 tourn.appVersion = cfg.yfVersion;
 if (cfg.ruleSet) tourn.applyRuleSet(cfg.ruleSet as CommonRuleSets);
+// Whatever the tournament's game format says on top of the preset — what a
+// TD types into YellowFruit's Rules page before importing a single game.
+// A tournament that reads 22 tossups is a different rule set from mACF,
+// and YF's Rules page locks the moment the first game lands, so this is
+// the only moment either side can set it.
+// Every rules setter in TournamentManager clears the standard rule set
+// (setMinOverTimeTossupCount, setOvertimeUsesBonuses, ...): once a TD
+// changes a rule, the tournament is no longer that preset, and YF's saved
+// file carries no standardRuleSet. Editing the fields without this would
+// leave the harness holding a label the real app would have dropped.
+const r = cfg.rules || {};
+if (Object.keys(r).length) tourn.clearStdRuleSet();
+if (r.regulationTossupCount) tourn.scoringRules.maximumRegulationTossupCount = r.regulationTossupCount;
+if (r.minimumOvertimeQuestionCount) tourn.scoringRules.minimumOvertimeQuestionCount = r.minimumOvertimeQuestionCount;
+if (r.overtimeIncludesBonuses !== undefined) tourn.scoringRules.overtimeIncludesBonuses = !!r.overtimeIncludesBonuses;
+if (r.bonusesBounceBack !== undefined) tourn.scoringRules.bonusesBounceBack = !!r.bonusesBounceBack;
+if (r.powers || r.negValue !== undefined) {
+  const want = new Set<number>([10]);
+  for (const p of r.powers || []) if (p && p.points) want.add(p.points);
+  if (r.negValue) want.add(r.negValue);
+  for (const at of tourn.scoringRules.answerTypes) want.add(at.value);
+  tourn.scoringRules.answerTypes = [...want]
+    .sort((a: number, b: number) => b - a)
+    .map((v: number) => new AnswerType(v));
+}
 tourn.trackPlayerYear = false; // a new-tournament checkbox; qb-td has no years
 
 // --- teams (importQbjTeams)
@@ -55,6 +81,16 @@ const phase = tourn.phases[0];
 phase.setRoundRange(1, cfg.rounds);
 phase.name = cfg.phaseName;
 phase.pools[0].name = cfg.poolName;
+// A blank pool's size is YellowFruit's own default of 4 (Phase
+// defaultSizeForBlankPool), NOT the number of teams — it is the size the
+// TD is expected to type in, and YF never grows it. Leave it at 4 with
+// more than four teams and Pool.checkSizeError blocks the tournament
+// outright: "This pool's size exceeds its expected size of 4. You must
+// correct this error before entering games." So a TD sets it to their
+// field, and qb-td's file writes the same (yft.js: size: roster.length).
+// Demo and college both happen to have exactly four teams, which is why
+// this went unnoticed until a scenario had three.
+phase.pools[0].size = tourn.getNumberOfTeams();
 
 // --- games (importMatchesFromQbj, the single-match branch), in the order
 // the files were picked in the import dialog

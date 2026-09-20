@@ -1324,6 +1324,26 @@ async function createBucket(request, env, t) {
   return json(env, { id: out.meta.last_row_id, room_name: roomName, secret });
 }
 
+// Give a room another BUCKET_TTL. A room's clock runs from its own
+// creation, so a tournament set up a day early can have every room expire
+// before the TD has finished with the day's games — and once a room is
+// shut there is no way to fix a game or add a missing one, because a
+// correction is an ordinary re-upload from the room that played it.
+//
+// Reopening cannot outlive the tournament: this route is behind the admin
+// gate, so now <= t.created + ADMIN_TTL, and the room therefore dies by
+// t.created + ADMIN_TTL + BUCKET_TTL — exactly FINAL_TTL, the same bound
+// a room created at the last possible moment already has.
+async function reopenBucket(env, t, bucketId) {
+  const { results } = await env.DB.prepare(
+    'SELECT id FROM buckets WHERE id = ?1 AND tournament_id = ?2'
+  ).bind(bucketId, t.id).all();
+  if (!results.length) return err(env, 404, 'no such room');
+  const created = Date.now();
+  await env.DB.prepare('UPDATE buckets SET created = ?1 WHERE id = ?2').bind(created, bucketId).run();
+  return json(env, { ok: true, closes: created + BUCKET_TTL });
+}
+
 async function deleteBucket(env, t, bucketId) {
   // Files already uploaded stay downloadable; only the mod's access dies.
   await env.DB.prepare(
@@ -2203,6 +2223,22 @@ function buzzConfig(t) {
   return null;
 }
 
+// The game-format half of a tournament's settings, for the public page.
+// Deliberately a whitelist, not a delete-list: settings is the TO's own
+// JSON and gains keys over time, and the buzzpoints password hash lives
+// in it.
+function pubFormat(t) {
+  try {
+    const s = JSON.parse(t.settings) || {};
+    const out = {};
+    if (typeof s.gameFormat === 'string') out.gameFormat = s.gameFormat;
+    if (s.formatOverrides && typeof s.formatOverrides === 'object') {
+      out.formatOverrides = s.formatOverrides;
+    }
+    return out;
+  } catch (e) { return {}; }
+}
+
 // buzz_v: a one-way stamp that moves with the password (see above).
 async function buzzStamp(b) {
   return (await sha256Hex('buzzv:' + b.salt)).slice(0, 12);
@@ -2412,6 +2448,14 @@ async function pubStateBody(env, t, pub) {
     packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
     // categories tab: refetch the (text-free) category map when this moves
     cats: catsStamp,
+    // The tournament's MODAQ game format, as stored — the public stat
+    // report scales its rate stats by the regulation tossup count and
+    // splits overtime on it, exactly as the TO's downloaded report does
+    // (app/engine/report.js). Resolved against the presets client-side
+    // (read_core.js effectiveFormat) so the preset table lives in one
+    // place. Only these two keys: settings also holds the buzzpoints
+    // config, whose hash must never leave the Worker.
+    format: pubFormat(t),
     // Stats: one stamp per round shard, so a client refetches the round
     // that moved and nothing else. These follow the materialized shards
     // rather than the file rows above — a game that has landed but is not
@@ -3748,6 +3792,7 @@ export default {
       if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
+      if ((mm = sub.match(/^\/buckets\/(\d+)\/reopen$/)) && method === 'POST') return reopenBucket(env, t, Number(mm[1]));
       if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
       if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey);
       if (sub === '/tiebreakers' && method === 'DELETE') return deleteTiebreakers(env, TB_KEY(t.id));

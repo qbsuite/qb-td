@@ -117,14 +117,18 @@ function runScenario(sc, importer, opener, importer3) {
     return m;
   }));
   const roster = parseRoster(sc.roster);
-  const ours = serializeYft({ name: sc.name, matches, roster });
+  // the tournament's MODAQ game format, as the dashboard hands it over
+  // (admin.js: effectiveFormat of the TO's settings); undefined keeps a
+  // scenario on YellowFruit's own defaults
+  const rules = sc.rules || {};
+  const ours = serializeYft({ name: sc.name, matches, roster, settings: rules });
   fs.writeFileSync(path.join(dir, 'qbtd.yft'), ours);
 
   // YellowFruit's side
   fs.writeFileSync(path.join(dir, 'in', 'roster.qbj'), JSON.stringify(sc.roster));
   for (const g of sc.games) fs.writeFileSync(path.join(dir, 'in', 'games', g.filename), JSON.stringify(g.qbj));
   fs.writeFileSync(path.join(dir, 'in', 'config.json'), JSON.stringify({
-    name: sc.name, yfVersion: YF_VERSION, ruleSet: sc.ruleSet,
+    name: sc.name, yfVersion: YF_VERSION, ruleSet: sc.ruleSet, rules,
     rounds: Math.max(...matches.map((m) => m.round)),
     phaseName: PHASE_NAME, poolName: POOL_NAME,
     // imported round by round, as buildYft orders them
@@ -163,7 +167,7 @@ function runScenario(sc, importer, opener, importer3) {
     if (a !== b) problems.push(`YellowFruit's ${pg} page differs between its own import and qb-td's file`);
   }
   // the YF 3 file against YF 3's own import
-  const ours3 = serializeYft3({ matches, roster });
+  const ours3 = serializeYft3({ matches, roster, settings: rules });
   fs.writeFileSync(path.join(dir, 'qbtd3.yft'), ours3);
   execFileSync('node', [importer3, path.join(dir, 'in'), path.join(dir, 'yf3.yft')], { stdio: 'inherit' });
   for (const f of JSON.parse(fs.readFileSync(path.join(dir, 'yf3.json'), 'utf8')).files) {
@@ -175,7 +179,7 @@ function runScenario(sc, importer, opener, importer3) {
   if (theirs3 !== ours3) problems.push(`YF 3 .yft differs from YellowFruit ${YF3_TAG}'s ${firstDifference(theirs3, ours3)}`);
 
   // qb-td's own report against the one YF saves
-  for (const page of buildReport({ name: sc.name, matches, roster, prefix: REPORT_PREFIX })) {
+  for (const page of buildReport({ name: sc.name, matches, roster, prefix: REPORT_PREFIX, settings: rules })) {
     const pg = page.name.slice(REPORT_PREFIX.length + 1, -'.html'.length);
     fs.writeFileSync(path.join(dir, `qbtd_report_${page.name}`), page.text);
     const yfPage = fs.readFileSync(path.join(dir, `yf_${pg}.html`), 'utf8');
