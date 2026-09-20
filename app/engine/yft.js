@@ -45,7 +45,7 @@ const abbrName = (name) => String(name).replace(/\W/g, '').substring(0, 20);
 
 // GeneralUtils.teamGetNameAndLetter: "Penn B" is school "Penn", letter "B";
 // a name not ending in space + one A-Z letter is its own school.
-function schoolAndLetter(teamName) {
+export function schoolAndLetter(teamName) {
   const m = /^(.*) ([A-Za-z])$/.exec(teamName);
   return m ? [m[1].trim(), m[2].toUpperCase()] : [teamName, ''];
 }
@@ -58,6 +58,51 @@ const RULE_SETS = [
   { key: 'Acf', values: [10, -5] },
   { key: 'mAcfPowers', values: [15, 10, -5] },
 ];
+
+// The three below are shared with report.js: the stat report shows the same
+// tossup-value columns, lists games in the same order, and anchors each box
+// score by its match id.
+
+/** Round by round, and within a round in upload order (the dashboard hands
+ *  games over newest first): the order a TD would import them in, which is
+ *  the order YF numbers and lists them. */
+export function importOrder(matches) {
+  return [...matches].sort((a, b) => a.round - b.round || (a.fileId ?? 0) - (b.fileId ?? 0));
+}
+
+/** A match's YF id, given its place in importOrder. */
+export function matchId(m, index) {
+  return `Match_${FIRST_MATCH_ID + index}~${abbrName(m.teams[0].name)}${abbrName(m.teams[1].name)}`;
+}
+
+// Overtime. The reader's file folds it into tossups_read, which YF reads
+// as an over-long regulation and refuses; YF wants the overtime tossups
+// counted apart, and each team's overtime buzzes listed (they earn no
+// bonus, so they come out of bonuses heard). Which buzzes were overtime
+// comes from the per-tossup record; without one the tossups are still
+// split, and the buzzes are left for the TD to enter.
+const REGULATION_TOSSUPS = 20;
+export function overtimeOf(m, regulation = REGULATION_TOSSUPS) {
+  const tossups = Math.max(0, m.tossupsRead - regulation);
+  const late = tossups && m.tossupBuzzes ? m.tossupBuzzes.slice(regulation).flat() : [];
+  return {
+    tossups,
+    count: (team, v) => late.filter((b) => b.team === team && b.value === v).length,
+  };
+}
+
+/** The tournament's answer types: a standard rule set's when the values
+ *  scored fit one, else the values seen (YF sortAnswerTypes order), with a
+ *  bare 10 as the fallback so the file always validates. */
+export function answerTypes(matches) {
+  const seen = new Set();
+  for (const m of matches) for (const t of m.teams) for (const p of t.players)
+    for (const c of p.counts) if (c.n) seen.add(c.value);
+  seen.delete(0); // a zero-point buzz is not an answer type
+  const ruleSet = RULE_SETS.find((rs) => [...seen].every((v) => rs.values.includes(v)));
+  if (!ruleSet && ![...seen].some((v) => v > 0)) seen.add(10);
+  return { ruleSet, values: ruleSet ? ruleSet.values : [...seen].sort((a, b) => b - a) };
+}
 
 // The fixed set of keys YF's CaseConversion.ts snake_cases — format facts
 // required for compatibility (the names follow the qbj tournament-schema
@@ -123,10 +168,7 @@ const ref = ($ref) => ({ $ref });
 export function buildYft(opts) {
   const settings = opts.settings || {};
   if (!opts.matches || !opts.matches.length) throw new Error('No matches to export');
-  // Round by round, and within a round in upload order (the dashboard
-  // hands them over newest first): the order a TD would import them in,
-  // which is the order YF numbers and lists them.
-  const matches = [...opts.matches].sort((a, b) => a.round - b.round || (a.fileId ?? 0) - (b.fileId ?? 0));
+  const matches = importOrder(opts.matches);
 
   // Roster: given, else derived from matches (union of observed lineups).
   let roster = opts.roster;
@@ -149,15 +191,7 @@ export function buildYft(opts) {
     }
   }
 
-  // Answer types: union of values seen in the data (positive desc, then
-  // negs), with a bare 10 as the fallback so the file always validates.
-  const valueSet = new Set();
-  for (const m of matches) for (const t of m.teams) for (const p of t.players)
-    for (const c of p.counts) valueSet.add(c.value);
-  valueSet.delete(0); // a zero-point buzz is not an answer type
-  const ruleSet = RULE_SETS.find((rs) => [...valueSet].every((v) => rs.values.includes(v)));
-  if (!ruleSet && ![...valueSet].some((v) => v > 0)) valueSet.add(10);
-  const values = ruleSet ? ruleSet.values : [...valueSet].sort((a, b) => b - a); // YF sortAnswerTypes order
+  const { ruleSet, values } = answerTypes(matches);
   const answerTypeId = (v) => `AnswerType_${v}`;
 
   const useBonuses = settings.useBonuses ?? matches.some((m) => m.teams.some((t) => t.bonusPoints > 0));
@@ -192,28 +226,13 @@ export function buildYft(opts) {
   // One prelim phase holding every round that has at least one match.
   const roundNumbers = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
   // Matches are numbered in that order, as YF numbers them on import.
-  const matchIds = new Map(matches.map((m, i) =>
-    [m, `Match_${FIRST_MATCH_ID + i}~${abbrName(m.teams[0].name)}${abbrName(m.teams[1].name)}`]));
+  const matchIds = new Map(matches.map((m, i) => [m, matchId(m, i)]));
 
-  // Overtime. The reader's file folds it into tossups_read, which YF reads
-  // as an over-long regulation and refuses; YF wants the overtime tossups
-  // counted apart, and each team's overtime buzzes listed (they earn no
-  // bonus, so they come out of bonuses heard). Which buzzes were overtime
-  // comes from the per-tossup record; without one the tossups are still
-  // split, and the buzzes are left for the TD to enter.
-  const regulation = settings.regulationTossupCount ?? 20;
-  const overtimeOf = (m) => {
-    const tossups = Math.max(0, m.tossupsRead - regulation);
-    const late = tossups && m.tossupBuzzes ? m.tossupBuzzes.slice(regulation).flat() : [];
-    return {
-      tossups,
-      count: (team, v) => late.filter((b) => b.team === team && b.value === v).length,
-    };
-  };
+  const regulation = settings.regulationTossupCount ?? REGULATION_TOSSUPS;
   const rounds = roundNumbers.map((n) => ({
     YfData: { number: n },
     name: String(n), // YF Round.name is number.toString() unless non-numeric
-    matches: matches.filter((m) => m.round === n).map((m) => [m, overtimeOf(m)]).map(([m, ot]) => ({
+    matches: matches.filter((m) => m.round === n).map((m) => [m, overtimeOf(m, regulation)]).map(([m, ot]) => ({
       YfData: { otherValidation: [], importedFile: m.filename },
       tiebreaker: false,
       id: matchIds.get(m),

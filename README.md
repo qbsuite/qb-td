@@ -874,19 +874,26 @@ plays, punctuation and accents in names, and an overtime game. Run it
 after any change to `app/engine/yft.js` or `parseMatch`; it needs git and
 network the first time. The unit suite pins the same facts without it.
 
-The HTML stat report (`app/engine/report.js`) is a port of YellowFruit
-4.0.18's `HTMLReports.ts` — same six filenames (bare for the in-page
-view, as in YF's own preview; `<prefix>_` on files and links alike for the
-download, as in YF's save-to-disk), document shape, page titles, page
-order, table columns, CSS, anchor scheme, and the `StatSummaries.ts`
-formulas (win % counts ties
-as half a win, PP20TUH, fractional games played, `N=` tie ranks). It covers
-what qb-td models: one phase, no pools or finals, no small-school/JV/UG/D2
-tracking, no lightning rounds, bouncebacks folded into bonus points. Its
-tossup-value columns come from values actually scored (the same rule the
-live stats page uses), where YellowFruit uses the tournament's configured
-answer types. After changing it, regenerate from real games and diff
-against a report YellowFruit produces from the same `.yft`.
+The HTML stat report (`app/engine/report.js`) writes the six pages
+YellowFruit 4.0.18 saves for the same tournament, byte for byte — the
+report is read by programs as well as people (the hsquizbowl.org database
+parses what is uploaded to it), so the markup is YF's and not a tidier
+equivalent: attributes unquoted SQBS-style (`<a HREF=...>`, `<table
+border=0 width=100%>`), a line break inside each generic tag, no doctype
+or charset, the top anchor written `id=#top`, YF's stylesheet, box scores
+anchored by the game's match id from the `.yft`, YF's generator line.
+Filenames are bare for the in-page view, as in YF's own preview, and
+`<prefix>_` on files and links alike for the download, as in YF's
+save-to-disk. The numbers are YF's too, quirks included: win % counts a
+tie as half a win, `N=` tie ranks, fractional games played; a team's
+PP20TUH and TUH are regulation-only and an overtime get is not a bonus
+heard, while the round report divides every point by regulation tossups
+and does count overtime gets as bonuses heard. The tossup-value columns
+are the `.yft`'s answer types. It covers what qb-td models: one stage, no
+finals, no small-school/JV/UG/D2 tracking, no lightning rounds,
+bouncebacks folded into bonus points; names are escaped only where they
+would otherwise be read as markup. `npm run yf-parity` compares all six
+pages with YF's own for every scenario — run it after any change here.
 
 ## License
 

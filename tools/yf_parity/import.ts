@@ -120,6 +120,7 @@ fs.writeFileSync(outFile, JSON.stringify(whole, (k, v) => {
 // --- YF's own stat report off the same tournament
 tourn.compileStats(true);
 const g = tourn.htmlGenerator;
+g.setFilePrefix(process.env.YF_REPORT_PREFIX || undefined); // as when saving the report to disk
 const pages: Record<string, string> = {
   standings: g.generateStandingsPage(), individuals: g.generateIndividualsPage(),
   games: g.generateScoreboardPage(), teamdetail: g.generateTeamDetailPage(),

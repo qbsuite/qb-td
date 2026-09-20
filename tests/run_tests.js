@@ -409,7 +409,6 @@ test('.yft path drops superseded uploads via dedupeMatches', () => {
   assert.equal(games.length, 2);
 });
 
-/* ---------- zip ---------- */
 // The three below are what `npm run yf-parity` checks against YellowFruit's
 // own code; they pin the facts here so the unit suite notices without it.
 
@@ -466,6 +465,7 @@ test('overtime is split out of tossups read, with each team\'s overtime buzzes',
 });
 
 
+/* ---------- zip ---------- */
 console.log('zip');
 
 test('store-only zip structure', () => {
@@ -1485,11 +1485,10 @@ test('report emits YellowFruit six-page set', () => {
     assert.match(f.text, /^<HTML>\n<HEAD>/, f.name + ' is a full document');
     assert.match(f.text, /<\/HTML>\s*$/, f.name + ' is closed');
     // every page carries the same nav to the other five
-    for (const other of REPORT) assert.ok(f.text.includes(`href="${other.name}"`));
+    for (const other of REPORT) assert.ok(f.text.includes(`<a HREF=${other.name}>`));
   }
 });
 
-test('standings: YF ordering, win pct, PP20TUH, PPB', () => {
 // What a TD uploads to the hsquizbowl.org tournament database: YellowFruit
 // saves its report as <prefix>_standings.html etc., and the database wants
 // exactly that. Bare filenames are only YF's in-app preview.
@@ -1506,25 +1505,33 @@ test('report with a prefix is named and interlinked like a YellowFruit export', 
   ]);
   const names = new Set(files.map((f) => f.name));
   for (const f of files) {
-    const hrefs = [...f.text.matchAll(/href="([^"#]*\.html)(?:#[^"]*)?"/g)].map((m) => m[1]);
+    const hrefs = [...f.text.matchAll(/HREF=([^\s>#]*\.html)/g)].map((m) => m[1]);
     assert.ok(hrefs.length >= 6, f.name + ' has its nav');
     for (const h of hrefs) assert.ok(names.has(h), `${f.name} links to ${h}, which is not in the set`);
   }
 });
 
-test('report pages carry YellowFruit\'s titles and generator line', () => {
+// The markup is YellowFruit's to the byte (npm run yf-parity compares whole
+// pages with YF's own): attributes unquoted, a line break inside each
+// generic tag, the top anchor written id=#top, YF's generator line.
+test('report pages carry YellowFruit\'s titles, markup and generator line', () => {
   const titles = ['Team Standings', 'Individuals', 'Scoreboard', 'Team Detail', 'Player Detail', 'Round Report'];
   REPORT.forEach((f, i) => {
-    assert.ok(f.text.includes(`<title>${titles[i]}</title>`), f.name);
-    assert.ok(f.text.includes(`<h1 id="top">${titles[i]}</h1>`), f.name);
+    assert.ok(f.text.includes(`<title>\n${titles[i]}\n</title>`), f.name);
+    assert.ok(f.text.includes(`<h1 id=#top>\n${titles[i]}\n</h1>`), f.name);
+    assert.ok(f.text.includes('<table border=0  width=100%>'), f.name);
+    assert.ok(!/<meta|<!doctype/i.test(f.text) && f.text.endsWith('</HTML>'), f.name);
     // the nav label stays the short one, as in YF
     assert.ok(f.text.includes('>Standings</a>'), f.name);
-    assert.match(f.text, /YellowFruit<\/a> 4\.0\.18 report format/, f.name + ' names its format');
-    assert.ok(!/Made with|qb-td/.test(f.text), f.name + ' carries no generator credit');
+    // YF's line; its version number only on the round report
+    assert.match(f.text, /Made with <a HREF=\S+ target="_blank">YellowFruit<\/a> (4\.0\.18)?&nbsp;&#x1F34C;<\/div>/, f.name);
+    assert.equal(f.text.includes('</a> 4.0.18&nbsp;'), f.name === 'rounds.html', f.name);
+    assert.ok(!f.text.includes('qb-td'), f.name);
   });
 });
 
   const rows = flat(page('standings.html'));
+test('standings: YF ordering, win pct, PP20TUH, PPB', () => {
   assert.ok(rows.includes('Rank Team W L Pct PP20TUH 15 10 -5 TUH PPB'));
   // Gamma (1.000) above Alpha (.500) above Beta (.000)
   assert.ok(rows.indexOf('Gamma') < rows.indexOf('Alpha'));
@@ -1562,10 +1569,15 @@ test('individuals: fractional GP and PP20TUH, ranked by PP20TUH', () => {
 
 test('scoreboard: one box score per game, YF score-string titles', () => {
   const html = page('games.html');
-  assert.equal((html.match(/class="boxScoreAnchor"><\/div>/g) || []).length, 2);
-  assert.ok(html.includes('<h3 class="boxScoreTitle">Alpha 125, Beta 55</h3>'));
-  assert.ok(html.includes('<h3 class="boxScoreTitle">Gamma 145, Alpha 55</h3>'));
-  assert.ok(html.includes('id="Round-1"') && html.includes('id="Round-2"'));
+  assert.equal((html.match(/class="boxScoreAnchor">/g) || []).length, 2);
+  assert.ok(html.includes('<h3 class="boxScoreTitle">\nAlpha 125, Beta 55\n</h3>'));
+  assert.ok(html.includes('<h3 class="boxScoreTitle">\nGamma 145, Alpha 55\n</h3>'));
+  assert.ok(html.includes('<div id=Round-1>') && html.includes('<div id=Round-2>'));
+  // box scores are anchored by the game's YF match id, the .yft's
+  assert.ok(html.includes('<div id=Match_1001~AlphaBeta class="boxScoreAnchor">'));
+  // (teams in the file's order, not winner first)
+  assert.ok(html.includes('<div id=Match_1002~AlphaGamma class="boxScoreAnchor">'));
+  assert.ok(html.includes('Round 1 - All Games&nbsp;'));
   // bonus sub-table per game: Alpha heard 6 in M1 for 60 -> 10.00
   assert.ok(flat(html).includes('Bonuses Heard Pts PPB Alpha 6 60 10.00'), flat(html));
 });
@@ -1578,14 +1590,14 @@ test('team detail: per-match rows plus a totals footer', () => {
   assert.ok(rows.includes('2 Gamma L 55 - 145'), rows);
   assert.ok(rows.includes('Total 1-1 2 7 2 40 9 90 10.00'), rows);
   // teams are alphabetical and anchored for the standings links
-  assert.ok(page('teamdetail.html').includes('<h2 id="Alpha">'));
+  assert.ok(page('teamdetail.html').includes('<h2 id=Alpha>\nAlpha\n</h2>'));
   assert.ok(rows.indexOf('Alpha') < rows.indexOf('Beta'));
 });
 
 test('player detail: per-match rows keyed by team-player anchor', () => {
   const html = page('playerdetail.html');
-  assert.ok(html.includes('<h2 id="Alpha-Ann">Ann, Alpha</h2>'));
-  assert.ok(html.includes('<h2 id="Gamma-Gil">Gil, Gamma</h2>'));
+  assert.ok(html.includes('<h2 id=Alpha-Ann>\nAnn, Alpha\n</h2>'));
+  assert.ok(html.includes('<h2 id=Gamma-Gil>\nGil, Gamma\n</h2>'));
   const rows = flat(html);
   assert.ok(rows.includes('Round Opponent Score GP 15 10 -5 TUH Pts'));
   // Ann: 2 games, 15*2+10*2-5 = 45 then 30 -> 75 total
@@ -1603,9 +1615,9 @@ test('round report: per-round rates and a tournament total', () => {
 
 test('report links resolve to anchors that exist', () => {
   const anchors = new Map(REPORT.map((f) =>
-    [f.name, new Set([...f.text.matchAll(/id="([^"]+)"/g)].map((m) => m[1]))]));
+    [f.name, new Set([...f.text.matchAll(/\bid=#?([^\s>]+)/g)].map((m) => m[1]))]));
   for (const f of REPORT) {
-    for (const m of f.text.matchAll(/href="([^"#]+\.html)#([^"]+)"/g)) {
+    for (const m of f.text.matchAll(/HREF=([^\s>#]+\.html)#([^\s>]+)/g)) {
       assert.ok(anchors.has(m[1]), f.name + ' links to unknown page ' + m[1]);
       assert.ok(anchors.get(m[1]).has(m[2]),
         `${f.name} links to ${m[1]}#${m[2]}, which has no such anchor`);
@@ -1640,7 +1652,7 @@ test('report deduplicates re-uploaded games', () => {
   const b = { ...parseMatch(M1), fileId: 2 };
   const files = buildReport({ name: 'T', matches: [a, b], roster: null });
   const games = files.find((f) => f.name === 'games.html').text;
-  assert.equal((games.match(/class="boxScoreAnchor"><\/div>/g) || []).length, 1);
+  assert.equal((games.match(/class="boxScoreAnchor">/g) || []).length, 1);
   assert.ok(flat(files.find((f) => f.name === 'standings.html').text)
     .includes('1 Alpha 1 0'));
 });

@@ -1,5 +1,5 @@
-// yf_parity.mjs — check the .yft qb-td generates against the one YellowFruit
-// itself writes from the same files.
+// yf_parity.mjs — check the .yft and the HTML stat report qb-td generates
+// against the ones YellowFruit itself writes from the same files.
 //
 //   npm run yf-parity            every scenario
 //   npm run yf-parity -- demo    one scenario
@@ -18,6 +18,9 @@
 //   4. No game in qb-td's file may carry a YellowFruit validation error
 //      (YF leaves such games out of the stats), and the stat report YF
 //      renders from it must equal the one from its own import.
+//   5. qb-td's own stat report (app/engine/report.js, the dashboard's
+//      "Download stat report") must be byte-identical, page for page, to
+//      the report YellowFruit saves to disk under the same file prefix.
 //
 // YellowFruit (AGPL-3.0) is cloned at the pinned tag into .cache/, never
 // into the repo; its two runtime dependencies are installed beside it.
@@ -33,11 +36,13 @@ import { build } from 'esbuild';
 import { parseMatch, parseRoster } from '../app/engine/qbj.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { serializeYft, PHASE_NAME, POOL_NAME } from '../app/engine/yft.js';
+import { buildReport } from '../app/engine/report.js';
 import { SCENARIOS } from './yf_parity/scenarios.mjs';
 
 const YF_TAG = 'v4.0.18';
 const YF_VERSION = YF_TAG.slice(1);
 const YF_REPO = 'https://github.com/ANadig/YellowFruit.git';
+const REPORT_PREFIX = 'parity'; // what the TD types in YF's save-report dialog
 const YF_ERROR = 1; // ValidationStatuses.Error, as a saved file stores it
 const YF_DEPS = ['dayjs@^1.11.10', 'string-similarity-js@^2.1.4'];
 
@@ -52,7 +57,7 @@ function ensureYellowFruit() {
     fs.rmSync(yfDir, { recursive: true, force: true });
     fs.mkdirSync(cache, { recursive: true });
     console.log(`cloning YellowFruit ${YF_TAG} ...`);
-    execFileSync('git', ['clone', '--quiet', '--depth', '1', '--branch', YF_TAG, YF_REPO, yfDir], { stdio: 'inherit' });
+    execFileSync('git', ['clone', '--quiet', '--depth', '1', '--branch', YF_TAG, YF_REPO, yfDir], { stdio: 'inherit', env: { ...process.env, YF_REPORT_PREFIX: REPORT_PREFIX } });
   }
   if (!YF_DEPS.every((d) => fs.existsSync(path.join(depsDir, 'node_modules', d.split('@')[0])))) {
     fs.mkdirSync(depsDir, { recursive: true });
@@ -100,7 +105,8 @@ function runScenario(sc, importer, opener) {
     m.filename = g.filename;
     return m;
   }));
-  const ours = serializeYft({ name: sc.name, matches, roster: parseRoster(sc.roster) });
+  const roster = parseRoster(sc.roster);
+  const ours = serializeYft({ name: sc.name, matches, roster });
   fs.writeFileSync(path.join(dir, 'qbtd.yft'), ours);
 
   // YellowFruit's side
@@ -114,7 +120,7 @@ function runScenario(sc, importer, opener) {
     files: [...matches].sort((a, b) => a.round - b.round).map((m) => m.filename),
     overtime: Object.fromEntries(sc.games.filter((g) => g.overtime).map((g) => [g.filename, g.overtime])),
   }));
-  execFileSync('node', [importer, path.join(dir, 'in'), path.join(dir, 'yf.yft')], { stdio: 'inherit' });
+  execFileSync('node', [importer, path.join(dir, 'in'), path.join(dir, 'yf.yft')], { stdio: 'inherit', env: { ...process.env, YF_REPORT_PREFIX: REPORT_PREFIX } });
 
   const log = JSON.parse(fs.readFileSync(path.join(dir, 'yf.json'), 'utf8'));
   for (const name of log.skippedRegistrations) problems.push(`YellowFruit skipped registration "${name}"`);
@@ -124,7 +130,7 @@ function runScenario(sc, importer, opener) {
   }
 
   const reopen = (who) => {
-    execFileSync('node', [opener, path.join(dir, `${who}.yft`), path.join(dir, `${who}_reopened.yft`), YF_VERSION], { stdio: 'inherit' });
+    execFileSync('node', [opener, path.join(dir, `${who}.yft`), path.join(dir, `${who}_reopened.yft`), YF_VERSION], { stdio: 'inherit', env: { ...process.env, YF_REPORT_PREFIX: REPORT_PREFIX } });
     return fs.readFileSync(path.join(dir, `${who}_reopened.yft`), 'utf8');
   };
   const theirs = reopen('yf');
@@ -143,6 +149,14 @@ function runScenario(sc, importer, opener) {
     const b = visible(path.join(dir, `qbtd_reopened_${pg}.html`));
     if (a !== b) problems.push(`YellowFruit's ${pg} page differs between its own import and qb-td's file`);
   }
+  // qb-td's own report against the one YF saves
+  for (const page of buildReport({ name: sc.name, matches, roster, prefix: REPORT_PREFIX })) {
+    const pg = page.name.slice(REPORT_PREFIX.length + 1, -'.html'.length);
+    fs.writeFileSync(path.join(dir, `qbtd_report_${page.name}`), page.text);
+    const yfPage = fs.readFileSync(path.join(dir, `yf_${pg}.html`), 'utf8');
+    if (yfPage !== page.text) problems.push(`stat report: ${page.name} differs from YellowFruit's ${firstDifference(yfPage, page.text)}`);
+  }
+
   // the failure this check was written for: a file with no pool opens to
   // an empty standings page
   if (!/\bRank\b[\s\S]*\bPPB\b/.test(visible(path.join(dir, 'qbtd_reopened_standings.html')))) {
@@ -170,8 +184,8 @@ for (const sc of scenarios) {
     failed++;
     for (const p of problems) console.log(`  FAIL ${p}`);
   } else {
-    console.log(`  ok ${games} games: same tournament as YellowFruit ${YF_VERSION}'s own import, no flagged games, same report`
-      + (raw ? ' (byte-identical even before YF re-saves it)' : ''));
+    console.log(`  ok ${games} games: .yft is the tournament YellowFruit ${YF_VERSION} imports, no flagged games; stat report byte-identical, all six pages`
+      + (raw ? ' (.yft byte-identical even before YF re-saves it)' : ''));
   }
 }
 console.log(failed ? `\n${failed} of ${scenarios.length} scenarios differ — files in ${path.relative(root, outRoot)}` : '\nall scenarios match');

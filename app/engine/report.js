@@ -14,6 +14,7 @@
 // database expects to be handed; the bare names are YF's in-app preview.
 
 import { aggregate } from './stats.js';
+import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME } from './yft.js';
 
 // Stat display scaling: points per 20 tossups heard, the convention used
 // across qb-td (and YellowFruit's default regulation tossup count).
@@ -36,37 +37,51 @@ const PAGES = [
 const MDASH = '&mdash;';
 const NBSP = '&nbsp;';
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-}[c]));
-const alphaOnly = (s) => String(s).replace(/[^0-9A-Za-z]/g, '');
+// Names only ever go into text nodes. YF writes them raw; this escapes just
+// what would otherwise be read as markup and leaves quotes as YF has them.
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const alphaOnly = (s) => String(s).replace(/\W/g, '');
+// Team.getTruncatedName(25), as box scores use it: a long name is cut with
+// "...", a lettered team keeping its letter after the cut.
+const trunc = (s, size) => (s.length <= size ? s : `${s.substring(0, size).trim()}...`);
+function truncName(name) {
+  if (name.length <= 25) return name;
+  const [, letter] = schoolAndLetter(name);
+  return letter ? `${trunc(name, 25 - letter.length - 1)} ${letter}` : trunc(name, 25);
+}
 
-/* ---------- html helpers (ported from YF's tag builders) ---------- */
+/* ---------- html helpers ---------- */
 
-const aTag = (href, contents) => `<a href="${href}">${contents}</a>`;
+// These write YF's markup to the byte — unquoted HREF/border/class/width,
+// quoted td attributes with a slot's space left behind when one is absent,
+// a line break inside every generic tag — because the report is read by
+// programs as well as people: the hsquizbowl.org database parses uploaded
+// reports, and tools/yf_parity.mjs compares these pages with YF's own.
+
+const genericTag = (tag, ...contents) => `<${tag}>\n${contents.join('\n')}\n</${tag}>`;
+const tagWithAttrs = (tag, attrs, ...contents) =>
+  `<${tag} ${attrs.join(' ')}>\n${contents.join('\n')}\n</${tag}>`;
+const attr = (name, val) => `${name}="${val}"`;
+const cls = (...names) => attr('class', names.join(' '));
+
+const aTag = (href, contents, newTab) =>
+  (newTab ? `<a HREF=${href} target="_blank">${contents}</a>` : `<a HREF=${href}>${contents}</a>`);
 const trTag = (cells) => `<tr>\n${cells.join('\n')}\n</tr>`;
-const trFoot = (cells) => `<tr class="pseudoTFoot">\n${cells.join('\n')}\n</tr>`;
-function tdTag({ bold, align, width, title } = {}, contents) {
-  const attrs = [
-    align ? ` align="${align}"` : '',
-    width ? ` width="${width}"` : '',
-    title ? ` title="${esc(title)}"` : '',
-  ].join('');
-  return `<td${attrs}>${bold ? `<b>${contents}</b>` : contents}</td>`;
+const trFoot = (cells) => `<tr class=pseudoTFoot>\n${cells.join('\n')}\n</tr>`;
+function tdTag({ bold, align, width, title, style } = {}, contents) {
+  const slot = (name, val) => (val === undefined ? '' : attr(name, val));
+  const inner = bold ? genericTag('b', contents) : contents;
+  return `<td ${slot('align', align)} ${slot('title', title)} ${slot('style', style)} ${slot('width', width)}>${inner}</td>`;
 }
 const th = (contents, right, width) =>
-  tdTag({ bold: true, align: right ? 'right' : undefined, width }, contents);
+  tdTag({ bold: true, align: right ? 'right' : undefined, width: width || undefined }, contents);
 const textCell = (contents) => tdTag({}, contents);
 const numCell = (contents) => tdTag({ align: 'right' }, contents);
 function tableTag(rows, { width, cssClass, border } = {}) {
-  const attrs = [
-    border !== undefined ? ` border="${border}"` : '',
-    cssClass ? ` class="${cssClass}"` : '',
-    width ? ` width="${width}"` : '',
-  ].join('');
-  return `<table${attrs}>\n${rows.join('\n')}\n</table>`;
+  const slot = (name, val) => (val === undefined ? '' : `${name}=${val}`);
+  return `<table ${slot('border', border)} ${slot('class', cssClass)} ${slot('width', width)}>\n${rows.join('\n')}\n</table>`;
 }
-const abbr = (text, tip) => `<abbr title="${esc(tip)}">${text}</abbr>`;
+const abbr = (text, tip) => tagWithAttrs('abbr', [attr('title', tip)], text);
 
 /* ---------- number formatting (YF's exact rules) ---------- */
 
@@ -79,7 +94,7 @@ function winPct(t) {
   return (t.w + t.t / 2) / (t.w + t.l + t.t);
 }
 function pptuh(t) {
-  return t.points / t.tuh; // NaN when tuh is 0
+  return t.regPoints / t.regTuh; // regulation only; NaN when no tossups
 }
 
 // YF standings order: win % desc (no games -> bottom), then PPTUH desc.
@@ -136,8 +151,9 @@ function rankPlayers(sorted) {
   return ranks;
 }
 
-const teamBonusesHeard = (mt) =>
+const teamGets = (mt) =>
   mt.players.reduce((s, p) => s + p.counts.reduce((n, c) => n + (c.value > 0 ? c.n : 0), 0), 0);
+const teamBonusesHeard = (mt) => mt.bonusesHeard; // gets, less overtime's (reportModel)
 const teamCounts = (mt) => {
   const counts = {};
   for (const p of mt.players) {
@@ -152,8 +168,7 @@ const playerPoints = (p) => p.counts.reduce((s, c) => s + c.value * c.n, 0);
 // Every link takes the report model `m` for its filePrefix ('' or
 // '<prefix>_', YF's setFilePrefix), so a saved report links to its own
 // prefixed files.
-const gameAnchor = (g) =>
-  `R${g.round}-${alphaOnly(g.teams[0].name)}-${alphaOnly(g.teams[1].name)}`;
+const gameAnchor = (g) => g.id; // the game's YF match id, as in the .yft
 const teamLink = (m, name) => aTag(`${m.filePrefix}teamdetail.html#${alphaOnly(name)}`, esc(name));
 const playerLink = (m, team, player) =>
   aTag(`${m.filePrefix}playerdetail.html#${alphaOnly(team)}-${alphaOnly(player)}`, esc(player));
@@ -162,26 +177,33 @@ const roundLink = (m, round, text) => aTag(`${m.filePrefix}games.html#Round-${ro
 
 /* ---------- page skeleton ---------- */
 
-const PAGE_STYLE = `<style>
-html{font-family: Roboto, sans-serif;}
-table{font-size: 11pt; border-spacing: 0; border-collapse: collapse;}
-td{padding: 5px;}
-tr:nth-child(even){background-color: #f2f2f2;}
-.headerAndDivider{display: flex; flex-direction: row; margin: 18px 0;}
-.headerAndDivider h2{margin: 0;}
-.scoreboardRoundHeader{width: 71%; position: sticky; top: 0; background-color: white; padding-bottom: 10px; margin-bottom: -10px;}
-.boxScoreAnchor{padding-top: 30px;}
-.boxScoreTitle{width: 71%;}
-.inlineDivider{flex-grow: 1; height: 1px; background-color: #9f9f9f; align-self: center;}
-.smallText{font-size: 10pt;}
-ul{margin: 0;}
-.boxScoreTable{display: flex; gap: 15px; align-items: flex-start;}
-.pseudoTFoot{border-top: 1px solid #909090; background-color: #ffffff !important;}
-.floatingTOC{top: 150px; right: 35px; position: fixed; padding-right: 5px; background-color: #cccccc; box-shadow: 4px 4px 7px #999999; line-height: 1.5; z-index: 99;}
-.floatingTOC ul{list-style-type: none; padding-inline-start: 20px;}
-@media screen and (min-width: 1000px) {.fwBelow1000px{width: 80%;}}
-@media screen and (min-width: 800px) {.fwBelow800px{width: 60%;}}
-</style>`;
+// YF's stylesheet, rule for rule and in its order; written out one
+// declaration per line the way YF's cssSelector does.
+const STYLE_RULES = [
+  ['HTML', ['font-family: Roboto, sans-serif']],
+  ['table', ['font-size: 11pt', 'border-spacing: 0', 'border-collapse: collapse']],
+  ['td', ['padding: 5px']],
+  ['tr:nth-child(even)', ['background-color: #f2f2f2']],
+  ['.headerAndDivider', ['display: flex', 'flex-direction: row', 'margin: 18px 0']],
+  ['.scoreboardRoundHeader', ['width: 71%', 'position: sticky', 'top: 0', 'background-color: white',
+    'padding-bottom: 10px', 'margin-bottom: -10px']],
+  ['.boxScoreAnchor', ['padding-top: 30px']],
+  ['.boxScoreTitle', ['width: 71%']],
+  ['.inlineDivider', ['flex-grow: 1', 'height: 1px', 'background-color: #9f9f9f', 'align-self: center']],
+  ['ul', ['margin: 0']],
+  ['.smallText', ['font-size: 10pt']],
+  ['.headerAndDivider h2', ['margin: 0']],
+  ['.boxScoreTable', ['display: flex', 'gap: 15px', 'align-items: flex-start']],
+  ['.pseudoTFoot', ['border-top: 1px solid #909090', 'background-color: #ffffff !important']],
+  ['.floatingTOC', ['top: 150px', 'right: 35px', 'position: fixed', 'padding-right: 5px',
+    'background-color: #cccccc', 'box-shadow: 4px 4px 7px #999999', 'line-height: 1.5', 'z-index: 99']],
+  ['.floatingTOC ul', ['list-style-type: none', 'padding-inline-start: 20px']],
+];
+const cssRule = ([selector, decls]) => `${selector}{\n${decls.map((d) => `${d};`).join('\n')}\n}`;
+const cssMinWidth = (px, className, pct) =>
+  `@media screen and (min-width: ${px}px) {\n${cssRule([`.${className}`, [`width: ${pct}%`]])}\n}`;
+const PAGE_STYLE = genericTag('style', ...STYLE_RULES.map(cssRule),
+  cssMinWidth(800, 'fwBelow800px', 60), cssMinWidth(1000, 'fwBelow1000px', 80));
 
 function topLinks(m) {
   const cells = PAGES.map((p) => tdTag({}, aTag(m.filePrefix + p.file, p.title)));
@@ -189,26 +211,25 @@ function topLinks(m) {
 }
 
 function headerWithDivider(m, text, pageFile, { noTopLink, sticky } = {}) {
-  const cls = sticky ? 'headerAndDivider scoreboardRoundHeader' : 'headerAndDivider';
-  const pieces = [`<h2>${text}${NBSP}</h2>`, '<div class="inlineDivider"></div>'];
+  const classes = sticky ? cls('headerAndDivider', 'scoreboardRoundHeader') : cls('headerAndDivider');
+  const pieces = [genericTag('h2', text + NBSP), tagWithAttrs('div', [cls('inlineDivider')])];
   if (!noTopLink) {
-    pieces.push(`<span>${NBSP}</span>`,
-      aTag(`${m.filePrefix}${pageFile}#top`, `<span class="smallText">&#x2191;Top</span>`));
+    pieces.push(genericTag('span', NBSP),
+      aTag(`${m.filePrefix}${pageFile}#top`, tagWithAttrs('span', [cls('smallText')], '&#x2191;Top')));
   }
-  return `<div class="${cls}">\n${pieces.join('\n')}\n</div>`;
+  return tagWithAttrs('div', [classes], ...pieces);
 }
 
-// YF's document shape (uppercase HTML/HEAD/BODY included) plus a charset,
-// which YF leaves out. Where YF's footer says "Made with YellowFruit",
-// this one names only the format the files follow.
-function htmlPage(m, title, data) {
-  const footer = '<div style="font-size:x-small; margin-top: 10px">'
-    + '<a href="https://github.com/ANadig/YellowFruit/releases" target="_blank">YellowFruit</a>'
-    + ` ${YF_VERSION} report format</div>`;
-  return `<HTML>\n<HEAD>\n<meta charset="utf-8">\n<title>${esc(title)}</title>\n</HEAD>\n<BODY>\n`
-    + `${topLinks(m)}\n<h1 id="top">${esc(title)}</h1>\n${PAGE_STYLE}\n`
-    + `<div style="font-size: 11pt; text-size-adjust: none;">\n${data}\n${footer}\n</div>\n`
-    + `</BODY>\n</HTML>\n`;
+// YF's document, whole: no doctype or charset, uppercase HTML/HEAD/BODY,
+// the top anchor written id=#top, YF's generator line (its version on the
+// round report only), and no newline after </HTML>.
+function htmlPage(m, title, data, withVersion) {
+  const madeWith = '<div class="html-rpt-hide-in-yft-app" style="font-size:x-small; margin-top: 10px">Made with '
+    + `${aTag('https://github.com/ANadig/YellowFruit/releases', 'YellowFruit', true)} `
+    + `${withVersion ? YF_VERSION : ''}${NBSP}&#x1F34C;</div>\n`;
+  const content = tagWithAttrs('div', ['style="font-size: 11pt; text-size-adjust: none;"'], data, madeWith);
+  const body = genericTag('BODY', topLinks(m), tagWithAttrs('h1', ['id=#top'], title), PAGE_STYLE, content);
+  return genericTag('HTML', genericTag('HEAD', genericTag('title', title)), body);
 }
 
 /* ---------- report model ---------- */
@@ -217,8 +238,32 @@ function htmlPage(m, title, data) {
 // with fractional games played, per-round game lists.
 function reportModel({ name, matches, roster, prefix }) {
   const agg = aggregate(matches, roster);
-  const vals = agg.values.filter((v) => v !== 0);
+  // the columns, game order and match ids of the .yft YF would hold
+  const vals = answerTypes(matches).values;
+  const games = importOrder(agg.games);
+  games.forEach((g, i) => {
+    g.id = matchId(g, i);
+    g.overtime = overtimeOf(matches.find((src) => src.teams === g.teams) || g);
+  });
   const anyTies = agg.teams.some((t) => t.t > 0);
+
+  // YF keeps overtime out of a team's rate stats when overtime has no
+  // bonuses: PP20TUH is regulation points over regulation tossups, and an
+  // overtime get is not a bonus heard. Per game first, then per team.
+  for (const g of games) {
+    for (const mt of g.teams) {
+      const otCount = (positiveOnly) => vals.reduce((n, v) =>
+        n + (positiveOnly && v <= 0 ? 0 : g.overtime.count(mt.name, v)), 0);
+      mt.regPoints = mt.points - vals.reduce((s, v) => s + v * g.overtime.count(mt.name, v), 0);
+      mt.bonusesHeard = teamGets(mt) - otCount(true);
+    }
+  }
+  for (const t of agg.teams) {
+    const mine = games.flatMap((g) => g.teams.filter((mt) => mt.name === t.name).map((mt) => [g, mt]));
+    t.regTuh = mine.reduce((s, [g]) => s + g.tossupsRead - g.overtime.tossups, 0);
+    t.regPoints = mine.reduce((s, [, mt]) => s + mt.regPoints, 0);
+    t.bonusesHeard = mine.reduce((s, [, mt]) => s + mt.bonusesHeard, 0);
+  }
 
   const teams = sortTeamsYf(agg.teams);
   const teamRanks = rankTeams(teams);
@@ -226,7 +271,7 @@ function reportModel({ name, matches, roster, prefix }) {
   // Fractional GP (sum of tuh share per game) + per-match rows, per player.
   const perPlayer = new Map(); // team\nname -> {gp, games: [{g, mt, mp}]}
   const perTeam = new Map();   // name -> [{g, mt, opp}]
-  for (const g of agg.games) {
+  for (const g of games) {
     const [a, b] = g.teams;
     for (const [mt, opp] of [[a, b], [b, a]]) {
       if (!perTeam.has(mt.name)) perTeam.set(mt.name, []);
@@ -258,7 +303,7 @@ function reportModel({ name, matches, roster, prefix }) {
 
   return {
     name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks,
-    games: agg.games, rounds, perTeam, hasPowers, hasNegs,
+    games, rounds, perTeam, hasPowers, hasNegs,
   };
 }
 
@@ -268,7 +313,8 @@ const valFootCells = (counts, vals) => vals.map((v) => th(String(counts[v] || 0)
 
 const record = (t) => (t.t ? `${t.w}-${t.l}-${t.t}` : `${t.w}-${t.l}`);
 const paren = (n) => (n < 0 ? `(${n})` : String(n));
-const scoreOnly = (mine, theirs) => `${paren(mine.points)} - ${paren(theirs.points)}`;
+const scoreOnly = (g, mine, theirs) =>
+  `${paren(mine.points)} - ${paren(theirs.points)}${g.overtime.tossups ? ' (OT)' : ''}`;
 const resultLetter = (mine, theirs) =>
   (mine.points > theirs.points ? 'W' : mine.points < theirs.points ? 'L' : 'T');
 
@@ -282,9 +328,9 @@ function standingsHtml(m) {
     th('L', true, '3%'),
     ...(m.anyTies ? [th('T', true, '3%')] : []),
     th(abbr('Pct', 'Win percentage'), true, '7%'),
-    th(abbr(`PP${REG_TUH}TUH`, `Points per ${REG_TUH} tossups heard`), true, '8%'),
+    th(abbr(`PP${REG_TUH}TUH`, `Points scored in regulation per ${REG_TUH} regulation tossups heard`), true, '8%'),
     ...valHeaders(m.vals),
-    th(abbr('TUH', 'Tossups heard'), true, '6%'),
+    th(abbr('TUH', 'Tossups heard in regulation'), true, '6%'),
     th(abbr('PPB', 'Points per bonus'), true, '7%'),
   ])];
   m.teams.forEach((t, i) => {
@@ -295,15 +341,17 @@ function standingsHtml(m) {
       numCell(String(t.l)),
       ...(m.anyTies ? [numCell(String(t.t))] : []),
       numCell(fmtWinPct(winPct(t))),
-      numCell(t.tuh ? ((t.points / t.tuh) * REG_TUH).toFixed(1) : MDASH),
+      numCell(t.regTuh ? (pptuh(t) * REG_TUH).toFixed(1) : MDASH),
       ...valCells(t.counts, m.vals),
-      numCell(String(t.tuh)),
+      numCell(String(t.regTuh)),
       numCell(fmtPpb(t.bonusPoints, t.bonusesHeard)),
     ]));
   });
-  const meta = `<span>${esc(m.name)}</span>`;
-  const header = headerWithDivider(m, 'All Games', 'standings.html', { noTopLink: true });
-  return `${meta}\n${header}\n${tableTag(rows, { cssClass: 'fwBelow1000px' })}<br/>`;
+  const meta = genericTag('span', esc(m.name));
+  const header = headerWithDivider(m, PHASE_NAME, 'standings.html', { noTopLink: true });
+  // the blank lines are YF's: slots it leaves empty for a one-stage,
+  // one-pool tournament (no final ranks, pool heading or tiebreakers)
+  return `${meta}\n\n${header}\n\n${tableTag(rows, { cssClass: 'fwBelow1000px' })}\n<br/>`;
 }
 
 /* ---------- individuals ---------- */
@@ -337,13 +385,13 @@ function individualsHtml(m) {
 
 function boxScoreTeamTable(mt, vals) {
   const rows = [trTag([
-    th(esc(mt.name)),
+    th(esc(truncName(mt.name))),
     th('TUH', true),
     ...valHeaders(vals),
     th('Tot', true, '8%'),
   ])];
   for (const p of mt.players) {
-    if (!p.tossupsHeard && !p.counts.some((c) => c.n)) continue;
+    if (!p.tossupsHeard) continue; // YF lists the players who heard a tossup
     const counts = Object.fromEntries(p.counts.map((c) => [c.value, c.n]));
     rows.push(trTag([
       tdTag({}, esc(p.name)),
@@ -371,10 +419,10 @@ function boxScoreBonusTable(g) {
   for (const mt of g.teams) {
     const heard = teamBonusesHeard(mt);
     rows.push(trTag([
-      tdTag({}, esc(mt.name)),
+      tdTag({}, esc(truncName(mt.name))),
       numCell(String(heard)),
       numCell(String(mt.bonusPoints)),
-      numCell(heard ? (mt.bonusPoints / heard).toFixed(2) : MDASH),
+      numCell(heard ? (mt.bonusPoints / heard).toFixed(2) : '--'), // a box score's blank, not the tables' dash
     ]));
   }
   return tableTag(rows);
@@ -384,35 +432,32 @@ function scoreString(g) {
   const [a, b] = g.teams;
   const win = b.points > a.points ? b : a;
   const lose = win === a ? b : a;
-  return `${esc(win.name)} ${win.points}, ${esc(lose.name)} ${lose.points}`;
+  return `${esc(win.name)} ${win.points}, ${esc(lose.name)} ${lose.points}${g.overtime.tossups ? ' (OT)' : ''}`;
 }
 
-function boxScore(g) {
-  const vals = [...new Set(g.teams.flatMap((t) =>
-    t.players.flatMap((p) => p.counts.filter((c) => c.n).map((c) => c.value))))]
-    .filter((v) => v !== 0).sort((x, y) => y - x);
+function boxScore(m, g) {
+  const tossups = `Tossups read: ${g.tossupsRead}${g.overtime.tossups ? ` (${g.overtime.tossups} in OT)` : ''}`;
   return [
-    `<div id="${gameAnchor(g)}" class="boxScoreAnchor"></div>`,
-    `<h3 class="boxScoreTitle">${scoreString(g)}</h3>`,
-    `<p>Tossups read: ${g.tossupsRead}${g.room ? ` ${NBSP}|${NBSP} ${esc(g.room)}` : ''}</p>`,
-    `<div class="boxScoreTable">\n${boxScoreTeamTable(g.teams[0], vals)}\n${boxScoreTeamTable(g.teams[1], vals)}\n</div>`,
+    tagWithAttrs('div', [`id=${gameAnchor(g)}`, cls('boxScoreAnchor')]),
+    tagWithAttrs('h3', [cls('boxScoreTitle')], scoreString(g)),
+    genericTag('p', tossups),
+    tagWithAttrs('div', [cls('boxScoreTable')], boxScoreTeamTable(g.teams[0], m.vals), boxScoreTeamTable(g.teams[1], m.vals)),
     '<br />',
     boxScoreBonusTable(g),
   ].join('\n');
 }
 
 function scoreboardHtml(m) {
-  const toc = `<div class="floatingTOC">\n<ul>\n${m.rounds.map((r) =>
-    `<li>${roundLink(m, r, `Round ${r}`)}</li>`).join('\n')}\n</ul>\n</div>`;
-  const sections = m.rounds.map((r, i) => {
-    const games = m.games.filter((g) => g.round === r);
-    return '<div>\n' + [
-      ...(i > 0 ? ['<br /><br />'] : []),
-      `<div id="Round-${r}"></div>`,
-      headerWithDivider(m, `Round ${r}`, 'games.html', { noTopLink: i === 0, sticky: true }),
-      ...games.map(boxScore),
-    ].join('\n') + '\n</div>';
-  });
+  // the table of contents names the stage, then its rounds indented under it
+  const toc = tagWithAttrs('div', [cls('floatingTOC')], genericTag('ul', [
+    PHASE_NAME, ...m.rounds.map((r) => `${NBSP}${NBSP}${roundLink(m, r, `Round ${r}`)}`),
+  ].map((item) => genericTag('li', item)).join('\n')));
+  const sections = m.rounds.map((r) => genericTag('div', [
+    ...(r !== 1 ? ['<br /><br />'] : []),
+    tagWithAttrs('div', [`id=Round-${r}`]),
+    headerWithDivider(m, `Round ${r} - ${PHASE_NAME}`, 'games.html', { noTopLink: r === 1, sticky: true }),
+    ...m.games.filter((g) => g.round === r).map((g) => boxScore(m, g)),
+  ].join('\n')));
   return `${toc}\n${sections.join('\n')}`;
 }
 
@@ -436,7 +481,7 @@ function teamDetailMatchTable(m, t) {
       textCell(String(g.round)),
       textCell(teamLink(m, opp.name)),
       textCell(resultLetter(mt, opp)),
-      textCell(gameLink(m, g, scoreOnly(mt, opp))),
+      textCell(gameLink(m, g, scoreOnly(g, mt, opp))),
       ...valCells(teamCounts(mt), m.vals),
       numCell(String(g.tossupsRead)),
       numCell(String(heard)),
@@ -486,7 +531,7 @@ function teamDetailHtml(m) {
     return an < bn ? -1 : an > bn ? 1 : 0;
   });
   return byName.map((t) => [
-    `<h2 id="${alphaOnly(t.name)}">${esc(t.name)}</h2>`,
+    tagWithAttrs('h2', [`id=${alphaOnly(t.name)}`], esc(t.name)),
     teamDetailMatchTable(m, t),
     '<br />',
     teamDetailPlayerTable(m, t),
@@ -512,7 +557,7 @@ function playerDetailTable(m, p) {
       textCell(String(g.round)),
       textCell(teamLink(m, opp.name)),
       textCell(resultLetter(mt, opp)),
-      textCell(gameLink(m, g, scoreOnly(mt, opp))),
+      textCell(gameLink(m, g, scoreOnly(g, mt, opp))),
       numCell((mp.tossupsHeard / g.tossupsRead).toFixed(1)),
       ...valCells(counts, m.vals),
       numCell(String(mp.tossupsHeard)),
@@ -540,7 +585,7 @@ function playerDetailHtml(m) {
     return an < bn ? -1 : an > bn ? 1 : 0;
   });
   return sorted.map((p) => [
-    `<h2 id="${alphaOnly(p.team)}-${alphaOnly(p.name)}">${esc(p.name)}, ${esc(p.team)}</h2>`,
+    tagWithAttrs('h2', [`id=${alphaOnly(p.team)}-${alphaOnly(p.name)}`], `${esc(p.name)}, ${esc(p.team)}`),
     playerDetailTable(m, p),
   ].join('\n')).join('\n');
 }
@@ -560,14 +605,18 @@ function roundReportHtml(m) {
     th(abbr('PPB', 'Points per bonus'), true, cw),
   ])];
 
+  // YF's round figures, as it computes them: every point over regulation
+  // tossups (negs likewise), powers and conversion over all tossups read,
+  // and every get — overtime's too — counted as a bonus heard.
   const roundTotals = (games) => {
-    const s = { games: games.length, tuh: 0, points: 0, powers: 0, gets: 0, negs: 0, bonusPts: 0, bonusesHeard: 0 };
+    const s = { games: games.length, tuh: 0, regTuh: 0, points: 0, powers: 0, gets: 0, negs: 0, bonusPts: 0, bonusesHeard: 0 };
     for (const g of games) {
       s.tuh += g.tossupsRead;
+      s.regTuh += g.tossupsRead - g.overtime.tossups;
       for (const mt of g.teams) {
         s.points += mt.points;
         s.bonusPts += mt.bonusPoints;
-        s.bonusesHeard += teamBonusesHeard(mt);
+        s.bonusesHeard += teamGets(mt);
         for (const [v, n] of Object.entries(teamCounts(mt))) {
           const val = Number(v);
           if (val > 10) s.powers += n;
@@ -581,10 +630,10 @@ function roundReportHtml(m) {
 
   const statCells = (s, cell) => [
     cell(String(s.games)),
-    cell(s.tuh ? ((REG_TUH * s.points) / s.tuh / 2).toFixed(1) : MDASH),
+    cell(s.regTuh ? ((REG_TUH * s.points) / s.regTuh / 2).toFixed(1) : MDASH),
     ...(m.hasPowers ? [cell(s.tuh ? `${((100 * s.powers) / s.tuh).toFixed(0)}%` : MDASH)] : []),
     cell(s.tuh ? `${((100 * s.gets) / s.tuh).toFixed(0)}%` : MDASH),
-    ...(m.hasNegs ? [cell(s.tuh ? ((REG_TUH * s.negs) / s.tuh / 2).toFixed(1) : MDASH)] : []),
+    ...(m.hasNegs ? [cell(s.regTuh ? ((REG_TUH * s.negs) / s.regTuh / 2).toFixed(1) : MDASH)] : []),
     cell(s.bonusesHeard ? (s.bonusPts / s.bonusesHeard).toFixed(2) : MDASH),
   ];
   const asNum = (text) => numCell(text);
@@ -621,6 +670,6 @@ export function buildReport(opts) {
   };
   return PAGES.map((p) => ({
     name: m.filePrefix + p.file,
-    text: htmlPage(m, p.heading, contents[p.file]),
+    text: htmlPage(m, p.heading, contents[p.file], p.file === 'rounds.html'),
   }));
 }
