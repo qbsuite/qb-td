@@ -305,6 +305,20 @@ function adminDeleteFile(id) {
   return { ok: true };
 }
 
+// Fixture games stay where they are, like deletes: only this browser's
+// uploads can change room.
+function adminMoveFile(id, body) {
+  if (id < FIRST_LOCAL_ID) err('not in the demo');
+  const roomName = fixture.rooms[Number(body && body.bucket_id) - 1];
+  if (!roomName) err('no such room');
+  const list = uploads();
+  const u = list.find((x) => x.id === id);
+  if (!u) err('no such file');
+  u.room = roomName;
+  saveUploads(list);
+  return { ok: true, room_name: roomName };
+}
+
 /* ---------- the pub() entry point ---------- */
 
 /** Handle one api.js pub() call. Same success values and thrown
@@ -347,6 +361,7 @@ export async function demoPub(path, opts = {}) {
     }
     const del = /^\/files\/(\d+)$/.exec(rest);
     if (del && method === 'DELETE') return adminDeleteFile(Number(del[1]));
+    if (del && method === 'POST') return adminMoveFile(Number(del[1]), opts.json);
     err('not in the demo'); // rooms/packets/roster/schedule edits, rotate
   }
 

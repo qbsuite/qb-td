@@ -188,9 +188,14 @@ async function fetchWholeBundle(errors) {
 async function fetchMatches(errors) {
   const entries = state.rounds ? await fetchRounds(errors) : await fetchWholeBundle(errors);
   loadedIds = new Set(entries.map((e) => e.id));
+  // A shard keeps the room a game had when it was built; the state's file
+  // list is read live, so a TD's room reassignment (or rename) shows here
+  // without the shard having to move.
+  const liveRoom = new Map((state.files || []).map((f) => [f.id, f.room]));
   const out = [];
   const raw = [];
   for (const entry of entries) {
+    if (liveRoom.get(entry.id)) entry.room = liveRoom.get(entry.id);
     try {
       const m = parseMatch(entry.qbj, { filename: entry.filename });
       m.room = entry.room;

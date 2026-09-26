@@ -1526,7 +1526,10 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
                 ? `<span class="pill warn link" data-goto="protdrawer">${plural(ps.open)} open</span>`
                 : `<span class="pill link" data-goto="protdrawer">${plural(ps.n)} &middot; ruled</span>`;
             return `<tr>
-              <td>${esc(room ? room.room_name : '#' + f.bucket_id)}</td>
+              <td><select data-movefile="${f.id}" title="Room this game came from">
+                ${room ? '' : `<option selected>#${f.bucket_id}</option>`}
+                ${buckets.map((b) => `<option value="${b.id}" ${b.id === f.bucket_id ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}
+              </select></td>
               <td class="brk">${esc(f.filename)}</td>
               <td>${f.kind}</td>
               <td class="num">${fmtBytes(f.size)}</td>
@@ -1699,6 +1702,16 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         await pub(a + '/files/' + b.dataset.delfile, { method: 'DELETE' });
         showDetail();
       } catch (e) { say(e.message, true); }
+    };
+  });
+  box.querySelectorAll('[data-movefile]').forEach((sel) => {
+    sel.onchange = async () => {
+      try {
+        const out = await pub(a + '/files/' + sel.dataset.movefile,
+          { method: 'POST', json: { bucket_id: Number(sel.value) } });
+        say('Moved to ' + out.room_name);
+        showDetail();
+      } catch (e) { say(e.message, true); showDetail(); }
     };
   });
   box.querySelectorAll('[data-editfile]').forEach((b) => {

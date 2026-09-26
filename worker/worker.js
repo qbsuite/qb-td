@@ -1721,6 +1721,59 @@ async function deleteFile(env, t, fileId) {
   return json(env, { ok: true });
 }
 
+// The TD reattributes an upload to another room (a moderator used the
+// wrong room's link). The stored blob stays where it is — its R2 path is
+// only a name — but everything that reports a room follows: the row, the
+// game's public copy, and the tiebreaker log's entries for that game.
+// A shard's stamp tracks ids, not rooms, so viewers holding one keep the
+// old room until it expires; the public page sidesteps that by taking
+// each game's room from /pub/:slug's live file list.
+async function moveFile(request, env, t, fileId) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const bucketId = Number(body.bucket_id);
+  if (!Number.isInteger(bucketId)) return err(env, 400, 'bucket_id required');
+  const [file, bucket] = await Promise.all([
+    env.DB.prepare(
+      'SELECT kind, error, round, summary, bucket_id FROM files WHERE id = ?1 AND tournament_id = ?2'
+    ).bind(fileId, t.id).all(),
+    env.DB.prepare(
+      'SELECT room_name FROM buckets WHERE id = ?1 AND tournament_id = ?2'
+    ).bind(bucketId, t.id).all(),
+  ]);
+  if (!file.results.length) return err(env, 404, 'no such file');
+  if (!bucket.results.length) return err(env, 404, 'no such room');
+  const f = file.results[0];
+  const roomName = bucket.results[0].room_name;
+  if (f.bucket_id === bucketId) return json(env, { ok: true });
+  await env.DB.prepare('UPDATE files SET bucket_id = ?2 WHERE id = ?1').bind(fileId, bucketId).run();
+
+  if ((f.kind === 'qbj' || f.kind === 'combined') && !f.error) {
+    const obj = await env.DATA.get(pubGameKey(t.id, fileId));
+    const entry = obj ? await obj.json().catch(() => null) : null;
+    if (entry) await putPubGame(env, t.id, { ...entry, room: roomName });
+    // Force the shards to be rebuilt: a set's pages label buzzes with the
+    // room held in them, and nothing else would rewrite them.
+    await env.DATA.put(rebuildKey(t.id), '{}', { httpMetadata: { contentType: 'application/json' } });
+    await markPub(env, t.id);
+  }
+  let teams = null;
+  try { teams = JSON.parse(f.summary || 'null').teams; } catch (e) { /* no summary */ }
+  if (f.kind === 'combined' && Array.isArray(teams) && teams.every(Boolean)) {
+    const pairKey = (ts) => [...ts].sort().join('\n');
+    // the log lives in the tournament's own blob, even on a set's mirror
+    const { cur } = await readTbPool(env, TB_KEY(t.id), t.ckey);
+    if (cur) {
+      await writeTbPool(env, TB_KEY(t.id), t.ckey, (pool) => {
+        for (const u of pool.uses) {
+          if (u.round === f.round && pairKey(u.teams || []) === pairKey(teams)) u.room = roomName;
+        }
+      });
+    }
+  }
+  return json(env, { ok: true, room_name: roomName });
+}
+
 // Escape hatch for drift: the dashboard re-posts the public copies of
 // games it fetched from the stored files, and the next tick rebuilds
 // every shard from them. The rebuild marker is what forces that —
@@ -3802,6 +3855,7 @@ export default {
       if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
       if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
       if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
+      if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'POST') return moveFile(request, env, t, Number(mm[1]));
       if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);
       if (sub === '/setpacket' && method === 'POST') return chooseSetPacket(request, env, t);
       if (sub === '/join' && method === 'POST') return joinSet(request, env, t);

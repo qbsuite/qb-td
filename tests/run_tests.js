@@ -2176,6 +2176,16 @@ const demoBucketA2 = await demoPub('/b/demo');
 await demoPub('/a/demo', { method: 'POST', json: { current_round: 8 } });
 const demoStateAdv = await demoPub('/pub/demo');
 const demoBucketAdv = await demoPub('/b/demo');
+// the TD moves a visitor upload to the other room; fixture games stay put
+const demoMoved = await demoPub('/a/demo/files/' + demoUp2.id,
+  { method: 'POST', json: { bucket_id: 2 } });
+const demoBucketBMoved = await demoPub('/b/demo-b');
+const demoAdminMoved = await demoPub('/a/demo');
+const demoStateMoved = await demoPub('/pub/demo');
+const demoMoveFixture = await demoPub('/a/demo/files/' + demoFixture.entries[0].id,
+  { method: 'POST', json: { bucket_id: 2 } }).catch((e) => e);
+const demoMoveNowhere = await demoPub('/a/demo/files/' + demoUp2.id,
+  { method: 'POST', json: { bucket_id: 99 } }).catch((e) => e);
 await demoPub('/a/demo/files/' + demoUp2.id, { method: 'DELETE' });
 const demoAdminAfter = await demoPub('/a/demo');
 demoReset();
@@ -2290,6 +2300,12 @@ test('demo flow: re-export dedupes, advance works, reset clears', () => {
   assert.equal(demoStateAdv.current_round, 8, 'advance persists');
   assert.deepEqual(demoStateAdv.packet_rounds, [1, 2, 3, 4, 5, 6, 7, 8]);
   assert.equal(demoBucketAdv.packets.length, 8, 'round 8 packet unlocked for mods');
+  assert.equal(demoMoved.room_name, demoFixture.rooms[1]);
+  assert.ok(demoBucketBMoved.uploads.some((u) => u.id === demoUp2.id), 'moved upload listed in room B');
+  assert.equal(demoAdminMoved.files.find((f) => f.id === demoUp2.id).bucket_id, 2);
+  assert.equal(demoStateMoved.files.find((f) => f.id === demoUp2.id).room, demoFixture.rooms[1]);
+  assert.ok(demoMoveFixture instanceof Error, 'fixture games cannot move');
+  assert.ok(demoMoveNowhere instanceof Error, 'unknown room rejected');
   assert.equal(demoAdminAfter.files.length, 14, 'delete removed one visitor upload');
   assert.equal(demoStateReset.current_round, 7, 'reset restores the live round');
   assert.equal(demoStateReset.files.length, 13, 'reset restores the fixture');

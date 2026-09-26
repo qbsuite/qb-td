@@ -62,7 +62,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   dialog, stored as overrides so it applies to every room — and
   admin-link rotation for leaks); stats + export with the buzzpoints
   control; and uploads grouped by round with a completeness pill per
-  group (current round open by default).
+  group (current round open by default) — each upload's room is a
+  dropdown, so a game sent from the wrong room's link can be moved to
+  the room it was actually played in.
 - **Tiebreakers**: a tiebreaker packet uploads once and is split into
   individually tracked questions (TU1, TU2, … B1, …), answerlines shown
   on the dashboard. In every room's MODAQ, **Actions → Add questions…**

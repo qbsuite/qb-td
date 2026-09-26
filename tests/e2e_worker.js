@@ -911,6 +911,68 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('empty rename rejected', r.status === 400, r.body);
 }
 
+// room reassignment: a moderator uploaded from the wrong room's link, and
+// the TD moves the game to the room it was actually played in. Everything
+// that names a room follows: both rooms' upload lists, the public file
+// list, the rebuilt round shard, and the tiebreaker log.
+{
+  r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 9' } });
+  const room9 = { id: r.body.id, secret: r.body.secret };
+  r = await call(`${A}/tiebreakers?name=tbmove.json`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tossups: [{ question: 'tb move', answer: 'Brahms' }] }) });
+  ok('tiebreaker pool for the move test', r.status === 200, r.body);
+  const q = JSON.parse(MATCH);
+  q._round = 6;
+  r = await call(`/b/${secret}/upload?round=6&name=Round_6_Alpha_Beta.qbtd.json`,
+    { method: 'POST', body: JSON.stringify({ qbj: q, game: { cycles: [] },
+      tb: { used: ['TU1'] } }) });
+  ok('game uploaded from the wrong room', r.status === 200 && r.body.error === null, r.body);
+  const mvId = r.body.id;
+  await tick();
+  r = await call('/pub/' + slug + '/rounds?n=6');
+  ok('shard names the uploading room first',
+    r.body.rounds[0].entries.find((e) => e.id === mvId).room === 'Room 1', r.body);
+  const stamp6 = (await call('/pub/' + slug)).body.rounds['6'];
+
+  r = await call(`${A}/files/${mvId}`, { method: 'POST', json: { bucket_id: room9.id } });
+  ok('file moved to another room', r.status === 200 && r.body.room_name === 'Room 9', r.body);
+  r = await call(A);
+  ok('moved file carries the new bucket',
+    r.body.files.find((f) => f.id === mvId).bucket_id === room9.id);
+  r = await call('/b/' + secret);
+  ok('old room no longer lists the game', !r.body.uploads.some((u) => u.id === mvId), r.body.uploads);
+  r = await call('/b/' + room9.secret);
+  ok('new room lists the game', r.body.uploads.some((u) => u.id === mvId), r.body.uploads);
+  r = await call('/pub/' + slug);
+  ok('public file list names the new room at once',
+    r.status === 200 && r.body.files.find((f) => f.id === mvId).room === 'Room 9', r.body.files);
+  r = await call('/b/' + secret + '/tiebreakers');
+  ok('tiebreaker log follows the game',
+    r.body.uses.length === 1 && r.body.uses[0].room === 'Room 9', r.body.uses);
+
+  await tick();
+  r = await call('/pub/' + slug);
+  ok('the move keeps the round stamp', r.body.rounds['6'] === stamp6, r.body.rounds);
+  r = await call('/pub/' + slug + '/rounds?n=6');
+  ok('rebuilt shard names the new room',
+    r.body.rounds[0].entries.find((e) => e.id === mvId).room === 'Room 9', r.body);
+
+  r = await call(`${A}/files/${mvId}`, { method: 'POST', json: { bucket_id: room9.id } });
+  ok('move to the same room is a no-op', r.status === 200, r.body);
+  r = await call(`${A}/files/${mvId}`, { method: 'POST', json: { bucket_id: 999999 } });
+  ok('move to unknown room 404', r.status === 404, r.body);
+  r = await call(`${A}/files/999999`, { method: 'POST', json: { bucket_id: room9.id } });
+  ok('move unknown file 404', r.status === 404, r.body);
+  r = await call(`${A}/files/${mvId}`, { method: 'POST', json: {} });
+  ok('move without a room rejected', r.status === 400, r.body);
+
+  await call(`${A}/files/${mvId}`, { method: 'DELETE' });
+  await call(`${A}/tiebreakers`, { method: 'DELETE' });
+  await call(`${A}/buckets/${room9.id}`, { method: 'DELETE' });
+  await tick();
+}
+
 // filenames longer than the 100-char storage cap keep their suffix, so kind
 // detection still sees "_Game.json" / ".qbj" (real MODAQ names with two long
 // team names overflow the cap)
