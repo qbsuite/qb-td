@@ -43,6 +43,13 @@ const buzzCls = (b) => b.value > 10 ? 'pow-t' : b.value > 0 ? 'ok' : b.value < 0
 /* The pieces, for callers that lay a question out themselves (the set
    page shows one question's plays grouped by wording): */
 
+/** A full answerline under its question — a tossup's or a bonus part's,
+    laid out the same way; a packet that already prefixes ANSWER: doesn't
+    get it twice. */
+function answerLineHtml(answer) {
+  return `<div class="q muted">ANSWER: ${sanitizeHtml(String(answer).replace(/^\s*ANSWER:\s*/i, ''))}</div>`;
+}
+
 /** A tossup's text with each buzz marked on its word, then the full
     answerline. `tu` = the packet's tossup, or null for no text. */
 export function tossupTextHtml(tu, buzzes) {
@@ -60,7 +67,7 @@ export function tossupTextHtml(tu, buzzes) {
     const cls = buzzWordClass(hits.map((h) => h.b));
     return `<span class="bw ${cls}">${w}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
   }).join(' ') + '</div>'
-    + `<div class="q muted">ANSWER: ${sanitizeHtml(tu.answer)}</div>`;
+    + answerLineHtml(tu.answer);
 }
 
 /** The numbered buzz list under a tossup's text. */
@@ -124,22 +131,24 @@ export function bonusMetaHtml(results) {
   return `${avg.toFixed(1)} avg &middot; ${conv.map((c) => c + '/' + heard).join(' ')}`;
 }
 
-/** A bonus's parts with their conversion, then each room's line. `bz` =
-    the packet's bonus, or null for no text. */
+/** A bonus's parts — each part's text, then its answerline the way a
+    tossup's sits under its text — with their conversion, then each room's
+    line. `bz` = the packet's bonus, or null for no text. */
 export function bonusBodyHtml(bz, results) {
   const heard = results.length;
-  const nParts = heard ? Math.max(...results.map((r) => r.parts.length)) : 0;
   const answers = bz && Array.isArray(bz.answers) ? bz.answers : [];
   const partsText = bz && Array.isArray(bz.parts) ? bz.parts : [];
+  // every part the packet has, even before any room has played it
+  const nParts = Math.max(0, ...results.map((r) => r.parts.length), partsText.length, answers.length);
   const rows = [];
   for (let p = 0; p < nParts; p++) {
     const c = results.filter((r) => r.parts[p] > 0).length;
     rows.push(`
-      <div class="q"><span class="${c ? 'ok' : 'bad'}">${c}/${heard}</span>
-        ${answers[p] ? `<b style="text-transform:none">${sanitizeHtml(answers[p])}</b>` : ''}
-        ${partsText[p] ? `<span class="muted">— ${sanitizeHtml(partsText[p])}</span>` : ''}</div>`);
+      <div class="q">${heard ? `<span class="${c ? 'ok' : 'bad'}">${c}/${heard}</span> ` : ''}${
+        partsText[p] ? sanitizeHtml(partsText[p]) : ''}</div>
+      ${answers[p] ? answerLineHtml(answers[p]) : ''}`);
   }
-  return `${bz && bz.leadin ? `<div class="q muted">${sanitizeHtml(bz.leadin)}</div>` : ''}
+  return `${bz && bz.leadin ? `<div class="q">${sanitizeHtml(bz.leadin)}</div>` : ''}
     ${rows.join('')}
     <div class="buzzlist">
       ${results.map((r) => `<div>

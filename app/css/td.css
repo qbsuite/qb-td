@@ -244,6 +244,8 @@ details.qd .qdmeta {
 }
 details.qd .qdmeta .ok, details.qd .qdmeta .bad, details.qd .qdmeta .pow-t { font-weight: 600; }
 details.qd .qdbody { padding: 6px 10px 4px; border-bottom: 1px solid var(--line); }
+/* a bonus sits indented under the tossup it was read with */
+details.qd.bonus summary, details.qd.bonus .qdbody { padding-left: 34px; }
 .buzzlist { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
 /* set page: one question's plays, grouped by the wording they heard */
 .revnote { font-size: 13px; color: var(--muted); margin: 4px 0 8px; max-width: 640px; }
