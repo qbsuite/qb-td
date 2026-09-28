@@ -31,6 +31,7 @@ import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   hasPlaceholders, poolStandings, fillPlaceholders, roundRooms } from '../engine/schedule.js';
 import { annLive, annTime } from './announce.js';
 import { buzzCredentials } from './buzzkey.js';
+import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
 
 const $ = (id) => document.getElementById(id);
@@ -142,16 +143,18 @@ function showList() {
     };
   });
   $('newbtn').onclick = async () => {
+    const run = busy($('newbtn'), { label: 'Creating' });
     try {
       const out = await pub('/api/tournaments', { method: 'POST', json: {
         name: $('newname').value, slug: $('newslug').value,
       } });
+      run.end();
       saveLink({ secret: out.admin_secret, slug: out.slug, name: out.name,
         closes: out.closes, created: Date.now() });
       showLinkModal(adminLink(out.admin_secret), out.closes, () => {
         location.href = adminLink(out.admin_secret);
       });
-    } catch (e) { say(e.message, true); }
+    } catch (e) { run.end(); say(e.message, true); }
   };
 }
 
@@ -196,7 +199,7 @@ async function showInvite() {
       <button id="invstart" class="primary">Create tournament</button>
     </div>`;
   $('invstart').onclick = async () => {
-    $('invstart').disabled = true;
+    const run = busy($('invstart'), { label: 'Creating' });
     try {
       const out = await pub('/i/' + inviteSecret, { method: 'POST', json: {
         name: $('invname').value, slug: $('invslug').value,
@@ -208,7 +211,7 @@ async function showInvite() {
       });
     } catch (e) {
       say(e.message, true);
-      $('invstart').disabled = false;
+      run.end();
     }
   };
 }
@@ -316,15 +319,17 @@ function setupSteps(t, buckets, rounds, settings) {
 }
 
 // Start: rooms begin serving packets, and every link closes 48 hours on.
-async function startTournament(a, t) {
+async function startTournament(a, t, btn) {
   const closes = new Date(Date.now() + 48 * 3600 * 1000).toLocaleString();
   if (!confirm('Start the tournament?\n\nRoom links start serving packets and taking games. '
     + `Your admin link and every room link stop working 48 hours from now, at ${closes}.`)) return;
+  const run = btn ? busy(btn, { label: 'Starting' }) : null;
   try {
     const out = await pub(a + '/start', { method: 'POST' });
     say('Tournament started. Links close ' + new Date(out.closes).toLocaleString());
     showDetail();
   } catch (e) { say(e.message, true); }
+  if (run) run.end();
 }
 
 function render() {
@@ -368,13 +373,15 @@ function render() {
   });
   $('rotate').onclick = async () => {
     if (!confirm('Mint a new admin link? The current link stops working.')) return;
+    const run = busy($('rotate'), { label: 'Making a new link' });
     try {
       const out = await pub(a + '/rotate', { method: 'POST' });
+      run.end();
       saveLink({ secret: out.admin_secret, slug: t.slug, name: t.name,
         closes: t.closes, created: t.created });
       history.replaceState(null, '', 'index.html?a=' + out.admin_secret);
       showLinkModal(adminLink(out.admin_secret), t.closes, () => location.reload());
-    } catch (e) { say(e.message, true); }
+    } catch (e) { run.end(); say(e.message, true); }
   };
   if (v === 'setup') renderSetup(a, t, buckets, rounds, files, settings, steps);
   else renderLive(a, t, buckets, rounds, files, settings, missing);
@@ -410,7 +417,7 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
   box.querySelectorAll('.step[data-step]').forEach((s) => {
     s.onclick = () => { setupTab = s.dataset.step; render(); };
   });
-  if ($('starttour')) $('starttour').onclick = () => startTournament(a, t);
+  if ($('starttour')) $('starttour').onclick = () => startTournament(a, t, $('starttour'));
   box.querySelectorAll('[data-tab]').forEach((b) => {
     b.onclick = () => { setupTab = b.dataset.tab; render(); };
   });
@@ -522,9 +529,11 @@ function renderStatsSec(a, t, settings) {
       // only ever sees what comes back (buzzkey.js). The derived token
       // rides along once so the Worker can wrap the content key for the
       // gated packet route — it is not stored on either side.
-      say('Setting password…');
-      const cred = await buzzCredentials(pw);
-      await saveSettings({ ...settings, buzz: cred.settings }, { buzz_token: cred.token });
+      const run = busy($('buzzset'), { label: 'Setting password', scope: box });
+      try {
+        const cred = await buzzCredentials(pw);
+        await saveSettings({ ...settings, buzz: cred.settings }, { buzz_token: cred.token });
+      } finally { run.end(); }
       say('Buzzpoints password set');
       showDetail();
     } catch (e) { say(e.message, true); }
@@ -573,13 +582,40 @@ function renderRoomsSec(a, t, buckets, files) {
     </div>`;
   $('mkrooms').onclick = async () => {
     const n = Math.max(1, Math.min(60, Number($('roomn').value) || 0));
+    const again = $('mkrooms').textContent.trim();
+    const run = busy($('mkrooms'), { label: 'Creating rooms', total: n, scope: box });
+    // each room's row appears as it's made; the redraw at the end fills in its links
+    const rowFor = (name) => {
+      let tbody = box.querySelector('table tbody') || box.querySelector('table');
+      if (!tbody) {
+        const holder = [...box.children].find((el) => el.classList && el.classList.contains('muted'));
+        const wrap = document.createElement('div');
+        wrap.className = 'tablewrap';
+        wrap.innerHTML = '<table><tr><th>Room</th><th>Links</th><th class="num">Files</th><th></th></tr></table>';
+        if (holder) holder.replaceWith(wrap); else box.querySelector('h2').after(wrap);
+        tbody = wrap.querySelector('table');
+      }
+      const tr = document.createElement('tr');
+      tr.className = 'fresh';
+      tr.innerHTML = `<td>${esc(name)}</td><td class="muted">Links ready in a moment</td><td class="num">0</td><td></td>`;
+      tbody.appendChild(tr);
+    };
+    let made = 0;
     try {
       for (let i = 0; i < n; i++) {
         await pub(a + '/buckets', { method: 'POST', json: { room_name: 'Room ' + (next + i) } });
+        made++;
+        rowFor('Room ' + (next + i));
+        run.step(made);
       }
       say(n + ' room' + (n === 1 ? '' : 's') + ' created');
-      showDetail();
-    } catch (e) { say(e.message, true); showDetail(); }
+    } catch (e) {
+      say(made
+        ? `Created ${made} of ${n} rooms. Room ${next + made} failed: ${e.message}. Press ${again} to make the other ${n - made}.`
+        : e.message, true);
+    }
+    run.end();
+    showDetail();
   };
   box.querySelectorAll('[data-roomrename]').forEach((inp) => {
     inp.onchange = async () => {
@@ -961,6 +997,7 @@ function renderRosterEditor(a, t) {
   $('rostersave').onclick = async () => {
     const clean = validated();
     if (!clean) return;
+    const run = busy($('rostersave'), { label: 'Saving' });
     try {
       await pub(`${a}/roster?name=roster.qbj`,
         { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, clean), null, 2) });
@@ -970,6 +1007,7 @@ function renderRosterEditor(a, t) {
       say('Roster saved');
       showDetail();
     } catch (e) { say('Roster: ' + e.message, true); }
+    run.end();
   };
 }
 
@@ -1083,6 +1121,7 @@ function renderSchedule(a, t, buckets, files) {
       } catch (e) { say(e.message, true); return; }
       // a generated schedule goes live right away — Save is only for
       // edits made after
+      const run = busy($('schedgen'), { label: 'Generating' });
       try {
         await pub(a + '/schedule', { method: 'POST', json: sched });
         schedDirty = false;
@@ -1091,6 +1130,7 @@ function renderSchedule(a, t, buckets, files) {
         schedDirty = true;
         say('Not saved: ' + e.message, true);
       }
+      run.end();
       render();
       return;
     };
@@ -1391,6 +1431,7 @@ function renderSchedule(a, t, buckets, files) {
     };
   }
   $('schedsave').onclick = async () => {
+    const run = busy($('schedsave'), { label: 'Saving' });
     try {
       // fill missing/stale room->bucket links by name so reader rooms
       // resolve their schedule line without hand-linking
@@ -1404,8 +1445,9 @@ function renderSchedule(a, t, buckets, files) {
       await pub(a + '/schedule', { method: 'POST', json: sched });
       schedDirty = false;
       say('Schedule saved');
+      run.end();
       rerender();
-    } catch (e) { say(e.message, true); }
+    } catch (e) { run.end(); say(e.message, true); }
   };
   $('schedregen').onclick = () => {
     if (!confirm('Start over? Unsaved edits are lost; the saved schedule stays until you save a new one.')) return;
@@ -1771,7 +1813,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     } catch (e) { say(e.message, true); }
   };
   if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
-  if ($('livestart')) $('livestart').onclick = () => startTournament(a, t);
+  if ($('livestart')) $('livestart').onclick = () => startTournament(a, t, $('livestart'));
   box.querySelectorAll('[data-delfile]').forEach((b) => {
     b.onclick = async () => {
       if (!confirm('Delete this file?')) return;
@@ -1901,8 +1943,8 @@ function autoAdvanceHtml(t, buckets, settings) {
     <div class="autoadv">
       <label class="row" style="align-items:flex-start;gap:10px">
         <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''} style="margin-top:4px">
-        <span><b>Open the next round automatically</b><br>
-          <span class="muted" style="font-size:13px">Opens the next round once every room with a game in the current round has started.</span></span>
+        <span><b>Advance rounds automatically</b><br>
+          <span class="muted" style="font-size:13px">Advance round once all rooms have started a game in the current round.</span></span>
       </label>
       <div class="muted" style="font-size:13px">Round ${t.current_round}: <b class="fg">${n} of ${playing.length}</b> rooms started${
         // everyone has started but nothing can open: say what it waits on
@@ -1977,7 +2019,8 @@ async function fetchOwnedJson(a, key) {
 
 // Every clean game file parsed, plus the roster: shared by Compute stats
 // and the schedule's fill-from-standings.
-async function collectMatches(a, t, buckets, files) {
+// onFile(done, total) after each game file, for the caller's progress.
+async function collectMatches(a, t, buckets, files, onFile = () => {}) {
   const qbjFiles = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error);
   const errors = [];
   let roster = null;
@@ -1988,7 +2031,9 @@ async function collectMatches(a, t, buckets, files) {
   const matches = [];
   const raw = [];   // qbj halves: the zip download + the served stats bundle
   const games = []; // game halves of combined uploads, for the zip only
+  let fetched = 0;
   for (const f of qbjFiles) {
+    onFile(fetched++, qbjFiles.length);
     try {
       // Combined reader uploads contribute only their qbj half downstream
       // (the game half carries the full packet text; the TO's zip gets it
@@ -2024,8 +2069,15 @@ async function collectMatches(a, t, buckets, files) {
 
 async function computeStats(a, t, buckets, files, settings) {
   const out = $('statsout');
-  out.innerHTML = '<div class="muted">Loading files…</div>';
-  const { roster, matches, raw, games, errors } = await collectMatches(a, t, buckets, files);
+  out.innerHTML = '';
+  // counts the games it fetches, one request each
+  const nGames = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error).length;
+  const run = busy($('calc'), { label: 'Computing stats', total: nGames, scope: $('calc').closest('.row') });
+  let got;
+  try {
+    got = await collectMatches(a, t, buckets, files, (done) => run.step(done));
+  } finally { run.end(); }
+  const { roster, matches, raw, games, errors } = got;
 
   if (!matches.length) {
     out.innerHTML = `<div class="bad">No readable game files</div>
@@ -2071,6 +2123,10 @@ async function computeStats(a, t, buckets, files, settings) {
   };
   $('dlzip').disabled = false;
   $('dlzip').onclick = async () => {
+    const run = busy($('dlzip'), { label: 'Building zip', scope: $('dlzip').closest('.row') });
+    try { await buildZip(); } finally { run.end(); }
+  };
+  const buildZip = async () => {
     // Every game as its separated files: match .qbj + MODAQ game file.
     // Files list newest-first, so first-wins dedupe keeps the latest
     // upload of a re-exported game (same name twice would break the zip).
@@ -2097,6 +2153,8 @@ async function computeStats(a, t, buckets, files, settings) {
   };
   $('rebuild').disabled = false;
   $('rebuild').onclick = async () => {
+    const batches = Math.ceil(raw.length / REBUILD_BATCH);
+    const run = busy($('rebuild'), { label: 'Rebuilding', total: batches, scope: $('rebuild').closest('.row') });
     try {
       const entries = raw.map((r) => ({
         id: r.id, round: r.round, room: r.room, filename: r.filename,
@@ -2111,10 +2169,11 @@ async function computeStats(a, t, buckets, files, settings) {
           method: 'POST', body: JSON.stringify({ entries: entries.slice(i, i + REBUILD_BATCH) }),
         });
         posted += res.entries;
-        say('Rebuilding stats data (' + posted + '/' + entries.length + ')');
+        run.step(i / REBUILD_BATCH + 1);
       }
       say('Stats data rebuilt (' + posted + ' games); the public page picks it up within a minute');
     } catch (e) { say(e.message, true); }
+    run.end();
   };
 }
 

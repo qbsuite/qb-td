@@ -163,6 +163,27 @@ a.chip:hover, button.chip:hover { color: var(--fg); text-decoration: none; box-s
 tr.catsub td { color: var(--muted); }
 tr.catsub td:first-child { padding-left: 28px; }
 tr.cattop td:first-child { font-weight: 600; }
+/* Loading (busy.js): the pressed button spins and counts; a thin bar
+   under its row fills as the steps land; a round chip being uploaded
+   spins in place of its dot */
+.spin {
+  width: 14px; height: 14px; border-radius: 99px; flex: none; display: inline-block;
+  border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+button.busy {
+  display: inline-flex; align-items: center; gap: 8px; color: var(--fg);
+  border-color: var(--pick-line); background: var(--hover-bg); font-variant-numeric: tabular-nums;
+}
+button.busy:disabled { color: var(--fg); }
+.busybar { height: 3px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 8px; }
+.busybar i { display: block; height: 100%; width: 0; background: var(--fg); transition: width .25s ease; }
+.chiprow .rchip.up { border-color: var(--fg); }
+.chiprow .rchip.up .dot { background: none; border: 2px solid var(--fg); border-right-color: transparent; animation: spin .7s linear infinite; }
+.chip.going { opacity: .45; }
+tr.fresh td { animation: arrive .6s ease; }
+@keyframes arrive { from { background: var(--pick); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .spin, .rchip.up .dot { animation-duration: 2s; } tr.fresh td { animation: none; } }
 /* Tournament Setup: what a tab is for, above its first section */
 .setupintro { max-width: 70ch; margin: 14px 0 0; }
 /* Live Hub: auto-advance switch and which rooms have started the round */

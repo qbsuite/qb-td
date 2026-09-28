@@ -236,7 +236,8 @@ function adminDetail() {
       name: fixture.name,
       current_round: currentRound(),
       published: 1,
-      settings: JSON.stringify(fixture.settings),
+      // a finished setup: the checklist's visit-only step counts as done
+      settings: JSON.stringify({ ...fixture.settings, statsSeen: true }),
       announce: '[]',
       rulings: local.getItem(RULINGS_KEY) || '{}',
       roster_r2_key: 't/1/roster.qbj',

@@ -9,6 +9,7 @@
 import { esc } from './api.js';
 import { guessRound } from '../engine/qbj.js';
 import { readZip } from '../engine/zip.js';
+import { busy } from './busy.js';
 
 function stripTags(s) { return String(s || '').replace(/<[^>]*>/g, ''); }
 
@@ -120,6 +121,7 @@ export function renderPacketsUi(box, o) {
   $('zipfile').onchange = async () => {
     const f = $('zipfile').files[0];
     if (!f) return;
+    const run = busy($('pickzip'), { label: 'Reading zip', scope: box });
     try {
       const entries = await readZip(new Uint8Array(await f.arrayBuffer()));
       const picked = entries
@@ -131,8 +133,9 @@ export function renderPacketsUi(box, o) {
       if (!picked.length) { o.say('No .json or .docx files in the zip', true); return; }
       staged.push(...picked);
       o.say(picked.length + ' packets staged');
+      run.end();
       o.rerender();
-    } catch (e) { o.say(e.message, true); }
+    } catch (e) { run.end(); o.say(e.message, true); }
   };
   $('pfiles').onchange = () => {
     if ($('pfiles').files.length) stageFiles([...$('pfiles').files]);
@@ -152,7 +155,10 @@ export function renderPacketsUi(box, o) {
   $('tbfile').onchange = async () => {
     const f = $('tbfile').files[0];
     if (!f) return;
-    if (await uploadTb(f.name, await f.arrayBuffer())) o.refresh();
+    const run = busy($('picktb'), { label: 'Splitting', scope: box });
+    const done = await uploadTb(f.name, await f.arrayBuffer());
+    run.end();
+    if (done) o.refresh();
   };
   if ($('tbclear')) {
     $('tbclear').onclick = async () => {
@@ -172,13 +178,38 @@ export function renderPacketsUi(box, o) {
       // whether it collides with an uploaded round or with a packet this
       // same pass just placed (Packet 1.json and Packet 1.docx)
       const occupied = new Set(rounds.map((r) => r.number));
+      const plan = [];
       for (const s of staged) {
         if (!s.guess || s.guess > slotCount || occupied.has(s.guess)) { remaining.push(s); continue; }
-        try { await o.uploadPacket(s, s.guess); placed++; occupied.add(s.guess); }
-        catch (e) { o.say(s.name + ': ' + e.message, true); remaining.push(s); }
+        plan.push(s);
+        occupied.add(s.guess);
       }
+      if (!plan.length) { o.say('No staged packet has a free round in its name: drag them onto rounds', true); return; }
+      // one upload at a time: the button counts, the round being uploaded
+      // spins, and it fills when the packet lands
+      const run = busy($('zipauto'), { label: 'Uploading packets', total: plan.length, scope: box });
+      const failed = [];
+      for (const s of plan) {
+        const slot = box.querySelector(`.slot[data-round="${s.guess}"]`);
+        const chip = box.querySelector(`[data-chip="${staged.indexOf(s)}"]`);
+        if (slot) slot.classList.add('up');
+        if (chip) chip.classList.add('going');
+        try {
+          await o.uploadPacket(s, s.guess);
+          placed++;
+          if (slot) { slot.classList.remove('up'); slot.classList.add('has'); }
+        } catch (e) {
+          failed.push(s.name + ': ' + e.message);
+          remaining.push(s);
+          if (slot) slot.classList.remove('up');
+          if (chip) chip.classList.remove('going');
+        }
+        run.step(placed + failed.length);
+      }
+      run.end();
       staged.splice(0, staged.length, ...remaining);
-      o.say(placed + ' assigned, ' + remaining.length + ' left to drag');
+      if (failed.length) o.say(`Uploaded ${placed} of ${plan.length}. ${failed.join('; ')}. The rest are still staged: press Assign by filename to try again.`, true);
+      else o.say(placed + ' assigned' + (remaining.length ? ', ' + remaining.length + ' left to drag' : ''));
       o.refresh();
     };
     $('zipclear').onclick = () => { staged.splice(0, staged.length); o.rerender(); };
@@ -194,11 +225,12 @@ export function renderPacketsUi(box, o) {
       slot.classList.remove('dragover');
       const s = droppedChip(e);
       if (!s) return;
+      slot.classList.add('up');
       try {
         await o.uploadPacket(s, Number(slot.dataset.round));
         unstage(s);
         o.refresh();
-      } catch (err) { o.say(err.message, true); }
+      } catch (err) { slot.classList.remove('up'); o.say(err.message, true); }
     };
   });
   const tbdrop = $('tbdrop');

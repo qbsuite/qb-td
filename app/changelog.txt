@@ -1,7 +1,7 @@
 Release Notes for 9/27/2026
 
 [ LIVE HUB ]
-- Added "Open the next round automatically": opens the next round once every room with a game in the current round has started.
+- Added "Advance rounds automatically": advances once all rooms have started a game in the current round.
 - Room chips show which rooms have started the current round.
 - "Advance to Round N" is always shown, and says when the next round has no packet yet.
 - Auto-advance says when it's waiting on the next round's packet.
@@ -32,11 +32,15 @@ Release Notes for 9/27/2026
 - Added By Category.
 
 [ UI ]
+- Slow actions show progress: the button spins and counts ("Creating rooms… 3 of 8") with a bar underneath.
 - New filter chips on the public and set pages.
 - Labels are now in Title Case.
 
 [ HUB ]
 - Tournaments can be removed from "Tournaments on this device". The tournament itself is kept.
+
+[ DEMO ]
+- Fixed the demo TD hub opening on Setup instead of the Live Hub.
 
 [ MISC ]
 - Added this changelog, linked from the tournament hub.
