@@ -218,6 +218,7 @@ async function showInvite() {
 
 let lastDetail = null;  // cached /a/:secret response for local re-renders
 let curView = null;     // 'setup' | 'live'; null = auto until the user picks
+let shownView = null;   // the view on screen right now
 let setupTab = 'rooms'; // active Tournament Setup sub-tab
 
 const staged = [];      // packets staged from a zip or loose files (packetsui.js)
@@ -266,12 +267,15 @@ function annAudience(a, buckets, published) {
 
 /* ---------- data fetch + top-level render ---------- */
 
-async function showDetail() {
+// `quiet`: a background refresh — a failed fetch keeps what's on screen
+// instead of replacing it with the error (a dropped connection, say).
+async function showDetail(quiet = false) {
   const a = '/a/' + adminSecret;
   let detail;
   try {
     detail = await pub(a);
   } catch (e) {
+    if (quiet && e.message !== 'tournament closed') return;
     if (e.message === 'tournament closed') {
       say('Tournament closed (links stop working 48 hours after Start, or 7 days after creation if it never started)', true);
     } else say(e.message, true);
@@ -333,6 +337,7 @@ function render() {
   const steps = setupSteps(t, buckets, rounds, settings);
   const missing = steps.filter((s) => !s[2]).map((s) => s[1]);
   const v = curView || (missing.length ? 'setup' : 'live');
+  shownView = v;
 
   view.innerHTML = `
     <div class="row">
@@ -1479,16 +1484,17 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       <span><span class="muted">Round</span> <span class="big">${t.current_round}</span> <span class="muted">of ${totalRounds}</span></span>
       ${rounds.length ? (rounds.some((r) => r.number === t.current_round)
         ? '<span class="ok">Packet up</span>' : '<span class="bad">No packet</span>') : ''}
-      ${intake.expected ? `<span><span class="${intake.got >= intake.expected ? 'ok' : 'bad'}">${intake.got}</span><span class="muted">/${intake.expected} games in</span></span>` : ''}
-      ${intake.missing.length ? `<span class="muted">Waiting: ${esc(intake.missing.join(', '))}</span>` : ''}
+      ${intake.expected ? `<span><span class="${intake.got >= intake.expected ? 'ok' : 'bad'}">${intake.got}</span><span class="muted">/${intake.expected} games uploaded</span></span>` : ''}
+      ${intake.missing.length ? `<span class="muted">Not uploaded yet: ${esc(intake.missing.join(', '))}</span>` : ''}
       ${tbTotal ? `<span class="pill ${tbUsed ? 'warn' : ''}">Tiebreakers: ${tbUsed} used &middot; ${tbTotal - tbUsed} unused</span>` : ''}
       ${prows.length ? `<span class="pill link ${popen.length ? 'warn' : ''}" data-goto="protdrawer">${
         popen.length ? `${popen.length} open protest${popen.length === 1 ? '' : 's'}` : 'Protests: none open'}</span>` : ''}
       <span class="spacer" style="flex:1"></span>
       <label>Round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
       <button id="setround">Set</button>
-      ${t.current_round < totalRounds
-        ? `<button id="advround" class="primary">Advance to Round ${t.current_round + 1}</button>` : ''}
+      <button id="advround" class="primary">Advance to Round ${t.current_round + 1}</button>
+      ${rounds.some((r) => r.number === t.current_round + 1) ? ''
+        : `<span class="muted" style="font-size:13px">No packet for Round ${t.current_round + 1} yet</span>`}
     </div>
     ${autoAdvanceHtml(t, buckets, settings)}
     ${renderProtests(prows, popen, openProt)}
@@ -1898,7 +1904,11 @@ function autoAdvanceHtml(t, buckets, settings) {
         <span><b>Open the next round automatically</b><br>
           <span class="muted" style="font-size:13px">Opens the next round once every room with a game in the current round has started.</span></span>
       </label>
-      <div class="muted" style="font-size:13px">Round ${t.current_round}: <b class="fg">${n} of ${playing.length}</b> rooms started</div>
+      <div class="muted" style="font-size:13px">Round ${t.current_round}: <b class="fg">${n} of ${playing.length}</b> rooms started${
+        // everyone has started but nothing can open: say what it waits on
+        settings.autoAdvance && playing.length && n === playing.length
+          && !lastDetail.rounds.some((r) => r.number === t.current_round + 1)
+          ? `. Round ${t.current_round + 1} opens as soon as its packet is uploaded.` : ''}</div>
       <div class="roomstarts">${rooms.map((r) => r.bye
         ? `<span class="roomstart bye" title="No game this round in the schedule"><span class="dot"></span>${esc(r.name)} &middot; bye</span>`
         : `<span class="roomstart${started.has(r.id) ? ' on' : ''}"><span class="dot"></span>${esc(r.name)}</span>`).join('')}</div>
@@ -2110,6 +2120,20 @@ async function computeStats(a, t, buckets, files, settings) {
 
 /* ---------- boot ---------- */
 
-if (adminSecret) showDetail();
-else if (inviteSecret) showInvite();
+if (adminSecret) {
+  showDetail();
+  // The Live Hub is watched through the day while rooms start, upload and
+  // move rounds on: refresh it every 30s while it's the visible tab, and at
+  // once on coming back to it — never mid-typing or under an open dialog,
+  // which a redraw would wipe.
+  const liveRefresh = () => {
+    if (document.visibilityState !== 'visible' || shownView !== 'live' || !lastDetail) return;
+    const el = document.activeElement;
+    if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+    if (!$('linkmodal').hidden) return;
+    showDetail(true);
+  };
+  setInterval(liveRefresh, 30000);
+  document.addEventListener('visibilitychange', liveRefresh);
+} else if (inviteSecret) showInvite();
 else showList();

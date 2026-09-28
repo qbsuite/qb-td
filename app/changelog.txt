@@ -3,6 +3,10 @@ Release Notes for 9/27/2026
 [ LIVE HUB ]
 - Added "Open the next round automatically": opens the next round once every room with a game in the current round has started.
 - Room chips show which rooms have started the current round.
+- "Advance to Round N" is always shown, and says when the next round has no packet yet.
+- Auto-advance says when it's waiting on the next round's packet.
+- The Live Hub refreshes on its own every 30 seconds and when you come back to the tab.
+- "Games in" now reads "games uploaded".
 
 [ SETUP ]
 - Tournaments now get 7 days of setup. Press Start tournament on the day; every link closes 48 hours after Start.
