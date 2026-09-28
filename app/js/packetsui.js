@@ -49,6 +49,7 @@ export function renderPacketsUi(box, o) {
     : [];
   const usesFor = (id) => ((pool && pool.uses) || []).filter((u) => u && u.q === id);
   box.innerHTML = `
+    ${o.intro ? `<p class="setupintro">${o.intro}</p>` : ''}
     <h2>Packets</h2>
     ${staged.length ? `
     <div class="row" style="margin-bottom:8px">
@@ -75,7 +76,7 @@ export function renderPacketsUi(box, o) {
       <label>${o.slotLabel || 'Rounds'} <input id="numrounds" type="number" min="1" max="999" value="${slotCount}" style="width:70px"></label>
       <button id="setrounds">Set</button>
     </div>
-    <div class="muted" style="font-size:13px;margin-top:6px">${o.packetsNote}</div>
+    ${o.packetsNote ? `<div class="muted" style="font-size:13px;margin-top:6px">${o.packetsNote}</div>` : ''}
     ${o.afterPackets || ''}
 
     <h2>${o.tbTitle || 'Tiebreakers'}</h2>

@@ -1144,8 +1144,9 @@ async function insertTournament(env, { slug, name, ip, settings, set }) {
   const rawKey = crypto.getRandomValues(new Uint8Array(32));
   try {
     const out = await env.DB.prepare(
-      'INSERT INTO tournaments (slug, name, admin_secret, admin_wrap, creator_ip, settings, created, set_id, set_key_enc) ' +
-      'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)'
+      // published = 1: the public page starts on (Stats settings turns it off)
+      'INSERT INTO tournaments (slug, name, admin_secret, admin_wrap, creator_ip, settings, created, set_id, set_key_enc, published) ' +
+      'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1)'
     ).bind(slug, name, await secretHash(adminSecret), await wrapKey(adminSecret, 'admin', rawKey),
       ip, JSON.stringify(settings || {}), created,
       set ? set.id : null, set ? await encField(rawKey, b64bytes(set.key)) : null).run();

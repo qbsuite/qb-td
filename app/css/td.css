@@ -163,6 +163,8 @@ a.chip:hover, button.chip:hover { color: var(--fg); text-decoration: none; box-s
 tr.catsub td { color: var(--muted); }
 tr.catsub td:first-child { padding-left: 28px; }
 tr.cattop td:first-child { font-weight: 600; }
+/* Tournament Setup: what a tab is for, above its first section */
+.setupintro { max-width: 70ch; margin: 14px 0 0; }
 /* Live Hub: auto-advance switch and which rooms have started the round */
 .autoadv { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 10px; display: grid; gap: 8px; }
 .autoadv .fg { color: var(--fg); }

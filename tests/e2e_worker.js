@@ -29,6 +29,8 @@ let r = await call('/a/abcdefghjkmnpqrstuvw');
 ok('bad admin link 404', r.status === 404);
 
 // create tournament: open, returns the admin secret + expiry
+// creation is capped per IP per day; earlier local runs must not use it up
+d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
 const slug = 'e2e-' + Math.random().toString(36).slice(2, 8);
 r = await call('/api/tournaments', { method: 'POST', json: { name: 'E2E Open', slug } });
 ok('create tournament', r.status === 200 && r.body.id > 0 && r.body.admin_secret.length >= 10, r.body);
@@ -198,6 +200,11 @@ r = await call('/b/' + secret + '/schedule');
 ok('bucket schedule falls back to name match', r.status === 200 && r.body.room === 0, r.body.room);
 r = await call(A + '/schedule', { method: 'POST', json: SCHED });
 ok('linked schedule restored', r.status === 200);
+// a new tournament starts public; turning the page off hides all of it
+r = await call('/pub/' + slug);
+ok('a new tournament starts public', r.status === 200, r.status);
+r = await call(A, { method: 'POST', json: { published: false } });
+ok('turn the public page off', r.status === 200);
 r = await call('/pub/' + slug + '/schedule');
 ok('unpublished schedule hidden', r.status === 404);
 

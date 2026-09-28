@@ -10,6 +10,9 @@ Release Notes for 9/27/2026
 - The setup checklist now covers MODAQ Settings and Stats settings.
 - Moved the buzzpoints switch and password to Stats settings.
 - Removed room reopening. Rooms now close with the tournament.
+- New tournaments start with the public page on.
+- Stats settings is checked once you've opened it.
+- Packets + Tiebreakers now says what to upload and how packets reach the rooms.
 
 [ READER ]
 - The scheduled matchup is locked in. Switching teams asks for confirmation.

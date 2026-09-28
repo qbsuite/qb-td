@@ -171,6 +171,9 @@ const tid = r.body.id;
 r = await call(A + '/start', { method: 'POST' });
 ok('start the mirror tournament', r.status === 200 && r.body.closes === r.body.started + 48 * 3600 * 1000, r.body);
 const mirrorStarted = r.body.started;
+// a mirror starts public like any tournament; this one's TD turns its page off
+ok('a mirror starts public', (await call(A)).body.tournament.published === 1);
+await call(A, { method: 'POST', json: { published: false } });
 
 r = await call('/i/' + invite, { method: 'POST', json: { name: 'again', slug: mirrorSlug + '-2' } });
 ok('an invite starts once', r.status === 409, r.body);

@@ -305,7 +305,7 @@ function setupSteps(t, buckets, rounds, settings) {
     ['modaq', 'MODAQ Settings', !!settings.gameFormat,
       settings.gameFormat ? (GAME_FORMAT_OPTIONS.find((o) => o.value === formatKey(settings)) || {}).label || 'Saved'
         : 'Not saved'],
-    ['stats', 'Stats settings', !!t.published,
+    ['stats', 'Stats settings', !!settings.statsSeen,
       (t.published ? 'Public' : 'Page off')
         + ((settings.buzz || {}).mode === 'password' ? ' · Buzzpoints on' : '')],
   ];
@@ -438,6 +438,14 @@ function renderModaqSec(a, t, settings) {
 
 function renderStatsSec(a, t, settings) {
   const box = $('setupsec');
+  // Opening this tab is the decision the checklist wants: the page starts
+  // public, so a TD who looks and leaves it on has chosen too.
+  if (!settings.statsSeen) {
+    // set here too, so a buzzpoints save below (which writes the whole
+    // settings object) can't undo it
+    settings = { ...settings, statsSeen: true };
+    pub(a, { method: 'POST', json: { settings } }).then(showDetail, () => {});
+  }
   const buzz = settings.buzz || {};
   const locked = !!(t.set && t.set.lock_buzz);
   box.innerHTML = `
@@ -463,9 +471,7 @@ function renderStatsSec(a, t, settings) {
       <input id="buzzpw" type="password" placeholder="Password" size="16" ${buzz.mode === 'password' ? '' : 'hidden'}>
       <button id="buzzset" ${buzz.mode === 'password' ? '' : 'hidden'}>Set password</button>
     </div>
-    <p class="muted" style="margin:6px 0 0">Shows each finished round's questions with where every room
-      buzzed, behind a password you give out. It reveals the packets, so turn it on only for a set that
-      won't be played again.</p>
+    <p class="muted" style="margin:6px 0 0">Updates buzzpoints (password-locked) when all games during a round finish.</p>
     ${locked ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
       <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
       played elsewhere, so the public page shows none, whatever is set here.</div>` : ''}`;
@@ -670,12 +676,13 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
     clearTb: () => pub(a + '/tiebreakers', { method: 'DELETE' }),
     pool: tbPool,
     showUses: true,
-    packetsNote: (t.set ? `The rounds of <b>${esc(t.set.name)}</b> are already here, and a fix its
+    intro: `Upload the packets and tiebreakers that will be used for the tournament, then assign
+      packets to round numbers. Moderator links will automatically load the packet that was assigned
+      to the round.`,
+    packetsNote: t.set ? `The rounds of <b>${esc(t.set.name)}</b> are already here, and a fix its
       editors upload reaches every round no room here has opened yet. A packet you
       upload yourself replaces that round for good — the set stops updating it, and its
-      games drop out of the set&rsquo;s category stats and buzzpoints. ` : '')
-      + `Upload a zip of the packets or upload individually. Then, link the
-      uploads to the corresponding round where they will be read.`,
+      games drop out of the set&rsquo;s category stats and buzzpoints.` : '',
     tbTitle: t.set ? 'Backup questions + tiebreakers' : 'Tiebreakers',
     tbNote: (t.set ? `The set&rsquo;s own backup questions are listed first, and its editors may add to them
       during the day; anything you upload here is added after them, for this tournament only, and Delete pool
