@@ -242,6 +242,7 @@ function adminDetail() {
       roster_r2_key: 't/1/roster.qbj',
       roster_name: 'roster.qbj',
       created,
+      started: created, // the demo is always mid-tournament
       closes: created + 48 * 3600 * 1000,
     },
     buckets: Object.entries(SECRETS).map(([secret, i]) => ({

@@ -191,6 +191,9 @@ for (let i = 0; i < ROOMS; i++) {
   rooms.push({ id: r.body.id, secret: r.body.secret, name: 'Room ' + (i + 1) });
 }
 step('create rooms', { made: rooms.length, wanted: ROOMS, p50: ms(pct(roomTimes, 0.5)), max: ms(Math.max(...roomTimes)) });
+// rooms serve nothing until the TD presses Start
+r = await call(A + '/start', { method: 'POST' });
+step('start', { status: r.status });
 
 const schedule = { v: 1, rooms: rooms.map((b) => ({ name: b.name, bucket: b.id })), phases: [{
   name: 'Prelims',

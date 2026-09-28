@@ -88,13 +88,15 @@ export function wireFormat(box, { settings: current, save, say, refresh, onToggl
     const ov = formatOverridesFrom(formatKey(settings), want);
     const bad = Object.keys(ov).filter((k) => !(k in cleanOverrides(ov)));
     if (bad.length) { say('Bad value: ' + bad.join(', '), true); return; }
-    const next = { ...settings };
+    // the preset is pinned too: saving is choosing a format, even the
+    // default one (the dashboard's setup checklist reads gameFormat)
+    const next = { ...settings, gameFormat: formatKey(settings) };
     if (Object.keys(ov).length) next.formatOverrides = ov;
     else delete next.formatOverrides;
     commit(next, 'Game format saved');
   };
   $('fmtreset').onclick = () => {
-    const next = { ...current() };
+    const next = { ...current(), gameFormat: formatKey(current()) };
     delete next.formatOverrides;
     commit(next, 'Game format reset');
   };

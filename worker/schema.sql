@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS tournaments (
   buzz_wrap TEXT,                    -- content key wrapped under the buzzpoints derived key
   creator_ip TEXT,                   -- creation rate limiting only
   current_round INTEGER NOT NULL DEFAULT 1,
+  -- When the TD pressed Start (worker.js closesAt): NULL during setup,
+  -- when the admin link lives SETUP_TTL from creation and room links
+  -- serve nothing; once set, every link closes RUN_TTL after it.
+  -- Existing databases get it from migrate-start.sql.
+  started INTEGER,
   published INTEGER NOT NULL DEFAULT 0,
   settings TEXT NOT NULL DEFAULT '{}', -- JSON: reader gameFormat etc.
   -- JSON array of live broadcasts (worker.js cleanAnnounce). Its own column,

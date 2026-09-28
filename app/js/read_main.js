@@ -33,6 +33,8 @@ import { Tossup } from 'modaq/src/state/PacketState.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
+// worker.js NOT_STARTED: every room route answers this until the TD presses Start
+const NOT_STARTED = "Tournament hasn't started";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -337,7 +339,8 @@ async function boot() {
   try {
     state = await pub('/b/' + secret);
   } catch (e) {
-    say(e.message === 'room closed' ? 'room closed' : e.message, true);
+    say(e.message === NOT_STARTED ? NOT_STARTED + '. Reload this page once the TD starts it.'
+      : e.message === 'room closed' ? 'room closed' : e.message, true);
     return;
   }
   setHeader(state.tournament, state.room, state.current_round, '');

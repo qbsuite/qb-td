@@ -4,12 +4,13 @@
 // No accounts anywhere. Three access levels, three route families, all
 // keyed by unguessable link secrets:
 //   /a/*    — the TO's admin API. The admin_secret minted at tournament
-//             creation is the only credential; it expires 48h after
-//             creation (ADMIN_TTL). Creation itself (POST
-//             /api/tournaments) is open, rate-limited per IP.
+//             creation is the only credential; it works for a week of
+//             setup, and 48h once the TD starts the tournament (closesAt).
+//             Creation itself (POST /api/tournaments) is open,
+//             rate-limited per IP.
 //   /b/*    — the moderator bucket API. The bucket secret in the URL is
 //             the credential. Grants upload + packet download for that
-//             one room only.
+//             one room only, once the tournament has started.
 //   /pub/*  — the public stats API. No auth, but only serves tournaments
 //             the TO has published, and only match qbj + roster blobs —
 //             never packets, never admin metadata, never secrets.
@@ -27,19 +28,23 @@
 // per-tournament key that only the link secrets can unwrap, and the
 // secrets themselves are stored hashed — see "question text encryption".
 
-// Admin and bucket links die 48h after their row's creation (question
-// security: a leaked link stops working soon after the tournament; a
-// forgotten one can't be phished later). Published stats stay up — the
-// publish flag, not the admin link, gates /pub.
-const ADMIN_TTL = 48 * 3600 * 1000;
-const BUCKET_TTL = 48 * 3600 * 1000;
-// A tournament's data is provably final once every write path is dead.
-// Rooms can only be created while the admin link lives (ADMIN_TTL), and a
-// room accepts uploads for BUCKET_TTL after its own creation, so the last
-// possible upload lands at created + ADMIN_TTL + BUCKET_TTL. From then on
-// /pub answers can be cached hard: the long tail of finished tournaments
-// costs one request per visitor, and a return visit costs none.
-const FINAL_TTL = ADMIN_TTL + BUCKET_TTL;
+// A tournament runs on two clocks. Setup: from creation the admin link
+// works for SETUP_TTL, long enough to build rooms, packets, roster and
+// schedule ahead of the day — but room links serve nothing yet, so no
+// packet can leave days early. Start: the TD presses Start, and from then
+// every link, the admin link and every room's alike, closes RUN_TTL later,
+// whatever the setup clock had left, earlier or later (closesAt). Links
+// dying is question security: a leaked link stops working soon after the
+// tournament, a forgotten one can't be phished later. Published stats
+// stay up — the publish flag, not the admin link, gates /pub.
+const SETUP_TTL = 7 * 24 * 3600 * 1000;
+const RUN_TTL = 48 * 3600 * 1000;
+// The latest any tournament can still be open: started at the last
+// moment of setup. Queries for "tournaments that might be open" use it.
+const MAX_LIFE = SETUP_TTL + RUN_TTL;
+function closesAt(t) {
+  return t.started ? t.started + RUN_TTL : t.created + SETUP_TTL;
+}
 // Live state may be re-served briefly to anything that caches it. The
 // public page deliberately revalidates past this (pubview.js) so its
 // refresh button can't no-op; the value is here for other /pub consumers
@@ -488,7 +493,7 @@ function cleanAnnounce(list, t) {
       rooms,
       created,
       // never past the tournament's own close
-      expires: Math.min(expires, t.created + ADMIN_TTL),
+      expires: Math.min(expires, closesAt(t)),
     });
   }
   const json = JSON.stringify(out);
@@ -1098,13 +1103,16 @@ async function getAdminTournament(env, secret) {
   return t;
 }
 function adminClosed(t) {
-  return Date.now() > t.created + ADMIN_TTL;
+  return Date.now() > closesAt(t);
 }
 
-// Past every write path's expiry (FINAL_TTL): the tournament's files,
-// schedule, roster and category map can never change again.
+// A tournament's data is provably final once every write path is dead,
+// and they all die together at closesAt: rooms share the admin link's
+// deadline. From then on /pub answers can be cached hard — the long tail
+// of finished tournaments costs one request per visitor, and a return
+// visit costs none.
 function tournamentFinal(t) {
-  return Date.now() > t.created + FINAL_TTL;
+  return Date.now() > closesAt(t);
 }
 // How long a /pub answer for this tournament stays good.
 function pubCache(t) {
@@ -1169,7 +1177,7 @@ async function createTournament(request, env) {
   if (!made) return err(env, 409, 'slug already taken');
   return json(env, {
     id: made.id, slug, name,
-    admin_secret: made.adminSecret, closes: made.created + ADMIN_TTL,
+    admin_secret: made.adminSecret, closes: made.created + SETUP_TTL,
   });
 }
 
@@ -1222,7 +1230,7 @@ async function getTournament(env, t, ctx) {
     // whether those editors have switched mirror buzzpoints off.
     // set_packets lets the TD put any of the set's packets on any round.
     tournament: {
-      ...pub_t, closes: t.created + ADMIN_TTL,
+      ...pub_t, closes: closesAt(t),
       set: sets.results[0] ? {
         slug: sets.results[0].slug, name: sets.results[0].name, published: sets.results[0].published,
         lock_buzz: mirrorBuzzLocked(sets.results[0].settings),
@@ -1324,24 +1332,27 @@ async function createBucket(request, env, t) {
   return json(env, { id: out.meta.last_row_id, room_name: roomName, secret });
 }
 
-// Give a room another BUCKET_TTL. A room's clock runs from its own
-// creation, so a tournament set up a day early can have every room expire
-// before the TD has finished with the day's games — and once a room is
-// shut there is no way to fix a game or add a missing one, because a
-// correction is an ordinary re-upload from the room that played it.
-//
-// Reopening cannot outlive the tournament: this route is behind the admin
-// gate, so now <= t.created + ADMIN_TTL, and the room therefore dies by
-// t.created + ADMIN_TTL + BUCKET_TTL — exactly FINAL_TTL, the same bound
-// a room created at the last possible moment already has.
-async function reopenBucket(env, t, bucketId) {
-  const { results } = await env.DB.prepare(
-    'SELECT id FROM buckets WHERE id = ?1 AND tournament_id = ?2'
-  ).bind(bucketId, t.id).all();
-  if (!results.length) return err(env, 404, 'no such room');
-  const created = Date.now();
-  await env.DB.prepare('UPDATE buckets SET created = ?1 WHERE id = ?2').bind(created, bucketId).run();
-  return json(env, { ok: true, closes: created + BUCKET_TTL });
+// Start the tournament: room links begin serving packets and taking
+// games, and every link closes RUN_TTL from now — replacing whatever the
+// setup clock had left. Once only; there is no un-start.
+async function startTournament(env, t) {
+  if (t.started) return err(env, 409, 'already started');
+  const started = Date.now();
+  const out = await env.DB.prepare(
+    'UPDATE tournaments SET started = ?2 WHERE id = ?1 AND started IS NULL'
+  ).bind(t.id, started).run();
+  if (!out.meta.changes) return err(env, 409, 'already started');
+  // broadcasts were capped at the setup deadline; the new one can be earlier
+  const { results } = await env.DB.prepare('SELECT announce FROM tournaments WHERE id = ?1').bind(t.id).all();
+  let list = [];
+  try { list = JSON.parse(results[0].announce) || []; } catch (e) { /* keep [] */ }
+  if (Array.isArray(list) && list.length) {
+    const closes = started + RUN_TTL;
+    await env.DB.prepare('UPDATE tournaments SET announce = ?2 WHERE id = ?1').bind(t.id,
+      JSON.stringify(list.map((a) => ({ ...a, expires: Math.min(Number(a.expires) || 0, closes) })))).run();
+  }
+  await markPub(env, t.id);
+  return json(env, { started, closes: started + RUN_TTL });
 }
 
 async function deleteBucket(env, t, bucketId) {
@@ -1866,8 +1877,8 @@ async function pubSchedule(env, slug) {
 // bucket state.
 async function bucketSchedule(env, secret) {
   const b = await getBucketRow(env, secret);
-  if (!b) return err(env, 404, 'bad link');
-  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
   const obj = await env.DATA.get(`t/${b.tournament_id}/schedule.json`);
   if (!obj) return err(env, 404, 'no schedule');
   let schedule;
@@ -2024,8 +2035,8 @@ async function adminTiebreakers(env, t) {
 // see which teams have already heard each question.
 async function bucketTiebreakers(env, secret) {
   const b = await getBucketRow(env, secret);
-  if (!b) return err(env, 404, 'bad link');
-  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
   const pool = await mergedTbPool(env, b, b.tournament_id, b.set_id);
   return pool ? json(env, pool) : err(env, 404, 'no tiebreakers');
 }
@@ -2063,7 +2074,8 @@ async function logTbUses(env, b, roomName, round, teams, usedIds) {
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, ' +
-    't.current_round, t.roster_r2_key, t.settings, t.announce, t.set_id, t.set_key_enc ' +
+    't.current_round, t.roster_r2_key, t.settings, t.announce, t.set_id, t.set_key_enc, ' +
+    't.created AS t_created, t.started ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2'
   ).bind(secret, await secretHash(secret)).all();
   const b = results[0] || null;
@@ -2071,16 +2083,28 @@ async function getBucketRow(env, secret) {
   return b;
 }
 
-// 410 keeps "expired" distinct from "never existed" so the mod's page can
-// say "room closed" instead of "bad link".
+// A room lives exactly as long as its tournament (closesAt). 410 keeps
+// "expired" distinct from "never existed" so the mod's page can say
+// "room closed" instead of "bad link".
 function bucketClosed(b) {
-  return Date.now() > b.created + BUCKET_TTL;
+  return Date.now() > closesAt({ created: b.t_created, started: b.started });
+}
+// Before Start a room link serves nothing at all — not the round's
+// packet, not the tiebreakers, not uploads — whatever the setup clock
+// says. The message is what the mod's page shows.
+const NOT_STARTED = "Tournament hasn't started";
+// The two gates every /b/ route passes, as one error response or null.
+function bucketGate(env, b) {
+  if (!b) return err(env, 404, 'bad link');
+  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  if (!b.started) return err(env, 403, NOT_STARTED);
+  return null;
 }
 
 async function bucketState(env, secret) {
   const b = await getBucketRow(env, secret);
-  if (!b) return err(env, 404, 'bad link');
-  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
   const [rounds, uploads, count] = await Promise.all([
     env.DB.prepare(
       'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
@@ -2103,7 +2127,7 @@ async function bucketState(env, secret) {
     tournament: b.tournament_name,
     room: b.room_name,
     current_round: b.current_round,
-    closes: b.created + BUCKET_TTL,
+    closes: closesAt({ created: b.t_created, started: b.started }),
     packet: packets.find((p) => p.number === b.current_round) || null,
     packets,
     roster: !!b.roster_r2_key,
@@ -2116,8 +2140,8 @@ async function bucketState(env, secret) {
 
 async function bucketUpload(request, url, env, secret) {
   const b = await getBucketRow(env, secret);
-  if (!b) return err(env, 404, 'bad link');
-  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
 
   const { results } = await env.DB.prepare(
     'SELECT COUNT(*) AS n FROM files WHERE bucket_id = ?1'
@@ -2184,8 +2208,8 @@ async function bucketUpload(request, url, env, secret) {
 
 async function bucketPacket(env, secret, url) {
   const b = await getBucketRow(env, secret);
-  if (!b) return err(env, 404, 'bad link');
-  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
   // Played rounds stay readable (a room running behind still needs them);
   // future rounds stay locked (question security).
   let round = Number(url.searchParams.get('round'));
@@ -2213,8 +2237,8 @@ async function bucketPacket(env, secret, url) {
 // the mod only picks teams. Same credential + lifetime rules as the packet.
 async function bucketRoster(env, secret) {
   const b = await getBucketRow(env, secret);
-  if (!b) return err(env, 404, 'bad link');
-  if (bucketClosed(b)) return err(env, 410, 'room closed');
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
   if (!b.roster_r2_key) return err(env, 404, 'no roster');
   const obj = await env.DATA.get(b.roster_r2_key);
   if (!obj) return err(env, 404, 'roster missing');
@@ -2229,8 +2253,8 @@ async function getPublishedTournament(env, slug) {
     // exists after migrate-pub.sql, and naming it here would break every
     // /pub route on a deploy that lands before the migration. With * the
     // column simply reads as undefined and `pub` stays null.
-    // (created rides along for tournamentFinal(): it decides how long
-    // public answers cache and whether the page keeps polling.)
+    // (created and started ride along for tournamentFinal(): they decide
+    // how long public answers cache.)
     // set_settings: see buzzConfig.
     'SELECT t.*, s.settings AS set_settings FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id ' +
     'WHERE t.slug = ?1 AND t.published = 1'
@@ -2676,8 +2700,8 @@ async function pubRoster(env, slug) {
    season. Nothing else changes clocks: an invite is NOT a tournament. It
    is a one-time, revocable credential the editor can mint weeks ahead.
    The TD either starts it when the event is close — which creates an
-   ordinary tournament on the ordinary 48h clocks (ADMIN_TTL, BUCKET_TTL,
-   FINAL_TTL), its rounds and reader game format already filled in — or
+   ordinary tournament on the ordinary clocks (a week of setup, 48h from
+   Start — closesAt), its rounds and reader game format already filled in — or
    uses it to join a tournament they have already made (joinSet).
 
    Packets, not rounds. The set numbers its PACKETS; which round a mirror
@@ -2809,7 +2833,7 @@ async function getSet(env, s, ctx) {
     env.DB.prepare(
       'SELECT m.id, m.name, m.slug, m.host, m.event_date, m.invite_enc, m.created, m.revoked, m.hidden, m.started, ' +
       'm.tournament_id, m.mirror_key_enc IS NOT NULL AS files, t.slug AS t_slug, t.name AS t_name, ' +
-      't.created AS t_created, t.current_round AS t_round, t.published AS t_published ' +
+      't.created AS t_created, t.started AS t_started, t.current_round AS t_round, t.published AS t_published ' +
       'FROM set_mirrors m LEFT JOIN tournaments t ON t.id = m.tournament_id WHERE m.set_id = ?1 ORDER BY m.id'
     ).bind(s.id).all(),
     env.DB.prepare(
@@ -2832,17 +2856,18 @@ async function getSet(env, s, ctx) {
     set: { ...pub_s, closes: s.created + SET_TTL },
     packets: packets.results,
     tiebreakers: !!tbHead,
-    mirrors: await Promise.all(mirrors.results.map(async ({ invite_enc, t_slug, t_name, t_created, t_round, t_published, ...m }) => ({
+    mirrors: await Promise.all(mirrors.results.map(async ({ invite_enc, t_slug, t_name, t_created, t_started, t_round, t_published, ...m }) => ({
       ...m,
       // an invite is only worth showing while it can still be used
       invite: !m.tournament_id && !m.revoked ? await decField(s.ckey, invite_enc) : null,
       tournament: m.tournament_id ? {
         id: m.tournament_id, slug: t_slug, name: t_name, created: t_created,
         current_round: t_round, published: !!t_published,
-        closes: t_created + ADMIN_TTL, games: gamesBy.get(m.tournament_id) || 0,
+        started: t_started || null, games: gamesBy.get(m.tournament_id) || 0,
         // until then its rooms can still upload — and a packet fix still
         // reaches its unplayed rounds (mirrorsOpenFor uses the same window)
-        final: t_created + FINAL_TTL,
+        closes: closesAt({ created: t_created, started: t_started }),
+        final: closesAt({ created: t_created, started: t_started }),
       } : null,
     }))),
   });
@@ -2978,20 +3003,23 @@ function versionCats(setCats, packet, version) {
 // the default a mirror would have started with.
 async function mirrorsOpenFor(env, sid, packet, offer) {
   const prefix = `${setPacketPrefix(sid)}${packet}/%`;
-  const since = Date.now() - FINAL_TTL;
+  const now = Date.now();
+  const since = now - MAX_LIFE; // an index-friendly pre-filter; openAt decides
+  const openAt = (n) => `(CASE WHEN t.started IS NULL THEN t.created + ${SETUP_TTL} ELSE t.started + ${RUN_TTL} END) > ?${n}`;
   const mirrors = '(SELECT tournament_id FROM set_mirrors WHERE set_id = ?1 AND tournament_id IS NOT NULL)';
   const played = "SELECT 1 FROM files f WHERE f.tournament_id = t.id AND f.kind IN ('qbj', 'combined') AND f.error IS NULL AND f.round = ";
   const { results: open } = await env.DB.prepare(
     'SELECT r.tournament_id AS tid, r.number AS round FROM rounds r JOIN tournaments t ON t.id = r.tournament_id ' +
-    `WHERE t.created > ?2 AND t.id IN ${mirrors} AND r.served = 0 AND r.packet_r2_key LIKE ?3 ` +
+    `WHERE t.created > ?2 AND ${openAt(4)} ` +
+    `AND t.id IN ${mirrors} AND r.served = 0 AND r.packet_r2_key LIKE ?3 ` +
     `AND NOT EXISTS (${played}r.number)`
-  ).bind(sid, since, prefix).all();
+  ).bind(sid, since, prefix, now).all();
   if (!offer) return open;
   const { results: fresh } = await env.DB.prepare(
-    `SELECT t.id AS tid, ?4 AS round FROM tournaments t WHERE t.created > ?2 AND t.id IN ${mirrors} ` +
+    `SELECT t.id AS tid, ?4 AS round FROM tournaments t WHERE t.created > ?2 AND ${openAt(5)} AND t.id IN ${mirrors} ` +
     'AND NOT EXISTS (SELECT 1 FROM rounds r WHERE r.tournament_id = t.id AND (r.number = ?4 OR r.packet_r2_key LIKE ?3)) ' +
     `AND NOT EXISTS (${played}?4)`
-  ).bind(sid, since, prefix, packet).all();
+  ).bind(sid, since, prefix, packet, now).all();
   return [...open, ...fresh];
 }
 
@@ -3444,7 +3472,7 @@ async function startInvite(request, env, secret) {
   await markSet(env, m.set_id);
   return json(env, {
     id: made.id, slug, name, admin_secret: made.adminSecret,
-    closes: made.created + ADMIN_TTL, set: m.set_name, rounds: linked.fill.length,
+    closes: made.created + SETUP_TTL, set: m.set_name, rounds: linked.fill.length,
   });
 }
 
@@ -3860,7 +3888,7 @@ export default {
       if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
-      if ((mm = sub.match(/^\/buckets\/(\d+)\/reopen$/)) && method === 'POST') return reopenBucket(env, t, Number(mm[1]));
+      if (sub === '/start' && method === 'POST') return startTournament(env, t);
       if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
       if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey);
       if (sub === '/tiebreakers' && method === 'DELETE') return deleteTiebreakers(env, TB_KEY(t.id));

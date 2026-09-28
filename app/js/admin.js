@@ -25,7 +25,7 @@ import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
-import { effectiveFormat, metaKey, gameKey, storeIntact } from './read_core.js';
+import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
   hasPlaceholders, poolStandings, fillPlaceholders } from '../engine/schedule.js';
@@ -136,10 +136,9 @@ function showList() {
 }
 
 /* ---------- starting a mirror from an invite ----------
-   The invite is not the tournament: nothing exists, and no clock runs,
-   until the TD presses Start. So the page says exactly that — an editor
-   sends these out weeks ahead, and a TD who starts one on the spot has
-   spent their 48 hours before the event. */
+   The invite is not the tournament: nothing exists until the TD creates
+   it here, and then it is an ordinary tournament — a week of setup, and
+   48 hours from the moment its TD presses Start. */
 
 async function showInvite() {
   let inv;
@@ -166,15 +165,15 @@ async function showInvite() {
         reads which packet stays up to you. Everything the rooms upload here, results and
         game files (MODAQ&rsquo;s included), is shared with the set&rsquo;s editors for set-wide stats.</div>
     </div>
-    <p style="margin:12px 0"><b>Starting creates the tournament and starts its 48-hour clock</b> —
-      the admin link, and every room link made from it, stops working 48 hours after you press
-      Start. Start within a day of the event, not when the invite arrives. It can be used once.
-      Already made your tournament? Don&rsquo;t start a second one: open it, and paste this page&rsquo;s link
+    <p style="margin:12px 0"><b>Creating the tournament gives you a week to set it up.</b>
+      The 48-hour clock only starts when you press <b>Start tournament</b> in its setup, on the day;
+      until then room links show &ldquo;Tournament hasn&rsquo;t started&rdquo;. This invite can be used once.
+      Already made your tournament? Don&rsquo;t create a second one: open it, and paste this page&rsquo;s link
       under Tournament Setup &rarr; Packets &rarr; Join a set.</p>
     <div class="row">
       <input id="invname" placeholder="Name" size="24" value="${esc(inv.name)}">
       <input id="invslug" placeholder="Slug (public URL)" size="18" value="${esc(inv.slug || '')}">
-      <button id="invstart" class="primary">Start tournament</button>
+      <button id="invstart" class="primary">Create tournament</button>
     </div>`;
   $('invstart').onclick = async () => {
     $('invstart').disabled = true;
@@ -254,7 +253,7 @@ async function showDetail() {
     detail = await pub(a);
   } catch (e) {
     if (e.message === 'tournament closed') {
-      say('Tournament closed (admin links stop working 48 hours after creation)', true);
+      say('Tournament closed (links stop working 48 hours after Start, or 7 days after creation if it never started)', true);
     } else say(e.message, true);
     view.innerHTML = `<div class="row"><a href="index.html">All tournaments</a></div>`;
     return;
@@ -282,7 +281,26 @@ function setupSteps(t, buckets, rounds, settings) {
       rounds.length + '/' + totalRounds + ' rounds'],
     ['roster', 'Roster', !!t.roster_name, t.roster_name ? 'Saved' : 'None yet'],
     ['sched', 'Schedule', !!sched, sched ? 'Saved' : 'None yet'],
+    // a format the TD (or the set) chose; the preset alone is just a default
+    ['modaq', 'MODAQ Settings', !!settings.gameFormat,
+      settings.gameFormat ? (GAME_FORMAT_OPTIONS.find((o) => o.value === formatKey(settings)) || {}).label || 'Saved'
+        : 'Not saved'],
+    ['stats', 'Stats settings', !!t.published,
+      (t.published ? 'Public' : 'Page off')
+        + ((settings.buzz || {}).mode === 'password' ? ' · Buzzpoints on' : '')],
   ];
+}
+
+// Start: rooms begin serving packets, and every link closes 48 hours on.
+async function startTournament(a, t) {
+  const closes = new Date(Date.now() + 48 * 3600 * 1000).toLocaleString();
+  if (!confirm('Start the tournament?\n\nRoom links start serving packets and taking games. '
+    + `Your admin link and every room link stop working 48 hours from now, at ${closes}.`)) return;
+  try {
+    const out = await pub(a + '/start', { method: 'POST' });
+    say('Tournament started. Links close ' + new Date(out.closes).toLocaleString());
+    showDetail();
+  } catch (e) { say(e.message, true); }
 }
 
 function render() {
@@ -307,7 +325,9 @@ function render() {
       <b style="font-size:18px">${esc(t.name)}</b>
       <span class="mono muted">${esc(t.slug)}</span>
       <span class="spacer" style="flex:1"></span>
-      <span class="muted">Admin link open until ${new Date(t.closes).toLocaleString()}</span>
+      <span class="muted">${t.started
+        ? `Started &middot; links close ${new Date(t.closes).toLocaleString()}`
+        : `Setup open until ${new Date(t.closes).toLocaleString()}`}</span>
       <button id="rotate" class="small">New admin link</button>
     </div>
     ${t.set ? `<div class="muted" style="font-size:13px;margin-top:4px">Mirror of <b>${esc(t.set.name)}</b>${
@@ -347,7 +367,14 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
         <span class="mark">${done ? '&#10003;' : '&#9675;'}</span>
         ${label} <span class="muted">${esc(detail)}</span>
       </span>`).join('')}
+      ${t.started
+        ? `<span class="step done started"><span class="mark">&#10003;</span> Started
+            <span class="muted">closes ${esc(new Date(t.closes).toLocaleString())}</span></span>`
+        : '<button id="starttour" class="primary">Start tournament</button>'}
     </div>
+    ${t.started ? '' : `<p class="muted" style="font-size:13px;margin:4px 0 0">Room links show
+      &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start. From then, your admin link and
+      every room link work for 48 hours. Setup stays open until ${esc(new Date(t.closes).toLocaleString())}.</p>`}
     <div class="tabs">
       ${[['rooms', 'Rooms'], ['packets', 'Packets + Tiebreakers'],
         ['roster', 'Roster'], ['sched', 'Schedule'],
@@ -355,9 +382,10 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
       <button class="tab ${setupTab === key ? 'active' : ''}" data-tab="${key}">${label}</button>`).join('')}
     </div>
     <div id="setupsec"></div>`;
-  box.querySelectorAll('.step').forEach((s) => {
+  box.querySelectorAll('.step[data-step]').forEach((s) => {
     s.onclick = () => { setupTab = s.dataset.step; render(); };
   });
+  if ($('starttour')) $('starttour').onclick = () => startTournament(a, t);
   box.querySelectorAll('[data-tab]').forEach((b) => {
     b.onclick = () => { setupTab = b.dataset.tab; render(); };
   });
@@ -365,7 +393,7 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
   else if (setupTab === 'packets') renderPacketsSec(a, t, buckets, rounds, settings);
   else if (setupTab === 'roster') renderRosterSec(a, t);
   else if (setupTab === 'modaq') renderModaqSec(a, t, settings);
-  else if (setupTab === 'stats') renderStatsSec(a, t);
+  else if (setupTab === 'stats') renderStatsSec(a, t, settings);
   else renderScheduleSec(a, t, buckets, files);
 }
 
@@ -388,9 +416,12 @@ function renderModaqSec(a, t, settings) {
 
 /* ---------- Stats settings: what the public stats page shows ---------- */
 
-function renderStatsSec(a, t) {
+function renderStatsSec(a, t, settings) {
   const box = $('setupsec');
+  const buzz = settings.buzz || {};
+  const locked = !!(t.set && t.set.lock_buzz);
   box.innerHTML = `
+    <h2>Public page</h2>
     <div class="row" style="margin-bottom:6px">
       <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Public page</label>
     </div>
@@ -399,11 +430,71 @@ function renderStatsSec(a, t) {
     <div class="row" style="margin-top:10px">
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
       <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy</button>
-    </div>`;
+    </div>
+    <h2>Buzzpoints</h2>
+    <div class="row">
+      <label class="row">Buzzpoints
+        <select id="buzzmode" ${locked ? 'disabled' : ''}>
+          <option value="">Off</option>
+          <option value="password" ${buzz.mode === 'password' ? 'selected' : ''}>On (password)</option>
+        </select>
+      </label>
+      ${buzz.hash ? '<span class="pill on">Password set</span>' : ''}
+      <input id="buzzpw" type="password" placeholder="Password" size="16" ${buzz.mode === 'password' ? '' : 'hidden'}>
+      <button id="buzzset" ${buzz.mode === 'password' ? '' : 'hidden'}>Set password</button>
+    </div>
+    <p class="muted" style="margin:6px 0 0">Shows each finished round's questions with where every room
+      buzzed, behind a password you give out. It reveals the packets, so turn it on only for a set that
+      won't be played again.</p>
+    ${locked ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
+      <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
+      played elsewhere, so the public page shows none, whatever is set here.</div>` : ''}`;
   $('pub').onchange = async () => {
     try {
       await pub(a, { method: 'POST', json: { published: $('pub').checked } });
       say($('pub').checked ? 'Public page on' : 'Public page off');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+  const saveSettings = async (next, extra) => {
+    await pub(a, { method: 'POST', json: { settings: next, ...extra } });
+    settings = next;
+  };
+  $('buzzmode').onchange = async () => {
+    const mode = $('buzzmode').value;
+    try {
+      const next = { ...settings };
+      if (!mode) delete next.buzz;
+      else {
+        // keep an existing password; otherwise wait for one to be set.
+        // Spread it whole: dropping kdf/iters here would silently demote a
+        // stretched password to the legacy scheme.
+        if (settings.buzz && settings.buzz.hash) {
+          next.buzz = { ...settings.buzz, mode: 'password' };
+        } else {
+          $('buzzpw').hidden = false;
+          $('buzzset').hidden = false;
+          say('Set a password');
+          return;
+        }
+      }
+      await saveSettings(next);
+      say(mode ? 'Buzzpoints on' : 'Buzzpoints off');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
+  $('buzzset').onclick = async () => {
+    const pw = $('buzzpw').value;
+    if (!pw) { say('Enter a password', true); return; }
+    try {
+      // PBKDF2 at 600k iterations takes about a second here; the Worker
+      // only ever sees what comes back (buzzkey.js). The derived token
+      // rides along once so the Worker can wrap the content key for the
+      // gated packet route — it is not stored on either side.
+      say('Setting password…');
+      const cred = await buzzCredentials(pw);
+      await saveSettings({ ...settings, buzz: cred.settings }, { buzz_token: cred.token });
+      say('Buzzpoints password set');
       showDetail();
     } catch (e) { say(e.message, true); }
   };
@@ -426,10 +517,8 @@ function renderRoomsSec(a, t, buckets, files) {
   box.innerHTML = `
     <h2>Rooms</h2>
     ${buckets.length ? `<div class="tablewrap"><table>
-      <tr><th>Room</th><th>Links</th><th class="num">Files</th><th>Closes</th><th></th></tr>
+      <tr><th>Room</th><th>Links</th><th class="num">Files</th><th></th></tr>
       ${buckets.map((b) => {
-        const closes = b.created + BUCKET_TTL;
-        const open = !roomClosed(b);
         return `<tr>
           <td><input data-roomrename="${b.id}" value="${esc(b.room_name)}" size="16"></td>
           <td><a href="${esc(readLink(b.secret))}" target="_blank">Reader</a>
@@ -437,14 +526,14 @@ function renderRoomsSec(a, t, buckets, files) {
             &nbsp;<a href="${esc(bucketLink(b.secret))}" target="_blank">Bucket</a>
             <button class="small" onclick="qtd.copy('${esc(bucketLink(b.secret))}', '${esc(b.room_name)} link')">Copy</button></td>
           <td class="num">${files.filter((f) => f.bucket_id === b.id).length}</td>
-          <td>${open
-            ? `<span class="muted">${new Date(closes).toLocaleString()}</span>`
-            : '<span class="pill">Closed</span>'}</td>
-          <td class="row">${open ? '' : `<button class="small" data-reopen="${b.id}" title="Give this room another 48 hours so it can take uploads again">Reopen</button>`}
-            <button class="small" data-delbucket="${b.id}">Remove</button></td>
+          <td class="row"><button class="small" data-delbucket="${b.id}">Remove</button></td>
         </tr>`;
       }).join('')}
-    </table></div>` : '<div class="muted">No rooms yet</div>'}
+    </table></div>
+    <p class="muted" style="font-size:13px;margin:6px 0 0">${t.started
+      ? `Room links work until ${esc(new Date(t.closes).toLocaleString())}, when the tournament closes.`
+      : 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament.'}</p>`
+    : '<div class="muted">No rooms yet</div>'}
     <div class="row" style="margin-top:10px">
       <label>${buckets.length ? 'Add' : 'Create'}
         <input id="roomn" type="number" min="1" max="60" value="${buckets.length ? 2 : 8}" style="width:64px">
@@ -478,15 +567,6 @@ function renderRoomsSec(a, t, buckets, files) {
       if (!confirm('Remove this room? Its link stops working. Uploaded files stay.')) return;
       try {
         await pub(a + '/buckets/' + b.dataset.delbucket, { method: 'DELETE' });
-        showDetail();
-      } catch (e) { say(e.message, true); }
-    };
-  });
-  box.querySelectorAll('[data-reopen]').forEach((b) => {
-    b.onclick = async () => {
-      try {
-        await pub(`${a}/buckets/${b.dataset.reopen}/reopen`, { method: 'POST' });
-        say('Room reopened for 48 hours');
         showDetail();
       } catch (e) { say(e.message, true); }
     };
@@ -1354,6 +1434,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const openProt = protOpen === null ? !!popen.length : protOpen;
 
   box.innerHTML = `
+    ${t.started ? '' : `
+    <div class="banner">
+      <span class="bad" style="font-weight:600">Not started</span>
+      <span class="muted">Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you start it.</span>
+      <span class="spacer" style="flex:1"></span>
+      <button id="livestart" class="primary">Start tournament</button>
+    </div>`}
     ${missing.length ? `
     <div class="banner">
       <span class="bad" style="font-weight:600">Tournament setup incomplete</span>
@@ -1443,21 +1530,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       <button id="dlreport" disabled>Download stat report</button>
       <button id="dlzip" disabled>Download QBJ bundle</button>
       <button id="rebuild" disabled>Rebuild stats data</button>
-      <span class="spacer" style="flex:1"></span>
-      <label class="row">Buzzpoints
-        <select id="buzzmode" ${t.set && t.set.lock_buzz ? 'disabled' : ''}>
-          <option value="">Off</option>
-          <option value="password" ${(settings.buzz || {}).mode === 'password' ? 'selected' : ''}>On (password)</option>
-        </select>
-      </label>
-      ${(settings.buzz || {}).hash ? '<span class="pill on">Password set</span>' : ''}
-      <input id="buzzpw" type="password" placeholder="Password" size="16"
-        ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>
-      <button id="buzzset" ${(settings.buzz || {}).mode === 'password' ? '' : 'hidden'}>Set password</button>
     </div>
-    ${t.set && t.set.lock_buzz ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
-      <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
-      played elsewhere, so this page shows none, whatever is set here.</div>` : ''}
     <!-- The two YellowFruits share an extension and nothing else, and
          neither says so when handed the other's file: YellowFruit 4
          refuses a file stamped newer than itself, and YellowFruit 3 throws
@@ -1486,7 +1559,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         <span class="muted">for a room that never turned one in</span></summary>
       <div class="row" style="padding:8px 10px">
         <label>Room <select id="addroom">${buckets.map((b) =>
-          `<option value="${b.id}">${esc(b.room_name)}${roomClosed(b) ? ' (closed)' : ''}</option>`).join('')}</select></label>
+          `<option value="${b.id}">${esc(b.room_name)}</option>`).join('')}</select></label>
         <label>Round <input id="addround" type="number" min="1" max="999"
           value="${t.current_round}" style="width:64px"></label>
         <input id="addfile" type="file" accept=".json,.qbj">
@@ -1653,48 +1726,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   };
   $('setround').onclick = () => goToRound(Number($('curround').value));
   if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
-  const saveSettings = async (next, extra) => {
-    await pub(a, { method: 'POST', json: { settings: next, ...extra } });
-    settings = next;
-  };
-  $('buzzmode').onchange = async () => {
-    const mode = $('buzzmode').value;
-    try {
-      const next = { ...settings };
-      if (!mode) delete next.buzz;
-      else {
-        // keep an existing password; otherwise wait for one to be set.
-        // Spread it whole: dropping kdf/iters here would silently demote a
-        // stretched password to the legacy scheme.
-        if (settings.buzz && settings.buzz.hash) {
-          next.buzz = { ...settings.buzz, mode: 'password' };
-        } else {
-          $('buzzpw').hidden = false;
-          $('buzzset').hidden = false;
-          say('Set a password');
-          return;
-        }
-      }
-      await saveSettings(next);
-      say(mode ? 'Buzzpoints on' : 'Buzzpoints off');
-      showDetail();
-    } catch (e) { say(e.message, true); }
-  };
-  $('buzzset').onclick = async () => {
-    const pw = $('buzzpw').value;
-    if (!pw) { say('Enter a password', true); return; }
-    try {
-      // PBKDF2 at 600k iterations takes about a second here; the Worker
-      // only ever sees what comes back (buzzkey.js). The derived token
-      // rides along once so the Worker can wrap the content key for the
-      // gated packet route — it is not stored on either side.
-      say('Setting password…');
-      const cred = await buzzCredentials(pw);
-      await saveSettings({ ...settings, buzz: cred.settings }, { buzz_token: cred.token });
-      say('Buzzpoints password set');
-      showDetail();
-    } catch (e) { say(e.message, true); }
-  };
+  if ($('livestart')) $('livestart').onclick = () => startTournament(a, t);
   box.querySelectorAll('[data-delfile]').forEach((b) => {
     b.onclick = async () => {
       if (!confirm('Delete this file?')) return;
@@ -1745,9 +1777,10 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
    mis-stamp a set mirror's buzzpoints and skew which rounds read as
    finished. */
 
-// worker.js BUCKET_TTL: a room takes uploads for 48h from its own creation.
-const BUCKET_TTL = 48 * 3600 * 1000;
-const roomClosed = (b) => Date.now() > b.created + BUCKET_TTL;
+// Rooms take games only once the tournament has started (worker.js
+// bucketGate), and close with it, so a correction needs a started one.
+const notStarted = () => !(lastDetail && lastDetail.tournament.started);
+const START_FIRST = 'Start the tournament first: rooms take games only once it has started';
 
 async function editGame(a, buckets, files, fileId) {
   const f = files.find((x) => x.id === fileId);
@@ -1755,13 +1788,8 @@ async function editGame(a, buckets, files, fileId) {
   const sum = f && fileSummary(f);
   if (!f || !room || !sum) { say('That game cannot be edited', true); return; }
 
+  if (notStarted()) { say(START_FIRST, true); return; }
   try {
-    // The room has to be open: the correction is an upload like any other.
-    if (roomClosed(room)) {
-      if (!confirm(`${room.room_name} is closed, so it cannot accept the correction.\n\n`
-        + 'Reopen it for another 48 hours?')) return;
-      await pub(`${a}/buckets/${room.id}/reopen`, { method: 'POST' });
-    }
     say('Loading the game…');
     // The MODAQ half of the stored upload, decrypted by the Worker under
     // the admin link's key — the same download the "game" link offers.
@@ -1796,8 +1824,8 @@ async function addGame(a, buckets) {
   if (!room) { say('Pick a room', true); return; }
   if (!Number.isInteger(round) || round < 1) { say('Pick a round', true); return; }
   if (!file) { say('Choose a file', true); return; }
+  if (notStarted()) { say(START_FIRST, true); return; }
   try {
-    if (roomClosed(room)) await pub(`${a}/buckets/${room.id}/reopen`, { method: 'POST' });
     say('Uploading…');
     const out = await pub(
       `/b/${room.secret}/upload?round=${round}&name=${encodeURIComponent(file.name)}`,

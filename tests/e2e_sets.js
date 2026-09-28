@@ -163,10 +163,14 @@ ok('a rejected start leaves the invite startable', r.body.started === null);
 
 r = await call('/i/' + invite, { method: 'POST', json: { name: 'Stanford Mirror of E2E', slug: mirrorSlug } });
 ok('start the mirror', r.status === 200 && r.body.admin_secret.length >= 10 && r.body.rounds === 2, r.body);
-ok('a started mirror is an ordinary 48h tournament',
-  r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000);
+ok('a created mirror is an ordinary tournament: a week of setup',
+  r.body.closes > Date.now() + (7 * 24 - 1) * 3600 * 1000 && r.body.closes < Date.now() + (7 * 24 + 1) * 3600 * 1000);
 const A = '/a/' + r.body.admin_secret;
 const tid = r.body.id;
+// ...and its rooms serve nothing until its TD presses Start
+r = await call(A + '/start', { method: 'POST' });
+ok('start the mirror tournament', r.status === 200 && r.body.closes === r.body.started + 48 * 3600 * 1000, r.body);
+const mirrorStarted = r.body.started;
 
 r = await call('/i/' + invite, { method: 'POST', json: { name: 'again', slug: mirrorSlug + '-2' } });
 ok('an invite starts once', r.status === 409, r.body);
@@ -362,7 +366,8 @@ ok('retired versions are kept, flagged',
   r.body.packets.filter((x) => x.packet === 2).length === 3
   && r.body.packets.filter((x) => x.packet === 2).every((x) => x.retired === 1), r.body.packets);
 ok('editor sees how long each mirror can still change',
-  r.body.mirrors[0].tournament.final === r.body.mirrors[0].tournament.created + 96 * 3600 * 1000, r.body.mirrors[0].tournament);
+  r.body.mirrors[0].tournament.final === mirrorStarted + 48 * 3600 * 1000
+  && r.body.mirrors[0].tournament.started === mirrorStarted, r.body.mirrors[0].tournament);
 await tick();
 r = await call(S + '/state');
 ok('state follows: played pin, pinned fix, own packet, retired rounds',
@@ -446,8 +451,10 @@ ok('state sees the mirror\'s page go public', r.body.mirrors[0].page === true);
   r = await call(`${J}/setpacket`, { method: 'POST', json: { round: 2, packet: 1 } });
   ok('and it can place the set\'s packets like any mirror', r.status === 200, r.body);
   r = await call(J + '/buckets', { method: 'POST', json: { room_name: 'J1' } });
+  const jroom = r.body.secret;
+  await call(J + '/start', { method: 'POST' });
   {
-    const p2 = await text(`/b/${r.body.secret}/packet?round=1`);
+    const p2 = await text(`/b/${jroom}/packet?round=1`);
     ok('its rooms still read its own round 1', p2.body.includes('JOINER-OWN'), p2.status);
   }
   r = await call(`${J}/join`, { method: 'POST', json: { invite: jinvite } });

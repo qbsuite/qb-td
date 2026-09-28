@@ -11,9 +11,17 @@ Part of [qbsuite](https://qbsuite.github.io/).
 
 - **TO dashboard** (`app/index.html`, no account): creating a tournament
   mints an unguessable admin link — the only credential, shown once with a
-  save-this-link warning, remembered in that device's localStorage, and
-  dead 48 hours after creation. Two views. **Tournament Setup** is the
-  before-the-day work, four steps with a done-state pill each:
+  save-this-link warning, remembered in that device's localStorage. It
+  works for a **week of setup** from creation; when the TD presses
+  **Start tournament** (the last item of the setup checklist, or the
+  "Not started" banner on the Live Hub, behind a confirmation), it and
+  every room link work for **48 hours from then** — replacing whatever
+  the week had left, earlier or later — and until then room links show
+  "Tournament hasn't started" and serve nothing. Two views. **Tournament
+  Setup** is the before-the-day work, a tab per step with a done-state
+  pill each (MODAQ Settings is done once a format is saved, Stats
+  settings once the public page is on — it also holds the buzzpoints
+  switch and password):
   **Rooms** (create N at once — Room 1…N, renamed inline in the table —
   each room a bucket whose private reader/bucket links go to its
   moderator), **Packets + Tiebreakers** (every upload is one button that
@@ -57,11 +65,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   sent to the room, and a ruling never edits a score: the moderator
   applies it in MODAQ and uploads again, which the row reports as the
   corrected game arriving; a count sits in the status strip and each
-  upload row carries a marker); settings (public page, reader game
+  upload row carries a marker); settings (reader game
   format — a MODAQ preset plus every field of MODAQ's own customize
   dialog, stored as overrides so it applies to every room — and
-  admin-link rotation for leaks); stats + export with the buzzpoints
-  control; and uploads grouped by round with a completeness pill per
+  admin-link rotation for leaks); stats + export; and uploads grouped by round with a completeness pill per
   group (current round open by default) — each upload's room is a
   dropdown, so a game sent from the wrong room's link can be moved to
   the room it was actually played in.
@@ -185,8 +192,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
   mirrored tournament. A set's packets, tiebreakers and reader game
   format are uploaded once; each mirror gets an **invite link** the
   editor can send weeks ahead, and the TD who opens it
-  (`index.html?i=<invite>`) presses Start to get an ordinary tournament —
-  the 48-hour clock starts then, not when the invite was made — with the
+  (`index.html?i=<invite>`) creates an ordinary tournament — a week of
+  setup, and 48 hours from its own Start on the day — with the
   packets, the backup questions and the format already in place (or
   pastes it into a tournament they already made). Which round reads
   which packet stays the TD's choice. The games every mirror collects
@@ -208,15 +215,15 @@ Part of [qbsuite](https://qbsuite.github.io/).
 ## Question sets
 
 A set is mirrored for a season, so its editor link lives a **year**
-(`SET_TTL`); everything a mirror does still runs on the 48-hour clocks.
+(`SET_TTL`); everything a mirror does still runs on a tournament's clocks.
 That works because **an invite is not a tournament**: it is a one-time,
 revocable credential that creates nothing until its TD uses it — either
 to start a tournament (Start on the invite page) or to join one they
 have already made (Tournament Setup → Packets → Join a set, which fills
 the rounds still empty and leaves their own packets alone). Editors can
 line mirrors up as early as they like, and the question-security story
-of a running tournament (links dead 48 h after creation) is exactly what
-it was. An invite can start the mirror and therefore read the packets,
+of a running tournament (room links serve nothing before Start, and
+every link is dead 48 h after it) is exactly what it was. An invite can start the mirror and therefore read the packets,
 so it should travel the way the packets themselves would; the set
 dashboard shows which invites are still unused, and revokes them.
 
@@ -359,15 +366,17 @@ dashboard shows which invites are still unused, and revokes them.
   link secrets: 20 chars from a 31-char alphabet (~99 bits) via
   `crypto.getRandomValues`; wrong secrets 404 uniformly. Tournament
   creation is open, rate-limited per IP.
-- **Admin links die 48 hours after tournament creation** (410 "tournament
-  closed"). A lost or leaked admin link can't be phished or abused after
-  the event; published stats stay up, and the public qbj + roster remain
-  importable into YellowFruit, so results outlive the link. A leak
-  mid-tournament is handled by the dashboard's "new admin link" button.
-- **Bucket links die 48 hours after room creation.** The bucket page shows
-  "room open until ..." and the dashboard shows each room's close time;
-  after that every moderator route returns "room closed". A leaked link
-  stops serving packets and accepting uploads soon after the tournament.
+- **Links die 48 hours after Start** (`closesAt` in `worker.js`), or a
+  week after creation if the tournament is never started. The admin link
+  then answers 410 "tournament closed" and every room link "room closed":
+  rooms share the tournament's deadline instead of keeping their own. A
+  lost or leaked link can't be phished or abused after the event;
+  published stats stay up, and the public qbj + roster remain importable
+  into YellowFruit, so results outlive the link. A leak mid-tournament is
+  handled by the dashboard's "new admin link" button.
+- **Room links serve nothing before Start** (403 "Tournament hasn't
+  started"): no packet, tiebreaker, roster, schedule or upload, whatever
+  the setup week has left — so a week of setup can't leak round 1 early.
 - **Set links live a year; invites live until started, revoked, or the
   set closes.** See "Question sets" above — a mirror started from an
   invite is an ordinary tournament on the clocks in this section.
@@ -448,11 +457,11 @@ dashboard shows which invites are still unused, and revokes them.
   and one upload per export click — about six Worker requests per game —
   and the 2 MB MODAQ bundle is a static asset on GitHub Pages, off
   Cloudflare entirely.
-- **Finished tournaments stop costing anything.** Rooms can only be
-  created while the admin link lives (48 h), and each room accepts
-  uploads for 48 h after its own creation, so nothing can change after
-  `created + 96 h` (`FINAL_TTL` in `worker.js`) — the data is provably
-  frozen, with no extra column or cron to say so. Past that point
+- **Finished tournaments stop costing anything.** Every write path — the
+  admin link and every room — closes at the same moment (48 h after
+  Start, or a week after creation without one), so nothing can change
+  after it (`closesAt` in `worker.js`) — the data is provably frozen,
+  with no cron to say so. Past that point
   `/pub/:slug` reports `final: true` and every public blob is served with
   a week's `max-age` instead of a minute's, so a repeat visitor's blobs
   come from their own browser cache. With nothing polling on the public
@@ -496,7 +505,7 @@ dashboard shows which invites are still unused, and revokes them.
   shared with the hub, turns MODAQ's game state into the protest list
   the upload carries and builds the hub's Protests drawer from it).
 - `worker/` — Cloudflare Worker (D1 metadata + R2 blobs). Auth model:
-  admin link secret for the TO API (48h lifetime), bucket secret for
+  admin link secret for the TO API (a week of setup, 48h from Start), bucket secret for
   moderator routes, publish flag gating all public reads. No secrets to
   provision.
 - `tests/` — `run_tests.js` (engine unit tests), `e2e_worker.js` (full
@@ -543,6 +552,8 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 # ...and one from before question sets (re-run schema.sql first: it
 # creates the three set tables):
 #   npx wrangler d1 execute qb-td --local --file migrate-sets.sql
+# ...and one from before Start tournament:
+#   npx wrangler d1 execute qb-td --local --file migrate-start.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled
 npx wrangler dev --local --port 8799 --test-scheduled &
@@ -578,7 +589,9 @@ end, which is also how it exercises the `final` caching path.
    creates the set tables) and then
    `npx wrangler d1 execute qb-td --remote --file migrate-sets.sql`
    BEFORE the Worker that expects it is deployed — the cron's queue query
-   names `set_id`,
+   names `set_id` — and one from before Start tournament needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-start.sql`,
+   also before the Worker (room routes name `started`),
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy

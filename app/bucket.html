@@ -57,6 +57,8 @@ const $ = (id) => document.getElementById(id);
 const secret = new URLSearchParams(location.search).get('b') || '';
 let state = null;
 let closed = false;
+// worker.js NOT_STARTED: every room route answers this until the TD presses Start
+const NOT_STARTED = "Tournament hasn't started";
 
 function say(text, bad = false) {
   $('msg').textContent = text || '';
@@ -70,7 +72,7 @@ function render() {
   $('ann').innerHTML = annCards(state.announce, 'from the TD');
   $('roundcard').hidden = false;
   $('curround').textContent = 'round ' + state.current_round;
-  $('closes').textContent = 'room open until ' + new Date(state.closes).toLocaleString();
+  $('closes').textContent = 'Room open until ' + new Date(state.closes).toLocaleString();
   const packets = state.packets || (state.packet ? [state.packet] : []);
   $('rounds').innerHTML = packets.map((p) =>
     `<a href="#" class="pill${p.number === state.current_round ? ' on' : ''}" data-round="${p.number}"
@@ -90,6 +92,13 @@ function render() {
   </table></div>` : '<div class="muted">none yet</div>') + extra;
 }
 
+// Before Start the room serves nothing, so nothing to show but the wait.
+function showNotStarted() {
+  $('roundcard').hidden = true;
+  $('uparea').hidden = true;
+  say(NOT_STARTED + '. Reload this page once the TD starts it.', true);
+}
+
 function showClosed() {
   closed = true;
   $('ann').innerHTML = '';
@@ -105,6 +114,7 @@ async function refresh() {
     render();
   } catch (e) {
     if (e.message === 'room closed') showClosed();
+    else if (e.message === NOT_STARTED) showNotStarted();
     else say(e.message, true);
   }
 }
@@ -144,6 +154,7 @@ $('upbtn').onclick = async () => {
     await refresh();
   } catch (e) {
     if (e.message === 'room closed') showClosed();
+    else if (e.message === NOT_STARTED) showNotStarted();
     else say(e.message, true);
   }
   $('upbtn').disabled = false;

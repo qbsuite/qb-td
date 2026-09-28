@@ -32,8 +32,9 @@ ok('bad admin link 404', r.status === 404);
 const slug = 'e2e-' + Math.random().toString(36).slice(2, 8);
 r = await call('/api/tournaments', { method: 'POST', json: { name: 'E2E Open', slug } });
 ok('create tournament', r.status === 200 && r.body.id > 0 && r.body.admin_secret.length >= 10, r.body);
-ok('creation reports 48h expiry',
-  r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
+// a week of setup; the 48h only starts when the TD presses Start
+ok('creation reports a week of setup',
+  r.body.closes > Date.now() + (7 * 24 - 1) * 3600 * 1000 && r.body.closes < Date.now() + (7 * 24 + 1) * 3600 * 1000,
   r.body.closes);
 let A = '/a/' + r.body.admin_secret;
 const tid = r.body.id;
@@ -66,6 +67,32 @@ r = await call(`${A}/roster?name=roster.qbj`, {
   ] }] }),
 });
 ok('upload roster', r.status === 200, r.body);
+
+// Before Start, a room link serves nothing: not the round's packet, not
+// the tiebreakers, not uploads — the mod's page shows the message.
+r = await call('/b/' + secret);
+ok('room before Start says so', r.status === 403 && r.body.error === "Tournament hasn't started", r.body);
+r = await call(`/b/${secret}/upload?round=1&name=early.qbj`, { method: 'POST', body: MATCH });
+ok('room before Start takes no upload', r.status === 403, r.body);
+for (const route of ['packet', 'tiebreakers', 'roster', 'schedule']) {
+  const res = await fetch(`${BASE}/b/${secret}/${route}`);
+  ok(`room before Start serves no ${route}`, res.status === 403, res.status);
+}
+r = await call(A);
+ok('detail before Start: not started, a week of setup',
+  !r.body.tournament.started && r.body.tournament.closes > Date.now() + 6 * 24 * 3600 * 1000, r.body.tournament);
+
+// Start: every link now closes 48h from here, replacing the setup clock
+r = await call(A + '/start', { method: 'POST' });
+ok('start the tournament', r.status === 200 && r.body.started > 0
+  && r.body.closes === r.body.started + 48 * 3600 * 1000, r.body);
+const startedAt = r.body.started;
+r = await call(A + '/start', { method: 'POST' });
+ok('starting twice is refused', r.status === 409, r.body);
+r = await call(A);
+ok('detail after Start: closes 48h from Start',
+  r.body.tournament.started === startedAt && r.body.tournament.closes === startedAt + 48 * 3600 * 1000,
+  r.body.tournament);
 
 // moderator flow
 r = await call('/b/' + secret);
@@ -1015,60 +1042,14 @@ ok('new admin link works', r.status === 200 && r.body.tournament.slug === slug);
     res.status === 200 && (await res.text()) === 'PDFBYTES', res.status);
 }
 
-// bucket state carries lifetime info
+// bucket state carries lifetime info: the tournament's own deadline
 r = await call('/b/' + secret);
-ok('bucket closes stamp ~48h out',
-  r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
-  r.body.closes);
+ok('bucket closes with the tournament, 48h from Start',
+  r.body.closes === startedAt + 48 * 3600 * 1000, r.body.closes);
 ok('bucket upload count', r.body.upload_count === 7, r.body.upload_count);
-
-// bucket expiry: backdate the bucket, every mod route dies with "room closed"
-execSync(
-  `npx wrangler d1 execute qb-td --local --command "UPDATE buckets SET created = 1 WHERE secret = '${storedCred(secret)}'"`,
-  { cwd: WORKER_DIR, stdio: 'ignore' },
-);
-r = await call('/b/' + secret);
-ok('expired bucket state 410', r.status === 410 && r.body.error === 'room closed', r);
-r = await call(`/b/${secret}/upload?round=1&name=late.qbj`, { method: 'POST', body: MATCH });
-ok('expired bucket upload 410', r.status === 410);
-{
-  const res = await fetch(`${BASE}/b/${secret}/packet`);
-  ok('expired bucket packet 410', res.status === 410);
-  const rr = await fetch(`${BASE}/b/${secret}/roster`);
-  ok('expired bucket roster 410', rr.status === 410);
-  const sr = await fetch(`${BASE}/b/${secret}/schedule`);
-  ok('expired bucket schedule 410', sr.status === 410);
-}
-// the TO's own access is unaffected by room expiry
-r = await call(A);
-ok('TO access survives room expiry', r.status === 200);
-
-// reopen: the TO gives the closed room another 48h, and it takes uploads
-// again on its existing link — what the dashboard's Edit and Add a game
-// need, because a correction is an ordinary re-upload from the room that
-// played the game.
-{
-  const bid = (await call(A)).body.buckets[0].id;
-  r = await call(`${A}/buckets/${bid}/reopen`, { method: 'POST' });
-  ok('reopen room', r.status === 200 && r.body.ok === true, r.body);
-  ok('reopen reports a fresh 48h',
-    r.body.closes > Date.now() + 47 * 3600 * 1000 && r.body.closes < Date.now() + 49 * 3600 * 1000,
-    r.body.closes);
-  r = await call('/b/' + secret);
-  ok('reopened room is live again', r.status === 200, r);
-  r = await call(`/b/${secret}/upload?round=1&name=reopened.qbj`, { method: 'POST', body: MATCH });
-  ok('reopened room takes an upload', r.status === 200, r);
-  r = await call(`${A}/files/${(await call(A)).body.files.find((f) => f.filename === 'reopened.qbj').id}`,
-    { method: 'DELETE' });
-  ok('clean up the reopen upload', r.status === 200);
-  r = await call(`${A}/buckets/999999/reopen`, { method: 'POST' });
-  ok('reopen unknown room 404', r.status === 404, r);
-  // back to closed for the checks that follow
-  d1exec(`UPDATE buckets SET created = 1 WHERE secret = '${storedCred(secret)}'`);
-  r = await call('/b/' + secret);
-  ok('room closed again', r.status === 410, r);
-  r = await call(A); // the checks below read this detail out of `r`
-}
+r = await call(`${A}/buckets/1/reopen`, { method: 'POST' });
+ok('rooms no longer reopen on their own clock', r.status === 404, r.status);
+r = await call(A); // the checks below read this detail out of `r`
 
 // admin detail reflects everything (rounds 1-3 + the label-packet round 4)
 ok('admin detail files', r.status === 200 && r.body.files.length === 7 && r.body.rounds.length === 4, r.body.files);
@@ -1086,16 +1067,27 @@ ok('delete bucket', r.status === 200);
 r = await call('/b/' + secret);
 ok('bucket link dead', r.status === 404);
 
-// admin expiry: backdate the tournament — admin routes die with 410,
-// published stats stay up
-execSync(
-  `npx wrangler d1 execute qb-td --local --command "UPDATE tournaments SET created = 1 WHERE slug = '${slug}'"`,
-  { cwd: WORKER_DIR, stdio: 'ignore' },
-);
+// Expiry. A second room, so the closed tournament's rooms can be checked
+// after the first room was deleted above.
+r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 9' } });
+const lateRoom = r.body.secret;
+ok('room made after Start works at once', (await call('/b/' + lateRoom)).status === 200);
+
+// 48h after Start everything closes together: the admin link and every
+// room — rooms no longer keep a clock of their own
+d1exec(`UPDATE tournaments SET started = ${Date.now() - 49 * 3600 * 1000} WHERE slug = '${slug}'`);
 r = await call(A);
 ok('expired admin link 410', r.status === 410 && r.body.error === 'tournament closed', r);
 r = await call(A + '/rotate', { method: 'POST' });
 ok('expired admin cannot rotate', r.status === 410);
+r = await call('/b/' + lateRoom);
+ok('its rooms close with it', r.status === 410 && r.body.error === 'room closed', r);
+r = await call(`/b/${lateRoom}/upload?round=1&name=late.qbj`, { method: 'POST', body: MATCH });
+ok('closed room takes no upload', r.status === 410);
+for (const route of ['packet', 'roster', 'schedule']) {
+  const res = await fetch(`${BASE}/b/${lateRoom}/${route}`);
+  ok(`closed room serves no ${route}`, res.status === 410, res.status);
+}
 r = await call('/pub/' + slug);
 ok('published stats survive admin expiry', r.status === 200 && r.body.name === 'E2E Open', r.body);
 
@@ -1105,5 +1097,39 @@ ok('expired tournament is final', r.body.final === true, r.body.final);
 ok('final state caches for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
 r = await call('/pub/' + slug + '/rounds?n=1');
 ok('final round shards cache for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
+
+// The rule itself, on tournaments backdated in D1: Start replaces the
+// setup deadline whichever way it moves it.
+{
+  const day = 24 * 3600 * 1000;
+  const make = async (tag) => {
+    const sl = 'e2e-clk-' + tag + '-' + Math.random().toString(36).slice(2, 6);
+    const made = (await call('/api/tournaments', { method: 'POST', json: { name: 'Clock ' + tag, slug: sl } })).body;
+    return { sl, A2: '/a/' + made.admin_secret };
+  };
+  const now = Date.now();
+  // never started: setup runs out after a week
+  const idle = await make('idle');
+  d1exec(`UPDATE tournaments SET created = ${now - 7 * day - 3600 * 1000} WHERE slug = '${idle.sl}'`);
+  ok('never started: closed after a week of setup', (await call(idle.A2)).status === 410);
+  // started on day 4: closes on day 6, days before setup would have ended
+  const early = await make('early');
+  d1exec(`UPDATE tournaments SET created = ${now - 4 * day}, started = ${now - 49 * 3600 * 1000} WHERE slug = '${early.sl}'`);
+  ok('started on day 4: closed 48h later despite setup time left', (await call(early.A2)).status === 410);
+  // started at the end of setup: runs 48h past the week
+  const late = await make('late');
+  d1exec(`UPDATE tournaments SET created = ${now - 8 * day}, started = ${now - 3600 * 1000} WHERE slug = '${late.sl}'`);
+  r = await call(late.A2);
+  ok('started late in setup: open 48h from Start, past the week',
+    r.status === 200 && r.body.tournament.closes === now - 3600 * 1000 + 48 * 3600 * 1000, r.body);
+  // broadcasts are capped at the deadline Start sets
+  const cap = await make('cap');
+  r = await call(cap.A2, { method: 'POST', json: { announce: [
+    { text: 'see you Saturday', pub: true, rooms: true, created: now, expires: now + 5 * day }] } });
+  ok('setup broadcast may run past 48h', r.status === 200);
+  r = await call(cap.A2 + '/start', { method: 'POST' });
+  const capAnn = JSON.parse((await call(cap.A2)).body.tournament.announce);
+  ok('Start pulls broadcasts in to its deadline', capAnn[0].expires === r.body.closes, capAnn);
+}
 
 summary('e2e');
