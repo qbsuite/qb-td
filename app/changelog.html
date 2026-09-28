@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>qb-td changelog</title>
+<link rel="stylesheet" href="css/td.css">
+<style>
+  .wrap { max-width: 720px; }
+  .release { padding: 18px 0 22px; border-top: 1px solid var(--line); }
+  .release:first-of-type { border-top: none; padding-top: 4px; }
+  .release h2 {
+    margin: 0 0 10px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
+    text-transform: none; color: var(--fg); display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  .release h2 a { color: inherit; }
+  .release h2 .pill { font-size: 11px; font-weight: 600; }
+  .section { margin-top: 12px; }
+  .section h3 {
+    font: 600 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.06em; color: var(--muted); margin-bottom: 4px;
+  }
+  .section ul { list-style: none; display: grid; gap: 3px; }
+  .section li { position: relative; padding-left: 16px; max-width: 64ch; }
+  .section li::before { content: "–"; position: absolute; left: 0; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>qb-td</h1>
+    <span class="sub">changelog</span>
+    <span class="spacer"></span>
+    <a href="index.html">Tournament hub</a>
+  </header>
+  <div id="msg"></div>
+  <div id="log"></div>
+</div>
+<script type="module">
+import { parseChangelog } from './js/changelog.js';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+try {
+  const res = await fetch('changelog.txt', { cache: 'no-cache' });
+  if (!res.ok) throw new Error('could not load the changelog (' + res.status + ')');
+  const releases = parseChangelog(await res.text());
+  document.getElementById('log').innerHTML = releases.map((r, i) => `
+    <section class="release" id="${r.iso}">
+      <h2><a href="#${r.iso}">Release Notes for ${esc(r.date)}</a>${i === 0 ? '<span class="pill on">Latest</span>' : ''}</h2>
+      ${r.sections.map((s) => `
+        <div class="section">
+          <h3>[ ${esc(s.name)} ]</h3>
+          <ul>${s.items.map((it) => `<li>${esc(it)}</li>`).join('')}</ul>
+        </div>`).join('')}
+    </section>`).join('');
+  if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+} catch (e) {
+  const msg = document.getElementById('msg');
+  msg.textContent = e.message;
+  msg.className = 'bad';
+}
+</script>
+</body>
+</html>

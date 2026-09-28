@@ -588,6 +588,13 @@ end, which is also how it exercises the `final` caching path.
 
 ## Deploy (self-hosting)
 
+Every deploy ships a changelog entry: add a release to the top of
+`app/changelog.txt` (shown at `app/changelog.html`, linked from the hub) in
+the Counter-Strike release-notes style — `Release Notes for M/D/YYYY`,
+`[ SECTION ]` headers, one short `- ` line per change a TD, moderator or
+player would notice. `npm test` checks the file parses and stays newest
+first.
+
 1. `cd worker`
 2. `npx wrangler d1 create qb-td` — put the id in `wrangler.toml`
 3. `npx wrangler r2 bucket create qb-td-data`

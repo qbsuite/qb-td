@@ -1,0 +1,177 @@
+Release Notes for 9/27/2026
+
+[ LIVE HUB ]
+- Added "Open the next round automatically": opens the next round once every room with a game in the current round has started.
+- Room chips show which rooms have started the current round.
+
+[ SETUP ]
+- Tournaments now get 7 days of setup. Press Start tournament on the day; every link closes 48 hours after Start.
+- Room links show "Tournament hasn't started" until Start.
+- The setup checklist now covers MODAQ Settings and Stats settings.
+- Moved the buzzpoints switch and password to Stats settings.
+- Removed room reopening. Rooms now close with the tournament.
+
+[ READER ]
+- The scheduled matchup is locked in. Switching teams asks for confirmation.
+- Moderators pick starters on the start card, any number per team.
+
+[ CATEGORIES ]
+- Added a Questions view: tossup conversion, power, neg and average buzz; bonus PPB and Easy/Medium/Hard conversion.
+- Bonus difficulty comes from the packet's e/m/h marks, or is ranked by conversion rate when there are none.
+- Added BB (bouncebacks): tossups won after the other team missed. Does not change points.
+- Fixed category counts showing readings instead of questions (doubled with two rooms).
+
+[ BUZZPOINTS ]
+- Added By Category.
+
+[ UI ]
+- New filter chips on the public and set pages.
+- Labels are now in Title Case.
+
+[ MISC ]
+- Added this changelog, linked from the tournament hub.
+
+Release Notes for 9/26/2026
+
+[ LIVE HUB ]
+- TDs can move an upload to the room it was actually played in.
+
+[ BUZZPOINTS ]
+- Bonuses sit indented under their tossup.
+- Bonus answers are laid out like tossup answers, with the packet's formatting kept.
+
+Release Notes for 9/20/2026
+
+[ LIVE HUB ]
+- TDs can correct a game in MODAQ (Edit) or add a missing one.
+- Tidied the live hub.
+
+[ EXPORTS ]
+- Exports use the tournament's own rules (tossup count, scoring).
+- One YellowFruit button that asks which version.
+
+[ PUBLIC PAGE ]
+- The Stats tab now shows the YellowFruit stat report itself.
+- The stat report follows dark mode.
+
+Release Notes for 9/19/2026
+
+[ EXPORTS ]
+- The .yft now matches what YellowFruit itself saves, checked against YellowFruit.
+- The stat report matches YellowFruit's byte for byte.
+- Added a .yft for YellowFruit 3.
+- Stat report files are named the way YellowFruit names them.
+
+Release Notes for 9/17/2026
+
+[ SETS ]
+- Added question sets: editors upload packets once and invite mirror sites.
+- Set-wide stats and buzzpoints across every mirror.
+
+Release Notes for 9/10/2026
+
+[ LIVE HUB ]
+- Protests logged in MODAQ show on the TD hub, with the swing an upheld ruling would produce.
+- TDs record a ruling and a note per protest.
+
+Release Notes for 8/17/2026
+
+[ PERFORMANCE ]
+- Stats load per round. A refresh fetches only the rounds that changed.
+
+Release Notes for 8/16/2026
+
+[ PUBLIC PAGE ]
+- Removed auto-refresh. Press Refresh for the latest results.
+
+[ ROOM PAGE ]
+- Removed the 60-second poll.
+
+[ SECURITY ]
+- Fixed room links that could not be recovered after encryption.
+
+Release Notes for 8/15/2026
+
+[ SECURITY ]
+- Question text is encrypted at rest.
+- Public copies of games no longer include match notes.
+
+Release Notes for 8/11/2026
+
+[ PERFORMANCE ]
+- Public stats are served from GitHub snapshots.
+
+Release Notes for 8/1/2026
+
+[ DEMO ]
+- Added the demo TD hub, a triple round robin and 2022 ACF Winter packets.
+
+[ BUZZPOINTS ]
+- Kept the packet's bold and underline in question and answer text.
+
+Release Notes for 7/30/2026
+
+[ DEMO ]
+- Added an in-browser demo tournament with 2025 VAULT packets.
+
+[ CATEGORIES ]
+- Reads category metadata across more tournament formats.
+
+Release Notes for 7/29/2026
+
+[ LIVE HUB ]
+- Dashboard overhaul.
+
+[ READER ]
+- Tiebreaker questions are tracked by the TD and added from MODAQ.
+
+Release Notes for 7/26/2026
+
+[ STATS ]
+- Added the YellowFruit-style HTML stat report.
+
+[ ARCHIVE ]
+- Added an archive of past tournaments.
+
+[ BUZZPOINTS ]
+- The password is stretched in the browser, and guessing is capped.
+
+Release Notes for 7/25/2026
+
+[ CATEGORIES ]
+- Added the Teams view with per-category PPB.
+- Reads UG Nats-style category labels.
+- Fixed re-uploaded games counting twice.
+
+[ UI ]
+- Fixed layout on narrow screens.
+
+Release Notes for 7/24/2026
+
+[ PUBLIC PAGE ]
+- Added the public tournament page.
+- Added the Categories tab: player stats by category and subcategory.
+- Added Buzzpoints, behind a password.
+
+[ SCHEDULE ]
+- Added the schedule creator, with triple and quadruple round robins.
+- Games can be moved between rooms.
+
+[ LIVE HUB ]
+- Added the round status strip and uploads grouped by round.
+- Added broadcasts to the public page and the rooms.
+
+[ READER ]
+- The schedule shows in a side panel.
+
+Release Notes for 7/23/2026
+
+[ SETUP ]
+- Added reader game format options.
+
+Release Notes for 7/20/2026
+
+[ RELEASE ]
+- qb-td: a TD hub, room links with MODAQ built in, and a stats page.
+- No accounts: the admin link is the only credential.
+- YellowFruit-style stat columns and per-game box scores.

@@ -1298,6 +1298,24 @@ test('roundRooms: who plays a round, by bucket link then room name; the rest hav
   assert.deepEqual(roundRooms(null, 1, buckets).map((r) => r.bye), [false, false, false]);
 });
 
+const { parseChangelog } = await import('../app/js/changelog.js');
+const changelogText = (await import('node:fs')).readFileSync(new URL('../app/changelog.txt', import.meta.url), 'utf8');
+test('changelog.txt parses: newest first, every release has changes, every line short', () => {
+  const releases = parseChangelog(changelogText);
+  assert.ok(releases.length > 0);
+  for (let i = 1; i < releases.length; i++) {
+    assert.ok(releases[i - 1].iso > releases[i].iso, `out of order: ${releases[i - 1].date} then ${releases[i].date}`);
+  }
+  for (const r of releases) {
+    assert.ok(r.sections.length > 0, r.date + ' has no sections');
+    for (const s of r.sections) {
+      assert.ok(s.items.length > 0, `${r.date} [ ${s.name} ] is empty`);
+      for (const it of s.items) assert.ok(it.length <= 160, `${r.date}: too long for a changelog line: ${it}`);
+    }
+  }
+  assert.throws(() => parseChangelog('Release Notes for 1/2/2026\nstray line'), /can't place/);
+});
+
 /* ---------- category stats ---------- */
 
 function catQbj(buzzList, bonuses = {}) {
