@@ -786,6 +786,56 @@ That part scales. What breaks first:
    stored marker instead. Also `pubStateBody` now has exactly one caller
    and could fold into `pubState` (cosmetic).
 
+## Potential: buzzer rooms in tournament rooms (not built)
+
+An idea on hold, written down with its numbers so it can be picked up
+later: give every tournament room a phone-buzzer room from
+qb-scorekeeper's room server (`qb-scorekeeper/rooms`, one Durable Object
+per room — the moderator's reader hosts, players buzz from their phones).
+Nothing in qb-td talks to it today.
+
+Priced on 9/28/2026 with `qb-scorekeeper/tests/sim_buzzers.mjs`: real
+WebSocket clients against the real room server behind a meter
+(`tests/sim/`), a moderator + 8 phones per room, 20 tossups, 100 buzzes
+a game, no question log shared with players, 8 games per room per day,
+8 rooms per tournament. Duration uses production's own ratio (September
+2026: 94 GB-s per 43.6k inbound messages).
+
+| Per day | DO requests | Rows written | Duration |
+|---|---|---|---|
+| One game | 39 | 228 | ~1 GB-s |
+| One tournament (64 games) | 2.4k | 15k | 77 GB-s |
+| 60 tournaments (3,840 games) | 145k | 877k | 4.6k GB-s |
+| Free plan, per day | 100k | 100k | 13k GB-s |
+
+- **Fits the free plan up to ~6 tournaments a day**; rows written are what
+  run out (~9x over at 60). On Workers Paid ($5/month: 50M rows written,
+  1M requests, 400k GB-s a month) four such 60-tournament days add $0.
+- **Buzz volume barely matters.** Doubling to 200 buzzes a game added
+  ~18% messages and ~2 writes: a losing or early buzz writes nothing,
+  only the winner does. Inbound per game is ~36% pongs (every phone
+  answers an RTT ping each time the buzzers open), ~26% host `state`
+  frames, ~17% buzzes.
+- **The writes are the host's display snapshot**: `syncRoom()` sends a
+  `state` on every `render()` and the room stores each one (~150 a game)
+  so late joiners get the current screen. Dropping the question log only
+  saves ~9%.
+- The room connections are Worker requests too (one per phone per game,
+  ~38k a day at 60 tournaments), and the free plan's 100k/day Worker
+  budget is shared with qb-td's own traffic (~53k at the same scale).
+- The room also re-arms its expiry alarm on every message. Production's
+  analytics suggest alarms don't count as rows written; if they do, the
+  60-tournament figure is ~3.0M instead of 877k — still inside Paid.
+
+What would make it viable on the free plan, roughly in order of payoff:
+1. Store the host's snapshot only when it changed (or at most every few
+   seconds); it only serves late joiners. Estimated to cut writes by
+   most of the ~150 per game — not yet measured.
+2. Ping phones for RTT every few arms instead of every arm (cuts the
+   largest message type).
+3. Move the room's expiry alarm off the per-message path (re-arm at most
+   once an hour).
+
 ## Deleting a tournament (operator runbook)
 
 There is deliberately no delete API — nothing reachable from the
