@@ -576,9 +576,10 @@ function lineCells(l) {
 }
 
 // The category filter every view shares: categories as read, with how
-// many tossups each had.
+// many tossups each had (distinct questions, not readings: with two rooms
+// every tossup is read twice).
 function catFilterHtml(q) {
-  const items = q.tossups.map((r) => ({ cat: r.cat, sub: r.sub, n: r.heard }))
+  const items = q.tossups.map((r) => ({ cat: r.cat, sub: r.sub, n: r.questions }))
     .concat(q.bonuses.map((r) => ({ cat: r.cat, sub: r.sub, n: 0 })));
   const cats = new Set(items.map((i) => i.cat));
   if (catSel && !cats.has(catSel)) { catSel = ''; catSubSel = ''; }
@@ -661,9 +662,10 @@ function renderQuestions(box, q) {
   box.innerHTML = `${catFilterHtml(q)}
     <div class="rhead">Tossups</div>
     ${tl.length ? `<div class="tablewrap"><table>
-      <tr><th>Category</th><th class="num">Heard</th><th class="num">Conv %</th><th class="num">Power %</th>
+      <tr><th>Category</th><th class="num" title="Tossups in this category">Tossups</th>
+        <th class="num" title="Times they were read, one per room">Heard</th><th class="num">Conv %</th><th class="num">Power %</th>
         <th class="num">Neg %</th><th class="num">Avg Buzz</th></tr>
-      ${tl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.heard}</td>
+      ${tl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.questions}</td><td class="num">${l.heard}</td>
         <td class="num">${pct(l.conv, l.heard)}</td><td class="num">${pct(l.powers, l.heard)}</td>
         <td class="num">${pct(l.negs, l.heard)}</td>
         <td class="num">${l.words && l.words.length ? (l.words.reduce((a, b) => a + b, 0) / l.words.length).toFixed(1) : '–'}</td></tr>`).join('')}
@@ -671,9 +673,10 @@ function renderQuestions(box, q) {
     <div class="rhead" style="margin-top:18px">Bonuses</div>
     ${note}
     ${bl.length ? `<div class="tablewrap"><table>
-      <tr><th>Category</th><th class="num">Heard</th><th class="num">PPB</th>
+      <tr><th>Category</th><th class="num" title="Bonuses in this category">Bonuses</th>
+        <th class="num" title="Times they were read, one per room">Heard</th><th class="num">PPB</th>
         <th class="num sep">Easy</th><th class="num">Medium</th><th class="num">Hard</th></tr>
-      ${bl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.heard}</td>
+      ${bl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.questions}</td><td class="num">${l.heard}</td>
         <td class="num">${l.heard ? (l.pts / l.heard).toFixed(2) : '–'}</td>
         <td class="num sep">${pct(l.e, l.dHeard)}</td><td class="num">${pct(l.m, l.dHeard)}</td>
         <td class="num">${pct(l.h, l.dHeard)}</td></tr>`).join('')}

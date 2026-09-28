@@ -175,3 +175,16 @@ CREATE TABLE IF NOT EXISTS set_mirrors (
 );
 CREATE INDEX IF NOT EXISTS idx_set_mirrors_set ON set_mirrors(set_id);
 CREATE INDEX IF NOT EXISTS idx_set_mirrors_tournament ON set_mirrors(tournament_id);
+
+-- The first time each room was handed a round's packet (worker.js
+-- noteRoomStart): a room has started that round. Drives auto-advance
+-- (settings.autoAdvance) and the Live Hub's room chips. Existing
+-- databases get it from migrate-starts.sql (or by re-running this file).
+CREATE TABLE IF NOT EXISTS room_starts (
+  bucket_id INTEGER NOT NULL,
+  tournament_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (bucket_id, round)
+);
+CREATE INDEX IF NOT EXISTS idx_room_starts_tournament ON room_starts(tournament_id, round);

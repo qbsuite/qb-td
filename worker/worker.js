@@ -1195,10 +1195,11 @@ async function rotateAdmin(env, t) {
 
 async function getTournament(env, t, ctx) {
   const id = t.id;
-  const [buckets, rounds, files, catsHead, sets, setPackets] = await Promise.all([
+  const [buckets, rounds, files, starts, catsHead, sets, setPackets] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, secret_enc, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created, summary FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
+    env.DB.prepare('SELECT bucket_id, round, at FROM room_starts WHERE tournament_id = ?1').bind(id).all(),
     env.DATA.head(`t/${id}/catmap.json`),
     t.set_id
       ? env.DB.prepare('SELECT slug, name, published, settings FROM sets WHERE id = ?1').bind(t.set_id).all()
@@ -1240,6 +1241,9 @@ async function getTournament(env, t, ctx) {
     buckets: rooms,
     rounds: rounds.results,
     files: files.results,
+    // which rooms have started which rounds (noteRoomStart): the Live
+    // Hub's auto-advance chips
+    starts: starts.results,
   });
 }
 
@@ -1302,7 +1306,10 @@ async function updateTournament(request, env, t) {
   // Unpublishing flags too: the cron sees published = 0 and retracts the
   // slug's folder from the branch.
   await markPub(env, id);
-  return json(env, { ok: true });
+  // switching auto-advance on after every room has already started opens
+  // the next round now, rather than at a start that will never come
+  const advanced = body.settings && body.settings.autoAdvance ? await maybeAdvance(env, id) : false;
+  return json(env, { ok: true, advanced });
 }
 
 async function createBucket(request, env, t) {
@@ -1676,6 +1683,9 @@ async function uploadPacket(request, url, env, t) {
   ).bind(id, round, key, filename).run();
   await updateCatmap(env, id, round, packetCategories(body, filename));
   await markPub(env, id); // packet_rounds rides the published state
+  // every room may already have started the current round, waiting only
+  // on this packet (auto-advance)
+  if (round === t.current_round + 1) await maybeAdvance(env, id);
   return json(env, { round, filename });
 }
 
@@ -2230,7 +2240,99 @@ async function bucketPacket(env, secret, url) {
       'UPDATE rounds SET served = 1 WHERE tournament_id = ?1 AND number = ?2 AND served = 0'
     ).bind(b.tournament_id, round).run();
   }
+  // The reader warms its cache on page load (warm=1) and says when a game
+  // really starts (bucketStartRound); any other fetch is a room taking the
+  // packet to read — the uploads page's download link.
+  if (url.searchParams.get('warm') !== '1') await noteRoomStart(env, b, round);
   return blobResponseDec(env, obj, await blobKey(b, results[0].packet_r2_key), results[0].packet_name);
+}
+
+// POST /b/:secret/start?round=n — the reader started a game on round n.
+async function bucketStartRound(env, secret, url) {
+  const b = await getBucketRow(env, secret);
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
+  const round = Number(url.searchParams.get('round'));
+  if (!Number.isInteger(round) || round < 1 || round > b.current_round) return err(env, 400, 'bad round');
+  await noteRoomStart(env, b, round);
+  return json(env, { ok: true });
+}
+
+/* ---------- rounds that open themselves (settings.autoAdvance) ----------
+   A room has started a round once it has been handed that round's packet
+   — the reader fetches it to start a game, and a room reading off paper
+   or its own MODAQ downloads it from its uploads page — so the packet
+   route is the signal, and nothing polls. With the TD's switch on, the
+   next round opens the moment every room with a game in the current one
+   has started it: rooms that finish early get their next packet without
+   waiting on the TD. It checks on a room's first start in the round, on
+   the next round's packet arriving, and on the TD switching it on — never
+   on the TD setting a round, so a round set back by hand stays put. It
+   never opens a round with no packet (the conditional UPDATE also loses
+   to a TD's change landing at the same moment). */
+
+// The rooms with a game in `round`: the schedule's, resolved to buckets
+// the way bucketSchedule does (bucket link, then room name), or every room
+// when the schedule has no such round. `unmatched` counts scheduled games
+// whose room is no bucket — nobody could ever start those, so a round
+// with one never opens by itself.
+function roomsPlaying(sched, round, buckets) {
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  for (const ph of (sched && sched.phases) || []) {
+    for (const r of ph.rounds || []) {
+      if (r.round !== round) continue;
+      const ids = new Set();
+      let unmatched = 0;
+      for (const g of (r.games || []).filter((x) => x.a && x.b)) {
+        const room = (sched.rooms || [])[g.room] || {};
+        const b = buckets.find((x) => x.id === room.bucket)
+          || buckets.find((x) => norm(x.room_name) === norm(room.name));
+        if (b) ids.add(b.id);
+        else unmatched++;
+      }
+      return { ids: [...ids], unmatched };
+    }
+  }
+  return { ids: buckets.map((x) => x.id), unmatched: 0 };
+}
+
+// First time only: a room re-fetching a packet (a reload, a second game)
+// changes nothing — and so can't push on a round the TD set back by hand,
+// whose rooms had all started it before.
+async function noteRoomStart(env, b, round) {
+  const out = await env.DB.prepare(
+    'INSERT OR IGNORE INTO room_starts (bucket_id, tournament_id, round, at) VALUES (?1, ?2, ?3, ?4)'
+  ).bind(b.id, b.tournament_id, round, Date.now()).run();
+  if (out.meta.changes && round === b.current_round) await maybeAdvance(env, b.tournament_id);
+}
+
+async function maybeAdvance(env, tid) {
+  const { results: tr } = await env.DB.prepare(
+    'SELECT current_round, settings FROM tournaments WHERE id = ?1'
+  ).bind(tid).all();
+  if (!tr.length) return false;
+  let settings = {};
+  try { settings = JSON.parse(tr[0].settings) || {}; } catch (e) { /* keep {} */ }
+  if (!settings.autoAdvance) return false;
+  const n = tr[0].current_round;
+  const [buckets, starts, next, schedObj] = await Promise.all([
+    env.DB.prepare('SELECT id, room_name FROM buckets WHERE tournament_id = ?1').bind(tid).all(),
+    env.DB.prepare('SELECT bucket_id FROM room_starts WHERE tournament_id = ?1 AND round = ?2').bind(tid, n).all(),
+    env.DB.prepare('SELECT 1 FROM rounds WHERE tournament_id = ?1 AND number = ?2').bind(tid, n + 1).all(),
+    env.DATA.get(`t/${tid}/schedule.json`),
+  ]);
+  if (!next.results.length) return false;
+  const sched = schedObj ? await schedObj.json().catch(() => null) : null;
+  const { ids, unmatched } = roomsPlaying(sched, n, buckets.results);
+  if (unmatched || !ids.length) return false;
+  const started = new Set(starts.results.map((x) => x.bucket_id));
+  if (!ids.every((id) => started.has(id))) return false;
+  const out = await env.DB.prepare(
+    'UPDATE tournaments SET current_round = ?2 WHERE id = ?1 AND current_round = ?3'
+  ).bind(tid, n + 1, n).run();
+  if (!out.meta.changes) return false;
+  await markPub(env, tid); // the round rides the public state, like a TD's advance
+  return true;
 }
 
 // The reader page (read.html) preloads the roster into its embedded MODAQ so
@@ -3819,6 +3921,7 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1]);

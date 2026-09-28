@@ -28,7 +28,7 @@ import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
-  hasPlaceholders, poolStandings, fillPlaceholders } from '../engine/schedule.js';
+  hasPlaceholders, poolStandings, fillPlaceholders, roundRooms } from '../engine/schedule.js';
 import { annLive, annTime } from './announce.js';
 import { buzzCredentials } from './buzzkey.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
@@ -1463,6 +1463,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       ${t.current_round < totalRounds
         ? `<button id="advround" class="primary">Advance to Round ${t.current_round + 1}</button>` : ''}
     </div>
+    ${autoAdvanceHtml(t, buckets, settings)}
     ${renderProtests(prows, popen, openProt)}
     <details class="drawer" id="anndrawer" ${openAnn ? 'open' : ''}>
       <summary><span class="dtitle">Broadcasts</span>
@@ -1725,6 +1726,17 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     } catch (e) { say(e.message, true); }
   };
   $('setround').onclick = () => goToRound(Number($('curround').value));
+  $('autoadv').onchange = async () => {
+    try {
+      const next = { ...settings };
+      if ($('autoadv').checked) next.autoAdvance = true;
+      else delete next.autoAdvance;
+      const out = await pub(a, { method: 'POST', json: { settings: next } });
+      say(out && out.advanced ? `Round ${t.current_round + 1} opened: every room had started Round ${t.current_round}`
+        : $('autoadv').checked ? 'Rounds open automatically' : 'Rounds open when you advance them');
+      showDetail();
+    } catch (e) { say(e.message, true); }
+  };
   if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
   if ($('livestart')) $('livestart').onclick = () => startTournament(a, t);
   box.querySelectorAll('[data-delfile]').forEach((b) => {
@@ -1837,6 +1849,33 @@ async function addGame(a, buckets) {
     $('addfile').value = '';
     showDetail();
   } catch (e) { say(e.message, true); }
+}
+
+/* ---------- auto-advance ----------
+   One switch for the whole tournament (settings.autoAdvance): the Worker
+   opens the next round once every room with a game in the current one
+   has started it (worker.js maybeAdvance). The chips show which rooms
+   have, whether the switch is on or not. */
+
+function autoAdvanceHtml(t, buckets, settings) {
+  if (!buckets.length) return '';
+  const started = new Set((lastDetail.starts || [])
+    .filter((x) => x.round === t.current_round).map((x) => x.bucket_id));
+  const rooms = roundRooms(sched, t.current_round, buckets);
+  const playing = rooms.filter((r) => !r.bye);
+  const n = playing.filter((r) => started.has(r.id)).length;
+  return `
+    <div class="autoadv">
+      <label class="row" style="align-items:flex-start;gap:10px">
+        <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''} style="margin-top:4px">
+        <span><b>Open the next round automatically</b><br>
+          <span class="muted" style="font-size:13px">Opens the next round once every room with a game in the current round has started.</span></span>
+      </label>
+      <div class="muted" style="font-size:13px">Round ${t.current_round}: <b class="fg">${n} of ${playing.length}</b> rooms started</div>
+      <div class="roomstarts">${rooms.map((r) => r.bye
+        ? `<span class="roomstart bye" title="No game this round in the schedule"><span class="dot"></span>${esc(r.name)} &middot; bye</span>`
+        : `<span class="roomstart${started.has(r.id) ? ' on' : ''}"><span class="dot"></span>${esc(r.name)}</span>`).join('')}</div>
+    </div>`;
 }
 
 /* ---------- protests ----------

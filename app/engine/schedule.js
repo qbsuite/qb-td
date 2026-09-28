@@ -631,6 +631,27 @@ export function flatRounds(schedule) {
  * game per bucket room. buckets: [{id, room_name}]; files:
  * [{round, bucket_id, kind, error}] — only clean qbj/combined count.
  */
+/**
+ * Which rooms play a round, for the Live Hub's auto-advance chips:
+ * [{id, name, bye}] over every bucket. The schedule's games are resolved
+ * to buckets the way the Worker does it (worker.js roomsPlaying — bucket
+ * link, then room name); a room with no game that round is a bye. Without
+ * the round in the schedule, every room plays.
+ */
+export function roundRooms(schedule, roundNumber, buckets) {
+  const round = schedule ? flatRounds(schedule).find((r) => r.round === roundNumber) : null;
+  if (!round) return buckets.map((b) => ({ id: b.id, name: b.room_name, bye: false }));
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  const playing = new Set();
+  for (const g of round.games.filter((x) => x.a && x.b)) {
+    const room = schedule.rooms[g.room] || {};
+    const b = buckets.find((x) => x.id === room.bucket)
+      || buckets.find((x) => norm(x.room_name) === norm(room.name));
+    if (b) playing.add(b.id);
+  }
+  return buckets.map((b) => ({ id: b.id, name: b.room_name, bye: !playing.has(b.id) }));
+}
+
 export function roundIntake(schedule, roundNumber, buckets, files) {
   const inRooms = new Set(files
     .filter((f) => f.round === roundNumber

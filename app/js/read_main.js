@@ -46,7 +46,9 @@ let teams = null;   // [{name, players}] from the roster
 let packet = null;  // normalized IPacket
 let sched = null;      // tournament schedule (when the TO made one)
 let schedRoom = null;  // this bucket's room index in it
-let defaultPick = { a: '', b: '' }; // last schedule preselect, so overrides stick
+let schedGame = null;  // {a, b}: what the schedule has this room playing in the selected round
+let locked = false;    // the scheduled matchup is showing, pickers hidden
+const starterSel = new Map(); // team name -> Set of the player names starting
 let tbPool = null;  // TO's tiebreaker pool (offered in Add Questions)
 
 // Non-blocking pool fetch: fills the Add Questions dialog whenever it
@@ -88,7 +90,9 @@ function fetchPacket(round, name) {
 }
 
 async function loadPacket(round, name) {
-  const res = await pub('/b/' + secret + '/packet?round=' + round);
+  // warm=1: fetching isn't starting — the Worker counts a room as having
+  // started a round (auto-advance) from the Start button's own signal
+  const res = await pub('/b/' + secret + '/packet?round=' + round + '&warm=1');
   // pub() returns parsed JSON when the blob was stored with a JSON content
   // type, and the raw Response otherwise.
   let parsed;
@@ -187,7 +191,13 @@ function mountMODAQ(id, meta, isNew) {
     // these props would clobber it.
     props.packet = packet;
     props.packetName = meta.packet;
-    props.players = pickTeams(teams, meta.a, meta.b);
+    // the moderator's starters; games from before they were chosen keep
+    // the roster's default (MODAQ starts the first four of each team)
+    const players = pickTeams(teams, meta.a, meta.b);
+    props.players = meta.starters
+      ? players.map((pl) => ({ name: pl.name, teamName: pl.teamName,
+        isStarter: (meta.starters[pl.teamName] || []).includes(pl.name) }))
+      : players;
     const format = resolveGameFormat(state.settings || {}, GameFormats);
     if (format) props.gameFormat = format;
   }
@@ -232,20 +242,61 @@ function renderSchedPanel() {
     </tr>`).join('');
 }
 
-// Preselect the scheduled matchup for the selected round. Only fills
-// pickers that are empty or still on the previous round's default — a
-// mod's manual choice is never clobbered.
+// The scheduled matchup for the selected round, locked in: the teams show
+// as the matchup rather than as two dropdowns, and changing them takes a
+// click (Change teams) and a warning at Start. It locks in again whenever
+// the round changes. Rooms the schedule has nothing for keep the pickers,
+// and a moderator's pick there is never clobbered.
 function applySchedDefault() {
-  if (!sched || schedRoom === null || !teams || $('teamrow').hidden) return;
-  const g = gameForRoom(sched, schedRoom, selectedRound);
-  const known = (n) => teams.some((t) => t.name === n);
-  if (!g || !known(g.a) || !known(g.b)) return;
-  const untouched = (el, prev) => !el.value || el.value === prev;
-  if (untouched($('teama'), defaultPick.a) && untouched($('teamb'), defaultPick.b)) {
-    $('teama').value = g.a;
-    $('teamb').value = g.b;
-    defaultPick = { a: g.a, b: g.b };
+  schedGame = null;
+  if (sched && schedRoom !== null && teams && !$('teamrow').hidden) {
+    const g = gameForRoom(sched, schedRoom, selectedRound);
+    const known = (n) => teams.some((t) => t.name === n);
+    if (g && known(g.a) && known(g.b)) schedGame = { a: g.a, b: g.b };
   }
+  if (schedGame) {
+    $('teama').value = schedGame.a;
+    $('teamb').value = schedGame.b;
+  }
+  locked = !!schedGame;
+  renderTeamPick();
+}
+
+function renderTeamPick() {
+  $('schedmatch').hidden = !locked;
+  $('teampickers').hidden = locked;
+  $('changeteams').hidden = !locked;
+  $('useschedteams').hidden = locked || !schedGame;
+  if (schedGame) {
+    $('schedfrom').textContent = `From the schedule \u00b7 Round ${selectedRound} in ${state.room}`;
+    $('mteama').textContent = schedGame.a;
+    $('mteamb').textContent = schedGame.b;
+  }
+  renderStarters();
+}
+
+// Starters for the two picked teams: every player, the roster's first
+// four ticked (MODAQ's own default), and the moderator ticks as many or as
+// few as are actually playing — at least one a team, checked at Start.
+function renderStarters() {
+  const names = [$('teama').value, $('teamb').value].filter((n, i, all) => n && all.indexOf(n) === i);
+  const picked = names.map((n) => teams.find((t) => t.name === n)).filter(Boolean);
+  for (const t of picked) {
+    if (!starterSel.has(t.name)) {
+      starterSel.set(t.name, new Set(t.players.filter((pl) => pl.isStarter).map((pl) => pl.name)));
+    }
+  }
+  $('starters').innerHTML = picked.length ? `
+    <div class="muted" style="font-size:13px;margin-top:12px">Starters</div>
+    <div class="lineups">${picked.map((t) => {
+      const on = starterSel.get(t.name);
+      return `<div class="lineup">
+        <h4><span>${esc(t.name)}</span><span class="count${on.size ? '' : ' none'}">${on.size} starting</span></h4>
+        <div class="plist">${t.players.map((pl) => `<button type="button" class="p${on.has(pl.name) ? ' on' : ''}"
+          data-team="${esc(t.name)}" data-player="${esc(pl.name)}" aria-pressed="${on.has(pl.name)}"><span class="box">${
+          on.has(pl.name) ? '\u2713' : ''}</span>${esc(pl.name)}${on.has(pl.name) ? '' : '<span class="bench">bench</span>'}</button>`).join('')}</div>
+      </div>`;
+    }).join('')}</div>` : '';
 }
 
 /* ---------- round + team picker (bare-link path) ---------- */
@@ -281,12 +332,31 @@ function showTeams() {
   // team fields start empty
   $('teama').innerHTML = '<option value=""></option>' + options;
   $('teamb').innerHTML = '<option value=""></option>' + options;
+  $('teama').onchange = renderStarters;
+  $('teamb').onchange = renderStarters;
+  $('changeteams').onclick = () => { locked = false; renderTeamPick(); };
+  $('useschedteams').onclick = () => { applySchedDefault(); };
+  $('starters').onclick = (e) => {
+    const btn = e.target.closest('[data-player]');
+    if (!btn) return;
+    const on = starterSel.get(btn.dataset.team);
+    if (on.has(btn.dataset.player)) on.delete(btn.dataset.player);
+    else on.add(btn.dataset.player);
+    renderStarters();
+  };
+  renderTeamPick();
   $('start').onclick = async () => {
     const a = $('teama').value, b = $('teamb').value;
     const round = selectedRound;
     const info = (state.packets || []).find((p) => p.number === round);
     try { pickTeams(teams, a, b); } catch (e) { say(e.message, true); return; }
     if (!info) { say('no packet for round ' + round, true); return; }
+    // the same two teams on swapped sides is not a switch
+    const same = schedGame && [a, b].sort().join('\n') === [schedGame.a, schedGame.b].sort().join('\n');
+    if (schedGame && !same && !confirm(`WARNING: The schedule indicates that "${schedGame.a}" vs "${
+      schedGame.b}" are playing in the room ${state.room}. Are you sure you want to switch?`)) return;
+    const noStarters = [a, b].filter((n) => !(starterSel.get(n) || new Set()).size);
+    if (noStarters.length) { say('Pick at least one starter for ' + noStarters.join(' and '), true); return; }
     const existing = deviceMetas().find((m) => m.round === round);
     if (existing && !confirm(
       `round ${round} already has a game on this device (${existing.a} vs ${existing.b}). start a new one?`)) {
@@ -306,7 +376,10 @@ function showTeams() {
       // tiebreakers enter via MODAQ's Add Questions dialog; the mapping
       // starts at the packet's own size and grows as the mod adds them
       tb: { t: packet.tossups.length, b: (packet.bonuses || []).length, tu: [], bo: [] },
+      starters: { [a]: [...starterSel.get(a)], [b]: [...starterSel.get(b)] },
     };
+    // the room has started this round (auto-advance); nothing waits on it
+    pub('/b/' + secret + '/start?round=' + round, { method: 'POST' }).catch(() => {});
     localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
     history.replaceState(null, '', gameLink(id));
     $('picker').hidden = true;

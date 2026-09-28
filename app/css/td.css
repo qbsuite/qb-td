@@ -163,6 +163,16 @@ a.chip:hover, button.chip:hover { color: var(--fg); text-decoration: none; box-s
 tr.catsub td { color: var(--muted); }
 tr.catsub td:first-child { padding-left: 28px; }
 tr.cattop td:first-child { font-weight: 600; }
+/* Live Hub: auto-advance switch and which rooms have started the round */
+.autoadv { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 10px; display: grid; gap: 8px; }
+.autoadv .fg { color: var(--fg); }
+.roomstarts { display: flex; flex-wrap: wrap; gap: 6px; }
+.roomstart { font-size: 13px; border-radius: 8px; padding: 3px 10px; background: var(--hover-bg); display: inline-flex; gap: 6px; align-items: center; }
+.roomstart .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--line); }
+.roomstart.on { background: var(--pick); }
+.roomstart.on .dot { background: var(--ok); }
+.roomstart.bye { color: var(--muted); background: none; box-shadow: inset 0 0 0 1px var(--line); }
+.roomstart.bye .dot { background: none; border: 1px dashed var(--muted); }
 /* Live Hub: protests drawer */
 .protest td { padding-block: 9px; vertical-align: top; }
 .protest .q { font-weight: 600; white-space: nowrap; }

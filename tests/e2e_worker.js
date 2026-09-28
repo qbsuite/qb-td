@@ -1067,6 +1067,59 @@ ok('delete bucket', r.status === 200);
 r = await call('/b/' + secret);
 ok('bucket link dead', r.status === 404);
 
+// Auto-advance: with the TD's switch on, the next round opens once every
+// room with a game in the current one has started it. Its own tournament,
+// so the main one's round and rooms stay as the checks around it expect.
+{
+  const aslug = 'e2e-auto-' + Math.random().toString(36).slice(2, 6);
+  const AA = '/a/' + (await call('/api/tournaments', { method: 'POST', json: { name: 'Auto', slug: aslug } })).body.admin_secret;
+  const mk = async (name) => (await call(AA + '/buckets', { method: 'POST', json: { room_name: name } })).body;
+  const [r1, r2, r3] = [await mk('Room 1'), await mk('Room 2'), await mk('Room 3')];
+  for (const n of [1, 2]) await call(`${AA}/packet?round=${n}&name=P${n}.json`, { method: 'POST', body: '{"tossups":[]}' });
+  // Room 3 has a bye in round 1
+  await call(AA + '/schedule', { method: 'POST', json: { v: 1, updated: 0,
+    rooms: [{ name: 'Room 1', bucket: r1.id }, { name: 'Room 2', bucket: r2.id }, { name: 'Room 3', bucket: r3.id }],
+    phases: [{ name: 'P', rounds: [
+      { round: 1, games: [{ room: 0, a: { team: 'A' }, b: { team: 'B' } }, { room: 1, a: { team: 'C' }, b: { team: 'D' } }], byes: [] },
+      { round: 2, games: [{ room: 0, a: { team: 'A' }, b: { team: 'C' } }, { room: 2, a: { team: 'B' }, b: { team: 'D' } }], byes: [] },
+    ] }] } });
+  await call(AA + '/start', { method: 'POST' });
+  const round = async () => (await call(AA)).body.tournament.current_round;
+
+  // the reader warming its cache is not starting
+  await fetch(`${BASE}/b/${r1.secret}/packet?round=1&warm=1`);
+  ok('a warm fetch starts nothing', (await call(AA)).body.starts.length === 0);
+  // switch off: rooms starting never moves the round
+  r = await call(`/b/${r1.secret}/start?round=1`, { method: 'POST' });
+  ok('reader says it started', r.status === 200, r.body);
+  await call(`/b/${r2.secret}/start?round=1`, { method: 'POST' });
+  ok('with the switch off, the round stays', await round() === 1);
+  ok('the dashboard sees who started',
+    (await call(AA)).body.starts.filter((x) => x.round === 1).length === 2);
+  // switching it on once everyone has started opens the round there and then
+  const settings = JSON.parse((await call(AA)).body.tournament.settings || '{}');
+  r = await call(AA, { method: 'POST', json: { settings: { ...settings, autoAdvance: true } } });
+  ok('switching on with every room started opens the next round', r.body.advanced === true && await round() === 2, r.body);
+
+  // round 2: Room 2 has the bye, so Rooms 1 and 3 are the ones waited on.
+  // Round 3 has no packet yet, so even then it stays.
+  await call(`/b/${r1.secret}/start?round=2`, { method: 'POST' });
+  ok('one room of two: still round 2', await round() === 2);
+  // a download from the uploads page counts too (rooms reading off paper)
+  await fetch(`${BASE}/b/${r3.secret}/packet?round=2`);
+  ok('every room started, but no packet for round 3: stays', await round() === 2);
+  await call(`${AA}/packet?round=3&name=P3.json`, { method: 'POST', body: '{"tossups":[]}' });
+  ok('round 3\'s packet arriving opens it, every room having started', await round() === 3);
+  // the TD setting a round back wins: rooms that had already started it
+  // don't push it on again
+  await call(AA, { method: 'POST', json: { current_round: 1 } });
+  await call(`/b/${r2.secret}/start?round=1`, { method: 'POST' });
+  await fetch(`${BASE}/b/${r1.secret}/packet?round=1`);
+  ok('a round the TD set back is not pushed on by old starts', await round() === 1);
+  r = await call(`/b/${r1.secret}/start?round=9`, { method: 'POST' });
+  ok('a start for a round not open yet is refused', r.status === 400, r.body);
+}
+
 // Expiry. A second room, so the closed tournament's rooms can be checked
 // after the first room was deleted above.
 r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 9' } });

@@ -11,7 +11,7 @@ import { buildYft } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText } from '../app/engine/schedule.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
@@ -1280,6 +1280,24 @@ test('tokenizeQuestionHtml keeps per-word formatting at tokenizeQuestion positio
   assert.deepEqual(tokenizeQuestionHtml(''), []);
 });
 
+test('roundRooms: who plays a round, by bucket link then room name; the rest have a bye', () => {
+  const buckets = [{ id: 11, room_name: 'Room 1' }, { id: 12, room_name: 'Room 2' }, { id: 13, room_name: 'Library' }];
+  const schedule = {
+    rooms: [{ name: 'Room 1', bucket: 11 }, { name: ' library ', bucket: null }, { name: 'Room 2', bucket: 12 }],
+    phases: [{ name: 'P', rounds: [
+      { round: 1, games: [{ room: 0, a: { team: 'A' }, b: { team: 'B' } }, { room: 1, a: { team: 'C' }, b: { team: 'D' } }], byes: [] },
+      // a placeholder game (no second team yet) is no game
+      { round: 2, games: [{ room: 2, a: { team: 'A' }, b: null }], byes: [] },
+    ] }],
+  };
+  assert.deepEqual(roundRooms(schedule, 1, buckets).map((r) => [r.name, r.bye]),
+    [['Room 1', false], ['Room 2', true], ['Library', false]]);
+  assert.deepEqual(roundRooms(schedule, 2, buckets).map((r) => r.bye), [true, true, true]);
+  // no such round in the schedule (or no schedule): every room plays
+  assert.deepEqual(roundRooms(schedule, 9, buckets).map((r) => r.bye), [false, false, false]);
+  assert.deepEqual(roundRooms(null, 1, buckets).map((r) => r.bye), [false, false, false]);
+});
+
 /* ---------- category stats ---------- */
 
 function catQbj(buzzList, bonuses = {}) {
@@ -1457,16 +1475,18 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
   ];
   const q = categoryQuestionStats(entries, MARKED);
   const t = (sub) => q.tossups.find((r) => r.sub === sub);
-  // American Lit tossup: read twice, converted twice, one power, words 5 and 11
+  // American Lit tossup: one question, read in both rooms — converted twice,
+  // one power, words 5 and 11. Readings never pass for questions: with two
+  // rooms, heard is double the question count.
   assert.deepEqual({ ...t('American Literature') }, { cat: 'Literature', sub: 'American Literature',
-    heard: 2, conv: 2, powers: 1, negs: 0, words: [5, 11] });
+    questions: 1, heard: 2, conv: 2, powers: 1, negs: 0, words: [5, 11] });
   // British Lit: read twice, converted once (after a neg), negged both times
   assert.deepEqual({ heard: t('British Literature').heard, conv: t('British Literature').conv,
     negs: t('British Literature').negs }, { heard: 2, conv: 1, negs: 2 });
   const b = (cat) => q.bonuses.find((r) => r.cat === cat);
   // marked 'hem': game 1 got parts 2+3 (e, m), game 2 got parts 1+2 (h, e)
   assert.deepEqual({ ...b('Literature') }, { cat: 'Literature', sub: 'American Literature',
-    heard: 2, pts: 40, dHeard: 2, e: 2, m: 1, h: 1, marked: 1, ranked: 0 });
+    questions: 1, heard: 2, pts: 40, dHeard: 2, e: 2, m: 1, h: 1, marked: 1, ranked: 0 });
   // biology was read once (game 2 had no correct buzz on tossup 2): ranked by
   // its only reading, the converted part is the easy one
   assert.deepEqual({ heard: b('Science').heard, e: b('Science').e, m: b('Science').m,
@@ -1479,11 +1499,11 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
 
   // display lines: a category, then its subcategories; filters narrow
   const lines = questionLines(q.tossups, '', '');
-  assert.deepEqual(lines.map((l) => [l.cat, l.sub, l.isSub, l.heard]), [
-    ['Literature', '', false, 4],
-    ['Literature', 'American Literature', true, 2],
-    ['Literature', 'British Literature', true, 2],
-    ['Mythology', '', false, 2],
+  assert.deepEqual(lines.map((l) => [l.cat, l.sub, l.isSub, l.questions, l.heard]), [
+    ['Literature', '', false, 2, 4],
+    ['Literature', 'American Literature', true, 1, 2],
+    ['Literature', 'British Literature', true, 1, 2],
+    ['Mythology', '', false, 1, 2],
   ]);
   assert.deepEqual(questionLines(q.tossups, 'Literature', 'British Literature').map((l) => [l.sub, l.heard]),
     [['British Literature', 2]]);

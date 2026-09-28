@@ -230,9 +230,12 @@ export function catBreakdown(rows, team, player) {
    the categories tab's Questions view. */
 
 /**
- * Per (category, subcategory) slice: {tossups: [{cat, sub, heard, conv,
- * powers, negs, words}], bonuses: [{cat, sub, heard, pts, dHeard, e, m,
- * h, marked, ranked}]}. A tossup reading converts on its first correct
+ * Per (category, subcategory) slice: {tossups: [{cat, sub, questions,
+ * heard, conv, powers, negs, words}], bonuses: [{cat, sub, questions,
+ * heard, pts, dHeard, e, m, h, marked, ranked}]}. `questions` counts
+ * distinct packet questions (round + number); `heard` counts readings of
+ * them, one per room that read it — with two rooms, twice as many. A
+ * tossup reading converts on its first correct
  * buzz (words: that buzz's word number); it counts as negged when any
  * buzz on it lost points. Bonus difficulty comes from the packet's own
  * e/m/h marks where it has them; a bonus without them has its parts
@@ -244,10 +247,14 @@ export function catBreakdown(rows, team, player) {
 export function categoryQuestionStats(entries, catmap) {
   const tossups = new Map();
   const bonuses = new Map();
-  const slice = (map, cat, sub, init) => {
+  const seen = new Map(); // slice row -> Set of "round:number" read in it
+  const slice = (map, cat, sub, init, qkey) => {
     const key = JSON.stringify([cat, sub]);
-    if (!map.has(key)) map.set(key, { cat, sub, ...init() });
-    return map.get(key);
+    if (!map.has(key)) map.set(key, { cat, sub, questions: 0, ...init() });
+    const row = map.get(key);
+    if (!seen.has(row)) seen.set(row, new Set());
+    if (!seen.get(row).has(qkey)) { seen.get(row).add(qkey); row.questions++; }
+    return row;
   };
   const tInit = () => ({ heard: 0, conv: 0, powers: 0, negs: 0, words: [] });
   const bInit = () => ({ heard: 0, pts: 0, dHeard: 0, e: 0, m: 0, h: 0, marked: 0, ranked: 0 });
@@ -260,7 +267,7 @@ export function categoryQuestionStats(entries, catmap) {
     for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
       const info = catInfo(cats.t, tossup);
       if (!info) continue;
-      const r = slice(tossups, info.cat, info.sub, tInit);
+      const r = slice(tossups, info.cat, info.sub, tInit, e.round + ':' + tossup);
       r.heard++;
       const right = buzzes.find((b) => b.value > 0);
       if (right) {
@@ -274,7 +281,7 @@ export function categoryQuestionStats(entries, catmap) {
       if (!bn.team) continue; // a bonus nobody controlled wasn't read
       const info = catInfo(cats.b, bn.bonus);
       if (!info) continue;
-      const r = slice(bonuses, info.cat, info.sub, bInit);
+      const r = slice(bonuses, info.cat, info.sub, bInit, e.round + ':' + bn.bonus);
       r.heard++;
       r.pts += bn.total;
       if (bn.parts.length !== 3) continue;

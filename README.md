@@ -50,7 +50,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   is the day-of page, carrying a notice until setup is complete: a
   status strip tracks the live round (packet up, games in vs scheduled,
   which rooms are still out, tiebreakers used vs unused) with one-click
-  advance next to the free set-any-round control; the **broadcasts**
+  advance next to the free set-any-round control, and under it the
+  **Open the next round automatically** switch (off by default, one
+  switch for the whole tournament): the Worker opens the next round once
+  every room with a game in the current one has started it — a room has
+  started a round when its reader presses Start on it, or its uploads
+  page downloads that round's packet — with a chip per room showing who
+  has; it never opens a round with no packet, and never pushes on a
+  round the TD set back by hand; the **broadcasts**
   drawer (one line, up to 200 characters, addressed to the public page
   and/or the rooms — every room, or a checked few — as a note or an
   alert, with a mandatory expiry from 30 minutes to the tournament's own
@@ -99,9 +106,15 @@ Part of [qbsuite](https://qbsuite.github.io/).
   a round's packet (the live round by default; played rounds stay
   selectable for a room running behind), the tournament roster, and the
   TO's game format — the mod picks the round and two teams and reads.
-  With a schedule whose room is linked to this bucket, the pickers
-  preselect the round's scheduled matchup (still overridable) and the
-  room's schedule line shows above the round list; a tiebreaker pool
+  With a schedule whose room is linked to this bucket, the round's
+  scheduled matchup is locked in as the matchup rather than two
+  pickers: changing it takes "Change teams", and starting with other
+  teams asks first ("WARNING: The schedule indicates that "A" vs "B" are
+  playing in the room Room 3. Are you sure you want to switch?"). Under
+  the matchup the mod ticks each team's **starters** — every player
+  listed, the roster's first four ticked, any number at least one — and
+  MODAQ starts the game with them. The room's schedule line shows above
+  the round list; a tiebreaker pool
   shows beside it with each question's heard-by state, and during a game
   the pool lives in MODAQ's Actions → Add questions dialog (qb-td's own
   selector, swapped in at bundle time — the stock file picker stays as
@@ -554,6 +567,8 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-sets.sql
 # ...and one from before Start tournament:
 #   npx wrangler d1 execute qb-td --local --file migrate-start.sql
+# ...and one from before auto-advance:
+#   npx wrangler d1 execute qb-td --local --file migrate-starts.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled
 npx wrangler dev --local --port 8799 --test-scheduled &
@@ -591,7 +606,10 @@ end, which is also how it exercises the `final` caching path.
    BEFORE the Worker that expects it is deployed — the cron's queue query
    names `set_id` — and one from before Start tournament needs
    `npx wrangler d1 execute qb-td --remote --file migrate-start.sql`,
-   also before the Worker (room routes name `started`),
+   also before the Worker (room routes name `started`), and one from
+   before auto-advance needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-starts.sql`
+   (the packet route writes `room_starts`),
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy
