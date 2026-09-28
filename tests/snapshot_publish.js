@@ -221,11 +221,6 @@ const realFetch = globalThis.fetch;
   const t = {
     id: 1, slug: 'stanford-open', name: 'Stanford Open', published: 1, pub_dirty: 1,
     pub_snapshot: null, roster_r2_key: null, current_round: 4, created: now,
-    announce: JSON.stringify([
-      { id: 'a1', text: 'lunch moved', level: 'info', created: now, expires: now + 3600_000, pub: true },
-      { id: 'a2', text: 'gone', level: 'info', created: now - 10, expires: now - 1, pub: true },
-      { id: 'a3', text: 'rooms only', level: 'info', created: now, expires: now + 3600_000, rooms: true },
-    ]),
   };
   const state = {
     tournaments: [t],
@@ -393,9 +388,9 @@ const realFetch = globalThis.fetch;
     t.pub_snapshot === null && t.pub_dirty === 1);
 }
 
-// 9. Live-only change (broadcast edited, blobs untouched): nothing is
-// committed at all. Broadcasts reach viewers through /pub/:slug, so a
-// change no blob holds costs GitHub nothing — the descriptor keeps
+// 9. Live-only change (round moved on, blobs untouched): nothing is
+// committed at all. The round number reaches viewers through /pub/:slug,
+// so a change no blob holds costs GitHub nothing — the descriptor keeps
 // advertising the commit that already has the blobs.
 {
   const gh = fakeGithub();
@@ -408,9 +403,6 @@ const realFetch = globalThis.fetch;
     pub_snapshot: JSON.stringify({
       sha: 'head-0', rounds: { 1: '3:1' }, schedule: null, cats: null, roster: false,
     }),
-    announce: JSON.stringify([
-      { id: 'b1', text: 'finals in room A', level: 'alert', created: now, expires: now + 3600_000, pub: true },
-    ]),
   };
   const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }] };
   const objects = {

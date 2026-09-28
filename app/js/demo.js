@@ -154,7 +154,6 @@ function bucketState(room) {
     packets: packetRounds().map((n) => ({ number: n, packet_name: packetName(n) })),
     roster: true,
     settings: fixture.settings,
-    announce: [],
     uploads: [...list].reverse().map(({ qbj, room: _r, ...u }) => u),
     upload_count: list.length,
   };
@@ -195,7 +194,7 @@ async function upload(room, query, opts) {
     created: Date.now(), qbj, room: fixture.rooms[room], protests,
   });
   saveUploads(list);
-  return { id, filename, round, kind, error, announce: [] };
+  return { id, filename, round, kind, error };
 }
 
 /* ---------- public routes (/pub/demo) ---------- */
@@ -207,7 +206,6 @@ function pubState() {
     name: fixture.name,
     current_round: currentRound(),
     roster: true,
-    announce: [],
     schedule: fixture.schedule.updated,
     // Truthy mode shows the tab; the sessionStorage key seeded below
     // stands in for the password a real tournament's viewers enter.
@@ -238,7 +236,6 @@ function adminDetail() {
       published: 1,
       // a finished setup: the checklist's visit-only step counts as done
       settings: JSON.stringify({ ...fixture.settings, statsSeen: true }),
-      announce: '[]',
       rulings: local.getItem(RULINGS_KEY) || '{}',
       roster_r2_key: 't/1/roster.qbj',
       roster_name: 'roster.qbj',

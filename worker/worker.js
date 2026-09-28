@@ -66,9 +66,6 @@ const MAX_BUCKETS = 60;
 // one link, ~2 files per game, re-exports adding rows).
 const MAX_FILES_PER_BUCKET = 600;
 const MAX_NAME = 120;
-const MAX_ANNOUNCE = 8;                  // live broadcasts per tournament
-const MAX_ANNOUNCE_TEXT = 200;
-const MAX_ANNOUNCE_JSON = 2048;
 const MAX_TB_BLOB = 8 * 1024 * 1024;     // tiebreaker pool blob cap
 const MAX_TB_USES = 500;                 // usage log cap (griefing backstop)
 const MAX_PROTESTS = 50;                 // protests kept per uploaded game
@@ -452,82 +449,6 @@ function stripMatchNotes(obj) {
   return obj;
 }
 
-/* ---------- broadcasts ----------
-   The TO's short messages to the public page and/or the moderator rooms.
-   They live as one JSON array on the tournament row so they ride along on
-   requests both surfaces already make (/pub/:slug, /b/:secret) — no new
-   route, no new blob, and nothing starts polling that wasn't already.
-
-   Every message carries an expiry, and it is not optional: the admin link
-   dies 48h after creation while the published page outlives it, so a
-   message with no end would strand "lunch at 12:15" on a finished
-   tournament with nobody left who can take it down. */
-
-// Whole-list write (POST /a/:secret with `announce`), same idiom as
-// settings. Returns {error} or {json} ready to bind.
-function cleanAnnounce(list, t) {
-  if (!Array.isArray(list)) return { error: 'bad announce' };
-  if (list.length > MAX_ANNOUNCE) return { error: `too many broadcasts (${MAX_ANNOUNCE} max)` };
-  const out = [];
-  for (const a of list) {
-    if (!a || typeof a !== 'object') return { error: 'bad broadcast' };
-    const text = String(a.text ?? '').trim().slice(0, MAX_ANNOUNCE_TEXT);
-    if (!text) return { error: 'broadcast text required' };
-    const toPub = !!a.pub;
-    let rooms = false;
-    if (a.rooms === true) rooms = true;
-    else if (Array.isArray(a.rooms)) {
-      rooms = [...new Set(a.rooms.map(Number).filter((n) => Number.isInteger(n)))]
-        .slice(0, MAX_BUCKETS);
-      if (!rooms.length) rooms = false;
-    }
-    if (!toPub && rooms === false) return { error: 'broadcast needs an audience' };
-    const created = Number.isInteger(a.created) ? a.created : Date.now();
-    const expires = Number(a.expires);
-    if (!Number.isInteger(expires)) return { error: 'broadcast needs an expiry' };
-    out.push({
-      id: /^[a-z0-9]{1,16}$/.test(String(a.id || '')) ? String(a.id) : randToken(6),
-      text,
-      level: a.level === 'alert' ? 'alert' : 'note',
-      pub: toPub,
-      rooms,
-      created,
-      // never past the tournament's own close
-      expires: Math.min(expires, closesAt(t)),
-    });
-  }
-  const json = JSON.stringify(out);
-  if (json.length > MAX_ANNOUNCE_JSON) return { error: 'broadcasts too large' };
-  return { error: null, json };
-}
-
-function parseAnnounce(row) {
-  let list;
-  try { list = JSON.parse(row.announce || '[]'); } catch (e) { return []; }
-  return Array.isArray(list) ? list.filter((a) => a && typeof a === 'object') : [];
-}
-
-// What a viewer gets: text and level, never the audience — a room has no
-// business learning that a message also went to the public page, or to
-// which other rooms. Alerts first, then newest first. A message with no
-// usable expiry is already gone (fail closed).
-function visibleAnnounce(list) {
-  const now = Date.now();
-  return list
-    .filter((a) => Number(a.expires) > now)
-    .map((a) => ({ id: a.id, text: a.text, level: a.level, created: a.created }))
-    .sort((x, y) => (x.level === y.level
-      ? y.created - x.created
-      : x.level === 'alert' ? -1 : 1));
-}
-function pubAnnounce(row) {
-  return visibleAnnounce(parseAnnounce(row).filter((a) => a.pub));
-}
-function roomAnnounce(row, bucketId) {
-  return visibleAnnounce(parseAnnounce(row).filter((a) =>
-    a.rooms === true || (Array.isArray(a.rooms) && a.rooms.includes(bucketId))));
-}
-
 /* ---------- public game blobs and per-round shards ----------
    The public copy of a game is its own object, t/<tid>/pub/<fileId>.json,
    written once by the upload that produced it. Nothing is shared, so the
@@ -723,8 +644,8 @@ async function materialize(env, t) {
    one. pub_snapshot records what the last commit contained — the
    per-blob stamps mirror pubState's, so the client's
    refetch-on-stamp-move logic works identically either way. Only blobs
-   are published, so a mutation that changes nothing a blob holds (a
-   broadcast, the round number) needs no publish at all — it reaches
+   are published, so a mutation that changes nothing a blob holds (the
+   round number, the name) needs no publish at all — it reaches
    viewers through /pub/:slug on their next refresh.
 
    Config (all optional — with SNAPSHOT_REPO unset this whole section is
@@ -752,6 +673,23 @@ function snapshotsEnabled(env) {
 // migrate-pub.sql is no longer optional.
 async function markPub(env, tid) {
   await env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(tid).run();
+}
+
+// The Live Hub's change counter (tournaments.rev) moves by trigger on
+// every D1 write it can see (migrate-rev.sql). The tiebreaker pools are
+// R2 blobs no trigger watches, so their routes bump it here — only on
+// success, and for a set's pool on every mirror's hub. Returns res.
+async function bumpRev(env, tid, res) {
+  if (res.ok) await env.DB.prepare('UPDATE tournaments SET rev = rev + 1 WHERE id = ?1').bind(tid).run();
+  return res;
+}
+async function bumpSetRev(env, sid, res) {
+  if (res.ok) {
+    await env.DB.prepare(
+      'UPDATE tournaments SET rev = rev + 1 WHERE id IN (SELECT tournament_id FROM set_mirrors WHERE set_id = ?1)'
+    ).bind(sid).run();
+  }
+  return res;
 }
 
 /* ----- GitHub auth: App installation token (preferred) or PAT ----- */
@@ -907,7 +845,7 @@ async function buildPublish(env, t, manifest, shardsOnly = false) {
 
   // A blob whose stamp matches the last publish is already at the branch
   // head (base_tree carries it forward), so re-uploading it only spends
-  // GitHub API calls — the difference between a broadcast-only republish
+  // GitHub API calls — the difference between a state-only republish
   // costing 6 calls and 13, and what keeps a 30-tournament day under the
   // App's 5,000/hour rate limit. Skips need prev.sha: without a prior
   // commit the stamps have nothing on the branch to vouch for.
@@ -1225,7 +1163,8 @@ async function getTournament(env, t, ctx) {
   const rooms = await Promise.all(buckets.results.map(async ({ secret_enc, ...b }) => ({
     ...b, secret: secret_enc && t.ckey ? await decField(t.ckey, secret_enc) : b.secret,
   })));
-  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, skey, set_key_enc, ...pub_t } = t;
+  // announce: the retired broadcasts column, still on old rows
+  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, skey, set_key_enc, announce, ...pub_t } = t;
   return json(env, {
     // `set` is what the dashboard's mirror notice reads: whose packets
     // these are, that the games are shared with that set's editors, and
@@ -1284,11 +1223,9 @@ async function updateTournament(request, env, t) {
       binds.push(await wrapKey(body.buzz_token, 'buzz', t.ckey));
     }
   }
-  if (body.announce !== undefined) {
-    const cleaned = cleanAnnounce(body.announce, t);
-    if (cleaned.error) return err(env, 400, cleaned.error);
-    sets.push('announce = ?'); binds.push(cleaned.json);
-  }
+  // broadcasts were retired (9/28/2026); a dashboard still open from
+  // before then hears so instead of a silent no-op
+  if (body.announce !== undefined) return err(env, 400, 'broadcasts were removed');
   if (body.rulings !== undefined) {
     const cleaned = cleanRulings(body.rulings);
     if (cleaned.error) return err(env, 400, cleaned.error);
@@ -1300,7 +1237,7 @@ async function updateTournament(request, env, t) {
     `UPDATE tournaments SET ${sets.join(', ')} WHERE id = ?`
   ).bind(...binds, id).run();
   // Flagging on every field is deliberately broad. Most of these (name,
-  // round, broadcasts) only ever reach viewers through /pub/:slug, so
+  // round) only ever reach viewers through /pub/:slug, so
   // they need no publish at all; settings can change what a blob holds,
   // and publishing recomputes cheaply and idempotently, so one flag for
   // the whole route beats reasoning about which fields matter.
@@ -1350,15 +1287,6 @@ async function startTournament(env, t) {
     'UPDATE tournaments SET started = ?2 WHERE id = ?1 AND started IS NULL'
   ).bind(t.id, started).run();
   if (!out.meta.changes) return err(env, 409, 'already started');
-  // broadcasts were capped at the setup deadline; the new one can be earlier
-  const { results } = await env.DB.prepare('SELECT announce FROM tournaments WHERE id = ?1').bind(t.id).all();
-  let list = [];
-  try { list = JSON.parse(results[0].announce) || []; } catch (e) { /* keep [] */ }
-  if (Array.isArray(list) && list.length) {
-    const closes = started + RUN_TTL;
-    await env.DB.prepare('UPDATE tournaments SET announce = ?2 WHERE id = ?1').bind(t.id,
-      JSON.stringify(list.map((a) => ({ ...a, expires: Math.min(Number(a.expires) || 0, closes) })))).run();
-  }
   await markPub(env, t.id);
   return json(env, { started, closes: started + RUN_TTL });
 }
@@ -2085,7 +2013,7 @@ async function logTbUses(env, b, roomName, round, teams, usedIds) {
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, ' +
-    't.current_round, t.roster_r2_key, t.settings, t.announce, t.set_id, t.set_key_enc, ' +
+    't.current_round, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, ' +
     't.created AS t_created, t.started ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2'
   ).bind(secret, await secretHash(secret)).all();
@@ -2143,7 +2071,6 @@ async function bucketState(env, secret) {
     packets,
     roster: !!b.roster_r2_key,
     settings,
-    announce: roomAnnounce(b, b.id),
     uploads: uploads.results,
     upload_count: count.results[0].n,
   });
@@ -2211,10 +2138,7 @@ async function bucketUpload(request, url, env, secret) {
   if (tbReport) {
     await logTbUses(env, b, b.room_name, round, tbReport.teams, tbReport.used);
   }
-  // Broadcasts ride back on the upload response: it's how the reader page
-  // (which never polls) picks up new messages, at exactly the between-rounds
-  // moment they're written for.
-  return json(env, { id: fileId, filename, round, kind, error, announce: roomAnnounce(b, b.id) });
+  return json(env, { id: fileId, filename, round, kind, error });
 }
 
 async function bucketPacket(env, secret, url) {
@@ -2629,8 +2553,6 @@ async function pubStateBody(env, t, pub) {
     name: t.name,
     current_round: t.current_round,
     roster: !!t.roster_r2_key,
-    // TO broadcasts addressed to the public page; audience fields stay server-side
-    announce: pubAnnounce(t),
     // stamp for the schedule tab: refetch only when this moves
     schedule: schedObj ? schedObj.uploaded.getTime() : null,
     // buzzpoints tab: the mode, the KDF parameters a viewer's browser
@@ -2853,7 +2775,7 @@ async function pubRoster(env, slug) {
    Who sees what. The editor's link reads everything, always. The public
    set page exists while the set's own `published` flag is on, and then
    shows every mirror's results — a mirror TD's publish switch governs
-   only that mirror's own page (schedule, broadcasts). Set-wide buzzpoint
+   only that mirror's own page (schedule). Set-wide buzzpoint
    text is password-gated exactly like a tournament's (buzzGate), served
    for a packet version once any mirror has finished a round on it; when
    to hand that password out, with later mirrors still to play, is the
@@ -3904,12 +3826,63 @@ async function pubSetQPacket(request, url, env, slug) {
   return gatedPacket(request, env, obj, row.r2_key, row.name, s.buzz_wrap, (skey) => ({ skey }));
 }
 
+/* ---------- D1 meter (dev only) ----------
+   `wrangler dev --var METER:1` counts the D1 rows every request and cron
+   tick reads and writes — the units D1 bills — so tests/sim_usage.js and
+   tests/e2e_usage.js can price a simulated day. GET /__meter reads the
+   running totals, DELETE /__meter zeroes them. Without METER (every real
+   deploy) env passes through untouched and /__meter is a 404. */
+const meter = { queries: 0, rows_read: 0, rows_written: 0 };
+
+function meterResult(res) {
+  for (const r of Array.isArray(res) ? res : [res]) {
+    if (!r || !r.meta) continue;
+    meter.queries++;
+    meter.rows_read += r.meta.rows_read || 0;
+    meter.rows_written += r.meta.rows_written || 0;
+  }
+  return res;
+}
+
+function meterStmt(stmt) {
+  return new Proxy(stmt, {
+    get(target, key) {
+      const v = target[key];
+      if (typeof v !== 'function') return v;
+      if (key === 'bind') return (...a) => meterStmt(v.apply(target, a));
+      if (key === 'all' || key === 'run') return async (...a) => meterResult(await v.apply(target, a));
+      return v.bind(target);
+    },
+  });
+}
+
+function metered(env) {
+  if (!env.METER) return env;
+  const db = new Proxy(env.DB, {
+    get(target, key) {
+      const v = target[key];
+      if (key === 'prepare') return (...a) => meterStmt(v.apply(target, a));
+      // statements handed to batch are our proxies: unwrap isn't needed,
+      // D1 reads them through the proxy's forwarded fields
+      if (key === 'batch') return async (stmts) => meterResult(await v.call(target, stmts));
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  });
+  return new Proxy(env, { get: (target, key) => (key === 'DB' ? db : target[key]) });
+}
+
 /* ---------- router ---------- */
 export default {
   async fetch(request, env, ctx) {
+    env = metered(env);
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+
+    if (env.METER && path === '/__meter') {
+      if (method === 'DELETE') { meter.queries = 0; meter.rows_read = 0; meter.rows_written = 0; }
+      return new Response(JSON.stringify(meter), { headers: { 'Content-Type': 'application/json' } });
+    }
 
     if (method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
@@ -3970,8 +3943,8 @@ export default {
       if (sub === '/gamefile' && method === 'GET') return setMirrorFile(env, s, url);
       if (sub === '/file' && method === 'GET') return setPacketFile(url, env, s);
       if (sub === '/tiebreakers' && method === 'GET') return setTiebreakers(env, s);
-      if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, SET_TB_KEY(s.id), s.ckey);
-      if (sub === '/tiebreakers' && method === 'DELETE') return clearSetTiebreakers(env, s);
+      if (sub === '/tiebreakers' && method === 'POST') return bumpSetRev(env, s.id, await uploadTiebreakers(request, url, env, SET_TB_KEY(s.id), s.ckey));
+      if (sub === '/tiebreakers' && method === 'DELETE') return bumpSetRev(env, s.id, await clearSetTiebreakers(env, s));
       if (sub === '/mirrors' && method === 'POST') return createMirror(request, env, s);
       if ((mm = sub.match(/^\/mirrors\/(\d+)$/)) && method === 'POST') return updateMirror(request, env, s, Number(mm[1]));
       if (sub === '/state' && method === 'GET') return json(env, await setStateBody(env, s));
@@ -3986,7 +3959,17 @@ export default {
       if (adminClosed(t)) return err(env, 410, 'tournament closed');
       const sub = m[2] || '';
       let mm;
-      if (sub === '' && method === 'GET') return getTournament(env, t, ctx);
+      if (sub === '' && method === 'GET') {
+        // The Live Hub's refresh sends the rev of the detail it holds; when
+        // nothing has moved (tournaments.rev, bumped by triggers — see
+        // migrate-rev.sql) the answer is the admin lookup already paid for,
+        // not the rooms + files + starts reads of a full detail.
+        const held = url.searchParams.get('rev');
+        if (held !== null && /^\d+$/.test(held) && Number(held) === t.rev) {
+          return json(env, { unchanged: true, rev: t.rev });
+        }
+        return getTournament(env, t, ctx);
+      }
       if (sub === '' && method === 'POST') return updateTournament(request, env, t);
       if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
       if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
@@ -3994,8 +3977,8 @@ export default {
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
       if (sub === '/start' && method === 'POST') return startTournament(env, t);
       if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
-      if (sub === '/tiebreakers' && method === 'POST') return uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey);
-      if (sub === '/tiebreakers' && method === 'DELETE') return deleteTiebreakers(env, TB_KEY(t.id));
+      if (sub === '/tiebreakers' && method === 'POST') return bumpRev(env, t.id, await uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey));
+      if (sub === '/tiebreakers' && method === 'DELETE') return bumpRev(env, t.id, await deleteTiebreakers(env, TB_KEY(t.id)));
       if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
       if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
       if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
@@ -4014,6 +3997,6 @@ export default {
   // Cron (wrangler.toml [triggers]): rebuilds dirty tournaments' round
   // shards and, when configured, publishes them to the GitHub data repo.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(tickDirty(env));
+    ctx.waitUntil(tickDirty(metered(env)));
   },
 };

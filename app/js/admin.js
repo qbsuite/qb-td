@@ -12,7 +12,7 @@
 // The dashboard is two views. Tournament Setup is the before-the-day
 // work — Rooms, Packets + Tiebreakers, Roster, Schedule — with a progress
 // pill per step. The Live Hub is the day-of page — round control,
-// broadcasts, settings, stats + export, uploads — and carries a notice
+// protests, settings, stats + export, uploads — and carries a notice
 // until setup is complete.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
@@ -29,7 +29,6 @@ import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_
 import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
   hasPlaceholders, poolStandings, fillPlaceholders, roundRooms } from '../engine/schedule.js';
-import { annLive, annTime } from './announce.js';
 import { buzzCredentials } from './buzzkey.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
@@ -232,51 +231,25 @@ let rosterTeams = null; // structured editor working copy [{name, players}]
 let rosterUpload = null; // parsed upload awaiting confirmation
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
-let annOpen = null;      // Broadcasts drawer; null = auto: open when something is live
 let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
-// the composer, so a re-render mid-compose doesn't eat what was typed
-let annForm = { text: '', to: 'both', rooms: [], mins: '240', alert: false };
-
-/* ---------- broadcasts ----------
-   Short messages the TO sends to the public page and/or the moderator
-   rooms. The whole live list is written at once (POST /a/:secret with
-   `announce`), same idiom as settings; the Worker validates it and hands
-   each surface only the messages addressed to it. */
-
-const MAX_ANNOUNCE = 8; // worker.js MAX_ANNOUNCE
-const ANN_EXPIRY = [
-  ['30', '30 minutes'], ['60', '1 hour'], ['120', '2 hours'],
-  ['240', '4 hours'], ['480', '8 hours'], ['end', 'when the tournament closes'],
-];
-
-function annId() {
-  return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
-}
-
-// Who a message went to. Unpublished tournaments grey the public pill out:
-// the message is stored and will appear the moment the page goes public.
-function annAudience(a, buckets, published) {
-  const parts = [];
-  if (a.pub) parts.push([published ? 'pill on' : 'pill', 'Public']);
-  if (a.rooms === true) parts.push(['pill on', 'Rooms']);
-  else if (Array.isArray(a.rooms)) {
-    for (const id of a.rooms) {
-      const b = buckets.find((x) => x.id === id);
-      parts.push(['pill on', b ? b.room_name : '#' + id]);
-    }
-  }
-  return parts.map(([cls, label]) => `<span class="${cls}">${esc(label)}</span>`).join(' ');
+// clock time of a ruling (protests drawer)
+function clockTime(ms) {
+  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
 /* ---------- data fetch + top-level render ---------- */
 
 // `quiet`: a background refresh — a failed fetch keeps what's on screen
 // instead of replacing it with the error (a dropped connection, say).
-async function showDetail(quiet = false) {
+// `held`: the rev of the detail on screen. The Worker answers {unchanged}
+// when nothing has moved since, and then nothing is refetched or redrawn.
+// Resolves true when the page was redrawn with a new detail.
+async function showDetail(quiet = false, held = null) {
   const a = '/a/' + adminSecret;
   let detail;
   try {
-    detail = await pub(a);
+    detail = await pub(Number.isInteger(held) ? a + '?rev=' + held : a);
+    if (detail.unchanged) return false;
   } catch (e) {
     if (quiet && e.message !== 'tournament closed') return;
     if (e.message === 'tournament closed') {
@@ -295,6 +268,7 @@ async function showDetail(quiet = false) {
   catch (e) { tbPool = null; }
   lastDetail = detail;
   render();
+  return true;
 }
 
 // The four setup steps and their done state.
@@ -1483,9 +1457,6 @@ document.addEventListener('keydown', (ev) => {
 
 function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const box = $('viewbody');
-  // expired broadcasts are simply dropped: the next write prunes them for good
-  let live = [];
-  try { live = annLive(JSON.parse(t.announce || '[]')); } catch (e) { /* keep [] */ }
   const totalRounds = Math.max(Number(settings.rounds) || 1, t.current_round,
     ...rounds.map((r) => r.number));
   const intake = roundIntake(sched, t.current_round, buckets, files);
@@ -1493,7 +1464,6 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     ...Array.from({ length: t.current_round }, (_, i) => i + 1),
     ...files.map((f) => f.round).filter((n) => Number.isInteger(n) && n > 0),
   ])].sort((x, y) => y - x);
-  const openAnn = annOpen === null ? !!live.length : annOpen;
   const tbUsed = tbPool
     ? [...(tbPool.tossups || []), ...(tbPool.bonuses || [])]
         .filter((q) => (tbPool.uses || []).some((u) => u && u.q === q.id)).length
@@ -1540,65 +1510,6 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     </div>
     ${autoAdvanceHtml(t, buckets, settings)}
     ${renderProtests(prows, popen, openProt)}
-    <details class="drawer" id="anndrawer" ${openAnn ? 'open' : ''}>
-      <summary><span class="dtitle">Broadcasts</span>
-        <span class="muted">${live.length
-          ? `${live.length} live &middot; ${esc(live[0].text)}`
-          : 'Nothing live'}</span>
-      </summary>
-      <div class="inner">
-        <div class="row" style="margin-top:8px">
-          <input id="anntext" maxlength="200" style="flex:1;min-width:240px"
-            placeholder="A line for the rooms or the public page"
-            value="${esc(annForm.text)}">
-          <span class="muted mono" id="anncount">${annForm.text.length}/200</span>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <label class="muted">To
-            <select id="annto">
-              <option value="both" ${annForm.to === 'both' ? 'selected' : ''}>Public page + rooms</option>
-              <option value="pub" ${annForm.to === 'pub' ? 'selected' : ''}>Public page only</option>
-              <option value="rooms" ${annForm.to === 'rooms' ? 'selected' : ''}>All rooms</option>
-              <option value="some" ${annForm.to === 'some' ? 'selected' : ''}>Specific rooms&hellip;</option>
-            </select>
-          </label>
-          <label class="muted">Expires
-            <select id="annmins">${ANN_EXPIRY.map(([vv, label]) =>
-              `<option value="${vv}" ${annForm.mins === vv ? 'selected' : ''}>${label}</option>`).join('')}
-            </select>
-          </label>
-          <label class="row"><input type="checkbox" id="annalert" ${annForm.alert ? 'checked' : ''}> Alert</label>
-          <span class="spacer" style="flex:1"></span>
-          ${live.length >= MAX_ANNOUNCE
-            ? `<span class="muted">${MAX_ANNOUNCE} live is the maximum &mdash; remove one first</span>` : ''}
-          <button id="annsend" class="primary" ${live.length >= MAX_ANNOUNCE ? 'disabled' : ''}>Send</button>
-        </div>
-        <div class="row" id="annrooms" ${annForm.to === 'some' ? '' : 'hidden'} style="margin-top:6px">
-          ${buckets.length ? buckets.map((b) => `
-            <label class="row"><input type="checkbox" data-annroom="${b.id}"
-              ${annForm.rooms.includes(b.id) ? 'checked' : ''}> ${esc(b.room_name)}</label>`).join('')
-            : '<span class="muted">No rooms yet</span>'}
-        </div>
-        <div class="row" style="margin-top:6px">
-          <span class="muted" style="font-size:13px">Rooms see this within a minute; the public page within five${
-            t.published ? '' : '. The public page is off, so public broadcasts stay hidden until you turn it on'}</span>
-        </div>
-
-        <h2>Live now</h2>
-        ${live.length ? `<div class="tablewrap"><table>
-          <tr><th>Message</th><th>To</th><th class="num">Sent</th><th class="num">Expires</th><th></th></tr>
-          ${live.map((x) => `<tr>
-            <td>${x.level === 'alert' ? '<span class="pill warn">Alert</span> ' : ''}${esc(x.text)}</td>
-            <td>${annAudience(x, buckets, t.published)}</td>
-            <td class="num">${esc(annTime(x.created))}</td>
-            <td class="num">${esc(annTime(x.expires))}</td>
-            <td class="num"><button class="small" data-delann="${esc(x.id)}">Remove</button></td>
-          </tr>`).join('')}
-        </table></div>` : '<div class="muted">Nothing live</div>'}
-      </div>
-    </details>
-
-
     <h2>Stats + Export</h2>
     <div class="row">
       <button id="calc" class="primary">Compute stats</button>
@@ -1702,10 +1613,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         .map((x) => Number(x.dataset.uprnd)));
     };
   });
-  $('anndrawer').ontoggle = () => { annOpen = $('anndrawer').open; };
 
   /* protests: rulings are the TD's record only — a whole-map write, like
-     broadcasts. Nothing goes to the room; the moderator applies an
+     settings. Nothing goes to the room; the moderator applies an
      upheld ruling in MODAQ and uploads the game again. */
   $('protdrawer').ontoggle = () => { protOpen = $('protdrawer').open; };
   box.querySelectorAll('[data-goto]').forEach((el) => {
@@ -1739,59 +1649,6 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       box.querySelector(`[data-rule="${CSS.escape(inp.dataset.rnote)}"]`).value, inp.value);
   });
 
-  /* broadcasts: every write sends the whole live list, so removals and
-     expiries prune themselves */
-  const checkedRooms = () => [...box.querySelectorAll('[data-annroom]:checked')]
-    .map((c) => Number(c.dataset.annroom));
-  const saveAnnounce = (next) => pub(a, { method: 'POST', json: { announce: next } });
-  $('anntext').oninput = () => {
-    annForm.text = $('anntext').value;
-    $('anncount').textContent = annForm.text.length + '/200';
-  };
-  $('annto').onchange = () => {
-    annForm.to = $('annto').value;
-    $('annrooms').hidden = annForm.to !== 'some';
-  };
-  $('annmins').onchange = () => { annForm.mins = $('annmins').value; };
-  $('annalert').onchange = () => { annForm.alert = $('annalert').checked; };
-  box.querySelectorAll('[data-annroom]').forEach((c) => {
-    c.onchange = () => { annForm.rooms = checkedRooms(); };
-  });
-  $('annsend').onclick = async () => {
-    const text = $('anntext').value.trim();
-    if (!text) { say('Type a message first', true); return; }
-    const to = $('annto').value;
-    const roomsTo = to === 'both' || to === 'rooms' ? true
-      : to === 'some' ? checkedRooms() : false;
-    if (Array.isArray(roomsTo) && !roomsTo.length) { say('Pick at least one room', true); return; }
-    const now = Date.now();
-    const mins = $('annmins').value;
-    try {
-      await saveAnnounce([...live, {
-        id: annId(),
-        text,
-        level: $('annalert').checked ? 'alert' : 'note',
-        pub: to === 'both' || to === 'pub',
-        rooms: roomsTo,
-        created: now,
-        // 'end' is the tournament's own close, which the Worker clamps to anyway
-        expires: mins === 'end' ? t.closes : now + Number(mins) * 60000,
-      }]);
-      annForm = { text: '', to, rooms: Array.isArray(roomsTo) ? roomsTo : [], mins, alert: false };
-      annOpen = true;
-      say('Broadcast sent');
-      showDetail();
-    } catch (e) { say(e.message, true); }
-  };
-  box.querySelectorAll('[data-delann]').forEach((b) => {
-    b.onclick = async () => {
-      try {
-        await saveAnnounce(live.filter((x) => x.id !== b.dataset.delann));
-        say('Broadcast removed');
-        showDetail();
-      } catch (e) { say(e.message, true); }
-    };
-  });
   const goToRound = async (n) => {
     try {
       await pub(a, { method: 'POST', json: { current_round: n } });
@@ -1960,8 +1817,7 @@ function autoAdvanceHtml(t, buckets, settings) {
 /* ---------- protests ----------
    What moderators log in MODAQ, from the newest upload of each game,
    with the swing an upheld ruling would produce (protests.js) and the
-   TD's ruling per row. The collapsed summary names the newest open one,
-   like the broadcasts drawer names its newest message. */
+   TD's ruling per row. The collapsed summary names the newest open one. */
 
 function renderProtests(rows, open, isOpen) {
   const first = open[0];
@@ -1992,7 +1848,7 @@ function renderProtests(rows, open, isOpen) {
               <select data-rule="${esc(r.key)}">${RULINGS.map(([v, l]) =>
                 `<option value="${v}" ${r.ruling === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
               <input data-rnote="${esc(r.key)}" maxlength="300" placeholder="Ruling note (stays on the hub)" value="${esc(r.note)}">
-              ${r.at && r.ruling !== 'open' ? `<span class="who">${rulingLabel(r.ruling)} ${esc(annTime(r.at))}</span>` : ''}
+              ${r.at && r.ruling !== 'open' ? `<span class="who">${rulingLabel(r.ruling)} ${esc(clockTime(r.at))}</span>` : ''}
               ${r.ruling === 'upheld' || r.superseded ? (r.corrected
                 ? '<span class="who ok">Corrected game received</span>'
                 : `<span class="followup wait">Waiting for ${esc(r.room)} to upload the corrected game</span>`) : ''}
@@ -2182,17 +2038,34 @@ async function computeStats(a, t, buckets, files, settings) {
 if (adminSecret) {
   showDetail();
   // The Live Hub is watched through the day while rooms start, upload and
-  // move rounds on: refresh it every 30s while it's the visible tab, and at
-  // once on coming back to it — never mid-typing or under an open dialog,
-  // which a redraw would wipe.
-  const liveRefresh = () => {
-    if (document.visibilityState !== 'visible' || shownView !== 'live' || !lastDetail) return;
-    const el = document.activeElement;
-    if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
-    if (!$('linkmodal').hidden) return;
-    showDetail(true);
+  // move rounds on: refresh it while it's the visible tab, and at once on
+  // coming back to it — never mid-typing or under an open dialog, which a
+  // redraw would wipe. Each refresh sends the rev it holds, so one that
+  // finds nothing new costs the Worker a single lookup; and while nothing
+  // moves the checks slow from every 30s to 60s (after 2 quiet ones) and
+  // 120s (after 4), snapping back to 30s on any change or on a return to
+  // the tab. Rounds advancing never wait on this: that's the Worker's.
+  let quietChecks = 0;
+  let timer = null;
+  const nextCheck = () => (quietChecks >= 4 ? 120 : quietChecks >= 2 ? 60 : 30) * 1000;
+  const liveRefresh = async () => {
+    clearTimeout(timer);
+    try {
+      if (document.visibilityState !== 'visible' || shownView !== 'live' || !lastDetail) return;
+      const el = document.activeElement;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (!$('linkmodal').hidden) return;
+      const moved = await showDetail(true, lastDetail.tournament.rev);
+      quietChecks = moved ? 0 : quietChecks + 1;
+    } finally {
+      timer = setTimeout(liveRefresh, nextCheck());
+    }
   };
-  setInterval(liveRefresh, 30000);
-  document.addEventListener('visibilitychange', liveRefresh);
+  timer = setTimeout(liveRefresh, nextCheck());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    quietChecks = 0;
+    liveRefresh();
+  });
 } else if (inviteSecret) showInvite();
 else showList();

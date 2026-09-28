@@ -57,13 +57,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   started a round when its reader presses Start on it, or its uploads
   page downloads that round's packet — with a chip per room showing who
   has; it never opens a round with no packet, and never pushes on a
-  round the TD set back by hand; the **broadcasts**
-  drawer (one line, up to 200 characters, addressed to the public page
-  and/or the rooms — every room, or a checked few — as a note or an
-  alert, with a mandatory expiry from 30 minutes to the tournament's own
-  close; a table of what's live, each removable, and the drawer's
-  summary carries the newest one so a collapsed drawer still answers
-  "what did I tell people?"); the **protests** drawer (every protest
+  round the TD set back by hand; the **protests** drawer (every protest
   moderators logged in MODAQ, from the newest upload of each game — round,
   room, question and buzz word, the answer given, the reason, and the
   score an upheld ruling would produce, computed the way MODAQ's own
@@ -94,8 +88,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
 - **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
   mobile-first): shows the live current round, downloads any played
   round's packet (the live round is highlighted; future rounds stay
-  locked), uploads the game's `.qbj` + MODAQ game file, and carries the
-  TD's broadcasts for this room (alerts first, then newest first). It is
+  locked), and uploads the game's `.qbj` + MODAQ game file. It is
   the fallback path, not the main one — the reader page below is — but it
   is not redundant: it is the only way to hand a moderator a packet MODAQ
   cannot open (a PDF), and the only way to submit a `.qbj` produced
@@ -129,9 +122,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   its own link (offline, zero requests), the room link always starts
   fresh against the live round, and packet re-uploads or round changes
   can never disturb a game in progress; the room link lists this
-  device's in-progress games. The TD's newest broadcast sits on one quiet
-  strip above MODAQ, picked up when the room link loads and again from
-  every upload's response — the page still never polls. Any number of moderators can share one
+  device's in-progress games. The page never polls. Any number of moderators can share one
   link (game state is per-device), and stats + the `.yft` count only
   the latest upload per round + team pair — a re-export corrects a
   game instead of double-counting it. `.json` packets load directly; `.docx`
@@ -139,8 +130,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (the same one MODAQ's demo uses — docx question text transits
   quizbowlreader.com).
 - **Public tournament page** (`app/t.html?t=<slug>`; `stats.html`
-  redirects): schedule + stats + buzzpoints tabs, under any broadcast the
-  TD addressed to the public page. The schedule tab
+  redirects): schedule + stats + buzzpoints tabs. The schedule tab
   renders the grid with played games' scores filled in from the
   collected qbj files (exact team-name match) and a per-team view
   behind a dropdown; the stats tab has standings, individual
@@ -328,7 +318,7 @@ dashboard shows which invites are still unused, and revokes them.
   public set page exists while the *set's* publish switch is on, and then
   shows every mirror not hidden from stats — including mirrors whose TD
   left their own page off. A mirror TD's publish switch governs only
-  that mirror's own page (schedule, broadcasts). Set-wide buzzpoint
+  that mirror's own page (schedule). Set-wide buzzpoint
   **text** is password-gated exactly like a tournament's, and served for
   a packet version once any one mirror has every room in for a round
   that read it. Whoever holds that password can read those questions
@@ -437,16 +427,23 @@ dashboard shows which invites are still unused, and revokes them.
 - **Request economics** (Cloudflare free tier): the public page reads
   one materialized blob per round (`t/<tid>/round/<n>.json`, rebuilt by
   the cron, TO-rebuildable) instead of fetching every game file, and
-  **nothing anywhere polls on a timer.** Every page fetches on load, on
+  **no public or room page polls on a timer.** Those fetch on load, on
   an explicit refresh, and (for the two moderator pages) when the tab
   regains focus — so cost is per *view*, never per open-tab-minute, and an
   idle tab costs exactly nothing. That is what makes many simultaneous
   tournaments affordable: 240 live rooms on a 60 s poll would have spent
-  the entire daily budget on polling alone. Broadcasts add no requests of
-  their own: they live in a column on the tournament row and ride out on
-  those state responses plus every moderator upload response, so a mod
-  sees one when they next touch the page and a viewer on their next
-  refresh. The public page has no focus refresh on purpose — viewers are
+  the entire daily budget on polling alone. The one timer is the TD's
+  Live Hub, one tab per tournament, and it is built to cost almost
+  nothing when idle: each check sends the `rev` it holds
+  (`GET /a/:secret?rev=`) and the Worker answers `{unchanged}` from the
+  admin lookup alone when nothing has moved — `tournaments.rev` is bumped
+  by triggers on every table the detail reads (`migrate-rev.sql`) — and
+  the checks slow from 30 s to 120 s while nothing does. Auto-advance
+  never depends on it; the Worker opens rounds on the rooms' packet
+  fetches. The cron's once-a-minute "anything to rebuild?" queries read
+  partial indexes of only the dirty rows, so an idle tick costs the same
+  with 10 tournaments on file or 10,000. `tests/sim_usage.js` measures a
+  whole simulated day in D1 rows. The public page has no focus refresh on purpose — viewers are
   readers, and are expected to refresh; a moderator must not miss the TD
   advancing the round.
   Stats data changes only when a file lands; `/pub/:slug` carries a
@@ -500,8 +497,7 @@ dashboard shows which invites are still unused, and revokes them.
   per mirror and put side by side, for a question set, and its
   buzzpoints gathered per question), `qmatch.js` (question identity
   across a set's packet versions).
-- `app/` — the static pages + `js/` page code (`announce.js` renders
-  the TD's broadcasts on all three read surfaces; `buzzview.js`,
+- `app/` — the static pages + `js/` page code (`buzzview.js`,
   `statsview.js`, `packetsui.js` and `formatui.js` are the pieces the
   tournament pages share with the set pages — `set.html` + `setadmin.js`
   for editors, `s.html` + `setpub.js` for the public, both over
@@ -569,10 +565,21 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-start.sql
 # ...and one from before auto-advance:
 #   npx wrangler d1 execute qb-td --local --file migrate-starts.sql
+# ...and one from before the Live Hub rev (once; the ALTER isn't re-runnable):
+#   npx wrangler d1 execute qb-td --local --file migrate-rev.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled
 npx wrangler dev --local --port 8799 --test-scheduled &
 cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js
+
+# D1 cost checks: start the dev Worker with the row meter instead
+#   npx wrangler dev --local --port 8799 --test-scheduled --var METER:1
+# (the meter is dev-only: /__meter 404s without METER). e2e_usage.js
+# asserts the idle cron and an unchanged Live Hub refresh stay flat;
+# sim_usage.js prices a whole day — TOURNAMENTS/ROOMS/ROUNDS/ROUND_MIN,
+# CLIENT=legacy|smart for the Live Hub before and after rev checks
+node tests/e2e_usage.js
+node tests/sim_usage.js
 
 # optional, and slow: a full-size tournament end to end (72 teams, 36
 # rooms, 17 rounds by default; TEAMS/ROOMS/ROUNDS/CONC override) against
@@ -616,7 +623,11 @@ first.
    also before the Worker (room routes name `started`), and one from
    before auto-advance needs
    `npx wrangler d1 execute qb-td --remote --file migrate-starts.sql`
-   (the packet route writes `room_starts`),
+   (the packet route writes `room_starts`), and one from before the Live
+   Hub's rev needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-rev.sql`
+   (the admin route reads `tournaments.rev`; it also adds the cron's
+   dirty-row indexes),
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy

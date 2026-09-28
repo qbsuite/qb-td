@@ -16,7 +16,6 @@
     <span id="room" class="sub"></span>
   </header>
   <div id="msg"></div>
-  <div id="ann"></div>
 
   <div class="card" id="roundcard" hidden>
     <div class="row">
@@ -51,7 +50,6 @@
 </div>
 <script type="module">
 import { pub, esc, fmtBytes } from './js/api.js';
-import { annCards } from './js/announce.js';
 
 const $ = (id) => document.getElementById(id);
 const secret = new URLSearchParams(location.search).get('b') || '';
@@ -69,7 +67,6 @@ function render() {
   document.title = state.tournament + ' - ' + state.room;
   $('tname').textContent = state.tournament;
   $('room').textContent = state.room;
-  $('ann').innerHTML = annCards(state.announce, 'from the TD');
   $('roundcard').hidden = false;
   $('curround').textContent = 'round ' + state.current_round;
   $('closes').textContent = 'Room open until ' + new Date(state.closes).toLocaleString();
@@ -101,7 +98,6 @@ function showNotStarted() {
 
 function showClosed() {
   closed = true;
-  $('ann').innerHTML = '';
   $('roundcard').hidden = true;
   $('uparea').hidden = true;
   say('room closed', true);
@@ -168,8 +164,7 @@ else {
   // to the tab, and after every upload — all demand-driven, so a room
   // costs requests only when someone is actually looking. A 60s poll here
   // was the single largest line item at scale (240 live rooms would have
-  // spent the whole daily budget on it) and it gave bucket-page users
-  // fresher broadcasts than the reader page, which has never polled.
+  // spent the whole daily budget on it).
   //
   // Focus refresh stays, unlike on the public page: a moderator must not
   // miss the TD advancing the round, and returning to the tab is exactly

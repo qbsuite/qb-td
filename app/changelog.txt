@@ -1,3 +1,21 @@
+Release Notes for 9/28/2026
+
+[ LIVE HUB ]
+- Removed Broadcasts.
+- The Live Hub only reloads when something changed, and checks less often while nothing does.
+
+[ ROOM PAGE ]
+- Removed TD broadcasts.
+
+[ READER ]
+- Removed the TD broadcast strip.
+
+[ PUBLIC PAGE ]
+- Removed TD announcements.
+
+[ PERFORMANCE ]
+- The background job no longer rereads every tournament each minute.
+
 Release Notes for 9/27/2026
 
 [ LIVE HUB ]

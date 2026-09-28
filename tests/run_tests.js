@@ -1546,30 +1546,12 @@ test('categoryQuestions: one category across rounds, oldest first, with its cate
   assert.equal(categoryQuestions(map, [1, 2], '', '', (n) => tu[n], (n) => bn[n]).tossups.length, 4);
 });
 
-/* ---------- broadcasts ---------- */
+/* ---------- browser-module shim ---------- */
 
-// announce.js is a browser view module (it pulls esc from api.js, which
-// reads location at import time), so it loads behind a shim. The ordering
-// rule inside it is pure, and mirrors the Worker's — the dashboard holds
-// the raw list and has to sort it the same way the read surfaces see it.
+// api.js reads location at import time; the demo tests below load it
+// (through demo.js), so give Node the two globals it touches.
 globalThis.location = globalThis.location || { search: '' };
 globalThis.localStorage = globalThis.localStorage || {};
-const { annLive } = await import('../app/js/announce.js');
-
-test('annLive drops expired, alerts first then newest first', () => {
-  const now = 1_000_000;
-  const list = [
-    { id: 'old', level: 'note', created: now - 300, expires: now + 100 },
-    { id: 'dead', level: 'note', created: now - 100, expires: now - 1 },
-    { id: 'new', level: 'note', created: now - 200, expires: now + 100 },
-    { id: 'alert', level: 'alert', created: now - 400, expires: now + 100 },
-  ];
-  assert.deepEqual(annLive(list, now).map((a) => a.id), ['alert', 'new', 'old']);
-  assert.equal(list[0].id, 'old'); // input untouched
-  // no usable expiry means gone: broadcasts fail closed, same as the Worker
-  assert.deepEqual(annLive([{ id: 'x', level: 'note', created: 1 }], now), []);
-  assert.deepEqual(annLive(null, now), []);
-});
 
 /* ---------- Worker category extraction ---------- */
 
@@ -2022,7 +2004,6 @@ test('archive captures carry the paths the public page reads', () => {
     assert.ok(data[`/pub/${slug}/bundle`], slug + ' has a bundle');
     // the buzzpoints tab needs packet text, which is never archived
     assert.equal(data[`/pub/${slug}`].buzz, null, slug + ' has buzzpoints off');
-    assert.deepEqual(data[`/pub/${slug}`].announce, [], slug + ' has no live broadcasts');
     assert.ok(!data[`/pub/${slug}/qpacket`], slug + ' must not carry packet text');
   }
 });

@@ -8,12 +8,9 @@
 // Nothing polls. A viewer reads a snapshot of the tournament as of the
 // moment they loaded the page, and refreshes for a newer one — so an
 // idle tab costs nothing at all, and a refresh shows results as soon as
-// the cron has published them (no CDN layer in the state's path). The
-// tradeoff is deliberate: broadcasts reach whoever refreshes, not
-// whoever happens to be looking.
+// the cron has published them (no CDN layer in the state's path).
 
 import { pub, esc, usingStaticData } from './api.js';
-import { annCards } from './announce.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { dedupeMatches } from '../engine/stats.js';
 import { buildReport } from '../engine/report.js';
@@ -776,10 +773,6 @@ async function load() {
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'Round ' + state.current_round;
-    // Broadcasts have no stamp of their own; they ride the state and must
-    // render before the no-change early return below. Expiry is applied
-    // by whoever produced the state (the Worker, or a frozen capture).
-    $('ann').innerHTML = annCards(state.announce, 'announcement');
     $('tab-buzz').hidden = !state.buzz;
     $('tab-cats').hidden = !state.cats;
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);
@@ -796,7 +789,7 @@ async function load() {
     // refresh button alike. The first load compares against the null /
     // undefined initial values, so everything fetches; a refresh that
     // finds nothing moved skips the heavy blobs entirely — the round
-    // number and broadcasts above have already been updated either way.
+    // number above has already been updated either way.
     const statsMoved = statsStamp !== lastVersion;
     const schedMoved = schedStamp !== lastSched;
     const catsMoved = catsStamp !== lastCats;

@@ -26,9 +26,8 @@ CREATE TABLE IF NOT EXISTS tournaments (
   started INTEGER,
   published INTEGER NOT NULL DEFAULT 0,
   settings TEXT NOT NULL DEFAULT '{}', -- JSON: reader gameFormat etc.
-  -- JSON array of live broadcasts (worker.js cleanAnnounce). Its own column,
-  -- not a settings key: a long game-format override must not be able to
-  -- crowd out announcements, or the reverse.
+  -- Retired: the TD's broadcasts, removed 9/28/2026. Nothing reads or
+  -- writes it; kept so existing databases and this file agree.
   announce TEXT NOT NULL DEFAULT '[]',
   -- JSON map of the TD's protest rulings (worker.js cleanRulings), keyed
   -- by the hub (round + question + team pair). Admin route only.
@@ -51,7 +50,12 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- set_mirrors.tournament_id. Existing databases get these from
   -- migrate-sets.sql.
   set_id INTEGER,
-  set_key_enc TEXT
+  set_key_enc TEXT,
+  -- The Live Hub's change counter: moves whenever anything the admin
+  -- detail shows changes (triggers at the end of this file), so a refresh
+  -- holding the current rev is answered "unchanged" for the price of the
+  -- admin lookup. Existing databases get it from migrate-rev.sql.
+  rev INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_tournaments_created ON tournaments(created);
 
@@ -188,3 +192,68 @@ CREATE TABLE IF NOT EXISTS room_starts (
   PRIMARY KEY (bucket_id, round)
 );
 CREATE INDEX IF NOT EXISTS idx_room_starts_tournament ON room_starts(tournament_id, round);
+
+-- ---------- Live Hub rev + cron dirty indexes ----------
+-- (same statements as migrate-rev.sql, which also adds the rev column
+-- to existing databases)
+
+-- The cron's "anything to rebuild?" queries (worker.js tickTournaments,
+-- tickSets) run every minute and almost always find nothing. Indexing
+-- only the rows they can pick makes that answer cost those rows, not a
+-- scan of every tournament and set ever created. The tournament index
+-- carries the query's whole condition, not just pub_dirty: a private
+-- tournament stays dirty (its rebuild waits for it to go public), so a
+-- pub_dirty-only index would still grow with every one of those.
+CREATE INDEX IF NOT EXISTS idx_tournaments_dirty ON tournaments(created)
+  WHERE pub_dirty = 1 AND (published = 1 OR pub_snapshot IS NOT NULL OR set_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_sets_dirty ON sets(id) WHERE state_dirty = 1;
+
+-- rev moves whenever anything the admin detail (worker.js getTournament)
+-- returns changes, so a Live Hub holding the current rev can be told
+-- "unchanged" for the price of the admin lookup. Triggers rather than
+-- code: a write path added later can't forget to bump it. The cron's own
+-- columns (pub_dirty, pub_snapshot) are deliberately not listed — a
+-- rebuild changes nothing the hub shows.
+CREATE TRIGGER IF NOT EXISTS rev_tournament AFTER UPDATE OF
+  slug, name, current_round, started, published, settings, rulings, roster_r2_key, roster_name, set_id
+  ON tournaments
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.id; END;
+
+CREATE TRIGGER IF NOT EXISTS rev_bucket_ins AFTER INSERT ON buckets
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_bucket_upd AFTER UPDATE ON buckets
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_bucket_del AFTER DELETE ON buckets
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = OLD.tournament_id; END;
+
+CREATE TRIGGER IF NOT EXISTS rev_round_ins AFTER INSERT ON rounds
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_round_upd AFTER UPDATE ON rounds
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_round_del AFTER DELETE ON rounds
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = OLD.tournament_id; END;
+
+CREATE TRIGGER IF NOT EXISTS rev_file_ins AFTER INSERT ON files
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_file_upd AFTER UPDATE ON files
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_file_del AFTER DELETE ON files
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = OLD.tournament_id; END;
+
+CREATE TRIGGER IF NOT EXISTS rev_start_ins AFTER INSERT ON room_starts
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_start_del AFTER DELETE ON room_starts
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = OLD.tournament_id; END;
+
+-- a set's name, page switch and settings, and its packet list, show on
+-- every mirror's hub; mirrors are found through set_mirrors (indexed),
+-- as everywhere else
+CREATE TRIGGER IF NOT EXISTS rev_set_upd AFTER UPDATE OF slug, name, published, settings ON sets
+  BEGIN UPDATE tournaments SET rev = rev + 1
+    WHERE id IN (SELECT tournament_id FROM set_mirrors WHERE set_id = NEW.id); END;
+CREATE TRIGGER IF NOT EXISTS rev_set_packet_ins AFTER INSERT ON set_packets
+  BEGIN UPDATE tournaments SET rev = rev + 1
+    WHERE id IN (SELECT tournament_id FROM set_mirrors WHERE set_id = NEW.set_id); END;
+CREATE TRIGGER IF NOT EXISTS rev_set_packet_upd AFTER UPDATE ON set_packets
+  BEGIN UPDATE tournaments SET rev = rev + 1
+    WHERE id IN (SELECT tournament_id FROM set_mirrors WHERE set_id = NEW.set_id); END;
