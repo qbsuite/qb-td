@@ -15,7 +15,8 @@ import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, bui
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
-import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../app/engine/cats.js';
+import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
+  categoryQuestionStats, questionLines, categoryQuestions } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
 import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
 import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
@@ -1327,11 +1328,13 @@ test('categoryStats credits only the players who buzzed', () => {
   const ann = (sub) => rows.find((r) => r.player === 'Ann' && r.sub === sub);
   assert.deepEqual(ann('American Literature'),
     { player: 'Ann', team: 'Alpha', cat: 'Literature', sub: 'American Literature',
-      powers: 1, gets: 0, negs: 0, pts: 15 });
+      powers: 1, gets: 0, negs: 0, bb: 0, pts: 15 });
   assert.deepEqual(ann('British Literature').pts, 10);
+  // Ann's 10 came after Beta's neg: a bounceback, counted beside the get, not added to points
+  assert.deepEqual({ gets: ann('British Literature').gets, bb: ann('British Literature').bb }, { gets: 1, bb: 1 });
   assert.deepEqual(rows.find((r) => r.player === 'Bob' && r.sub === 'British Literature'),
     { player: 'Bob', team: 'Beta', cat: 'Literature', sub: 'British Literature',
-      powers: 0, gets: 0, negs: 1, pts: -5 });
+      powers: 0, gets: 0, negs: 1, bb: 0, pts: -5 });
   // no buzz, no row: Bob never appears in Mythology, Ann's zeroed buzz counts nothing
   assert.equal(rows.some((r) => r.cat === 'Mythology'), false);
   // a round missing from the map contributes nothing
@@ -1347,13 +1350,13 @@ test('catPlayerLines filters + aggregates; catBreakdown nests subs', () => {
   const rows = categoryStats(entries, CATMAP);
   const lit = catPlayerLines(rows, 'Literature', '');
   assert.equal(lit[0].player, 'Ann');
-  assert.deepEqual(lit[0], { player: 'Ann', team: 'Alpha', powers: 1, gets: 1, negs: 0, pts: 25 });
+  assert.deepEqual(lit[0], { player: 'Ann', team: 'Alpha', powers: 1, gets: 1, negs: 0, bb: 0, pts: 25 });
   assert.equal(lit.some((l) => l.player === 'Bob'), false); // Bob only buzzed on myth
   const amer = catPlayerLines(rows, 'Literature', 'American Literature');
   assert.deepEqual({ powers: amer[0].powers, pts: amer[0].pts }, { powers: 1, pts: 15 });
   const bd = catBreakdown(rows, 'Alpha', 'Ann');
   assert.deepEqual(bd.map((c) => c.cat), ['Literature']); // canonical order, buzzed cats only
-  assert.deepEqual(bd[0].line, { powers: 1, gets: 1, negs: 0, pts: 25 });
+  assert.deepEqual(bd[0].line, { powers: 1, gets: 1, negs: 0, bb: 0, pts: 25 });
   assert.deepEqual(bd[0].subs.map((s) => s.sub), ['American Literature', 'British Literature']);
   assert.deepEqual(catBreakdown(rows, 'Beta', 'Bob')[0].subs, []); // Mythology has no subcategory
   assert.ok(catCompare('Literature', 'History') < 0);
@@ -1370,14 +1373,15 @@ test('categoryTeamStats joins team buzzes + controlled bonuses; catTeamLines doe
   // bonus 1 (Amer Lit, 20 pts) and bonus 2 (Sci - Biology, 10 pts) both went to Alpha
   assert.deepEqual(rows.find((r) => r.team === 'Alpha' && r.sub === 'American Literature'),
     { team: 'Alpha', cat: 'Literature', sub: 'American Literature',
-      powers: 1, gets: 0, negs: 0, pts: 15, bh: 1, bpts: 20 });
+      powers: 1, gets: 0, negs: 0, bb: 0, pts: 15, bh: 1, bpts: 20 });
   assert.deepEqual(rows.find((r) => r.team === 'Alpha' && r.cat === 'Science'),
     { team: 'Alpha', cat: 'Science', sub: 'Biology',
-      powers: 0, gets: 0, negs: 0, pts: 0, bh: 1, bpts: 10 });
+      powers: 0, gets: 0, negs: 0, bb: 0, pts: 0, bh: 1, bpts: 10 });
   // Beta only negged: no bonus slice
   assert.equal(rows.filter((r) => r.team === 'Beta').every((r) => r.bh === 0), true);
   const all = catTeamLines(rows, '', '');
-  assert.deepEqual(all[0], { team: 'Alpha', powers: 1, gets: 1, negs: 0, pts: 25,
+  // tossup 2: Beta negged, then Alpha got it: one bounceback for Alpha
+  assert.deepEqual(all[0], { team: 'Alpha', powers: 1, gets: 1, negs: 0, bb: 1, pts: 25,
     bh: 2, bpts: 30, ppb: 15 });
   assert.deepEqual({ negs: all[1].negs, ppb: all[1].ppb }, { negs: 1, ppb: null });
   // filtering to Literature drops the biology bonus from Alpha's ppb
@@ -1407,6 +1411,101 @@ test('dedupeEntries keeps the latest upload per round + team pair', () => {
   assert.deepEqual({ powers: rows[0].powers, negs: rows[0].negs }, { powers: 1, negs: 0 });
   // different rounds never collide
   assert.equal(dedupeEntries([mk(1, []), { ...mk(2, []), round: 2 }]).length, 2);
+});
+
+test('bouncebacks: any earlier miss by the other team; a power stays a power', () => {
+  const entries = [{ id: 1, round: 1, room: 'R1', qbj: catQbj([
+    // tossup 1: Bob misses for no penalty, then Ann powers it
+    { t: 1, team: 'Beta', player: 'Bob', pos: 3, value: 0 },
+    { t: 1, team: 'Alpha', player: 'Ann', pos: 8, value: 15 },
+    // tossup 2: a clean get, nobody missed first
+    { t: 2, team: 'Beta', player: 'Bob', pos: 30, value: 10 },
+  ]) }];
+  const rows = categoryStats(entries, CATMAP);
+  const ann = rows.find((r) => r.player === 'Ann');
+  assert.deepEqual({ powers: ann.powers, bb: ann.bb, pts: ann.pts }, { powers: 1, bb: 1, pts: 15 });
+  assert.equal(rows.find((r) => r.player === 'Bob' && r.gets).bb, 0);
+  // the zero-point miss itself earns no row of its own
+  assert.equal(rows.filter((r) => r.player === 'Bob').length, 1);
+});
+
+test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or by rank', () => {
+  const MARKED = { rounds: {
+    1: { t: CATMAP.rounds[1].t, b: [
+      { c: 'Literature', s: 'American Literature', d: 'hem' }, // marked: part 1 is hard
+      { c: 'Science', s: 'Biology' },                          // unmarked: ranked
+      { c: 'Mythology', s: '', d: 'ee' },                      // malformed marks: ranked
+    ] },
+  } };
+  const game = (id, buzzList, bonuses) => ({ id, round: 1, room: 'R' + id, qbj: {
+    ...catQbj(buzzList, bonuses), match_teams: [
+      { team: { name: 'T' + id + 'a' }, match_players: [{ player: { name: 'Ann' } }] },
+      { team: { name: 'T' + id + 'b' }, match_players: [{ player: { name: 'Bob' } }] },
+    ] } });
+  const entries = [
+    game(1, [
+      { t: 1, team: 'Alpha', player: 'Ann', pos: 4, value: 15 },
+      { t: 2, team: 'Beta', player: 'Bob', pos: 2, value: -5 },
+      { t: 2, team: 'Alpha', player: 'Ann', pos: 9, value: 10 },
+      { t: 3, team: 'Alpha', player: 'Ann', pos: 7, value: 10 },
+    ], { 1: [0, 10, 10], 2: [0, 10, 0], 3: [10, 10, 10] }),
+    game(2, [
+      { t: 1, team: 'Alpha', player: 'Ann', pos: 10, value: 10 },
+      { t: 2, team: 'Beta', player: 'Bob', pos: 5, value: -5 }, // dead after the neg
+      { t: 3, team: 'Beta', player: 'Bob', pos: 6, value: 10 },
+    ], { 1: [10, 10, 0], 3: [0, 10, 0] }),
+  ];
+  const q = categoryQuestionStats(entries, MARKED);
+  const t = (sub) => q.tossups.find((r) => r.sub === sub);
+  // American Lit tossup: read twice, converted twice, one power, words 5 and 11
+  assert.deepEqual({ ...t('American Literature') }, { cat: 'Literature', sub: 'American Literature',
+    heard: 2, conv: 2, powers: 1, negs: 0, words: [5, 11] });
+  // British Lit: read twice, converted once (after a neg), negged both times
+  assert.deepEqual({ heard: t('British Literature').heard, conv: t('British Literature').conv,
+    negs: t('British Literature').negs }, { heard: 2, conv: 1, negs: 2 });
+  const b = (cat) => q.bonuses.find((r) => r.cat === cat);
+  // marked 'hem': game 1 got parts 2+3 (e, m), game 2 got parts 1+2 (h, e)
+  assert.deepEqual({ ...b('Literature') }, { cat: 'Literature', sub: 'American Literature',
+    heard: 2, pts: 40, dHeard: 2, e: 2, m: 1, h: 1, marked: 1, ranked: 0 });
+  // biology was read once (game 2 had no correct buzz on tossup 2): ranked by
+  // its only reading, the converted part is the easy one
+  assert.deepEqual({ heard: b('Science').heard, e: b('Science').e, m: b('Science').m,
+    h: b('Science').h, ranked: b('Science').ranked }, { heard: 1, e: 1, m: 0, h: 0, ranked: 1 });
+  // malformed marks fall back to ranking: part 2 converted twice (easy),
+  // part 1 and 3 once each, ties in packet order (part 1 medium)
+  assert.deepEqual({ e: b('Mythology').e, m: b('Mythology').m, h: b('Mythology').h,
+    dHeard: b('Mythology').dHeard, ranked: b('Mythology').ranked, marked: b('Mythology').marked },
+    { e: 2, m: 1, h: 1, dHeard: 2, ranked: 1, marked: 0 });
+
+  // display lines: a category, then its subcategories; filters narrow
+  const lines = questionLines(q.tossups, '', '');
+  assert.deepEqual(lines.map((l) => [l.cat, l.sub, l.isSub, l.heard]), [
+    ['Literature', '', false, 4],
+    ['Literature', 'American Literature', true, 2],
+    ['Literature', 'British Literature', true, 2],
+    ['Mythology', '', false, 2],
+  ]);
+  assert.deepEqual(questionLines(q.tossups, 'Literature', 'British Literature').map((l) => [l.sub, l.heard]),
+    [['British Literature', 2]]);
+  assert.deepEqual(questionLines(q.tossups, 'Literature', '')[0].words, [5, 11, 10]);
+  // a subcategory named like its category folds into it
+  assert.deepEqual(questionLines([{ cat: 'Geography', sub: 'Geography', heard: 3 }], '', '')
+    .map((l) => [l.sub, l.isSub, l.heard]), [['', false, 3]]);
+});
+
+test('categoryQuestions: one category across rounds, oldest first, with its category', () => {
+  const map = { rounds: {
+    1: { t: [{ c: 'Science', s: 'Physics' }, { c: 'History', s: '' }], b: [{ c: 'Science', s: 'Biology' }] },
+    2: { t: [{ c: 'History', s: '' }, { c: 'Science', s: 'Chemistry' }], b: [] },
+  } };
+  const tu = { 1: [{ tossup: 1, buzzes: [] }, { tossup: 2, buzzes: [] }],
+    2: [{ tossup: 1, buzzes: [] }, { tossup: 2, buzzes: [] }] };
+  const bn = { 1: [{ bonus: 1, results: [] }], 2: [] };
+  const sci = categoryQuestions(map, [2, 1], 'Science', '', (n) => tu[n], (n) => bn[n]);
+  assert.deepEqual(sci.tossups.map((x) => [x.round, x.tossup, x.sub]), [[1, 1, 'Physics'], [2, 2, 'Chemistry']]);
+  assert.deepEqual(sci.bonuses.map((x) => [x.round, x.bonus, x.cat]), [[1, 1, 'Science']]);
+  assert.equal(categoryQuestions(map, [1, 2], 'Science', 'Chemistry', (n) => tu[n], (n) => bn[n]).tossups.length, 1);
+  assert.equal(categoryQuestions(map, [1, 2], '', '', (n) => tu[n], (n) => bn[n]).tossups.length, 4);
 });
 
 /* ---------- broadcasts ---------- */
@@ -1531,6 +1630,24 @@ test('packetCategories: metadata-only packets map tossups and bonuses', () => {
     b: [{ c: 'Science', s: 'Physics' }, { c: 'Literature', s: 'World Literature' }],
   });
   assert.equal(packetCategories(body, 'Packet 1.docx'), null);
+});
+
+test('packetCategories: bonuses keep their e/m/h difficulty marks', () => {
+  const body = new TextEncoder().encode(JSON.stringify({
+    tossups: [{ question: 'q', answer: 'a', category: 'Science', subcategory: 'Physics' }],
+    bonuses: [
+      { leadin: 'l', category: 'Science', subcategory: 'Physics', difficultyModifiers: ['m', 'E', 'h'] },
+      { leadin: 'l', category: 'History', subcategory: '' },
+      { leadin: 'l', category: 'Religion', subcategory: '', difficultyModifiers: ['e', 'x', 'h'] },
+      { leadin: 'l', difficultyModifiers: ['e', 'm', 'h'] }, // no category: nothing to file it under
+    ],
+  }));
+  assert.deepEqual(packetCategories(body, 'p.json').b, [
+    { c: 'Science', s: 'Physics', d: 'meh' },
+    { c: 'History', s: '' },
+    { c: 'Religion', s: '' },
+    null,
+  ]);
 });
 
 /* ---------- html stat report ---------- */

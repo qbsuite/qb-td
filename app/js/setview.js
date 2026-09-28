@@ -36,9 +36,9 @@ const SNAP_TIMEOUT_MS = 8000; // a hung snapshot must fall back like a failed on
 export function mountSetView(root, source, opts = {}) {
   root.innerHTML = `
     <div class="tabs">
-      <button class="tab" data-tab="stats">stats</button>
-      <button class="tab" data-tab="cats" hidden>categories</button>
-      <button class="tab" data-tab="buzz" hidden>buzzpoints</button>
+      <button class="tab" data-tab="stats">Stats</button>
+      <button class="tab" data-tab="cats" hidden>Categories</button>
+      <button class="tab" data-tab="buzz" hidden>Buzzpoints</button>
     </div>
     <div class="sitebar row" style="margin:8px 0"></div>
     <div class="setmsg"></div>
@@ -144,11 +144,11 @@ export function mountSetView(root, source, opts = {}) {
     const mirrors = state.mirrors || [];
     if (mirrors.length < 2) { sitebar.innerHTML = ''; return; }
     const inCount = mirrors.length - excluded.size;
-    sitebar.innerHTML = `<span class="muted">sites</span>
-      ${mirrors.map((m) => `<a href="#" class="pill${excluded.has(m.id) ? '' : ' on'}" data-site="${m.id}"
-        title="${excluded.has(m.id) ? 'include' : 'exclude'}"${excluded.has(m.id) ? ' style="text-decoration:line-through"' : ''}>${esc(m.label)}</a>`).join('')}
-      ${excluded.size ? `<a href="#" class="pill" data-site="all">all ${mirrors.length}</a>` : ''}
-      <span class="muted">${inCount === mirrors.length ? 'all ' + mirrors.length : inCount + ' of ' + mirrors.length}</span>`;
+    sitebar.innerHTML = `<span class="muted">Sites</span>
+      ${mirrors.map((m) => `<a href="#" class="chip${excluded.has(m.id) ? '' : ' on'}" data-site="${m.id}"
+        title="${excluded.has(m.id) ? 'Include' : 'Exclude'}"${excluded.has(m.id) ? ' style="text-decoration:line-through"' : ''}>${esc(m.label)}</a>`).join('')}
+      ${excluded.size ? `<a href="#" class="chip" data-site="all">All ${mirrors.length}</a>` : ''}
+      <span class="muted">${inCount === mirrors.length ? 'All ' + mirrors.length : inCount + ' of ' + mirrors.length}</span>`;
     sitebar.querySelectorAll('[data-site]').forEach((el) => {
       el.onclick = (e) => {
         e.preventDefault();
@@ -166,7 +166,7 @@ export function mountSetView(root, source, opts = {}) {
 
   function renderStatsTab() {
     const mirrors = state.mirrors || [];
-    if (!mirrors.length) { out.innerHTML = '<div class="muted">no mirrors have started yet</div>'; return; }
+    if (!mirrors.length) { out.innerHTML = '<div class="muted">No mirrors have started yet</div>'; return; }
     const s = setStandings(activeSites());
     const bySite = new Map(s.sites.map((x) => [x.id, x]));
     const siteRows = mirrors.map((m) => {
@@ -175,7 +175,7 @@ export function mountSetView(root, source, opts = {}) {
       const off = excluded.has(m.id);
       return `<tr class="${off ? 'muted' : ''}">
         <td class="name">${link ? `<a href="${esc(link)}">${esc(m.label)}</a>` : esc(m.label)}${
-          off ? ' <span class="pill">excluded</span>' : ''}</td>
+          off ? ' <span class="pill">Excluded</span>' : ''}</td>
         <td class="name muted">${esc(m.host || '')}</td>
         <td class="muted">${esc(m.date || '')}</td>
         <td class="num sep">${x.teams || 0}</td><td class="num sep">${x.games || 0}</td>
@@ -193,7 +193,7 @@ export function mountSetView(root, source, opts = {}) {
       </table></div>
       <div class="setstats"></div>`;
     if (s.teams.length) renderStats(out.querySelector('.setstats'), s, [], { site: true, games: false });
-    else out.querySelector('.setstats').innerHTML = '<div class="muted" style="margin-top:12px">no games yet</div>';
+    else out.querySelector('.setstats').innerHTML = '<div class="muted" style="margin-top:12px">No games yet</div>';
   }
 
   /* ---------- categories ---------- */
@@ -205,27 +205,29 @@ export function mountSetView(root, source, opts = {}) {
     if (catSel && !cats.includes(catSel)) { catSel = ''; catSubSel = ''; }
     const subs = catSel && catView !== 'questions' && catView !== 'bonuses'
       ? [...new Set(rows.filter((r) => r.cat === catSel && r.sub).map((r) => r.sub))].sort() : [];
-    return `
-      <div class="row" style="margin-bottom:8px">
+    return `<div class="chipstack">
+      <div class="chips">
         ${['', ...cats].map((c) =>
-          `<a href="#" class="pill${catSel === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c) || 'all'}</a>`).join('')}
+          `<a href="#" class="chip${catSel === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c) || 'All'}</a>`).join('')}
       </div>
-      ${subs.length ? `<div class="row" style="margin-bottom:10px">
+      ${subs.length ? `<div class="chips sub">
         ${['', ...subs].map((x) =>
-          `<a href="#" class="pill${catSubSel === x ? ' on' : ''}" data-catsub="${esc(x)}">${esc(x) || 'all'}</a>`).join('')}
-      </div>` : ''}`;
+          `<a href="#" class="chip${catSubSel === x ? ' on' : ''}" data-catsub="${esc(x)}">${esc(x) || 'All'}</a>`).join('')}
+      </div>` : ''}
+    </div>`;
   }
 
   const lineCells = (l) => `<td class="num">${l.powers}</td><td class="num">${l.gets}</td>`
-    + `<td class="num">${l.negs}</td><td class="num">${l.pts}</td>`;
-  const LINE_HEAD = '<th class="num">15</th><th class="num">10</th><th class="num">-5</th><th class="num">pts</th>';
+    + `<td class="num">${l.negs}</td><td class="num">${l.bb || 0}</td><td class="num">${l.pts}</td>`;
+  const LINE_HEAD = '<th class="num">15</th><th class="num">10</th><th class="num">-5</th>'
+    + '<th class="num" title="Bouncebacks: tossups won after the other team missed them">BB</th><th class="num">Pts</th>';
 
   const pct1 = (x) => (x === null || x === undefined ? '–' : Math.round(x * 100) + '%');
 
   function renderCatsTab() {
     const c = setCategories(activeSites(), catmap);
-    if (!c.questions.length) { out.innerHTML = '<div class="muted">no categorized games yet</div>'; return; }
-    const views = [['questions', 'tossups'], ['bonuses', 'bonuses'], ['players', 'players'], ['teams', 'teams']];
+    if (!c.questions.length) { out.innerHTML = '<div class="muted">No categorized games yet</div>'; return; }
+    const views = [['questions', 'Tossups'], ['bonuses', 'Bonuses'], ['players', 'Players'], ['teams', 'Teams']];
     let body;
     if (catView === 'bonuses') {
       // bonus parts ranked by how they converted: "easiest" is the part
@@ -287,9 +289,9 @@ export function mountSetView(root, source, opts = {}) {
         </table></div>`;
     }
     out.innerHTML = `
-      <div class="row" style="margin-bottom:10px">
+      <div class="views">
         ${views.map(([k, label]) =>
-          `<a href="#" class="pill${catView === k ? ' on' : ''}" data-catview="${k}">${label}</a>`).join('')}
+          `<a href="#" class="view${catView === k ? ' on' : ''}" data-catview="${k}">${label}</a>`).join('')}
       </div>${body}`;
     out.querySelectorAll('[data-catview]').forEach((p) => {
       p.onclick = (e) => { e.preventDefault(); catView = p.dataset.catview; catSubSel = ''; render(); };
@@ -350,9 +352,9 @@ export function mountSetView(root, source, opts = {}) {
     const moved = groups.some((g) => g.homes.some((h) => h.p !== p));
 
     const badges = (row.others.length ? ` <span class="pill">${row.others.length + 1} wordings</span>` : '')
-      + (moved ? ' <span class="pill">moved</span>' : '');
+      + (moved ? ' <span class="pill">Moved</span>' : '');
     let meta;
-    if (!row.heard) meta = '<span class="muted">not played yet</span>';
+    if (!row.heard) meta = '<span class="muted">Not played yet</span>';
     else if (kind === 't') {
       meta = tossupMetaHtml(groups.flatMap((g) => g.buzzes), row.heard, (row.same || groups[0]).buzzes);
     } else meta = rooms(row.heard) + ' &middot; ' + bonusMetaHtml(groups.flatMap((g) => g.results));
@@ -391,8 +393,8 @@ export function mountSetView(root, source, opts = {}) {
   // the text can be read, where it sits, and how it converted everywhere.
   async function renderBuzzTable(box, index) {
     const { tossups } = setQuestionTable(index, catmap, state.packets);
-    if (!tossups.length) { box.innerHTML = '<div class="muted">no finished games</div>'; return; }
-    box.innerHTML = '<div class="muted">loading packets</div>';
+    if (!tossups.length) { box.innerHTML = '<div class="muted">No finished games</div>'; return; }
+    box.innerHTML = '<div class="muted">Loading packets</div>';
     const wanted = new Map();
     for (const t of tossups) if (t.home) wanted.set(t.home.p + ':' + t.home.v, [t.home.p, t.home.v]);
     const texts = new Map();
@@ -414,7 +416,7 @@ export function mountSetView(root, source, opts = {}) {
           <th class="num sep">conv</th><th class="num sep">neg</th><th class="num sep">avg word</th></tr>
         ${rows.map((t) => `<tr>
           <td class="muted" style="white-space:nowrap">${t.home ? `packet ${t.home.p} T${t.home.pos}` : '–'}${
-            (state.packets || {})[t.home && t.home.p] === (t.home && t.home.v) ? '' : ' <span class="pill">not current</span>'}</td>
+            (state.packets || {})[t.home && t.home.p] === (t.home && t.home.v) ? '' : ' <span class="pill">Not current</span>'}</td>
           <td class="name">${answerOf(t)}${t.wordings > 1 ? ` <span class="pill">${t.wordings} wordings</span>` : ''}</td>
           <td class="name muted">${esc(t.cat)}${t.sub ? ' · ' + esc(t.sub) : ''}</td>
           <td class="num sep">${t.heard}</td>${rows.some((x) => x.powers) ? `<td class="num sep">${pct1(t.powers / t.heard)}</td>` : ''}
@@ -429,8 +431,8 @@ export function mountSetView(root, source, opts = {}) {
     const rows = sel.earlier
       ? setEarlierRows(index, catmap, state.packets, sel.p, v)
       : setPacketRows(index, catmap, sel.p, v);
-    if (!rows.some((r) => r.heard)) { box.innerHTML = '<div class="muted">no finished games</div>'; return; }
-    box.innerHTML = '<div class="muted">loading packet</div>';
+    if (!rows.some((r) => r.heard)) { box.innerHTML = '<div class="muted">No finished games</div>'; return; }
+    box.innerHTML = '<div class="muted">Loading packet</div>';
     // every text this page draws on: the version on screen, plus wherever
     // an earlier wording (or a moved question) was actually read
     const wanted = new Map([[sel.p + ':' + v, [sel.p, v]]]);
@@ -493,17 +495,23 @@ export function mountSetView(root, source, opts = {}) {
         || choices.filter((c) => !c.earlier).pop() || choices[0] || 'summary';
     }
     out.innerHTML = `
-      <div class="row" style="margin-bottom:10px">
-        ${choices.filter((c) => !c.earlier).map((c, i) =>
-          `<a href="#" class="pill${same(c, buzzSel) ? ' on' : ''}" data-buzzsel="${choices.indexOf(c)}">packet ${c.p}</a>`).join('')}
-        <span style="flex:1"></span>
-        <a href="#" class="pill${buzzSel === 'table' ? ' on' : ''}" data-buzzsel="table">all tossups</a>
-        <a href="#" class="pill${buzzSel === 'summary' ? ' on' : ''}" data-buzzsel="summary">players</a>
+      <div class="views">
+        <a href="#" class="view${buzzSel !== 'table' && buzzSel !== 'summary' ? ' on' : ''}" data-buzzsel="${
+          Math.max(0, choices.indexOf(choices.filter((c) => !c.earlier).pop()))}">By Packet</a>
+        <a href="#" class="view${buzzSel === 'table' ? ' on' : ''}" data-buzzsel="table">All Tossups</a>
+        <span class="grow"></span>
+        <a href="#" class="view${buzzSel === 'summary' ? ' on' : ''}" data-buzzsel="summary">Players</a>
       </div>
-      ${nav.earlier.length ? `<div class="row" style="margin-bottom:10px">
-        <span class="muted">no longer in the set</span>
-        ${choices.filter((c) => c.earlier).map((c) =>
-          `<a href="#" class="pill${same(c, buzzSel) ? ' on' : ''}" data-buzzsel="${choices.indexOf(c)}">packet ${c.p} v${c.v}</a>`).join('')}
+      ${buzzSel !== 'table' && buzzSel !== 'summary' ? `<div class="chipstack">
+        <div class="chips">
+          ${choices.filter((c) => !c.earlier).map((c) =>
+            `<a href="#" class="chip${same(c, buzzSel) ? ' on' : ''}" data-buzzsel="${choices.indexOf(c)}">Packet ${c.p}</a>`).join('')}
+        </div>
+        ${nav.earlier.length ? `<div class="chips sub">
+          <span class="muted" style="font-size:13px">No longer in the set</span>
+          ${choices.filter((c) => c.earlier).map((c) =>
+            `<a href="#" class="chip${same(c, buzzSel) ? ' on' : ''}" data-buzzsel="${choices.indexOf(c)}">Packet ${c.p} v${c.v}</a>`).join('')}
+        </div>` : ''}
       </div>` : ''}
       <div class="buzzout"></div>`;
     out.querySelectorAll('[data-buzzsel]').forEach((el) => {

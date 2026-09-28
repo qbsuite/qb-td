@@ -20,8 +20,9 @@ import { buildReport } from '../engine/report.js';
 import { mountReport } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries } from '../engine/buzz.js';
-import { roundHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
-import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare } from '../engine/cats.js';
+import { roundHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
+import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
+  categoryQuestionStats, questionLines, categoryQuestions } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
 import { effectiveFormat } from './read_core.js';
 
@@ -41,10 +42,13 @@ let rawEntries = [];       // {id, round, room, qbj}, deduped — buzz + categor
 const roundCache = new Map(); // round number (as a string) -> {v, entries} already fetched
 let loadedIds = new Set();    // file ids the fetched rounds actually contained
 let roundsComplete = true;    // false when a round failed to fetch this pass
-let buzzView = null;       // selected round number, or 'summary'
+let buzzMode = 'round';    // 'round' | 'category' | 'summary'
+let buzzView = null;       // the round By Round shows
+let buzzCat = '';          // the category By Category shows
+let buzzSub = '';
 let catmap = null;         // text-free per-tossup categories from /pub/:slug/cats
 let lastCats;              // its stamp
-let catView = 'cat';       // 'cat' | 'player'
+let catView = 'cat';       // 'cat' (players) | 'team' | 'player' | 'questions'
 let catSel = '';
 let catSubSel = '';
 let catPlayerSel = null;   // {team, player}
@@ -252,7 +256,7 @@ function renderScheduleGrid(box) {
     <div class="rhead">${esc(phase.name)}</div>
     <div class="tablewrap">
     <table class="sched">
-      <tr><th></th>${schedule.rooms.map((r, i) => used[i] ? `<th>${esc(r.name)}</th>` : '').join('')}${hasByes ? '<th>bye</th>' : ''}</tr>
+      <tr><th></th>${schedule.rooms.map((r, i) => used[i] ? `<th>${esc(r.name)}</th>` : '').join('')}${hasByes ? '<th>Bye</th>' : ''}</tr>
       ${phase.rounds.map((round) => `
       <tr>
         <td class="roundcell${round.round === cur ? ' now' : ''}">${round.round}</td>
@@ -296,12 +300,12 @@ function renderTeamView(box, team) {
           <td class="muted">${esc(room)}</td><td class="num">${result}</td></tr>`);
       } else if (round.byes.some((s) => slotText(s) === team)) {
         rows.push(`<tr><td class="roundcell">${round.round}</td>
-          <td class="muted">bye</td><td></td><td></td></tr>`);
+          <td class="muted">Bye</td><td></td><td></td></tr>`);
       }
     }
   }
   box.innerHTML = `<div class="tablewrap"><table>
-    <tr><th>round</th><th>opponent</th><th>room</th><th class="num">result</th></tr>
+    <tr><th>Round</th><th>Opponent</th><th>Room</th><th class="num">Result</th></tr>
     ${rows.join('')}</table></div>`;
 }
 
@@ -319,14 +323,14 @@ function scheduleTeams() {
 
 function renderSchedule(box) {
   if (!schedule) {
-    box.innerHTML = '<div class="muted">no schedule</div>';
+    box.innerHTML = '<div class="muted">No schedule</div>';
     return;
   }
   const teams = scheduleTeams();
   box.innerHTML = `
     <div style="margin-bottom:10px">
       <select id="teamsel">
-        <option value="">all teams</option>
+        <option value="">All teams</option>
         ${teams.map((n) => `<option ${n === teamFilter ? 'selected' : ''}>${esc(n)}</option>`).join('')}
       </select>
     </div>
@@ -374,9 +378,9 @@ async function tryBuzzKey(pw) {
   // immediately.
   let tok;
   try {
-    if (state.buzz_kdf) say('checking password');
+    if (state.buzz_kdf) say('Checking password');
     tok = await buzzToken(pw, state.buzz_kdf);
-  } catch (e) { say('could not check the password', true); return; }
+  } catch (e) { say('Could not check the password', true); return; }
   sessionStorage.setItem(BUZZ_KEY, JSON.stringify({ tok, v: state.buzz_v }));
   const probe = (state.buzz_done || []).filter((n) =>
     (state.packet_rounds || []).includes(n))[0];
@@ -388,7 +392,7 @@ async function tryBuzzKey(pw) {
       // neither should leave a stored key behind
       if (m.includes('bad password') || m.includes('too many attempts')) {
         sessionStorage.removeItem(BUZZ_KEY);
-        say(m.includes('too many') ? m : 'bad password', true);
+        say(m.includes('too many') ? m : 'Bad password', true);
         return;
       } // other failures (no packet etc.): let the tab render what it can
     }
@@ -403,41 +407,133 @@ const buzzEntries = () => {
   return rawEntries.filter((e) => done.has(e.round));
 };
 
+/* ---------- navigation + filters (td.css .views / .chips) ---------- */
+
+// View switch: bold words. items [{v, label} | {grow: true}].
+function viewsHtml(items, cur, attr) {
+  return `<div class="views">${items.map((i) => i.grow ? '<span class="grow"></span>'
+    : `<a href="#" class="view${i.v === cur ? ' on' : ''}" data-${attr}="${esc(i.v)}"${
+      i.v === cur ? ' aria-current="true"' : ''}>${esc(i.label)}</a>`).join('')}</div>`;
+}
+// Filter chips. items [{v, label, n?, off?}]; `sub` hangs the row off a
+// rule, for the level under another.
+function chipsHtml(items, cur, attr, sub = false) {
+  return `<div class="chips${sub ? ' sub' : ''}">${items.map((i) => i.off
+    ? `<span class="chip off">${esc(i.label)}</span>`
+    : `<a href="#" class="chip${i.v === cur ? ' on' : ''}" data-${attr}="${esc(i.v)}"${
+      i.v === cur ? ' aria-current="true"' : ''}>${esc(i.label)}${i.n ? `<span class="n">${i.n}</span>` : ''}</a>`).join('')}</div>`;
+}
+function wire(box, attr, pick) {
+  box.querySelectorAll(`[data-${attr}]`).forEach((el) => {
+    el.onclick = (e) => { e.preventDefault(); pick(el.dataset[attr]); render(); };
+  });
+}
+// Category chips, then the picked category's subcategories under them.
+// `items` are [{cat, sub}] with a count each (`n`); a subcategory named
+// like its category adds nothing and isn't offered. `all` offers an All
+// chip for no category.
+function catChipsHtml(items, cat, sub, catAttr, subAttr, all = true) {
+  const count = new Map();
+  for (const i of items) {
+    count.set(i.cat, (count.get(i.cat) || 0) + i.n);
+    if (i.sub && i.sub !== i.cat) count.set(i.cat + '\n' + i.sub, (count.get(i.cat + '\n' + i.sub) || 0) + i.n);
+  }
+  const cats = [...new Set(items.map((i) => i.cat))].sort(catCompare);
+  const subs = cat ? [...new Set(items.filter((i) => i.cat === cat && i.sub && i.sub !== cat)
+    .map((i) => i.sub))].sort() : [];
+  return `<div class="chipstack">
+    ${chipsHtml([...(all ? [{ v: '', label: 'All' }] : []),
+      ...cats.map((c) => ({ v: c, label: c, n: count.get(c) }))], cat, catAttr)}
+    ${subs.length ? chipsHtml([{ v: '', label: 'All' },
+      ...subs.map((s) => ({ v: s, label: s, n: count.get(cat + '\n' + s) }))], sub, subAttr, true) : ''}
+  </div>`;
+}
+
+/* ---------- buzzpoints tab ---------- */
+
 function renderBuzzSummary(box) {
   box.innerHTML = buzzSummaryHtml(buzzSummary(buzzEntries()));
 }
 
+// A packet, or null when it can't be read (the numbers still render);
+// false when the stored key was rejected, which re-asks for it.
+async function buzzPacketOrNull(round) {
+  try { return await fetchBuzzPacket(round); }
+  catch (e) {
+    if (String(e.message).includes('bad password')) {
+      sessionStorage.removeItem(BUZZ_KEY);
+      render();
+      return false;
+    }
+    return null;
+  }
+}
+
 async function renderBuzzRound(box, round) {
   if (!buzzDoneSet().has(round)) {
-    box.innerHTML = '<div class="muted">round in progress</div>';
+    box.innerHTML = '<div class="muted">Round in progress</div>';
     return;
   }
   const tossups = roundTossupBuzzes(rawEntries, round);
   const bonuses = roundBonuses(rawEntries, round);
   if (!tossups.length && !bonuses.length) {
-    box.innerHTML = '<div class="muted">no games this round</div>';
+    box.innerHTML = '<div class="muted">No games this round</div>';
     return;
   }
-  box.innerHTML = '<div class="muted">loading packet</div>';
-  let packet = null;
-  try { packet = await fetchBuzzPacket(round); }
-  catch (e) {
-    if (String(e.message).includes('bad password')) {
-      sessionStorage.removeItem(BUZZ_KEY);
-      render();
-      return;
-    } // packet unreadable: numbers still render without text
-  }
-  if (tab !== 'buzz' || buzzView !== round) return; // user moved on mid-fetch
+  box.innerHTML = '<div class="muted">Loading packet</div>';
+  const packet = await buzzPacketOrNull(round);
+  if (packet === false) return;
+  if (tab !== 'buzz' || buzzMode !== 'round' || buzzView !== round) return; // user moved on mid-fetch
   box.innerHTML = roundHtml(tossups, bonuses, packet);
 }
 
+// Every finished round's tossups and bonuses in one category, each row
+// expanding exactly as it does in its round.
+function buzzCategoryIndex(rounds) {
+  return categoryQuestions(catmap, rounds, '', '',
+    (n) => roundTossupBuzzes(rawEntries, n), (n) => roundBonuses(rawEntries, n));
+}
+
+async function renderBuzzCategory(box, rounds) {
+  const all = buzzCategoryIndex(rounds);
+  const items = all.tossups.map((t) => ({ cat: t.cat, sub: t.sub, n: 1 }))
+    .concat(all.bonuses.map((b) => ({ cat: b.cat, sub: b.sub, n: 0 })));
+  if (!items.length) { box.innerHTML = '<div class="muted">No categorized questions yet</div>'; return; }
+  const cats = [...new Set(items.map((i) => i.cat))].sort(catCompare);
+  if (!cats.includes(buzzCat)) { buzzCat = cats[0]; buzzSub = ''; }
+  const pick = (q) => q.cat === buzzCat && (!buzzSub || q.sub === buzzSub);
+  const tossups = all.tossups.filter(pick);
+  const bonuses = all.bonuses.filter(pick);
+  // no All here: every category at once is just every round again
+  const filter = catChipsHtml(items, buzzCat, buzzSub, 'buzzcat', 'buzzsub', false);
+  box.innerHTML = `${filter}<div id="buzzcatout"><div class="muted">Loading packets</div></div>`;
+  wire(box, 'buzzcat', (v) => { buzzCat = v; buzzSub = ''; });
+  wire(box, 'buzzsub', (v) => { buzzSub = v; });
+  const at = { cat: buzzCat, sub: buzzSub };
+  const want = [...new Set([...tossups, ...bonuses].map((q) => q.round))];
+  const packets = new Map();
+  for (const [n, p] of await Promise.all(want.map(async (n) => [n, await buzzPacketOrNull(n)]))) {
+    if (p === false) return;
+    packets.set(n, p);
+  }
+  if (tab !== 'buzz' || buzzMode !== 'category' || buzzCat !== at.cat || buzzSub !== at.sub) return;
+  const out = box.querySelector('#buzzcatout');
+  if (!out) return;
+  out.innerHTML = `
+    <div class="rhead">Tossups <span class="muted">${tossups.length}</span></div>
+    ${tossups.map((t) => tossupHtml(t.tossup, t.buzzes, packets.get(t.round), undefined,
+      `R${t.round} T${t.tossup}`)).join('') || '<div class="muted">None</div>'}
+    <div class="rhead" style="margin-top:18px">Bonuses <span class="muted">${bonuses.length}</span></div>
+    ${bonuses.map((b) => bonusHtml(b.bonus, b.results, packets.get(b.round),
+      { label: `R${b.round} B${b.bonus}`, nest: false })).join('') || '<div class="muted">None</div>'}`;
+}
+
 function renderBuzz(box) {
-  if (!state.buzz) { box.innerHTML = '<div class="muted">not enabled</div>'; return; }
+  if (!state.buzz) { box.innerHTML = '<div class="muted">Not enabled</div>'; return; }
   if (!buzzStored()) {
     box.innerHTML = `<div class="row">
-      <input id="buzzpw" type="password" placeholder="password">
-      <button id="buzzgo" class="primary">view</button>
+      <input id="buzzpw" type="password" placeholder="Password">
+      <button id="buzzgo" class="primary">View</button>
     </div>`;
     $('buzzgo').onclick = () => tryBuzzKey($('buzzpw').value);
     $('buzzpw').onkeydown = (e) => { if (e.key === 'Enter') tryBuzzKey($('buzzpw').value); };
@@ -446,88 +542,74 @@ function renderBuzz(box) {
   const done = buzzDoneSet();
   const rounds = (state.packet_rounds || []).filter((n) => done.has(n));
   const pending = (state.packet_rounds || []).filter((n) => !done.has(n));
-  if (buzzView === null || (buzzView !== 'summary' && !rounds.includes(buzzView))) {
-    buzzView = rounds.length ? rounds[rounds.length - 1] : 'summary';
+  // By Category needs the category map, which docx packets don't give
+  const byCat = Boolean(catmap);
+  if (buzzMode === 'category' && !byCat) buzzMode = 'round';
+  if (buzzMode === 'round' && !rounds.includes(buzzView)) {
+    if (rounds.length) buzzView = rounds[rounds.length - 1];
+    else buzzMode = 'summary';
   }
   box.innerHTML = `
-    <div class="row" style="margin-bottom:10px">
-      ${rounds.map((n) =>
-        `<a href="#" class="pill${buzzView === n ? ' on' : ''}" data-buzzround="${n}">round ${n}</a>`).join('')}
-      ${pending.map((n) =>
-        `<span class="pill muted">round ${n} in progress</span>`).join('')}
-      <span style="flex:1"></span>
-      <a href="#" class="pill${buzzView === 'summary' ? ' on' : ''}" data-buzzround="summary">summary</a>
-    </div>
+    ${viewsHtml([{ v: 'round', label: 'By Round' },
+      ...(byCat ? [{ v: 'category', label: 'By Category' }] : []),
+      { grow: true }, { v: 'summary', label: 'Summary' }], buzzMode, 'buzzmode')}
+    ${buzzMode === 'round' ? `<div class="chipstack">${chipsHtml([
+      ...rounds.map((n) => ({ v: String(n), label: 'Round ' + n })),
+      ...pending.map((n) => ({ off: true, label: `Round ${n} in progress` })),
+    ], String(buzzView), 'buzzround')}</div>` : ''}
     <div id="buzzout"></div>`;
-  box.querySelectorAll('[data-buzzround]').forEach((p) => {
-    p.onclick = (e) => {
-      e.preventDefault();
-      const v = p.dataset.buzzround;
-      buzzView = v === 'summary' ? 'summary' : Number(v);
-      render();
-    };
-  });
-  if (buzzView === 'summary') renderBuzzSummary($('buzzout'));
+  wire(box, 'buzzmode', (v) => { buzzMode = v; });
+  wire(box, 'buzzround', (v) => { buzzView = Number(v); });
+  if (buzzMode === 'summary') renderBuzzSummary($('buzzout'));
+  else if (buzzMode === 'category') renderBuzzCategory($('buzzout'), rounds);
   else renderBuzzRound($('buzzout'), buzzView);
 }
 
 /* ---------- categories tab ---------- */
 
-const CAT_HEAD = '<th class="num">15</th><th class="num">10</th>'
-  + '<th class="num">-5</th><th class="num">pts</th>';
+const CAT_HEAD = '<th class="num">15</th><th class="num">10</th><th class="num">-5</th>'
+  + '<th class="num" title="Bouncebacks: tossups won after the other team missed them">BB</th>'
+  + '<th class="num">Pts</th>';
 function lineCells(l) {
   return `<td class="num">${l.powers}</td><td class="num">${l.gets}</td>`
-    + `<td class="num">${l.negs}</td><td class="num">${l.pts}</td>`;
+    + `<td class="num">${l.negs}</td><td class="num">${l.bb}</td><td class="num">${l.pts}</td>`;
 }
 
-// Category + subcategory filter pills, shared by the by-category and
-// by-team views (same catSel/catSubSel state).
-function catFilterHtml(rows) {
-  const cats = [...new Set(rows.map((r) => r.cat))].sort(catCompare);
-  if (catSel && !cats.includes(catSel)) { catSel = ''; catSubSel = ''; }
-  const subs = catSel
-    ? [...new Set(rows.filter((r) => r.cat === catSel && r.sub).map((r) => r.sub))].sort() : [];
-  return `
-    <div class="row" style="margin-bottom:8px">
-      ${['', ...cats].map((c) =>
-        `<a href="#" class="pill${catSel === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c) || 'all'}</a>`).join('')}
-    </div>
-    ${subs.length ? `<div class="row" style="margin-bottom:10px">
-      ${['', ...subs].map((s) =>
-        `<a href="#" class="pill${catSubSel === s ? ' on' : ''}" data-catsub="${esc(s)}">${esc(s) || 'all'}</a>`).join('')}
-    </div>` : ''}`;
+// The category filter every view shares: categories as read, with how
+// many tossups each had.
+function catFilterHtml(q) {
+  const items = q.tossups.map((r) => ({ cat: r.cat, sub: r.sub, n: r.heard }))
+    .concat(q.bonuses.map((r) => ({ cat: r.cat, sub: r.sub, n: 0 })));
+  const cats = new Set(items.map((i) => i.cat));
+  if (catSel && !cats.has(catSel)) { catSel = ''; catSubSel = ''; }
+  return catChipsHtml(items, catSel, catSubSel, 'cat', 'catsub');
 }
 function wireCatFilter(box) {
-  box.querySelectorAll('[data-cat]').forEach((p) => {
-    p.onclick = (e) => { e.preventDefault(); catSel = p.dataset.cat; catSubSel = ''; render(); };
-  });
-  box.querySelectorAll('[data-catsub]').forEach((p) => {
-    p.onclick = (e) => { e.preventDefault(); catSubSel = p.dataset.catsub; render(); };
-  });
+  wire(box, 'cat', (v) => { catSel = v; catSubSel = ''; });
+  wire(box, 'catsub', (v) => { catSubSel = v; });
 }
+const noneHere = '<div class="muted">No buzzes in this category</div>';
 
-function renderByCategory(box, rows) {
-  const filter = catFilterHtml(rows);
+function renderByCategory(box, rows, q) {
   const lines = catPlayerLines(rows, catSel, catSubSel);
-  box.innerHTML = `${filter}
-    <div class="tablewrap"><table>
-      <tr><th class="name">player</th><th class="name">team</th>${CAT_HEAD}</tr>
+  box.innerHTML = `${catFilterHtml(q)}
+    ${lines.length ? `<div class="tablewrap"><table>
+      <tr><th class="name">Player</th><th class="name">Team</th>${CAT_HEAD}</tr>
       ${lines.map((l) =>
         `<tr><td class="name">${esc(l.player)}</td><td class="name muted">${esc(l.team)}</td>${lineCells(l)}</tr>`).join('')}
-    </table></div>`;
+    </table></div>` : noneHere}`;
   wireCatFilter(box);
 }
 
-function renderByTeam(box, teamRows) {
-  const filter = catFilterHtml(teamRows);
+function renderByTeam(box, teamRows, q) {
   const lines = catTeamLines(teamRows, catSel, catSubSel);
-  box.innerHTML = `${filter}
-    <div class="tablewrap"><table>
-      <tr><th class="name">team</th>${CAT_HEAD}<th class="num">bonuses</th><th class="num">bpts</th><th class="num">ppb</th></tr>
+  box.innerHTML = `${catFilterHtml(q)}
+    ${lines.length ? `<div class="tablewrap"><table>
+      <tr><th class="name">Team</th>${CAT_HEAD}<th class="num">Bonuses</th><th class="num">Bpts</th><th class="num">PPB</th></tr>
       ${lines.map((l) =>
         `<tr><td class="name">${esc(l.team)}</td>${lineCells(l)}<td class="num">${l.bh}</td>`
         + `<td class="num">${l.bpts}</td><td class="num">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
-    </table></div>`;
+    </table></div>` : noneHere}`;
   wireCatFilter(box);
 }
 
@@ -548,7 +630,7 @@ function renderByPlayer(box, rows) {
       </select>
     </div>
     <div class="tablewrap"><table>
-      <tr><th>category</th>${CAT_HEAD}</tr>
+      <tr><th>Category</th>${CAT_HEAD}</tr>
       ${bd.map(({ cat, line, subs }) =>
         `<tr><td><b>${esc(cat)}</b></td>${lineCells(line)}</tr>`
         + subs.map(({ sub, line: sl }) =>
@@ -561,23 +643,60 @@ function renderByPlayer(box, rows) {
   };
 }
 
+// How each category's questions played: tossups the way the buzzpoints
+// sites show them, bonuses with PPB and their easy / medium / hard parts.
+function renderQuestions(box, q) {
+  const pct = (n, d) => (d ? Math.round((n / d) * 100) + '%' : '–');
+  const rowCls = (l) => (l.isSub ? 'catsub' : 'cattop');
+  const name = (l) => esc(l.isSub ? l.sub : l.cat);
+  const tl = questionLines(q.tossups, catSel, catSubSel);
+  const bl = questionLines(q.bonuses, catSel, catSubSel);
+  // the difficulty notice counts the bonuses on screen, once each
+  const top = bl.filter((l) => !l.isSub || catSubSel);
+  const ranked = top.reduce((n, l) => n + (l.ranked || 0), 0);
+  const marked = top.reduce((n, l) => n + (l.marked || 0), 0);
+  const note = !ranked ? '' : `<p class="ranknote" role="note"><span class="i" aria-hidden="true">i</span>${
+    marked ? `Bonus difficulty not available for ${ranked} of ${ranked + marked} bonuses, ranked by conversion rate.`
+      : 'Bonus difficulty not available, ranked by conversion rate.'}</p>`;
+  box.innerHTML = `${catFilterHtml(q)}
+    <div class="rhead">Tossups</div>
+    ${tl.length ? `<div class="tablewrap"><table>
+      <tr><th>Category</th><th class="num">Heard</th><th class="num">Conv %</th><th class="num">Power %</th>
+        <th class="num">Neg %</th><th class="num">Avg Buzz</th></tr>
+      ${tl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.heard}</td>
+        <td class="num">${pct(l.conv, l.heard)}</td><td class="num">${pct(l.powers, l.heard)}</td>
+        <td class="num">${pct(l.negs, l.heard)}</td>
+        <td class="num">${l.words && l.words.length ? (l.words.reduce((a, b) => a + b, 0) / l.words.length).toFixed(1) : '–'}</td></tr>`).join('')}
+    </table></div>` : '<div class="muted">None</div>'}
+    <div class="rhead" style="margin-top:18px">Bonuses</div>
+    ${note}
+    ${bl.length ? `<div class="tablewrap"><table>
+      <tr><th>Category</th><th class="num">Heard</th><th class="num">PPB</th>
+        <th class="num sep">Easy</th><th class="num">Medium</th><th class="num">Hard</th></tr>
+      ${bl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.heard}</td>
+        <td class="num">${l.heard ? (l.pts / l.heard).toFixed(2) : '–'}</td>
+        <td class="num sep">${pct(l.e, l.dHeard)}</td><td class="num">${pct(l.m, l.dHeard)}</td>
+        <td class="num">${pct(l.h, l.dHeard)}</td></tr>`).join('')}
+    </table></div>` : '<div class="muted">None</div>'}`;
+  wireCatFilter(box);
+}
+
 function renderCats(box) {
-  if (!catmap) { box.innerHTML = '<div class="muted">no categories</div>'; return; }
-  const rows = categoryStats(rawEntries, catmap);
-  if (!rows.length) { box.innerHTML = '<div class="muted">no games yet</div>'; return; }
+  if (!catmap) { box.innerHTML = '<div class="muted">No categories</div>'; return; }
+  const q = categoryQuestionStats(rawEntries, catmap);
+  if (!q.tossups.length && !q.bonuses.length) { box.innerHTML = '<div class="muted">No games yet</div>'; return; }
   box.innerHTML = `
-    <div class="row" style="margin-bottom:10px">
-      <a href="#" class="pill${catView === 'cat' ? ' on' : ''}" data-catview="cat">players</a>
-      <a href="#" class="pill${catView === 'team' ? ' on' : ''}" data-catview="team">teams</a>
-      <a href="#" class="pill${catView === 'player' ? ' on' : ''}" data-catview="player">by player</a>
-    </div>
+    ${viewsHtml([{ v: 'cat', label: 'Players' }, { v: 'team', label: 'Teams' },
+      { v: 'player', label: 'By Player' }, { v: 'questions', label: 'Questions' }], catView, 'catview')}
     <div id="catbody"></div>`;
-  box.querySelectorAll('[data-catview]').forEach((p) => {
-    p.onclick = (e) => { e.preventDefault(); catView = p.dataset.catview; render(); };
-  });
-  if (catView === 'cat') renderByCategory($('catbody'), rows);
-  else if (catView === 'team') renderByTeam($('catbody'), categoryTeamStats(rawEntries, catmap));
-  else renderByPlayer($('catbody'), rows);
+  wire(box, 'catview', (v) => { catView = v; });
+  const rows = categoryStats(rawEntries, catmap);
+  if (catView === 'questions') renderQuestions($('catbody'), q);
+  else if (catView === 'team') renderByTeam($('catbody'), categoryTeamStats(rawEntries, catmap), q);
+  else if (catView === 'player') {
+    if (rows.length) renderByPlayer($('catbody'), rows);
+    else $('catbody').innerHTML = '<div class="muted">No buzzes yet</div>';
+  } else renderByCategory($('catbody'), rows, q);
 }
 
 /* ---------- stats tab ---------- */
@@ -602,7 +721,7 @@ function renderStatsTab(box) {
   if (!matches.length) {
     box.innerHTML = statsErrors.length
       ? statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')
-      : pendingNote() || '<div class="muted">no games yet</div>';
+      : pendingNote() || '<div class="muted">No games yet</div>';
     return;
   }
   box.innerHTML = statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('') + pendingNote()
@@ -653,7 +772,7 @@ async function load() {
     if (storedKey && storedKey.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
     $('tname').textContent = state.name;
-    $('round').textContent = 'round ' + state.current_round;
+    $('round').textContent = 'Round ' + state.current_round;
     // Broadcasts have no stamp of their own; they ride the state and must
     // render before the no-change early return below. Expiry is applied
     // by whoever produced the state (the Worker, or a frozen capture).
@@ -679,7 +798,7 @@ async function load() {
     const schedMoved = schedStamp !== lastSched;
     const catsMoved = catsStamp !== lastCats;
     if (!statsMoved && !schedMoved && !catsMoved) { say(''); return; }
-    say('loading');
+    say('Loading');
 
     const jobs = [];
     if (statsMoved) {
@@ -722,5 +841,5 @@ async function load() {
 
 document.querySelectorAll('.tab').forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });
 $('refresh').onclick = () => load();
-if (!slug) say('bad link', true);
+if (!slug) say('Bad link', true);
 else load();

@@ -474,7 +474,11 @@ const CATPACKET = JSON.stringify({
     { question: 'q2 text', answer: 'a2', category: 'Science', subcategory: 'Biology' },
     { question: 'q3 text', answer: 'a3' },
   ],
-  bonuses: [{ leadin: 'b1 text', metadata: 'World History' }],
+  bonuses: [
+    { leadin: 'b1 text', metadata: 'World History' },
+    // difficulty marks travel with the category (text-free), for the questions view
+    { leadin: 'b2 text', category: 'Science', subcategory: 'Physics', difficultyModifiers: ['h', 'e', 'm'] },
+  ],
 });
 r = await call(`${A}/packet?round=2&name=Packet2.json`, { method: 'POST',
   headers: { 'Content-Type': 'application/json' }, body: CATPACKET });
@@ -489,6 +493,8 @@ ok('cats served, text-free',
   && r.body.rounds['2'].t[2] === null
   && r.body.rounds['2'].b[0].c === 'History'
   && r.body.rounds['2'].b[0].s === 'World'
+  && r.body.rounds['2'].b[0].d === undefined
+  && r.body.rounds['2'].b[1].d === 'hem'
   && !JSON.stringify(r.body).includes('q1 text')
   && !JSON.stringify(r.body).includes('b1 text'), r.body);
 // replacement packet without categories clears the round's entry

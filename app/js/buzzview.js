@@ -72,7 +72,7 @@ export function tossupTextHtml(tu, buzzes) {
 
 /** The numbered buzz list under a tossup's text. */
 export function buzzListHtml(buzzes) {
-  if (!buzzes.length) return '<div class="buzzlist">no buzzes</div>';
+  if (!buzzes.length) return '<div class="buzzlist">No buzzes</div>';
   return `<div class="buzzlist">
     ${buzzes.map((b, i) => `<div><span class="${buzzCls(b)}">${i + 1} ${b.value > 0 ? '+' : ''}${b.value}</span>
         ${esc(b.player)} (${esc(b.team)}) &middot; word ${b.position + 1}${b.room ? ' &middot; ' + esc(b.room) : ''}</div>`).join('')}
@@ -88,7 +88,7 @@ export function buzzListHtml(buzzes) {
  */
 export function tossupMetaHtml(buzzes, heard, positioned = buzzes) {
   if (!heard) {
-    const dead = buzzes.some((b) => b.value > 0) ? '' : '<span class="bad">dead</span> ';
+    const dead = buzzes.some((b) => b.value > 0) ? '' : '<span class="bad">Dead</span> ';
     return dead + buzzes.map((b) => `<span class="${buzzCls(b)}">${b.position + 1}</span>`).join(' ');
   }
   const powers = buzzes.filter((b) => b.value > 10).length;
@@ -105,13 +105,14 @@ export function tossupMetaHtml(buzzes, heard, positioned = buzzes) {
     + (avg ? ` &middot; avg word ${avg}` : '');
 }
 
-/** One tossup of a packet (1-based `tossup`), collapsed to its answerline. */
-export function tossupHtml(tossup, buzzes, packet, heard) {
+/** One tossup of a packet (1-based `tossup`), collapsed to its answerline.
+    `label` replaces the "T4" in front (buzzpoints by category: "R3 T4"). */
+export function tossupHtml(tossup, buzzes, packet, heard, label) {
   const tu = packet && packet.tossups && packet.tossups[tossup - 1];
   return `
     <details class="qd">
-      <summary><span class="roundcell">T${tossup}</span>
-        ${tu ? mainAnswerHtml(tu.answer) : '<span class="muted">(no packet text)</span>'}
+      <summary><span class="roundcell">${label || 'T' + tossup}</span>
+        ${tu ? mainAnswerHtml(tu.answer) : '<span class="muted">(No packet text)</span>'}
         <span class="qdmeta">${tossupMetaHtml(buzzes, heard)}</span></summary>
       <div class="qdbody">
         ${tossupTextHtml(tu, buzzes)}
@@ -164,14 +165,17 @@ export function bonusAnswersHtml(bz) {
   const answers = bz && Array.isArray(bz.answers) ? bz.answers : [];
   return answers.length
     ? answers.map((a) => mainAnswerHtml(a)).join(' <span class="muted">/</span> ')
-    : '<span class="muted">(no packet text)</span>';
+    : '<span class="muted">(No packet text)</span>';
 }
 
-export function bonusHtml(bonus, results, packet) {
+/** One bonus, collapsed to its answerlines. It sits indented under the
+    tossup it was read with unless `nest` is false (a list of bonuses on
+    their own); `label` replaces the "B4" in front. */
+export function bonusHtml(bonus, results, packet, { label, nest = true } = {}) {
   const bz = packet && Array.isArray(packet.bonuses) && packet.bonuses[bonus - 1];
   return `
-    <details class="qd bonus">
-      <summary><span class="roundcell">B${bonus}</span>
+    <details class="qd${nest ? ' bonus' : ''}">
+      <summary><span class="roundcell">${label || 'B' + bonus}</span>
         ${bonusAnswersHtml(bz)}
         <span class="qdmeta">${bonusMetaHtml(results)}</span></summary>
       <div class="qdbody">${bonusBodyHtml(bz, results)}</div>
@@ -197,7 +201,7 @@ export function roundHtml(tossups, bonuses, packet) {
 
 /** buzz.js buzzSummary rows as a table; rows carrying `site` get a column. */
 export function buzzSummaryHtml(rows) {
-  if (!rows.length) return '<div class="muted">no buzzes yet</div>';
+  if (!rows.length) return '<div class="muted">No buzzes yet</div>';
   const sites = rows.some((p) => p.site);
   return `<div class="tablewrap"><table>
     <tr><th class="name">player</th><th class="name">team</th>${sites ? '<th class="name">site</th>' : ''}

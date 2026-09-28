@@ -1534,9 +1534,13 @@ export function categoryFromMetadata(meta) {
   return best || categoryFromVocab(meta);
 }
 
-// Round entry shape: {t: [{c, s} | null, ...], b: [...]} — tossup and
-// bonus categories by packet position. Maps written before bonuses were
-// extracted store a bare tossup array; readers accept both.
+// Round entry shape: {t: [{c, s} | null, ...], b: [{c, s, d?} | null, ...]}
+// — tossup and bonus categories by packet position. `d` is a bonus's
+// difficulty marks, one e/m/h letter per part in packet order, from the
+// packet's own difficultyModifiers (MODAQ / qbreader JSON; YAPP writes
+// them from "[10e]"-style markers); absent when the packet has none.
+// Maps written before bonuses were extracted store a bare tossup array;
+// readers accept both.
 export function packetCategories(body, filename) {
   if (!/\.json$/i.test(filename)) return null;
   let parsed;
@@ -1549,8 +1553,18 @@ export function packetCategories(body, filename) {
     }
     return categoryFromMetadata(q.metadata);
   };
+  const marksOf = (q) => {
+    const m = q && Array.isArray(q.difficultyModifiers) ? q.difficultyModifiers : null;
+    if (!m || !m.length) return '';
+    const d = m.map((x) => String(x || '').trim().toLowerCase().charAt(0)).join('');
+    return d.length === m.length && /^[emh]+$/.test(d) ? d : '';
+  };
   const t = parsed.tossups.map(catOf);
-  const b = (Array.isArray(parsed.bonuses) ? parsed.bonuses : []).map(catOf);
+  const b = (Array.isArray(parsed.bonuses) ? parsed.bonuses : []).map((q) => {
+    const c = catOf(q);
+    const d = marksOf(q);
+    return c && d ? { ...c, d } : c;
+  });
   return t.some(Boolean) || b.some(Boolean) ? { t, b } : null;
 }
 
@@ -1559,7 +1573,8 @@ export function packetCategories(body, filename) {
 // written by an older parser then read as stale and the dashboard load
 // backfills them, so already-uploaded tournaments pick up the
 // improvement without a re-upload.
-const CATMAP_VERSION = '2';
+// '3': bonuses carry their e/m/h difficulty marks.
+const CATMAP_VERSION = '3';
 
 // Backfill for packets uploaded before category extraction existed (or
 // before the current parser understood their format): recompute the

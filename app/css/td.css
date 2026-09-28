@@ -7,6 +7,8 @@
   --hover-bg: #f4f4f0;
   --ok: #15803d;
   --bad: #b91c1c;
+  --pick: #e4e4df;       /* a picked filter chip */
+  --pick-line: #c9c9c2;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -18,6 +20,8 @@
     --hover-bg: #1b1b20;
     --ok: #4ade80;
     --bad: #f87171;
+    --pick: #2c2c33;
+    --pick-line: #44444d;
   }
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -121,6 +125,44 @@ table.box th:first-child {
 .pill.warn { color: var(--bad); border-color: var(--bad); }
 .pill.link { cursor: pointer; }
 .pill.link:hover { border-color: var(--link); color: var(--link); }
+/* Public + set pages: navigation and filters. Views are bold words (a
+   different shape from the page tabs above them); filters are quiet
+   chips whose pick is a darker neutral, so the pick reads without
+   competing with the stats. Subcategories hang off a rule one size
+   down, and a picked one is outlined where a picked category is filled,
+   so the two levels never look alike. .pill stays for status badges. */
+.views { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin-bottom: 12px; }
+.views .grow { flex: 1; }
+.view {
+  font: inherit; font-weight: 600; color: var(--muted); background: none; border: none;
+  border-radius: 0; padding: 2px 0; cursor: pointer; white-space: nowrap;
+}
+.view:hover { color: var(--fg); text-decoration: none; }
+.view.on {
+  color: var(--fg); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px;
+}
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chipstack { display: grid; gap: 8px; margin-bottom: 12px; }
+.chip {
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--hover-bg);
+  border: none; border-radius: 8px; padding: 3px 10px; cursor: pointer; white-space: nowrap;
+}
+a.chip:hover, button.chip:hover { color: var(--fg); text-decoration: none; box-shadow: inset 0 0 0 1px var(--line); }
+.chip.on { background: var(--pick); font-weight: 600; box-shadow: inset 0 0 0 1px var(--pick-line); }
+.chip .n { font-size: 11px; color: var(--muted); margin-left: 5px; font-weight: 400; }
+.chip.off { color: var(--muted); cursor: default; box-shadow: none; }
+.chips.sub { margin-left: 4px; padding-left: 12px; border-left: 2px solid var(--pick-line); gap: 4px; }
+.chips.sub .chip { background: none; color: var(--muted); padding: 2px 8px; }
+.chips.sub .chip:hover { background: var(--hover-bg); color: var(--fg); box-shadow: none; }
+.chips.sub .chip.on { background: none; color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.ranknote { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 7px; margin: 0 0 6px; }
+.ranknote .i {
+  width: 16px; height: 16px; flex: none; border-radius: 99px; border: 1px solid var(--muted);
+  display: inline-grid; place-items: center; font: italic 700 11px/1 Georgia, serif;
+}
+tr.catsub td { color: var(--muted); }
+tr.catsub td:first-child { padding-left: 28px; }
+tr.cattop td:first-child { font-weight: 600; }
 /* Live Hub: protests drawer */
 .protest td { padding-block: 9px; vertical-align: top; }
 .protest .q { font-weight: 600; white-space: nowrap; }

@@ -126,21 +126,32 @@ Part of [qbsuite](https://qbsuite.github.io/).
   behind a dropdown; the stats tab has standings, individual
   leaderboard, and round-by-round scores, all computed in the browser.
   The categories tab (appears when any JSON packet carries qbreader
-  category metadata) shows per-player buzz results sliced by category
-  and subcategory — filter pills by category, or a by-player view with
-  each player's per-category breakdown; it reads a text-free category
-  map the Worker extracts from packets at upload (`/pub/:slug/cats` —
-  no question text, so it's public without the buzzpoints gate; docx
-  packets carry no categories).
+  category metadata) has four views, filtered by category chips with a
+  subcategory row under the picked one: **Players** and **Teams** (buzz
+  results per slice, with a **BB** count: bouncebacks, tossups won after
+  the other team missed — any wrong buzz, no-penalty ones included; a
+  count beside the others, never points, so a bounceback power is still
+  a power), **By Player** (one player's per-category breakdown), and
+  **Questions** (how each category played: tossups heard, conversion,
+  power and neg rates and average buzz word; bonuses heard, PPB, and
+  Easy / Medium / Hard part conversion — from the packet's own e/m/h
+  marks, MODAQ's `difficultyModifiers`, and where a packet has none, from
+  ranking each bonus's parts by how often they converted, which the tab
+  says). It reads a text-free category map the Worker extracts from
+  packets at upload (`/pub/:slug/cats` — categories and difficulty
+  marks, no question text, so it's public without the buzzpoints gate;
+  docx packets carry no categories).
   The buzzpoints tab (TO-enabled, always password-gated — off or on,
-  never open) lists each
-  round's questions in packet order as collapsed answerlines (first
-  answerline only, keeping the packet's bold/underline on the required
-  part) — a tossup
-  expands to its text with every room's buzzed words underlined
-  (MODAQ's `buzz_position.word_index` rides in every qbj), the bonus
-  read with it expands to per-part conversion and each room's line —
-  plus a per-player summary (15/10/neg counts, average and earliest
+  never open) goes **By Round**, **By Category** or **Summary**. By Round
+  lists a round's questions in packet order as collapsed answerlines
+  (first answerline only, keeping the packet's bold/underline on the
+  required part) — a tossup expands to its text with every room's
+  buzzed words underlined (MODAQ's `buzz_position.word_index` rides in
+  every qbj), the bonus read with it (set in under it) expands to each
+  part's text and answerline, its conversion, and each room's line. By
+  Category lists every finished round's tossups and bonuses in one
+  category or subcategory, labelled by round, each expanding the same
+  way. Summary is per player (15/10/neg counts, average and earliest
   correct buzz). Question text comes from the round packets through a gated
   route; the TO's password is stretched in the browser (PBKDF2-SHA256,
   600k iterations, random salt — `app/js/buzzkey.js`) and only the derived
