@@ -76,6 +76,11 @@ function saveLink(entry) {
   list.unshift(entry);
   localStorage.setItem(LINKS_KEY, JSON.stringify(list.slice(0, 30)));
 }
+// Off this device's list only: the tournament itself, its rooms and its
+// public page are untouched.
+function forgetLink(secret) {
+  localStorage.setItem(LINKS_KEY, JSON.stringify(savedLinks().filter((e) => e.secret !== secret)));
+}
 
 /* ---------- save-this-link modal ---------- */
 
@@ -106,6 +111,7 @@ function showList() {
         <span class="spacer" style="flex:1"></span>
         ${open ? `<span class="muted">Open until ${new Date(e.closes).toLocaleString()}</span>`
                : `<span class="pill">Closed</span> <a href="${esc(statsLink(e.slug))}">Page</a>`}
+        <button class="small" data-forget="${esc(e.secret)}" title="Remove from this device's list">Remove</button>
       </div>`;
     }).join('') || '<div class="muted">None yet</div>'}
     <h2>New tournament</h2>
@@ -121,6 +127,20 @@ function showList() {
     <div><a href="archive.html">Past tournaments</a></div>
     <h2>Demo</h2>
     <div><a href="demo.html">Simulated tournament</a></div>`;
+  view.querySelectorAll('[data-forget]').forEach((b) => {
+    b.onclick = () => {
+      const e = links.find((x) => x.secret === b.dataset.forget);
+      if (!e) return;
+      const open = Date.now() < e.closes;
+      if (!confirm(`Remove "${e.name}" from this device?\n\n`
+        + 'The tournament itself is not deleted: its rooms and public page keep working. '
+        + (open ? 'This device forgets its admin link, so keep a copy if you still need to manage it.'
+          : 'It has closed, so there is nothing left to manage.'))) return;
+      forgetLink(e.secret);
+      say('Removed ' + e.name + ' from this device');
+      showList();
+    };
+  });
   $('newbtn').onclick = async () => {
     try {
       const out = await pub('/api/tournaments', { method: 'POST', json: {

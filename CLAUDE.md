@@ -21,7 +21,7 @@ Release Notes for 9/27/2026
 
 - One `- ` line per change a TD, moderator or player would notice; skip
   internal-only work (refactors, tests, docs).
-- Sections in use: RELEASE, SETUP, LIVE HUB, READER, ROOM PAGE,
+- Sections in use: RELEASE, HUB, SETUP, LIVE HUB, READER, ROOM PAGE,
   PUBLIC PAGE, CATEGORIES, BUZZPOINTS, STATS, EXPORTS, SCHEDULE, SETS,
   DEMO, ARCHIVE, SECURITY, PERFORMANCE, UI, MISC.
 - A second deploy on the same date adds to that date's release.
