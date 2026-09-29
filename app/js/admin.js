@@ -787,8 +787,17 @@ function cleanRosterTeams() {
 // Hidden debug aid: with ?debug in the hub's URL the Roster step offers a
 // preset roster, so a test tournament on the live site can be set up in
 // one click. It goes through the ordinary upload preview and confirm, and
-// only ever touches the tournament this admin link opens.
-const DEBUG = new URLSearchParams(location.search).has('debug');
+// only ever touches the tournament this admin link opens. The flag sticks
+// to this browser (links from the tournament list don't carry ?debug)
+// until a visit with ?debug=0.
+const DEBUG = (() => {
+  const v = new URLSearchParams(location.search).get('debug');
+  try {
+    if (v === '0') localStorage.removeItem('qbtdDebug');
+    else if (v !== null) localStorage.setItem('qbtdDebug', '1');
+    return localStorage.getItem('qbtdDebug') === '1';
+  } catch (e) { return v !== null && v !== '0'; }
+})();
 const TEST_TEAMS = ['Stanford', 'Berkeley', 'UIUC', 'ASU', 'Chicago', 'Michigan', 'Yale', 'Penn',
   'Rutgers', 'Columbia', 'Minnesota', 'Georgia Tech', 'Harvard', 'MIT', 'Duke', 'Virginia',
   'Cornell', 'Brown', 'Ohio State', 'Maryland', 'Texas', 'UCLA', 'Johns Hopkins', 'Rice'];

@@ -405,6 +405,16 @@ await waitJs(`!!document.querySelector('#upconfirm') && document.querySelector('
 await click('#upconfirm');
 roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).length === 12 && r; }, 'roster restored');
 ok('4 roster: the original twelve teams are back', JSON.stringify(parseRoster(roster).map((t) => t.name)) === JSON.stringify(TEAMS));
+// the flag sticks to the browser: a plain admin link still shows it, until ?debug=0
+await goto(`${PAGES}/index.html?a=${secret}`);
+await waitJs(`!!document.querySelector('[data-step="roster"]')`, 'the step list (plain link)');
+await click('[data-step="roster"]');
+await check('4 roster: ?debug sticks for later visits without it', () => waitJs(`!!document.querySelector('#dbgroster')`, 'sticky debug loader'));
+await goto(`${PAGES}/index.html?a=${secret}&debug=0`);
+await waitJs(`!!document.querySelector('[data-step="roster"]')`, 'the step list (debug off)');
+await click('[data-step="roster"]');
+await waitJs(`!!document.querySelector('#rfile')`, 'roster section (debug off)');
+ok('4 roster: ?debug=0 turns it off', !(await js(`!!document.querySelector('#dbgroster')`)));
 await goto(`${PAGES}/index.html?a=${secret}`);
 await waitJs(`document.querySelectorAll('.stepbtn').length === 6`, 'the step list again');
 const rosterTeams = parseRoster(roster);
