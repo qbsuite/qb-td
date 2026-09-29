@@ -3826,13 +3826,19 @@ async function pubSetQPacket(request, url, env, slug) {
   return gatedPacket(request, env, obj, row.r2_key, row.name, s.buzz_wrap, (skey) => ({ skey }));
 }
 
-/* ---------- D1 meter (dev only) ----------
+/* ---------- D1 + R2 meter (dev only) ----------
    `wrangler dev --var METER:1` counts the D1 rows every request and cron
-   tick reads and writes — the units D1 bills — so tests/sim_usage.js and
+   tick reads and writes, and the R2 operations by billing class — the
+   units D1 and R2 bill — so tests/sim_usage.js, tests/sim_day.js and
    tests/e2e_usage.js can price a simulated day. GET /__meter reads the
    running totals, DELETE /__meter zeroes them. Without METER (every real
    deploy) env passes through untouched and /__meter is a 404. */
-const meter = { queries: 0, rows_read: 0, rows_written: 0 };
+const meter = { queries: 0, rows_read: 0, rows_written: 0, r2_class_a: 0, r2_class_b: 0, r2_free: 0 };
+const METER_ZERO = { ...meter };
+// R2's billing classes (developers.cloudflare.com/r2/pricing): writes and
+// lists are Class A, reads and heads Class B, deletes free
+const R2_CLASS = { put: 'r2_class_a', list: 'r2_class_a', createMultipartUpload: 'r2_class_a',
+  get: 'r2_class_b', head: 'r2_class_b', delete: 'r2_free' };
 
 function meterResult(res) {
   for (const r of Array.isArray(res) ? res : [res]) {
@@ -3868,7 +3874,14 @@ function metered(env) {
       return typeof v === 'function' ? v.bind(target) : v;
     },
   });
-  return new Proxy(env, { get: (target, key) => (key === 'DB' ? db : target[key]) });
+  const data = new Proxy(env.DATA, {
+    get(target, key) {
+      const v = target[key];
+      if (typeof v !== 'function') return v;
+      return (...a) => { if (R2_CLASS[key]) meter[R2_CLASS[key]]++; return v.apply(target, a); };
+    },
+  });
+  return new Proxy(env, { get: (target, key) => (key === 'DB' ? db : key === 'DATA' ? data : target[key]) });
 }
 
 /* ---------- router ---------- */
@@ -3880,7 +3893,7 @@ export default {
     const method = request.method;
 
     if (env.METER && path === '/__meter') {
-      if (method === 'DELETE') { meter.queries = 0; meter.rows_read = 0; meter.rows_written = 0; }
+      if (method === 'DELETE') Object.assign(meter, METER_ZERO);
       return new Response(JSON.stringify(meter), { headers: { 'Content-Type': 'application/json' } });
     }
 
