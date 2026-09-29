@@ -12,9 +12,11 @@ Release Notes for 9/28/2026
 
 [ PUBLIC PAGE ]
 - Removed TD announcements.
+- The public page loads faster. New games show up within about a minute of upload.
 
 [ PERFORMANCE ]
 - The background job no longer rereads every tournament each minute.
+- Public pages are served prebuilt, and each tournament's stats rebuild runs on its own.
 
 Release Notes for 9/27/2026
 
