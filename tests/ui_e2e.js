@@ -382,6 +382,31 @@ await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'team re
 await click('#rostersave');
 roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).length === 12 && r; }, 'roster back to 12');
 ok('4 roster: back to the twelve teams', JSON.stringify(parseRoster(roster).map((t) => t.name)) === JSON.stringify(TEAMS));
+// the hidden debug roster: absent without ?debug, loads a preset with it
+ok('4 roster: no test-roster loader without ?debug', !(await js(`!!document.querySelector('#dbgroster')`)));
+await goto(`${PAGES}/index.html?a=${secret}&debug`);
+await waitJs(`!!document.querySelector('[data-step="roster"]')`, 'the step list (debug)');
+await click('[data-step="roster"]');
+await waitJs(`!!document.querySelector('#dbgroster')`, 'the debug roster loader');
+await js(`(() => { const s = document.querySelector('#dbgteams'); s.value = '8'; s.dispatchEvent(new Event('change')); return true; })()`);
+await click('#dbgtricky');
+await click('#dbgroster');
+await waitJs(`!!document.querySelector('#upconfirm') && document.querySelector('#upreview').textContent.includes('8 teams')`, 'debug roster preview');
+await click('#upconfirm');
+{
+  const r = await until(async () => { const x = await storedRoster(); return x && parseRoster(x).length === 8 && x; }, 'debug roster saved');
+  const teams = parseRoster(r);
+  ok('4 roster: ?debug loads a preset roster MODAQ reads, tricky names intact',
+    modaqValid(r) && teams[0].name === 'Stanford' && teams[1].name === 'St. John\'s "A"'
+      && teams[1].players.includes('Smith, Jr.') && teams.every((tm) => tm.players.length === 4), teams.map((tm) => tm.name));
+}
+await setFiles('#rfile', [badRosterPath]);
+await waitJs(`!!document.querySelector('#upconfirm') && document.querySelector('#upreview').textContent.includes('12 teams')`, 'restore preview');
+await click('#upconfirm');
+roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).length === 12 && r; }, 'roster restored');
+ok('4 roster: the original twelve teams are back', JSON.stringify(parseRoster(roster).map((t) => t.name)) === JSON.stringify(TEAMS));
+await goto(`${PAGES}/index.html?a=${secret}`);
+await waitJs(`document.querySelectorAll('.stepbtn').length === 6`, 'the step list again');
 const rosterTeams = parseRoster(roster);
 
 /* ---------- 5. schedule ---------- */

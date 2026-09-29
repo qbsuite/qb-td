@@ -225,3 +225,5 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 #msg.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 #msg.bad { background: var(--bad); color: var(--bg); }
 @media (prefers-reduced-motion: reduce) { #msg { transition: none; } }
+/* ?debug only: the test-roster loader */
+.debugrow { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 13px; }

@@ -21,6 +21,7 @@ Release Notes for 9/29/2026
 - Fixed a just-generated schedule sometimes disappearing after a roster change.
 - Fixed Save format sometimes saving the previous preset.
 - "Bucket" links are now "Upload page".
+- Add &debug to the hub's URL to load a test roster from the Roster step.
 
 [ READER ]
 - New start screen: round buttons, the scheduled matchup, starter checklists, this room's schedule.

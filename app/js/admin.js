@@ -784,6 +784,29 @@ function cleanRosterTeams() {
     players: tm.players.map((p) => p.trim()).filter(Boolean) }));
 }
 
+// Hidden debug aid: with ?debug in the hub's URL the Roster step offers a
+// preset roster, so a test tournament on the live site can be set up in
+// one click. It goes through the ordinary upload preview and confirm, and
+// only ever touches the tournament this admin link opens.
+const DEBUG = new URLSearchParams(location.search).has('debug');
+const TEST_TEAMS = ['Stanford', 'Berkeley', 'UIUC', 'ASU', 'Chicago', 'Michigan', 'Yale', 'Penn',
+  'Rutgers', 'Columbia', 'Minnesota', 'Georgia Tech', 'Harvard', 'MIT', 'Duke', 'Virginia',
+  'Cornell', 'Brown', 'Ohio State', 'Maryland', 'Texas', 'UCLA', 'Johns Hopkins', 'Rice'];
+const TEST_FIRST = ['Ava', 'Marcus', 'Priya', 'Sam', 'Jordan', 'Eli', 'Nora', 'Theo', 'Mina', 'Leo', 'Iris', 'Ben', 'Ruth', 'Omar'];
+const TEST_LAST = ['Chen', 'Lee', 'Rao', 'Ortiz', 'Kim', 'Brooks', 'Patel', 'Grant', 'Park', 'Hart', 'Novak', 'Adler', 'Diaz'];
+function testRoster(n, tricky) {
+  const teams = TEST_TEAMS.slice(0, n).map((name, ti) => ({
+    name,
+    players: Array.from({ length: 4 }, (_, p) =>
+      TEST_FIRST[(ti * 3 + p) % TEST_FIRST.length] + ' ' + TEST_LAST[(ti * 5 + p * 7) % TEST_LAST.length]),
+  }));
+  if (tricky && teams.length >= 2) {
+    // names that have broken naive CSV/quote handling before
+    teams[1] = { name: 'St. John\'s "A"', players: ['Smith, Jr.', 'O\'Brien', 'José Núñez', 'Lee-Park'] };
+  }
+  return teams;
+}
+
 function renderRosterSec(a, t) {
   const box = $('setupsec');
   box.innerHTML = `
@@ -798,8 +821,23 @@ function renderRosterSec(a, t) {
       <input id="rfile" type="file" accept=".qbj,.json" hidden>
       <button id="editroster">${t.roster_name ? 'Edit roster' : 'Create roster'}</button>
     </div>
+    ${DEBUG ? `<div class="row debugrow">
+      <span class="muted">Debug</span>
+      <label>Test roster <select id="dbgteams">${[4, 6, 8, 12, 16, 24].map((n) =>
+        `<option value="${n}" ${n === 12 ? 'selected' : ''}>${n} teams</option>`).join('')}</select></label>
+      <label class="row" style="gap:6px"><input type="checkbox" id="dbgtricky"> tricky names</label>
+      <button id="dbgroster" class="small">Load</button>
+    </div>` : ''}
     <div id="upreview"></div>
     <div id="rosteredit" style="margin-top:12px"></div>`;
+  if (DEBUG) {
+    $('dbgroster').onclick = () => {
+      const teams = testRoster(Number($('dbgteams').value), $('dbgtricky').checked);
+      rosterUpload = { filename: `test-roster-${teams.length}.qbj`,
+        text: JSON.stringify(buildRosterQbj(t.name, teams)), teams };
+      renderUpPreview(a);
+    };
+  }
   $('pickroster').onclick = () => $('rfile').click();
   $('rfile').onchange = async () => {
     const f = $('rfile').files[0];
