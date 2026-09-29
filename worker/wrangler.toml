@@ -13,6 +13,18 @@ database_id = "d57faef8-7c4b-45c6-9d13-7a7d9ca2d312"
 binding = "DATA"
 bucket_name = "qb-td-data"
 
+# The cron's per-tournament rebuild runs as its own invocation through a
+# binding back to this Worker's Rebuild entrypoint (worker.js), so each
+# rebuild gets its own CPU allowance instead of the tick paying for every
+# dirty tournament at once. A named entrypoint is only reachable through a
+# binding — never from the public URL. Self-hosting under another Worker
+# name: change `service` to match `name` above. Without the binding the
+# cron rebuilds inline, as it always did.
+[[services]]
+binding = "REBUILD"
+service = "qb-td"
+entrypoint = "Rebuild"
+
 # Attempt cap on the buzzpoints password route (worker.js pubQPacket).
 # Cloudflare's rate limiter needs no provisioning and costs nothing, but it
 # counts per colo rather than globally. Period must be 10 or 60.

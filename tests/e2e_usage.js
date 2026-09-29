@@ -3,12 +3,15 @@
 //   cd worker && npx wrangler dev --local --port 8799 --test-scheduled --var METER:1
 //   node tests/e2e_usage.js
 //
-// Three promises, each a scaling cost measured in rows read:
+// Four promises, each a scaling cost measured in rows read:
 // - the once-a-minute cron costs the same with 1 or 1,000 tournaments on
 //   file: finding "nothing to rebuild" reads the dirty rows, not the table
 // - a Live Hub refresh that finds nothing new costs the admin lookup and
 //   nothing else (GET /a/:secret?rev=), and every change a TD could be
 //   waiting to see moves the rev so it is never missed
+// - a public page view reads the prebuilt state: a flat handful of rows
+//   however many games, with games showing after the next tick and the
+//   tournament row's own fields (name, round) at once
 // - broadcasts are gone, and auto-advance needs no open Live Hub
 
 import { execSync } from 'node:child_process';
@@ -157,6 +160,37 @@ rev = (await call(A)).body.tournament.rev;
 await stays('cron tick rebuilds the public page', () => tick());
 await stays('a room re-fetching a packet it already started', () => call('/b/' + room1.secret + '/packet?round=1'));
 await stays('reads of any kind', async () => { await call(A); await call('/pub/' + T.slug); await call('/b/' + room1.secret); });
+
+/* ---------- the public page: prebuilt, flat per view ---------- */
+{
+  const P = await makeTournament('Usage Public');
+  const pb = [];
+  for (let k = 0; k < 3; k++) pb.push((await call(P.A + '/buckets', { method: 'POST', json: { room_name: 'Room ' + (k + 1) } })).body);
+  await call(P.A + '/packet?round=1&name=P1.pdf', { method: 'POST', body: 'PDFBYTES' });
+  await call(P.A + '/start', { method: 'POST' });
+  await call(P.A, { method: 'POST', json: { published: true } });
+  const game = (k) => call('/b/' + pb[k].secret + '/upload?round=1&name=R1_' + k + '.qbj', { method: 'POST', body: MATCH(1) });
+  await game(0);
+  await tick();
+  const one = await rowsRead(() => call('/pub/' + P.slug));
+  ok('public state lists the game after a tick', one.out.body.files.length === 1, one.out.body.files);
+  await game(1);
+  await game(2);
+  let before = await call('/pub/' + P.slug);
+  ok('a new game waits for the tick (prebuilt state)', before.body.files.length === 1, before.body.files.length);
+  await tick();
+  const three = await rowsRead(() => call('/pub/' + P.slug));
+  ok('...and is listed after it', three.out.body.files.length === 3, three.out.body.files.length);
+  ok(`a public view reads a flat handful of rows (${one.rows} with 1 game, ${three.rows} with 3)`,
+    three.rows <= 3 && three.rows === one.rows, { one: one.rows, three: three.rows });
+  const shard = (await call('/pub/' + P.slug + '/rounds?n=1')).body;
+  ok('the round shard is valid JSON listing every game', shard.rounds && shard.rounds[0].entries.length === 3
+    && shard.rounds[0].entries.every((e) => e.qbj && e.id), shard);
+  ok('the shard stamp matches the state', shard.rounds[0].v === three.out.body.rounds['1'], [shard.rounds[0].v, three.out.body.rounds]);
+  await call(P.A, { method: 'POST', json: { name: 'Usage Public Renamed', current_round: 2 } });
+  const live = (await call('/pub/' + P.slug)).body;
+  ok('name and round number show at once, no tick', live.name === 'Usage Public Renamed' && live.current_round === 2, live);
+}
 
 /* ---------- broadcasts are gone ---------- */
 

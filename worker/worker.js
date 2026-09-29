@@ -542,8 +542,10 @@ async function readLegacyBundle(env, tid) {
  */
 async function materialize(env, t) {
   const tid = t.id;
+  // bucket_id and filename ride along for the public state, which the
+  // same tick builds from these rows (putPubState) instead of re-querying
   const { results: rows } = await env.DB.prepare(
-    "SELECT id, round FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
+    "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
   ).bind(tid).all();
 
   const byRound = new Map();
@@ -570,10 +572,18 @@ async function materialize(env, t) {
     const want = statsVersion(fs);
     if (!forced && prev.rounds[n] === want) { manifest.rounds[n] = want; continue; }
 
+    // Each game's public copy is compact JSON (putPubGame) keyed by its
+    // file id, so the shard is those texts joined: no parse of every game
+    // and re-stringify of the round, which was most of a busy tick's CPU
+    // (bench_routes.mjs: ~4-5ms a tournament on 13KB games, against the
+    // Free plan's 10ms per cron invocation). A blob that isn't a JSON
+    // object is left out like a missing one.
     const entries = new Array(fs.length).fill(null);
     await Promise.all(fs.map(async (f, i) => {
       const obj = await env.DATA.get(pubGameKey(tid, f.id));
-      if (obj) entries[i] = await obj.json().catch(() => null);
+      if (!obj) return;
+      const text = (await obj.text()).trim();
+      if (text.startsWith('{') && text.endsWith('}')) entries[i] = text;
     }));
 
     const gaps = entries.map((e, i) => (e ? -1 : i)).filter((i) => i >= 0);
@@ -583,21 +593,23 @@ async function materialize(env, t) {
         if (backfill <= 0) break;
         const entry = legacy && legacy.get(fs[i].id);
         if (!entry) continue;
-        entries[i] = entry;
+        entries[i] = JSON.stringify(entry);
         backfill -= 1;
         await putPubGame(env, tid, entry);
       }
     }
 
+    const keptIds = fs.filter((f, i) => entries[i]).map((f) => f.id);
     const kept = entries.filter(Boolean);
     if (kept.length < fs.length) {
       console.log('tournament', tid, 'round', n, 'is missing',
         fs.length - kept.length, 'public game blobs; will retry next tick');
     }
-    const got = (kept.length ? kept[kept.length - 1].id : 0) + ':' + kept.length;
-    await env.DATA.put(roundBlobKey(tid, n), JSON.stringify({ v: got, round: n, entries: kept }), {
-      httpMetadata: { contentType: 'application/json' },
-    });
+    const got = (keptIds.length ? keptIds[keptIds.length - 1] : 0) + ':' + kept.length;
+    await env.DATA.put(roundBlobKey(tid, n),
+      '{"v":' + JSON.stringify(got) + ',"round":' + n + ',"entries":[' + kept.join(',') + ']}', {
+        httpMetadata: { contentType: 'application/json' },
+      });
     manifest.rounds[n] = got;
     changed.push(n);
   }
@@ -611,7 +623,7 @@ async function materialize(env, t) {
   await env.DATA.put(manifestKey(tid), JSON.stringify(manifest), {
     httpMetadata: { contentType: 'application/json' },
   });
-  return { manifest, changed, removed };
+  return { manifest, changed, removed, rows };
 }
 
 /* ---------- public snapshots on GitHub (optional) ----------
@@ -954,12 +966,53 @@ async function tickDirty(env) {
   await tickSets(env);
 }
 
+// A tournament row as the cron works on it. set_published: the set's page
+// shows this mirror — the set is public and the editor has not hidden the
+// mirror from it.
+const TICK_ROW_SELECT = 'SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t ' +
+  'LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id ';
+
+/* The CPU-heavy half of a tick — a tournament's round shards and its
+   prebuilt public state — as its own Worker invocation. The Free plan's
+   CPU allowance is per invocation, so a tick with several dirty
+   tournaments no longer pays for all of them at once: the cron calls this
+   once per tournament through the REBUILD binding (wrangler.toml), and a
+   service-binding call runs as its own invocation with its own CPU
+   (measured on Cloudflare 9/28/2026: a caller making five calls that each
+   burned more than the Free cap stayed at ~2ms). A named entrypoint is
+   only reachable through a binding, never from the public URL. Answers
+   the manifest the GitHub publish needs; the publish itself stays in the
+   tick, one commit for the batch. */
+export const Rebuild = {
+  async fetch(request, env) {
+    env = metered(env);
+    if (env.METER) meter.rebuild_invocations++;
+    const tid = Number(new URL(request.url).searchParams.get('tid'));
+    if (!Number.isInteger(tid) || tid < 1) return new Response('bad tid', { status: 400 });
+    const { results } = await env.DB.prepare(TICK_ROW_SELECT + 'WHERE t.id = ?1').bind(tid).all();
+    if (!results.length) return new Response('no such tournament', { status: 404 });
+    return Response.json(await rebuildInline(env, results[0]));
+  },
+};
+
+async function rebuildInline(env, t) {
+  const { manifest, rows } = await materialize(env, t);
+  // /pub/:slug serves this instead of re-deriving it per view
+  if (t.published) await putPubState(env, t, { rows, manifest });
+  return { manifest };
+}
+
+// Through the binding when there is one (production, wrangler dev); in
+// place otherwise (unit tests, a self-host without the binding).
+async function rebuildTournament(env, t) {
+  if (!env.REBUILD) return rebuildInline(env, t);
+  const res = await env.REBUILD.fetch('https://rebuild/?tid=' + t.id);
+  if (!res.ok) throw new Error('rebuild ' + res.status + ': ' + (await res.text()).slice(0, 200));
+  return res.json();
+}
+
 async function tickTournaments(env) {
-  const { results } = await env.DB.prepare(
-    // set_published: the set's page shows this mirror — the set is public
-    // and the editor has not hidden the mirror from it
-    'SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t ' +
-    'LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id ' +
+  const { results } = await env.DB.prepare(TICK_ROW_SELECT +
     'WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ' +
     'ORDER BY t.created DESC LIMIT 4'
   ).all();
@@ -985,7 +1038,7 @@ async function tickTournaments(env) {
   for (const t of results) {
     try {
       const isPublic = t.published || t.set_published;
-      const { manifest } = isPublic || t.set_id ? await materialize(env, t) : {};
+      const { manifest } = isPublic || t.set_id ? await rebuildTournament(env, t) : {};
       if (!snapshots) continue;
       // public only through its set: the games go out, the mirror's own
       // page (schedule, roster, category map) stays its TD's call
@@ -2513,9 +2566,12 @@ async function pubQPacket(request, url, env, slug) {
 // page never polls, so this stays on the Worker where it can't be stale.
 // `pub` is the snapshot descriptor to advertise: the route passes the
 // stored one, the publisher passes the one it just committed.
-async function pubStateBody(env, t, pub) {
+// `loaded`: the game rows and manifest the cron's materialize just read
+// (same query, same order), so building the prebuilt state doesn't read
+// them twice
+async function pubStateBody(env, t, pub, loaded = null) {
   const [files, buckets, schedObj, packetRounds, catsHead, manifest] = await Promise.all([
-    env.DB.prepare(
+    loaded && loaded.rows ? { results: loaded.rows } : env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
     env.DB.prepare(
@@ -2526,7 +2582,7 @@ async function pubStateBody(env, t, pub) {
       'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     ).bind(t.id, t.current_round).all(),
     env.DATA.get(`t/${t.id}/catmap.json`),
-    readManifest(env, t.id),
+    loaded && loaded.manifest ? loaded.manifest : readManifest(env, t.id),
   ]);
   // an empty map is a "checked, nothing found" backfill marker: the
   // tab stays hidden
@@ -2595,6 +2651,22 @@ async function pubStateBody(env, t, pub) {
   };
 }
 
+/* The public state, prebuilt. pubStateBody reads every game row, the
+   rooms, the rounds and three blobs — ~2 D1 rows per game on every view,
+   the Worker's largest D1 cost and its heaviest route. The cron already
+   rebuilds a tournament whenever markPub flags it; it now also stores
+   the body here, and a view reads one blob. Fields the tournament row
+   carries (and the view reads anyway) are overlaid live, so a rename or a
+   new round number shows at once; the rest trails a mutation by the tick,
+   as the round shards always have. */
+const PUBSTATE_KEY = (tid) => `t/${tid}/pubstate.json`;
+
+async function putPubState(env, t, loaded) {
+  const body = await pubStateBody(env, t, null, loaded);
+  await env.DATA.put(PUBSTATE_KEY(t.id), JSON.stringify(body),
+    { httpMetadata: { contentType: 'application/json' } });
+}
+
 async function pubState(env, slug, ctx) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
@@ -2605,6 +2677,15 @@ async function pubState(env, slug, ctx) {
       return snap && snap.sha ? { repo: env.SNAPSHOT_REPO, ...snap } : null;
     } catch (e) { return null; }
   })();
+  const built = await env.DATA.get(PUBSTATE_KEY(t.id));
+  if (built) {
+    const body = { ...(await built.json()), name: t.name, current_round: t.current_round,
+      roster: !!t.roster_r2_key, format: pubFormat(t), pub, final: tournamentFinal(t) };
+    return json(env, body, 200, pubCache(t));
+  }
+  // not built yet (published before this existed, or the first tick
+  // hasn't run): derive it live, and have the next tick build it
+  if (ctx) ctx.waitUntil(markPub(env, t.id));
   const body = await pubStateBody(env, t, pub);
   // Games but no shards to serve them from: a tournament published
   // before the round shards existed. Flag it so the next tick
@@ -3833,7 +3914,10 @@ async function pubSetQPacket(request, url, env, slug) {
    tests/e2e_usage.js can price a simulated day. GET /__meter reads the
    running totals, DELETE /__meter zeroes them. Without METER (every real
    deploy) env passes through untouched and /__meter is a 404. */
-const meter = { queries: 0, rows_read: 0, rows_written: 0, r2_class_a: 0, r2_class_b: 0, r2_free: 0 };
+const meter = { queries: 0, rows_read: 0, rows_written: 0, r2_class_a: 0, r2_class_b: 0, r2_free: 0,
+  // invocations of the Rebuild entrypoint: proves the cron's rebuilds go
+  // through the binding (each its own invocation), not inline
+  rebuild_invocations: 0 };
 const METER_ZERO = { ...meter };
 // R2's billing classes (developers.cloudflare.com/r2/pricing): writes and
 // lists are Class A, reads and heads Class B, deletes free

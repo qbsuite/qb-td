@@ -4,7 +4,7 @@
 // the GitHub API all mocked. No wrangler, no network:
 //   node tests/snapshot_publish.js
 
-import worker from '../worker/worker.js';
+import worker, { Rebuild } from '../worker/worker.js';
 
 let passed = 0;
 function ok(name, cond, extra) {
@@ -27,6 +27,15 @@ function fakeDb(state) {
             .filter((t) => t.pub_dirty && (t.published || t.pub_snapshot || t.set_id))
             .map((t) => ({ ...t,
               set_published: setOf(t) ? Number(setOf(t).published && !(mirrorOf(t) || {}).hidden) : null })),
+        };
+      }
+      // the Rebuild entrypoint's own lookup of the tournament it was handed
+      if (/FROM tournaments t LEFT JOIN sets s .* WHERE t\.id = \?1/.test(sql)) {
+        const setOf = (t) => (state.sets || []).find((x) => x.id === t.set_id);
+        const mirrorOf = (t) => (state.mirrors || []).find((m) => m.tournament_id === t.id);
+        return {
+          results: state.tournaments.filter((t) => t.id === args[0]).map((t) => ({ ...t,
+            set_published: setOf(t) ? Number(setOf(t).published && !(mirrorOf(t) || {}).hidden) : null })),
         };
       }
       if (/SELECT id FROM sets WHERE state_dirty = 1/.test(sql)) {
@@ -117,6 +126,7 @@ function r2obj(text, uploadedMs) {
   return {
     arrayBuffer: async () => buf,
     json: async () => JSON.parse(text),
+    text: async () => text, // R2ObjectBody.text(), as materialize reads game copies
     textFor: () => text,
     uploaded: new Date(uploadedMs),
   };
@@ -780,4 +790,57 @@ const realFetch = globalThis.fetch;
 }
 
 globalThis.fetch = realFetch;
+
+// N. The per-tournament rebuild through the REBUILD binding (production's
+// path: each rebuild its own invocation) produces exactly what the inline
+// rebuild does — shards, manifest, prebuilt public state and the commit.
+{
+  const scenario = () => {
+    const now = 1_700_000_000_000;
+    const mk = (id, slug) => ({ id, slug, name: slug, published: 1, pub_dirty: 1, pub_snapshot: null,
+      roster_r2_key: null, current_round: 2, created: now + id, settings: '{}' });
+    const state = {
+      tournaments: [mk(1, 'alpha-open'), mk(2, 'beta-open')],
+      files: [{ id: 3, tournament_id: 1, round: 1 }, { id: 4, tournament_id: 1, round: 2 },
+        { id: 5, tournament_id: 2, round: 1 }],
+      buckets: [{ id: 1, tournament_id: 1, room_name: 'Room 1' }, { id: 2, tournament_id: 2, room_name: 'Room 1' }],
+      rounds: [],
+    };
+    const objects = { 't/1/pub/3.json': pubGame(3, 1), 't/1/pub/4.json': pubGame(4, 2), 't/2/pub/5.json': pubGame(5, 1) };
+    return { state, objects };
+  };
+  const snapshotOf = (objects) => Object.fromEntries(Object.keys(objects).sort()
+    .filter((k) => !k.endsWith('/rounds.json')) // manifest carries a timestamp
+    .map((k) => [k, objects[k].textFor ? objects[k].textFor() : '']));
+
+  const inline = scenario();
+  const ghA = fakeGithub();
+  globalThis.fetch = ghA.fetch;
+  await runCron(env(inline.state, inline.objects, ghA));
+
+  const bound = scenario();
+  const ghB = fakeGithub();
+  globalThis.fetch = ghB.fetch;
+  let invocations = 0;
+  const base = env(bound.state, bound.objects, ghB);
+  // what the REBUILD binding does in production: a separate invocation of
+  // the Rebuild entrypoint, with the Worker's env (and no binding of its own)
+  const withBinding = { ...base, REBUILD: { fetch: async (url) => { invocations++; return Rebuild.fetch(new Request(url), base); } } };
+  await runCron(withBinding);
+
+  ok('rebuild binding: called once per dirty tournament', invocations === 2, invocations);
+  ok('rebuild binding: shards and public state identical to inline',
+    JSON.stringify(snapshotOf(inline.objects)) === JSON.stringify(snapshotOf(bound.objects)),
+    Object.keys(snapshotOf(bound.objects)));
+  ok('rebuild binding: prebuilt public state written for both tournaments',
+    Boolean(bound.objects['t/1/pubstate.json']) && Boolean(bound.objects['t/2/pubstate.json']));
+  ok('rebuild binding: one commit, same files as inline',
+    ghA.commits.length === 1 && ghB.commits.length === 1
+    && JSON.stringify(ghA.trees.map((t) => t.tree.map((e) => e.path).sort()))
+      === JSON.stringify(ghB.trees.map((t) => t.tree.map((e) => e.path).sort())), { a: ghA.trees, b: ghB.trees });
+  ok('rebuild binding: both tournaments clean after the tick',
+    bound.state.tournaments.every((t) => t.pub_dirty === 0 && t.pub_snapshot));
+  globalThis.fetch = realFetch;
+}
+
 console.log(passed + ' tests passed');

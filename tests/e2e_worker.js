@@ -658,9 +658,13 @@ ok('second rebuild restores the room', r.body.rounds[0].entries[0].room === 'Roo
 // "games, no manifest". The state must flag itself for the next tick
 // rather than sit there empty — a finished tournament can't be mutated
 // back into the queue — and must not advertise the long cache while it
-// is in that state.
-execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/rounds.json --local`,
-  { cwd: WORKER_DIR, stdio: 'ignore' });
+// is in that state. Such a tournament also has no prebuilt public state
+// (pubstate.json came later still), which is what sends a view down the
+// live path at all.
+for (const key of ['rounds.json', 'pubstate.json']) {
+  execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/${key} --local`,
+    { cwd: WORKER_DIR, stdio: 'ignore' });
+}
 r = await call('/pub/' + slug);
 ok('unmaterialized state reports no rounds', Object.keys(r.body.rounds).length === 0, r.body.rounds);
 ok('unmaterialized state caches briefly', maxAge(r.cache) <= 60, r.cache);
@@ -901,8 +905,11 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('old room no longer lists the game', !r.body.uploads.some((u) => u.id === mvId), r.body.uploads);
   r = await call('/b/' + room9.secret);
   ok('new room lists the game', r.body.uploads.some((u) => u.id === mvId), r.body.uploads);
+  // the public state is prebuilt by the cron: a move shows there on the
+  // next tick, like the stats always have
+  await tick();
   r = await call('/pub/' + slug);
-  ok('public file list names the new room at once',
+  ok('public file list names the new room after the tick',
     r.status === 200 && r.body.files.find((f) => f.id === mvId).room === 'Room 9', r.body.files);
   r = await call('/b/' + secret + '/tiebreakers');
   ok('tiebreaker log follows the game',

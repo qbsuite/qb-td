@@ -581,6 +581,20 @@ cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js
 node tests/e2e_usage.js
 node tests/sim_usage.js
 
+# a whole tournament end to end (same metered dev Worker): TD setup,
+# rooms playing real-size games through auto-advance, the cron, then the
+# standings computed three ways — from the games themselves, from the
+# public round shards, and from the TD's downloads — must match exactly,
+# with categories, buzzpoints, room pages and the rebuild binding checked
+node tests/e2e_day.js
+
+# capacity and CPU, with a behaviour model the project owner set (moderators
+# and TDs on laptops; viewers half phones, 90% checking once a round, 10%
+# refreshing every 1-2 min late in each round):
+SHAPE=mid node tests/sim_day.js          # one day's requests, D1 rows, R2 ops, freshness
+SHAPE=large node tests/bench_routes.mjs  # CPU per route under wrangler's profiler
+SHAPE=large node tests/profile_day.mjs   # a whole day's CPU profile
+
 # optional, and slow: a full-size tournament end to end (72 teams, 36
 # rooms, 17 rounds by default; TEAMS/ROOMS/ROUNDS/CONC override) against
 # the same dev Worker, reporting upload latency, tick cost, and what a
@@ -641,7 +655,10 @@ first.
    Skipping this is not fatal — `pubState` flags a tournament that has
    games but no shards the first time anyone views it — but the bulk
    flag converges everything in a few ticks instead of on demand)
-5. `npx wrangler deploy`
+5. `npx wrangler deploy` — `wrangler.toml`'s `REBUILD` service binding
+   points at this Worker's own name (`qb-td`); a self-host under another
+   name changes `service` to match, or the deploy fails
+   (without the binding at all, the cron rebuilds inline)
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`.
@@ -720,29 +737,34 @@ Fixed Worker load at that scale is about 32k requests/day (reader pages
 the 100k/day free tier for public viewers at one request per page view.
 That part scales. What breaks first:
 
-1. **D1 rows read binds at roughly half the request budget.** Every
-   `/pub/:slug` re-derives the state from scratch, including a query that
-   returns **one row per game** (`pubStateBody`'s `files` query) — 120 rows by the end
-   of a 16-team RR, plus buckets and rounds, ~145 rows per public page
-   view. Against D1's 5M-rows/day free tier that caps public views at
-   ~34k/day (~1,100 per tournament), well before the request budget runs
-   out. Note this is a *read*-side cost: writes are already incremental
-   (a game's public copy is one blob written by its upload, the cron
-   rebuilds only the round that moved, and the publisher only commits
-   blobs whose stamps moved), so "we only append on change" is true and
-   does not help here.
+1. ~~**D1 rows read binds at roughly half the request budget.**~~ Fixed:
+   `/pub/:slug` used to re-derive the state per view (one D1 row per game,
+   plus rooms and rounds, and three R2 reads) — 94% of a large
+   tournament's day of D1 reads in `tests/sim_day.js` (2.2M rows, 44% of
+   the free 5M). The cron now stores the body (`t/<tid>/pubstate.json`,
+   `putPubState`) when it rebuilds a tournament, and a view reads that
+   blob plus the tournament row it already looked up — 1 D1 row, however
+   many games. The row's own fields (name, round) are overlaid live; the
+   file list trails an upload by a tick, as the stats always have. A
+   tournament with no blob yet takes the old live path and flags itself.
 
-   The fix that fits the existing design is to **materialize the
-   `/pub/:slug` body into a small R2 blob** in the cron tick — the same
-   pattern the round shards already use — making the route O(1) instead
-   of O(games). Its stamps would then come from the same rebuild that
-   writes the shards, so there is nothing new to invalidate. `markPub` already fires on every mutation that can change
-   the state, so no new invalidation plumbing is needed and no staleness
-   is introduced. (A short Worker Cache API TTL is less work but
-   reintroduces exactly the staleness the no-poll design removed.)
-   Measure before committing to it: it trades D1 rows for an R2 read.
+2. **The cron's CPU.** Measured with real-size games (`tests/bench_routes.mjs`):
+   rebuilding one tournament costs ~5ms of Worker CPU, and the tick used
+   to rebuild up to four in one invocation (~19-24ms against the Free
+   plan's 10ms per invocation). Each rebuild now runs as its own
+   invocation: the tick calls the `Rebuild` entrypoint once per dirty
+   tournament through the `REBUILD` self-binding (wrangler.toml), and
+   only the GitHub commit stays in the tick. Verified on Cloudflare
+   (9/28/2026, throwaway Workers): a service-binding call is billed and
+   CPU-accounted as its own invocation (a caller making five calls that
+   each burned far past the cap stayed at ~2ms), a named entrypoint is
+   unreachable from the public URL, and each call shows as one request in
+   analytics — so this costs a request per rebuild. Also measured: the
+   Free plan's 10ms is not enforced per request; requests with ~1s of CPU
+   succeeded and kills came at ~0.2-2s, apparently a burst allowance that
+   runs down under sustained load. Don't rely on it.
 
-2. **The cron cannot keep up, and starves the losers.** The tick takes
+   **The cron cannot keep up, and starves the losers.** The tick takes
    `ORDER BY created DESC LIMIT 4`. With ~30 tournaments finishing rounds
    around the same time the dirty queue is 30 deep and drains at 4/minute,
    so the last tournament waits ~7-8 minutes — and because the ordering is
