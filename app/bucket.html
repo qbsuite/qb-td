@@ -7,45 +7,47 @@
 <meta name="referrer" content="no-referrer">
 <title>qb-td</title>
 <link rel="stylesheet" href="css/td.css">
+<link rel="stylesheet" href="css/room.css">
 </head>
 <body>
-<div class="wrap narrow">
-  <header>
-    <h1 id="tname">qb-td</h1>
-    <span class="spacer"></span>
-    <span id="room" class="sub"></span>
+<div class="bwrap">
+  <header class="bhead">
+    <div>
+      <h1 id="tname">qb-td</h1>
+      <span id="room"></span>
+    </div>
+    <a id="readerlink" href="#" hidden>Open the reader</a>
   </header>
   <div id="msg"></div>
 
-  <div class="card" id="roundcard" hidden>
-    <div class="row">
-      <b id="curround"></b>
-      <span class="spacer" style="flex:1"></span>
-      <span id="rounds"></span>
-      <span id="nopacket" class="muted" hidden>no packet yet</span>
+  <section class="bsec" id="roundcard" hidden>
+    <div class="bsechead">
+      <h2>Packets</h2>
+      <span class="muted"><span id="curround"></span> · <span id="closes"></span></span>
     </div>
-    <div class="row" style="margin-top:6px">
-      <span id="closes" class="muted"></span>
-      <span class="spacer" style="flex:1"></span>
-      <a id="readerlink" href="#">read in browser</a>
-    </div>
-  </div>
+    <div class="bchips" id="rounds"></div>
+    <div id="nopacket" class="muted" style="padding-top:12px" hidden>No packet yet</div>
+  </section>
 
-  <div id="uparea">
-    <h2>upload game files</h2>
-    <div class="card">
-      <div class="row">
-        <label>round <input id="upround" type="number" min="1" max="999" style="width:70px"></label>
+  <div id="uparea" class="bstack">
+    <section class="bsec">
+      <div class="bsechead">
+        <h2>Upload a game</h2>
+        <label>Round <input id="upround" type="number" min="1" max="999"></label>
+      </div>
+      <label class="drop" id="drop">
+        <span>Drop the .qbj and the MODAQ game file</span>
+        <span class="muted">or <span style="color:var(--link)">choose files</span></span>
+        <span class="picked" id="picked"></span>
         <input id="upfiles" type="file" multiple accept=".qbj,.json">
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button id="upbtn" class="primary">upload</button>
-        <span class="muted">the .qbj and the game file</span>
-      </div>
-    </div>
+      </label>
+      <div class="uprow"><button id="upbtn" class="primary">Upload</button></div>
+    </section>
 
-    <h2>this room's uploads</h2>
-    <div id="uploads" class="tablewrap"></div>
+    <section class="bsec">
+      <div class="bsechead"><h2>This room&rsquo;s uploads</h2></div>
+      <div id="uploads" class="ulist"></div>
+    </section>
   </div>
 </div>
 <script type="module">
@@ -68,25 +70,25 @@ function render() {
   $('tname').textContent = state.tournament;
   $('room').textContent = state.room;
   $('roundcard').hidden = false;
-  $('curround').textContent = 'round ' + state.current_round;
-  $('closes').textContent = 'Room open until ' + new Date(state.closes).toLocaleString();
+  $('readerlink').hidden = false;
+  $('curround').textContent = 'Now on round ' + state.current_round;
+  $('closes').textContent = 'open until ' + new Date(state.closes).toLocaleString([], {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   const packets = state.packets || (state.packet ? [state.packet] : []);
   $('rounds').innerHTML = packets.map((p) =>
-    `<a href="#" class="pill${p.number === state.current_round ? ' on' : ''}" data-round="${p.number}"
-      title="${esc(p.packet_name)}">round ${p.number}</a>`).join(' ');
+    `<a href="#" class="${p.number === state.current_round ? 'on' : ''}" data-round="${p.number}"
+      title="${esc(p.packet_name)}">Round ${p.number}</a>`).join('');
   $('nopacket').hidden = !!packets.length;
   if (!$('upround').value) $('upround').value = state.current_round;
   const extra = state.upload_count > state.uploads.length
-    ? `<div class="muted" style="margin-top:6px">latest ${state.uploads.length} of ${state.upload_count}</div>` : '';
-  $('uploads').innerHTML = (state.uploads.length ? `<div class="tablewrap"><table>
-    <tr><th class="num">round</th><th>file</th><th class="num">size</th><th>status</th></tr>
-    ${state.uploads.map((u) => `<tr>
-      <td class="num">${u.round}</td>
-      <td class="brk">${esc(u.filename)}</td>
-      <td class="num">${fmtBytes(u.size)}</td>
-      <td>${u.error ? `<span class="bad">${esc(u.error)}</span>` : '<span class="ok">ok</span>'}</td>
-    </tr>`).join('')}
-  </table></div>` : '<div class="muted">none yet</div>') + extra;
+    ? `<div class="muted" style="margin-top:8px;font-size:13px">Latest ${state.uploads.length} of ${state.upload_count}</div>` : '';
+  $('uploads').innerHTML = (state.uploads.length ? state.uploads.map((u) => `<div class="u">
+      <span class="muted">Round ${u.round}</span>
+      <span class="brk">${esc(u.filename)}</span>
+      <span class="num">${fmtBytes(u.size)}</span>
+      <span class="st ${u.error ? 'bad' : 'ok'}" title="${u.error ? 'Error' : 'Uploaded'}">${u.error ? '!' : '&#10003;'}</span>
+      ${u.error ? `<span class="err">${esc(u.error)}</span>` : ''}
+    </div>`).join('') : '<div class="none">None yet</div>') + extra;
 }
 
 // Before Start the room serves nothing, so nothing to show but the wait.
@@ -135,7 +137,7 @@ $('rounds').onclick = async (e) => {
 
 $('upbtn').onclick = async () => {
   const files = [...$('upfiles').files];
-  if (!files.length) { say('choose files', true); return; }
+  if (!files.length) { say('Choose files', true); return; }
   const round = Number($('upround').value);
   $('upbtn').disabled = true;
   try {
@@ -145,8 +147,9 @@ $('upbtn').onclick = async () => {
         { method: 'POST', body: f });
       if (out.error) say(f.name + ': ' + out.error, true);
     }
-    say('uploaded');
+    say('Uploaded');
     $('upfiles').value = '';
+    showPicked();
     await refresh();
   } catch (e) {
     if (e.message === 'room closed') showClosed();
@@ -154,6 +157,22 @@ $('upbtn').onclick = async () => {
     else say(e.message, true);
   }
   $('upbtn').disabled = false;
+};
+
+// drop zone: dropped files land in the same input the picker fills
+function showPicked() {
+  const files = [...$('upfiles').files];
+  $('picked').textContent = files.map((f) => f.name).join(', ');
+}
+$('upfiles').onchange = showPicked;
+$('drop').ondragover = (e) => { e.preventDefault(); $('drop').classList.add('dragover'); };
+$('drop').ondragleave = () => $('drop').classList.remove('dragover');
+$('drop').ondrop = (e) => {
+  e.preventDefault();
+  $('drop').classList.remove('dragover');
+  if (!e.dataTransfer.files.length) return;
+  $('upfiles').files = e.dataTransfer.files;
+  showPicked();
 };
 
 if (!secret) say('bad link', true);

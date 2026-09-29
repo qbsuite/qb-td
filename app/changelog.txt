@@ -1,3 +1,41 @@
+Release Notes for 9/29/2026
+
+[ UI ]
+- New look across the hub, room pages and public page: fewer boxes, softer dark mode.
+- Status messages show briefly at the bottom of the window; errors stay until clicked.
+
+[ LIVE HUB ]
+- Round line across the top, with a Live now list: one row per room with its game and status.
+- Uploads is a rooms by rounds grid. Click a cell to see its files, move one to another room, or delete it.
+- A game in the wrong room says which room it was scheduled in, with a one-click move.
+- Add a game takes the .qbj and the MODAQ game file together.
+- Auto-advance lists which rooms have started the round.
+- Protests: newest open one in the side column, full list below the uploads.
+- Download menu after Compute: YellowFruit 4, YellowFruit 3, HTML report, QBJ bundle, Rebuild public stats.
+
+[ SETUP ]
+- One step list replaces the checklist and tabs. Order: Rooms, Roster, Schedule, Packets, MODAQ Settings, Public page.
+- Packets shows one row per round with the packet assigned to it, and Upload or Replace per round.
+- The number of rounds comes from the schedule; Add a round for more.
+- A roster file from another tool is saved in a form MODAQ can read.
+- Fixed a just-generated schedule sometimes disappearing after a roster change.
+- Fixed Save format sometimes saving the previous preset.
+- "Bucket" links are now "Upload page".
+
+[ READER ]
+- New start screen: round buttons, the scheduled matchup, starter checklists, this room's schedule.
+
+[ ROOM PAGE ]
+- New layout. Drop the .qbj and the MODAQ game file together.
+
+[ PUBLIC PAGE ]
+- Schedule has Now (live round and up next) and All rounds, with pool filters.
+- Winners are highlighted in green.
+- Stats can switch between Classic (default) and a New layout.
+- Buzzpoints show where in each tossup the buzzes landed.
+- Phones: tabs no longer break mid-word; category chips scroll sideways.
+- Fixed an error when switching tabs before the page finished loading.
+
 Release Notes for 9/28/2026
 
 [ LIVE HUB ]

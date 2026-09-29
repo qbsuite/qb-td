@@ -85,18 +85,21 @@ export function wireFormat(box, { settings: current, save, say, refresh, onToggl
       pronunciationGuideMarkers: p1 ? [p1, p2] : null,
     };
     const settings = current();
-    const ov = formatOverridesFrom(formatKey(settings), want);
+    // the preset on screen, not the saved copy: a pick whose save hasn't
+    // come back yet must not be undone by pressing Save right after it
+    const key = $('gformat').value || formatKey(settings);
+    const ov = formatOverridesFrom(key, want);
     const bad = Object.keys(ov).filter((k) => !(k in cleanOverrides(ov)));
     if (bad.length) { say('Bad value: ' + bad.join(', '), true); return; }
     // the preset is pinned too: saving is choosing a format, even the
     // default one (the dashboard's setup checklist reads gameFormat)
-    const next = { ...settings, gameFormat: formatKey(settings) };
+    const next = { ...settings, gameFormat: key };
     if (Object.keys(ov).length) next.formatOverrides = ov;
     else delete next.formatOverrides;
     commit(next, 'Game format saved');
   };
   $('fmtreset').onclick = () => {
-    const next = { ...current(), gameFormat: formatKey(current()) };
+    const next = { ...current(), gameFormat: $('gformat').value || formatKey(current()) };
     delete next.formatOverrides;
     commit(next, 'Game format reset');
   };

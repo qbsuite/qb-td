@@ -12,7 +12,7 @@
 
 import { pub, esc, usingStaticData } from './api.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
-import { dedupeMatches } from '../engine/stats.js';
+import { dedupeMatches, aggregate } from '../engine/stats.js';
 import { buildReport } from '../engine/report.js';
 import { mountReport } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
@@ -211,6 +211,17 @@ async function fetchMatches(errors) {
 
 /* ---------- schedule tab ---------- */
 
+// Two views: Now (the round being read and the one after it, grouped by
+// pool, a card per group) and All rounds (the grid). Pool chips filter
+// either when the schedule has more than one pool. The view is a
+// per-viewer convenience, so it lives in localStorage and nothing breaks
+// when that's unavailable.
+const SCHED_VIEW_KEY = 'qbtdSchedView';
+let schedView = null;      // 'now' | 'all'
+let poolSel = '';          // '' = every pool
+function readPref(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+function savePref(key, v) { try { localStorage.setItem(key, v); } catch (e) { /* private window */ } }
+
 // Played results, keyed by round + the two team names (order-free).
 function resultMap() {
   const map = new Map();
@@ -226,29 +237,60 @@ function resultFor(results, round, aName, bName) {
   return results.get(round.round + '|' + [aName, bName].sort().join('|'));
 }
 
+function findRound(n) {
+  for (const phase of schedule.phases) {
+    for (const r of phase.rounds) if (r.round === n) return r;
+  }
+  return null;
+}
+
+// The pool a game belongs to: both teams seeded into the same pool (the
+// generator records membership in schedule.pools). Crossover and playoff
+// games belong to none.
+function poolOf(g) {
+  const pools = schedule.pools || {};
+  const a = g.a && g.a.team;
+  const b = g.b && g.b.team;
+  if (!a || !b) return '';
+  for (const [k, members] of Object.entries(pools)) {
+    if (members.includes(a) && members.includes(b)) return 'Pool ' + k;
+  }
+  return '';
+}
+function poolsIn(rounds) {
+  return [...new Set(rounds.flatMap((r) => r.games.map(poolOf)).filter(Boolean))].sort();
+}
+const keepGame = (g) => !poolSel || poolOf(g) === poolSel;
+const roomName = (g) => (schedule.rooms[g.room] ? schedule.rooms[g.room].name : '');
+
+// One team's line of a game: the winner's line is tinted, the loser's
+// muted, a playoff placeholder italic.
+function lineHtml(slot, name, pts, won, lost) {
+  return `<div class="gl${won ? ' won' : ''}${lost ? ' lost' : ''}${slot && slot.label ? ' ph' : ''}">`
+    + `<span class="t">${esc(name || '—')}</span>${pts !== null ? `<span class="s">${pts}</span>` : ''}</div>`;
+}
+
 function gameCell(g, round, results) {
   const a = slotText(g.a);
   const b = slotText(g.b);
-  const side = (slot, name, pts, won) => `<div class="g${slot && slot.label ? ' ph' : ''}">` +
-    (won ? `<span class="win">${esc(name)} ${pts}</span>`
-      : pts !== null ? `${esc(name)} <span class="score">${pts}</span>` : esc(name || '—')) +
-    '</div>';
   const m = a && b && g.a.team && g.b.team ? resultFor(results, round, a, b) : null;
-  if (!m) return side(g.a, a, null) + side(g.b, b, null);
+  if (!m) return lineHtml(g.a, a, null) + lineHtml(g.b, b, null);
   const ma = m.teams.find((t) => t.name === a);
   const mb = m.teams.find((t) => t.name === b);
-  return side(g.a, a, ma.points, ma.points > mb.points)
-    + side(g.b, b, mb.points, mb.points > ma.points);
+  return lineHtml(g.a, a, ma.points, ma.points > mb.points, ma.points < mb.points)
+    + lineHtml(g.b, b, mb.points, mb.points > ma.points, mb.points < ma.points);
 }
 
 function renderScheduleGrid(box) {
   const results = resultMap();
   const cur = state.current_round;
   box.innerHTML = schedule.phases.map((phase) => {
-    const hasByes = phase.rounds.some((r) => r.byes.length);
+    if (!phase.rounds.some((r) => r.games.some(keepGame))) return '';
+    // byes aren't in any pool: shown only when the whole schedule is
+    const hasByes = !poolSel && phase.rounds.some((r) => r.byes.length);
     // only rooms this phase actually uses get columns
     const used = schedule.rooms.map((_, i) =>
-      phase.rounds.some((r) => r.games.some((g) => g.room === i)));
+      phase.rounds.some((r) => r.games.some((g) => g.room === i && keepGame(g))));
     return `
     <div class="rhead">${esc(phase.name)}</div>
     <div class="tablewrap">
@@ -259,16 +301,43 @@ function renderScheduleGrid(box) {
         <td class="roundcell${round.round === cur ? ' now' : ''}">${round.round}</td>
         ${schedule.rooms.map((_, roomI) => {
           if (!used[roomI]) return '';
-          const g = round.games.find((x) => x.room === roomI);
+          const g = round.games.find((x) => x.room === roomI && keepGame(x));
           const cls = round.round === cur ? ' class="now"' : '';
           return `<td${cls}>${g ? gameCell(g, round, results) : ''}</td>`;
         }).join('')}
         ${hasByes ? `<td${round.round === cur ? ' class="now"' : ''}>${round.byes.map((s) =>
-          `<div class="g${s && s.label ? ' ph' : ''}">${esc(slotText(s)) || '—'}</div>`).join('')}</td>` : ''}
+          `<div class="gl${s && s.label ? ' ph' : ''}"><span class="t">${esc(slotText(s)) || '—'}</span></div>`).join('')}</td>` : ''}
       </tr>`).join('')}
     </table>
     </div>`;
-  }).join('');
+  }).join('') || '<div class="muted">No games</div>';
+}
+
+// Now: the current round (Live now) and the next (Up next), side by side
+// on a wide screen, stacked on a phone.
+function renderNow(box) {
+  const results = resultMap();
+  const cur = state.current_round;
+  const blocks = [[cur, 'Live now', 'live'], [cur + 1, 'Up next', '']]
+    .map(([n, tag, cls]) => ({ n, tag, cls, r: findRound(n) })).filter((b) => b.r);
+  const named = poolsIn(blocks.map((b) => b.r)).length > 1;
+  box.innerHTML = `<div class="nowgrid">${blocks.map((b) => {
+    const groups = new Map();
+    for (const g of b.r.games.filter(keepGame)) {
+      const k = poolOf(g);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(g);
+    }
+    const order = [...groups.keys()].sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
+    return `<section class="nowblock">
+      <div class="nowhead"><h3>Round ${b.n}</h3><span class="nowtag ${b.cls}">${b.tag}</span></div>
+      ${order.map((k) => `${named ? `<div class="poolname">${esc(k || 'Other games')}</div>` : ''}
+        <div class="gcard">${groups.get(k).map((g) => `<div class="gg">
+          ${roomName(g) ? `<div class="groom">${esc(roomName(g))}</div>` : ''}
+          ${gameCell(g, b.r, results)}</div>`).join('')}</div>`).join('') || '<div class="muted">No games</div>'}
+      ${!poolSel && b.r.byes.length ? `<div class="byes muted">Bye: ${b.r.byes.map((s) => esc(slotText(s))).join(', ')}</div>` : ''}
+    </section>`;
+  }).join('')}</div>`;
 }
 
 function renderTeamView(box, team) {
@@ -280,7 +349,7 @@ function renderTeamView(box, team) {
       if (g) {
         const oppSlot = slotText(g.a) === team ? g.b : g.a;
         const opp = slotText(oppSlot);
-        const room = schedule.rooms[g.room] ? schedule.rooms[g.room].name : '';
+        const room = roomName(g);
         const m = g.a && g.a.team && g.b && g.b.team ? resultFor(results, round, g.a.team, g.b.team) : null;
         let result = '<span class="muted">–</span>';
         if (m) {
@@ -288,11 +357,11 @@ function renderTeamView(box, team) {
           const theirs = m.teams.find((t) => t.name === opp);
           if (mine && theirs) {
             result = mine.points > theirs.points
-              ? `<span class="ok">W ${mine.points}–${theirs.points}</span>`
-              : `<span class="bad">L ${mine.points}–${theirs.points}</span>`;
+              ? `<span class="wtag">W ${mine.points}–${theirs.points}</span>`
+              : `<span class="muted">L ${mine.points}–${theirs.points}</span>`;
           }
         }
-        rows.push(`<tr><td class="roundcell">${round.round}</td>
+        rows.push(`<tr${round.round === state.current_round ? ' class="nowrow"' : ''}><td class="roundcell">${round.round}</td>
           <td class="name${oppSlot && oppSlot.label ? ' ph' : ''}">${esc(opp) || '—'}</td>
           <td class="muted">${esc(room)}</td><td class="num">${result}</td></tr>`);
       } else if (round.byes.some((s) => slotText(s) === team)) {
@@ -323,20 +392,41 @@ function renderSchedule(box) {
     box.innerHTML = '<div class="muted">No schedule</div>';
     return;
   }
+  const cur = state.current_round;
+  const hasNow = Boolean(findRound(cur));
+  if (!schedView) {
+    const kept = readPref(SCHED_VIEW_KEY);
+    schedView = kept === 'all' || (kept === 'now' && hasNow) ? kept : hasNow ? 'now' : 'all';
+  }
+  if (schedView === 'now' && !hasNow) schedView = 'all';
   const teams = scheduleTeams();
+  const shown = schedView === 'now'
+    ? [findRound(cur), findRound(cur + 1)].filter(Boolean)
+    : schedule.phases.flatMap((p) => p.rounds);
+  const pools = teamFilter ? [] : poolsIn(shown);
+  if (poolSel && !pools.includes(poolSel)) poolSel = '';
+  const view = (v, label) => `<a href="#" class="view${schedView === v ? ' on' : ''}" data-schedview="${v}"${
+    schedView === v ? ' aria-current="true"' : ''}>${label}</a>`;
   box.innerHTML = `
-    <div style="margin-bottom:10px">
-      <select id="teamsel">
+    <div class="views schedviews">
+      ${hasNow ? view('now', 'Now') : ''}${view('all', 'All rounds')}
+      <span class="grow"></span>
+      <select id="teamsel" aria-label="Follow a team">
         <option value="">All teams</option>
         ${teams.map((n) => `<option ${n === teamFilter ? 'selected' : ''}>${esc(n)}</option>`).join('')}
       </select>
     </div>
+    ${pools.length > 1 ? `<div class="chipstack">${chipsHtml([{ v: '', label: 'All' },
+      ...pools.map((p) => ({ v: p, label: p }))], poolSel, 'pool')}</div>` : ''}
     <div id="schedout"></div>`;
+  wire(box, 'schedview', (v) => { schedView = v; savePref(SCHED_VIEW_KEY, v); });
+  wire(box, 'pool', (v) => { poolSel = v; });
   $('teamsel').onchange = () => {
     teamFilter = $('teamsel').value;
     render();
   };
   if (teamFilter && teams.includes(teamFilter)) renderTeamView($('schedout'), teamFilter);
+  else if (schedView === 'now') renderNow($('schedout'));
   else renderScheduleGrid($('schedout'));
 }
 
@@ -564,11 +654,19 @@ function renderBuzz(box) {
 
 /* ---------- categories tab ---------- */
 
-const CAT_HEAD = '<th class="num">15</th><th class="num">10</th><th class="num">-5</th>'
+// The 15 column only when there are powers to count: the format has them,
+// or (an older game, a changed format) someone got one anyway.
+function showPowers(lines) {
+  // a state without a format (the demo fixture, older data) goes by the lines
+  if (!state.format || !Object.keys(state.format).length) return lines.some((l) => l.powers);
+  const f = effectiveFormat(state.format);
+  return Boolean((f.powers || []).length) || lines.some((l) => l.powers);
+}
+const catHead = (pw) => (pw ? '<th class="num">15</th>' : '') + '<th class="num">10</th><th class="num">-5</th>'
   + '<th class="num" title="Bouncebacks: tossups won after the other team missed them">BB</th>'
   + '<th class="num">Pts</th>';
-function lineCells(l) {
-  return `<td class="num">${l.powers}</td><td class="num">${l.gets}</td>`
+function lineCells(l, pw) {
+  return (pw ? `<td class="num">${l.powers}</td>` : '') + `<td class="num">${l.gets}</td>`
     + `<td class="num">${l.negs}</td><td class="num">${l.bb}</td><td class="num">${l.pts}</td>`;
 }
 
@@ -590,22 +688,26 @@ const noneHere = '<div class="muted">No buzzes in this category</div>';
 
 function renderByCategory(box, rows, q) {
   const lines = catPlayerLines(rows, catSel, catSubSel);
+  const pw = showPowers(lines);
+  // on a phone the team rides under the player's name (pub.css)
   box.innerHTML = `${catFilterHtml(q)}
-    ${lines.length ? `<div class="tablewrap"><table>
-      <tr><th class="name">Player</th><th class="name">Team</th>${CAT_HEAD}</tr>
+    ${lines.length ? `<div class="tablewrap"><table class="cattable">
+      <tr><th class="name">Player</th><th class="name teamcol">Team</th>${catHead(pw)}</tr>
       ${lines.map((l) =>
-        `<tr><td class="name">${esc(l.player)}</td><td class="name muted">${esc(l.team)}</td>${lineCells(l)}</tr>`).join('')}
+        `<tr><td class="name">${esc(l.player)}<span class="subteam">${esc(l.team)}</span></td>`
+        + `<td class="name muted teamcol">${esc(l.team)}</td>${lineCells(l, pw)}</tr>`).join('')}
     </table></div>` : noneHere}`;
   wireCatFilter(box);
 }
 
 function renderByTeam(box, teamRows, q) {
   const lines = catTeamLines(teamRows, catSel, catSubSel);
+  const pw = showPowers(lines);
   box.innerHTML = `${catFilterHtml(q)}
     ${lines.length ? `<div class="tablewrap"><table>
-      <tr><th class="name">Team</th>${CAT_HEAD}<th class="num">Bonuses</th><th class="num">Bpts</th><th class="num">PPB</th></tr>
+      <tr><th class="name">Team</th>${catHead(pw)}<th class="num">Bonuses</th><th class="num">Bpts</th><th class="num">PPB</th></tr>
       ${lines.map((l) =>
-        `<tr><td class="name">${esc(l.team)}</td>${lineCells(l)}<td class="num">${l.bh}</td>`
+        `<tr><td class="name">${esc(l.team)}</td>${lineCells(l, pw)}<td class="num">${l.bh}</td>`
         + `<td class="num">${l.bpts}</td><td class="num">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
     </table></div>` : noneHere}`;
   wireCatFilter(box);
@@ -620,6 +722,7 @@ function renderByPlayer(box, rows) {
     catPlayerSel = players[0];
   }
   const bd = catBreakdown(rows, catPlayerSel.team, catPlayerSel.player);
+  const pw = showPowers(bd.map((b) => b.line));
   box.innerHTML = `
     <div style="margin-bottom:10px">
       <select id="catplayersel">
@@ -628,11 +731,11 @@ function renderByPlayer(box, rows) {
       </select>
     </div>
     <div class="tablewrap"><table>
-      <tr><th>Category</th>${CAT_HEAD}</tr>
+      <tr><th>Category</th>${catHead(pw)}</tr>
       ${bd.map(({ cat, line, subs }) =>
-        `<tr><td><b>${esc(cat)}</b></td>${lineCells(line)}</tr>`
+        `<tr><td><b>${esc(cat)}</b></td>${lineCells(line, pw)}</tr>`
         + subs.map(({ sub, line: sl }) =>
-          `<tr class="muted"><td style="padding-left:28px">${esc(sub)}</td>${lineCells(sl)}</tr>`).join('')
+          `<tr class="muted"><td style="padding-left:28px">${esc(sub)}</td>${lineCells(sl, pw)}</tr>`).join('')
       ).join('')}
     </table></div>`;
   $('catplayersel').onchange = () => {
@@ -713,9 +816,65 @@ function pendingNote() {
     + 'Please wait for a minute before refreshing.</div>';
 }
 
-// The stats tab is the YellowFruit-style report (engine/report.js): the
-// same six pages the TO can download, shown in place.
+// The stats tab has two layouts, picked per viewer. Classic, the default,
+// is the YellowFruit-style report (engine/report.js): the same six pages
+// the TO can download, shown in place. New draws standings and
+// individuals in the page's own style, per pool when there are pools; the
+// report's other pages stay a click away under Classic.
+const STATS_LAYOUT_KEY = 'qbtdStatsLayout';
+let statsLayout = null;    // 'classic' | 'new'
+let statsSec = 'standings'; // New layout: 'standings' | 'individuals'
 let unmountReport = null;
+
+const pct3 = (w, l, t) => {
+  const gp = w + l + t;
+  return gp ? ((w + t / 2) / gp).toFixed(3).replace(/^0/, '') : '–';
+};
+
+function standingsTable(teams, vals, ties) {
+  return `<div class="tablewrap"><table class="nstats">
+    <tr><th class="num"></th><th class="name">Team</th><th class="num">W</th><th class="num">L</th>${ties ? '<th class="num">T</th>' : ''}
+      <th class="num">Pct</th><th class="num" title="Points per 20 tossups heard">PP20TUH</th>
+      ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
+      <th class="num" title="Tossups heard">TUH</th><th class="num" title="Points per bonus">PPB</th></tr>
+    ${teams.map((tm, i) => `<tr>
+      <td class="num muted">${i + 1}</td><td class="name">${esc(tm.name)}</td>
+      <td class="num">${tm.w}</td><td class="num">${tm.l}</td>${ties ? `<td class="num">${tm.t}</td>` : ''}
+      <td class="num">${pct3(tm.w, tm.l, tm.t)}</td><td class="num">${tm.pp20tuh.toFixed(2)}</td>
+      ${vals.map((v) => `<td class="num">${tm.counts[v] || 0}</td>`).join('')}
+      <td class="num">${tm.tuh}</td><td class="num">${tm.ppb.toFixed(2)}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+function renderNewStats(box) {
+  const agg = aggregate(dedupeMatches(matches), roster);
+  const vals = agg.values.filter((v) => v !== 0);
+  const ties = agg.teams.some((t) => t.t > 0);
+  if (statsSec === 'individuals') {
+    box.innerHTML = `<div class="tablewrap"><table class="nstats">
+      <tr><th class="num"></th><th class="name">Player</th><th class="name teamcol">Team</th><th class="num">GP</th>
+        ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
+        <th class="num">TUH</th><th class="num">Pts</th><th class="num" title="Points per 20 tossups heard">PP20TUH</th></tr>
+      ${agg.players.map((p, i) => `<tr>
+        <td class="num muted">${i + 1}</td><td class="name">${esc(p.name)}<span class="subteam">${esc(p.team)}</span></td>
+        <td class="name muted teamcol">${esc(p.team)}</td><td class="num">${p.gp}</td>
+        ${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
+        <td class="num">${p.tuh}</td><td class="num">${p.points}</td><td class="num">${p.pp20tuh.toFixed(2)}</td></tr>`).join('')}
+    </table></div>`;
+    return;
+  }
+  // per pool when the schedule seeded pools; teams in none go last
+  const pools = (schedule && schedule.pools) || {};
+  const keys = Object.keys(pools).sort();
+  if (keys.length < 2) { box.innerHTML = standingsTable(agg.teams, vals, ties); return; }
+  const inPool = new Set(keys.flatMap((k) => pools[k]));
+  const groups = keys.map((k) => ['Pool ' + k, agg.teams.filter((t) => pools[k].includes(t.name))])
+    .concat([['Other teams', agg.teams.filter((t) => !inPool.has(t.name))]])
+    .filter(([, teams]) => teams.length);
+  box.innerHTML = groups.map(([name, teams]) =>
+    `<h3 class="poolhead">${esc(name)}</h3>${standingsTable(teams, vals, ties)}`).join('');
+}
+
 function renderStatsTab(box) {
   if (unmountReport) { unmountReport(); unmountReport = null; }
   if (!matches.length) {
@@ -724,8 +883,21 @@ function renderStatsTab(box) {
       : pendingNote() || '<div class="muted">No games yet</div>';
     return;
   }
+  if (!statsLayout) statsLayout = readPref(STATS_LAYOUT_KEY) === 'new' ? 'new' : 'classic';
+  const isNew = statsLayout === 'new';
+  const sec = (v, label) => `<a href="#" class="view${statsSec === v ? ' on' : ''}" data-statssec="${v}">${label}</a>`;
   box.innerHTML = statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('') + pendingNote()
-    + '<div class="reportbox"></div>';
+    + `<div class="views statsbar">
+        ${isNew ? sec('standings', 'Standings') + sec('individuals', 'Individuals') : ''}
+        <span class="grow"></span>
+        <span class="layoutpick"><span class="muted">Layout</span>${chipsHtml([{ v: 'classic', label: 'Classic' },
+          { v: 'new', label: 'New' }], statsLayout, 'layout')}</span>
+      </div>`
+    + (isNew ? '<div id="newstats"></div><p class="muted statsnote">Scoreboard, team and player detail, and the round report are in the Classic layout.</p>'
+      : '<div class="reportbox"></div>');
+  wire(box, 'layout', (v) => { statsLayout = v; savePref(STATS_LAYOUT_KEY, v); });
+  wire(box, 'statssec', (v) => { statsSec = v; });
+  if (isNew) { renderNewStats($('newstats')); return; }
   unmountReport = mountReport(box.querySelector('.reportbox'),
     buildReport({ name: state.name, matches: dedupeMatches(matches), roster,
       // same rules the TO's own download uses: the report is scaled and
@@ -739,6 +911,8 @@ function render() {
   document.querySelectorAll('.tab').forEach((b) =>
     b.classList.toggle('active', b.dataset.tab === tab));
   const box = $('out');
+  // a tab picked before the first load lands: load() renders it then
+  if (!state) return;
   if (tab === 'schedule') renderSchedule(box);
   else if (tab === 'buzz') renderBuzz(box);
   else if (tab === 'cats') renderCats(box);

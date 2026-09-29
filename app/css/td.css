@@ -9,19 +9,30 @@
   --bad: #b91c1c;
   --pick: #e4e4df;       /* a picked filter chip */
   --pick-line: #c9c9c2;
+  --warn: #b4410e;      /* waiting on something: a missing game, an open protest */
+  --win-bg: #dcefe0;    /* a winning line, tinted */
+  --win-fg: #14532d;
+  --card: #f1f1ec;      /* the only filled surface: public game groups */
+  --sel: #efefea;       /* a selected row or cell */
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #131316;
-    --fg: #e7e7ea;
-    --muted: #85858f;
-    --line: #2a2a30;
-    --link: #7aa2f7;
-    --hover-bg: #1b1b20;
-    --ok: #4ade80;
-    --bad: #f87171;
-    --pick: #2c2c33;
-    --pick-line: #44444d;
+    /* soft dark: charcoal rather than near-black, off-white text */
+    --bg: #232326;
+    --fg: #e4e4e7;
+    --muted: #a1a1aa;
+    --line: #36363c;
+    --link: #8fb0f5;
+    --hover-bg: #2c2c31;
+    --ok: #6fc58d;
+    --bad: #f08a8a;
+    --pick: #38383f;
+    --pick-line: #4d4d55;
+    --warn: #e7a177;
+    --win-bg: #2a4032;
+    --win-fg: #cfeeda;
+    --card: #2b2b2f;
+    --sel: #303036;
   }
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -403,3 +414,32 @@ select.slotsel { padding: 2px 6px; font-size: 13px; max-width: 16ch; }
   button, .btn { padding: 10px 16px; }
   input, select { padding: 9px 10px; }
 }
+/* The one loud action on a page (Advance to round N): filled, so it stands
+   out from every outlined button around it. */
+:root { --act: #1d4ed8; --act-fg: #ffffff; --act-hover: #1e40af; }
+@media (prefers-color-scheme: dark) { :root { --act: #3b6fd4; --act-fg: #f5f7fb; --act-hover: #4a7de0; } }
+button.advance { background: var(--act); border-color: var(--act); color: var(--act-fg); border-radius: 10px; }
+button.advance:hover { background: var(--act-hover); border-color: var(--act-hover); }
+button.advance:disabled { background: var(--hover-bg); border-color: var(--line); color: var(--muted); }
+/* Packets: one row per round, the packet it reads beside it */
+.pkhead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.pkhead h2 { margin-bottom: 0; }
+.pkcount { color: var(--fg); }
+.secnote { color: var(--muted); font-size: 14px; margin: 6px 0 12px; }
+.pkbar { margin-bottom: 10px; }
+.pkstaged { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.pkstaged .chip { cursor: grab; }
+table.pktable { margin-top: 4px; border-top: 1px solid var(--line); }
+.pktable td { vertical-align: middle; }
+.pktable .pkn { width: 110px; white-space: nowrap; color: var(--muted); }
+.pktable .pkfile { overflow-wrap: anywhere; }
+.pktable .pkfile a { color: var(--fg); }
+.pktable .pkact { width: 1%; text-align: right; }
+.pktable .dot { display: inline-block; width: 8px; height: 8px; border-radius: 99px; margin-right: 10px;
+  box-shadow: inset 0 0 0 1.5px var(--muted); vertical-align: 1px; }
+.pktable tr.has .dot { background: var(--ok); box-shadow: none; }
+.pktable tr.has .pkn { color: var(--fg); }
+.pktable tr.warn .dot { background: var(--bad); }
+.pktable tr.slot.dragover td { background: var(--sel); }
+.pktable tr.up .dot { background: none; box-shadow: none; border: 2px solid var(--fg); border-right-color: transparent;
+  width: 6px; height: 6px; animation: spin .7s linear infinite; }

@@ -276,6 +276,7 @@ function renderPackets() {
   renderPacketsUi($('setbody'), {
     staged,
     slotLabel: 'Packets',
+    slotName: 'Packet',
     slots: Math.max(Number(settings.rounds) || 1, ...current.map((p) => p.packet)),
     rounds: current.map((p) => ({
       number: p.packet,

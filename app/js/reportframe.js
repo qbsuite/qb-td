@@ -65,14 +65,14 @@ export function reportSrcdoc(pages) {
   const dark = `
     @media (prefers-color-scheme: dark) {
       html{color-scheme:dark}
-      body{background:#131316;color:#e7e7ea}
-      a{color:#7aa2f7}
-      a:visited{color:#a78bfa}
-      tr:nth-child(even){background-color:#1b1b20}
-      .scoreboardRoundHeader{background-color:#131316}
-      .pseudoTFoot{border-top-color:#3a3a42;background-color:#131316 !important}
-      .floatingTOC{background-color:#1b1b20;box-shadow:none}
-      .inlineDivider{background-color:#3a3a42}
+      body{background:#232326;color:#e4e4e7}
+      a{color:#8fb0f5}
+      a:visited{color:#b9a4f5}
+      tr:nth-child(even){background-color:#2c2c31}
+      .scoreboardRoundHeader{background-color:#232326}
+      .pseudoTFoot{border-top-color:#4d4d55;background-color:#232326 !important}
+      .floatingTOC{background-color:#2c2c31;box-shadow:none}
+      .inlineDivider{background-color:#4d4d55}
     }`;
   return `<!doctype html><html><head><meta charset="utf-8">${styleOf(pages[0].text)}
     <style>body{margin:0 8px 8px;background:#fff}

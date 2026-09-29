@@ -7,94 +7,69 @@
 <meta name="referrer" content="no-referrer">
 <title>qb-td reader</title>
 <link rel="stylesheet" href="css/td.css">
-<style>
-  /* Page chrome collapses to one bar once MODAQ is mounted. */
-  .wrap.readerbar { padding: 10px 16px; max-width: none; }
-  .wrap.readerbar header { margin-bottom: 0; }
-  body.reading #picker, body.reading #packetrow, body.reading #schedpanel,
-  body.reading #tbpanel { display: none; }
-  #schedrows td, #tbrows td { padding: 2px 8px 2px 0; border-bottom: none; }
-  #schedrows tr.now td { background: var(--hover-bg); }
-  #roundrows .row { margin: 4px 0; }
-  #roundrows .pill.sel { background: var(--hover-bg); border-color: currentColor; }
-  body.reading #msg { display: none; }
-  body:not(.reading) #game, body:not(.reading) #newgame { display: none; }
-  #modaq { min-height: 70vh; }
-  .matchup { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 2px 0 6px; }
-  .matchup .vs { font-size: 14px; font-weight: 400; color: var(--muted); }
-  .linkbtn { font-size: 13px; color: var(--muted); background: none; border: none; padding: 0;
-    text-decoration: underline; text-underline-offset: 3px; }
-  .linkbtn:hover { color: var(--fg); }
-  /* starters: one column per team, a tick per player */
-  .lineups { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-top: 12px; }
-  .lineup h4 { font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-  .lineup h4 .count { font-weight: 400; font-size: 13px; color: var(--muted); }
-  .lineup h4 .count.none { color: var(--bad); }
-  .plist { display: grid; gap: 4px; }
-  .plist .p { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 5px 9px; background: var(--hover-bg);
-    font-size: 14px; border: none; color: var(--fg); text-align: left; width: 100%; }
-  .plist .p .box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--muted); flex: none;
-    display: grid; place-items: center; font-size: 11px; line-height: 1; }
-  .plist .p.on { background: var(--pick); box-shadow: inset 0 0 0 1px var(--pick-line); font-weight: 600; }
-  .plist .p.on .box { background: var(--fg); border-color: var(--fg); color: var(--bg); }
-  .plist .p .bench { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 400; }
-</style>
+<link rel="stylesheet" href="css/room.css">
 </head>
 <body>
-<div class="wrap readerbar">
-  <header>
-    <h1 id="tname" style="font-size:17px">qb-td</h1>
-    <span id="room" class="sub"></span>
-    <span id="game" class="sub"></span>
-    <span class="spacer"></span>
-    <a id="newgame" href="#">new game</a>
-    <a id="bucketlink" href="#">uploads</a>
-  </header>
+<header class="rbar">
+  <h1 id="tname">qb-td</h1>
+  <span id="room" class="sub"></span>
+  <span id="game" class="sub"></span>
+  <span class="spacer"></span>
+  <a id="newgame" href="#">New game</a>
+  <a id="bucketlink" href="#">Upload page</a>
+</header>
+<div class="rmsg">
   <div id="msg"></div>
   <div id="notfound" hidden>
-    <div class="card">
-      <p>This game link belongs to another device or its saved state was
-      cleared.</p>
-      <p style="margin-top:8px"><a id="roomlink" href="#">start a new game</a></p>
-    </div>
+    <p>This game link belongs to another device or its saved state was
+    cleared.</p>
+    <p style="margin-top:8px"><a id="roomlink" href="#">Start a new game</a></p>
   </div>
-  <div id="packetrow" class="row" style="margin:4px 0 10px">
-    <span class="muted" id="packetname"></span>
-  </div>
-  <div class="row" style="align-items:flex-start">
-    <div class="card" id="picker" style="flex:2;min-width:260px" hidden>
+</div>
+<div class="rstart">
+  <main id="picker" hidden>
+    <div>
+      <div class="rlabel">Round</div>
       <div id="roundrows"></div>
-      <div id="teamrow" style="margin-top:12px" hidden>
-        <!-- the scheduled matchup, locked in: changing it takes a click -->
-        <div id="schedmatch" hidden>
-          <div class="muted" style="font-size:12px" id="schedfrom"></div>
-          <div class="matchup"><span id="mteama"></span> <span class="vs">vs</span> <span id="mteamb"></span></div>
+      <span class="muted" id="packetname"></span>
+    </div>
+    <div id="teamrow" hidden>
+      <div class="matchrow">
+        <div class="grow">
+          <!-- the scheduled matchup, locked in: changing it takes a click -->
+          <div id="schedmatch" hidden>
+            <div id="schedfrom"></div>
+            <div class="matchup"><span id="mteama"></span> <span class="vs">vs</span> <span id="mteamb"></span></div>
+          </div>
+          <div class="row" id="teampickers">
+            <select id="teama" aria-label="First team"></select>
+            <span class="muted">vs</span>
+            <select id="teamb" aria-label="Second team"></select>
+          </div>
         </div>
-        <div class="row" id="teampickers">
-          <select id="teama" aria-label="First team"></select>
-          <span class="muted">vs</span>
-          <select id="teamb" aria-label="Second team"></select>
-        </div>
-        <div id="starters"></div>
-        <div class="row" style="margin-top:10px">
-          <button id="start" class="primary">Start</button>
-          <span id="startnote" class="muted" style="font-size:13px"></span>
-          <span class="spacer" style="flex:1"></span>
+        <div class="matchlinks">
           <button id="changeteams" class="linkbtn" hidden>Change teams</button>
           <button id="useschedteams" class="linkbtn" hidden>Use the scheduled teams</button>
         </div>
       </div>
+      <div id="starters"></div>
+      <div class="startrow">
+        <button id="start" class="primary">Start game</button>
+        <span id="startnote" class="note">Starting tells the TD this room has begun the round.</span>
+      </div>
     </div>
-    <div class="card" id="schedpanel" style="flex:1;min-width:200px" hidden>
-      <div class="rhead" style="margin-top:0">schedule</div>
+  </main>
+  <aside class="rside">
+    <div id="schedpanel" hidden>
+      <h2>This room&rsquo;s schedule</h2>
       <div class="tablewrap"><table id="schedrows"></table></div>
     </div>
-    <div class="card" id="tbpanel" style="flex:1;min-width:220px" hidden>
-      <div class="rhead" style="margin-top:0">tiebreakers</div>
-      <div class="muted" id="tbbase" style="font-size:12px;margin-bottom:4px"></div>
+    <div id="tbpanel" hidden>
+      <h2>Tiebreakers</h2>
       <div class="tablewrap"><table id="tbrows"></table></div>
+      <div class="muted" id="tbbase"></div>
     </div>
-  </div>
+  </aside>
 </div>
 <div id="modaq"></div>
 <script src="js/read.bundle.js" defer></script>

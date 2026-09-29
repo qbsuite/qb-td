@@ -28,7 +28,7 @@ import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
   insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
-  hasPlaceholders, poolStandings, fillPlaceholders, roundRooms } from '../engine/schedule.js';
+  hasPlaceholders, poolStandings, fillPlaceholders, roundRooms, flatRounds } from '../engine/schedule.js';
 import { buzzCredentials } from './buzzkey.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
@@ -39,10 +39,16 @@ const msg = $('msg');
 const adminSecret = new URLSearchParams(location.search).get('a') || '';
 const inviteSecret = new URLSearchParams(location.search).get('i') || '';
 
+// Status line: a small notice at the bottom of the window. Confirmations
+// fade after a few seconds; errors stay until clicked, so none is missed.
+let sayTimer = null;
 function say(text, bad = false) {
+  clearTimeout(sayTimer);
   msg.textContent = text || '';
-  msg.className = bad ? 'bad' : '';
+  msg.className = text ? (bad ? 'bad show' : 'show') : '';
+  if (text && !bad) sayTimer = setTimeout(() => { msg.className = ''; }, 4000);
 }
+msg.onclick = () => { clearTimeout(sayTimer); msg.className = ''; };
 
 function pageDir() {
   return location.href.split(/[?#]/)[0].replace(/index\.html$/, '').replace(/\/$/, '');
@@ -231,10 +237,16 @@ let rosterTeams = null; // structured editor working copy [{name, players}]
 let rosterUpload = null; // parsed upload awaiting confirmation
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
+let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
+let addOpen = null;      // Add a game panel: {bid, round} to prefill, or null when closed
 let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
 // clock time of a ruling (protests drawer)
 function clockTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+// "Oct 1, 4:54 AM": when links close, short enough for a header line
+function fmtWhen(ms) {
+  return new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 /* ---------- data fetch + top-level render ---------- */
@@ -272,16 +284,30 @@ async function showDetail(quiet = false, held = null) {
 }
 
 // The four setup steps and their done state.
-function setupSteps(t, buckets, rounds, settings) {
-  const totalRounds = Math.max(Number(settings.rounds) || 1, t.current_round,
+// How many rounds the tournament has: the schedule's rounds, or more if
+// the TD added some on the Packets step (settings.rounds), and never
+// fewer than a round that is live or already has a packet.
+function schedRoundCount() {
+  if (!sched || !Array.isArray(sched.phases)) return 0;
+  return Math.max(0, ...sched.phases.flatMap((p) => (p.rounds || []).map((r) => Number(r.round) || 0)));
+}
+function roundCount(t, rounds, settings) {
+  return Math.max(1, schedRoundCount(), Number(settings.rounds) || 0, t.current_round,
     ...rounds.map((r) => r.number));
+}
+
+// The setup steps, in the order a TD does them, and their done state.
+// Packets come after the schedule: the schedule decides how many rounds
+// there are to fill.
+function setupSteps(t, buckets, rounds, settings) {
+  const totalRounds = roundCount(t, rounds, settings);
   return [
     ['rooms', 'Rooms', buckets.length > 0,
       buckets.length ? buckets.length + ' rooms' : 'None yet'],
-    ['packets', 'Packets', rounds.length > 0,
-      rounds.length + '/' + totalRounds + ' rounds'],
     ['roster', 'Roster', !!t.roster_name, t.roster_name ? 'Saved' : 'None yet'],
     ['sched', 'Schedule', !!sched, sched ? 'Saved' : 'None yet'],
+    ['packets', 'Packets', rounds.length > 0,
+      rounds.length + '/' + totalRounds + ' rounds'],
     // a format the TD (or the set) chose; the preset alone is just a default
     ['modaq', 'MODAQ Settings', !!settings.gameFormat,
       settings.gameFormat ? (GAME_FORMAT_OPTIONS.find((o) => o.value === formatKey(settings)) || {}).label || 'Saved'
@@ -318,28 +344,27 @@ function render() {
   const v = curView || (missing.length ? 'setup' : 'live');
   shownView = v;
 
+  document.body.classList.add('hubpage');
   view.innerHTML = `
-    <div class="row">
-      <a href="index.html">&larr; All tournaments</a>
-      <span class="spacer" style="flex:1"></span>
-      <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
-      <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy</button>
-    </div>
-    <div class="row" style="margin-top:6px">
-      <b style="font-size:18px">${esc(t.name)}</b>
-      <span class="mono muted">${esc(t.slug)}</span>
-      <span class="spacer" style="flex:1"></span>
-      <span class="muted">${t.started
-        ? `Started &middot; links close ${new Date(t.closes).toLocaleString()}`
-        : `Setup open until ${new Date(t.closes).toLocaleString()}`}</span>
-      <button id="rotate" class="small">New admin link</button>
-    </div>
-    ${t.set ? `<div class="muted" style="font-size:13px;margin-top:4px">Mirror of <b>${esc(t.set.name)}</b>${
-      t.set.published ? ` &middot; <a href="${esc(setLink(t.set.slug))}" target="_blank">set page</a>` : ''}</div>` : ''}
-    <div class="tabs bigtabs" style="margin-top:10px">
-      <button class="tab ${v === 'setup' ? 'active' : ''}" data-view="setup">Tournament Setup${
-        missing.length ? ' <span class="ndot">&bull;</span>' : ''}</button>
-      <button class="tab ${v === 'live' ? 'active' : ''}" data-view="live">Live Hub</button>
+    <div class="hubhead">
+      <div class="hubtitle">
+        <h1>${esc(t.name)}</h1>
+        <span class="muted">${t.started
+          ? `closes ${esc(fmtWhen(t.closes))}`
+          : `Not started &middot; setup open until ${esc(fmtWhen(t.closes))}`}</span>
+        <span class="mono muted slug">${esc(t.slug)}</span>
+      </div>
+      <nav class="hubnav">
+        <button class="hubtab ${v === 'setup' ? 'on' : ''}" data-view="setup">Setup${
+          missing.length ? ' <span class="ndot" title="Setup incomplete">&bull;</span>' : ''}</button>
+        <button class="hubtab ${v === 'live' ? 'on' : ''}" data-view="live">Live</button>
+        <span class="spacer" style="flex:1"></span>
+        <button class="linkbtn" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy public link</button>
+        <a href="${esc(statsLink(t.slug))}" target="_blank">Open public page</a>
+        <button id="rotate" class="linkbtn">New admin link</button>
+      </nav>
+      ${t.set ? `<div class="muted" style="font-size:13px;margin-top:6px">Mirror of <b>${esc(t.set.name)}</b>${
+        t.set.published ? ` &middot; <a href="${esc(setLink(t.set.slug))}" target="_blank">set page</a>` : ''}</div>` : ''}
     </div>
     <div id="viewbody"></div>`;
   view.querySelectorAll('[data-view]').forEach((b) => {
@@ -366,35 +391,32 @@ function render() {
 
 function renderSetup(a, t, buckets, rounds, files, settings, steps) {
   const box = $('viewbody');
+  // the step list is the checklist and the tabs at once: one line per
+  // step, its done state and a word on where it stands
+  const LABEL = { packets: 'Packets + Tiebreakers', stats: 'Public page' };
   box.innerHTML = `
-    <div class="steps">
-      ${steps.map(([key, label, done, detail]) => `
-      <span class="step ${done ? 'done' : ''}" data-step="${key}">
-        <span class="mark">${done ? '&#10003;' : '&#9675;'}</span>
-        ${label} <span class="muted">${esc(detail)}</span>
-      </span>`).join('')}
-      ${t.started
-        ? `<span class="step done started"><span class="mark">&#10003;</span> Started
-            <span class="muted">closes ${esc(new Date(t.closes).toLocaleString())}</span></span>`
-        : '<button id="starttour" class="primary">Start tournament</button>'}
-    </div>
-    ${t.started ? '' : `<p class="muted" style="font-size:13px;margin:4px 0 0">Room links show
-      &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start. From then, your admin link and
-      every room link work for 48 hours. Setup stays open until ${esc(new Date(t.closes).toLocaleString())}.</p>`}
-    <div class="tabs">
-      ${[['rooms', 'Rooms'], ['packets', 'Packets + Tiebreakers'],
-        ['roster', 'Roster'], ['sched', 'Schedule'],
-        ['modaq', 'MODAQ Settings'], ['stats', 'Stats settings']].map(([key, label]) => `
-      <button class="tab ${setupTab === key ? 'active' : ''}" data-tab="${key}">${label}</button>`).join('')}
-    </div>
-    <div id="setupsec"></div>`;
-  box.querySelectorAll('.step[data-step]').forEach((s) => {
-    s.onclick = () => { setupTab = s.dataset.step; render(); };
+    <div class="setupgrid">
+      <aside class="steplist">
+        ${steps.map(([key, label, done, detail]) => `
+        <button class="stepbtn ${setupTab === key ? 'on' : ''}" data-step="${key}" ${setupTab === key ? 'aria-current="true"' : ''}>
+          <span class="mark ${done ? 'done' : ''}">${done ? '&#10003;' : '&#9675;'}</span>
+          <span class="stext"><span class="slabel">${LABEL[key] || label}</span><span class="sdetail">${esc(detail)}</span></span>
+        </button>`).join('')}
+        <div class="stepstart">
+          ${t.started
+            ? `<div><b>Started</b></div><div class="muted" style="font-size:13px">Links close ${esc(fmtWhen(t.closes))}</div>`
+            : `<button id="starttour" class="primary">Start tournament</button>
+               <div class="muted" style="font-size:12px">Room links open for 48 hours from Start.</div>`}
+        </div>
+      </aside>
+      <div id="setupsec"></div>
+    </div>`;
+  box.querySelectorAll('[data-step]').forEach((s) => {
+    // working through the steps is choosing Setup: finishing the last one
+    // must not flip the page to Live under the TD's hands
+    s.onclick = () => { setupTab = s.dataset.step; curView = 'setup'; render(); };
   });
   if ($('starttour')) $('starttour').onclick = () => startTournament(a, t, $('starttour'));
-  box.querySelectorAll('[data-tab]').forEach((b) => {
-    b.onclick = () => { setupTab = b.dataset.tab; render(); };
-  });
   if (setupTab === 'rooms') renderRoomsSec(a, t, buckets, files);
   else if (setupTab === 'packets') renderPacketsSec(a, t, buckets, rounds, settings);
   else if (setupTab === 'roster') renderRosterSec(a, t);
@@ -412,7 +434,7 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
 
 function renderModaqSec(a, t, settings) {
   const box = $('setupsec');
-  box.innerHTML = formatHtml(settings, true);
+  box.innerHTML = '<h2>MODAQ settings</h2>' + formatHtml(settings, true);
   wireFormat(box, {
     settings: () => settings,
     save: async (next) => { await pub(a, { method: 'POST', json: { settings: next } }); },
@@ -530,17 +552,19 @@ function renderRoomsSec(a, t, buckets, files) {
   const next = nextRoomNumber(buckets);
   box.innerHTML = `
     <h2>Rooms</h2>
-    ${buckets.length ? `<div class="tablewrap"><table>
-      <tr><th>Room</th><th>Links</th><th class="num">Files</th><th></th></tr>
+    ${buckets.length ? `<div class="tablewrap"><table class="roomtable">
+      <tr><th>Name</th><th>Reader link</th><th>Upload page</th><th class="num">Files</th><th></th></tr>
       ${buckets.map((b) => {
+        // names go into a JS string inside an attribute: escape for both
+        const js = (s) => esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
         return `<tr>
-          <td><input data-roomrename="${b.id}" value="${esc(b.room_name)}" size="16"></td>
-          <td><a href="${esc(readLink(b.secret))}" target="_blank">Reader</a>
-            <button class="small" onclick="qtd.copy('${esc(readLink(b.secret))}', '${esc(b.room_name)} reader link')">Copy</button>
-            &nbsp;<a href="${esc(bucketLink(b.secret))}" target="_blank">Bucket</a>
-            <button class="small" onclick="qtd.copy('${esc(bucketLink(b.secret))}', '${esc(b.room_name)} link')">Copy</button></td>
-          <td class="num">${files.filter((f) => f.bucket_id === b.id).length}</td>
-          <td class="row"><button class="small" data-delbucket="${b.id}">Remove</button></td>
+          <td><input class="inlinename" data-roomrename="${b.id}" value="${esc(b.room_name)}" aria-label="Room name"></td>
+          <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(readLink(b.secret))}', '${js(b.room_name)} reader link')">Copy</button>
+            <a class="muted" href="${esc(readLink(b.secret))}" target="_blank">Open</a></td>
+          <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(bucketLink(b.secret))}', '${js(b.room_name)} upload page')">Copy</button>
+            <a class="muted" href="${esc(bucketLink(b.secret))}" target="_blank">Open</a></td>
+          <td class="num muted">${files.filter((f) => f.bucket_id === b.id).length}</td>
+          <td class="num"><button class="linkbtn muted" data-delbucket="${b.id}">Remove</button></td>
         </tr>`;
       }).join('')}
     </table></div>
@@ -565,13 +589,13 @@ function renderRoomsSec(a, t, buckets, files) {
         const holder = [...box.children].find((el) => el.classList && el.classList.contains('muted'));
         const wrap = document.createElement('div');
         wrap.className = 'tablewrap';
-        wrap.innerHTML = '<table><tr><th>Room</th><th>Links</th><th class="num">Files</th><th></th></tr></table>';
+        wrap.innerHTML = '<table class="roomtable"><tr><th>Name</th><th>Reader link</th><th>Upload page</th><th class="num">Files</th><th></th></tr></table>';
         if (holder) holder.replaceWith(wrap); else box.querySelector('h2').after(wrap);
         tbody = wrap.querySelector('table');
       }
       const tr = document.createElement('tr');
       tr.className = 'fresh';
-      tr.innerHTML = `<td>${esc(name)}</td><td class="muted">Links ready in a moment</td><td class="num">0</td><td></td>`;
+      tr.innerHTML = `<td>${esc(name)}</td><td class="muted" colspan="2">Links ready in a moment</td><td class="num">0</td><td></td>`;
       tbody.appendChild(tr);
     };
     let made = 0;
@@ -667,7 +691,11 @@ const JOIN_HTML = `
 
 function renderPacketsSec(a, t, buckets, rounds, settings) {
   const fromSet = (r) => t.set && r.packet_r2_key.startsWith('s/');
-  const slots = Math.max(Number(settings.rounds) || 1, t.current_round, ...rounds.map((r) => r.number));
+  const slots = roundCount(t, rounds, settings);
+  const fromSched = schedRoundCount();
+  // the fewest rounds the TD can shrink to: the schedule's, a live round,
+  // or the last round holding a packet
+  const minSlots = Math.max(1, fromSched, t.current_round, ...rounds.map((r) => r.number));
   renderPacketsUi($('setupsec'), {
     staged,
     slots,
@@ -678,6 +706,8 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
       href: `${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}`,
     })),
     setSlots: (n) => pub(a, { method: 'POST', json: { settings: { ...settings, rounds: n } } }),
+    minSlots,
+    countNote: fromSched ? (slots > fromSched ? `the schedule has ${fromSched}` : 'from the schedule') : '',
     uploadPacket: (s, round) => pub(`${a}/packet?round=${round}&name=${encodeURIComponent(s.name)}`,
       { method: 'POST', body: stagedBlob(s) }),
     uploadTb: async (name, data) => {
@@ -691,9 +721,8 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
     clearTb: () => pub(a + '/tiebreakers', { method: 'DELETE' }),
     pool: tbPool,
     showUses: true,
-    intro: `Upload the packets and tiebreakers that will be used for the tournament, then assign
-      packets to round numbers. Moderator links will automatically load the packet that was assigned
-      to the round.`,
+    intro: `Each round's room links load the packet assigned to it. Upload a zip or files, then
+      assign by filename or drag a packet onto a round.`,
     packetsNote: t.set ? `The rounds of <b>${esc(t.set.name)}</b> are already here, and a fix its
       editors upload reaches every round no room here has opened yet. A packet you
       upload yourself replaces that round for good — the set stops updating it, and its
@@ -822,11 +851,17 @@ function renderUpPreview(a) {
     </div>`;
   $('upconfirm').onclick = async () => {
     try {
+      // Save the roster rebuilt from its parsed teams, not the file as
+      // uploaded: MODAQ reads only a versioned tournament with a name, and
+      // a file qb-td can parse may be neither. Names are all either keeps.
       await pub(`${a}/roster?name=${encodeURIComponent(u.filename)}`,
-        { method: 'POST', body: u.text });
+        { method: 'POST', body: JSON.stringify(buildRosterQbj(lastDetail.tournament.name, u.teams)) });
       rosterUpload = null;
       rosterTeams = null;   // editor reloads from the new roster
       schedFetched = false; // schedule editor re-reads the team list
+      // …and has the new names at once, so a schedule generated before
+      // that refetch lands is built from this roster, not the last one
+      schedTeams = u.teams.map((tm) => tm.name);
       say('Roster saved');
       showDetail();
     } catch (e) { say('Roster: ' + e.message, true); }
@@ -978,6 +1013,7 @@ function renderRosterEditor(a, t) {
       rosterTeams = clean.map((tm) => ({ name: tm.name, players: [...tm.players] }));
       rosterOpen = false;
       schedFetched = false; // schedule editor re-reads the team list
+      schedTeams = clean.map((tm) => tm.name); // …and has the new names at once
       say('Roster saved');
       showDetail();
     } catch (e) { say('Roster: ' + e.message, true); }
@@ -1005,10 +1041,14 @@ let schedRoomsN = null;    // creator rooms input
 async function ensureSched(a, t) {
   if (schedFetched || !t.roster_r2_key) return;
   schedFetched = true;
+  // A schedule generated (or edited) while these fetches were out is newer
+  // than what they bring back: keep it rather than wipe it.
+  const before = sched;
   try { schedTeams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)).map((x) => x.name); }
   catch (e) { schedTeams = []; }
-  try { sched = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); }
-  catch (e) { sched = null; }
+  let got = null;
+  try { got = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); } catch (e) { got = null; }
+  if (sched === before) sched = got;
 }
 
 // Slot refs are room-keyed ({p, r, room, side} / {p, r, bye}) so empty
@@ -1446,6 +1486,8 @@ function renderSchedule(a, t, buckets, files) {
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;
+  if ($('dlpanel') && !$('dlpanel').hidden) { $('dlpanel').hidden = true; $('dlmenu').focus(); return; }
+  if (cellOpen && shownView === 'live') { cellOpen = null; render(); return; }
   if (slotEditRef || gameSel) {
     slotEditRef = null;
     gameSel = null;
@@ -1455,10 +1497,66 @@ document.addEventListener('keydown', (ev) => {
 
 /* ================= Live Hub ================= */
 
+// The schedule room a bucket is linked to: by id, else by name (as
+// roundRooms matches them), or -1.
+function schedRoomIndex(b) {
+  if (!sched || !b) return -1;
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  const i = sched.rooms.findIndex((r) => r.bucket === b.id);
+  return i !== -1 ? i : sched.rooms.findIndex((r) => norm(r.name) === norm(b.room_name));
+}
+
+/** The two teams the schedule puts in this room this round, or null. */
+function scheduledGame(b, round) {
+  const i = schedRoomIndex(b);
+  if (i === -1) return null;
+  const r = flatRounds(sched).find((x) => x.round === round);
+  const g = r && r.games.find((x) => x.room === i);
+  return g && g.a && g.b ? [slotText(g.a), slotText(g.b)] : null;
+}
+
+/** The room the schedule has these two teams playing in that round, or
+    null — the target of "Scheduled in X. Move it there". */
+function scheduledRoomFor(teams, round) {
+  if (!sched) return null;
+  const buckets = lastDetail.buckets;
+  const want = [...teams].map((x) => x.trim().toLowerCase()).sort().join('|');
+  for (const b of buckets) {
+    const g = scheduledGame(b, round);
+    if (g && g.map((x) => x.trim().toLowerCase()).sort().join('|') === want) return b;
+  }
+  return null;
+}
+
+// What each file picked for Add a game is, so a TD sees the pair before
+// it goes up: a reader upload is whole; a .qbj wants its _Game.json.
+function addKind(name) {
+  if (/\.qbtd\.json$/i.test(name)) return 'Reader upload';
+  if (/_game\.json$/i.test(name)) return 'MODAQ game file';
+  if (/\.qbj$/i.test(name)) return 'Match file';
+  return 'Game file';
+}
+function addListHtml(fs) {
+  if (!fs.length) return '';
+  const kinds = fs.map((f) => addKind(f.name));
+  const lone = kinds.includes('Match file') && !kinds.includes('MODAQ game file') && !kinds.includes('Reader upload');
+  return fs.map((f, i) => `<div class="addfile"><span class="mono">${esc(f.name)}</span>
+      <span class="muted">${kinds[i]}</span></div>`).join('')
+    + (lone ? '<div class="muted small">Stats will count it. Without the game file it can&rsquo;t be reopened in the reader.</div>' : '');
+}
+
+// one listener for the page's lifetime: a click outside closes the menu
+document.addEventListener('click', (ev) => {
+  const p = $('dlpanel');
+  if (p && !p.hidden && !ev.target.closest('.dlwrap')) {
+    p.hidden = true;
+    if ($('dlmenu')) $('dlmenu').setAttribute('aria-expanded', 'false');
+  }
+});
+
 function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const box = $('viewbody');
-  const totalRounds = Math.max(Number(settings.rounds) || 1, t.current_round,
-    ...rounds.map((r) => r.number));
+  const totalRounds = roundCount(t, rounds, settings);
   const intake = roundIntake(sched, t.current_round, buckets, files);
   const uploadRounds = [...new Set([
     ...Array.from({ length: t.current_round }, (_, i) => i + 1),
@@ -1477,142 +1575,297 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const popen = prows.filter((r) => r.ruling === 'open');
   const openProt = protOpen === null ? !!popen.length : protOpen;
 
+  // ---- the rooms of the current round: schedule + uploads + starts ----
+  const started = new Set((lastDetail.starts || [])
+    .filter((x) => x.round === t.current_round).map((x) => x.bucket_id));
+  const good = (f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
+  const liveRooms = roundRooms(sched, t.current_round, buckets);
+  const liveRows = liveRooms.map((r) => {
+    const b = buckets.find((x) => x.id === r.id);
+    const mine = files.filter((f) => f.bucket_id === r.id && f.round === t.current_round);
+    const g = mine.filter(good).sort((x, y) => y.id - x.id)[0] || null;
+    const sum = g ? fileSummary(g) : null;
+    const planned = scheduledGame(b, t.current_round);
+    const ps = g ? pfiles.get(g.id) : null;
+    return { b, bye: r.bye && !g, file: g, sum, planned, openProt: ps && !ps.superseded ? ps.open : 0,
+      state: g ? 'in' : started.has(r.id) ? 'started' : 'idle' };
+  });
+  const playing = liveRooms.filter((r) => !r.bye);
+  const nStarted = playing.filter((r) => started.has(r.id)).length;
+  const nextHasPacket = rounds.some((r) => r.number === t.current_round + 1);
+
+  // ---- the uploads grid: rooms down, rounds across ----
+  const lastRound = Math.max(totalRounds, ...uploadRounds);
+  const roundCols = Array.from({ length: lastRound }, (_, i) => i + 1);
+  const cellFiles = (bid, n) => files.filter((f) => f.bucket_id === bid && f.round === n);
+  const gridCell = (b, n) => {
+    const fs = cellFiles(b.id, n);
+    const goods = fs.filter(good);
+    const errs = fs.filter((f) => f.error);
+    const games = new Set(goods.map((f) => { const s = fileSummary(f); return s ? [...s.teams].sort().join('|') : f.id; }));
+    const bye = sched ? roundRooms(sched, n, buckets).find((r) => r.id === b.id)?.bye : false;
+    let mark = '', cls = '', title = '';
+    if (errs.length) { mark = '!'; cls = 'warn'; title = errs.length + ' file' + (errs.length === 1 ? '' : 's') + ' could not be read'; }
+    else if (goods.length > 1) { mark = String(goods.length); cls = games.size > 1 ? 'warn' : ''; title = goods.length + ' uploads'; }
+    else if (goods.length === 1) { mark = '&#10003;'; title = 'Game in'; }
+    else if (fs.length) { mark = '&middot;'; cls = 'muted'; title = 'Game file only'; }
+    else if (n > t.current_round || bye) { mark = ''; cls = 'muted'; title = bye ? 'No game this round' : ''; }
+    else if (n === t.current_round) {
+      mark = started.has(b.id) ? '&#9675;' : '&ndash;';
+      cls = started.has(b.id) ? 'muted' : 'warn';
+      title = started.has(b.id) ? 'Started, not uploaded' : 'Not started';
+    } else { mark = '&ndash;'; cls = 'warn'; title = 'Missing'; }
+    const sel = cellOpen && cellOpen.bid === b.id && cellOpen.round === n;
+    const clickable = fs.length || (n <= t.current_round && !bye);
+    return `<td class="ucell">${clickable
+      ? `<button class="umark ${cls} ${sel ? 'sel' : ''}" data-cell="${b.id}:${n}" title="${esc(title)}"
+          aria-label="${esc(b.room_name)}, round ${n}: ${esc(title || 'empty')}">${mark}</button>`
+      : `<span class="umark ${cls}" title="${esc(title)}">${mark}</span>`}</td>`;
+  };
+  const fileLinks = (f) => {
+    const link = (params, label) =>
+      `<a href="${esc(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}`)}" download>${label}</a>`;
+    const base = f.filename.replace(/\.qbtd\.json$/i, '');
+    return f.kind === 'combined' && !f.error
+      ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
+        + link(`part=game&dl=${encodeURIComponent(base + '_Game.json')}`, 'game')
+      : link(`dl=${encodeURIComponent(f.filename)}`, 'Download');
+  };
+  const protestMarker = (f) => {
+    const ps = pfiles.get(f.id);
+    const plural = (n) => `${n} protest${n === 1 ? '' : 's'}`;
+    return !ps ? '' : ps.superseded
+      ? `<span class="pill">${plural(ps.n)} &middot; superseded</span>`
+      : ps.open
+        ? `<button class="pill warn link" data-goto="protdrawer">${plural(ps.open)} open</button>`
+        : `<button class="pill link" data-goto="protdrawer">${plural(ps.n)} &middot; ruled</button>`;
+  };
+  // the open cell's files, newest first, each with its own room picker
+  const cellPanel = () => {
+    if (!cellOpen) return '';
+    const b = buckets.find((x) => x.id === cellOpen.bid);
+    if (!b) return '';
+    const n = cellOpen.round;
+    const fs = cellFiles(b.id, n).sort((x, y) => y.id - x.id);
+    const latest = new Map(); // teams -> newest good file id (dedupeMatches keeps the highest)
+    for (const f of fs.filter(good)) {
+      const s = fileSummary(f);
+      const k = s ? [...s.teams].sort().join('|') : 'f' + f.id;
+      if (!latest.has(k)) latest.set(k, f.id);
+    }
+    const rows = fs.map((f) => {
+      const s = fileSummary(f);
+      const k = s ? [...s.teams].sort().join('|') : 'f' + f.id;
+      const superseded = good(f) && latest.get(k) !== f.id;
+      const home = s ? scheduledRoomFor(s.teams, n) : null;
+      const hint = home && home.id !== b.id
+        ? `<div class="warntext">Scheduled in ${esc(home.room_name)}. <button class="linkbtn" data-moveto="${f.id}:${home.id}">Move it there</button></div>` : '';
+      return `<div class="pfile ${superseded ? 'old' : ''}">
+        <div class="pline">
+          <span>${s ? `${esc(s.teams[0])} <b>${s.score[0]}</b> &ndash; <b>${s.score[1]}</b> ${esc(s.teams[1])}` : esc(f.filename)}
+            ${superseded ? '<span class="muted" style="font-size:13px"> &middot; superseded</span>' : ''}</span>
+          <select data-movefile="${f.id}" aria-label="Room this game came from">
+            ${buckets.some((x) => x.id === f.bucket_id) ? '' : `<option selected>#${f.bucket_id}</option>`}
+            ${buckets.map((x) => `<option value="${x.id}" ${x.id === f.bucket_id ? 'selected' : ''}>${esc(x.room_name)}</option>`).join('')}
+          </select>
+        </div>
+        ${hint}
+        <div class="pmeta muted">${esc(f.filename)} &middot; ${esc(f.kind)} &middot; ${fmtBytes(f.size)}
+          ${f.error ? ` &middot; <span class="warntext">${esc(f.error)}</span>` : ''} ${protestMarker(f)}</div>
+        <div class="pacts">${fileLinks(f)}
+          ${f.kind === 'combined' && !f.error && s
+            ? `<button class="linkbtn" data-editfile="${f.id}" title="Reopen this game in the reader to correct it">Edit in reader</button>` : ''}
+          <span class="spacer" style="flex:1"></span>
+          <button class="linkbtn muted" data-delfile="${f.id}">Delete</button></div>
+      </div>`;
+    }).join('');
+    return `<tr class="cellpanel"><td colspan="${roundCols.length + 1}"><div class="pop">
+      <div class="phead"><b>Round ${n} &middot; ${esc(b.room_name)}</b>
+        ${fs.filter(good).length > 1 ? `<span class="warntext">${fs.filter(good).length} games</span>` : ''}
+        <span class="spacer" style="flex:1"></span>
+        <button class="linkbtn" data-addfor="${b.id}:${n}">Add a game here</button>
+        <button class="linkbtn muted" data-closecell aria-label="Close">Close</button></div>
+      ${rows || '<div class="muted" style="padding-top:8px">Nothing uploaded for this round yet.</div>'}
+    </div></td></tr>`;
+  };
+
+  const pfirst = popen[0];
   box.innerHTML = `
     ${t.started ? '' : `
     <div class="banner">
-      <span class="bad" style="font-weight:600">Not started</span>
+      <span class="warntext" style="font-weight:600">Not started</span>
       <span class="muted">Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you start it.</span>
       <span class="spacer" style="flex:1"></span>
       <button id="livestart" class="primary">Start tournament</button>
     </div>`}
     ${missing.length ? `
     <div class="banner">
-      <span class="bad" style="font-weight:600">Tournament setup incomplete</span>
+      <span class="warntext" style="font-weight:600">Setup incomplete</span>
       <span class="muted">Still to do: ${missing.map(esc).join(', ')}</span>
       <span class="spacer" style="flex:1"></span>
-      <button id="gosetup" class="primary">Open Tournament Setup</button>
+      <button id="gosetup">Open setup</button>
     </div>` : ''}
-    <div class="statusbar">
-      <span><span class="muted">Round</span> <span class="big">${t.current_round}</span> <span class="muted">of ${totalRounds}</span></span>
-      ${rounds.length ? (rounds.some((r) => r.number === t.current_round)
-        ? '<span class="ok">Packet up</span>' : '<span class="bad">No packet</span>') : ''}
-      ${intake.expected ? `<span><span class="${intake.got >= intake.expected ? 'ok' : 'bad'}">${intake.got}</span><span class="muted">/${intake.expected} games uploaded</span></span>` : ''}
-      ${intake.missing.length ? `<span class="muted">Not uploaded yet: ${esc(intake.missing.join(', '))}</span>` : ''}
-      ${tbTotal ? `<span class="pill ${tbUsed ? 'warn' : ''}">Tiebreakers: ${tbUsed} used &middot; ${tbTotal - tbUsed} unused</span>` : ''}
-      ${prows.length ? `<span class="pill link ${popen.length ? 'warn' : ''}" data-goto="protdrawer">${
-        popen.length ? `${popen.length} open protest${popen.length === 1 ? '' : 's'}` : 'Protests: none open'}</span>` : ''}
-      <span class="spacer" style="flex:1"></span>
-      <label>Round <input id="curround" type="number" min="1" max="999" value="${t.current_round}" style="width:70px"></label>
-      <button id="setround">Set</button>
-      <button id="advround" class="primary">Advance to Round ${t.current_round + 1}</button>
-      ${rounds.some((r) => r.number === t.current_round + 1) ? ''
-        : `<span class="muted" style="font-size:13px">No packet for Round ${t.current_round + 1} yet</span>`}
+    <div class="roundline">
+      <span class="biground">Round ${t.current_round}<span class="of"> / ${totalRounds}</span></span>
+      ${rounds.length && !rounds.some((r) => r.number === t.current_round)
+        ? '<span class="warntext">No packet for this round</span>' : ''}
+      ${tbTotal ? `<span class="muted">Tiebreakers <span class="fg">${tbUsed}/${tbTotal}</span> used</span>` : ''}
     </div>
-    ${autoAdvanceHtml(t, buckets, settings)}
-    ${renderProtests(prows, popen, openProt)}
-    <h2>Stats + Export</h2>
-    <div class="row">
-      <button id="calc" class="primary">Compute stats</button>
-      <button id="dlyft" disabled>YellowFruit (.yft)&hellip;</button>
-      <button id="dlreport" disabled>Download stat report</button>
-      <button id="dlzip" disabled>Download QBJ bundle</button>
-      <button id="rebuild" disabled>Rebuild stats data</button>
-    </div>
-    <!-- The two YellowFruits share an extension and nothing else, and
-         neither says so when handed the other's file: YellowFruit 4
-         refuses a file stamped newer than itself, and YellowFruit 3 throws
-         before it can show an error — the app simply does nothing. So the
-         choice is made here, in front of the TD, rather than left to two
-         similar-looking buttons. -->
-    <div id="yftpick" hidden class="card" style="margin-top:6px">
-      <div class="row"><b>Which YellowFruit will open this?</b>
-        <span class="spacer" style="flex:1"></span>
-        <button id="yftclose" class="small">Cancel</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button id="dlyft4" class="primary">YellowFruit 4</button>
-        <span class="muted">Needs <b>4.0.18 or newer</b>.</span>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button id="dlyft3">YellowFruit 3</button>
-        <span class="muted">Needs <b>3.0.2</b>.</span>
-      </div>
-    </div>
-    <div id="statsout" style="margin-top:12px"></div>
+    <div class="livegrid">
+      <div class="livemain">
+        <section>
+          <div class="sechead"><h2>Live now</h2>
+            ${intake.expected ? `<span class="muted">${intake.got}/${intake.expected} in</span>` : ''}</div>
+          ${liveRows.length ? liveRows.map((r) => `
+          <div class="lrow ${r.bye ? 'bye' : ''}">
+            <span class="lroom">${esc(r.b.room_name)}</span>
+            <span class="lgame">${r.sum
+              ? `<span class="${r.sum.score[0] > r.sum.score[1] ? 'win' : ''}">${esc(r.sum.teams[0])} ${r.sum.score[0]}</span>
+                 <span class="muted">&ndash;</span>
+                 <span class="${r.sum.score[1] > r.sum.score[0] ? 'win' : ''}">${r.sum.score[1]} ${esc(r.sum.teams[1])}</span>`
+              : r.bye ? '<span class="muted">No game this round</span>'
+              : r.planned ? `${esc(r.planned[0])} <span class="muted">v</span> ${esc(r.planned[1])}`
+              : '<span class="muted">No game yet</span>'}
+              ${r.openProt ? `<button class="linkbtn warntext" data-goto="protdrawer">protest</button>` : ''}
+              ${r.file && r.file.error ? `<span class="warntext">${esc(r.file.error)}</span>` : ''}</span>
+            <span class="lacts">${r.file
+              ? fileLinks(r.file) + (r.file.kind === 'combined' && r.sum
+                ? ` <button class="linkbtn" data-editfile="${r.file.id}">Edit</button>` : '')
+              : r.bye ? '' : `<button class="linkbtn" data-addfor="${r.b.id}:${t.current_round}">Upload</button>`}</span>
+            <span class="lmark ${r.state === 'idle' ? 'warn' : r.state === 'started' ? 'muted' : ''}"
+              title="${r.state === 'in' ? 'Game in' : r.state === 'started' ? 'Started, not uploaded' : 'Not started'}">${
+              r.bye ? '' : r.state === 'in' ? '&#10003;' : r.state === 'started' ? '&#9675;' : '&ndash;'}</span>
+          </div>`).join('') : '<div class="muted" style="padding:10px 0">No rooms yet. Add them under Setup.</div>'}
+        </section>
 
-    <h2>Uploads</h2>
-    <details class="rgroup" style="margin-bottom:8px">
-      <summary><span class="dtitle">Add a game</span>
-        <span class="muted">for a room that never turned one in</span></summary>
-      <div class="row" style="padding:8px 10px">
-        <label>Room <select id="addroom">${buckets.map((b) =>
-          `<option value="${b.id}">${esc(b.room_name)}</option>`).join('')}</select></label>
-        <label>Round <input id="addround" type="number" min="1" max="999"
-          value="${t.current_round}" style="width:64px"></label>
-        <input id="addfile" type="file" accept=".json,.qbj">
-        <button id="addgame" class="primary">Upload</button>
+        <section>
+          <div class="sechead"><h2>Uploads</h2>
+            <button class="linkbtn" id="addtoggle" aria-expanded="${addOpen ? 'true' : 'false'}">Add a game</button></div>
+          <div id="addpanel" class="addpanel" ${addOpen ? '' : 'hidden'}>
+            <div class="row">
+              <label>Room <select id="addroom">${buckets.map((b) =>
+                `<option value="${b.id}" ${addOpen && addOpen.bid === b.id ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}</select></label>
+              <label>Round <input id="addround" type="number" min="1" max="999"
+                value="${addOpen && addOpen.round ? addOpen.round : t.current_round}" style="width:64px"></label>
+              <input id="addfile" type="file" multiple accept=".json,.qbj" aria-label="Game files">
+            </div>
+            <div id="addlist" class="addlist"></div>
+            <div class="muted" style="font-size:13px">The match <span class="mono">.qbj</span> and its MODAQ
+              <span class="mono">_Game.json</span> together, or one reader upload (<span class="mono">.qbtd.json</span>).</div>
+            <div class="row" style="margin-top:10px">
+              <button id="addgame" class="primary">Upload</button>
+              <button id="addcancel" class="linkbtn muted">Cancel</button>
+            </div>
+          </div>
+          ${buckets.length ? `<div class="tablewrap"><table class="ugrid">
+            <tr><th class="uroom">Room</th>${roundCols.map((n) =>
+              `<th class="${n === t.current_round ? 'now' : ''}">${n}</th>`).join('')}</tr>
+            ${buckets.map((b) => `<tr><td class="uroom">${esc(b.room_name)}</td>${roundCols.map((n) => gridCell(b, n)).join('')}</tr>${
+              cellOpen && cellOpen.bid === b.id ? cellPanel() : ''}`).join('')}
+          </table></div>
+          <div class="muted legend">&#10003; in &middot; &#9675; started &middot; &ndash; missing &middot; 2 two uploads &middot; ! can&rsquo;t read</div>`
+          : ''}
+        </section>
+
+        ${renderProtests(prows, popen, openProt)}
+        <section id="statsec" hidden>
+          <div class="sechead"><h2>Stats</h2></div>
+          <div id="statsout"></div>
+        </section>
       </div>
-      <div class="muted" style="padding:0 10px 8px;font-size:13px">A reader upload
-        (<span class="mono">.qbtd.json</span>) or a plain match <span class="mono">.qbj</span>.</div>
-    </details>
-    ${uploadRounds.map((rn) => {
-      const group = files.filter((f) => f.round === rn);
-      const ri = rn === t.current_round ? intake : roundIntake(sched, rn, buckets, files);
-      const open = uploadsOpen ? uploadsOpen.has(rn) : rn === t.current_round;
-      return `
-      <details class="rgroup" data-uprnd="${rn}" ${open ? 'open' : ''}>
-        <summary><b>Round ${rn}</b>
-          ${ri.expected ? `<span class="pill ${ri.got >= ri.expected ? 'on' : 'warn'}">${ri.got}/${ri.expected}</span>` : ''}
-          ${ri.missing.length ? `<span class="muted">Missing ${esc(ri.missing.join(', '))}</span>` : ''}
-        </summary>
-        ${group.length ? `<div class="tablewrap"><table>
-          <tr><th>Room</th><th>File</th><th>Kind</th><th class="num">Size</th><th>Status</th><th></th></tr>
-          ${group.map((f) => {
-            const room = buckets.find((b) => b.id === f.bucket_id);
-            // A combined reader upload downloads as its two real files — the
-            // match .qbj and the MODAQ game file — not the raw wrapper JSON.
-            const link = (params, label) =>
-              `<a href="${esc(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}`)}" download>${label}</a>`;
-            const base = f.filename.replace(/\.qbtd\.json$/i, '');
-            const links = f.kind === 'combined' && !f.error
-              ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
-                + link(`part=game&dl=${encodeURIComponent(base + '_Game.json')}`, 'game')
-              : link(`dl=${encodeURIComponent(f.filename)}`, 'Download');
-            const ps = pfiles.get(f.id);
-            const plural = (n) => `${n} protest${n === 1 ? '' : 's'}`;
-            const marker = !ps ? '' : ps.superseded
-              ? `<span class="pill">${plural(ps.n)} &middot; superseded</span>`
-              : ps.open
-                ? `<span class="pill warn link" data-goto="protdrawer">${plural(ps.open)} open</span>`
-                : `<span class="pill link" data-goto="protdrawer">${plural(ps.n)} &middot; ruled</span>`;
-            return `<tr>
-              <td><select data-movefile="${f.id}" title="Room this game came from">
-                ${room ? '' : `<option selected>#${f.bucket_id}</option>`}
-                ${buckets.map((b) => `<option value="${b.id}" ${b.id === f.bucket_id ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}
-              </select></td>
-              <td class="brk">${esc(f.filename)}</td>
-              <td>${f.kind}</td>
-              <td class="num">${fmtBytes(f.size)}</td>
-              <td>${f.error ? `<span class="bad">${esc(f.error)}</span>` : '<span class="ok">OK</span>'} ${marker}</td>
-              <td class="row">
-                ${links}
-                ${f.kind === 'combined' && !f.error && fileSummary(f)
-                  ? `<button data-editfile="${f.id}" title="Reopen this game in the reader to correct it">Edit</button>` : ''}
-                <button data-delfile="${f.id}">Delete</button>
-              </td>
-            </tr>`;
-          }).join('')}
-        </table></div>` : '<div class="muted" style="padding:6px 10px">No files</div>'}
-      </details>`;
-    }).join('')}`;
+
+      <aside class="liverail">
+        <div class="railblock">
+          <button id="advround" class="primary advance">Advance to round ${t.current_round + 1}</button>
+          ${nextHasPacket || !rounds.length ? '' : `<div class="warntext small">No packet for round ${t.current_round + 1} yet</div>`}
+          <label class="setround">Set round
+            <input id="curround" type="number" min="1" max="999" value="${t.current_round}" aria-label="Round">
+            <button id="setround" class="linkbtn">Set</button></label>
+        </div>
+        ${buckets.length ? `
+        <div class="railblock">
+          <label class="railtoggle"><span><b>Auto-advance</b> <span class="muted">${nStarted}/${playing.length} started</span></span>
+            <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''}></label>
+          ${settings.autoAdvance && playing.length && nStarted === playing.length && !nextHasPacket
+            ? `<div class="muted small">Round ${t.current_round + 1} opens as soon as its packet is uploaded.</div>` : ''}
+          <div class="startlist">${liveRooms.map((r) => `<span class="sroom ${r.bye ? 'bye' : started.has(r.id) ? 'on' : ''}"
+              title="${r.bye ? 'No game this round' : started.has(r.id) ? 'Started' : 'Not started'}"><span class="dot"></span>${esc(r.name)}${r.bye ? ' &middot; bye' : ''}</span>`).join('')}</div>
+        </div>` : ''}
+        <div class="railblock">
+          <div class="railhead"><b>Protests${popen.length ? ` <span class="warntext">${popen.length}</span>` : ''}</b>
+            ${prows.length ? '<button class="linkbtn" data-goto="protdrawer">All</button>' : ''}</div>
+          ${pfirst ? `
+          <div class="pcompact">
+            <span>R${pfirst.round} &middot; ${esc(pfirst.room)} &middot; ${qLabel(pfirst.p)}</span>
+            <span class="muted">${esc(pfirst.p.team)}${pfirst.p.given ? `: <span class="given">${esc(pfirst.p.given)}</span>` : ''}</span>
+            ${pfirst.known ? `<span class="${pfirst.flips ? 'warntext' : 'muted'} small">${pfirst.flips ? 'Can flip' : 'Result stands'} &middot;
+              ${esc(pfirst.teams[0])} ${pfirst.upheld[0]} &ndash; ${pfirst.upheld[1]} ${esc(pfirst.teams[1])} if upheld</span>` : ''}
+            <select data-rule="${esc(pfirst.key)}" aria-label="Ruling">${RULINGS.map(([v, l]) =>
+              `<option value="${v}" ${pfirst.ruling === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          </div>` : `<div class="muted small">${prows.length ? 'Nothing open' : 'None logged'}</div>`}
+          <div class="muted small">For your records only. The moderator should fix the game in MODAQ and re-export.</div>
+        </div>
+        <div class="railblock">
+          <div class="railhead"><b>Stats</b></div>
+          <div class="statbtns">
+            <button id="calc">Compute</button>
+            <div class="dlwrap">
+              <button id="dlmenu" aria-haspopup="true" aria-expanded="false" disabled>Download &#9662;</button>
+              <div id="dlpanel" class="dlpanel" role="menu" hidden>
+                <button id="dlyft4" role="menuitem" disabled>YellowFruit 4 (.yft)<span class="muted">4.0.18+</span></button>
+                <button id="dlyft3" role="menuitem" disabled>YellowFruit 3 (.yft)<span class="muted">3.0.2</span></button>
+                <button id="dlreport" role="menuitem" class="sep" disabled>HTML report<span class="muted">.zip</span></button>
+                <button id="dlzip" role="menuitem" disabled>QBJ bundle<span class="muted">split per game</span></button>
+                <button id="rebuild" role="menuitem" class="sep" disabled>Rebuild public stats</button>
+              </div>
+            </div>
+          </div>
+          <div class="muted small" id="statsnote">${files.filter(good).length} games ready</div>
+        </div>
+      </aside>
+    </div>`;
 
   if ($('gosetup')) $('gosetup').onclick = () => { curView = 'setup'; render(); };
-  box.querySelectorAll('details.rgroup').forEach((d) => {
-    d.ontoggle = () => {
-      uploadsOpen = new Set([...box.querySelectorAll('details.rgroup[open]')]
-        .map((x) => Number(x.dataset.uprnd)));
+  // uploads grid: a cell opens its files under its row; one at a time
+  box.querySelectorAll('[data-cell]').forEach((btn) => {
+    btn.onclick = () => {
+      const [bid, n] = btn.dataset.cell.split(':').map(Number);
+      const fs = cellFiles(bid, n);
+      if (!fs.length) { addOpen = { bid, round: n }; cellOpen = null; render(); $('addfile').focus(); return; }
+      cellOpen = cellOpen && cellOpen.bid === bid && cellOpen.round === n ? null : { bid, round: n };
+      render();
     };
   });
+  box.querySelectorAll('[data-closecell]').forEach((b) => { b.onclick = () => { cellOpen = null; render(); }; });
+  box.querySelectorAll('[data-addfor]').forEach((b) => {
+    b.onclick = () => {
+      const [bid, n] = b.dataset.addfor.split(':').map(Number);
+      addOpen = { bid, round: n };
+      render();
+      $('addpanel').scrollIntoView({ block: 'nearest' });
+      $('addfile').focus();
+    };
+  });
+  box.querySelectorAll('[data-moveto]').forEach((b) => {
+    b.onclick = async () => {
+      const [fid, bid] = b.dataset.moveto.split(':').map(Number);
+      try {
+        const out = await pub(a + '/files/' + fid, { method: 'POST', json: { bucket_id: bid } });
+        say('Moved to ' + out.room_name);
+        showDetail();
+      } catch (e) { say(e.message, true); showDetail(); }
+    };
+  });
+  $('addtoggle').onclick = () => { addOpen = addOpen ? null : { bid: null, round: t.current_round }; render(); };
+  $('addcancel').onclick = () => { addOpen = null; render(); };
+  $('addfile').onchange = () => { $('addlist').innerHTML = addListHtml([...$('addfile').files]); };
+  // Download menu: closed by picking an item, Escape, or a click elsewhere
+  $('dlmenu').onclick = (ev) => {
+    ev.stopPropagation();
+    const open = $('dlpanel').hidden;
+    $('dlpanel').hidden = !open;
+    $('dlmenu').setAttribute('aria-expanded', String(open));
+  };
 
   /* protests: rulings are the TD's record only — a whole-map write, like
      settings. Nothing goes to the room; the moderator applies an
@@ -1764,54 +2017,33 @@ async function editGame(a, buckets, files, fileId) {
 async function addGame(a, buckets) {
   const room = buckets.find((b) => b.id === Number($('addroom').value));
   const round = Number($('addround').value);
-  const file = $('addfile').files[0];
+  // the match file goes up before its MODAQ game file, as a room's does
+  const order = (f) => (/_game\.json$/i.test(f.name) ? 1 : 0);
+  const picked = [...$('addfile').files].sort((x, y) => order(x) - order(y));
   if (!room) { say('Pick a room', true); return; }
   if (!Number.isInteger(round) || round < 1) { say('Pick a round', true); return; }
-  if (!file) { say('Choose a file', true); return; }
+  if (!picked.length) { say('Choose the game files', true); return; }
   if (notStarted()) { say(START_FIRST, true); return; }
+  const run = busy($('addgame'), { label: 'Uploading', total: picked.length, scope: $('addpanel') });
+  const bad = [];
   try {
-    say('Uploading…');
-    const out = await pub(
-      `/b/${room.secret}/upload?round=${round}&name=${encodeURIComponent(file.name)}`,
-      { method: 'POST', body: await file.text() });
-    // The Worker stores an unparseable game with its error rather than
-    // rejecting it, the same as for a room — say so instead of "done".
-    if (out && out.error) say(file.name + ': ' + out.error, true);
-    else say(`${file.name} added to ${room.room_name}, round ${round}`);
-    $('addfile').value = '';
+    let done = 0;
+    for (const file of picked) {
+      const out = await pub(
+        `/b/${room.secret}/upload?round=${round}&name=${encodeURIComponent(file.name)}`,
+        { method: 'POST', body: await file.text() });
+      // The Worker stores an unparseable game with its error rather than
+      // rejecting it, the same as for a room — say so instead of "done".
+      if (out && out.error) bad.push(file.name + ': ' + out.error);
+      run.step(++done);
+    }
+    run.end();
+    if (bad.length) say(bad.join('; '), true);
+    else say(`${picked.length === 1 ? picked[0].name : picked.length + ' files'} added to ${room.room_name}, round ${round}`);
+    addOpen = null;
+    cellOpen = { bid: room.id, round };
     showDetail();
-  } catch (e) { say(e.message, true); }
-}
-
-/* ---------- auto-advance ----------
-   One switch for the whole tournament (settings.autoAdvance): the Worker
-   opens the next round once every room with a game in the current one
-   has started it (worker.js maybeAdvance). The chips show which rooms
-   have, whether the switch is on or not. */
-
-function autoAdvanceHtml(t, buckets, settings) {
-  if (!buckets.length) return '';
-  const started = new Set((lastDetail.starts || [])
-    .filter((x) => x.round === t.current_round).map((x) => x.bucket_id));
-  const rooms = roundRooms(sched, t.current_round, buckets);
-  const playing = rooms.filter((r) => !r.bye);
-  const n = playing.filter((r) => started.has(r.id)).length;
-  return `
-    <div class="autoadv">
-      <label class="row" style="align-items:flex-start;gap:10px">
-        <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''} style="margin-top:4px">
-        <span><b>Advance rounds automatically</b><br>
-          <span class="muted" style="font-size:13px">Advance round once all rooms have started a game in the current round.</span></span>
-      </label>
-      <div class="muted" style="font-size:13px">Round ${t.current_round}: <b class="fg">${n} of ${playing.length}</b> rooms started${
-        // everyone has started but nothing can open: say what it waits on
-        settings.autoAdvance && playing.length && n === playing.length
-          && !lastDetail.rounds.some((r) => r.number === t.current_round + 1)
-          ? `. Round ${t.current_round + 1} opens as soon as its packet is uploaded.` : ''}</div>
-      <div class="roomstarts">${rooms.map((r) => r.bye
-        ? `<span class="roomstart bye" title="No game this round in the schedule"><span class="dot"></span>${esc(r.name)} &middot; bye</span>`
-        : `<span class="roomstart${started.has(r.id) ? ' on' : ''}"><span class="dot"></span>${esc(r.name)}</span>`).join('')}</div>
-    </div>`;
+  } catch (e) { run.end(); say(e.message, true); }
 }
 
 /* ---------- protests ----------
@@ -1827,7 +2059,7 @@ function renderProtests(rows, open, isOpen) {
     : rows.length ? 'Nothing open' : 'None logged';
   return `
     <details class="drawer" id="protdrawer" ${isOpen ? 'open' : ''}>
-      <summary><span class="dtitle">Protests</span><span class="muted">${summary}</span></summary>
+      <summary><span class="dtitle">All protests</span><span class="muted">${summary}</span></summary>
       <div class="inner">
         ${rows.length ? `<div class="tablewrap" style="margin-top:8px"><table>
           <tr><th>Round</th><th>Room</th><th>Question</th><th>Protest</th><th>Score</th><th>Ruling</th></tr>
@@ -1857,7 +2089,7 @@ function renderProtests(rows, open, isOpen) {
         </table></div>` : ''}
         <div class="muted" style="font-size:13px;margin-top:8px">
           ${rows.length
-            ? 'A ruling is recorded for you only; nothing is sent to the room. Tell the moderator however you reach them; they apply it in MODAQ and upload the game again.'
+            ? 'For your records only. The moderator should fix the game in MODAQ and re-export.'
             : 'Protests moderators log in MODAQ show up here with each upload, with the score swing an upheld ruling would produce.'}
         </div>
       </div>
@@ -1926,6 +2158,7 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}) {
 async function computeStats(a, t, buckets, files, settings) {
   const out = $('statsout');
   out.innerHTML = '';
+  $('statsec').hidden = false;
   // counts the games it fetches, one request each
   const nGames = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error).length;
   const run = busy($('calc'), { label: 'Computing stats', total: nGames, scope: $('calc').closest('.row') });
@@ -1954,13 +2187,17 @@ async function computeStats(a, t, buckets, files, settings) {
     name: t.name, matches: dedupeMatches(matches), roster,
     settings: effectiveFormat(settings),
   };
-  // One .yft button, then the version question (the #yftpick panel). The
-  // files are still named apart, so both can sit in one folder.
-  $('dlyft').disabled = false;
-  $('dlyft').onclick = () => { $('yftpick').hidden = !$('yftpick').hidden; };
-  $('yftclose').onclick = () => { $('yftpick').hidden = true; };
+  // The two YellowFruits share an extension and nothing else, and neither
+  // says so when handed the other's file: YellowFruit 4 refuses a file
+  // stamped newer than itself, and YellowFruit 3 throws before it can show
+  // an error. So the menu names the version, and what it needs, on each
+  // item. The files are still named apart, so both can sit in one folder.
+  $('dlmenu').disabled = false;
+  for (const id of ['dlyft4', 'dlyft3', 'dlreport', 'dlzip', 'rebuild']) $(id).disabled = false;
+  const closeMenu = () => { $('dlpanel').hidden = true; $('dlmenu').setAttribute('aria-expanded', 'false'); };
+  $('statsnote').textContent = `${matches.length} games in these stats`;
   const yft = (name, text) => {
-    try { download(name, text, 'application/json'); $('yftpick').hidden = true; }
+    try { download(name, text, 'application/json'); closeMenu(); }
     catch (e) { say(e.message, true); }
   };
   $('dlyft4').onclick = () => yft(t.slug + '-yf4.yft', serializeYft(exportOpts));
@@ -1975,12 +2212,13 @@ async function computeStats(a, t, buckets, files, settings) {
       const pages = buildReport({ ...exportOpts, prefix: t.slug });
       download(t.slug + '-report.zip',
         makeZip(pages.map((f) => ({ name: f.name, data: f.text }))), 'application/zip');
+      closeMenu();
     } catch (e) { say(e.message, true); }
   };
   $('dlzip').disabled = false;
   $('dlzip').onclick = async () => {
     const run = busy($('dlzip'), { label: 'Building zip', scope: $('dlzip').closest('.row') });
-    try { await buildZip(); } finally { run.end(); }
+    try { await buildZip(); closeMenu(); } finally { run.end(); }
   };
   const buildZip = async () => {
     // Every game as its separated files: match .qbj + MODAQ game file.
@@ -2030,6 +2268,7 @@ async function computeStats(a, t, buckets, files, settings) {
       say('Stats data rebuilt (' + posted + ' games); the public page picks it up within a minute');
     } catch (e) { say(e.message, true); }
     run.end();
+    closeMenu();
   };
 }
 
@@ -2055,6 +2294,8 @@ if (adminSecret) {
       const el = document.activeElement;
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
       if (!$('linkmodal').hidden) return;
+      // files picked in Add a game, or an open Download menu, would be wiped
+      if (addOpen || ($('dlpanel') && !$('dlpanel').hidden)) return;
       const moved = await showDetail(true, lastDetail.tournament.rev);
       quietChecks = moved ? 0 : quietChecks + 1;
     } finally {

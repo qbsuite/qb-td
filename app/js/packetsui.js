@@ -1,6 +1,7 @@
-// packetsui.js — the Packets + Tiebreakers section: a zip or loose files
-// staged as chips, dragged onto round slots (filenames carrying a round
-// number auto-assign, never over an occupied slot), and a tiebreaker
+// packetsui.js — the Packets + Tiebreakers section: one row per round
+// showing the packet it reads, a zip or loose files staged as chips and
+// dragged onto rows (filenames carrying a round number auto-assign, never
+// over an occupied round) or a file uploaded straight onto one row, and a tiebreaker
 // packet split into individually tracked questions. Shared by the TO
 // dashboard (admin.js — a tournament's own packets) and the set editor's
 // (setadmin.js — the packets every mirror of the set starts with); each
@@ -28,7 +29,10 @@ export function stagedBlob(s) {
  *   slots         how many round slots to show
  *   rounds        [{number, name, href, warn}] — slots that hold a packet
  *                 (warn: shown red — a set packet whose review is not done)
- *   setSlots(n)   persist a new slot count
+ *   setSlots(n)   persist a new slot count (Add / Remove last)
+ *   minSlots      the fewest slots Remove last may leave (default 1)
+ *   countNote     where the count comes from ('from the schedule')
+ *   slotName      what one slot is called ('Round', or 'Packet' for a set)
  *   uploadPacket(staged, round), uploadTb(name, data) -> true on success,
  *   clearTb()     the caller's routes
  *   pool          the tiebreaker pool blob, or null
@@ -49,39 +53,53 @@ export function renderPacketsUi(box, o) {
          answer: (b.answers || []).map(stripTags).join(' / ') }))]
     : [];
   const usesFor = (id) => ((pool && pool.uses) || []).filter((u) => u && u.q === id);
+  const noun = o.slotName || 'Round';
+  const nounPl = (o.slotLabel || 'Rounds').toLowerCase();
+  const minSlots = Math.max(1, o.minSlots || 1);
   box.innerHTML = `
-    ${o.intro ? `<p class="setupintro">${o.intro}</p>` : ''}
-    <h2>Packets</h2>
-    ${staged.length ? `
-    <div class="row" style="margin-bottom:8px">
-      ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
-        s.guess ? ` <span class="muted">&rarr; ${s.guess}</span>` : ''}</span>`).join('')}
-      <button id="zipauto">Assign by filename</button>
-      <button id="zipclear">Clear</button>
-    </div>` : ''}
-    <div class="chiprow">
-      ${slots.map((k) => {
-        const r = rounds.find((x) => x.number === k);
-        return r
-          ? `<a class="rchip has slot${r.warn ? ' warn' : ''}" data-round="${k}" title="${esc(r.name)}"
-               href="${esc(r.href)}" download><span class="dot"></span>${k}</a>`
-          : `<span class="rchip slot" data-round="${k}"><span class="dot"></span>${k}</span>`;
-      }).join('')}
+    <div class="pkhead">
+      <h2>Packets</h2>
+      <span class="pkcount">${slotCount} ${slotCount === 1 ? noun.toLowerCase() : nounPl}${
+        o.countNote ? ` <span class="muted">&middot; ${o.countNote}</span>` : ''}</span>
+      <span class="spacer" style="flex:1"></span>
+      <button id="dropslot" class="small" ${slotCount <= minSlots ? 'disabled' : ''}
+        title="Remove the last ${noun.toLowerCase()} (only an empty one past the schedule)">Remove last</button>
+      <button id="addslot" class="small">Add a ${noun.toLowerCase()}</button>
     </div>
-    <div class="row" style="margin-top:10px">
-      <button id="pickzip" class="primary">Upload packet zip</button>
+    ${o.intro ? `<p class="secnote">${o.intro}</p>` : ''}
+    <div class="row pkbar">
+      <button id="pickzip">Upload packet zip</button>
       <button id="pickfiles">Upload packets</button>
       <input id="zipfile" type="file" accept=".zip" hidden>
       <input id="pfiles" type="file" accept=".json,.docx" multiple hidden>
-      <span class="spacer" style="flex:1"></span>
-      <label>${o.slotLabel || 'Rounds'} <input id="numrounds" type="number" min="1" max="999" value="${slotCount}" style="width:70px"></label>
-      <button id="setrounds">Set</button>
+      <input id="rowfile" type="file" accept=".json,.docx" hidden>
     </div>
+    ${staged.length ? `
+    <div class="pkstaged">
+      <span class="muted">Staged</span>
+      ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
+        s.guess ? ` <span class="muted">&rarr; ${noun} ${s.guess}</span>` : ''}</span>`).join('')}
+      <span class="spacer" style="flex:1"></span>
+      <button id="zipauto" class="small">Assign by filename</button>
+      <button id="zipclear" class="small">Clear</button>
+    </div>` : ''}
+    <table class="pktable">
+      ${slots.map((k) => {
+        const r = rounds.find((x) => x.number === k);
+        return `<tr class="slot${r ? ' has' : ''}${r && r.warn ? ' warn' : ''}" data-round="${k}">
+          <td class="pkn">${noun} ${k}</td>
+          <td class="pkfile">${r
+            ? `<span class="dot"></span><a href="${esc(r.href)}" download title="Download">${esc(r.name)}</a>`
+            : `<span class="dot"></span><span class="muted">No packet yet${staged.length ? ' &middot; drop one here' : ''}</span>`}</td>
+          <td class="pkact"><button class="small" data-pickround="${k}">${r ? 'Replace' : 'Upload'}</button></td>
+        </tr>`;
+      }).join('')}
+    </table>
     ${o.packetsNote ? `<div class="muted" style="font-size:13px;margin-top:6px">${o.packetsNote}</div>` : ''}
     ${o.afterPackets || ''}
 
     <h2>${o.tbTitle || 'Tiebreakers'}</h2>
-    <div class="muted" style="font-size:13px;margin-bottom:8px">${o.tbNote}</div>
+    <p class="secnote">${o.tbNote}</p>
     <div class="row" style="margin-bottom:8px">
       <button id="picktb" class="primary">Upload tiebreaker packet</button>
       <input id="tbfile" type="file" accept=".json" hidden>
@@ -246,12 +264,29 @@ export function renderPacketsUi(box, o) {
       o.refresh();
     }
   };
-  $('setrounds').onclick = async () => {
-    const n = Number($('numrounds').value);
-    if (!Number.isInteger(n) || n < 1 || n > 999) { o.say((o.slotLabel || 'Rounds') + ' must be 1-999', true); return; }
+  const setSlots = async (n) => {
+    if (n < minSlots || n > 999) return;
     try {
       await o.setSlots(n);
       o.refresh();
     } catch (e) { o.say(e.message, true); }
+  };
+  $('addslot').onclick = () => setSlots(slotCount + 1);
+  $('dropslot').onclick = () => setSlots(slotCount - 1);
+  // one file straight onto one round, no staging
+  let rowTarget = null;
+  box.querySelectorAll('[data-pickround]').forEach((b) => {
+    b.onclick = () => { rowTarget = Number(b.dataset.pickround); $('rowfile').value = ''; $('rowfile').click(); };
+  });
+  $('rowfile').onchange = async () => {
+    const f = $('rowfile').files[0];
+    if (!f || !rowTarget) return;
+    const slot = box.querySelector(`.slot[data-round="${rowTarget}"]`);
+    if (slot) slot.classList.add('up');
+    try {
+      await o.uploadPacket({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) }, rowTarget);
+      o.say(`${noun} ${rowTarget}: ${f.name}`);
+      o.refresh();
+    } catch (e) { if (slot) slot.classList.remove('up'); o.say(e.message, true); }
   };
 }

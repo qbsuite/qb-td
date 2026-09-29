@@ -105,15 +105,35 @@ export function tossupMetaHtml(buzzes, heard, positioned = buzzes) {
     + (avg ? ` &middot; avg word ${avg}` : '');
 }
 
+/**
+ * Where a tossup's buzzes landed, as a track: the question runs left to
+ * right, a filled dot per correct buzz, a hollow ring per neg. `words` is
+ * the question's word count; without packet text the track spans the
+ * latest buzz instead. The exact words ride in the title for hover.
+ */
+export function buzzTrackHtml(buzzes, words) {
+  const n = Math.max(words || 0, ...buzzes.map((b) => b.position + 1), 1);
+  const said = buzzes.map((b) => `${b.value < 0 ? 'neg' : b.value > 0 ? '+' + b.value : '0'} at word ${b.position + 1}`)
+    .join(', ') || 'No buzzes';
+  const cls = (b) => (b.value > 10 ? 'pow' : b.value > 0 ? 'get' : b.value < 0 ? 'neg' : 'zero');
+  const dead = buzzes.some((b) => b.value > 0) ? '' : '<span class="bad deadtag">Dead</span>';
+  return `${dead}<span class="btrack" role="img" title="${esc(said)}" aria-label="${esc(said)}">${
+    buzzes.map((b) => `<i class="bdot ${cls(b)}" style="left:${(((b.position + 0.5) / n) * 100).toFixed(1)}%"></i>`).join('')}</span>`;
+}
+
 /** One tossup of a packet (1-based `tossup`), collapsed to its answerline.
-    `label` replaces the "T4" in front (buzzpoints by category: "R3 T4"). */
+    `label` replaces the "T4" in front (buzzpoints by category: "R3 T4").
+    Without `heard` (one tournament's rounds) the buzzes show as a track;
+    with it (a set's editors, over every room) as rates. */
 export function tossupHtml(tossup, buzzes, packet, heard, label) {
   const tu = packet && packet.tossups && packet.tossups[tossup - 1];
+  const meta = heard ? tossupMetaHtml(buzzes, heard)
+    : buzzTrackHtml(buzzes, tu ? tokenizeQuestionHtml(tu.question).length : 0);
   return `
     <details class="qd">
       <summary><span class="roundcell">${label || 'T' + tossup}</span>
         ${tu ? mainAnswerHtml(tu.answer) : '<span class="muted">(No packet text)</span>'}
-        <span class="qdmeta">${tossupMetaHtml(buzzes, heard)}</span></summary>
+        <span class="qdmeta${heard ? '' : ' track'}">${meta}</span></summary>
       <div class="qdbody">
         ${tossupTextHtml(tu, buzzes)}
         ${buzzListHtml(buzzes)}

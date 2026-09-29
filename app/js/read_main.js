@@ -119,7 +119,7 @@ async function fetchTeams() {
 function setHeader(t, room, round, game) {
   document.title = t + ' - ' + room;
   $('tname').textContent = t;
-  $('room').textContent = room + ' · round ' + round;
+  $('room').textContent = room + ' · Round ' + round;
   if (game) $('game').textContent = game;
   $('bucketlink').href = 'bucket.html?b=' + encodeURIComponent(secret);
   $('newgame').href = roomLink();
@@ -276,7 +276,6 @@ function renderStarters() {
     }
   }
   $('starters').innerHTML = picked.length ? `
-    <div class="muted" style="font-size:13px;margin-top:12px">Starters</div>
     <div class="lineups">${picked.map((t) => {
       const on = starterSel.get(t.name);
       return `<div class="lineup">
@@ -297,22 +296,21 @@ function deviceMetas() {
     .filter((m) => storeIntact(localStorage.getItem(gameKey(secret, m.id))));
 }
 
-// One row per round: a pill to pick it (green = the live round the TD set,
-// filled = selected), plus a continue button when this device already has
-// a game for it. Rounds with a game but no packet keep their continue.
+// One small button per round (dot = the live round the TD set, outlined =
+// selected); a round with no packet is shown but can't be picked. Games
+// this device already has are listed under them, each with Continue.
 function renderRounds() {
   const rows = roundRows(state.packets || [], deviceMetas(), state.current_round);
-  $('roundrows').innerHTML = rows.map((r) => `
-    <div class="row">
-      ${r.packet
-        ? `<a href="#" class="pill${r.live ? ' on' : ''}${r.number === selectedRound ? ' sel' : ''}"
-            data-round="${r.number}">round ${r.number}</a>`
-        : `<span class="pill muted">round ${r.number}</span>`}
-      ${r.game ? `<span class="muted">${esc(r.game.a)} vs ${esc(r.game.b)}</span>
-        <a class="btn" href="${esc(gameLink(r.game.id))}">continue</a>` : ''}
-    </div>`).join('');
+  const games = rows.filter((r) => r.game);
+  $('roundrows').innerHTML = `<div class="rounds">${rows.map((r) => r.packet
+    ? `<a href="#" class="rnd${r.live ? ' live' : ''}${r.number === selectedRound ? ' sel' : ''}"
+        data-round="${r.number}" title="${r.live ? 'The live round' : 'Round ' + r.number}">${r.number}</a>`
+    : `<span class="rnd off" title="No packet for round ${r.number}">${r.number}</span>`).join('')}</div>
+    ${games.length ? `<div class="devgames">${games.map((r) => `<div>
+      <span class="muted">Round ${r.number}: ${esc(r.game.a)} vs ${esc(r.game.b)} on this device</span>
+      <a href="${esc(gameLink(r.game.id))}">Continue</a></div>`).join('')}</div>` : ''}`;
   const sel = rows.find((r) => r.number === selectedRound);
-  $('packetname').textContent = (sel && sel.packet) || '';
+  $('packetname').textContent = sel && sel.packet ? 'Packet: ' + sel.packet : '';
 }
 
 function showTeams() {

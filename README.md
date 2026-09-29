@@ -572,6 +572,11 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 npx wrangler dev --local --port 8799 --test-scheduled &
 cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js
 
+# the pages themselves, in headless Chrome (no npm deps): the dev Worker
+# started with --var ALLOWED_ORIGIN:http://localhost:8765, plus
+# `cd app && python3 -m http.server 8765`, then
+node tests/ui_e2e.js
+
 # D1 cost checks: start the dev Worker with the row meter instead
 #   npx wrangler dev --local --port 8799 --test-scheduled --var METER:1
 # (the meter is dev-only: /__meter 404s without METER). e2e_usage.js

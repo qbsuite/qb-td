@@ -1,0 +1,91 @@
+/* pub.css — the public tournament page (t.html) only, on top of td.css:
+   the schedule's Now view and tinted winners, the stats layout switch,
+   the buzzpoints track, and the phone layout of the tabs, chips and
+   category tables. Colours are td.css variables, so dark mode follows. */
+
+/* page tabs never break a word: they scroll sideways on a narrow phone */
+.tabs { overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { white-space: nowrap; flex: none; }
+
+/* ---------- schedule ---------- */
+.schedviews select { max-width: 100%; }
+
+/* a team's line of a game; the winner's tinted, the loser's muted */
+.gl {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 1px 6px; margin: 1px -6px; border-radius: 6px;
+}
+.gl .s { font-variant-numeric: tabular-nums; }
+.gl.won { background: var(--win-bg); color: var(--win-fg); font-weight: 600; }
+.gl.lost { color: var(--muted); }
+.gl.ph { color: var(--muted); font-style: italic; }
+.sched .gl { min-width: 14ch; }
+.wtag {
+  background: var(--win-bg); color: var(--win-fg); font-weight: 600;
+  border-radius: 6px; padding: 1px 6px; white-space: nowrap;
+}
+tr.nowrow td { background: var(--sel); }
+
+/* Now: current round and the next, a card per pool */
+.nowgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 36px; margin-top: 4px; }
+.nowhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.nowhead h3 { font-size: 17px; font-weight: 600; }
+.nowtag { font-size: 13px; font-weight: 600; color: var(--muted); }
+.nowtag.live { color: var(--warn); }
+.poolname { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+.gcard { background: var(--card); border-radius: 12px; padding: 0 14px; margin-top: 6px; }
+.gg { padding: 10px 0; border-top: 1px solid var(--line); }
+.gg:first-child { border-top: none; }
+.groom { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.byes { font-size: 13px; margin-top: 8px; }
+
+/* ---------- stats ---------- */
+.statsbar { align-items: center; }
+.layoutpick { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.layoutpick .chips { flex-wrap: nowrap; }
+.poolhead { font-size: 17px; font-weight: 600; margin: 18px 0 4px; }
+.poolhead:first-child { margin-top: 4px; }
+.statsnote { font-size: 13px; margin-top: 12px; }
+
+/* on a phone a player's team rides under the name instead of a column */
+.subteam { display: none; }
+
+/* ---------- buzzpoints: where each tossup's buzzes landed ---------- */
+.btrack { position: relative; display: inline-block; vertical-align: middle; width: 180px; height: 12px; }
+.btrack::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 5px;
+  height: 2px; border-radius: 2px; background: var(--line);
+}
+.bdot {
+  position: absolute; top: 1px; width: 10px; height: 10px; margin-left: -5px;
+  border-radius: 99px; box-sizing: border-box;
+  border: 2px solid var(--ok); background: var(--ok);
+}
+.bdot.pow { border-color: var(--link); background: var(--link); }
+.bdot.neg { border-color: var(--bad); background: var(--bg); }
+.bdot.zero { border-color: var(--muted); background: var(--bg); }
+.deadtag { font-size: 12px; font-weight: 600; margin-right: 8px; vertical-align: middle; }
+details.qd .qdmeta.track { line-height: 20px; }
+
+@media (max-width: 640px) {
+  .tab { padding: 7px 10px; }
+  /* filter chips: one row that swipes, rather than four that wrap */
+  .chips {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; padding-bottom: 2px;
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { padding: 7px 12px; }
+  .nowgrid { grid-template-columns: minmax(0, 1fr); }
+  .schedviews select { flex: 1 1 100%; }
+  .subteam { display: block; font-size: 13px; color: var(--muted); }
+  th.teamcol, td.teamcol { display: none; }
+  th.name, td.name { min-width: 0; }
+  /* the track takes its own full-width line under the answer */
+  /* summary numbers and the track take their own line under the answer
+     instead of floating into the next row */
+  details.qd .qdmeta { float: none; display: block; margin: 4px 0 0; }
+  details.qd .qdmeta.track { display: flex; align-items: center; margin: 6px 0 2px; }
+  details.qd .qdmeta.track .btrack { flex: 1; width: auto; }
+}
