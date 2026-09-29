@@ -263,7 +263,27 @@ export function formatsFor(nTeams, nRooms) {
  * Build a schedule. teams: exact roster names in seed order. rooms:
  * [{name, bucket}] (length >= the format's roomsNeeded).
  */
-export function buildSchedule(key, teams, rooms) {
+export function buildSchedule(key, teams, rooms, opts = {}) {
+  const o = { seeding: 'snake', roundOrder: 'asis', rooms: 'keep', seed: 1, ...opts };
+  const rng = mulberry32(Number(o.seed) || 1);
+  // random seeding: the roster order stops mattering (pools and circle
+  // positions both come from the shuffled order)
+  if (o.seeding === 'random') teams = shuffled(teams, rng);
+  const schedule = buildBase(key, teams, rooms);
+  if (o.roundOrder === 'shuffle') {
+    for (const ph of schedule.phases) ph.rounds = shuffled(ph.rounds, rng);
+    renumber(schedule);
+  }
+  tagBrackets(schedule);
+  if (o.rooms !== 'keep') {
+    schedule.phases.forEach((ph) => reassignRooms(ph, o.rooms, rng, schedule.rooms.length));
+  }
+  schedule.brackets = bracketRooms(schedule, schedule.brackets);
+  for (const ph of schedule.phases) ph.meet = 1;
+  return schedule;
+}
+
+function buildBase(key, teams, rooms) {
   const fmt = allFormats(teams.length).find((f) => f.key === key);
   if (!fmt) throw new Error('No such format for ' + teams.length + ' teams');
   if (rooms.length < fmt.roomsNeeded) throw new Error('Needs ' + fmt.roomsNeeded + ' rooms');
@@ -356,6 +376,262 @@ export function buildSchedule(key, teams, rooms) {
     ...(poolRecord ? { pools: poolRecord } : {}),
     updated: 0,
   };
+}
+
+
+/* ---------- generation options ---------- */
+
+/** Seeded PRNG (mulberry32): the same seed always builds the same schedule. */
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffled(arr, rng) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Re-seat a phase's games in rooms. mode:
+ *   blocks  — each bracket gets a fixed block of rooms, in bracket order,
+ *             and teams keep their room within it where they can
+ *   shuffle — every round's games land in random rooms
+ *   rotate  — each game goes to the free room its two teams have used
+ *             least so far (teams see the rooms evenly, best effort)
+ * Only rooms the phase needs are used (its busiest round's game count).
+ */
+function reassignRooms(phase, mode, rng, nRooms) {
+  const need = Math.min(nRooms, Math.max(0, ...phase.rounds.map((r) => r.games.filter((g) => g.a || g.b).length)));
+  if (!need) return;
+  const tkey = (s) => (s ? s.team || s.label || '' : '');
+  if (mode === 'blocks') {
+    const order = [];
+    const size = new Map();
+    for (const r of phase.rounds) {
+      const per = new Map();
+      for (const g of r.games) {
+        const b = g.bracket || '';
+        if (!order.includes(b)) order.push(b);
+        per.set(b, (per.get(b) || 0) + 1);
+      }
+      for (const [b, n] of per) size.set(b, Math.max(size.get(b) || 0, n));
+    }
+    const start = new Map();
+    let at = 0;
+    for (const b of order) { start.set(b, at); at += size.get(b); }
+    const prev = new Map();
+    for (const r of phase.rounds) {
+      const next = new Map();
+      for (const b of order) {
+        const games = r.games.filter((g) => (g.bracket || '') === b);
+        const pairs = games.map((g) => [tkey(g.a), tkey(g.b)]);
+        const local = new Map([...prev].filter(([, room]) => room >= start.get(b) && room < start.get(b) + size.get(b))
+          .map(([t, room]) => [t, room - start.get(b)]));
+        const got = assignRooms(pairs, size.get(b), local);
+        games.forEach((g, i) => { g.room = start.get(b) + got[i]; pairs[i].forEach((t) => next.set(t, g.room)); });
+      }
+      prev.clear();
+      for (const [t, room] of next) prev.set(t, room);
+      r.games.sort((x, y) => x.room - y.room);
+    }
+    return;
+  }
+  const visits = new Map();
+  const seen = (t, room) => ((visits.get(t) || new Map()).get(room) || 0);
+  for (const r of phase.rounds) {
+    const games = r.games.filter((g) => g.a || g.b);
+    if (mode === 'shuffle') {
+      const rooms = shuffled([...Array(need).keys()], rng);
+      games.forEach((g, i) => { g.room = rooms[i % need]; });
+    } else {
+      const free = new Set([...Array(need).keys()]);
+      for (const g of shuffled(games, rng)) {
+        let best = -1;
+        let score = Infinity;
+        for (const room of [...free].sort((x, y) => x - y)) {
+          const sc = seen(tkey(g.a), room) + seen(tkey(g.b), room);
+          if (sc < score) { score = sc; best = room; }
+        }
+        g.room = best;
+        free.delete(best);
+        for (const t of [tkey(g.a), tkey(g.b)]) {
+          if (!t) continue;
+          if (!visits.has(t)) visits.set(t, new Map());
+          visits.get(t).set(best, seen(t, best) + 1);
+        }
+      }
+    }
+    // placeholder rows with no teams (an inserted round) keep their rooms
+    r.games.sort((x, y) => x.room - y.room);
+  }
+}
+
+/* ---------- brackets ---------- */
+
+const ORD = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd'
+  : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
+
+/**
+ * Which bracket each game belongs to, worked out from the schedule
+ * itself: a prelim game whose two teams share a pool is that pool's; a
+ * playoff game between placeholders is Championship/Consolation (both
+ * sides in the top half of their pools, or not) when the phase crosses
+ * finish positions, else that finish position's pool ("1st place"). Any
+ * other phase is one bracket named after the phase. Writes g.bracket
+ * where it's missing and returns the bracket list [{key, name, phase}].
+ */
+export function tagBrackets(schedule) {
+  const pools = schedule.pools || {};
+  const poolOf = new Map();
+  for (const [letter, members] of Object.entries(pools)) for (const t of members) poolOf.set(t, letter);
+  const size = (letter) => (pools[letter] || []).length;
+  const pos = (s) => {
+    const m = s && s.label ? PH_RE.exec(s.label) : null;
+    return m ? { pool: m[1], n: Number(m[2]) } : null;
+  };
+  const list = schedule.brackets ? schedule.brackets.map((b) => ({ ...b })) : [];
+  const add = (key, name, phase) => {
+    if (!list.some((b) => b.key === key)) list.push({ key, name, phase });
+    return key;
+  };
+  schedule.phases.forEach((ph, p) => {
+    const games = ph.rounds.flatMap((r) => r.games);
+    const labeled = games.filter((g) => pos(g.a) && pos(g.b));
+    const crossing = labeled.some((g) => pos(g.a).n !== pos(g.b).n);
+    for (const g of games) {
+      if (g.bracket) continue;
+      const pa = pos(g.a);
+      const pb = pos(g.b);
+      if (pa && pb) {
+        if (crossing) {
+          const top = (x) => x.n <= Math.ceil(size(x.pool) / 2);
+          g.bracket = top(pa) && top(pb) ? add('CH', 'Championship', p) : add('CO', 'Consolation', p);
+        } else if (pa.n === pb.n) {
+          g.bracket = add('F' + pa.n, ORD(pa.n) + ' place', p);
+        }
+        continue;
+      }
+      const la = g.a && g.a.team ? poolOf.get(g.a.team) : null;
+      const lb = g.b && g.b.team ? poolOf.get(g.b.team) : null;
+      if (la && la === lb && p === 0) { g.bracket = add(la, 'Pool ' + la, p); continue; }
+      if (!Object.keys(pools).length && (g.a || g.b)) g.bracket = add('ph' + (p + 1), ph.name, p);
+    }
+  });
+  // a pool phase whose games didn't all tag (edited across pools) and
+  // any phase that tagged nothing still gets one bracket for its games
+  schedule.phases.forEach((ph, p) => {
+    if (list.some((b) => b.phase === p)) return;
+    const key = add('ph' + (p + 1), ph.name, p);
+    for (const r of ph.rounds) for (const g of r.games) if (!g.bracket && (g.a || g.b)) g.bracket = key;
+  });
+  schedule.brackets = list;
+  return list;
+}
+
+/** Brackets with the rooms their games use most ({...b, rooms: [...]}) —
+    each room goes to the bracket that plays in it most often in a phase. */
+export function bracketRooms(schedule, brackets) {
+  const out = (brackets || schedule.brackets || []).map((b) => ({ ...b, rooms: [] }));
+  schedule.phases.forEach((ph, p) => {
+    const count = new Map(); // room -> Map(bracket -> n)
+    for (const r of ph.rounds) {
+      for (const g of r.games) {
+        if (!g.bracket || !(g.a || g.b)) continue;
+        if (!count.has(g.room)) count.set(g.room, new Map());
+        const m = count.get(g.room);
+        m.set(g.bracket, (m.get(g.bracket) || 0) + 1);
+      }
+    }
+    for (const [room, m] of count) {
+      const best = [...m].sort((x, y) => y[1] - x[1])[0][0];
+      const b = out.find((x) => x.key === best && x.phase === p);
+      if (b) b.rooms.push(room);
+    }
+  });
+  for (const b of out) b.rooms.sort((x, y) => x - y);
+  return out;
+}
+
+/**
+ * The editor's lanes for one phase: [{key, name, rooms}] in bracket
+ * order, then "Other rooms" for rooms no bracket claims. Only brackets
+ * in `only` (a key list) when given.
+ */
+export function phaseLanes(schedule, p, only) {
+  const brs = bracketRooms(schedule).filter((b) => b.phase === p && (!only || only.includes(b.key)));
+  const lanes = brs.filter((b) => b.rooms.length).map((b) => ({ key: b.key, name: b.name, rooms: b.rooms }));
+  if (!only) {
+    const used = new Set(lanes.flatMap((l) => l.rooms));
+    const other = schedule.rooms.map((_, i) => i).filter((i) => !used.has(i));
+    if (other.length) lanes.push({ key: '', name: 'Other rooms', rooms: other });
+  }
+  return lanes;
+}
+
+/**
+ * Problems for the editor's Checks list, most serious first:
+ *   {sev: 0|1, kind, p, r, room?, key?, text}
+ * kinds: twice (a team in two places in one round), missing (a team or
+ * playoff slot of this phase with no game or bye this round), half (a
+ * game with one side empty), again (a pair meeting more often than the
+ * phase allows — phase.meet, default 1).
+ */
+export function scheduleChecks(schedule) {
+  const out = [];
+  schedule.phases.forEach((ph, p) => {
+    const expected = new Set();
+    for (const r of ph.rounds) {
+      for (const g of r.games) for (const s of [g.a, g.b]) if (s) expected.add(slotText(s));
+      for (const s of r.byes) if (s) expected.add(slotText(s));
+    }
+    const met = new Map();
+    ph.rounds.forEach((r, ri) => {
+      const where = new Map();
+      const note = (t, room) => { if (!t) return; if (!where.has(t)) where.set(t, []); where.get(t).push(room); };
+      for (const g of r.games) { note(slotText(g.a), g.room); note(slotText(g.b), g.room); }
+      for (const s of r.byes) note(slotText(s), 'bye');
+      for (const [t, rooms] of where) {
+        if (rooms.length > 1) out.push({ sev: 0, kind: 'twice', p, r: ri, key: t, room: rooms.find((x) => x !== 'bye'), text: `Round ${r.round}: ${t} is in two places` });
+      }
+      const empty = r.games.every((g) => !g.a && !g.b) && !r.byes.length;
+      if (!empty) {
+        const missing = [...expected].filter((t) => !where.has(t));
+        if (missing.length) {
+          out.push({ sev: 0, kind: 'missing', p, r: ri, key: missing[0],
+            text: `Round ${r.round}: ` + (missing.length > 2 ? `${missing.length} teams have` : missing.join(' and ') + (missing.length === 1 ? ' has' : ' have')) + ' no game' });
+        }
+      }
+      for (const g of r.games) {
+        if (!!g.a !== !!g.b) {
+          const room = schedule.rooms[g.room] ? schedule.rooms[g.room].name : 'room ' + (g.room + 1);
+          out.push({ sev: 1, kind: 'half', p, r: ri, room: g.room, text: `Round ${r.round}, ${room}: a game is missing a team` });
+        }
+        const a = slotText(g.a);
+        const b = slotText(g.b);
+        if (!a || !b) continue;
+        const k = a < b ? a + '|' + b : b + '|' + a;
+        met.set(k, [...(met.get(k) || []), { r: ri, room: g.room, round: r.round }]);
+      }
+    });
+    const allowed = ph.meet || 1;
+    for (const [k, seen] of met) {
+      if (seen.length <= allowed) continue;
+      const [a, b] = k.split('|');
+      const last = seen[seen.length - 1];
+      out.push({ sev: 1, kind: 'again', p, r: last.r, room: last.room,
+        text: `${ph.name}: ${a} and ${b} meet ${seen.length} times` + (allowed > 1 ? ` (${allowed} planned)` : '') });
+    }
+  });
+  return out.sort((x, y) => x.sev - y.sev);
 }
 
 /* ---------- editing ---------- */

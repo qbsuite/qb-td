@@ -15,7 +15,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import archive from '../app/archive/ug-nats-stanford.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
-import { parseMatch, parseRoster } from '../app/engine/qbj.js';
+import { parseMatch, parseRoster, buildRosterQbj } from '../app/engine/qbj.js';
+import { roundRobinRounds, tagBrackets } from '../app/engine/schedule.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { roundTossupBuzzes } from '../app/engine/buzz.js';
 import { BASE, call, d1exec, tick, ok, summary } from './e2e_lib.js';
@@ -423,9 +424,20 @@ const rosterTeams = parseRoster(roster);
 
 await click('[data-step="sched"]');
 await waitJs(`!!document.querySelector('input[name="schedfmt"][value="pools2"]')`, 'schedule formats');
-await js(`document.querySelector('input[name="schedfmt"][value="pools2"]').checked = true; true`);
+await click('input[name="schedfmt"][value="pools2"]');
 ok('5 schedule: the creator offers six rooms', (await js(`document.querySelector('#schedrooms').value`)) === '6');
 ok('5 schedule: and the twelve teams just saved', (await text('#schedsec')).includes('12 teams'), (await text('#schedsec')).slice(0, 80));
+// generation options: Reroll only matters (and only works) once an option is random
+ok('5 schedule: with default options there is nothing to reroll', await js(`document.querySelector('#optreroll').disabled`));
+await fill('#optrooms', 'rotate', ['change']);
+await waitJs(`!document.querySelector('#optreroll').disabled`, 'Reroll enabled for rotate');
+const seed1 = await text('.sgseed b');
+await click('#optreroll');
+await waitJs(`document.querySelector('.sgseed b').textContent !== ${q(seed1)}`, 'a new seed');
+ok('5 schedule: Reroll draws a new seed, and the preview line describes the result',
+  /8 rounds · 6 of 6 rooms used · no byes/.test(await text('.sgpreview')), await text('.sgpreview'));
+await fill('#optrooms', 'keep', ['change']); // back to defaults: the rest of the run depends on the default rooms
+await click('input[name="schedfmt"][value="pools2"]');
 await click('#schedgen');
 const schedKey = `t/${tid}/schedule.json`;
 const storedSched = async () => { const r = await call(`${A}/file?key=${encodeURIComponent(schedKey)}`); return r.status === 200 ? r.body : null; };
@@ -433,26 +445,122 @@ let sched = await until(storedSched, 'schedule saved');
 ok('5 schedule: two pools of the roster\'s twelve teams, saved', sched.pools && Object.keys(sched.pools).length === 2
   && JSON.stringify(Object.values(sched.pools).flat().sort()) === JSON.stringify([...TEAMS].sort()),
   sched.pools);
-const firstA = sched.phases[0].rounds[0].games.find((g) => g.room === 0).a.team;
-const chipFor = (p, r, room, side) => `[...document.querySelectorAll('.slotchip')].find((c) => {
-  const x = JSON.parse(c.dataset.ref); return x.p === ${p} && x.r === ${r} && x.room === ${room} && x.side === ${q(side)}; })`;
-await waitJs(`!!(${chipFor(0, 0, 0, 'a')})`, 'the schedule editor');
-await js(`(${chipFor(0, 0, 0, 'a')}).click(); true`);
-await waitJs(`!!document.querySelector('select.slotsel')`, 'the slot dropdown');
-await fill('select.slotsel', '__clear', ['change']);
-await waitJs(`!document.querySelector('#schedsave').disabled`, 'Save enabled');
+ok('5 schedule: saved with its brackets, every game tagged',
+  JSON.stringify(sched.brackets.map((b) => b.name)) === JSON.stringify(['Pool A', 'Pool B', 'Championship', 'Consolation'])
+    && sched.phases.every((ph) => ph.rounds.every((r) => r.games.every((g) => g.bracket))), sched.brackets);
+const generated = JSON.stringify(sched.phases);
+await waitJs(`!!document.querySelector('.sgcell')`, 'the schedule editor');
+ok('5 schedule: the grid groups rooms into bracket lanes',
+  JSON.stringify(await js(`[...document.querySelectorAll('.sgphase')].map((ph) => [...ph.querySelectorAll('.sglane:not(.sglane-byes)')].map((l) => l.textContent.trim()))`))
+    === JSON.stringify([['Pool A', 'Pool B'], ['Championship', 'Consolation']]));
+const slotEl = (p, r, room, side) => `[...document.querySelectorAll('.sgslot[data-ref]')].find((e) => { const x = JSON.parse(e.dataset.ref);
+  return x.p === ${p} && x.r === ${r} && x.room === ${room} && x.side === ${q(side)}; })`;
+const cellEl = (p, r, room) => `[...document.querySelectorAll('.sgcell')].find((e) => { const x = JSON.parse(e.dataset.cell); return x.p === ${p} && x.r === ${r} && x.room === ${room}; })`;
+// real DOM drag events with a DataTransfer, the way a mouse drag fires them
+const dragOnto = (fromExpr, toExpr) => js(`(() => { const from = ${fromExpr}, to = ${toExpr}; if (!from || !to) throw new Error('drag: nothing there');
+  const dt = new DataTransfer();
+  from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  to.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  const over = to.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  to.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  from.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+  return !over; })()`);
+const slotText2 = (p, r, room, side) => js(`(${slotEl(p, r, room, side)}).textContent`);
+const gameAt = (s2, p, r, room) => s2.phases[p].rounds[r].games.find((g) => g.room === room);
+const [t00, t01] = [await slotText2(0, 0, 0, 'a'), await slotText2(0, 0, 1, 'a')];
+ok('5 schedule: a dragged team is a valid drop on another team', await dragOnto(slotEl(0, 0, 0, 'a'), slotEl(0, 0, 1, 'a')));
+await waitJs(`(${slotEl(0, 0, 0, 'a')}).textContent === ${q(t01)}`, 'teams swapped by drag');
+ok('5 schedule: the swap shows as an unsaved change', /1 unsaved change/.test(await text('.sgbar')));
 await click('#schedsave');
-sched = await until(async () => { const s = await storedSched(); const g = s.phases[0].rounds[0].games.find((x) => x.room === 0); return (!g || !g.a) && s; }, 'cleared slot saved');
-ok('5 schedule: clearing a slot through the dropdown saves', true);
-await waitJs(`!!(${chipFor(0, 0, 0, 'a')})`, 'the editor after save');
-await js(`(${chipFor(0, 0, 0, 'a')}).click(); true`);
-await waitJs(`!!document.querySelector('select.slotsel')`, 'the dropdown again');
-ok('5 schedule: the freed team is offered back', await js(`[...document.querySelector('select.slotsel').options].some((o) => o.value === ${q(firstA)})`));
-await fill('select.slotsel', firstA, ['change']);
-await waitJs(`!document.querySelector('#schedsave').disabled`, 'Save enabled again');
+sched = await until(async () => { const x = await storedSched(); return gameAt(x, 0, 0, 0).a.team === t01 && gameAt(x, 0, 0, 1).a.team === t00 && x; }, 'drag swap saved');
+ok('5 schedule: dragging a team onto another swaps them, and Save stores it', true);
+// click path: select, Swap with…, click the other team; Undo / Redo / Discard
+await js(`(${slotEl(0, 0, 0, 'a')}).click(); true`);
+await waitJs(`!!document.querySelector('.sgpanel [data-act="swap"]')`, 'the slot panel');
+await click('.sgpanel [data-act="swap"]');
+await js(`(${slotEl(0, 0, 1, 'a')}).click(); true`);
+await waitJs(`(${slotEl(0, 0, 0, 'a')}).textContent === ${q(t00)}`, 'swapped back by clicks');
+await click('#schedundo');
+await waitJs(`(${slotEl(0, 0, 0, 'a')}).textContent === ${q(t01)}`, 'undo');
+await click('#schedredo');
+await waitJs(`(${slotEl(0, 0, 0, 'a')}).textContent === ${q(t00)}`, 'redo');
+ok('5 schedule: click Swap with…, Undo and Redo each work', true);
 await click('#schedsave');
-sched = await until(async () => { const s = await storedSched(); const g = s.phases[0].rounds[0].games.find((x) => x.room === 0); return g && g.a && g.a.team === firstA && s; }, 'slot restored');
-ok('5 schedule: picking a team in the dropdown saves', true);
+sched = await until(async () => { const x = await storedSched(); return JSON.stringify(x.phases) === generated && x; }, 'back to the generated schedule');
+ok('5 schedule: saved back to the generated pairings', true);
+// the old dropdown path: clear a slot from the panel's Any team list; checks notice; Discard
+await js(`(${slotEl(0, 1, 2, 'b')}).click(); true`);
+await waitJs(`!!document.querySelector('.sgpanel select.slotsel')`, 'the Any team dropdown');
+const cleared = await slotText2(0, 1, 2, 'b');
+await fill('.sgpanel select.slotsel', '__clear', ['change']);
+await waitJs(`(${slotEl(0, 1, 2, 'b')}).textContent === 'empty'`, 'slot cleared');
+ok('5 schedule: Checks flag the half-empty game and the team left without one',
+  (await text('.sgchecks')).includes(cleared + ' has no game') && /missing a team/.test(await text('.sgchecks')), await text('.sgchecks'));
+await click('#scheddiscard');
+await waitJs(`(${slotEl(0, 1, 2, 'b')}).textContent === ${q(cleared)} && /Saved/.test(document.querySelector('.sgbar').textContent)`, 'discarded');
+ok('5 schedule: Discard puts the saved schedule back', /all clear/.test(await text('.sgchecks')));
+// rooms and whole games: add a room, drag a game into it, remove the room, undo all of it
+await click('#schedaddroom');
+await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 7`, 'a seventh room column');
+const moved = [await slotText2(0, 0, 0, 'a'), await slotText2(0, 0, 0, 'b')];
+ok('5 schedule: an empty room accepts a dragged game', await dragOnto(cellEl(0, 0, 0), cellEl(0, 0, 6)));
+await waitJs(`!!(${slotEl(0, 0, 6, 'a')}) && (${slotEl(0, 0, 6, 'a')}).textContent === ${q(moved[0])}`, 'game moved to the new room');
+await click('#schedsave');
+sched = await until(async () => { const x = await storedSched(); const g = gameAt(x, 0, 0, 6); return x.rooms.length === 7 && g && g.a.team === moved[0] && !gameAt(x, 0, 0, 0) && x; }, 'moved game saved');
+ok('5 schedule: dragging a game into an empty room moves it, and Save stores it', true);
+await js(`[...document.querySelectorAll('.sgroom')].find((b) => b.textContent === 'Room 7').click(); true`);
+await waitJs(`!!document.querySelector('.sgpanel [data-act="droproom"]')`, 'the room panel');
+await click('.sgpanel [data-act="droproom"]');
+await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 6`, 'room removed');
+ok('5 schedule: removing a room drops its teams to Byes',
+  JSON.stringify(await js(`[...document.querySelectorAll('[data-byes="0.0"] .sgslot')].map((b) => b.textContent)`)) === JSON.stringify(moved));
+await click('#schedundo');
+await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 7
+  && (${slotEl(0, 0, 6, 'a')}).textContent === ${q(moved[0])}`, 'room removal undone');
+ok('5 schedule: Undo brings the room and its game back', /Saved/.test(await text('.sgbar')));
+// the game goes home by the click path this time, then the empty room goes without asking
+await js(`(${cellEl(0, 0, 6)}).querySelector('.sgh').click(); true`);
+await waitJs(`!!document.querySelector('.sgpanel [data-act="move"]')`, 'the game panel');
+await click('.sgpanel [data-act="move"]');
+await js(`(${cellEl(0, 0, 0)}).querySelector('.sgadd').click(); true`);
+await waitJs(`!!(${slotEl(0, 0, 0, 'a')}) && (${slotEl(0, 0, 0, 'a')}).textContent === ${q(moved[0])}`, 'game moved back by clicks');
+const dialogsBefore = dialogs.length;
+await js(`[...document.querySelectorAll('.sgroom')].find((b) => b.textContent === 'Room 7').click(); true`);
+await waitJs(`!!document.querySelector('.sgpanel [data-act="droproom"]')`, 'the room panel again');
+await click('.sgpanel [data-act="droproom"]');
+await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 6`, 'empty room removed');
+ok('5 schedule: an empty room goes without a confirm', dialogs.length === dialogsBefore, dialogs.slice(dialogsBefore));
+await click('#schedsave');
+sched = await until(async () => { const x = await storedSched(); return x.rooms.length === 6 && JSON.stringify(x.phases) === generated && x; }, 'back to six rooms');
+ok('5 schedule: moved back by clicks and saved as generated', true);
+// rounds: insert then delete an empty one is no change at all
+const nRounds = await js(`document.querySelectorAll('.sgrnd').length`);
+await js(`document.querySelector('[data-insround="0.0"]').click(); true`);
+await waitJs(`document.querySelectorAll('.sgrnd').length === ${nRounds + 1}`, 'a round inserted');
+ok('5 schedule: the inserted round renumbers the rest', (await js(`[...document.querySelectorAll('.sgrnd > span:first-child')].map((x) => x.textContent).join(',')`)) === '1,2,3,4,5,6,7,8,9');
+await js(`document.querySelector('[data-delround="0.1"]').click(); true`);
+await waitJs(`document.querySelectorAll('.sgrnd').length === ${nRounds} && /Saved/.test(document.querySelector('.sgbar').textContent)`, 'round deleted, nothing to save');
+ok('5 schedule: deleting the empty round leaves nothing to save', true);
+// By team: each team's opponent per round, straight from the stored schedule
+await click('[data-view2="teams"]');
+await waitJs(`document.querySelectorAll('.sgtname').length === 12`, 'the by-team view');
+{
+  const g = gameAt(sched, 0, 0, 0);
+  const row = await js(`(() => { const names = [...document.querySelectorAll('.sgtname')]; const i = names.findIndex((n) => n.textContent === ${q(g.a.team)});
+    const cells = [...document.querySelectorAll('.sgtc')]; return cells[i * 8].textContent; })()`);
+  ok('5 schedule: By team shows each team\'s round 1 opponent', row.startsWith('v ' + g.b.team), row);
+}
+await js(`document.querySelector('.sgtc').click(); true`);
+await waitJs(`!!document.querySelector('.sggrid') && !!document.querySelector('.sgcell.on')`, 'jumped to the game');
+ok('5 schedule: clicking a By team cell selects that game in the grid', true);
+await click('[data-view2="brackets"]');
+await waitJs(`document.querySelectorAll('.sgmapcard[data-filter]').length === 4`, 'the brackets view');
+await js(`[...document.querySelectorAll('.sgmapcard[data-filter]')].find((b) => b.dataset.filter === 'CO').click(); true`);
+await waitJs(`!!document.querySelector('.sggrid') && document.querySelectorAll('.sggrid').length === 1
+  && [...document.querySelectorAll('.sglane:not(.sglane-byes)')].map((l) => l.textContent.trim()).join() === 'Consolation'`, 'filtered to Consolation');
+ok('5 schedule: a bracket card filters the grid to that bracket', true);
+await js(`document.querySelector('.sgchips [data-filter=""]').click(); true`);
+sched = await storedSched();
 const schedRounds = Math.max(...sched.phases.flatMap((p) => p.rounds.map((r) => r.round)));
 const gameIn = (n, room) => sched.phases.flatMap((p) => p.rounds).find((r) => r.round === n).games.find((g) => g.room === room);
 const roomBucket = (room) => buckets.find((b) => b.id === sched.rooms[room].bucket);
@@ -966,6 +1074,47 @@ await click('#tab-schedule');
 await waitJs(`!!document.querySelector('.schedviews')`, 'schedule on a phone');
 ok('24 phone: the schedule view has no sideways page scroll', await js(`document.documentElement.scrollWidth <= window.innerWidth + 1`));
 await desktop();
+
+/* ---------- 5b. the schedule editor at scale ---------- */
+
+// 48 teams in 4 pools of 12, 24 rooms, 11 prelim rounds + 6 rounds of
+// finish-position pools (double round robin): bigger than the format
+// picker goes, built from the engine's own round robins
+{
+  d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
+  const big = (await call('/api/tournaments', { method: 'POST', json: { name: 'UI E2E Big', slug: 'ui-big-' + Math.random().toString(36).slice(2, 7) } })).body;
+  const BA = '/a/' + big.admin_secret;
+  const teams = Array.from({ length: 48 }, (_, i) => 'Team ' + String(i + 1).padStart(2, '0'));
+  await call(BA + '/roster?name=roster.qbj', { method: 'POST', body: JSON.stringify(buildRosterQbj('UI E2E Big', teams.map((n) => ({ name: n, players: [n + ' P1'] })))) });
+  const pools = { A: [], B: [], C: [], D: [] };
+  teams.forEach((t, i) => { const row = Math.floor(i / 4), col = i % 4; pools['ABCD'[row % 2 ? 3 - col : col]].push(t); });
+  const pre = { name: 'Prelims', rounds: roundRobinRounds(12).map((rd, r) => ({ round: r + 1, byes: [],
+    games: Object.values(pools).flatMap((m, p) => rd.pairs.map(([x, y], gi) => ({ room: p * 6 + gi, a: { team: m[x] }, b: { team: m[y] } }))) })) };
+  const rr4 = roundRobinRounds(4);
+  const play = { name: 'Playoffs', meet: 2, rounds: [...rr4, ...rr4].map((rd, r) => ({ round: 12 + r, byes: [],
+    games: Array.from({ length: 12 }, (_, i) => i + 1).flatMap((pos) => rd.pairs.map(([x, y], gi) => ({ room: (pos - 1) * 2 + gi, a: { label: 'ABCD'[x] + pos }, b: { label: 'ABCD'[y] + pos } }))) })) };
+  const bigSched = { v: 1, rooms: Array.from({ length: 24 }, (_, i) => ({ name: 'Room ' + (i + 1), bucket: null })), phases: [pre, play], pools, updated: 0 };
+  tagBrackets(bigSched);
+  ok('5b scale: a 48-team schedule saves', (await call(BA + '/schedule', { method: 'POST', json: bigSched })).status === 200);
+  await goto(`${PAGES}/index.html?a=${big.admin_secret}`);
+  await waitJs(`!!document.querySelector('[data-step="sched"]')`, 'big: steps');
+  await click('[data-step="sched"]');
+  await waitJs(`document.querySelectorAll('.sgcell').length > 0`, 'big: the grid');
+  ok('5b scale: every room column in both phases', JSON.stringify(await js(`[...document.querySelectorAll('.sggrid')].map((g) => g.querySelectorAll('.sgroom:not(.sgroom-byes)').length)`)) === '[24,24]');
+  ok('5b scale: all 17 rounds and 408 games', (await js(`document.querySelectorAll('.sgrnd').length`)) === 17 && (await js(`document.querySelectorAll('.sgcell:not(.empty)').length`)) === 408);
+  ok('5b scale: 16 bracket lanes, and the double round robin is not flagged', (await js(`document.querySelectorAll('.sglane:not(.sglane-byes)').length`)) === 16
+    && /all clear/.test(await text('.sgchecks')), await text('.sgchecks'));
+  ok('5b scale: the grid scrolls inside its own box', await js(`(() => { const b = document.querySelector('#sgscroll'); return b.scrollWidth > b.clientWidth && b.scrollHeight > b.clientHeight; })()`));
+  await js(`[...document.querySelectorAll('.sgchips .chip')].find((c) => c.textContent.trim() === 'Pool C').click(); true`);
+  await waitJs(`document.querySelectorAll('.sggrid').length === 1 && document.querySelectorAll('.sgroom:not(.sgroom-byes)').length === 6`, 'big: Pool C only');
+  ok('5b scale: a pool chip narrows the grid to that pool\'s six rooms', true);
+  const t0 = Date.now();
+  await dragOnto(`document.querySelectorAll('.sgslot[data-ref]')[0]`, `document.querySelectorAll('.sgslot[data-ref]')[3]`);
+  await waitJs(`/1 unsaved change/.test(document.querySelector('.sgbar').textContent)`, 'big: a drag');
+  ok('5b scale: a drag redraws quickly', Date.now() - t0 < 1500, Date.now() - t0);
+  await click('#scheddiscard');
+  await waitJs(`/Saved/.test(document.querySelector('.sgbar').textContent)`, 'big: discarded');
+}
 
 /* ---------- 25. no page errors anywhere ---------- */
 

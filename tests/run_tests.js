@@ -11,7 +11,8 @@ import { buildYft } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32 } from '../app/engine/schedule.js';
+import { createHash as schedHash } from 'node:crypto';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
@@ -2036,6 +2037,135 @@ test('archive captures carry no question text', () => {
     })(data, slug);
     assert.deepEqual(long, [], slug + ' has unexpected long strings');
   }
+});
+
+/* ---------- schedule: brackets, generation options, checks ---------- */
+
+// every format and field size, generated with default options, minus the
+// new bracket fields: identical to the generator before options existed
+test('buildSchedule defaults are unchanged (brackets aside) for every format, 3-36 teams', () => {
+  const strip = (x) => {
+    const c = JSON.parse(JSON.stringify(x));
+    delete c.brackets;
+    for (const ph of c.phases) { delete ph.meet; for (const r of ph.rounds) for (const g of r.games) delete g.bracket; }
+    return c;
+  };
+  const out = {};
+  for (let n = 3; n <= 36; n++) {
+    const teams = Array.from({ length: n }, (_, i) => 'T' + (i + 1));
+    for (const f of allFormats(n)) {
+      const rooms = Array.from({ length: f.roomsNeeded + 1 }, (_, i) => ({ name: 'R' + (i + 1), bucket: null }));
+      out[n + ':' + f.key] = JSON.stringify(strip(buildSchedule(f.key, teams, rooms)));
+    }
+  }
+  assert.equal(Object.keys(out).length, 84);
+  assert.equal(schedHash('sha256').update(JSON.stringify(out)).digest('hex'),
+    '0519ba33711b4396990004571ba0d8bc0e116ecb6ec0198888f455cd756bd584');
+});
+
+const T12 = Array.from({ length: 12 }, (_, i) => 'T' + (i + 1));
+const R6 = Array.from({ length: 6 }, (_, i) => ({ name: 'R' + (i + 1), bucket: null }));
+const everyGame = (s) => s.phases.flatMap((ph) => ph.rounds.flatMap((r) => r.games));
+
+test('buildSchedule tags every game with a bracket, and lists the brackets with their rooms', () => {
+  const names = (s) => s.brackets.map((b) => b.name + '@' + b.phase + ':' + b.rooms.join(','));
+  assert.deepEqual(names(buildSchedule('rr', T12, R6)), ['Round robin@0:0,1,2,3,4,5']);
+  assert.deepEqual(names(buildSchedule('pools2', T12, R6)),
+    ['Pool A@0:0,1,2', 'Pool B@0:3,4,5', 'Championship@1:0,1,2', 'Consolation@1:3,4,5']);
+  assert.deepEqual(buildSchedule('pools3', T12, R6).brackets.map((b) => b.name),
+    ['Pool A', 'Pool B', 'Pool C', '1st place', '2nd place', '3rd place', '4th place']);
+  assert.deepEqual(buildSchedule('rr2', T12.slice(0, 6), R6).brackets.map((b) => b.name), ['Round robin 1', 'Round robin 2']);
+  for (const f of allFormats(12)) {
+    const s = buildSchedule(f.key, T12, R6);
+    assert.ok(everyGame(s).every((g) => g.bracket), f.key + ': a game has no bracket');
+    assert.ok(s.phases.every((ph) => ph.meet === 1), f.key + ': meet');
+  }
+});
+
+test('tagBrackets works out the same brackets for a schedule saved before brackets existed', () => {
+  for (const key of ['rr', 'pools2', 'pools3', 'pools4']) {
+    const fresh = buildSchedule(key, T12, R6);
+    const old = JSON.parse(JSON.stringify(fresh));
+    delete old.brackets;
+    for (const g of everyGame(old)) delete g.bracket;
+    tagBrackets(old);
+    assert.deepEqual(everyGame(old).map((g) => g.bracket), everyGame(fresh).map((g) => g.bracket), key);
+    assert.deepEqual(bracketRooms(old).map((b) => b.key + b.rooms), fresh.brackets.map((b) => b.key + b.rooms), key);
+  }
+});
+
+test('phaseLanes groups room columns by bracket, filters to one, and keeps unclaimed rooms', () => {
+  const s = buildSchedule('pools2', T12, R6);
+  assert.deepEqual(phaseLanes(s, 0).map((l) => l.name + ':' + l.rooms), ['Pool A:0,1,2', 'Pool B:3,4,5']);
+  assert.deepEqual(phaseLanes(s, 1, ['CO']).map((l) => l.name + ':' + l.rooms), ['Consolation:3,4,5']);
+  s.rooms.push({ name: 'Spare', bucket: null });
+  assert.deepEqual(phaseLanes(s, 0).map((l) => l.name), ['Pool A', 'Pool B', 'Other rooms']);
+});
+
+test('generation options are seeded: same seed same schedule, and every option keeps the schedule sound', () => {
+  const sig = (s) => JSON.stringify(s.phases.map((ph) => ph.rounds.map((r) => r.games.map((g) => [g.room, slotText(g.a), slotText(g.b)]))));
+  const pairs = (s) => JSON.stringify(everyGame(s).map((g) => [slotText(g.a), slotText(g.b)].sort().join('|')).sort());
+  const base = buildSchedule('pools2', T12, R6);
+  for (const opts of [{ seeding: 'random' }, { roundOrder: 'shuffle' }, { rooms: 'shuffle' }, { rooms: 'rotate' }, { rooms: 'blocks' }]) {
+    const a = buildSchedule('pools2', T12, R6, { ...opts, seed: 7 });
+    assert.equal(sig(a), sig(buildSchedule('pools2', T12, R6, { ...opts, seed: 7 })), JSON.stringify(opts) + ' not reproducible');
+    if (opts.rooms !== 'blocks') assert.notEqual(sig(a), sig(buildSchedule('pools2', T12, R6, { ...opts, seed: 8 })), JSON.stringify(opts) + ' ignores the seed');
+    assert.deepEqual(scheduleChecks(a), [], JSON.stringify(opts) + ' made a problem');
+    for (const r of a.phases.flatMap((ph) => ph.rounds)) {
+      assert.equal(new Set(r.games.map((g) => g.room)).size, r.games.length, 'two games in one room');
+    }
+    // room and round options move games around but never change who plays whom
+    if (opts.seeding !== 'random') assert.equal(pairs(a), pairs(base), JSON.stringify(opts) + ' changed the pairings');
+  }
+  // random seeding still puts every team in exactly one pool
+  const rs = buildSchedule('pools2', T12, R6, { seeding: 'random', seed: 3 });
+  assert.deepEqual(Object.values(rs.pools).flat().sort(), [...T12].sort());
+  // rotate spreads teams over more rooms than the default keeps them in
+  const spread = (s) => {
+    const seen = new Map();
+    for (const r of s.phases[0].rounds) for (const g of r.games) for (const t of [slotText(g.a), slotText(g.b)]) {
+      if (!seen.has(t)) seen.set(t, new Set());
+      seen.get(t).add(g.room);
+    }
+    return [...seen.values()].reduce((n, x) => n + x.size, 0) / seen.size;
+  };
+  assert.ok(spread(buildSchedule('pools2', T12, R6, { rooms: 'rotate', seed: 3 })) > spread(base));
+  // blocks: a pool's games stay in its own block of rooms all prelims
+  const bl = buildSchedule('pools3', T12, R6, { rooms: 'blocks' });
+  for (const b of bl.brackets.filter((x) => x.phase === 0)) {
+    const rooms = new Set(bl.phases[0].rounds.flatMap((r) => r.games.filter((g) => g.bracket === b.key).map((g) => g.room)));
+    assert.equal(Math.max(...rooms) - Math.min(...rooms) + 1, rooms.size, b.name + ' rooms not contiguous');
+  }
+  // the PRNG itself is deterministic and in [0, 1)
+  const g1 = mulberry32(42);
+  const g2 = mulberry32(42);
+  for (let i = 0; i < 5; i++) { const x = g1(); assert.equal(x, g2()); assert.ok(x >= 0 && x < 1); }
+});
+
+test('scheduleChecks: double-booked, missing, half-empty, and meetings beyond what the phase allows', () => {
+  const s = buildSchedule('rr', T12.slice(0, 4), R6.slice(0, 2));
+  assert.deepEqual(scheduleChecks(s), []);
+  const r1 = s.phases[0].rounds[0];
+  const kept = r1.games[1].a;
+  r1.games[1].a = r1.games[0].a; // one team in two games, another gone
+  const c = scheduleChecks(s);
+  assert.ok(c.some((x) => x.kind === 'twice' && x.r === 0 && x.key === slotText(r1.games[0].a)), JSON.stringify(c));
+  assert.ok(c.some((x) => x.kind === 'missing' && x.key === slotText(kept)), JSON.stringify(c));
+  assert.equal(c[0].sev, 0);
+  r1.games[1].a = kept;
+  r1.games[1].b = null;
+  assert.ok(scheduleChecks(s).some((x) => x.kind === 'half' && x.room === r1.games[1].room));
+  // a double round robin as one phase: pairs meet twice, which meet: 2 allows
+  const d = buildSchedule('rr', T12.slice(0, 4), R6.slice(0, 2));
+  const again = JSON.parse(JSON.stringify(d.phases[0].rounds));
+  d.phases[0].rounds.push(...again);
+  assert.ok(scheduleChecks(d).some((x) => x.kind === 'again'));
+  d.phases[0].meet = 2;
+  assert.deepEqual(scheduleChecks(d), []);
+  // an inserted empty round is not "missing" every team
+  const e = buildSchedule('rr', T12.slice(0, 4), R6.slice(0, 2));
+  insertRound(e, 0, 0);
+  assert.deepEqual(scheduleChecks(e), []);
 });
 
 /* ---------- schedule editing: insert / cell swaps / room columns ---------- */

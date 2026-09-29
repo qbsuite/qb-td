@@ -23,6 +23,14 @@ Release Notes for 9/29/2026
 - "Bucket" links are now "Upload page".
 - Add &debug to the hub's URL once to load test rosters from the Roster step; it stays on in that browser until &debug=0.
 
+[ SCHEDULE ]
+- New schedule editor: rooms grouped by bracket (Pool A, Championship, 1st place...), round numbers and rooms stay in view while scrolling.
+- Drag a team onto another to swap, onto Byes to bench it; drag a game onto another game or an empty room.
+- Click a team or a game for the same moves in a side panel, plus Undo, Redo and Discard.
+- Checks list teams booked twice, teams with no game, half-empty games and repeat pairings.
+- By team and Brackets views; filter the grid to one bracket; Compact rows for big fields.
+- Generate options: random seeding, shuffled round order, rooms kept, blocked, shuffled or rotated, with a reusable seed.
+
 [ READER ]
 - New start screen: round buttons, the scheduled matchup, starter checklists, this room's schedule.
 

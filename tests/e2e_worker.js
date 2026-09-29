@@ -591,8 +591,15 @@ r = await call(`/b/${secret}/upload?round=2&name=Round_2_Alpha_Beta.qbj`,
 ok('second qbj uploads', r.status === 200 && r.body.error === null, r.body);
 const secondQbjId = r.body.id;
 
+// The cron hands each tournament's rebuild to its own invocation
+// (REBUILD binding), so the trigger can return before that rebuild has
+// landed: wait for it rather than read once.
 await tick();
-r = await call('/pub/' + slug);
+for (let i = 0; i < 20; i++) {
+  r = await call('/pub/' + slug);
+  if (r.body.version !== v1 && r.body.rounds && r.body.rounds['2']) break;
+  await new Promise((res) => setTimeout(res, 250));
+}
 ok('version moves on upload', r.body.version !== v1, r.body.version);
 ok('a new round gets its own stamp, leaving round 1 alone',
   r.body.rounds['2'] && r.body.rounds['1'] === v1.split(':')[0] + ':1', r.body.rounds);

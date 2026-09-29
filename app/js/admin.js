@@ -26,9 +26,8 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { formatsFor, buildSchedule, validateSchedule, slotText, roundIntake,
-  insertRound, removeRound, addRound, swapCells, addRoomCol, removeRoomCol,
-  hasPlaceholders, poolStandings, fillPlaceholders, roundRooms, flatRounds } from '../engine/schedule.js';
+import { slotText, roundIntake, poolStandings, roundRooms, flatRounds } from '../engine/schedule.js';
+import { renderSchedStep, schedEscape } from './schededit.js';
 import { buzzCredentials } from './buzzkey.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
@@ -368,7 +367,10 @@ function render() {
     </div>
     <div id="viewbody"></div>`;
   view.querySelectorAll('[data-view]').forEach((b) => {
-    b.onclick = () => { curView = b.dataset.view; render(); };
+    b.onclick = () => {
+      if (setupTab === 'sched' && b.dataset.view !== curView && !leaveSchedOk()) return;
+      curView = b.dataset.view; render();
+    };
   });
   $('rotate').onclick = async () => {
     if (!confirm('Mint a new admin link? The current link stops working.')) return;
@@ -414,7 +416,10 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
   box.querySelectorAll('[data-step]').forEach((s) => {
     // working through the steps is choosing Setup: finishing the last one
     // must not flip the page to Live under the TD's hands
-    s.onclick = () => { setupTab = s.dataset.step; curView = 'setup'; render(); };
+    s.onclick = () => {
+      if (setupTab === 'sched' && s.dataset.step !== 'sched' && !leaveSchedOk()) return;
+      setupTab = s.dataset.step; curView = 'setup'; render();
+    };
   });
   if ($('starttour')) $('starttour').onclick = () => startTournament(a, t, $('starttour'));
   if (setupTab === 'rooms') renderRoomsSec(a, t, buckets, files);
@@ -1076,10 +1081,7 @@ function renderRosterEditor(a, t) {
 let sched = null;          // working schedule (or null: creator shown)
 let schedFetched = false;
 let schedTeams = null;     // roster team names, seed order
-let slotEditRef = null;    // slot being edited via inline dropdown
-let gameSel = null;        // selected cell {p, r, room} for a match swap
 let schedDirty = false;
-let schedRoomsOpen = false;
 let schedRoomsN = null;    // creator rooms input
 
 // Fetch-once per page load (or per roster change): the roster team list
@@ -1098,448 +1100,58 @@ async function ensureSched(a, t) {
   if (sched === before) sched = got;
 }
 
-// Slot refs are room-keyed ({p, r, room, side} / {p, r, bye}) so empty
-// cells are addressable; a write creates the game on demand.
-function refKey(ref) {
-  return ref.bye !== undefined ? `${ref.p}.${ref.r}.b${ref.bye}` : `${ref.p}.${ref.r}.${ref.room}.${ref.side}`;
-}
-function gameIn(round, room) { return round.games.find((g) => g.room === room) || null; }
-function slotValue(ref) {
-  const round = sched.phases[ref.p].rounds[ref.r];
-  if (ref.bye !== undefined) return round.byes[ref.bye] ?? null;
-  const g = gameIn(round, ref.room);
-  return g ? g[ref.side] : null;
-}
-function setSlotValue(ref, v) {
-  const round = sched.phases[ref.p].rounds[ref.r];
-  if (ref.bye !== undefined) {
-    if (v === null) round.byes.splice(ref.bye, 1);
-    else round.byes[ref.bye] = v;
-    return;
-  }
-  let g = gameIn(round, ref.room);
-  if (!g) {
-    g = { room: ref.room, a: null, b: null };
-    round.games.push(g);
-    round.games.sort((x, y) => x.room - y.room);
-  }
-  g[ref.side] = v;
-}
-function swapSlotValues(r1, r2) {
-  const v1 = slotValue(r1);
-  const v2 = slotValue(r2);
-  // set game slots before bye splices so bye indexes stay valid
-  const order = [[r1, v2], [r2, v1]].sort((x) => (x[0].bye !== undefined ? 1 : -1));
-  for (const [ref, v] of order) setSlotValue(ref, v);
-}
-
 function renderScheduleSec(a, t, buckets, files) {
   const outer = $('setupsec');
   outer.innerHTML = '<h2>Schedule</h2><div id="schedsec"></div>';
   renderSchedule(a, t, buckets, files);
 }
 
+// The step itself lives in schededit.js; this hands it the working
+// schedule (which the Live Hub reads too) and the Worker calls.
 function renderSchedule(a, t, buckets, files) {
   const box = $('schedsec');
   if (!box) return;
   if (!t.roster_r2_key) {
-    box.innerHTML = '<div class="muted">Needs a roster first. Please create one on the Roster tab.</div>';
+    box.innerHTML = '<div class="muted">Needs a roster first. Please create one on the Roster step.</div>';
     return;
   }
-  const rerender = () => renderSchedule(a, t, buckets, files);
-  const touch = () => { schedDirty = true; rerender(); };
-
-  /* -- creator -- */
-  if (!sched) {
-    if (schedRoomsN === null) schedRoomsN = Math.max(1, buckets.length);
-    const fmts = formatsFor(schedTeams.length, schedRoomsN);
-    box.innerHTML = `
-      <div class="row" style="margin-bottom:8px">
-        <span class="muted">${schedTeams.length} teams (roster order is seed order)</span>
-        <label class="muted">Rooms <input id="schedrooms" type="number" min="1" max="60" value="${schedRoomsN}" style="width:64px"></label>
-      </div>
-      ${fmts.map((f, i) => `
-      <div class="card"><label class="row"><input type="radio" name="schedfmt" value="${f.key}" ${i === 0 ? 'checked' : ''}>
-        <span><b>${esc(f.name)}</b> <span class="muted">&mdash; ${esc(f.desc)}</span></span></label></div>`).join('')
-      || '<div class="muted">No format fits</div>'}
-      ${fmts.length ? '<div class="row"><button id="schedgen" class="primary">Generate</button></div>' : ''}`;
-    $('schedrooms').onchange = () => {
-      schedRoomsN = Math.max(1, Number($('schedrooms').value) || 1);
-      rerender();
-    };
-    if ($('schedgen')) $('schedgen').onclick = async () => {
-      const key = box.querySelector('input[name="schedfmt"]:checked').value;
-      const rooms = [];
-      for (let i = 0; i < schedRoomsN; i++) {
-        rooms.push(buckets[i] ? { name: buckets[i].room_name, bucket: buckets[i].id }
-          : { name: 'Room ' + (i + 1), bucket: null });
-      }
-      try {
-        sched = buildSchedule(key, schedTeams, rooms);
-        sched.format = key;
-        slotEditRef = null;
-        gameSel = null;
-      } catch (e) { say(e.message, true); return; }
-      // a generated schedule goes live right away — Save is only for
-      // edits made after
-      const run = busy($('schedgen'), { label: 'Generating' });
-      try {
-        await pub(a + '/schedule', { method: 'POST', json: sched });
-        schedDirty = false;
-        say('Schedule saved');
-      } catch (e) {
-        schedDirty = true;
-        say('Not saved: ' + e.message, true);
-      }
-      run.end();
-      render();
-      return;
-    };
-    return;
-  }
-
-  /* -- editor -- */
-  const warnings = validateSchedule(sched, schedTeams);
-  const normName = (x) => String(x || '').trim().toLowerCase();
-  for (const b of buckets) {
-    if (!sched.rooms.some((r) => r.bucket === b.id || normName(r.name) === normName(b.room_name))) {
-      warnings.push('Room not on schedule: ' + b.room_name);
-    }
-  }
-  // Inline dropdown options: teams still free in the slot's round.
-  const availFor = (p, r, current) => {
-    const inRound = new Set();
-    const round = sched.phases[p].rounds[r];
-    for (const g of round.games) {
-      if (g.a) inRound.add(slotText(g.a));
-      if (g.b) inRound.add(slotText(g.b));
-    }
-    for (const s of round.byes) if (s) inRound.add(slotText(s));
-    return schedTeams.filter((n) => !inRound.has(n) || n === current);
-  };
-  const chip = (ref, slot) => {
-    const text = slot ? slotText(slot) : '';
-    if (slotEditRef && refKey(slotEditRef) === refKey(ref)) {
-      const avail = availFor(ref.p, ref.r, text);
-      return `<select class="slotsel" data-slotsel='${esc(JSON.stringify(ref))}'>
-        <option value="__keep" selected hidden>${text ? esc(text) : '&mdash;'}</option>
-        ${avail.filter((n) => n !== text).map((n) => `<option>${esc(n)}</option>`).join('')}
-        ${slot ? '<option value="__clear">— Clear slot</option>' : ''}
-      </select>`;
-    }
-    const cls = 'slotchip' + (slot && slot.label ? ' ph' : '') + (slot ? '' : ' empty');
-    return `<span class="${cls}" draggable="${slot ? 'true' : 'false'}"
-      data-ref='${esc(JSON.stringify(ref))}'>${text ? esc(text) : '&mdash;'}</span>`;
-  };
-  const selGame = gameSel ? gameIn(sched.phases[gameSel.p].rounds[gameSel.r], gameSel.room) : null;
-  const canFill = sched.pools && hasPlaceholders(sched);
-  box.innerHTML = `
-    <div class="row" style="margin-bottom:6px">
-      <button id="schedaddround">+ Round</button>
-      <button id="schedaddroom">+ Room</button>
-      <button id="schedroomsbtn">Rooms</button>
-      ${canFill ? '<button id="schedfill">Fill playoff slots from standings</button>' : ''}
-      <button id="schedregen">Regenerate</button>
-      <button id="scheddel" style="color:var(--bad)">Delete</button>
-      <span class="spacer" style="flex:1"></span>
-      ${schedDirty ? '<span class="pill warn">Unsaved</span>' : ''}
-      <button id="schedsave" class="primary" ${schedDirty ? '' : 'disabled'}>Save</button>
-    </div>
-    ${warnings.length ? `<div class="bad">${warnings.map(esc).join(' &middot; ')}</div>` : ''}
-    ${gameSel ? `
-    <div class="row" style="margin:6px 0">
-      <span>Swapping <b>${esc(selGame ? (slotText(selGame.a) || '—') + ' v ' + (slotText(selGame.b) || '—') : 'empty cell')}</b>
-        &mdash; click another cell to trade places</span>
-      <button id="gunsel" class="small">Cancel</button>
-    </div>` : ''}
-    <div id="schedroomspanel" ${schedRoomsOpen ? '' : 'hidden'} class="card" style="margin:6px 0">
-      ${sched.rooms.map((r, i) => `
-      <div class="row" style="margin:2px 0">
-        <input data-roomname="${i}" value="${esc(r.name)}" size="18">
-        <select data-roombucket="${i}">
-          <option value=""></option>
-          ${buckets.map((b) => `<option value="${b.id}" ${b.id === r.bucket ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}
-        </select>
-      </div>`).join('')}
-      <div class="muted" style="font-size:12px;margin-top:4px">Linked room readers preselect their scheduled teams</div>
-    </div>
-    ${sched.phases.map((phase, p) => {
-      const hasByes = phase.rounds.some((r) => r.byes.length);
-      return `
-      <div class="rhead">${esc(phase.name)}</div>
-      <div class="tablewrap">
-      <table class="sched">
-        <tr><th></th>${sched.rooms.map((r, i) => `<th>${esc(r.name)}
-          <button class="xbtn colx" data-delcol="${i}" title="Remove room (its teams drop to the bye column)">&times;</button></th>`).join('')}
-          <th>Bye</th></tr>
-        ${phase.rounds.map((round, r) => `
-        <tr>
-          <td class="roundcell">${round.round}
-            <span class="rowtools">
-              <button class="xbtn" data-insround="${p}.${r}" title="Insert round after">+</button>
-              <button class="xbtn" data-delround="${p}.${r}" title="Delete this round">&times;</button>
-            </span>
-          </td>
-          ${sched.rooms.map((_, roomI) => {
-            const g = gameIn(round, roomI);
-            const sel = gameSel && gameSel.p === p && gameSel.r === r && gameSel.room === roomI;
-            return `<td><div class="gamebox${sel ? ' sel' : ''}" draggable="true"
-              data-cell='${esc(JSON.stringify({ p, r, room: roomI }))}'>
-              <div>
-                <div>${chip({ p, r, room: roomI, side: 'a' }, g ? g.a : null)}</div>
-                <div>${chip({ p, r, room: roomI, side: 'b' }, g ? g.b : null)}</div>
-              </div>
-              <span class="ghandle" data-ghandle='${esc(JSON.stringify({ p, r, room: roomI }))}'
-                title="${sel ? 'Cancel' : 'Swap this match with another cell'}">&#8646;</span>
-            </div></td>`;
-          }).join('')}
-          <td class="byetray" data-byetray="${p}.${r}">${
-            round.byes.map((s, bi) => chip({ p, r, bye: bi }, s)).join('<br>')}</td>
-        </tr>`).join('')}
-      </table>
-      </div>`;
-    }).join('')}
-    <div class="muted" style="font-size:13px;margin-top:8px">
-      Click a slot for the team dropdown &middot; drag chips to swap teams &middot;
-      drag a match box (or use &#8646;) to swap matches between cells &middot;
-      hover a round number to insert or delete rounds &middot; drop a chip on the
-      Bye column to bench a team</div>`;
-
-  const parseRef = (s) => JSON.parse(s);
-  const cellOf = (ref) => ({ p: ref.p, r: ref.r, room: ref.room });
-
-  // team chips: click opens the dropdown (or completes a match swap); drag swaps
-  box.querySelectorAll('.slotchip').forEach((c) => {
-    const ref = parseRef(c.dataset.ref);
-    c.onclick = (ev) => {
-      ev.stopPropagation();
-      if (gameSel) {
-        if (ref.bye !== undefined) { gameSel = null; rerender(); return; }
-        swapCells(sched, gameSel, cellOf(ref));
-        gameSel = null;
-        touch();
-        return;
-      }
-      slotEditRef = ref;
-      rerender();
-      const sel = box.querySelector('select.slotsel');
-      if (sel) sel.focus();
-    };
-    c.ondragstart = (ev) => {
-      ev.stopPropagation(); // the chip's team swap wins over the box's match swap
-      ev.dataTransfer.setData('text/plain', JSON.stringify({ slot: ref }));
-    };
-    c.ondragover = (ev) => { ev.preventDefault(); c.classList.add('dragover'); };
-    c.ondragleave = () => c.classList.remove('dragover');
-    c.ondrop = (ev) => {
-      ev.preventDefault();
-      const payload = JSON.parse(ev.dataTransfer.getData('text/plain') || 'null');
-      if (!payload || !payload.slot || refKey(payload.slot) === refKey(ref)) return;
-      ev.stopPropagation();
-      swapSlotValues(payload.slot, ref);
-      slotEditRef = null;
-      touch();
-    };
+  if (schedRoomsN === null) schedRoomsN = Math.max(1, buckets.length);
+  renderSchedStep(box, {
+    sched: () => sched,
+    setSched: (s) => { sched = s; },
+    dirty: () => schedDirty,
+    setDirty: (d) => { schedDirty = d; },
+    teams: schedTeams || [],
+    buckets,
+    roomsN: () => schedRoomsN,
+    setRoomsN: (n) => { schedRoomsN = n; },
+    save: (s) => pub(a + '/schedule', { method: 'POST', json: s }),
+    del: () => pub(a + '/schedule', { method: 'DELETE' }),
+    fill: async () => {
+      const { matches, roster } = await collectMatches(a, t, buckets, files);
+      if (!matches.length) return null;
+      return poolStandings(sched.pools, aggregate(matches, roster).teams.map((x) => x.name));
+    },
+    say,
+    refresh: () => render(),
   });
-  box.querySelectorAll('select.slotsel').forEach((sel) => {
-    const ref = parseRef(sel.dataset.slotsel);
-    sel.onchange = () => {
-      const vv = sel.value;
-      if (vv !== '__keep') setSlotValue(ref, vv === '__clear' ? null : { team: vv });
-      slotEditRef = null;
-      touch();
-    };
-    sel.onblur = () => {
-      if (slotEditRef && refKey(slotEditRef) === refKey(ref)) { slotEditRef = null; rerender(); }
-    };
-  });
-  // match boxes and their handles: click-click or drag to swap whole matches
-  box.querySelectorAll('[data-ghandle]').forEach((h) => {
-    const cell = parseRef(h.dataset.ghandle);
-    h.onclick = (ev) => {
-      ev.stopPropagation();
-      if (gameSel && gameSel.p === cell.p && gameSel.r === cell.r && gameSel.room === cell.room) {
-        gameSel = null;
-        rerender();
-        return;
-      }
-      if (gameSel) {
-        swapCells(sched, gameSel, cell);
-        gameSel = null;
-        touch();
-        return;
-      }
-      gameSel = cell;
-      slotEditRef = null;
-      rerender();
-    };
-    h.ondragstart = (ev) => {
-      ev.stopPropagation();
-      ev.dataTransfer.setData('text/plain', JSON.stringify({ cell }));
-    };
-  });
-  box.querySelectorAll('[data-cell]').forEach((el) => {
-    const cell = parseRef(el.dataset.cell);
-    el.onclick = () => {
-      if (!gameSel) return;
-      if (gameSel.p === cell.p && gameSel.r === cell.r && gameSel.room === cell.room) {
-        gameSel = null;
-        rerender();
-        return;
-      }
-      swapCells(sched, gameSel, cell);
-      gameSel = null;
-      touch();
-    };
-    el.ondragstart = (ev) =>
-      ev.dataTransfer.setData('text/plain', JSON.stringify({ cell }));
-    el.ondragover = (ev) => ev.preventDefault();
-    el.ondrop = (ev) => {
-      const payload = JSON.parse(ev.dataTransfer.getData('text/plain') || 'null');
-      if (!payload || !payload.cell) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      const c2 = payload.cell;
-      if (c2.p === cell.p && c2.r === cell.r && c2.room === cell.room) return;
-      swapCells(sched, c2, cell);
-      gameSel = null;
-      touch();
-    };
-  });
-  box.querySelectorAll('[data-byetray]').forEach((tray) => {
-    tray.ondragover = (ev) => { ev.preventDefault(); tray.classList.add('dragover'); };
-    tray.ondragleave = () => tray.classList.remove('dragover');
-    tray.ondrop = (ev) => {
-      ev.preventDefault();
-      tray.classList.remove('dragover');
-      const payload = JSON.parse(ev.dataTransfer.getData('text/plain') || 'null');
-      if (!payload || !payload.slot) return;
-      const [p, r] = tray.dataset.byetray.split('.').map(Number);
-      const v = slotValue(payload.slot);
-      if (v === null) return;
-      setSlotValue(payload.slot, null);
-      sched.phases[p].rounds[r].byes.push(v);
-      slotEditRef = null;
-      touch();
-    };
-  });
-  box.querySelectorAll('[data-insround]').forEach((b) => {
-    b.onclick = () => {
-      const [p, r] = b.dataset.insround.split('.').map(Number);
-      insertRound(sched, p, r);
-      slotEditRef = null;
-      gameSel = null;
-      touch();
-    };
-  });
-  box.querySelectorAll('[data-delround]').forEach((b) => {
-    b.onclick = () => {
-      const [p, r] = b.dataset.delround.split('.').map(Number);
-      const round = sched.phases[p].rounds[r];
-      const filled = round.games.some((g) => g.a || g.b) || round.byes.length;
-      if (filled && !confirm('Delete Round ' + round.round + '?')) return;
-      removeRound(sched, p, r);
-      if (!sched.phases[p].rounds.length && sched.phases.length > 1) sched.phases.splice(p, 1);
-      slotEditRef = null;
-      gameSel = null;
-      touch();
-    };
-  });
-  box.querySelectorAll('[data-delcol]').forEach((b) => {
-    b.onclick = () => {
-      const i = Number(b.dataset.delcol);
-      const filled = sched.phases.some((ph) => ph.rounds.some((round) => {
-        const g = gameIn(round, i);
-        return g && (g.a || g.b);
-      }));
-      if (filled && !confirm('Remove ' + sched.rooms[i].name + '? Its teams drop to the Bye column.')) return;
-      removeRoomCol(sched, i);
-      slotEditRef = null;
-      gameSel = null;
-      touch();
-    };
-  });
-  $('schedaddround').onclick = () => { addRound(sched, sched.phases.length - 1); touch(); };
-  $('schedaddroom').onclick = () => {
-    addRoomCol(sched, 'Room ' + (sched.rooms.length + 1));
-    touch();
-  };
-  $('schedroomsbtn').onclick = () => { schedRoomsOpen = !schedRoomsOpen; rerender(); };
-  box.querySelectorAll('[data-roomname]').forEach((inp) => {
-    inp.onchange = () => {
-      sched.rooms[Number(inp.dataset.roomname)].name = inp.value.trim() || inp.value;
-      touch();
-    };
-  });
-  box.querySelectorAll('[data-roombucket]').forEach((sel) => {
-    sel.onchange = () => {
-      sched.rooms[Number(sel.dataset.roombucket)].bucket = sel.value ? Number(sel.value) : null;
-      touch();
-    };
-  });
-  if ($('gunsel')) $('gunsel').onclick = () => { gameSel = null; rerender(); };
-  if ($('schedfill')) {
-    $('schedfill').onclick = async () => {
-      say('Computing standings…');
-      try {
-        const { matches, roster } = await collectMatches(a, t, buckets, files);
-        if (!matches.length) { say('No game files uploaded yet — nothing to rank', true); return; }
-        const ranked = aggregate(matches, roster).teams.map((x) => x.name);
-        const filled = fillPlaceholders(sched, poolStandings(sched.pools, ranked));
-        say(filled + ' playoff slots filled from standings — check the grid, then Save');
-        touch();
-      } catch (e) { say(e.message, true); }
-    };
-  }
-  $('schedsave').onclick = async () => {
-    const run = busy($('schedsave'), { label: 'Saving' });
-    try {
-      // fill missing/stale room->bucket links by name so reader rooms
-      // resolve their schedule line without hand-linking
-      const norm = (x) => String(x || '').trim().toLowerCase();
-      for (const room of sched.rooms) {
-        if (room.bucket !== null && buckets.some((b) => b.id === room.bucket)) continue;
-        const hit = buckets.find((b) => norm(b.room_name) === norm(room.name)
-          && !sched.rooms.some((r2) => r2.bucket === b.id));
-        room.bucket = hit ? hit.id : null;
-      }
-      await pub(a + '/schedule', { method: 'POST', json: sched });
-      schedDirty = false;
-      say('Schedule saved');
-      run.end();
-      rerender();
-    } catch (e) { run.end(); say(e.message, true); }
-  };
-  $('schedregen').onclick = () => {
-    if (!confirm('Start over? Unsaved edits are lost; the saved schedule stays until you save a new one.')) return;
-    sched = null;
-    slotEditRef = null;
-    gameSel = null;
-    rerender();
-  };
-  $('scheddel').onclick = async () => {
-    if (!confirm('Delete the schedule?')) return;
-    try {
-      await pub(a + '/schedule', { method: 'DELETE' });
-      sched = null;
-      schedDirty = false;
-      slotEditRef = null;
-      gameSel = null;
-      say('Schedule deleted');
-      render();
-    } catch (e) { say(e.message, true); }
-  };
 }
+
+// Leaving the schedule step (or the page) with unsaved edits asks first.
+function leaveSchedOk() {
+  return !schedDirty || confirm('The schedule has unsaved changes. Leave without saving?');
+}
+window.addEventListener('beforeunload', (ev) => {
+  if (!schedDirty) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+});
 
 document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;
   if ($('dlpanel') && !$('dlpanel').hidden) { $('dlpanel').hidden = true; $('dlmenu').focus(); return; }
   if (cellOpen && shownView === 'live') { cellOpen = null; render(); return; }
-  if (slotEditRef || gameSel) {
-    slotEditRef = null;
-    gameSel = null;
-    render();
-  }
+  if (schedEscape()) render();
 });
 
 /* ================= Live Hub ================= */
