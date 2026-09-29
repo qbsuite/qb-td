@@ -595,6 +595,10 @@ SHAPE=mid node tests/sim_day.js          # one day's requests, D1 rows, R2 ops, 
 SHAPE=large node tests/bench_routes.mjs  # CPU per route under wrangler's profiler
 SHAPE=large node tests/profile_day.mjs   # a whole day's CPU profile
 
+# what a real day cost, from Cloudflare's own analytics (wrangler login):
+# invocations, errors, CPU percentiles, the minutes past 10ms CPU, D1 rows
+node tools/cf_usage.mjs 2026-09-19
+
 # optional, and slow: a full-size tournament end to end (72 teams, 36
 # rooms, 17 rounds by default; TEAMS/ROOMS/ROUNDS/CONC override) against
 # the same dev Worker, reporting upload latency, tick cost, and what a
