@@ -803,10 +803,18 @@ That part scales. What breaks first:
    for, rebuilt per touched mirror) — materializing is R2-bounded and cheap, so the two
    halves of the tick want different limits.
 
-   Raising the *publish* limit is bounded by **memory, not GitHub**
-   (GitHub is ~5+N calls/tick against a 5,000/hour App limit).
-   `buildPublish` holds the batch's blobs in memory at once and base64
-   for the blob API inflates ~1.33x. Per-round shards made this much
+   Raising the *publish* limit is bounded by **memory, not GitHub**.
+   The limit that binds on GitHub's side is its secondary one, 500
+   content-creating requests an hour (80 a minute), not the App's
+   5,000/hour. Files ride inline in the tree request (`commitFiles`), so a
+   commit costs 5 calls, 3 of them content-creating, however many files
+   it carries, and the tick makes at most one commit a minute: 180 an
+   hour at most. (Before this, a blob upload per file made a busy tick
+   3 + N, ~420/hour at four dirty tournaments a minute.) Keep it one
+   batched commit per tick: per-tournament commits would break the limit
+   at three tournaments changing every minute.
+   `buildPublish` holds the batch's files in memory at once, and
+   JSON-encoding the tree request copies them again. Per-round shards made this much
    smaller — a round of a 16-team RR is ~100KB where the whole
    tournament's bundle was ~1.6MB — but the shape of the risk is the
    same, so: **cap the batch by total bytes rather than count** (there is

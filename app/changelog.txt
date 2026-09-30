@@ -1,3 +1,8 @@
+Release Notes for 9/30/2026
+
+[ PERFORMANCE ]
+- Publishing public stats uses fewer GitHub API calls, however many files change.
+
 Release Notes for 9/29/2026
 
 [ UI ]

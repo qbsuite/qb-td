@@ -767,6 +767,21 @@ async function github(env, method, path, body, bearer) {
 
 /* ----- the publisher ----- */
 
+// Files go into the tree request as inline `content` rather than one
+// POST /git/blobs each: GitHub's secondary rate limit allows 500
+// content-creating requests an hour (80 a minute), and a blob per file
+// made a busy tick 3 + N of them — ~420/hour at four dirty tournaments
+// a minute. Inline, every commit costs 3 (tree, commit, ref) however many
+// files it carries. Inline content must be a UTF-8 string, so anything
+// that isn't valid UTF-8 (every published file is JSON today) or is large
+// still goes up as a blob; the total cap keeps one tree request bounded.
+const INLINE_MAX_FILE = 1024 * 1024;
+const INLINE_MAX_TOTAL = 4 * 1024 * 1024;
+
+function inlineText(body) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(body); } catch (e) { return null; }
+}
+
 // One commit of [path, body, hadBefore] entries onto the branch head:
 // body is bytes to write, null means delete — but only when hadBefore
 // says the path was actually committed before, so sha:null can't point
@@ -785,8 +800,17 @@ async function commitFiles(env, message, entries) {
       : undefined;
 
     const tree = [];
+    let inlined = 0;
     for (const [path, body, hadBefore] of entries) {
       if (body !== null) {
+        const size = body.byteLength;
+        const text = size <= INLINE_MAX_FILE && inlined + size <= INLINE_MAX_TOTAL
+          ? inlineText(body) : null;
+        if (text !== null) {
+          inlined += size;
+          tree.push({ path, mode: '100644', type: 'blob', content: text });
+          continue;
+        }
         const blob = await github(env, 'POST', `/repos/${repo}/git/blobs`,
           { content: b64bytes(body), encoding: 'base64' });
         tree.push({ path, mode: '100644', type: 'blob', sha: blob.sha });
@@ -861,11 +885,10 @@ async function buildPublish(env, t, manifest, shardsOnly = false) {
   const rosterStamp = rosterObj ? rosterObj.uploaded.getTime() : null;
 
   // A blob whose stamp matches the last publish is already at the branch
-  // head (base_tree carries it forward), so re-uploading it only spends
-  // GitHub API calls — the difference between a state-only republish
-  // costing 6 calls and 13, and what keeps a 30-tournament day under the
-  // App's 5,000/hour rate limit. Skips need prev.sha: without a prior
-  // commit the stamps have nothing on the branch to vouch for.
+  // head (base_tree carries it forward), so re-sending it only grows the
+  // tree request and the commit (files ride inline, see commitFiles).
+  // Skips need prev.sha: without a prior commit the stamps have nothing
+  // on the branch to vouch for.
   const had = {
     schedule: prev && prev.schedule !== null && prev.schedule !== undefined,
     cats: prev && prev.cats !== null && prev.cats !== undefined,
@@ -957,10 +980,12 @@ function retractEntries(t) {
 // that makes an uploaded game public, so it runs first and independently
 // of the GitHub half. The publish half is ONE commit regardless of
 // tournament count: a single batch of every tournament's changed shards
-// and retractions. Per-tournament commits would spend the ~10-call
-// Git-Data-API overhead once per tournament; batching spends it once per
-// tick, which is what keeps a fully loaded cron inside GitHub's
-// 5,000 requests/hour App limit.
+// and retractions. A commit costs 5 Git Data API calls, 3 of them
+// content-creating (tree, commit, ref), and GitHub's secondary limit is
+// 500 content-creating requests an hour: one batch per tick caps the
+// publisher at 60 commits, 180 of those an hour, however many
+// tournaments are live. Per-tournament commits would break that limit at
+// three tournaments changing every minute.
 //
 // A set's mirror is in the queue whether or not its own page is public:
 // its shards are what the set's editors (and, once the set is published,

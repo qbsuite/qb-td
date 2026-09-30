@@ -524,8 +524,51 @@ const realFetch = globalThis.fetch;
   ok('batch: every descriptor advertises the shared blob commit',
     state.tournaments.every((t) => JSON.parse(t.pub_snapshot).sha === 'commit-1'));
   ok('batch: message names everyone', gh.commits[0].message === 'publish t1, t2, t3');
-  // GET ref + GET commit + POST tree + POST commit + PATCH ref + 3 blobs
-  ok('batch: eight API calls for three tournaments', gh.apiCalls === 8);
+  // GET ref + GET commit + POST tree + POST commit + PATCH ref: the
+  // shards ride inline in the tree, so the bill doesn't grow with them
+  ok('batch: five API calls for three tournaments', gh.apiCalls === 5);
+  ok('batch: no blob uploads, every shard inline in the tree',
+    gh.blobs.length === 0 && gh.trees[0].tree.every((e) => typeof e.content === 'string' && !e.sha));
+  ok('batch: inline content is the shard exactly',
+    gh.trees[0].tree.every((e) => e.content === objects['t/' + e.path[1] + '/round/1.json'].textFor()));
+}
+
+// 12b. Inline content has to be UTF-8 text and bounded: a file that isn't
+// valid UTF-8, or is over the inline cap, still goes up as a blob, in the
+// same single commit as the inline files.
+{
+  const bytesObj = (bytes, uploadedMs) => ({
+    arrayBuffer: async () => bytes.buffer, uploaded: new Date(uploadedMs),
+  });
+  const run = async (rosterBytes) => {
+    const gh = fakeGithub();
+    gh.branchSha = 'head-0';
+    globalThis.fetch = gh.fetch;
+    const t = {
+      id: 1, slug: 'stanford-open', published: 1, pub_dirty: 1, roster_r2_key: 't/1/roster.qbj',
+      created: Date.now(), current_round: 1, pub_snapshot: null,
+    };
+    const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }] };
+    const objects = { 't/1/pub/3.json': pubGame(3, 1), 't/1/roster.qbj': bytesObj(rosterBytes, 4000) };
+    await runCron(env(state, objects, gh));
+    return { gh, t };
+  };
+  const byPath = (gh, p) => gh.trees[0].tree.find((e) => e.path === p);
+
+  const bad = await run(new Uint8Array([0x7b, 0xff, 0xfe, 0x7d])); // "{" + invalid UTF-8 + "}"
+  ok('inline: non-UTF-8 file goes up as a blob, the shard stays inline, one commit',
+    bad.gh.commits.length === 1 && bad.gh.blobs.length === 1
+    && byPath(bad.gh, 'stanford-open/roster.json').sha === 'blob-1'
+    && byPath(bad.gh, 'stanford-open/roster.json').content === undefined
+    && typeof byPath(bad.gh, 'stanford-open/r1.json').content === 'string');
+  ok('inline: the blob carries the exact bytes',
+    bad.gh.blobs[0].encoding === 'base64' && bad.gh.blobs[0].content === btoa('{\xff\xfe}'));
+
+  const big = await run(new TextEncoder().encode('"' + 'x'.repeat(1024 * 1024) + '"'));
+  ok('inline: a file over the inline cap goes up as a blob',
+    big.gh.blobs.length === 1 && byPath(big.gh, 'stanford-open/roster.json').sha === 'blob-1'
+    && typeof byPath(big.gh, 'stanford-open/r1.json').content === 'string'
+    && JSON.parse(big.t.pub_snapshot).roster_at === 4000);
 }
 
 // 13. Mixed tick: one publish + one retract share the single batch.
