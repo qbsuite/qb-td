@@ -1437,7 +1437,10 @@ async function tickLive(env, ids) {
     if (!ids.length && !(await liveCandidates(env, Date.now(), 1)).length) return;
     if (!env.LIVE) { await livePublish(env, ids); return; }
     const res = await env.LIVE.fetch('https://live/?ids=' + ids.join(','));
-    if (!res.ok) console.log('live publish', res.status, (await res.text()).slice(0, 200));
+    // read it either way: a binding call whose answer is never read ends
+    // as clientDisconnected in the analytics, an error that isn't one
+    const text = await res.text();
+    if (!res.ok) console.log('live publish', res.status, text.slice(0, 200));
   } catch (e) {
     console.log('live publish call failed:', e.message);
   }

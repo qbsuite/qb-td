@@ -508,6 +508,19 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
   ok('tick: rebuilt and deployed in one tick', !!f && f.name === 'Tournament 1' && w.row(a).pub_dirty === 0, { f, row: w.row(a) });
 }
 
+// 14b. Through the LIVE binding (as in production): the tick reads the
+// entrypoint's answer, so the call doesn't end as clientDisconnected.
+{
+  clock = realNow();
+  const w = world();
+  w.add();
+  const answers = [];
+  w.env.LIVE = { fetch: async (u) => { const r = await LivePublish.fetch(new Request(u), w.env); answers.push(r); return r; } };
+  await w.tick();
+  ok('binding: deployed through LIVE, answer read', answers.length === 1 && answers[0].bodyUsed && !!w.live('tour-1'),
+    answers.map((r) => r.bodyUsed));
+}
+
 // 15. Budget: a full run (10 tournaments) stays well inside the Free
 // plan's 50 subrequests per invocation.
 {
