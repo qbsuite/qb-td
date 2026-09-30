@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS tournaments (
   buzz_wrap TEXT,                    -- content key wrapped under the buzzpoints derived key
   creator_ip TEXT,                   -- creation rate limiting only
   current_round INTEGER NOT NULL DEFAULT 1,
+  -- Per-bracket rounds, JSON {bracketKey: round} (app/engine/brackets.js):
+  -- NULL unless the schedule has more than one bracket in a phase; then
+  -- current_round is the lowest of them. Existing databases get it from
+  -- migrate-brackets.sql.
+  bracket_rounds TEXT,
   -- When the TD pressed Start (worker.js closesAt): NULL during setup,
   -- when the admin link lives SETUP_TTL from creation and room links
   -- serve nothing; once set, every link closes RUN_TTL after it.

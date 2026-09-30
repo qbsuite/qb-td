@@ -37,6 +37,11 @@
 // dying is question security: a leaked link stops working soon after the
 // tournament, a forgotten one can't be phished later. Published stats
 // stay up — the publish flag, not the admin link, gates /pub.
+
+// Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
+import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance,
+  advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
+
 const SETUP_TTL = 7 * 24 * 3600 * 1000;
 const RUN_TTL = 48 * 3600 * 1000;
 // The latest any tournament can still be open: started at the last
@@ -1237,7 +1242,28 @@ async function getTournament(env, t, ctx) {
     // which rooms have started which rounds (noteRoomStart): the Live
     // Hub's auto-advance chips
     starts: starts.results,
+    // each room's round (its bracket's, when brackets keep their own) and
+    // the game files uploaded for a round their room hasn't reached
+    ...(await roomRoundsDetail(env, t, buckets.results, files.results)),
   });
+}
+
+async function roomRoundsDetail(env, t, buckets, files) {
+  const byRoom = {};
+  if (t.bracket_rounds !== null && t.bracket_rounds !== undefined) {
+    const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
+    const model = bracketModel(obj ? await obj.json().catch(() => null) : null);
+    const state = bracketRounds(model, t.current_round, t.bracket_rounds);
+    for (const b of buckets) {
+      byRoom[b.id] = state.phase ? roomRound(model, state, roomIndexOf(model.schedule, b), t.current_round) : t.current_round;
+    }
+  } else {
+    for (const b of buckets) byRoom[b.id] = t.current_round;
+  }
+  const early = files
+    .filter((f) => ['qbj', 'combined', 'game'].includes(f.kind) && f.round > (byRoom[f.bucket_id] ?? t.current_round))
+    .map((f) => f.id);
+  return { room_rounds: byRoom, early };
 }
 
 async function updateTournament(request, env, t) {
@@ -1256,6 +1282,27 @@ async function updateTournament(request, env, t) {
     const n = Number(body.current_round);
     if (!Number.isInteger(n) || n < 1 || n > 999) return err(env, 400, 'bad round');
     sets.push('current_round = ?'); binds.push(n);
+    // Set round puts every bracket on that round (brackets.js)
+    if (t.bracket_rounds !== null && t.bracket_rounds !== undefined) {
+      sets.push('bracket_rounds = ?'); binds.push('{}');
+    }
+  }
+  // Advance all brackets, or one ({advance: 'all' | bracketKey}) — the
+  // Live Hub's buttons when brackets keep their own rounds
+  if (body.advance !== undefined) {
+    if (sets.length) return err(env, 400, 'advance goes alone');
+    const obj = await env.DATA.get(`t/${id}/schedule.json`);
+    const model = bracketModel(obj ? await obj.json().catch(() => null) : null);
+    const state = bracketRounds(model, t.current_round, t.bracket_rounds);
+    const res = body.advance === 'all'
+      ? advanceAll(model, state, t.current_round)
+      : state.phase ? advanceBracket(model, state, String(body.advance)) : null;
+    if (!res) return err(env, 400, 'that bracket is at the end of its phase');
+    const multi = t.bracket_rounds !== null && t.bracket_rounds !== undefined;
+    const moved = await writeBracketRounds(env, id, t.current_round, t.bracket_rounds,
+      multi ? res : { current: res.current, rounds: null });
+    if (!moved) return err(env, 409, 'the round moved meanwhile; reload');
+    return json(env, { ok: true, current_round: res.current, bracket_rounds: res.rounds });
   }
   if (body.published !== undefined) {
     sets.push('published = ?'); binds.push(body.published ? 1 : 0);
@@ -1667,7 +1714,10 @@ async function uploadPacket(request, url, env, t) {
   await markPub(env, id); // packet_rounds rides the published state
   // every room may already have started the current round, waiting only
   // on this packet (auto-advance)
-  if (round === t.current_round + 1) await maybeAdvance(env, id);
+  if (round === t.current_round + 1
+    || (t.bracket_rounds !== null && t.bracket_rounds !== undefined && round > t.current_round)) {
+    await maybeAdvance(env, id);
+  }
   return json(env, { round, filename });
 }
 
@@ -1845,12 +1895,23 @@ async function putSchedule(request, env, t) {
   await env.DATA.put(`t/${t.id}/schedule.json`, body, {
     httpMetadata: { contentType: 'application/json' },
   });
+  // brackets keep their own rounds only when the schedule has more than
+  // one bracket in a phase; keep rounds already stored across re-saves
+  const model = bracketModel(parsed);
+  const multi = !!(model && model.multi);
+  await env.DB.prepare(
+    'UPDATE tournaments SET current_round = current_round, bracket_rounds = ' +
+    (multi ? "COALESCE(bracket_rounds, '{}')" : 'NULL') + ' WHERE id = ?1'
+  ).bind(t.id).run();
   await markPub(env, t.id);
-  return json(env, { ok: true });
+  return json(env, { ok: true, brackets: multi });
 }
 
 async function deleteSchedule(env, t) {
   await env.DATA.delete(`t/${t.id}/schedule.json`);
+  await env.DB.prepare(
+    'UPDATE tournaments SET current_round = current_round, bracket_rounds = NULL WHERE id = ?1'
+  ).bind(t.id).run();
   await markPub(env, t.id);
   return json(env, { ok: true });
 }
@@ -1881,7 +1942,17 @@ async function bucketSchedule(env, secret) {
   const norm = (x) => String(x || '').trim().toLowerCase();
   let room = rooms.findIndex((r) => r && r.bucket === b.id);
   if (room === -1) room = rooms.findIndex((r) => r && norm(r.name) === norm(b.room_name));
-  return json(env, { room: room === -1 ? null : room, schedule });
+  // brackets: every game tagged, and the bracket list with the schedule
+  // editor's colours; `multi` says whether the room page should show them
+  const model = bracketModel(schedule);
+  const place = await roomPlace(env, b);
+  return json(env, {
+    room: room === -1 ? null : room,
+    schedule: model ? model.schedule : schedule,
+    brackets: model ? model.brackets : [],
+    multi: !!(model && model.multi),
+    round: place.round,
+  });
 }
 
 /* ---------- tiebreakers (R2 blob t/<tid>/tiebreakers.json) ----------
@@ -2066,7 +2137,7 @@ async function logTbUses(env, b, roomName, round, teams, usedIds) {
 async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, ' +
-    't.current_round, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, ' +
+    't.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, ' +
     't.created AS t_created, t.started ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2'
   ).bind(secret, await secretHash(secret)).all();
@@ -2093,14 +2164,33 @@ function bucketGate(env, b) {
   return null;
 }
 
+// Where this room is: its round and bracket. With brackets off
+// (bracket_rounds NULL: one bracket, or no schedule) it's current_round
+// and no schedule is read, exactly as before.
+async function roomPlace(env, b) {
+  const plain = { round: b.current_round, bracket: null, model: null, state: null, room: null };
+  if (b.bracket_rounds === null || b.bracket_rounds === undefined) return plain;
+  const obj = await env.DATA.get(`t/${b.tournament_id}/schedule.json`);
+  const sched = obj ? await obj.json().catch(() => null) : null;
+  const model = bracketModel(sched);
+  if (!model || !model.multi) return plain;
+  const state = bracketRounds(model, b.current_round, b.bracket_rounds);
+  const room = roomIndexOf(model.schedule, { id: b.id, room_name: b.room_name });
+  const round = roomRound(model, state, room, b.current_round);
+  const key = roomBracket(model, state, room, b.current_round);
+  const info = key ? bracketInfo(model, key) : null;
+  return { round, bracket: info ? { key: info.key, name: info.name, color: info.color } : null, model, state, room };
+}
+
 async function bucketState(env, secret) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
+  const place = await roomPlace(env, b);
   const [rounds, uploads, count] = await Promise.all([
     env.DB.prepare(
       'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
-    ).bind(b.tournament_id, b.current_round).all(),
+    ).bind(b.tournament_id, place.round).all(),
     env.DB.prepare(
       'SELECT id, round, kind, filename, size, error, created FROM files WHERE bucket_id = ?1 ORDER BY created DESC LIMIT ?2'
     ).bind(b.id, BUCKET_LIST_LIMIT).all(),
@@ -2118,9 +2208,13 @@ async function bucketState(env, secret) {
   return json(env, {
     tournament: b.tournament_name,
     room: b.room_name,
-    current_round: b.current_round,
+    // this room's round (its bracket's, when brackets keep their own)
+    current_round: place.round,
+    // the tournament's (lowest bracket's) round, and this room's bracket
+    tournament_round: b.current_round,
+    bracket: place.bracket,
     closes: closesAt({ created: b.t_created, started: b.started }),
-    packet: packets.find((p) => p.number === b.current_round) || null,
+    packet: packets.find((p) => p.number === place.round) || null,
     packets,
     roster: !!b.roster_r2_key,
     settings,
@@ -2141,7 +2235,7 @@ async function bucketUpload(request, url, env, secret) {
 
   const filename = cleanFilename(url.searchParams.get('name'));
   let round = Number(url.searchParams.get('round'));
-  if (!Number.isInteger(round) || round < 1 || round > 999) round = b.current_round;
+  if (!Number.isInteger(round) || round < 1 || round > 999) round = (await roomPlace(env, b)).round;
 
   const buf = await request.arrayBuffer();
   if (!buf.byteLength) return err(env, 400, 'empty file');
@@ -2200,9 +2294,10 @@ async function bucketPacket(env, secret, url) {
   if (gate) return gate;
   // Played rounds stay readable (a room running behind still needs them);
   // future rounds stay locked (question security).
+  const place = await roomPlace(env, b);
   let round = Number(url.searchParams.get('round'));
-  if (!Number.isInteger(round) || round < 1) round = b.current_round;
-  if (round > b.current_round) return err(env, 403, 'not the live round yet');
+  if (!Number.isInteger(round) || round < 1) round = place.round;
+  if (round > place.round) return err(env, 403, 'not the live round yet');
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
   ).bind(b.tournament_id, round).all();
@@ -2221,7 +2316,7 @@ async function bucketPacket(env, secret, url) {
   // The reader warms its cache on page load (warm=1) and says when a game
   // really starts (bucketStartRound); any other fetch is a room taking the
   // packet to read — the uploads page's download link.
-  if (url.searchParams.get('warm') !== '1') await noteRoomStart(env, b, round);
+  if (url.searchParams.get('warm') !== '1') await noteRoomStart(env, b, round, place);
   return blobResponseDec(env, obj, await blobKey(b, results[0].packet_r2_key), results[0].packet_name);
 }
 
@@ -2230,9 +2325,10 @@ async function bucketStartRound(env, secret, url) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
+  const place = await roomPlace(env, b);
   const round = Number(url.searchParams.get('round'));
-  if (!Number.isInteger(round) || round < 1 || round > b.current_round) return err(env, 400, 'bad round');
-  await noteRoomStart(env, b, round);
+  if (!Number.isInteger(round) || round < 1 || round > place.round) return err(env, 400, 'bad round');
+  await noteRoomStart(env, b, round, place);
   return json(env, { ok: true });
 }
 
@@ -2277,22 +2373,31 @@ function roomsPlaying(sched, round, buckets) {
 // First time only: a room re-fetching a packet (a reload, a second game)
 // changes nothing — and so can't push on a round the TD set back by hand,
 // whose rooms had all started it before.
-async function noteRoomStart(env, b, round) {
+async function noteRoomStart(env, b, round, place) {
   const out = await env.DB.prepare(
     'INSERT OR IGNORE INTO room_starts (bucket_id, tournament_id, round, at) VALUES (?1, ?2, ?3, ?4)'
   ).bind(b.id, b.tournament_id, round, Date.now()).run();
-  if (out.meta.changes && round === b.current_round) await maybeAdvance(env, b.tournament_id);
+  // a room's start moves only its own bracket (brackets.js)
+  const at = place ? place.round : b.current_round;
+  if (out.meta.changes && round === at) {
+    await maybeAdvance(env, b.tournament_id, place && place.bracket ? place.bracket.key : null);
+  }
 }
 
-async function maybeAdvance(env, tid) {
+async function maybeAdvance(env, tid, onlyBracket = null) {
   const { results: tr } = await env.DB.prepare(
-    'SELECT current_round, settings FROM tournaments WHERE id = ?1'
+    'SELECT current_round, settings, bracket_rounds FROM tournaments WHERE id = ?1'
   ).bind(tid).all();
   if (!tr.length) return false;
   let settings = {};
   try { settings = JSON.parse(tr[0].settings) || {}; } catch (e) { /* keep {} */ }
   if (!settings.autoAdvance) return false;
   const n = tr[0].current_round;
+  if (tr[0].bracket_rounds !== null && tr[0].bracket_rounds !== undefined) {
+    const moved = await maybeAdvanceBrackets(env, tid, n, tr[0].bracket_rounds, onlyBracket);
+    if (moved !== null) return moved;
+    // not multi after all (schedule changed underneath): as before
+  }
   const [buckets, starts, next, schedObj] = await Promise.all([
     env.DB.prepare('SELECT id, room_name FROM buckets WHERE tournament_id = ?1').bind(tid).all(),
     env.DB.prepare('SELECT bucket_id FROM room_starts WHERE tournament_id = ?1 AND round = ?2').bind(tid, n).all(),
@@ -2310,6 +2415,49 @@ async function maybeAdvance(env, tid) {
   ).bind(tid, n + 1, n).run();
   if (!out.meta.changes) return false;
   await markPub(env, tid); // the round rides the public state, like a TD's advance
+  return true;
+}
+
+// Per-bracket auto-advance (brackets.js autoAdvance). null when the
+// schedule isn't multi (the caller then runs the one-round rule).
+async function maybeAdvanceBrackets(env, tid, n, stored, onlyBracket) {
+  const [schedObj, buckets, starts, packets] = await Promise.all([
+    env.DATA.get(`t/${tid}/schedule.json`),
+    env.DB.prepare('SELECT id, room_name FROM buckets WHERE tournament_id = ?1').bind(tid).all(),
+    env.DB.prepare('SELECT bucket_id, round FROM room_starts WHERE tournament_id = ?1').bind(tid).all(),
+    env.DB.prepare('SELECT number FROM rounds WHERE tournament_id = ?1').bind(tid).all(),
+  ]);
+  const sched = schedObj ? await schedObj.json().catch(() => null) : null;
+  const model = bracketModel(sched);
+  if (!model || !model.multi) return null;
+  const state = bracketRounds(model, n, stored);
+  if (!state.phase) return null;
+  const bucketOf = model.schedule.rooms.map((r, i) => {
+    const b = buckets.results.find((x) => x.id === (r || {}).bucket)
+      || buckets.results.find((x) => roomIndexOf(model.schedule, x) === i);
+    return b ? b.id : null;
+  });
+  const have = new Set(packets.results.map((r) => r.number));
+  const res = autoAdvance(model, state, n, {
+    matched: (i) => bucketOf[i] !== null && bucketOf[i] !== undefined,
+    started: (round) => new Set(bucketOf.map((id, i) => [id, i])
+      .filter(([id]) => id !== null && starts.results.some((x) => x.bucket_id === id && x.round === round))
+      .map(([, i]) => i)),
+    hasPacket: (round) => have.has(round),
+  }, onlyBracket);
+  if (!res) return false;
+  return writeBracketRounds(env, tid, n, stored, res);
+}
+
+// Store {current, rounds} if nothing else moved the rounds meanwhile.
+// current_round is in the SET list either way, so the Live Hub's change
+// counter (rev trigger) moves with a bracket.
+async function writeBracketRounds(env, tid, n, stored, res) {
+  const out = await env.DB.prepare(
+    'UPDATE tournaments SET current_round = ?2, bracket_rounds = ?3 WHERE id = ?1 AND current_round = ?4 AND bracket_rounds IS ?5'
+  ).bind(tid, res.current, res.rounds === null ? null : JSON.stringify(res.rounds), n, stored).run();
+  if (!out.meta.changes) return false;
+  await markPub(env, tid);
   return true;
 }
 

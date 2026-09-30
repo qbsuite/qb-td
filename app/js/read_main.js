@@ -28,6 +28,7 @@ import { tbBridge } from './tb_bridge.js';
 import { protestReport } from './protests.js';
 import { Tossup } from 'modaq/src/state/PacketState.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
+import { slotLabel } from '../engine/brackets.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 // worker.js NOT_STARTED: every room route answers this until the TD presses Start
@@ -43,6 +44,7 @@ let teams = null;   // [{name, players}] from the roster
 let packet = null;  // normalized IPacket
 let sched = null;      // tournament schedule (when the TO made one)
 let schedRoom = null;  // this bucket's room index in it
+let schedBrackets = null; // [{key, name, phase, color}] when brackets keep their own rounds, else null
 let schedGame = null;  // {a, b}: what the schedule has this room playing in the selected round
 let locked = false;    // the scheduled matchup is showing, pickers hidden
 const starterSel = new Map(); // team name -> Set of the player names starting
@@ -116,10 +118,16 @@ async function fetchTeams() {
 
 /* ---------- MODAQ mount ---------- */
 
-function setHeader(t, room, round, game) {
+// bracket: {name, color} on a schedule whose brackets keep their own
+// rounds (the room's round is its bracket's)
+function setHeader(t, room, round, game, bracket) {
   document.title = t + ' - ' + room;
   $('tname').textContent = t;
   $('room').textContent = room + ' · Round ' + round;
+  if (bracket) {
+    $('room').insertAdjacentHTML('beforeend',
+      ` · <span class="bname"><i class="lane-${Number(bracket.color) || 0}"></i>${esc(bracket.name)}</span>`);
+  }
   if (game) $('game').textContent = game;
   $('bucketlink').href = 'bucket.html?b=' + encodeURIComponent(secret);
   $('newgame').href = roomLink();
@@ -219,16 +227,43 @@ function renderTbPanel() {
 
 // This room's schedule in the side panel: one row per round, round
 // number leading, current round highlighted.
+// With brackets, the rows split under a heading per phase and bracket
+// ("Prelims · Pool A"), and playoff slots read "Pool A 1st" until filled.
 function renderSchedPanel() {
   if (!sched || schedRoom === null) return;
   const rows = roomRounds(sched, schedRoom);
   if (!rows.length) return;
   $('schedpanel').hidden = false;
-  $('schedrows').innerHTML = rows.map((r) => `
+  const row = (r) => `
     <tr${r.round === state.current_round ? ' class="now"' : ' class="muted"'}>
       <td class="roundcell">${r.round}</td>
-      <td class="name">${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}</td>
-    </tr>`).join('');
+      <td class="name">${schedBrackets
+        ? `${esc(slotLabel(r.a) || '—')} v ${esc(slotLabel(r.b) || '—')}`
+        : `${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}`}</td>
+    </tr>`;
+  if (!schedBrackets) { $('schedrows').innerHTML = rows.map(row).join(''); return; }
+  let last = null;
+  $('schedrows').innerHTML = rows.map((r) => {
+    const ph = sched.phases.find((p) => p.rounds.some((x) => x.round === r.round));
+    const g = ph.rounds.find((x) => x.round === r.round).games.find((x) => x.room === schedRoom);
+    const b = schedBrackets.find((x) => x.key === (g && g.bracket));
+    const key = (ph.name || '') + '|' + (b ? b.key : '');
+    const head = key === last ? '' : `<tr class="bhrow"><td colspan="2">${b ? `<i class="lane-${Number(b.color) || 0}"></i>` : ''}${
+      esc([ph.name, b && b.name].filter(Boolean).join(' \u00b7 '))}</td></tr>`;
+    last = key;
+    return head + row(r);
+  }).join('');
+}
+
+// The bracket this room's game in round n belongs to, or null.
+function bracketAt(n) {
+  if (!schedBrackets || !sched || schedRoom === null) return null;
+  for (const ph of sched.phases) for (const r of ph.rounds) {
+    if (r.round !== n) continue;
+    const g = r.games.find((x) => x.room === schedRoom);
+    return (g && schedBrackets.find((x) => x.key === g.bracket)) || null;
+  }
+  return null;
 }
 
 // The scheduled matchup for the selected round, locked in: the teams show
@@ -257,7 +292,10 @@ function renderTeamPick() {
   $('changeteams').hidden = !locked;
   $('useschedteams').hidden = locked || !schedGame;
   if (schedGame) {
-    $('schedfrom').textContent = `From the schedule \u00b7 Round ${selectedRound} in ${state.room}`;
+    const br = bracketAt(selectedRound);
+    $('schedfrom').innerHTML = br
+      ? `From the schedule \u00b7 <i class="lane-${Number(br.color) || 0}"></i>${esc(br.name)} \u00b7 Round ${selectedRound} in ${esc(state.room)}`
+      : esc(`From the schedule \u00b7 Round ${selectedRound} in ${state.room}`);
     $('mteama').textContent = schedGame.a;
     $('mteamb').textContent = schedGame.b;
   }
@@ -403,7 +441,7 @@ async function boot() {
       : e.message === 'room closed' ? 'room closed' : e.message, true);
     return;
   }
-  setHeader(state.tournament, state.room, state.current_round, '');
+  setHeader(state.tournament, state.room, state.current_round, '', state.bracket);
   // schedule-less tournaments: this quietly 404s and nothing changes
   const schedP = pub('/b/' + secret + '/schedule').then((r) => r, () => null);
   // likewise tournaments without a tiebreaker pool
@@ -441,6 +479,7 @@ async function boot() {
   if (sr && sr.room !== null && sr.schedule) {
     sched = sr.schedule;
     schedRoom = sr.room;
+    schedBrackets = sr.multi && Array.isArray(sr.brackets) ? sr.brackets : null;
     renderSchedPanel();
     applySchedDefault();
   }

@@ -495,7 +495,8 @@ export function tagBrackets(schedule) {
   for (const [letter, members] of Object.entries(pools)) for (const t of members) poolOf.set(t, letter);
   const size = (letter) => (pools[letter] || []).length;
   const pos = (s) => {
-    const m = s && s.label ? PH_RE.exec(s.label) : null;
+    const lab = s && (s.label || s.from);
+    const m = lab ? PH_RE.exec(lab) : null;
     return m ? { pool: m[1], n: Number(m[2]) } : null;
   };
   const list = schedule.brackets ? schedule.brackets.map((b) => ({ ...b })) : [];
@@ -792,7 +793,9 @@ export function fillPlaceholders(schedule, poolRanks) {
     const team = (poolRanks[m[1]] || [])[Number(m[2]) - 1];
     if (!team) return slot;
     filled++;
-    return { team };
+    // `from` keeps the slot it filled, so pages can say "Stanford (A1)"
+    // and bracket tagging still reads a filled playoff game
+    return { team, from: slot.label };
   };
   for (const ph of schedule.phases) {
     for (const round of ph.rounds) {

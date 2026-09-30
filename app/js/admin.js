@@ -28,6 +28,7 @@ import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { slotText, roundIntake, poolStandings, roundRooms, flatRounds } from '../engine/schedule.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
+import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials } from './buzzkey.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
@@ -311,7 +312,7 @@ function setupSteps(t, buckets, rounds, settings) {
     ['modaq', 'MODAQ Settings', !!settings.gameFormat,
       settings.gameFormat ? (GAME_FORMAT_OPTIONS.find((o) => o.value === formatKey(settings)) || {}).label || 'Saved'
         : 'Not saved'],
-    ['stats', 'Stats settings', !!settings.statsSeen,
+    ['stats', 'Public page', !!settings.statsSeen,
       (t.published ? 'Public' : 'Page off')
         + ((settings.buzz || {}).mode === 'password' ? ' · Buzzpoints on' : '')],
   ];
@@ -1213,9 +1214,161 @@ document.addEventListener('click', (ev) => {
   }
 });
 
+/* ---------- brackets: when a schedule's pools (or playoff brackets)
+   keep their own rounds (engine/brackets.js). null for a round robin, no
+   schedule, or a schedule saved before brackets existed — the Live Hub
+   then looks exactly as it always has. ---------- */
+function liveBrackets(t, buckets, files) {
+  if (!sched || t.bracket_rounds === null || t.bracket_rounds === undefined) return null;
+  const bm = bracketModel(sched);
+  const st = bracketRounds(bm, t.current_round, t.bracket_rounds);
+  if (!st.phase) return null;
+  const ph = st.phase;
+  const top = maxRound(st, t.current_round);
+  const starts = lastDetail.starts || [];
+  const early = new Set(lastDetail.early || []);
+  const good = (f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
+  const startedAt = (bid, n) => starts.some((x) => x.bucket_id === bid && x.round === n);
+  const goodIn = (bid, n) => files.filter((f) => f.bucket_id === bid && f.round === n && good(f)).sort((x, y) => y.id - x.id)[0] || null;
+  const rooms = buckets.map((b) => {
+    const idx = roomIndexOf(bm.schedule, b);
+    const rr = (lastDetail.room_rounds && lastDetail.room_rounds[b.id]) || roomRound(bm, st, idx, t.current_round);
+    const key = roomBracket(bm, st, idx, t.current_round);
+    const g = idx === null ? null : gameIn(bm, idx, rr);
+    const file = goodIn(b.id, rr);
+    const game = g && g.a && g.b ? g : null;
+    // an upload for a round this room hasn't reached; a round it left
+    // without its game coming in
+    const ahead = files.filter((f) => f.bucket_id === b.id && early.has(f.id)).sort((x, y) => x.round - y.round)[0];
+    const prev = idx === null ? null : gameIn(bm, idx, rr - 1);
+    const behind = prev && prev.a && prev.b && !goodIn(b.id, rr - 1) && startedAt(b.id, rr);
+    const note = ahead ? `Also uploaded a round ${ahead.round} game before round ${ahead.round} opened. Check its round number.`
+      : behind ? `Round ${rr - 1} game still not in. Started round ${rr} anyway.` : '';
+    return { b, idx, rr, key: game ? key : null, game, file, sum: file ? fileSummary(file) : null, note,
+      started: startedAt(b.id, rr),
+      state: file ? 'in' : startedAt(b.id, rr) ? 'started' : 'idle' };
+  });
+  const groups = ph.keys.map((key) => {
+    const info = bracketInfo(bm, key);
+    const rows = rooms.filter((r) => r.key === key);
+    return { key, name: info ? info.name : key, color: info ? info.color : 0, round: st.rounds[key], rows,
+      nIn: rows.filter((r) => r.state === 'in').length, nStarted: rows.filter((r) => r.started).length };
+  });
+  const idle = rooms.filter((r) => !r.key);
+  const all = advanceAll(bm, st, t.current_round);
+  const next = bm.phases.find((x) => x.p > ph.p && x.first !== null);
+  return { bm, st, ph, top, rooms, groups, idle, layout: liveLayout(groups.length), advTo: all.current,
+    crosses: !Object.keys(all.rounds).length, next,
+    roomOf: (bid) => rooms.find((r) => r.b.id === bid),
+    // which bracket a room plays round n in, for the uploads grid
+    bracketAt: (b, n) => {
+      const r = rooms.find((x) => x.b.id === b.id);
+      const g = r && r.idx !== null ? gameIn(bm, r.idx, n) : null;
+      return g && g.a && g.b && g.bracket ? bracketInfo(bm, g.bracket) : null;
+    } };
+}
+
+// "Prelims · round 3 of 5 · 1 bracket still on round 2"
+function phaseLine(bk) {
+  const { ph, top } = bk;
+  const behind = bk.groups.filter((g) => g.round < top);
+  const lows = [...new Set(behind.map((g) => g.round))];
+  const n = behind.length;
+  const late = !n ? ''
+    : lows.length === 1 ? ` &middot; ${n} bracket${n === 1 ? '' : 's'} still on round ${lows[0]}`
+    : ` &middot; ${n} brackets behind`;
+  return `${esc(ph.name || 'Round')} &middot; round ${top - ph.first + 1} of ${ph.last - ph.first + 1}${late}`;
+}
+
+// Live now with brackets: a heading per bracket (its color, where it is,
+// how many games are in), its rooms under it. liveLayout picks the
+// two-column flow; column-count balances uneven bracket sizes.
+function liveBracketsHtml(bk, fileLinks) {
+  const row = (r) => {
+    const game = r.sum
+      ? `<span class="${r.sum.score[0] > r.sum.score[1] ? 'win' : ''}">${esc(r.sum.teams[0])} ${r.sum.score[0]}</span>
+         <span class="muted">&ndash;</span>
+         <span class="${r.sum.score[1] > r.sum.score[0] ? 'win' : ''}">${r.sum.score[1]} ${esc(r.sum.teams[1])}</span>`
+      : r.game ? `${esc(slotLabel(r.game.a))} <span class="muted">v</span> ${esc(slotLabel(r.game.b))}`
+      : '<span class="muted">No game this round</span>';
+    const acts = r.file
+      ? fileLinks(r.file) + (r.file.kind === 'combined' && r.sum ? ` <button class="linkbtn" data-editfile="${r.file.id}">Edit</button>` : '')
+      : r.game ? `<button class="linkbtn" data-addfor="${r.b.id}:${r.rr}">Upload</button>` : '';
+    const title = r.note || (r.state === 'in' ? 'Game in' : r.state === 'started' ? 'Started, not uploaded' : 'Not started');
+    const mark = !r.game ? '' : r.note ? '!' : r.state === 'in' ? '&#10003;' : r.state === 'started' ? '&#9675;' : '&ndash;';
+    return `<div class="brow ${r.game ? '' : 'bye'}" data-room="${r.b.id}">
+      <span class="bgame"><span class="bteams">${game}</span>
+        <span class="broom">${esc(r.b.room_name)}<span class="lacts">${acts}</span></span>
+        ${r.note ? `<span class="bnote">${esc(r.note)}</span>` : ''}</span>
+      <span class="lmark ${r.note || r.state === 'idle' ? 'warn' : r.state === 'started' ? 'muted' : ''}" title="${esc(title)}">${mark}</span>
+    </div>`;
+  };
+  const head = (g) => `<div class="bhead"><i class="lane-${g.color}"></i><b>${esc(g.name)}</b>
+      ${g.round < bk.top ? `<span class="warntext">&middot; still on round ${g.round}</span>` : ''}
+      <span class="spacer"></span>
+      <span class="${g.nIn < g.rows.length ? 'warntext' : 'muted'}">${g.nIn}/${g.rows.length} in</span></div>`;
+  const idle = bk.idle.length ? `<div class="bgroup"><div class="bhead"><i class="lane-x"></i><b>No game this round</b></div>
+      ${bk.idle.map(row).join('')}</div>` : '';
+  if (bk.layout === 'plain') return `<div class="bplain">${bk.groups.flatMap((g) => g.rows).map(row).join('')}${idle}</div>`;
+  return `<div class="bcols">${bk.groups.map((g) => `<div class="bgroup" data-bracket="${esc(g.key)}">${head(g)}${g.rows.map(row).join('')}</div>`).join('')}${idle}</div>`;
+}
+
+// Uploads grid header with brackets: which rounds are Prelims, Playoffs…
+function phaseSpans(bk, cols) {
+  const segs = [];
+  for (const n of cols) {
+    const ph = phaseOfRound(bk.bm, n);
+    const last = segs[segs.length - 1];
+    if (last && last.ph === ph) last.n++;
+    else segs.push({ ph, n: 1 });
+  }
+  return `<tr class="uphase"><th></th>${segs.map((x) =>
+    `<th colspan="${x.n}">${x.ph ? `<span>${esc(x.ph.name || '')}</span>` : ''}</th>`).join('')}</tr>`;
+}
+
+// Uploads grid rows: by the bracket each room holds this round (rooms
+// with no game last, unheaded), or one headless group without brackets.
+function gridGroups(bk, buckets) {
+  if (!bk) return [{ head: null, rows: buckets }];
+  const out = bk.groups.map((g) => ({ head: g, rows: g.rows.map((r) => r.b) })).filter((g) => g.rows.length);
+  if (bk.idle.length) out.push({ head: { color: 'x', name: 'No game this round' }, rows: bk.idle.map((r) => r.b) });
+  return out;
+}
+
+// who else moves when the TD advances every bracket
+function advNote(bk) {
+  if (bk.crosses) return bk.next ? `Opens ${esc(bk.next.name || 'the next phase')} for every bracket.` : '';
+  const behind = bk.groups.filter((g) => g.round < bk.top).map((g) => esc(g.name));
+  if (!behind.length) return '';
+  const list = behind.length === 1 ? behind[0] : behind.slice(0, -1).join(', ') + ' and ' + behind[behind.length - 1];
+  return `${list} catch${behind.length === 1 ? 'es' : ''} up to round ${bk.advTo} too.`;
+}
+
+// Auto-advance with brackets: each bracket's round and starts, and its
+// own Advance. No mode to pick: brackets always move on their own.
+function autoBracketsHtml(bk, settings) {
+  const rows = bk.rooms.filter((r) => r.key);
+  const nStarted = rows.filter((r) => r.started).length;
+  return `<div class="railblock">
+    <label class="railtoggle"><span><b>Auto-advance</b> <span class="muted">${nStarted}/${rows.length} started</span></span>
+      <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''}></label>
+    ${settings.autoAdvance ? '<div class="muted small">Each bracket opens its next round once every room in it has started this one.</div>' : ''}
+    <div class="blist">${bk.groups.map((g) => `<div class="bline" data-bline="${esc(g.key)}">
+      <i class="lane-${g.color}"></i>
+      <span>${esc(g.name)} <span class="${g.round < bk.top ? 'warntext' : 'muted'}">rd ${g.round}</span></span>
+      <span class="muted">${g.nStarted}/${g.rows.length} started</span>
+      ${g.round < bk.ph.last
+        ? `<button class="linkbtn" data-advbracket="${esc(g.key)}" title="Open round ${g.round + 1} for ${esc(g.name)}">Advance</button>`
+        : '<span class="muted small" title="Last round of this phase">last</span>'}
+    </div>`).join('')}</div>
+  </div>`;
+}
+
 function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const box = $('viewbody');
   const totalRounds = roundCount(t, rounds, settings);
+  const bk = liveBrackets(t, buckets, files);
+  const topRound = bk ? bk.top : t.current_round;
   const intake = roundIntake(sched, t.current_round, buckets, files);
   const uploadRounds = [...new Set([
     ...Array.from({ length: t.current_round }, (_, i) => i + 1),
@@ -1263,19 +1416,26 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     const errs = fs.filter((f) => f.error);
     const games = new Set(goods.map((f) => { const s = fileSummary(f); return s ? [...s.teams].sort().join('|') : f.id; }));
     const bye = sched ? roundRooms(sched, n, buckets).find((r) => r.id === b.id)?.bye : false;
+    // with brackets a room is on its own round (its bracket's)
+    const now = bk ? bk.roomOf(b.id).rr : t.current_round;
+    const startedNow = bk ? bk.roomOf(b.id).started : started.has(b.id);
     let mark = '', cls = '', title = '';
     if (errs.length) { mark = '!'; cls = 'warn'; title = errs.length + ' file' + (errs.length === 1 ? '' : 's') + ' could not be read'; }
     else if (goods.length > 1) { mark = String(goods.length); cls = games.size > 1 ? 'warn' : ''; title = goods.length + ' uploads'; }
     else if (goods.length === 1) { mark = '&#10003;'; title = 'Game in'; }
     else if (fs.length) { mark = '&middot;'; cls = 'muted'; title = 'Game file only'; }
-    else if (n > t.current_round || bye) { mark = ''; cls = 'muted'; title = bye ? 'No game this round' : ''; }
-    else if (n === t.current_round) {
-      mark = started.has(b.id) ? '&#9675;' : '&ndash;';
-      cls = started.has(b.id) ? 'muted' : 'warn';
-      title = started.has(b.id) ? 'Started, not uploaded' : 'Not started';
+    else if (n > now || bye) { mark = ''; cls = 'muted'; title = bye ? 'No game this round' : ''; }
+    else if (n === now) {
+      mark = startedNow ? '&#9675;' : '&ndash;';
+      cls = startedNow ? 'muted' : 'warn';
+      title = startedNow ? 'Started, not uploaded' : 'Not started';
     } else { mark = '&ndash;'; cls = 'warn'; title = 'Missing'; }
+    if (bk) {
+      const br = bk.bracketAt(b, n);
+      title = `Round ${n}${br ? ' \u00b7 ' + br.name : ''}${title ? ': ' + title : ''}`;
+    }
     const sel = cellOpen && cellOpen.bid === b.id && cellOpen.round === n;
-    const clickable = fs.length || (n <= t.current_round && !bye);
+    const clickable = fs.length || (n <= now && !bye);
     return `<td class="ucell">${clickable
       ? `<button class="umark ${cls} ${sel ? 'sel' : ''}" data-cell="${b.id}:${n}" title="${esc(title)}"
           aria-label="${esc(b.room_name)}, round ${n}: ${esc(title || 'empty')}">${mark}</button>`
@@ -1365,8 +1525,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       <button id="gosetup">Open setup</button>
     </div>` : ''}
     <div class="roundline">
-      <span class="biground">Round ${t.current_round}<span class="of"> / ${totalRounds}</span></span>
-      ${rounds.length && !rounds.some((r) => r.number === t.current_round)
+      <span class="biground">Round ${topRound}<span class="of"> / ${totalRounds}</span></span>
+      ${bk ? `<span class="muted">${phaseLine(bk)}</span>` : ''}
+      ${rounds.length && !rounds.some((r) => r.number === topRound)
         ? '<span class="warntext">No packet for this round</span>' : ''}
       ${tbTotal ? `<span class="muted">Tiebreakers <span class="fg">${tbUsed}/${tbTotal}</span> used</span>` : ''}
     </div>
@@ -1374,8 +1535,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       <div class="livemain">
         <section>
           <div class="sechead"><h2>Live now</h2>
-            ${intake.expected ? `<span class="muted">${intake.got}/${intake.expected} in</span>` : ''}</div>
-          ${liveRows.length ? liveRows.map((r) => `
+            ${bk ? `<span class="muted">${bk.rooms.filter((r) => r.key && r.state === 'in').length}/${bk.rooms.filter((r) => r.key).length} in</span>`
+              : intake.expected ? `<span class="muted">${intake.got}/${intake.expected} in</span>` : ''}</div>
+          ${bk ? liveBracketsHtml(bk, fileLinks) : liveRows.length ? liveRows.map((r) => `
           <div class="lrow ${r.bye ? 'bye' : ''}">
             <span class="lroom">${esc(r.b.room_name)}</span>
             <span class="lgame">${r.sum
@@ -1417,10 +1579,14 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
             </div>
           </div>
           ${buckets.length ? `<div class="tablewrap"><table class="ugrid">
+            ${bk ? phaseSpans(bk, roundCols) : ''}
             <tr><th class="uroom">Room</th>${roundCols.map((n) =>
-              `<th class="${n === t.current_round ? 'now' : ''}">${n}</th>`).join('')}</tr>
-            ${buckets.map((b) => `<tr><td class="uroom">${esc(b.room_name)}</td>${roundCols.map((n) => gridCell(b, n)).join('')}</tr>${
-              cellOpen && cellOpen.bid === b.id ? cellPanel() : ''}`).join('')}
+              `<th class="${(bk ? Object.values(bk.st.rounds).includes(n) : n === t.current_round) ? 'now' : ''}">${n}</th>`).join('')}</tr>
+            ${gridGroups(bk, buckets).map(({ head, rows }) => (head
+              ? `<tr class="ugroup"><td colspan="${roundCols.length + 1}"><i class="lane-${head.color}"></i><b>${esc(head.name)}</b>
+                  <span class="muted">this round</span></td></tr>` : '')
+              + rows.map((b) => `<tr><td class="uroom" title="${esc(b.room_name)}">${esc(b.room_name)}</td>${roundCols.map((n) => gridCell(b, n)).join('')}</tr>${
+              cellOpen && cellOpen.bid === b.id ? cellPanel() : ''}`).join('')).join('')}
           </table></div>
           <div class="muted legend">&#10003; in &middot; &#9675; started &middot; &ndash; missing &middot; 2 two uploads &middot; ! can&rsquo;t read</div>`
           : ''}
@@ -1435,13 +1601,16 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
 
       <aside class="liverail">
         <div class="railblock">
-          <button id="advround" class="primary advance">Advance to round ${t.current_round + 1}</button>
-          ${nextHasPacket || !rounds.length ? '' : `<div class="warntext small">No packet for round ${t.current_round + 1} yet</div>`}
+          ${bk ? `<button id="advall" class="primary advance">Advance all to round ${bk.advTo}</button>
+          ${advNote(bk) ? `<div class="muted small">${advNote(bk)}</div>` : ''}
+          ${rounds.some((r) => r.number === bk.advTo) || !rounds.length ? '' : `<div class="warntext small">No packet for round ${bk.advTo} yet</div>`}`
+          : `<button id="advround" class="primary advance">Advance to round ${t.current_round + 1}</button>
+          ${nextHasPacket || !rounds.length ? '' : `<div class="warntext small">No packet for round ${t.current_round + 1} yet</div>`}`}
           <label class="setround">Set round
-            <input id="curround" type="number" min="1" max="999" value="${t.current_round}" aria-label="Round">
+            <input id="curround" type="number" min="1" max="999" value="${bk ? bk.top : t.current_round}" aria-label="Round">
             <button id="setround" class="linkbtn">Set</button></label>
         </div>
-        ${buckets.length ? `
+        ${buckets.length && bk ? autoBracketsHtml(bk, settings) : buckets.length ? `
         <div class="railblock">
           <label class="railtoggle"><span><b>Auto-advance</b> <span class="muted">${nStarted}/${playing.length} started</span></span>
             <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''}></label>
@@ -1582,6 +1751,20 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     } catch (e) { say(e.message, true); }
   };
   if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
+  // brackets: all of them, or one
+  const advance = async (which, btn) => {
+    const run = busy(btn, { label: 'Advancing' });
+    try {
+      const out = await pub(a, { method: 'POST', json: { advance: which } });
+      uploadsOpen = null;
+      say(which === 'all' ? 'Round ' + out.current_round
+        : `${bracketInfo(bk.bm, which)?.name || which}: round ${(out.bracket_rounds || {})[which] || out.current_round}`);
+      showDetail();
+    } catch (e) { say(e.message, true); showDetail(); }
+    run.end();
+  };
+  if ($('advall')) $('advall').onclick = () => advance('all', $('advall'));
+  box.querySelectorAll('[data-advbracket]').forEach((b) => { b.onclick = () => advance(b.dataset.advbracket, b); });
   if ($('livestart')) $('livestart').onclick = () => startTournament(a, t, $('livestart'));
   box.querySelectorAll('[data-delfile]').forEach((b) => {
     b.onclick = async () => {

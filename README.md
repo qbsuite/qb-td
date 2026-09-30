@@ -520,8 +520,10 @@ dashboard shows which invites are still unused, and revokes them.
 - `tests/` — `run_tests.js` (engine unit tests), `e2e_worker.js` (full
   TO -> moderator -> public flow against `wrangler dev`), `e2e_sets.js`
   (editor -> invite -> mirror -> set-wide reads, same dev Worker;
-  `e2e_lib.js` is what the two share), `snapshot_publish.js` (the cron
-  tick, mocked).
+  `e2e_lib.js` is what they share), `e2e_brackets.js` (per-bracket
+  rounds: pools advancing on their own, packet locks, the playoffs
+  opening together, the TD's buttons; same dev Worker),
+  `snapshot_publish.js` (the cron tick, mocked).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
 - `tools/yf_parity.mjs` + `tools/yf_parity/` — `npm run yf-parity`: the
@@ -567,10 +569,12 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-starts.sql
 # ...and one from before the Live Hub rev (once; the ALTER isn't re-runnable):
 #   npx wrangler d1 execute qb-td --local --file migrate-rev.sql
+# ...and one from before per-bracket rounds (once; the ALTER isn't re-runnable):
+#   npx wrangler d1 execute qb-td --local --file migrate-brackets.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled
 npx wrangler dev --local --port 8799 --test-scheduled &
-cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js
+cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js && node tests/e2e_brackets.js
 
 # the pages themselves, in headless Chrome (no npm deps): the dev Worker
 # started with --var ALLOWED_ORIGIN:http://localhost:8765, plus
@@ -650,7 +654,9 @@ first.
    Hub's rev needs
    `npx wrangler d1 execute qb-td --remote --file migrate-rev.sql`
    (the admin route reads `tournaments.rev`; it also adds the cron's
-   dirty-row indexes),
+   dirty-row indexes), and one from before per-bracket rounds needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-brackets.sql`
+   (every room route reads `tournaments.bracket_rounds`),
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy

@@ -12,6 +12,12 @@ Release Notes for 9/29/2026
 - Auto-advance lists which rooms have started the round.
 - Protests: newest open one in the side column, full list below the uploads.
 - Download menu after Compute: YellowFruit 4, YellowFruit 3, HTML report, QBJ bundle, Rebuild public stats.
+- Pools and playoff brackets now move through rounds on their own: a pool whose rooms have all started moves on without waiting.
+- Playoffs open for every bracket together once each bracket has started its last prelim round.
+- Live now shows a heading per bracket with how many games are in and which brackets are still a round behind.
+- Flags a room that uploaded a game for a round it hasn't reached, or started a round without its last game in.
+- Advance all, or advance a single bracket from the Auto-advance list. Set round puts every bracket on that round.
+- Uploads groups rooms by bracket, with Prelims and Playoffs marked over the rounds.
 
 [ SETUP ]
 - One step list replaces the checklist and tabs. Order: Rooms, Roster, Schedule, Packets, MODAQ Settings, Public page.
@@ -33,9 +39,11 @@ Release Notes for 9/29/2026
 
 [ READER ]
 - New start screen: round buttons, the scheduled matchup, starter checklists, this room's schedule.
+- With pools or playoff brackets: the header names the room's bracket, and its schedule is split by bracket.
 
 [ ROOM PAGE ]
 - New layout. Drop the .qbj and the MODAQ game file together.
+- Shows the room's round, its bracket and the scheduled game. Packets unlock with the room's own bracket.
 
 [ PUBLIC PAGE ]
 - Schedule has Now (live round and up next) and All rounds, with pool filters.

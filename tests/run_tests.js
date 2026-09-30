@@ -13,6 +13,7 @@ import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32 } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
+import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
@@ -3130,6 +3131,110 @@ test('checkPacket: lays a packet out for a reviewer and flags what looks off', (
   assert.ok(b.warnings.some((w) => /share an answerline \(Author 1\)/.test(w)));
   assert.ok(b.warnings.some((w) => /2 tossups without category data/.test(w)));
   assert.equal(b.count, b.warnings.length + b.tossups.flatMap((t) => t.warnings).length + b.bonuses[0].warnings.length);
+});
+
+/* ---------- per-bracket rounds (brackets.js) ---------- */
+
+const BK12 = ['Stanford', 'Berkeley', 'UIUC', 'ASU', 'Chicago', 'Michigan', 'Yale', 'Penn', 'Rutgers', 'Columbia', 'Minnesota', 'Georgia Tech'];
+const BR6 = [1, 2, 3, 4, 5, 6].map((i) => ({ name: 'Room ' + i, bucket: 100 + i }));
+const pools2 = () => buildSchedule('pools2', BK12, BR6);
+const poolRoom = (m, key) => bkRooms(m, key, 1)[0];
+
+test('brackets: a two-pool schedule is multi, a round robin is not', () => {
+  const m = bracketModel(pools2());
+  assert.equal(m.multi, true);
+  assert.deepEqual(m.phases.map((p) => [p.first, p.last, p.keys]), [[1, 5, ['A', 'B']], [6, 8, ['CH', 'CO']]]);
+  assert.deepEqual(m.brackets.map((b) => [b.key, b.color]), [['A', 0], ['B', 1], ['CH', 0], ['CO', 1]]);
+  const rr = bracketModel(buildSchedule('rr', BK12, BR6));
+  assert.equal(rr.multi, false);
+  assert.equal(bracketModel(null), null);
+  // one bracket: nothing keeps its own round
+  assert.deepEqual(bracketRounds(rr, 3, '{"ph1":5}'), { phase: null, rounds: {} });
+});
+
+test('brackets: stored rounds read at least current_round and at most the phase end', () => {
+  const m = bracketModel(pools2());
+  assert.deepEqual(bracketRounds(m, 2, '{"A":4}').rounds, { A: 4, B: 2 });
+  assert.deepEqual(bracketRounds(m, 3, { A: 1, B: 9 }).rounds, { A: 3, B: 5 });
+  assert.deepEqual(bracketRounds(m, 7, '{}').rounds, { CH: 7, CO: 7 });
+  assert.equal(bracketRounds(m, 40, '{}').phase, null, 'past the schedule: current_round only');
+});
+
+test('brackets: a room is on its bracket\'s round; idle rooms on current_round', () => {
+  const m = bracketModel(pools2());
+  const st = bracketRounds(m, 2, { A: 3, B: 2 });
+  const a = poolRoom(m, 'A');
+  const b = poolRoom(m, 'B');
+  assert.equal(roomRound(m, st, a, 2), 3);
+  assert.equal(roomRound(m, st, b, 2), 2);
+  assert.equal(roomBracket(m, st, a, 2), 'A');
+  assert.equal(roomRound(m, st, null, 2), 2);
+  assert.equal(roomIndexOf(m.schedule, { id: 102, room_name: 'x' }), 1, 'bucket link');
+  assert.equal(roomIndexOf(m.schedule, { id: 999, room_name: ' room 3 ' }), 2, 'name fallback');
+  assert.equal(roomIndexOf(m.schedule, { id: 999, room_name: 'nope' }), null);
+});
+
+test('brackets: auto-advance moves a finished bracket one round and nothing else', () => {
+  const m = bracketModel(pools2());
+  const st = bracketRounds(m, 2, {});
+  const aRooms = new Set(bkRooms(m, 'A', 2));
+  const bRooms = new Set(bkRooms(m, 'B', 2));
+  const env = (startedAt, packets = [3, 4, 5, 6]) => ({
+    matched: () => true, started: (r) => startedAt[r] || new Set(), hasPacket: (r) => packets.includes(r),
+  });
+  assert.deepEqual(autoAdvance(m, st, 2, env({ 2: aRooms })), { current: 2, rounds: { A: 3, B: 2 } });
+  assert.equal(autoAdvance(m, st, 2, env({ 2: aRooms }), 'B'), null, 'a B room\'s start never moves A');
+  assert.equal(autoAdvance(m, st, 2, env({ 2: aRooms }, [])), null, 'no packet, no round');
+  assert.equal(autoAdvance(m, st, 2, { ...env({ 2: aRooms }), matched: (i) => !aRooms.has(i) }), null, 'a room with no link never opens');
+  assert.deepEqual(autoAdvance(m, st, 2, env({ 2: new Set([...aRooms, ...bRooms]) })), { current: 3, rounds: { A: 3, B: 3 } });
+  // one round per call: starts left over from before a set-back don't cascade
+  const back = bracketRounds(m, 2, {});
+  const all = new Set([...aRooms, ...bRooms]);
+  assert.deepEqual(autoAdvance(m, back, 2, env({ 2: all, 3: all, 4: all })), { current: 3, rounds: { A: 3, B: 3 } });
+});
+
+test('brackets: the playoffs open together once every pool has started its last round', () => {
+  const m = bracketModel(pools2());
+  const aRooms = bkRooms(m, 'A', 5);
+  const bRooms = bkRooms(m, 'B', 5);
+  const env = (s) => ({ matched: () => true, started: (r) => (r === 5 ? s : new Set()), hasPacket: () => true });
+  const st = bracketRounds(m, 5, { A: 5, B: 5 });
+  assert.equal(autoAdvance(m, st, 5, env(new Set(aRooms))), null, 'Pool B still reading round 5');
+  assert.deepEqual(autoAdvance(m, st, 5, env(new Set([...aRooms, ...bRooms]))), { current: 6, rounds: {} });
+  // Pool A done, Pool B a round behind: A waits at the phase end
+  const st2 = bracketRounds(m, 4, { A: 5, B: 4 });
+  assert.equal(autoAdvance(m, st2, 4, env(new Set(aRooms)), 'A'), null);
+  assert.deepEqual(bracketRounds(m, 6, '{}').rounds, { CH: 6, CO: 6 });
+});
+
+test('brackets: Advance all and one bracket at a time', () => {
+  const m = bracketModel(pools2());
+  assert.deepEqual(advanceAll(m, bracketRounds(m, 3, { A: 4, B: 3 }), 3), { current: 5, rounds: { A: 5, B: 5 } });
+  assert.deepEqual(advanceAll(m, bracketRounds(m, 4, { A: 5, B: 4 }), 4), { current: 5, rounds: { A: 5, B: 5 } });
+  assert.deepEqual(advanceAll(m, bracketRounds(m, 5, { A: 5, B: 5 }), 5), { current: 6, rounds: {} });
+  assert.deepEqual(advanceAll(m, bracketRounds(m, 8, {}), 8), { current: 9, rounds: {} }, 'past the last phase');
+  assert.deepEqual(advanceBracket(m, bracketRounds(m, 2, {}), 'A'), { current: 2, rounds: { A: 3, B: 2 } });
+  assert.equal(advanceBracket(m, bracketRounds(m, 5, { A: 5, B: 5 }), 'A'), null, 'at the phase end');
+  const rr = bracketModel(buildSchedule('rr', BK12, BR6));
+  assert.deepEqual(advanceAll(rr, bracketRounds(rr, 4, null), 4), { current: 5, rounds: {} });
+});
+
+test('brackets: filled playoff slots keep their label and still tag', () => {
+  const s = pools2();
+  for (const ph of s.phases) for (const r of ph.rounds) for (const g of r.games) delete g.bracket;
+  delete s.brackets;
+  fillPlaceholders(s, { A: s.pools.A, B: s.pools.B });
+  const g = s.phases[1].rounds[0].games[0];
+  assert.equal(g.a.from, 'A1');
+  assert.equal(slotLabel(g.a), s.pools.A[0] + ' (A1)');
+  const m = bracketModel(s);
+  assert.deepEqual(m.phases[1].keys, ['CH', 'CO']);
+  assert.equal(slotLabel({ label: 'B2' }), 'Pool B 2nd');
+  assert.equal(slotLabel({ label: 'C11' }), 'Pool C 11th');
+  assert.equal(slotLabel({ team: 'Yale' }), 'Yale');
+  assert.equal(liveLayout(1), 'plain');
+  assert.equal(liveLayout(2), 'columns');
+  assert.equal(liveLayout(12), 'columns');
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

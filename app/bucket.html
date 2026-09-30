@@ -52,11 +52,14 @@
 </div>
 <script type="module">
 import { pub, esc, fmtBytes } from './js/api.js';
+import { slotLabel } from './engine/brackets.js';
 
 const $ = (id) => document.getElementById(id);
 const secret = new URLSearchParams(location.search).get('b') || '';
 let state = null;
 let closed = false;
+let schedGame = null; // brackets only: this room's game on its round, {a, b}
+let schedGameRound = 0;
 // worker.js NOT_STARTED: every room route answers this until the TD presses Start
 const NOT_STARTED = "Tournament hasn't started";
 
@@ -72,6 +75,11 @@ function render() {
   $('roundcard').hidden = false;
   $('readerlink').hidden = false;
   $('curround').textContent = 'Now on round ' + state.current_round;
+  // brackets that keep their own rounds: which one this room is in, and its game
+  if (state.bracket) {
+    $('curround').insertAdjacentHTML('beforeend', ` &middot; <span class="bname"><i class="lane-${Number(state.bracket.color) || 0}"></i>${
+      esc(state.bracket.name)}</span>${schedGame ? ` &middot; ${esc(schedGame.a)} vs ${esc(schedGame.b)}` : ''}`);
+  }
   $('closes').textContent = 'open until ' + new Date(state.closes).toLocaleString([], {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   const packets = state.packets || (state.packet ? [state.packet] : []);
@@ -105,10 +113,31 @@ function showClosed() {
   say('room closed', true);
 }
 
+// The game the schedule has this room playing in round n (placeholders
+// read "Pool A 1st" until the playoffs are filled), or null.
+async function roomGame(n) {
+  try {
+    const sr = await pub('/b/' + secret + '/schedule');
+    if (!sr || sr.room === null || !sr.schedule) return null;
+    for (const ph of sr.schedule.phases) for (const r of ph.rounds) {
+      if (r.round !== n) continue;
+      const g = r.games.find((x) => x.room === sr.room);
+      return g && g.a && g.b ? { a: slotLabel(g.a), b: slotLabel(g.b) } : null;
+    }
+  } catch (e) { /* no schedule: the round and bracket alone */ }
+  return null;
+}
+
 async function refresh() {
   if (closed) return;
   try {
     state = await pub('/b/' + secret);
+    // fetched once per round the room reaches, not on every refresh
+    if (!state.bracket) { schedGame = null; schedGameRound = 0; }
+    else if (schedGameRound !== state.current_round) {
+      schedGame = await roomGame(state.current_round);
+      schedGameRound = state.current_round;
+    }
     render();
   } catch (e) {
     if (e.message === 'room closed') showClosed();

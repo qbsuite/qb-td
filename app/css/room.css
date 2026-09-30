@@ -98,6 +98,10 @@ a.rnd:hover { text-decoration: none; background: var(--hover-bg); }
 #schedrows tr.now td:first-child { border-radius: 8px 0 0 8px; padding-left: 8px; }
 #schedrows tr.now td:last-child { border-radius: 0 8px 8px 0; }
 #schedrows tr td:first-child { padding-left: 8px; width: 34px; }
+/* brackets that keep their own rounds: a heading per phase and bracket */
+#schedrows tr.bhrow td { padding: 12px 0 4px; font-size: 12px; font-weight: 600; color: var(--fg); border-bottom: none; }
+#schedrows tr.bhrow i, #schedfrom i, .bname i { margin-right: 6px; vertical-align: 1px; }
+.bname { white-space: nowrap; }
 #tbrows td { border-bottom: 1px solid var(--line); padding: 8px 8px 8px 0; vertical-align: top; }
 #tbbase { font-size: 12px; margin-top: 8px; }
 

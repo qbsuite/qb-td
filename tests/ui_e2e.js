@@ -16,7 +16,7 @@ import path from 'node:path';
 import archive from '../app/archive/ug-nats-stanford.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseMatch, parseRoster, buildRosterQbj } from '../app/engine/qbj.js';
-import { roundRobinRounds, tagBrackets } from '../app/engine/schedule.js';
+import { roundRobinRounds, tagBrackets, buildSchedule } from '../app/engine/schedule.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { roundTossupBuzzes } from '../app/engine/buzz.js';
 import { BASE, call, d1exec, tick, ok, summary } from './e2e_lib.js';
@@ -739,20 +739,28 @@ async function openHub() {
 }
 await openHub();
 ok(`12 live: Round 1 / ${schedRounds}`, (await text('.biground')).replace(/\s+/g, ' ').trim() === `Round 1 / ${schedRounds}`, await text('.biground'));
+// a round robin's plain rows (.lrow), or a bracket schedule's rows under
+// their headings (.brow: the room name leads its second line)
 async function liveMarks() {
-  return js(`[...document.querySelectorAll('.lrow')].map((r) => [r.querySelector('.lroom').textContent,
+  return js(`[...document.querySelectorAll('.lrow, .brow')].map((r) => [r.querySelector('.lroom')
+    ? r.querySelector('.lroom').textContent : r.querySelector('.broom').firstChild.textContent,
     r.querySelector('.lmark').textContent.trim()])`);
 }
+const liveHeads = () => js(`[...document.querySelectorAll('.bcols .bhead b')].map((b) => b.textContent)`);
 async function expectLive(label, round) {
   const x = await detail();
   const startedSet = new Set((x.starts || []).filter((s) => s.round === round).map((s) => s.bucket_id));
-  const want = sched.rooms.map((_, room) => {
+  // two pools: rooms under their pool's heading, in pool order, room order within
+  const bix = (room) => sched.brackets.findIndex((br) => br.key === gameIn(round, room).bracket);
+  const want = sched.rooms.map((_, room) => room).sort((p, q2) => bix(p) - bix(q2) || p - q2).map((room) => {
     const b = roomBucket(room);
     const inFile = x.files.some((f) => f.bucket_id === b.id && f.round === round && (f.kind === 'qbj' || f.kind === 'combined') && !f.error);
     return [b.room_name, inFile ? '✓' : startedSet.has(b.id) ? '○' : '–'];
   });
   const got = await liveMarks();
   ok(`12 live: ${label}: one row per room, marks match the Worker`, JSON.stringify(got) === JSON.stringify(want), { got, want });
+  const heads = await liveHeads();
+  ok(`12 live: ${label}: a heading per pool`, JSON.stringify(heads) === JSON.stringify(['Pool A', 'Pool B']), heads);
   const k = sched.rooms.filter((_, room) => startedSet.has(roomBucket(room).id)).length;
   const railText = (await text('.railtoggle')).replace(/\s+/g, ' ');
   ok(`12 live: ${label}: auto-advance says ${k}/6 started`, railText.includes(`${k}/6 started`), railText);
@@ -766,9 +774,10 @@ await click('#autoadv');
 d = await until(async () => { const x = await detail(); return !settingsOf(x).autoAdvance && x; }, 'auto-advance off');
 ok('12 live: and off again', true);
 
-await waitJs(`!!document.querySelector('#advround')`, 'Advance');
-ok('15 rounds: the button reads Advance to round 2', (await text('#advround')).trim() === 'Advance to round 2');
-await click('#advround');
+// two pools keep their own rounds: the button advances every pool
+await waitJs(`!!document.querySelector('#advall')`, 'Advance');
+ok('15 rounds: the button reads Advance all to round 2', (await text('#advall')).trim() === 'Advance all to round 2', await text('#advall'));
+await click('#advall');
 d = await until(async () => { const x = await detail(); return x.tournament.current_round === 2 && x; }, 'advanced');
 await waitJs(`document.querySelector('.biground').textContent.includes('Round 2')`, 'hub on round 2');
 ok('15 rounds: Advance moves the Worker and the hub to round 2', true);
@@ -1114,6 +1123,147 @@ await desktop();
   ok('5b scale: a drag redraws quickly', Date.now() - t0 < 1500, Date.now() - t0);
   await click('#scheddiscard');
   await waitJs(`/Saved/.test(document.querySelector('.sgbar').textContent)`, 'big: discarded');
+}
+
+/* ---------- 12b. brackets that keep their own rounds ---------- */
+
+// Two pools, set up through the Worker: Pool A a round ahead of Pool B, a
+// Pool A room that started round 3 without its round 2 game, and a Pool B
+// room that uploaded a round 3 game early. Then a round robin, which must
+// look exactly as it always has.
+async function bracketDay(name, format) {
+  d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
+  const t = (await call('/api/tournaments', { method: 'POST', json: { name, slug: 'ui-bk-' + Math.random().toString(36).slice(2, 7) } })).body;
+  const TA = '/a/' + t.admin_secret;
+  const rooms = [];
+  for (let i = 0; i < 6; i++) rooms.push((await call(TA + '/buckets', { method: 'POST', json: { room_name: 'Hall ' + (i + 1) } })).body);
+  await call(TA + '/roster?name=roster.qbj', { method: 'POST',
+    body: JSON.stringify(buildRosterQbj(name, TEAMS.map((n) => ({ name: n, players: [player(n, 0)] })))) });
+  const s2 = buildSchedule(format, TEAMS, rooms.map((r) => ({ name: r.room_name, bucket: r.id })));
+  await call(TA + '/schedule', { method: 'POST', json: s2 });
+  const last = Math.max(...s2.phases.flatMap((p) => p.rounds.map((r) => r.round)));
+  for (let n = 1; n <= last; n++) {
+    await call(`${TA}/packet?round=${n}&name=P${n}.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: packetFor(n) });
+  }
+  await call(TA, { method: 'POST', json: { settings: { gameFormat: 'acf', autoAdvance: true } } });
+  await call(TA + '/start', { method: 'POST' });
+  const games = (n, key) => s2.phases.flatMap((p) => p.rounds).find((r) => r.round === n).games.filter((g) => g.a && g.b && (!key || g.bracket === key));
+  const room = (g) => rooms[g.room];
+  const start = (g, n) => call(`/b/${room(g).secret}/start?round=${n}`, { method: 'POST' });
+  const upload = (g, n) => call(`/b/${room(g).secret}/upload?round=${n}&name=${encodeURIComponent(`Round_${n}_${g.a.team}.qbj`)}`,
+    { method: 'POST', body: JSON.stringify(matchFor(n, g.a.team, g.b.team, g.room % 2 === 1)) });
+  return { t, TA, rooms, s2, last, games, room, start, upload, detail: async () => (await call(TA)).body };
+}
+async function openHubOf(adminSecret) {
+  await goto(`${PAGES}/index.html?a=${adminSecret}`);
+  await waitJs(`!!document.querySelector('.hubtab')`, 'the hub');
+  if (!(await exists('.biground'))) await click('[data-view="live"]');
+  await waitJs(`!!document.querySelector('.biground')`, 'the Live Hub');
+}
+{
+  const P = await bracketDay('UI E2E Pools', 'pools2');
+  for (const g of P.games(1)) { await P.start(g, 1); await P.upload(g, 1); }
+  for (const g of P.games(2, 'A')) await P.start(g, 2);
+  for (const g of P.games(2, 'A').slice(0, 2)) await P.upload(g, 2);
+  const lateA = P.games(3, 'A').find((g) => g.room === P.games(2, 'A')[2].room);
+  await P.start(lateA, 3);                                   // round 2 still not in
+  await P.upload(P.games(2, 'B')[0], 2);
+  const earlyB = P.games(3, 'B')[2];
+  await P.upload(earlyB, 3);                                  // before round 3 opened for Pool B
+  let x = await P.detail();
+  const br = JSON.parse(x.tournament.bracket_rounds);
+  ok('12b brackets: the Worker has Pool A on round 3, Pool B on 2', x.tournament.current_round === 2 && br.A === 3 && br.B === 2, br);
+
+  await openHubOf(P.t.admin_secret);
+  ok('12b brackets: Round 3 / 8, Prelims round 3 of 5, one pool behind',
+    (await text('.biground')).replace(/\s+/g, ' ').trim() === 'Round 3 / 8'
+      && (await text('.roundline')).replace(/\s+/g, ' ').includes('Prelims · round 3 of 5 · 1 bracket still on round 2'),
+    await text('.roundline'));
+  ok('12b brackets: Live now has a heading per pool', JSON.stringify(await liveHeads()) === JSON.stringify(['Pool A', 'Pool B']), await liveHeads());
+  // each heading's count, worked out from the Worker's files
+  const good = (f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
+  for (const key of ['A', 'B']) {
+    const gs = P.games(br[key], key);
+    const nIn = gs.filter((g) => x.files.some((f) => f.bucket_id === P.room(g).id && f.round === br[key] && good(f))).length;
+    const head = (await js(`document.querySelector('.bgroup[data-bracket="${key}"] .bhead').textContent`)).replace(/\s+/g, ' ');
+    ok(`12b brackets: Pool ${key}'s heading says ${nIn}/${gs.length} in${key === 'B' ? ' and that it is still on round 2' : ''}`,
+      head.includes(`${nIn}/${gs.length} in`) && (key === 'B') === head.includes('still on round 2'), head);
+  }
+  const rowNote = (bid) => js(`((document.querySelector('.brow[data-room="${bid}"] .bnote') || {}).textContent || '')`);
+  const rowMark = (bid) => js(`document.querySelector('.brow[data-room="${bid}"] .lmark').textContent.trim()`);
+  ok('12b brackets: a room that started round 3 without its round 2 game is flagged',
+    (await rowNote(P.room(lateA).id)) === 'Round 2 game still not in. Started round 3 anyway.' && (await rowMark(P.room(lateA).id)) === '!',
+    await rowNote(P.room(lateA).id));
+  ok('12b brackets: a room that uploaded for a round it hasn\'t reached is flagged',
+    (await rowNote(P.room(earlyB).id)) === 'Also uploaded a round 3 game before round 3 opened. Check its round number.'
+      && (await rowMark(P.room(earlyB).id)) === '!' && x.early.length === 1,
+    [await rowNote(P.room(earlyB).id), x.early]);
+  ok('12b brackets: every other row is unflagged', (await js(`document.querySelectorAll('.brow .bnote').length`)) === 2);
+  const startedNow = P.rooms.filter((b) => (x.starts || []).some((s2) => s2.bucket_id === b.id && s2.round === x.room_rounds[b.id])).length;
+  const rail = (await text('.railtoggle')).replace(/\s+/g, ' ');
+  ok(`12b brackets: auto-advance says ${startedNow}/6 started`, rail.includes(`${startedNow}/6 started`), rail);
+  const lines = await js(`[...document.querySelectorAll('.bline')].map((l) => l.textContent.replace(/\\s+/g, ' ').trim())`);
+  ok('12b brackets: the rail lists each pool, its round and its own Advance',
+    lines.length === 2 && lines[0].startsWith('Pool A rd 3') && lines[1].startsWith('Pool B rd 2') && lines.every((l) => l.endsWith('Advance')), lines);
+  ok('12b brackets: Advance all to round 4, and who catches up',
+    (await text('#advall')).trim() === 'Advance all to round 4' && (await text('.liverail')).includes('Pool B catches up to round 4 too.'));
+  ok('12b brackets: the uploads grid names the phases over the rounds',
+    JSON.stringify(await js(`[...document.querySelectorAll('.ugrid tr.uphase th span')].map((e) => e.textContent)`)) === JSON.stringify(['Prelims', 'Playoffs']));
+  ok('12b brackets: and groups its rooms by pool',
+    JSON.stringify(await js(`[...document.querySelectorAll('.ugrid tr.ugroup b')].map((e) => e.textContent)`)) === JSON.stringify(['Pool A', 'Pool B']));
+  const a0 = P.room(P.games(1, 'A')[0]).id;
+  ok('12b brackets: a cell says its round and pool',
+    (await js(`document.querySelector('[data-cell="${a0}:1"]').title`)) === 'Round 1 · Pool A: Game in',
+    await js(`document.querySelector('[data-cell="${a0}:1"]').title`));
+
+  // Pool B's own Advance, through the page, reaches the Worker
+  await click('[data-advbracket="B"]');
+  x = await until(async () => { const y = await P.detail(); return JSON.parse(y.tournament.bracket_rounds).B === 3 && y; }, 'Pool B advanced');
+  ok('12b brackets: Pool B\'s Advance moves Pool B only, and the Worker agrees',
+    x.tournament.current_round === 3 && JSON.parse(x.tournament.bracket_rounds).A === 3, x.tournament);
+  await waitJs(`!document.querySelector('.bgroup[data-bracket="B"] .bhead').textContent.includes('still on round')`, 'Pool B caught up on the page');
+  ok('12b brackets: the hub follows', (await text('.roundline')).replace(/\s+/g, ' ').includes('Prelims · round 3 of 5')
+    && !(await text('.roundline')).includes('still on round'));
+
+  // the reader and the upload page of a Pool B room say which pool it is in
+  const gB = P.games(3, 'B')[0];
+  const bB = P.room(gB);
+  await goto(`${PAGES}/read.html?b=${bB.secret}`);
+  await waitJs(`!document.querySelector('#schedpanel').hidden && !document.querySelector('#schedmatch').hidden`, 'the Pool B reader');
+  ok('12b reader: the header says the room, its round and its pool',
+    (await text('#room')).replace(/\s+/g, ' ').trim() === `${bB.room_name} · Round 3 · Pool B`, await text('#room'));
+  ok('12b reader: From the schedule names the pool',
+    (await text('#schedfrom')).replace(/\s+/g, ' ').trim() === `From the schedule · Pool B · Round 3 in ${bB.room_name}`, await text('#schedfrom'));
+  const heads = await js(`[...document.querySelectorAll('#schedrows tr.bhrow')].map((r) => r.textContent.trim())`);
+  ok('12b reader: this room\'s schedule splits under phase and bracket headings',
+    heads.length === 2 && heads[0] === 'Prelims · Pool B' && /^Playoffs · (Championship|Consolation)$/.test(heads[1]), heads);
+  ok('12b reader: playoff games read as placeholders until filled',
+    (await js(`[...document.querySelectorAll('#schedrows tr:not(.bhrow)')].slice(-1)[0].textContent`)).match(/Pool [AB] \d+(st|nd|rd|th) v Pool [AB] \d+(st|nd|rd|th)/) !== null,
+    await js(`[...document.querySelectorAll('#schedrows tr:not(.bhrow)')].slice(-1)[0].textContent`));
+  await goto(`${PAGES}/bucket.html?b=${bB.secret}`);
+  await waitJs(`!!document.querySelector('#curround .bname')`, 'the Pool B upload page');
+  ok('12b room page: Now on round 3 · Pool B · the game',
+    (await text('#curround')).replace(/\s+/g, ' ').trim() === `Now on round 3 · Pool B · ${gB.a.team} vs ${gB.b.team}`, await text('#curround'));
+}
+{
+  // a round robin: one bracket, no bracket anything
+  const R = await bracketDay('UI E2E Round Robin', 'rr');
+  for (const g of R.games(1)) { await R.start(g, 1); await R.upload(g, 1); }
+  const x = await R.detail();
+  ok('12b round robin: the Worker keeps one round', x.tournament.bracket_rounds === null && x.tournament.current_round === 2, x.tournament);
+  await openHubOf(R.t.admin_secret);
+  ok('12b round robin: Live now is the plain list, no headings',
+    (await js(`document.querySelectorAll('.bcols, .bgroup, .brow').length`)) === 0 && (await js(`document.querySelectorAll('.lrow').length`)) === 6);
+  ok('12b round robin: no phase line, the usual Advance',
+    !/round \d+ of \d+/.test(await text('.roundline')) && (await text('#advround')).trim() === 'Advance to round 3'
+      && !(await exists('.bline')) && !(await exists('.ugrid tr.ugroup')) && !(await exists('.ugrid tr.uphase')));
+  await goto(`${PAGES}/read.html?b=${R.rooms[0].secret}`);
+  await waitJs(`!document.querySelector('#schedpanel').hidden`, 'the round robin reader');
+  ok('12b round robin: the reader header has no bracket', (await text('#room')).replace(/\s+/g, ' ').trim() === `${R.rooms[0].room_name} · Round 2`
+    && !(await exists('#schedrows tr.bhrow')), await text('#room'));
+  await goto(`${PAGES}/bucket.html?b=${R.rooms[0].secret}`);
+  await waitJs(`!document.querySelector('#roundcard').hidden`, 'the round robin upload page');
+  ok('12b round robin: the upload page says the round alone', (await text('#curround')).trim() === 'Now on round 2', await text('#curround'));
 }
 
 /* ---------- 25. no page errors anywhere ---------- */

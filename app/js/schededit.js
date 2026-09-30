@@ -42,7 +42,7 @@ export function schedEscape() {
   return true;
 }
 
-const COLORS = 4; // lane tints cycle (hub.css .lane-0..3)
+const COLORS = 8; // lane tints cycle (td.css .lane-0..7)
 const refKey = (x) => x.bye !== undefined ? `${x.p}.${x.r}.b${x.bye}` : `${x.p}.${x.r}.${x.room}.${x.side}`;
 const cellKey = (x) => `${x.p}.${x.r}.${x.room}`;
 const slotShow = (s) => {

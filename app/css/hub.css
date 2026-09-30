@@ -77,13 +77,44 @@ body.hubpage .wrap { max-width: 1180px; padding: 22px 32px 64px; }
 .lrow .lmark.muted { color: var(--muted); }
 .lrow.bye .lroom, .lrow.bye .lgame { color: var(--muted); }
 
+/* Live now with brackets (admin.js liveBracketsHtml): a heading per
+   bracket, flowing in two balanced columns */
+.bcols { column-count: 2; column-gap: 32px; }
+.bgroup { break-inside: avoid; padding-bottom: 6px; }
+.bhead { display: flex; align-items: center; gap: 8px; padding: 14px 0 4px; font-size: 13px; }
+.bhead i { width: 9px; height: 9px; }
+.bhead .spacer { flex: 1; }
+.brow {
+  display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 8px; align-items: center;
+  min-height: 38px; padding: 3px 8px; margin: 0 -8px; border-top: 1px solid var(--line); border-radius: 8px; font-size: 13px;
+}
+.brow:hover, .brow:focus-within { background: var(--sel); }
+.bgame { display: flex; flex-direction: column; min-width: 0; font-variant-numeric: tabular-nums; }
+.bteams { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bteams .win { font-weight: 600; }
+.broom { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
+.broom .lacts { display: flex; gap: 10px; opacity: 0; }
+.brow:hover .lacts, .brow:focus-within .lacts { opacity: 1; }
+.broom .linkbtn, .broom a { font-size: 11px; }
+.bnote { font-size: 11px; color: var(--warn); line-height: 1.35; white-space: normal; }
+.brow .lmark { text-align: center; font-size: 15px; font-weight: 700; }
+.brow .lmark.warn { color: var(--warn); }
+.brow .lmark.muted { color: var(--muted); }
+.brow.bye .bteams { color: var(--muted); }
+.bplain .brow { font-size: 14px; }
+/* the rail's bracket list */
+.blist { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.bline { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 2px 0; }
+.bline .linkbtn { font-size: 13px; }
+
 /* Uploads grid: rooms down, rounds across */
 .ugrid { width: auto; font-variant-numeric: tabular-nums; margin-top: 4px; }
 .ugrid th, .ugrid td { border-bottom: none; padding: 0; }
 .ugrid tr + tr td { border-top: 1px solid var(--line); }
 .ugrid th { font-size: 13px; color: var(--muted); text-align: center; padding: 10px 0 8px; width: 40px; }
 .ugrid th.now { color: var(--fg); font-weight: 700; }
-.ugrid .uroom { text-align: left; color: var(--muted); font-size: 14px; padding: 6px 16px 6px 0; min-width: 12ch; width: auto; }
+.ugrid .uroom { text-align: left; color: var(--muted); font-size: 14px; padding: 6px 16px 6px 0; min-width: 12ch; width: auto;
+  white-space: nowrap; overflow-wrap: normal; max-width: 26ch; overflow: hidden; text-overflow: ellipsis; }
 .ugrid td.ucell { text-align: center; padding: 3px 0; }
 .umark {
   display: inline-grid; place-items: center; width: 32px; height: 28px; border-radius: 8px;
@@ -96,6 +127,12 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 .umark.sel { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--link); }
 .legend { font-size: 13px; margin-top: 10px; }
 
+/* grouped by bracket: a heading row per bracket, phase names over the rounds */
+.ugrid tr.ugroup td { border-top: none; padding: 12px 0 4px; font-size: 12px; text-align: left; }
+.ugrid tr.ugroup td i { margin-right: 8px; }
+.ugrid tr.ugroup td .muted { margin-left: 8px; }
+.ugrid tr.uphase th { padding: 8px 0 2px; font-size: 12px; font-weight: 400; text-align: left; }
+.ugrid tr.uphase th span { display: block; margin: 0 2px; padding: 0 4px 2px; border-bottom: 2px solid var(--line); }
 /* the open cell's files, under its row */
 .ugrid tr.cellpanel td { border-top: none; padding: 4px 0 14px; text-align: left; }
 .pop {
@@ -206,7 +243,8 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 
 @media (max-width: 900px) {
   .livegrid, .setupgrid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-  .lrow .lacts { opacity: 1; }
+  .lrow .lacts, .broom .lacts { opacity: 1; }
+  .bcols { column-count: 1; }
 }
 /* Packets: the heading row (title, round count, Add / Remove) carries the rule */
 #setupsec .pkhead { align-items: center; border-bottom: 1px solid var(--fg); padding-bottom: 10px; margin-bottom: 0; }
@@ -229,18 +267,8 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 .debugrow { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 13px; }
 
 /* ================= Schedule step (schededit.js) ================= */
-.lane-0 { --lc: #2f5fb3; --lt: #eef2fa; }
-.lane-1 { --lc: #b8741a; --lt: #fbf3e6; }
-.lane-2 { --lc: #2f7d57; --lt: #eaf5ef; }
-.lane-3 { --lc: #8b3fa6; --lt: #f5ecf8; }
-.lane-x { --lc: var(--muted); --lt: var(--hover-bg); }
-@media (prefers-color-scheme: dark) {
-  .lane-0 { --lc: #8fb0f5; --lt: #26314a; }
-  .lane-1 { --lc: #e3ad63; --lt: #3a2f20; }
-  .lane-2 { --lc: #74c69b; --lt: #21352a; }
-  .lane-3 { --lc: #c99ae0; --lt: #33263a; }
-}
-i.lane-0, i.lane-1, i.lane-2, i.lane-3, i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
+/* .lane-0..3 / .lane-x colors live in td.css (the room pages use them too) */
+i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
   display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--lc); flex: none;
 }
 .sgchips .chip i { margin-right: 6px; }

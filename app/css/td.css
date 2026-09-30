@@ -443,3 +443,28 @@ table.pktable { margin-top: 4px; border-top: 1px solid var(--line); }
 .pktable tr.slot.dragover td { background: var(--sel); }
 .pktable tr.up .dot { background: none; box-shadow: none; border: 2px solid var(--fg); border-right-color: transparent;
   width: 6px; height: 6px; animation: spin .7s linear infinite; }
+
+/* Bracket colors (a schedule bracket's order in its phase, mod 8):
+   the schedule editor, Live Hub and the room pages share them. */
+.lane-0 { --lc: #2f5fb3; --lt: #eef2fa; }
+.lane-1 { --lc: #b8741a; --lt: #fbf3e6; }
+.lane-2 { --lc: #2f7d57; --lt: #eaf5ef; }
+.lane-3 { --lc: #8b3fa6; --lt: #f5ecf8; }
+.lane-4 { --lc: #1f7a8c; --lt: #e6f3f5; }
+.lane-5 { --lc: #b83b5e; --lt: #f9e9ee; }
+.lane-6 { --lc: #6b7a1f; --lt: #f1f4e3; }
+.lane-7 { --lc: #5b6475; --lt: #eceef2; }
+.lane-x { --lc: var(--muted); --lt: var(--hover-bg); }
+@media (prefers-color-scheme: dark) {
+  .lane-0 { --lc: #8fb0f5; --lt: #26314a; }
+  .lane-1 { --lc: #e3ad63; --lt: #3a2f20; }
+  .lane-2 { --lc: #74c69b; --lt: #21352a; }
+  .lane-3 { --lc: #c99ae0; --lt: #33263a; }
+  .lane-4 { --lc: #6cc3d3; --lt: #1f3337; }
+  .lane-5 { --lc: #ec8ea8; --lt: #3a2229; }
+  .lane-6 { --lc: #b7c46a; --lt: #2c301c; }
+  .lane-7 { --lc: #a9b1c1; --lt: #2c2f36; }
+}
+i.lane-0, i.lane-1, i.lane-2, i.lane-3, i.lane-4, i.lane-5, i.lane-6, i.lane-7 {
+  display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--lc); flex: none;
+}
