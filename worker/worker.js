@@ -1044,6 +1044,12 @@ async function tickTournaments(env) {
     try {
       const isPublic = t.published || t.set_published;
       const { manifest } = isPublic || t.set_id ? await rebuildTournament(env, t) : {};
+      // the hub's "Up to date" mark: public data rebuilt as of now. Only a
+      // hint, so it never fails the rebuild it describes
+      if (isPublic) {
+        await env.DB.prepare('UPDATE tournaments SET pub_built = ?2 WHERE id = ?1')
+          .bind(t.id, Date.now()).run().catch((e) => console.log('pub_built for', t.slug, e.message));
+      }
       if (!snapshots) continue;
       // public only through its set: the games go out, the mirror's own
       // page (schedule, roster, category map) stays its TD's call
@@ -1409,6 +1415,19 @@ async function renameBucket(request, env, t, bucketId) {
     'UPDATE buckets SET room_name = ?3 WHERE id = ?1 AND tournament_id = ?2'
   ).bind(bucketId, t.id, roomName).run();
   if (!out.meta.changes) return err(env, 404, 'no such room');
+  // The saved schedule keeps its own copy of each room's name: follow the
+  // rename on the rooms linked to this one, so the public schedule and the
+  // reader say the new name without a trip through the schedule editor.
+  const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
+  const sched = obj ? await obj.json().catch(() => null) : null;
+  if (sched && Array.isArray(sched.rooms) && sched.rooms.some((r) => r && r.bucket === Number(bucketId))) {
+    for (const r of sched.rooms) if (r && r.bucket === Number(bucketId)) r.name = roomName;
+    await env.DATA.put(`t/${t.id}/schedule.json`, JSON.stringify(sched), {
+      httpMetadata: { contentType: 'application/json' },
+    });
+  }
+  // game rows on the public page carry the room's name
+  await markPub(env, t.id);
   return json(env, { id: bucketId, room_name: roomName });
 }
 
@@ -4211,7 +4230,8 @@ export default {
         // not the rooms + files + starts reads of a full detail.
         const held = url.searchParams.get('rev');
         if (held !== null && /^\d+$/.test(held) && Number(held) === t.rev) {
-          return json(env, { unchanged: true, rev: t.rev });
+          // the public page mark rides along: the cron's columns don't move rev
+          return json(env, { unchanged: true, rev: t.rev, pub_dirty: t.pub_dirty, pub_built: t.pub_built ?? null });
         }
         return getTournament(env, t, ctx);
       }

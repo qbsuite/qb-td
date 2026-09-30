@@ -4,6 +4,9 @@ Release Notes for 9/29/2026
 - New look across the hub, room pages and public page: fewer boxes, softer dark mode.
 - Status messages show briefly at the bottom of the window; errors stay until clicked.
 
+[ HUB ]
+- Next to Open public page: Updating while your latest changes are on their way to viewers (a minute or two), then Up to date.
+
 [ LIVE HUB ]
 - Round line across the top, with a Live now list: one row per room with its game and status.
 - Uploads is a rooms by rounds grid. Click a cell to see its files, move one to another room, or delete it.
@@ -28,6 +31,7 @@ Release Notes for 9/29/2026
 - Fixed Save format sometimes saving the previous preset.
 - "Bucket" links are now "Upload page".
 - Add &debug to the hub's URL once to load test rosters from the Roster step; it stays on in that browser until &debug=0.
+- Renaming a room now updates the schedule and the public page too.
 
 [ SCHEDULE ]
 - New schedule editor: rooms grouped by bracket (Pool A, Championship, 1st place...), round numbers and rooms stay in view while scrolling.

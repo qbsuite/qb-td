@@ -261,7 +261,7 @@ async function showDetail(quiet = false, held = null) {
   let detail;
   try {
     detail = await pub(Number.isInteger(held) ? a + '?rev=' + held : a);
-    if (detail.unchanged) return false;
+    if (detail.unchanged) { notePub(detail); return false; }
   } catch (e) {
     if (quiet && e.message !== 'tournament closed') return;
     if (e.message === 'tournament closed') {
@@ -280,7 +280,33 @@ async function showDetail(quiet = false, held = null) {
   catch (e) { tbPool = null; }
   lastDetail = detail;
   render();
+  // the header isn't redrawn when the view stays put: its mark is
+  notePub({});
   return true;
+}
+
+// The mark beside Open public page: whether viewers see the latest
+// changes yet. Most changes reach the public page on the cron's next
+// rebuild (once a minute), and viewers' copies cache for 60s on top, so
+// it reads Updating while a rebuild is pending and for a minute after.
+// Rough on purpose: it's there to explain a lag, not to time one.
+const PUB_CACHE_MS = 60 * 1000;
+function pubWaiting(t) {
+  return !!t.published && (!!t.pub_dirty || (!!t.pub_built && Date.now() - t.pub_built < PUB_CACHE_MS));
+}
+function pubMarkHtml(t) {
+  if (!t.published) return '<span id="pubmark" class="pubstat">Page off</span>';
+  return pubWaiting(t)
+    ? '<span id="pubmark" class="pubstat wait" title="Viewers see this change within a couple of minutes"><span class="mk">&#9675;</span>Updating</span>'
+    : '<span id="pubmark" class="pubstat" title="Viewers see your latest changes"><span class="mk">&#10003;</span>Up to date</span>';
+}
+// a refresh's pub_dirty / pub_built onto the detail on screen, and the mark
+function notePub(x) {
+  if (!lastDetail || !x) return;
+  if ('pub_dirty' in x) lastDetail.tournament.pub_dirty = x.pub_dirty;
+  if ('pub_built' in x) lastDetail.tournament.pub_built = x.pub_built;
+  const m = $('pubmark');
+  if (m) m.outerHTML = pubMarkHtml(lastDetail.tournament);
 }
 
 // The four setup steps and their done state.
@@ -361,6 +387,7 @@ function render() {
         <span class="spacer" style="flex:1"></span>
         <button class="linkbtn" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy public link</button>
         <a href="${esc(statsLink(t.slug))}" target="_blank">Open public page</a>
+        ${pubMarkHtml(t)}
         <button id="rotate" class="linkbtn">New admin link</button>
       </nav>
       ${t.set ? `<div class="muted" style="font-size:13px;margin-top:6px">Mirror of <b>${esc(t.set.name)}</b>${
@@ -628,6 +655,10 @@ function renderRoomsSec(a, t, buckets, files) {
       try {
         await pub(a + '/buckets/' + inp.dataset.roomrename, {
           method: 'POST', json: { room_name: name } });
+        // the Worker renamed the saved schedule's copy; the one held here
+        // (saved or mid-edit) follows, so a later save doesn't undo it
+        const bid = Number(inp.dataset.roomrename);
+        if (sched && Array.isArray(sched.rooms)) sched.rooms.forEach((r) => { if (r && r.bucket === bid) r.name = name; });
         say('Renamed to ' + name);
         showDetail();
       } catch (e) { say(e.message, true); }
@@ -2128,11 +2159,23 @@ if (adminSecret) {
   // the tab. Rounds advancing never wait on this: that's the Worker's.
   let quietChecks = 0;
   let timer = null;
-  const nextCheck = () => (quietChecks >= 4 ? 120 : quietChecks >= 2 ? 60 : 30) * 1000;
+  // while the public page mark reads Updating, check at least once a
+  // minute, so it turns to Up to date without a reload
+  const nextCheck = () => Math.min(quietChecks >= 4 ? 120 : quietChecks >= 2 ? 60 : 30,
+    lastDetail && pubWaiting(lastDetail.tournament) ? 60 : 120) * 1000;
   const liveRefresh = async () => {
     clearTimeout(timer);
     try {
-      if (document.visibilityState !== 'visible' || shownView !== 'live' || !lastDetail) return;
+      if (document.visibilityState !== 'visible' || !lastDetail) return;
+      // Setup isn't redrawn under the TD (the schedule editor holds work):
+      // there, only the mark moves, and only while it reads Updating
+      if (shownView !== 'live') {
+        if (!pubWaiting(lastDetail.tournament)) { notePub({}); return; }
+        const held = lastDetail.tournament.rev;
+        const x = await pub('/a/' + adminSecret + '?rev=' + held).catch(() => null);
+        notePub(x && (x.unchanged ? x : x.tournament));
+        return;
+      }
       const el = document.activeElement;
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
       if (!$('linkmodal').hidden) return;

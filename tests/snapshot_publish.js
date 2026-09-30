@@ -113,6 +113,7 @@ function fakeDb(state) {
       const t = state.tournaments.find((x) => x.id === args[0]);
       if (/SET pub_dirty = 1/.test(sql)) { t.pub_dirty = 1; return; }
       if (/SET pub_dirty = 0/.test(sql)) { t.pub_dirty = 0; return; }
+      if (/SET pub_built = \?2/.test(sql)) { t.pub_built = args[1]; return; }
       if (/SET pub_snapshot = \?2/.test(sql)) { t.pub_snapshot = args[1]; return; }
       if (/SET pub_snapshot = NULL/.test(sql)) { t.pub_snapshot = null; return; }
       throw new Error('unexpected run(): ' + sql);
@@ -245,6 +246,7 @@ const realFetch = globalThis.fetch;
   const snap = JSON.parse(t.pub_snapshot);
   ok('fresh publish: one commit, ref advanced once',
     gh.refUpdates === 1 && snap.sha === 'commit-1' && gh.branchSha === 'commit-1');
+  ok('fresh publish: records when it rebuilt (the hub\'s public page mark)', typeof t.pub_built === 'number' && t.pub_built > 0, t.pub_built);
   ok('fresh publish: a shard per round, each holding its own game',
     shardOf(objects, 1, 1).entries.length === 1 && shardOf(objects, 1, 1).entries[0].id === 3
     && shardOf(objects, 1, 2).entries[0].id === 7);

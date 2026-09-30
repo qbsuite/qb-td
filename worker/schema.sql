@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- are configured). Existing databases get these from migrate-pub.sql.
   pub_dirty INTEGER NOT NULL DEFAULT 0,
   pub_snapshot TEXT,                 -- descriptor of the last published commit
+  -- When the cron last finished rebuilding it (epoch ms): the hub's
+  -- public page mark. Existing databases get it from migrate-pubbuilt.sql.
+  pub_built INTEGER,
   -- Mirrors of a question set (worker.js "question sets"): the set this
   -- tournament was started from, and the set's content key encrypted
   -- under this tournament's own — its rounds rows point at the set's

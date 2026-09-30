@@ -636,10 +636,45 @@ await waitJs(`!!document.querySelector('#pub')`, 'public page section');
 await js(`document.querySelector('#pub').checked = false; document.querySelector('#pub').dispatchEvent(new Event('change')); true`);
 d = await until(async () => { const x = await detail(); return !x.tournament.published && x; }, 'public page off');
 ok('8 public: switching the page off reaches the Worker', true);
+await waitJs(`(document.querySelector('#pubmark') || {}).textContent === 'Page off'`, 'the mark says Page off');
+ok('8 public: the header mark says Page off', true);
 await waitJs(`!!document.querySelector('#pub') && !document.querySelector('#pub').checked`, 'rerendered off');
 await js(`document.querySelector('#pub').checked = true; document.querySelector('#pub').dispatchEvent(new Event('change')); true`);
 d = await until(async () => { const x = await detail(); return x.tournament.published && x; }, 'public page on');
 ok('8 public: and back on', true);
+await waitJs(`/Updating/.test((document.querySelector('#pubmark') || {}).textContent || '')`, 'the mark');
+ok('8 public: turning it on marks the page Updating', true);
+// the cron rebuilds; a minute on (viewers' cache), the mark reads Up to date
+await tick();
+d1exec(`UPDATE tournaments SET pub_built = 1000 WHERE id = ${tid}`);
+await goto(`${PAGES}/index.html?a=${secret}`);
+await waitJs(`!!document.querySelector('[data-view="setup"]')`, 'the hub');
+await click('[data-view="setup"]');
+await waitJs(`document.querySelectorAll('.stepbtn').length === 6`, 'the step list');
+await waitJs(`/Up to date/.test((document.querySelector('#pubmark') || {}).textContent || '')`, 'Up to date');
+ok('8 public: once rebuilt, the mark reads Up to date', (await js(`document.querySelector('#pubmark').className`)) === 'pubstat');
+// a room renamed on the Rooms step: the saved schedule and the one held
+// by the page both follow, and the public page rebuilds
+{
+  const b = buckets[1];
+  const si = (await storedSched()).rooms.findIndex((r) => r.bucket === b.id);
+  await click('[data-step="rooms"]');
+  await waitJs(`!!document.querySelector('[data-roomrename="${b.id}"]')`, 'the room row');
+  await fill(`[data-roomrename="${b.id}"]`, 'Hall 7 East', ['change']);
+  const st = await until(async () => { const x = await storedSched(); return x.rooms[si].name === 'Hall 7 East' && x; }, 'schedule renamed');
+  ok('8 rename: the saved schedule follows a room rename', st.rooms[si].name === 'Hall 7 East');
+  await waitJs(`/Updating/.test((document.querySelector('#pubmark') || {}).textContent || '')`, 'Updating after rename');
+  ok('8 rename: and the page marks the public page Updating', true);
+  await click('[data-step="sched"]');
+  await waitJs(`!!document.querySelector('[data-roomname="${si}"]')`, 'schedule rooms');
+  ok('8 rename: the schedule step shows the new name', (await js(`document.querySelector('[data-roomname="${si}"]').value`)) === 'Hall 7 East');
+  await click('[data-step="rooms"]');
+  await waitJs(`!!document.querySelector('[data-roomrename="${b.id}"]')`, 'the room row');
+  await fill(`[data-roomrename="${b.id}"]`, b.room_name, ['change']);
+  await until(async () => (await storedSched()).rooms[si].name === b.room_name, 'renamed back');
+  await click('[data-step="stats"]');
+  await waitJs(`!!document.querySelector('#pub')`, 'public page section');
+}
 await waitJs(`!!document.querySelector('#buzzmode')`, 'buzzpoints controls');
 await fill('#buzzmode', 'password', ['change']);
 await waitJs(`!document.querySelector('#buzzpw').hidden`, 'password field');

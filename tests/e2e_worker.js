@@ -871,8 +871,28 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('bucket renamed', r.status === 200 && r.body.room_name === 'Library 204', r.body);
   r = await call('/b/' + secret);
   ok('rename reflected in bucket state', r.body.room === 'Library 204', r.body.room);
+  // the saved schedule's copy of the name follows (linked rooms only), and
+  // the public data is flagged for a rebuild so game rows follow too
+  r = await call('/b/' + secret + '/schedule');
+  ok('rename reaches the saved schedule', r.body.schedule.rooms[r.body.room].name === 'Library 204'
+    && r.body.schedule.rooms.some((x) => x.bucket === null && x.name === 'Room 2'), r.body.schedule && r.body.schedule.rooms);
+  ok('rename flags a public rebuild', d1row(`SELECT pub_dirty FROM tournaments WHERE slug = '${slug}'`).pub_dirty === 1);
+  // the hub's public page mark: an unchanged refresh carries the flag and
+  // the last rebuild's time
+  let held = (await call(A)).body.tournament.rev;
+  r = await call(A + '?rev=' + held);
+  ok('an unchanged refresh carries the public page state', r.body.unchanged === true && r.body.pub_dirty === 1 && 'pub_built' in r.body, r.body);
+  const t0 = Date.now();
+  await tick();
+  r = await call(A + '?rev=' + held);
+  ok('the rebuild clears it and records when', r.body.unchanged === true && r.body.pub_dirty === 0 && r.body.pub_built >= t0 - 1000, r.body);
+  r = await call('/pub/' + slug);
+  ok('rebuilt public game rows carry the new room name', r.body.files.some((f) => f.room === 'Library 204')
+    && !r.body.files.some((f) => f.room === 'Room 1'), r.body.files.map((f) => f.room));
   r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: 'Room 1' } });
   ok('rename back', r.status === 200);
+  r = await call('/b/' + secret + '/schedule');
+  ok('and the schedule follows back', r.body.schedule.rooms[r.body.room].name === 'Room 1');
   r = await call(`${A}/buckets/999999`, { method: 'POST', json: { room_name: 'X' } });
   ok('rename unknown room 404', r.status === 404, r.body);
   r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: '  ' } });

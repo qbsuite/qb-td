@@ -571,6 +571,8 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-rev.sql
 # ...and one from before per-bracket rounds (once; the ALTER isn't re-runnable):
 #   npx wrangler d1 execute qb-td --local --file migrate-brackets.sql
+# ...and one from before the hub's public page mark (once, same reason):
+#   npx wrangler d1 execute qb-td --local --file migrate-pubbuilt.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled
 npx wrangler dev --local --port 8799 --test-scheduled &
@@ -657,6 +659,9 @@ first.
    dirty-row indexes), and one from before per-bracket rounds needs
    `npx wrangler d1 execute qb-td --remote --file migrate-brackets.sql`
    (every room route reads `tournaments.bracket_rounds`),
+   and one from before the hub's public page mark needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-pubbuilt.sql`
+   (the cron writes `tournaments.pub_built`),
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy
