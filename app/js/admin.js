@@ -286,25 +286,41 @@ async function showDetail(quiet = false, held = null) {
 }
 
 // The mark beside Open public page: whether viewers see the latest
-// changes yet. Most changes reach the public page on the cron's next
-// rebuild (once a minute), and viewers' copies cache for 60s on top, so
-// it reads Updating while a rebuild is pending and for a minute after.
+// changes yet. Changes reach the public page on the cron's next rebuild
+// (once a minute). When the Worker serves the page from qb-td-live
+// (t.live, worker.js liveMark), Updating lasts until the file carrying
+// the change has deployed, plus a moment for it to spread, and Delayed
+// says deploys are failing — viewers are on older results, or on the
+// Worker, until a retry lands. Without it, viewers' copies of /pub/:slug
+// cache for 60s, so it reads Updating for a minute after the rebuild.
 // Rough on purpose: it's there to explain a lag, not to time one.
 const PUB_CACHE_MS = 60 * 1000;
+const LIVE_SPREAD_MS = 30 * 1000;
 function pubWaiting(t) {
-  return !!t.published && (!!t.pub_dirty || (!!t.pub_built && Date.now() - t.pub_built < PUB_CACHE_MS));
+  if (!t.published) return false;
+  if (t.pub_dirty) return true;
+  if (t.live) {
+    return t.live.state === 'pending'
+      || (t.live.state === 'ok' && !!t.live.at && Date.now() - t.live.at < LIVE_SPREAD_MS);
+  }
+  return !!t.pub_built && Date.now() - t.pub_built < PUB_CACHE_MS;
 }
 function pubMarkHtml(t) {
   if (!t.published) return '<span id="pubmark" class="pubstat">Page off</span>';
+  if (t.live && t.live.state === 'failing' && !t.pub_dirty) {
+    return '<span id="pubmark" class="pubstat wait" title="Publishing to the public page is failing and retrying on its own. '
+      + 'Viewers may see older results until it lands."><span class="mk">&#9888;</span>Delayed</span>';
+  }
   return pubWaiting(t)
     ? '<span id="pubmark" class="pubstat wait" title="Viewers see this change within a couple of minutes"><span class="mk">&#9675;</span>Updating</span>'
     : '<span id="pubmark" class="pubstat" title="Viewers see your latest changes"><span class="mk">&#10003;</span>Up to date</span>';
 }
-// a refresh's pub_dirty / pub_built onto the detail on screen, and the mark
+// a refresh's pub_dirty / pub_built / live onto the detail on screen, and the mark
 function notePub(x) {
   if (!lastDetail || !x) return;
   if ('pub_dirty' in x) lastDetail.tournament.pub_dirty = x.pub_dirty;
   if ('pub_built' in x) lastDetail.tournament.pub_built = x.pub_built;
+  if ('live' in x) lastDetail.tournament.live = x.live;
   const m = $('pubmark');
   if (m) m.outerHTML = pubMarkHtml(lastDetail.tournament);
 }

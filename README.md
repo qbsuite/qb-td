@@ -553,6 +553,8 @@ dashboard shows which invites are still unused, and revokes them.
 ```bash
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
 node tests/snapshot_publish.js   # cron tick: round shards + GitHub publisher (D1/R2/GitHub mocked)
+node tests/live_publish.js       # qb-td-live publisher: deploys, retries, heartbeats, unpublish, hub mark
+                                 # (real SQLite from schema.sql via node:sqlite; R2 + Cloudflare API mocked)
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
@@ -603,6 +605,7 @@ node tests/e2e_day.js
 # and TDs on laptops; viewers half phones, 90% checking once a round, 10%
 # refreshing every 1-2 min late in each round):
 SHAPE=mid node tests/sim_day.js          # one day's requests, D1 rows, R2 ops, freshness
+LIVE=1 SHAPE=mid node tests/sim_day.js   # the same day with viewers reading qb-td-live (modelled)
 SHAPE=large node tests/bench_routes.mjs  # CPU per route under wrangler's profiler
 SHAPE=large node tests/profile_day.mjs   # a whole day's CPU profile
 
@@ -662,6 +665,10 @@ first.
    and one from before the hub's public page mark needs
    `npx wrangler d1 execute qb-td --remote --file migrate-pubbuilt.sql`
    (the cron writes `tournaments.pub_built`),
+   and one from before qb-td-live needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-live.sql`
+   BEFORE a Worker with `LIVE_SCRIPT` set is deployed (the cron and the
+   admin routes name the `live_*` columns),
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy
@@ -682,6 +689,9 @@ first.
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`.
+7. Optional: serve the public state from a files-only Worker — see
+   "Public state on qb-td-live" below. Without it, leave `LIVE_SCRIPT`
+   empty; nothing else changes.
 
 ## Public snapshots on GitHub (optional)
 
@@ -696,16 +706,17 @@ atomic commit per change (at most one per minute per tournament), and
 immutable, so there is no CDN staleness to reason about, and they never
 touch the Worker.
 
-The small state stays on the Worker deliberately. It is one response per
-page view — the page never polls — so it costs almost nothing, and going
-direct means it is never stale: a refresh shows results as soon as the
-cron has committed them. Publishing it to a branch-head raw URL instead
-would add GitHub's `max-age=300` to every update and save almost nothing.
-`pubview.js` requests it with `cache: 'no-cache'`, so the refresh button
-can't be silently answered from the browser's own copy — with no poll,
-that button is the only way a viewer gets newer data and it has to work
-every time. Buzzpoints stay on the Worker too: packet text is
-password-gated per request, which a static host can't do.
+The small state (`/pub/:slug`: which shards to fetch, the round, the
+file list) is NOT published here: a branch-head raw URL is cached for
+`max-age=300`, so it would trail every update by up to five minutes.
+It comes from qb-td-live when that's set up (next section) — free, and
+fresh within about a minute of an upload — and otherwise from the
+Worker, one request per page view. Either way `pubview.js` asks with
+`cache: 'no-cache'`, so the refresh button can't be silently answered
+from the browser's own copy — with no poll, that button is the only way
+a viewer gets newer data and it has to work every time. Buzzpoints stay
+on the Worker: packet text is password-gated per request, which a
+static host can't do.
 
 Every blob fetch falls back to the `/pub` routes, so a failed publish, a
 pruned repo, or turning the feature off just means Worker serving —
@@ -742,6 +753,91 @@ The data repo's history grows one small commit per change; old slugs
 can be deleted from the branch freely (archived pages don't read it, and
 SHA-pinned fetches of *recorded* snapshots still resolve through
 history).
+
+## Public state on qb-td-live (optional)
+
+Takes the last per-view Worker request off the public page. Every page
+load or refresh used to cost one `GET /pub/:slug` — 58–82% of a
+tournament day's Worker requests in `tests/sim_day.js`, from the same
+100,000/day the moderators and TD run on. Each published tournament's
+state is now a static file, `/t/<slug>.json`, on a second, files-only
+Worker (`qb-td-live`). Requests to static assets are free, unlimited and
+not counted toward that limit (checked 9/30/2026 in the account's
+analytics: 3,934 asset requests, 0 script requests), so viewers cost the
+Worker nothing at any audience size. Measured with `LIVE=1
+tests/sim_day.js`: a tournament-day drops from 979 / 4,894 / 13,482 Worker
+requests (small / mid / large) to 454 / 950 / 2,813 — on the Free plan,
+~200 / ~98 / ~33 such days a day instead of ~98 / ~20 / ~7.
+
+How it works (worker.js "public state on qb-td-live"):
+
+- The cron's tick hands the tournaments it rebuilt to the `LivePublish`
+  entrypoint (its own invocation through the `LIVE` binding), which
+  deploys the files-only Worker through Cloudflare's API — upload
+  session, upload the changed files, PUT — at most once a tick. Every
+  deploy carries every published tournament's file; unchanged ones ride
+  by hash and aren't re-uploaded.
+- `live_want` (built) vs `live_hash` (deployed) makes it self-repairing:
+  a failed deploy, or two overlapping ticks landing out of order, leaves
+  them different and the next run redeploys. Failures retry every 5
+  minutes; the tick's own fresh changes always go.
+- Heartbeat: while a tournament is active (rebuilt in the last 6 h) its
+  file is redeployed at least every 10 minutes, and says so. A page that
+  finds a file well overdue knows deploys are stuck and asks the Worker
+  instead of showing frozen results.
+- The page (`pubview.js` `loadState`) reads the file first and falls
+  back to `/pub/:slug` at most once per load or refresh: on a 404 (not
+  deployed yet, or unpublished), or — skipping the file for 10 minutes in
+  that tab — on an error, a timeout, or an overdue heartbeat. A file
+  older than what's on screen (the edge briefly serving the previous
+  deploy, ~6% of deploys for a few seconds) reads as "nothing new". The
+  fallback carries `?fb=<reason>`, logged as `live fallback <slug>
+  <reason>` in Workers Logs.
+- Viewers see a change a tick (≤1 min) plus the deploy's spread (median
+  1.2 s, max 26 s in a 200-deploy soak) after it happens. That includes
+  the round number and the name, which `/pub/:slug` shows instantly.
+- The hub's mark: Updating until the file carrying the change has
+  deployed, then Up to date; Delayed while deploys are failing.
+- Only the production pages use it: `app/js/api.js` reads the file only
+  when talking to the default backend, or when `?live=<url>` (or
+  localStorage `qbtdLive`) names one. `?live=off` turns it off.
+
+Setup:
+
+1. Create the files-only Worker once, with your own login: a folder
+   holding `site/_headers` (`/*` then `  Access-Control-Allow-Origin: *`)
+   and any placeholder file, and a `wrangler.json` of `{ "name":
+   "qb-td-live", "compatibility_date": "2026-07-01", "assets": {
+   "directory": "./site" }, "workers_dev": true }`; `npx wrangler
+   deploy`. After this only the cron deploys it.
+2. Token: **Manage Account → Account API Tokens** (account-owned — a
+   per-Worker scope on a token from My Profile fails with
+   `com.cloudflare.edge.worker.script is not a supported resource
+   type`), Create Token → Custom, permission group Individual Workers →
+   **Editor**, Worker `qb-td-live` only, no expiry. It can deploy that
+   Worker and nothing else: no reading or deploying `qb-td`, no creating
+   Workers.
+3. `npx wrangler d1 execute qb-td --remote --file migrate-live.sql`
+4. `npx wrangler secret put LIVE_TOKEN`; set `LIVE_SCRIPT` and
+   `LIVE_ACCOUNT_ID` in `wrangler.toml`; `npx wrangler deploy`. Within a
+   few ticks the backfill has deployed every published tournament.
+5. Point `app/js/api.js`'s default `LIVE` at the new Worker's URL.
+
+Watching it: `node tools/cf_watch.mjs [date]` shows the whole account for
+a day — script requests per Worker, asset requests, D1, R2, Durable
+Objects — and how many versions `qb-td-live` has stored. Versions pile
+up one per deploy (roughly 20–50 per tournament-day plus heartbeats);
+there is no delete endpoint and no documented cap, and deleting and
+recreating the Worker (step 1) clears them and keeps its URL. Files come
+back over the next ticks — the first deploy rebuilds up to 10, backfill
+adds 5 a minute — and until a tournament's file is back its viewers get
+the 404 path, i.e. the Worker, as before.
+
+A gap left on purpose: the heartbeat only covers a file deployed while
+its tournament was active. If the first deploy of the day keeps failing,
+viewers stay on the file from setup (served with a 200, heartbeat long
+expired), so the page can't tell. The hub's Delayed mark is the signal;
+check `tools/cf_watch.mjs` and the Worker's logs.
 
 ## Known scaling limits (none of this bites yet)
 
@@ -916,6 +1012,11 @@ npx wrangler d1 execute qb-td --remote --command \
   "DELETE FROM files WHERE tournament_id=<id>; DELETE FROM buckets WHERE tournament_id=<id>; DELETE FROM rounds WHERE tournament_id=<id>; DELETE FROM tournaments WHERE id=<id>"
 npx wrangler r2 object delete "qb-td-data/<r2_key>" --remote
 ```
+
+With qb-td-live on, the deleted tournament's file goes with the next
+deploy (its row is gone, so the next manifest leaves it out); to force
+one now, mark any published tournament dirty (`UPDATE tournaments SET
+pub_dirty = 1 WHERE id = <another id>`).
 
 If snapshots are enabled, also `git rm -r <slug>` in the data repo —
 harmless to skip (nothing points at it once `/pub/:slug` is gone), but

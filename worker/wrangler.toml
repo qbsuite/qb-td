@@ -25,6 +25,15 @@ binding = "REBUILD"
 service = "qb-td"
 entrypoint = "Rebuild"
 
+# The qb-td-live deploy (worker.js "public state on qb-td-live") runs as
+# its own invocation through this binding, like the rebuilds above, so
+# its Cloudflare API calls and R2 reads don't come out of the tick's 50
+# subrequests. Self-hosting under another name: change `service` too.
+[[services]]
+binding = "LIVE"
+service = "qb-td"
+entrypoint = "LivePublish"
+
 # Attempt cap on the buzzpoints password route (worker.js pubQPacket).
 # Cloudflare's rate limiter needs no provisioning and costs nothing, but it
 # counts per colo rather than globally. Period must be 10 or 60.
@@ -57,5 +66,26 @@ SNAPSHOT_BRANCH = "main"
 GITHUB_APP_ID = "4565927"
 GITHUB_INSTALLATION_ID = "153087044"
 
-# The only secrets are the snapshot publisher's GitHub credential (above);
+# Public state files (worker.js "public state on qb-td-live"): viewers
+# read each published tournament's state from this files-only Worker
+# instead of /pub/:slug. Leave LIVE_SCRIPT empty to turn it off. Needs
+# migrate-live.sql and the LIVE_TOKEN secret (`npx wrangler secret put
+# LIVE_TOKEN`: an ACCOUNT-owned API token with Individual Workers Editor
+# on LIVE_SCRIPT only, no expiry). Setup: ../README.md ("Public state on
+# qb-td-live").
+LIVE_SCRIPT = "qb-td-live"
+LIVE_ACCOUNT_ID = "905b6a6cd745425d70d3c4d9612ba2d8"
+
+# The only secrets are the snapshot publisher's GitHub credential and
+# LIVE_TOKEN (above);
 # all request access is via unguessable link secrets (see worker.js).
+
+# Workers Logs, for counting how often the public page falls back to the Worker
+# (pubState logs "live fallback <slug> <reason>"). Per-request invocation
+# logs off: the Free plan's 200,000 events/day then hold only console
+# output, almost all of it those fallbacks.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false

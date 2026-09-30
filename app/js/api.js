@@ -4,8 +4,17 @@
 // admin, bucket, and public routes are all keyed by link secrets.
 
 const qs = new URLSearchParams(location.search);
-export const API = qs.get('server') || localStorage.qbtdServer
-  || 'https://qb-td.denisliu10.workers.dev';
+const PROD_API = 'https://qb-td.denisliu10.workers.dev';
+export const API = qs.get('server') || localStorage.qbtdServer || PROD_API;
+
+// Where the public page reads each tournament's state file (worker.js
+// "public state on qb-td-live"): a files-only Worker, free to read. Only
+// for the production backend unless ?live= (or localStorage qbtdLive)
+// names one — a test or self-hosted backend must never read production's
+// files. ?live=off turns it off. null means: ask the Worker, as before.
+const liveOpt = qs.get('live') || localStorage.qbtdLive;
+export const LIVE = liveOpt === 'off' ? null
+  : liveOpt || (API === PROD_API ? 'https://qb-td-live.denisliu10.workers.dev' : null);
 
 // The demo tournament (demo.html): the 'demo' slug/admin id and the
 // 'demo'/'demo-b' bucket secrets are its reserved names, and every pub()

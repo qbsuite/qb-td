@@ -36,8 +36,16 @@
 // (plus RECONNECT_PER_HOUR drops); a phone that wakes to check reconnects;
 // pushes cost 1 DO request per rebuild. See the report at the end.
 //
+// LIVE=1 (modelled): the page reads its state from qb-td-live (worker.js
+// "public state on qb-td-live"), so a viewer's load is a free static-asset
+// request, not a Worker one — they're counted, not sent. What the Worker
+// pays instead: one LivePublish invocation per tick that rebuilt the
+// tournament, plus a heartbeat deploy whenever ten minutes pass without
+// one (the tournament is active all day).
+//
 // Knobs: SHAPE (small|mid|large), ROUND_MIN (40), PHONE_SHARE (0.5),
-// REFRESHER_SHARE (0.1), RECONNECT_PER_HOUR (0.5, laptop viewers, PUSH).
+// REFRESHER_SHARE (0.1), RECONNECT_PER_HOUR (0.5, laptop viewers, PUSH),
+// LIVE (0).
 
 import { d1exec, d1row } from './e2e_lib.js';
 
@@ -53,6 +61,8 @@ const ROUND_MIN = Number(process.env.ROUND_MIN || 40);
 const PHONE_SHARE = Number(process.env.PHONE_SHARE ?? 0.5);
 const REFRESHER_SHARE = Number(process.env.REFRESHER_SHARE ?? 0.1);
 const RECONNECT_PER_HOUR = Number(process.env.RECONNECT_PER_HOUR ?? 0.5);
+const LIVE = process.env.LIVE === '1';
+const LIVE_HEARTBEAT_S = 600;
 const STEP = 30;                        // seconds per step
 const STEPS = (ROUND_MIN * 60) / STEP;  // steps per round
 const TEAMS = ROOMS * 2;
@@ -168,7 +178,11 @@ const viewers = Array.from({ length: VIEWERS }, () => ({
   refresher: rand() < REFRESHER_SHARE,
 }));
 const pushLog = { connects: 0, laptopConnects: 0, phoneConnects: 0 };
-const viewerLoad = (v) => call(`viewer page load (${v.refresher ? 'refresher' : 'once per round'})`, '/pub/' + slug, { headers: { 'Cache-Control': 'no-cache' } });
+const liveLog = { loads: 0, deploys: 0, heartbeats: 0, lastDeploy: 0 };
+const viewerLoad = (v) => {
+  if (LIVE) { liveLog.loads++; return null; }
+  return call(`viewer page load (${v.refresher ? 'refresher' : 'once per round'})`, '/pub/' + slug, { headers: { 'Cache-Control': 'no-cache' } });
+};
 
 /* ---------- the day ---------- */
 
@@ -244,7 +258,12 @@ for (let round = 1; round <= ROUNDS; round++) {
     if (s % 2 === 1) {
       const before = await meter();
       await tick();
-      if ((await meter()).rows_written > before.rows_written) rebuilds++;
+      const after = await meter();
+      if (after.rows_written > before.rows_written) rebuilds++;
+      if (LIVE) {
+        if (after.rebuild_invocations > before.rebuild_invocations) { liveLog.deploys++; liveLog.lastDeploy = now; }
+        else if (now - liveLog.lastDeploy >= LIVE_HEARTBEAT_S) { liveLog.heartbeats++; liveLog.lastDeploy = now; }
+      }
       if (watch) {
         const st = (await call(null, '/pub/' + slug)).body;
         const mins = (now - watch.at) / 60;
@@ -297,9 +316,15 @@ if (fresh.length) {
   console.log(`freshness (${fresh.length} uploads): listed on the public page after avg ${avg('listed')} / max ${max('listed')} min; ` +
     `in the stats after avg ${avg('stats')} / max ${max('stats')} min`);
 }
+if (LIVE) {
+  const deployReq = liveLog.deploys + liveLog.heartbeats;
+  console.log(`\nLIVE (modelled): ${liveLog.loads} viewer state loads served by qb-td-live (free, not Worker requests); ` +
+    `${liveLog.deploys} deploys + ${liveLog.heartbeats} heartbeats = ${deployReq} LivePublish invocations. ` +
+    `Worker requests for the tournament: ${totals.requests + deployReq}`);
+}
 console.log(`\nPUSH (modelled): viewer page loads ${viewerReq} -> ${pushLog.connects} connections ` +
   `(${pushLog.laptopConnects} laptop incl. ${drops} wifi drops, ${pushLog.phoneConnects} phone), ` +
   `each 1 Worker + 1 DO request; plus ~${rebuilds} DO requests for pushes`);
-console.log(JSON.stringify({ shape: SHAPE, hours, totals, viewerReq,
+console.log(JSON.stringify({ shape: SHAPE, hours, totals, viewerReq, live: LIVE ? liveLog : null,
   perCategory: Object.fromEntries(Object.entries(cost).map(([k, c]) => [k, c.requests])), viewerRows: viewerRows.reduce((n, x) => n + x['D1 rows read'], 0),
   push: { ...pushLog, rebuilds }, fresh: fresh.map((f) => [f.listed, f.stats]) }));

@@ -992,7 +992,9 @@ function retractEntries(t) {
 // the set page) read. Its blobs go to GitHub when either flag says
 // public — the mirror's own, or its set's.
 async function tickDirty(env) {
-  await tickTournaments(env);
+  // after the GitHub commit, so each live file carries the snapshot the
+  // tick just recorded (pub_snapshot) — as /pub/:slug would serve it
+  await tickLive(env, await tickTournaments(env));
   await tickSets(env);
 }
 
@@ -1041,12 +1043,15 @@ async function rebuildTournament(env, t) {
   return res.json();
 }
 
+// Answers the ids of the published tournaments it rebuilt: the files
+// tickLive redeploys.
 async function tickTournaments(env) {
   const { results } = await env.DB.prepare(TICK_ROW_SELECT +
     'WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ' +
     'ORDER BY t.created DESC LIMIT 4'
   ).all();
-  if (!results.length) return;
+  const rebuilt = [];
+  if (!results.length) return rebuilt;
   const reflag = (id) =>
     env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(id).run();
   // Claim before working: a mutation mid-tick re-sets the flag and the
@@ -1075,6 +1080,7 @@ async function tickTournaments(env) {
         await env.DB.prepare('UPDATE tournaments SET pub_built = ?2 WHERE id = ?1')
           .bind(t.id, Date.now()).run().catch((e) => console.log('pub_built for', t.slug, e.message));
       }
+      if (t.published) rebuilt.push(t.id);
       if (!snapshots) continue;
       // public only through its set: the games go out, the mirror's own
       // page (schedule, roster, category map) stays its TD's call
@@ -1085,7 +1091,7 @@ async function tickTournaments(env) {
       await reflag(t.id);
     }
   }
-  if (!pubs.length && !retracts.length) return;
+  if (!pubs.length && !retracts.length) return rebuilt;
 
   try {
     const batch = [...pubs, ...retracts].flatMap((p) => p.entries);
@@ -1111,6 +1117,341 @@ async function tickTournaments(env) {
     console.log('snapshot batch failed:', e.message);
     for (const p of [...pubs, ...retracts]) await reflag(p.t.id);
   }
+  return rebuilt;
+}
+
+/* ---------- public state on qb-td-live ----------
+   Every view of the public page used to cost one Worker request: GET
+   /pub/:slug, the small state that says which round shards to fetch.
+   Those were 58-82% of a tournament day's requests (tests/sim_day.js),
+   and the Free plan allows 100,000 a day for everything. Now each
+   published tournament's state is a static file, /t/<slug>.json, on a
+   second, files-only Worker (LIVE_SCRIPT, e.g. qb-td-live). Requests to
+   static assets are free and unlimited and never count toward that limit
+   (verified 9/30/2026: 3,934 asset requests, 0 script requests), so a
+   view costs the Worker nothing. /pub/:slug stays as the page's fallback.
+
+   Publishing a file is a deploy of that Worker through Cloudflare's API
+   (upload session -> upload -> PUT), with a token scoped to it alone
+   (LIVE_TOKEN: Individual Workers Editor on LIVE_SCRIPT, account-owned —
+   Cloudflare refuses a per-Worker scope on a user-owned token). Soak test,
+   9/30/2026: 200 deploys a minute apart, none failed; a new file was
+   visible after a median 1.2s (max 26s); 6% of deploys briefly served the
+   previous version again for up to ~10s, which the page reads as "nothing
+   new". Old versions pile up (no delete endpoint, no documented cap);
+   deleting and recreating the Worker clears them and keeps its URL.
+
+   Mechanics: the cron's tick hands the tournaments it just rebuilt to the
+   LivePublish entrypoint (its own invocation, like Rebuild, so its
+   subrequests and CPU don't come out of the tick's), which deploys at
+   most once a tick. Every deploy carries the whole site: a file per
+   published tournament. Two columns keep it honest: live_want is the hash
+   of the body last built, written BEFORE deploying; live_hash is what the
+   last successful deploy shipped, written for every file in it. Whenever
+   they differ — a failed deploy, or two overlapping ticks landing out of
+   order — the next run redeploys that tournament, so nothing has to be
+   reflagged and no stale file can stick. A failure is retried at most
+   every LIVE_RETRY_MS; the tick's own fresh changes always go.
+
+   Heartbeat: a failing deploy would otherwise leave viewers on the last
+   file with a normal 200 — frozen stats and no reason to fall back. So
+   while a tournament is active (rebuilt within LIVE_ACTIVE_MS) its file
+   is redeployed at least every LIVE_HEARTBEAT_MS, riding the same
+   one-deploy tick, and the file says so (hb_ms, hb_until): a page that
+   finds it well overdue knows deploys are stuck and asks the Worker.
+
+   Config — all optional; with any missing this section is dead code and
+   the page's /pub/:slug path is exactly as before: LIVE_SCRIPT and
+   LIVE_ACCOUNT_ID vars, LIVE_TOKEN secret, the LIVE service binding
+   (wrangler.toml), migrate-live.sql applied. Setup: ../README.md ("Public
+   state on qb-td-live"). */
+
+const LIVE_HEARTBEAT_MS = 10 * 60 * 1000;
+const LIVE_ACTIVE_MS = 6 * 3600 * 1000;
+const LIVE_RETRY_MS = 5 * 60 * 1000;
+// Tournaments one deploy rebuilds: the tick's own (at most 4) first, then
+// retries, heartbeats and backfill. Keeps LivePublish's R2 reads, and so
+// its subrequests, well inside the Free plan's 50.
+const LIVE_MAX_PER_RUN = 10;
+const LIVE_BACKFILL_PER_RUN = 5;
+// A failure stamped this long ago is a real one, not a deploy in flight
+// (the stamp goes on before each deploy; see livePublish).
+const LIVE_FAILING_AFTER_MS = 60 * 1000;
+const LIVE_API_TIMEOUT_MS = 20000;
+const LIVE_COMPAT_DATE = '2026-07-01';
+// The page on qbsuite.github.io reads these cross-origin. Travels as the
+// assets config's _headers text, not as a file.
+const LIVE_HEADERS = '/*\n  Access-Control-Allow-Origin: *\n';
+// Always in the manifest, so a deploy with no published tournament still
+// has a file, and a probe for "is qb-td-live up" has something to fetch.
+const LIVE_HEALTH = JSON.stringify({ service: 'qb-td public state' }) + '\n';
+
+function liveEnabled(env) {
+  return Boolean(env.LIVE_SCRIPT && env.LIVE_ACCOUNT_ID && env.LIVE_TOKEN);
+}
+const livePath = (slug) => `/t/${slug}.json`;
+
+// What the page needs to know it's missing: rows whose file isn't the
+// one last built (a retry not yet due waits), active ones due a
+// heartbeat, published ones never deployed. Each part rides its own
+// partial index (schema.sql), so the tick can ask every minute for the
+// price of the rows it finds.
+const LIVE_TODO_SQL =
+  'SELECT id FROM tournaments WHERE live_want IS NOT live_hash ' +
+  'AND (live_failed_at IS NULL OR live_failed_at < ?1) LIMIT ?2';
+// A failing file waits out LIVE_RETRY_MS here too: without it a stale
+// live_at re-picks it every minute, and each try's fresh failure stamp
+// would keep the hub's mark off Delayed for the whole outage.
+const LIVE_HEARTBEAT_SQL =
+  'SELECT id FROM tournaments WHERE live_hash IS NOT NULL AND pub_built > ?1 AND live_at < ?2 ' +
+  'AND (live_failed_at IS NULL OR live_failed_at < ?4) LIMIT ?3';
+// pub_built: the cron has built this tournament's pubstate, so there is a
+// body to publish. Without it a candidate would come back every minute.
+const LIVE_BACKFILL_SQL =
+  'SELECT id FROM tournaments WHERE published = 1 AND live_hash IS NULL AND pub_built IS NOT NULL ' +
+  'AND live_want IS NULL LIMIT ?1';
+
+async function liveCandidates(env, now, limit) {
+  const [todo, hb, fill] = await Promise.all([
+    env.DB.prepare(LIVE_TODO_SQL).bind(now - LIVE_RETRY_MS, limit).all(),
+    env.DB.prepare(LIVE_HEARTBEAT_SQL).bind(now - LIVE_ACTIVE_MS, now - LIVE_HEARTBEAT_MS, limit, now - LIVE_RETRY_MS).all(),
+    env.DB.prepare(LIVE_BACKFILL_SQL).bind(Math.min(limit, LIVE_BACKFILL_PER_RUN)).all(),
+  ]);
+  return [...todo.results, ...hb.results, ...fill.results].map((r) => r.id);
+}
+
+// The file: what /pub/:slug serves (the prebuilt pubstate plus the row's
+// live fields), stamped. `final` stays off it — it drives the Worker's
+// Cache-Control, and a file would carry it wrong once the tournament
+// closes. null when the cron hasn't built a pubstate yet.
+async function liveBody(env, t, now) {
+  const built = await env.DATA.get(PUBSTATE_KEY(t.id));
+  if (!built) return null;
+  const body = { ...(await built.json()), ...pubOverlay(env, t), at: now,
+    hb_ms: LIVE_HEARTBEAT_MS,
+    hb_until: Math.min((t.pub_built || now) + LIVE_ACTIVE_MS, closesAt(t)) };
+  delete body.final;
+  return JSON.stringify(body);
+}
+
+// Cloudflare's asset hash: 32 hex of SHA-256 over base64(content) + the
+// extension, the way its direct-upload docs compute it.
+async function liveHash(text, ext) {
+  const b64 = b64bytes(new TextEncoder().encode(text));
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(b64 + ext));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
+async function cfLive(env, method, path, body, bearer) {
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.LIVE_ACCOUNT_ID}${path}`, {
+    method,
+    signal: AbortSignal.timeout(LIVE_API_TIMEOUT_MS),
+    headers: {
+      Authorization: `Bearer ${bearer || env.LIVE_TOKEN}`,
+      ...(typeof body === 'string' ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body,
+  });
+  let out = null;
+  try { out = await res.json(); } catch (e) { /* not JSON */ }
+  if (!res.ok || (out && out.success === false)) {
+    throw new Error(`cloudflare ${method} ${path.split('?')[0]}: ${res.status} ` +
+      JSON.stringify((out && out.errors) || '').slice(0, 200));
+  }
+  return out ? out.result : null;
+}
+
+// One deploy of the whole site. manifest: {path: {hash, size}}; texts:
+// hash -> content for every file this run built. Answers { missing } —
+// the hashes Cloudflare asked for that this run didn't build — instead of
+// deploying, so the caller can rebuild those files and try once more.
+async function deployLive(env, manifest, texts) {
+  const session = await cfLive(env, 'POST', `/workers/scripts/${env.LIVE_SCRIPT}/assets-upload-session`,
+    JSON.stringify({ manifest }));
+  const buckets = session.buckets || [];
+  const missing = buckets.flat().filter((h) => !texts.has(h));
+  if (missing.length) return { missing };
+  let jwt = session.jwt;
+  for (const bucket of buckets) {
+    const form = new FormData();
+    for (const h of bucket) {
+      form.append(h, new Blob([b64bytes(new TextEncoder().encode(texts.get(h)))],
+        { type: 'application/json' }), h);
+    }
+    // 202 per bucket, 201 with the completion token on the last
+    const up = await cfLive(env, 'POST', '/workers/assets/upload?base64=true', form, jwt);
+    if (up && up.jwt) jwt = up.jwt;
+  }
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify({
+    assets: { jwt, config: { _headers: LIVE_HEADERS } },
+    compatibility_date: LIVE_COMPAT_DATE,
+  })], { type: 'application/json' }));
+  await cfLive(env, 'PUT', `/workers/scripts/${env.LIVE_SCRIPT}`, form);
+  return { ok: true };
+}
+
+const inList = (n) => Array.from({ length: n }, (_, i) => '?' + (i + 1)).join(', ');
+
+// The deploy. tickIds: the tournaments the tick just rebuilt. Never
+// throws: a failure is recorded on the rows (live_failed_at) and retried.
+async function livePublish(env, tickIds = []) {
+  const now = Date.now();
+  const ids = [...new Set([...tickIds, ...(await liveCandidates(env, now, LIVE_MAX_PER_RUN))])]
+    .slice(0, LIVE_MAX_PER_RUN);
+  if (!ids.length) return { deployed: false };
+
+  const texts = new Map([[await liveHash(LIVE_HEALTH, 'json'), LIVE_HEALTH]]);
+  const built = new Map(); // id -> { slug, hash, size, at } | { slug, remove: true }
+  const unbuildable = [];
+  const build = async (rows) => {
+    for (const t of rows) {
+      if (!t.published) { built.set(t.id, { slug: t.slug, remove: true }); continue; }
+      const text = await liveBody(env, t, now);
+      if (text === null) { unbuildable.push(t.id); continue; }
+      const hash = await liveHash(text, 'json');
+      texts.set(hash, text);
+      built.set(t.id, { slug: t.slug, hash, size: new TextEncoder().encode(text).byteLength, at: now });
+    }
+  };
+  const rowsFor = async (list) => (await env.DB.prepare(TICK_ROW_SELECT + `WHERE t.id IN (${inList(list.length)})`)
+    .bind(...list).all()).results;
+  const wanted = () => JSON.stringify([...built].map(([id, b]) => ({ id, w: b.remove ? null : b.hash })));
+
+  try {
+    await build(await rowsFor(ids));
+    // Intent before the deploy: a slower run that lands after this one
+    // then leaves live_hash != live_want, and the next run repairs it.
+    // The failure stamp goes on now too and success clears it, so a run
+    // killed outright (CPU, a timeout) still waits LIVE_RETRY_MS to retry.
+    await env.DB.prepare(
+      "UPDATE tournaments SET live_want = j.value ->> 'w', live_failed_at = ?2 " +
+      "FROM json_each(?1) AS j WHERE tournaments.id = j.value ->> 'id'"
+    ).bind(wanted(), now).run();
+    if (unbuildable.length) {
+      // published, but no pubstate to publish: park it (want != hash, so
+      // it retries on the failure cadence) rather than every minute
+      await env.DB.prepare(
+        "UPDATE tournaments SET live_want = '-', live_failed_at = ?2 WHERE id IN (SELECT value FROM json_each(?1))"
+      ).bind(JSON.stringify(unbuildable), now).run();
+    }
+    // nothing to ship (only parked rows came up): no deploy
+    if (!built.size) return { deployed: false };
+
+    let deployed = null;
+    let dropped = []; // lost files this run can't rebuild: re-added by backfill
+    for (let attempt = 0; attempt < 2 && !deployed; attempt++) {
+      const { results: live } = await env.DB.prepare(
+        'SELECT id, slug, published, live_hash, live_size FROM tournaments WHERE live_hash IS NOT NULL'
+      ).all();
+      const manifest = { '/health.json': { hash: [...texts.keys()][0], size: LIVE_HEALTH.length } };
+      const files = []; // what this deploy ships, for the live_hash write
+      for (const r of live) {
+        // An unpublished tournament's file goes, whatever its columns say:
+        // unpublishing is the TD's privacy switch, so it can't hinge on the
+        // one write in updateTournament having landed.
+        if (!r.published && !built.has(r.id)) built.set(r.id, { slug: r.slug, remove: true });
+        if (built.has(r.id) || dropped.includes(r.id)) continue;
+        manifest[livePath(r.slug)] = { hash: r.live_hash, size: r.live_size };
+        files.push({ id: r.id, h: r.live_hash, s: r.live_size, at: null });
+      }
+      for (const [id, b] of built) {
+        if (b.remove) continue;
+        manifest[livePath(b.slug)] = { hash: b.hash, size: b.size };
+        files.push({ id, h: b.hash, s: b.size, at: b.at });
+      }
+      const res = await deployLive(env, manifest, texts);
+      if (res.ok) { deployed = files; break; }
+      // Cloudflare no longer holds a file an earlier deploy shipped (the
+      // Worker was deleted and recreated): rebuild as many as one run may
+      // and send everything again. The rest leave this deploy and their
+      // rows forget it (live_hash/want NULL), so backfill brings them back
+      // a few per tick instead of one run blowing its subrequests.
+      const lost = live.filter((r) => res.missing.includes(r.live_hash) && !built.has(r.id)).map((r) => r.id);
+      if (!lost.length || attempt === 1) throw new Error('deploy wanted files this run cannot build: ' + res.missing.length);
+      // Also dropped: a lost file whose tournament can't be rebuilt (its
+      // pubstate is gone) — asking again would fail every deploy for good.
+      const room = Math.max(0, LIVE_MAX_PER_RUN - built.size);
+      if (room) await build(await rowsFor(lost.slice(0, room)));
+      dropped = lost.filter((id) => !built.has(id));
+      if (dropped.length) {
+        await env.DB.prepare(
+          'UPDATE tournaments SET live_want = NULL, live_hash = NULL, live_size = NULL, live_at = NULL ' +
+          'WHERE id IN (SELECT value FROM json_each(?1))'
+        ).bind(JSON.stringify(dropped)).run();
+      }
+      await env.DB.prepare(
+        "UPDATE tournaments SET live_want = j.value ->> 'w', live_failed_at = ?2 " +
+        "FROM json_each(?1) AS j WHERE tournaments.id = j.value ->> 'id'"
+      ).bind(wanted(), now).run();
+    }
+
+    // What is live now, for every file this deploy carried — unchanged
+    // ones included, which is what repairs an out-of-order deploy. Rows
+    // already saying so aren't rewritten.
+    await env.DB.prepare(
+      "UPDATE tournaments SET live_hash = j.value ->> 'h', live_size = j.value ->> 's', " +
+      "live_at = COALESCE(j.value ->> 'at', tournaments.live_at), " +
+      "live_failed_at = CASE WHEN j.value ->> 'at' IS NULL THEN tournaments.live_failed_at ELSE NULL END " +
+      "FROM json_each(?1) AS j WHERE tournaments.id = j.value ->> 'id' " +
+      "AND (tournaments.live_hash IS NOT (j.value ->> 'h') OR j.value ->> 'at' IS NOT NULL)"
+    ).bind(JSON.stringify(deployed)).run();
+    const removed = [...built].filter(([, b]) => b.remove).map(([id]) => id);
+    if (removed.length) {
+      await env.DB.prepare(
+        'UPDATE tournaments SET live_want = NULL, live_hash = NULL, live_size = NULL, live_at = NULL, ' +
+        'live_failed_at = NULL WHERE id IN (SELECT value FROM json_each(?1))'
+      ).bind(JSON.stringify(removed)).run();
+    }
+    return { deployed: true, files: deployed.length, built: built.size };
+  } catch (e) {
+    console.log('live publish failed:', e.message);
+    const tried = [...built.keys()];
+    if (tried.length) {
+      await env.DB.prepare(
+        'UPDATE tournaments SET live_failed_at = ?2 WHERE id IN (SELECT value FROM json_each(?1))'
+      ).bind(JSON.stringify(tried), now).run().catch((e2) => console.log('live_failed_at:', e2.message));
+    }
+    return { deployed: false, error: e.message };
+  }
+}
+
+// The deploy as its own invocation (see Rebuild for why), reachable only
+// through the LIVE binding.
+export const LivePublish = {
+  async fetch(request, env) {
+    env = metered(env);
+    if (env.METER) meter.live_invocations++;
+    const ids = (new URL(request.url).searchParams.get('ids') || '').split(',')
+      .map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    return Response.json(await livePublish(env, ids));
+  },
+};
+
+// From the tick: deploy when it rebuilt something public, or when a
+// retry, heartbeat or backfill is due — never otherwise, so an idle
+// minute costs three index lookups and no request.
+async function tickLive(env, ids) {
+  if (!liveEnabled(env)) return;
+  try {
+    if (!ids.length && !(await liveCandidates(env, Date.now(), 1)).length) return;
+    if (!env.LIVE) { await livePublish(env, ids); return; }
+    const res = await env.LIVE.fetch('https://live/?ids=' + ids.join(','));
+    if (!res.ok) console.log('live publish', res.status, (await res.text()).slice(0, 200));
+  } catch (e) {
+    console.log('live publish call failed:', e.message);
+  }
+}
+
+// The hub's mark: has the latest change reached viewers? null when the
+// page isn't served from qb-td-live (feature off, or page unpublished).
+function liveMark(env, t) {
+  if (!liveEnabled(env) || !t.published) return null;
+  if (t.live_hash && t.live_want === t.live_hash) return { state: 'ok', at: t.live_at ?? null };
+  if (t.live_failed_at && Date.now() - t.live_failed_at > LIVE_FAILING_AFTER_MS) {
+    return { state: 'failing', since: t.live_failed_at };
+  }
+  return { state: 'pending' };
 }
 
 /* ---------- TO admin API (/a/*, admin-link-authed) ----------
@@ -1260,7 +1601,7 @@ async function getTournament(env, t, ctx) {
     // whether those editors have switched mirror buzzpoints off.
     // set_packets lets the TD put any of the set's packets on any round.
     tournament: {
-      ...pub_t, closes: closesAt(t),
+      ...pub_t, closes: closesAt(t), live: liveMark(env, t),
       set: sets.results[0] ? {
         slug: sets.results[0].slug, name: sets.results[0].name, published: sets.results[0].published,
         lock_buzz: mirrorBuzzLocked(sets.results[0].settings),
@@ -1337,6 +1678,9 @@ async function updateTournament(request, env, t) {
   }
   if (body.published !== undefined) {
     sets.push('published = ?'); binds.push(body.published ? 1 : 0);
+    // off: its qb-td-live file should go — want nothing, and the next
+    // deploy (want != hash) drops it. On is the tick's rebuild's job.
+    if (!body.published && liveEnabled(env)) sets.push('live_want = NULL');
   }
   if (body.settings !== undefined) {
     if (typeof body.settings !== 'object' || body.settings === null) return err(env, 400, 'bad settings');
@@ -2859,9 +3203,11 @@ async function putPubState(env, t, loaded) {
     { httpMetadata: { contentType: 'application/json' } });
 }
 
-async function pubState(env, slug, ctx) {
-  const t = await getPublishedTournament(env, slug);
-  if (!t) return err(env, 404, 'not found');
+// The fields a view takes from the tournament row rather than the
+// prebuilt pubstate: the row's own columns, and the GitHub snapshot the
+// cron last recorded. Shared by /pub/:slug and the qb-td-live file, so
+// the two can't drift.
+function pubOverlay(env, t) {
   const pub = (() => {
     if (!env.SNAPSHOT_REPO || !t.pub_snapshot) return null;
     try {
@@ -2869,10 +3215,21 @@ async function pubState(env, slug, ctx) {
       return snap && snap.sha ? { repo: env.SNAPSHOT_REPO, ...snap } : null;
     } catch (e) { return null; }
   })();
+  return { name: t.name, current_round: t.current_round, roster: !!t.roster_r2_key,
+    format: pubFormat(t), pub };
+}
+
+// fb: the page came here because the qb-td-live file failed it (404, err,
+// old, latched — app/js/pubview.js loadState). Logged, so Workers Logs
+// count the fallbacks; nothing else changes.
+async function pubState(env, slug, ctx, fb = null) {
+  if (fb) console.log('live fallback', slug, String(fb).replace(/[^a-z0-9]/g, '').slice(0, 12));
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const { pub } = pubOverlay(env, t);
   const built = await env.DATA.get(PUBSTATE_KEY(t.id));
   if (built) {
-    const body = { ...(await built.json()), name: t.name, current_round: t.current_round,
-      roster: !!t.roster_r2_key, format: pubFormat(t), pub, final: tournamentFinal(t) };
+    const body = { ...(await built.json()), ...pubOverlay(env, t), final: tournamentFinal(t) };
     return json(env, body, 200, pubCache(t));
   }
   // not built yet (published before this existed, or the first tick
@@ -4109,7 +4466,9 @@ async function pubSetQPacket(request, url, env, slug) {
 const meter = { queries: 0, rows_read: 0, rows_written: 0, r2_class_a: 0, r2_class_b: 0, r2_free: 0,
   // invocations of the Rebuild entrypoint: proves the cron's rebuilds go
   // through the binding (each its own invocation), not inline
-  rebuild_invocations: 0 };
+  rebuild_invocations: 0,
+  // invocations of the LivePublish entrypoint (qb-td-live deploys)
+  live_invocations: 0 };
 const METER_ZERO = { ...meter };
 // R2's billing classes (developers.cloudflare.com/r2/pricing): writes and
 // lists are Class A, reads and heads Class B, deletes free
@@ -4190,7 +4549,7 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1]);
 
     // Public stats routes — publish-gated inside.
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1], ctx);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1], ctx, url.searchParams.get('fb'));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubRounds(env, m[1], url);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
@@ -4256,7 +4615,8 @@ export default {
         const held = url.searchParams.get('rev');
         if (held !== null && /^\d+$/.test(held) && Number(held) === t.rev) {
           // the public page mark rides along: the cron's columns don't move rev
-          return json(env, { unchanged: true, rev: t.rev, pub_dirty: t.pub_dirty, pub_built: t.pub_built ?? null });
+          return json(env, { unchanged: true, rev: t.rev, pub_dirty: t.pub_dirty, pub_built: t.pub_built ?? null,
+            live: liveMark(env, t) });
         }
         return getTournament(env, t, ctx);
       }

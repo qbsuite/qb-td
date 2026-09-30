@@ -50,6 +50,16 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- When the cron last finished rebuilding it (epoch ms): the hub's
   -- public page mark. Existing databases get it from migrate-pubbuilt.sql.
   pub_built INTEGER,
+  -- The public state file on qb-td-live (worker.js "public state on
+  -- qb-td-live"): live_want is the hash of the body last built, live_hash
+  -- /size/at what the last successful deploy shipped. They differ until a
+  -- deploy lands, which is what retries it; live_failed_at paces retries.
+  -- Existing databases get these from migrate-live.sql.
+  live_want TEXT,
+  live_hash TEXT,
+  live_size INTEGER,
+  live_at INTEGER,
+  live_failed_at INTEGER,
   -- Mirrors of a question set (worker.js "question sets"): the set this
   -- tournament was started from, and the set's content key encrypted
   -- under this tournament's own — its rounds rows point at the set's
@@ -215,6 +225,16 @@ CREATE INDEX IF NOT EXISTS idx_room_starts_tournament ON room_starts(tournament_
 CREATE INDEX IF NOT EXISTS idx_tournaments_dirty ON tournaments(created)
   WHERE pub_dirty = 1 AND (published = 1 OR pub_snapshot IS NOT NULL OR set_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_sets_dirty ON sets(id) WHERE state_dirty = 1;
+
+-- The cron's qb-td-live questions (worker.js liveCandidates), asked every
+-- minute: the same rule as above, each index holds only the rows its
+-- query can pick. live: every deployed file (the manifest, heartbeats);
+-- todo: built but not yet deployed; backfill: published, built, never
+-- deployed.
+CREATE INDEX IF NOT EXISTS idx_tournaments_live ON tournaments(pub_built) WHERE live_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tournaments_live_todo ON tournaments(id) WHERE live_want IS NOT live_hash;
+CREATE INDEX IF NOT EXISTS idx_tournaments_live_fill ON tournaments(id)
+  WHERE published = 1 AND live_hash IS NULL AND pub_built IS NOT NULL;
 
 -- rev moves whenever anything the admin detail (worker.js getTournament)
 -- returns changes, so a Live Hub holding the current rev can be told

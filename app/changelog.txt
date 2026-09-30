@@ -1,5 +1,12 @@
 Release Notes for 9/30/2026
 
+[ PUBLIC PAGE ]
+- Results load from a free static copy, so a busy event no longer uses up the server's daily budget.
+- Round and name changes reach viewers within about a minute, like results.
+
+[ HUB ]
+- Up to date next to Open public page now means viewers can see the change; Delayed if publishing is failing.
+
 [ PERFORMANCE ]
 - Publishing public stats uses fewer GitHub API calls, however many files change.
 

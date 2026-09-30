@@ -1301,6 +1301,95 @@ async function openHubOf(adminSecret) {
   ok('12b round robin: the upload page says the round alone', (await text('#curround')).trim() === 'Now on round 2', await text('#curround'));
 }
 
+/* ---------- 24b. the public state from qb-td-live ----------
+   A stand-in for the files-only Worker (worker.js "public state on
+   qb-td-live"): serves /t/<slug>.json as the real one does (CORS, max-age
+   0), in whatever state a check needs. The page's fetches are recorded,
+   so each check can count exactly the Worker requests for the state. */
+{
+  const { createServer } = await import('node:http');
+  const real = (await call('/pub/' + slug)).body;
+  let mode = 'ok';
+  let liveHits = 0;
+  let bodyAt = Date.now();
+  const fileFor = () => {
+    const now = Date.now();
+    if (mode === 'older') return { ...real, name: 'OLDER ' + real.name, at: bodyAt - 60000, hb_ms: 600000, hb_until: now + 3600000 };
+    if (mode === 'frozen') return { ...real, name: 'FROZEN ' + real.name, at: now - 30 * 60000, hb_ms: 600000, hb_until: now + 3600000 };
+    bodyAt = now;
+    return { ...real, name: 'LIVE ' + real.name, at: now, hb_ms: 600000, hb_until: now + 3600000 };
+  };
+  const server = createServer((req, res) => {
+    liveHits++;
+    const head = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=0, must-revalidate' };
+    if (req.url !== '/t/' + slug + '.json' || mode === '404') { res.writeHead(404, head); res.end('not found'); return; }
+    if (mode === '500') { res.writeHead(500, head); res.end('oops'); return; }
+    if (mode === 'hang') { setTimeout(() => { try { res.writeHead(200, head); res.end('{}'); } catch (e) { /* gone */ } }, 7000); return; }
+    res.writeHead(200, { ...head, 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(fileFor()));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const LIVE_URL = 'http://127.0.0.1:' + server.address().port;
+  const { identifier } = await S('Page.addScriptToEvaluateOnNewDocument', { source:
+    `window.__urls = []; const __f = window.fetch; window.fetch = (u, o) => { window.__urls.push(String(u)); return __f(u, o); };` });
+  const liveUrl = `${PAGES}/t.html?t=${slug}&live=${encodeURIComponent(LIVE_URL)}`;
+  // Worker requests for the state itself (not its blobs), with their ?fb=
+  const stateCalls = () => js(`window.__urls.filter((u) => { try { return new URL(u).pathname === '/pub/' + ${q(slug)}; }
+    catch (e) { return false; } }).map((u) => new URL(u).searchParams.get('fb'))`);
+  const shownName = () => text('#tname');
+  // a fresh tab state: no latch, then load
+  const fresh = async (m, url = liveUrl) => {
+    mode = m;
+    await goto(url);
+    await js('sessionStorage.clear(); true');
+    await reload();
+  };
+  const refresh = async () => { await click('#refresh'); await new Promise((r) => setTimeout(r, 400)); };
+
+  await fresh('ok');
+  await waitJs(`document.querySelector('#tname').textContent === ${q('LIVE ' + real.name)}`, 'the state from the live file');
+  ok('24b live: the state comes from the file, no Worker state request', JSON.stringify(await stateCalls()) === '[]', await stateCalls());
+  const hits = liveHits;
+  await refresh();
+  ok('24b live: refresh re-reads the file, still no Worker state request',
+    liveHits > hits && JSON.stringify(await stateCalls()) === '[]', { liveHits, calls: await stateCalls() });
+
+  mode = 'older';
+  await refresh();
+  ok('24b live: an older file on refresh is "nothing new"', (await shownName()) === 'LIVE ' + real.name
+    && JSON.stringify(await stateCalls()) === '[]', { name: await shownName(), calls: await stateCalls() });
+
+  await fresh('404');
+  await waitJs(`document.querySelector('#tname').textContent === ${q(real.name)}`, 'the Worker after a 404');
+  ok('24b live: 404 -> exactly one Worker request, no latch', JSON.stringify(await stateCalls()) === '["404"]'
+    && !(await js(`sessionStorage.getItem('qbtd-live-off')`)), await stateCalls());
+
+  await fresh('500');
+  await waitJs(`document.querySelector('#tname').textContent === ${q(real.name)}`, 'the Worker after a 500');
+  ok('24b live: 500 -> exactly one Worker request, latched', JSON.stringify(await stateCalls()) === '["err"]'
+    && !!(await js(`sessionStorage.getItem('qbtd-live-off')`)), await stateCalls());
+  mode = 'ok';
+  const latchedHits = liveHits;
+  await refresh();
+  ok('24b live: latched tab skips the file for now: one Worker request per refresh',
+    liveHits === latchedHits && JSON.stringify(await stateCalls()) === '["err","latched"]', { calls: await stateCalls() });
+
+  await fresh('frozen');
+  await waitJs(`document.querySelector('#tname').textContent === ${q(real.name)}`, 'the Worker for a frozen file');
+  ok('24b live: a file overdue for its heartbeat -> the Worker, once', JSON.stringify(await stateCalls()) === '["old"]', await stateCalls());
+
+  await fresh('hang');
+  await waitJs(`document.querySelector('#tname').textContent === ${q(real.name)}`, 'the Worker after a timeout', 12000);
+  ok('24b live: a hung file times out -> exactly one Worker request', JSON.stringify(await stateCalls()) === '["err"]', await stateCalls());
+
+  await fresh('ok', `${PAGES}/t.html?t=${slug}&live=off`);
+  await waitJs(`document.querySelector('#tname').textContent === ${q(real.name)}`, 'the Worker with ?live=off');
+  ok('24b live: ?live=off asks the Worker as before (no fb)', JSON.stringify(await stateCalls()) === '[null]', await stateCalls());
+
+  await S('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+  await new Promise((r) => server.close(r));
+}
+
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);

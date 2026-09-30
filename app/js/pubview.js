@@ -1,6 +1,7 @@
 // pubview.js — the public tournament page (t.html?t=<slug>): schedule +
-// stats tabs. Data comes from the publish-gated /pub routes: one small
-// /pub/:slug on load or refresh, then a blob per round of games, plus
+// stats tabs. Data comes from one small state on load or refresh (the
+// tournament's file on qb-td-live, free to read; the Worker's /pub/:slug
+// when that fails — see loadState), then a blob per round of games, plus
 // the schedule / category map, only when their stamps move. A round that
 // has finished never moves again, so refreshing late in a long day
 // fetches the round in progress and nothing else.
@@ -8,9 +9,10 @@
 // Nothing polls. A viewer reads a snapshot of the tournament as of the
 // moment they loaded the page, and refreshes for a newer one — so an
 // idle tab costs nothing at all, and a refresh shows results as soon as
-// the cron has published them (no CDN layer in the state's path).
+// the cron has published them and the file has deployed (a minute or
+// so behind a moderator's upload).
 
-import { pub, esc, usingStaticData } from './api.js';
+import { pub, esc, usingStaticData, LIVE } from './api.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { dedupeMatches, aggregate } from '../engine/stats.js';
 import { buildReport } from '../engine/report.js';
@@ -925,18 +927,69 @@ function setTab(next, push = true) {
   render();
 }
 
+/* The state: the tournament's file on qb-td-live (worker.js "public state
+   on qb-td-live"), which costs the Worker nothing, else the Worker's
+   /pub/:slug — at most ONE Worker request per load or refresh, never a
+   retry, still no polling.
+   - 200: use it. It's served max-age=0 with an ETag, so cache:
+     'no-cache' revalidates (usually a 304) and the refresh button always
+     sees the newest file. An `at` older than what's on screen is the
+     edge briefly serving the previous deploy: nothing new, keep what we
+     have.
+   - 404: not published there (yet, or any more): ask the Worker, which
+     knows. No latch — the next refresh looks at the file again.
+   - network error, 5xx, bad JSON, or a file overdue for its heartbeat
+     (deploys are failing, so it's frozen): ask the Worker, and skip the
+     file for LIVE_LATCH_MS in this tab so each refresh doesn't pay for
+     the failure again.
+   ?fb= tells the Worker why, for its logs. With no LIVE (dev, a
+   self-hosted backend, ?live=off) or frozen data, it's /pub/:slug as
+   always. cache: 'no-cache' there too: /pub/:slug is served max-age=60,
+   and refreshing is the ONLY way a viewer gets newer data. */
+const LIVE_LATCH_MS = 10 * 60 * 1000;
+const LIVE_LATCH_KEY = 'qbtd-live-off';
+const LIVE_TIMEOUT_MS = 5000;
+// how far past its heartbeat a file may be before it counts as frozen
+const LIVE_GRACE_MS = 5 * 60 * 1000;
+let heldAt = 0;
+function liveLatched() {
+  try { return Date.now() < Number(sessionStorage.getItem(LIVE_LATCH_KEY) || 0); } catch (e) { return false; }
+}
+function latchLive() {
+  try { sessionStorage.setItem(LIVE_LATCH_KEY, String(Date.now() + LIVE_LATCH_MS)); } catch (e) { /* private mode */ }
+}
+async function loadState() {
+  const worker = async (why) =>
+    asJson(await pub('/pub/' + slug + (why ? '?fb=' + why : ''), { cache: 'no-cache' }));
+  if (!LIVE || usingStaticData()) return worker(null);
+  if (liveLatched()) return worker('latched');
+  let body;
+  try {
+    const res = await fetch(LIVE + '/t/' + encodeURIComponent(slug) + '.json',
+      { cache: 'no-cache', signal: AbortSignal.timeout(LIVE_TIMEOUT_MS) });
+    if (res.status === 404) return worker('404');
+    if (!res.ok) throw new Error('live ' + res.status);
+    body = await res.json();
+    if (!body || typeof body.at !== 'number' || typeof body.name !== 'string') throw new Error('live body');
+  } catch (e) {
+    latchLive();
+    return worker('err');
+  }
+  const now = Date.now();
+  if (body.hb_until && now < body.hb_until && now - body.at > (body.hb_ms || 0) + LIVE_GRACE_MS) {
+    latchLive();
+    return worker('old');
+  }
+  if (state && body.at < heldAt) return state;
+  heldAt = body.at;
+  return body;
+}
+
 async function load() {
   try {
-    // The state always comes from the Worker (or frozen local data): it
-    // is one small response per page view, and going direct keeps it
-    // free of the snapshot's publish lag and CDN staleness. Only the
-    // heavy blobs below are served off GitHub.
-    //
-    // cache: 'no-cache' is load-bearing. /pub/:slug is served max-age=60,
-    // and refreshing is now the ONLY way a viewer gets newer data — read
-    // the browser's copy and the button silently does nothing for up to a
-    // minute. Revalidating costs one small request per press.
-    state = await asJson(await pub('/pub/' + slug, { cache: 'no-cache' }));
+    // Only the state comes from here; the heavy blobs below are served
+    // off GitHub (and the Worker as their fallback).
+    state = await loadState();
     // Track the snapshot's stamps when one is advertised — its blobs are
     // what we'll fetch, so refetch decisions must follow what IT holds
     // (it can trail the Worker by up to a cron tick; the next refresh
