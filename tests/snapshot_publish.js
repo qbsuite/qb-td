@@ -22,9 +22,12 @@ function fakeDb(state) {
       if (/FROM tournaments t LEFT JOIN sets s .* WHERE t\.pub_dirty = 1/.test(sql)) {
         const setOf = (t) => (state.sets || []).find((s) => s.id === t.set_id);
         const mirrorOf = (t) => (state.mirrors || []).find((m) => m.tournament_id === t.id);
+        // ORDER BY pub_dirty_at, created: longest-waiting first, NULLs first
+        const key = (t) => [t.pub_dirty_at ?? -Infinity, t.created ?? 0];
         return {
           results: state.tournaments
             .filter((t) => t.pub_dirty && (t.published || t.pub_snapshot || t.set_id))
+            .sort((a, b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1])
             .map((t) => ({ ...t,
               set_published: setOf(t) ? Number(setOf(t).published && !(mirrorOf(t) || {}).hidden) : null })),
         };
@@ -111,8 +114,8 @@ function fakeDb(state) {
         return;
       }
       const t = state.tournaments.find((x) => x.id === args[0]);
-      if (/SET pub_dirty = 1/.test(sql)) { t.pub_dirty = 1; return; }
-      if (/SET pub_dirty = 0/.test(sql)) { t.pub_dirty = 0; return; }
+      if (/SET pub_dirty = 1/.test(sql)) { t.pub_dirty = 1; t.pub_dirty_at = t.pub_dirty_at ?? args[1]; return; }
+      if (/SET pub_dirty = 0/.test(sql)) { t.pub_dirty = 0; t.pub_dirty_at = null; return; }
       if (/SET pub_built = \?2/.test(sql)) { t.pub_built = args[1]; return; }
       if (/SET pub_snapshot = \?2/.test(sql)) { t.pub_snapshot = args[1]; return; }
       if (/SET pub_snapshot = NULL/.test(sql)) { t.pub_snapshot = null; return; }

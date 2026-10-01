@@ -74,7 +74,7 @@ const planT = d1rows(
   'EXPLAIN QUERY PLAN SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t ' +
   'LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id ' +
   'WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ' +
-  'ORDER BY t.created DESC LIMIT 4'
+  'ORDER BY t.pub_dirty_at, t.created LIMIT 4'
 ).map((x) => x.detail).join(' | ');
 ok('dirty-tournament query uses the partial index', /idx_tournaments_dirty/.test(planT), planT);
 const planS = d1rows('EXPLAIN QUERY PLAN SELECT id FROM sets WHERE state_dirty = 1 ORDER BY id LIMIT 8')

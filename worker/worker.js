@@ -688,8 +688,12 @@ function snapshotsEnabled(env) {
 // awaited inline. Unconditional even with snapshots off — the tick also
 // materializes the round shards the public page reads, which is why
 // migrate-pub.sql is no longer optional.
+// pub_dirty_at: when it started waiting. COALESCE keeps the first mark,
+// so a tournament that keeps changing can't lose its place in the queue
+// (tickTournaments serves the longest-waiting first).
 async function markPub(env, tid) {
-  await env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(tid).run();
+  await env.DB.prepare('UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1')
+    .bind(tid, Date.now()).run();
 }
 
 // The Live Hub's change counter (tournaments.rev) moves by trigger on
@@ -1048,16 +1052,19 @@ async function rebuildTournament(env, t) {
 async function tickTournaments(env) {
   const { results } = await env.DB.prepare(TICK_ROW_SELECT +
     'WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ' +
-    'ORDER BY t.created DESC LIMIT 4'
+    'ORDER BY t.pub_dirty_at, t.created LIMIT 4'
   ).all();
   const rebuilt = [];
   if (!results.length) return rebuilt;
+  // a failed rebuild goes to the back of the queue, so one that keeps
+  // failing can't hold a slot every tick
   const reflag = (id) =>
-    env.DB.prepare('UPDATE tournaments SET pub_dirty = 1 WHERE id = ?1').bind(id).run();
+    env.DB.prepare('UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1')
+      .bind(id, Date.now()).run();
   // Claim before working: a mutation mid-tick re-sets the flag and the
   // next tick picks it up, instead of the clear losing its write.
   for (const t of results) {
-    await env.DB.prepare('UPDATE tournaments SET pub_dirty = 0 WHERE id = ?1').bind(t.id).run();
+    await env.DB.prepare('UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ?1').bind(t.id).run();
     // A mirror that moved makes its half of the set's state blob stale.
     // Recorded in D1, not handed to tickSets in memory, so a rebuild that
     // fails (or a tick that dies in between) still knows what to re-read.
@@ -3562,9 +3569,9 @@ async function updateSet(request, env, s) {
     // The set's flag decides whether its mirrors' blobs belong on GitHub:
     // queue them all, and the cron publishes or retracts each.
     await env.DB.prepare(
-      'UPDATE tournaments SET pub_dirty = 1 WHERE id IN ' +
+      'UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id IN ' +
       '(SELECT tournament_id FROM set_mirrors WHERE set_id = ?1 AND tournament_id IS NOT NULL)'
-    ).bind(s.id).run();
+    ).bind(s.id, Date.now()).run();
   }
   await markSet(env, s.id);
   return json(env, { ok: true });

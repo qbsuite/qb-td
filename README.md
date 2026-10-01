@@ -665,6 +665,9 @@ first.
    and one from before the hub's public page mark needs
    `npx wrangler d1 execute qb-td --remote --file migrate-pubbuilt.sql`
    (the cron writes `tournaments.pub_built`),
+   and one from before the fair rebuild queue needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-dirtyat.sql`
+   (every mutation writes `tournaments.pub_dirty_at`),
    and one from before qb-td-live needs
    `npx wrangler d1 execute qb-td --remote --file migrate-live.sql`
    BEFORE a Worker with `LIVE_SCRIPT` set is deployed (the cron and the
@@ -880,24 +883,24 @@ That part scales. What breaks first:
    succeeded and kills came at ~0.2-2s, apparently a burst allowance that
    runs down under sustained load. Don't rely on it.
 
-   **The cron cannot keep up, and starves the losers.** The tick takes
-   `ORDER BY created DESC LIMIT 4`. With ~30 tournaments finishing rounds
-   around the same time the dirty queue is 30 deep and drains at 4/minute,
-   so the last tournament waits ~7-8 minutes — and because the ordering is
-   newest-first, it is systematically the *oldest* tournaments that wait,
-   every round. This binds harder than it used to: the tick is what
-   materializes the round shards, so a tournament at the back of the
-   queue has games that are uploaded, safe, and simply not public yet.
-   The public page says so (`pendingNote` in `pubview.js` counts games
-   the state knows about that the shards don't hold), which turns the
-   symptom from silence into a number, but the fix is the queue:
-   **order by how long a tournament has been dirty, not by age**, and
-   raise the limit (question sets add to this queue: a set's mirror is
-   materialized whether or not its own page is public, so an unpublished
-   mirror now takes a slot that only published tournaments used to; a
-   set's own state blob is already the materialized pattern item 1 asks
-   for, rebuilt per touched mirror) — materializing is R2-bounded and cheap, so the two
-   halves of the tick want different limits.
+   **The cron can't rebuild more than four tournaments a tick.** It used
+   to take the four newest dirty ones, and that starved the oldest: in a
+   9/30/2026 production test with 11 simultaneous tournaments finishing
+   rounds together, the four oldest showed only 1–3 of their 12 games on
+   the public page before each round ended, while the newest showed 8–10.
+   Fixed: the queue is served longest-waiting first (`pub_dirty_at`,
+   kept from a tournament's first unpublished change, cleared when the
+   tick claims it; `migrate-dirtyat.sql`), so with N tournaments busy at
+   once nobody waits more than about N/4 minutes — ~3 at 11. Raising the
+   four is NOT free: each tournament costs the tick about ten
+   subrequests (its claim, the Rebuild call, `pub_built`, three R2 reads
+   for the GitHub publish plus its round shards, the `pub_snapshot`
+   write) against the Free plan's 50, and the tick is near 40 with four.
+   Going higher means batching those writes and moving the publish reads
+   into the Rebuild invocation first. Question sets add to this queue: a
+   set's mirror is materialized whether or not its own page is public,
+   so an unpublished mirror takes a slot that only published tournaments
+   used to; materializing is R2-bounded and cheap.
 
    Raising the *publish* limit is bounded by **memory, not GitHub**.
    The limit that binds on GitHub's side is its secondary one, 500

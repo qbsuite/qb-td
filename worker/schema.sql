@@ -46,6 +46,10 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- cron has rebuilt the round shards (and published them, if snapshots
   -- are configured). Existing databases get these from migrate-pub.sql.
   pub_dirty INTEGER NOT NULL DEFAULT 0,
+  -- when it started waiting (epoch ms): the queue is served oldest first,
+  -- so a busy tournament can't starve the rest. Existing databases get it
+  -- from migrate-dirtyat.sql.
+  pub_dirty_at INTEGER,
   pub_snapshot TEXT,                 -- descriptor of the last published commit
   -- When the cron last finished rebuilding it (epoch ms): the hub's
   -- public page mark. Existing databases get it from migrate-pubbuilt.sql.
@@ -222,7 +226,7 @@ CREATE INDEX IF NOT EXISTS idx_room_starts_tournament ON room_starts(tournament_
 -- carries the query's whole condition, not just pub_dirty: a private
 -- tournament stays dirty (its rebuild waits for it to go public), so a
 -- pub_dirty-only index would still grow with every one of those.
-CREATE INDEX IF NOT EXISTS idx_tournaments_dirty ON tournaments(created)
+CREATE INDEX IF NOT EXISTS idx_tournaments_dirty ON tournaments(pub_dirty_at)
   WHERE pub_dirty = 1 AND (published = 1 OR pub_snapshot IS NOT NULL OR set_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_sets_dirty ON sets(id) WHERE state_dirty = 1;
 

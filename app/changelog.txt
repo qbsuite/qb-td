@@ -9,6 +9,7 @@ Release Notes for 9/30/2026
 
 [ PERFORMANCE ]
 - Publishing public stats uses fewer GitHub API calls, however many files change.
+- With many tournaments live at once, each one's public page keeps up evenly instead of the oldest falling behind.
 
 Release Notes for 9/29/2026
 

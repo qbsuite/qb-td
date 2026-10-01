@@ -521,6 +521,43 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
     answers.map((r) => r.bodyUsed));
 }
 
+// 14c. The rebuild queue is served longest-waiting first: a tournament
+// that keeps changing can't starve the ones behind it (with newest-first
+// the oldest waited out every busy minute).
+{
+  clock = realNow();
+  const w = world();
+  const ids = Array.from({ length: 6 }, () => w.add({ pub_built: null }));
+  // all six waiting, the OLDEST-created waiting longest
+  ids.forEach((id, i) => w.DB.raw.prepare('UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = ? WHERE id = ?')
+    .run(clock - (10 - i) * 1000, id));
+  await w.tick();
+  const claimed = () => ids.filter((id) => w.row(id).pub_dirty === 0);
+  ok('queue: the four that waited longest go first', JSON.stringify(claimed()) === JSON.stringify(ids.slice(0, 4)), claimed());
+  ok('queue: claiming clears the wait stamp', ids.slice(0, 4).every((id) => w.row(id).pub_dirty_at === null));
+  // the served four change again at once (a busy round): they queue BEHIND
+  // the two still waiting
+  clock += MIN;
+  for (const id of ids.slice(0, 4)) {
+    w.DB.raw.prepare('UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?) WHERE id = ?').run(clock, id);
+  }
+  await w.tick();
+  ok('queue: the two left waiting are served next, not starved',
+    w.row(ids[4]).pub_dirty === 0 && w.row(ids[5]).pub_dirty === 0, ids.map((id) => w.row(id).pub_dirty));
+  // two of the re-marked four were served alongside; the other two still
+  // wait, stamped with when they were first marked again
+  const still = ids.slice(0, 4).filter((id) => w.row(id).pub_dirty === 1);
+  ok('queue: 4 a tick — two of the re-marked still waiting', still.length === 2 && still.every((id) => w.row(id).pub_dirty_at === clock),
+    still.map((id) => w.row(id)));
+  const secret = w.row(still[0]).admin_secret;
+  clock += 5000;
+  // a real change through the admin route (markPub) keeps the first stamp
+  await worker.fetch(new Request('https://w/a/' + secret, { method: 'POST', body: JSON.stringify({ name: 'Renamed again' }),
+    headers: { 'Content-Type': 'application/json' } }), w.env, { waitUntil() {} });
+  ok('queue: a further change keeps its place (first wait stamp kept)', w.row(still[0]).pub_dirty_at === clock - 5000,
+    w.row(still[0]).pub_dirty_at);
+}
+
 // 15. Budget: a full run (10 tournaments) stays well inside the Free
 // plan's 50 subrequests per invocation.
 {
