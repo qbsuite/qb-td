@@ -76,10 +76,14 @@ export function combinedUpload(match, round, storeText, tbUsed = null, protests 
    The TO's tiebreaker pool (Worker blob, GET /b/:secret/tiebreakers) is
    offered inside MODAQ's Actions -> Add questions dialog (tb_add_dialog.js,
    swapped in at bundle time): the mod checks with the TD which question to
-   read and appends exactly that one to the end of the current packet. The
-   game meta records the base packet size and the pool ids in appended
-   order, so the upload can map "question 21 was read" back to "TU1 was
-   used". */
+   read and adds exactly that one, either at the reader's place (to replace
+   a thrown-out question) or at the end of the current packet. The game
+   meta (meta.tb) records the base packet size and where in the game's
+   packet every added question sits, keyed by 0-based game index, with
+   its pool id ('' for questions from a packet file). The upload numbers
+   questions as if every added one had been appended (tbRemapMatch), so
+   stats keyed on packet question numbers stay right and "question 21 was
+   read" maps back to "TU1 was used". */
 
 /** Validate a fetched pool; null when there is nothing usable in it. */
 export function normalizeTbPool(json) {
@@ -108,18 +112,98 @@ export function tbSelection(pool, ids) {
   };
 }
 
-/** Pool question ids a finished game actually read, from MODAQ's match
-    qbj: every tossup (and thrown-out replacement) whose packet position
-    is past the base packet, and every awarded bonus past the base
-    bonuses. (A tiebreaker bonus thrown out before award is the one case
-    with no qbj record — it lands in the match notes only.) */
+/** meta.tb in its current shape, {t, b, tuAt, boAt}. Games from before
+    mid-packet inserts stored {t, b, tu, bo}: ids appended in order after
+    the base packet, which is the same thing with the positions implied. */
+export function tbState(tb) {
+  if (!tb) return null;
+  if (tb.tuAt || tb.boAt) return { t: tb.t, b: tb.b, tuAt: { ...tb.tuAt }, boAt: { ...tb.boAt } };
+  const at = (base, ids) => Object.fromEntries((ids || []).map((id, i) => [base + i, id]));
+  return { t: tb.t, b: tb.b, tuAt: at(tb.t, tb.tu), boAt: at(tb.b, tb.bo) };
+}
+
+/** Record questions added to a game. base = the game packet's sizes
+    before this add; at = the game indices they were inserted at (base.t /
+    base.b for an append); sel = {tu, bo} pool ids, '' for packet-file
+    questions. Added questions already at or past an insert point move
+    down with it. */
+export function tbRecordAdd(tb, base, at, sel) {
+  const st = tbState(tb) || { t: base.t, b: base.b, tuAt: {}, boAt: {} };
+  const place = (map, from, ids) => {
+    const out = {};
+    for (const [k, id] of Object.entries(map)) {
+      const i = Number(k);
+      out[i >= from ? i + ids.length : i] = id;
+    }
+    ids.forEach((id, j) => { out[from + j] = id || ''; });
+    return out;
+  };
+  return {
+    t: st.t, b: st.b,
+    tuAt: place(st.tuAt, at.t, sel.tu || []),
+    boAt: place(st.boAt, at.b, sel.bo || []),
+  };
+}
+
+/** Pool ids already added to the game, in game order. */
+export function tbAddedIds(tb) {
+  const st = tbState(tb);
+  if (!st) return [];
+  const ids = (map) => Object.keys(map).map(Number).sort((x, y) => x - y).map((k) => map[k]);
+  return [...ids(st.tuAt), ...ids(st.boAt)].filter(Boolean);
+}
+
+/** 1-based game question number -> the number it would have had with
+    every added question appended after the packet: packet questions keep
+    the TD's packet numbers, added ones follow the packet in game order. */
+export function tbNumbering(tb) {
+  const st = tbState(tb);
+  const fn = (base, map) => {
+    const added = Object.keys(map || {}).map(Number).sort((x, y) => x - y);
+    return (n) => {
+      if (!st || !Number.isInteger(n) || n < 1) return n;
+      const g = n - 1;
+      const rank = added.indexOf(g);
+      if (rank >= 0) return base + rank + 1;
+      return n - added.filter((k) => k < g).length;
+    };
+  };
+  return { tu: fn(st && st.t, st && st.tuAt), bo: fn(st && st.b, st && st.boAt) };
+}
+
+/** A copy of MODAQ's match qbj with every tossup and bonus numbered by
+    tbNumbering, for the upload. */
+export function tbRemapMatch(match, tb) {
+  if (!tb || !match) return match;
+  const num = tbNumbering(tb);
+  const out = JSON.parse(JSON.stringify(match));
+  for (const q of out.match_questions || []) {
+    if (!q) continue;
+    for (const k of ['tossup_question', 'replacement_tossup_question']) {
+      if (q[k] && Number.isInteger(q[k].question_number)) q[k].question_number = num.tu(q[k].question_number);
+    }
+    const bq = q.bonus && q.bonus.question;
+    if (bq && Number.isInteger(bq.question_number)) bq.question_number = num.bo(bq.question_number);
+  }
+  return out;
+}
+
+/** Pool question ids a finished game actually read, from a match qbj
+    already numbered by tbRemapMatch: every tossup (and thrown-out
+    replacement) past the base packet, and every awarded bonus past the
+    base bonuses. (A tiebreaker bonus thrown out before award is the one
+    case with no qbj record — it lands in the match notes only.) */
 export function tbUsedIds(match, tb) {
-  if (!tb) return [];
+  const st = tbState(tb);
+  if (!st) return [];
+  const inOrder = (map) => Object.keys(map).map(Number).sort((x, y) => x - y).map((k) => map[k]);
+  const tu = inOrder(st.tuAt);
+  const bo = inOrder(st.boAt);
   const used = [];
   const seen = new Set();
   const hit = (id) => { if (id && !seen.has(id)) { seen.add(id); used.push(id); } };
-  const tuAt = (num) => hit(tb.tu[num - 1 - tb.t]);
-  const boAt = (num) => hit(tb.bo[num - 1 - tb.b]);
+  const tuAt = (num) => hit(tu[num - 1 - st.t]);
+  const boAt = (num) => hit(bo[num - 1 - st.b]);
   for (const q of (match && match.match_questions) || []) {
     const t = q.tossup_question;
     if (t && Number.isInteger(t.question_number)) tuAt(t.question_number);
@@ -129,6 +213,42 @@ export function tbUsedIds(match, tb) {
     if (bq && Number.isInteger(bq.question_number)) boAt(bq.question_number);
   }
   return used;
+}
+
+/** Where questions added "at the reader's place" go: game indices {t, b}
+    so they become the current tossup and the next bonus to read.
+    curT/curB are MODAQ's getTossupIndex/getBonusIndex for the current
+    cycle (curB -1 when the bonuses ran out). Refused ({error}) when a
+    game record already points at or past that place, since MODAQ stores
+    question indices in its events and they would then point at the wrong
+    question: buzzes on the current tossup, or anything on later cycles.
+    The one exception is the current cycle's bonus answer left empty by a
+    thrown-out bonus, which is exactly what the new bonus replaces. */
+export function readerInsertPoint({ cycles, cycleIndex, curT, curB, bonusCount, tossups, bonuses }) {
+  const t = curT;
+  const b = curB < 0 ? bonusCount : curB;
+  const late = (i) => (i === cycleIndex ? 'current' : 'later');
+  for (let i = 0; i < (cycles || []).length; i++) {
+    const c = cycles[i] || {};
+    if (tossups) {
+      const buzzes = [...(c.wrongBuzzes || []), ...(c.correctBuzz ? [c.correctBuzz] : [])];
+      if (buzzes.some((x) => x && x.tossupIndex >= t)) return { error: late(i) };
+      if ([...(c.thrownOutTossups || []), ...(c.tossupProtests || [])].some((x) => x && x.questionIndex >= t)) {
+        return { error: late(i) };
+      }
+    }
+    if (bonuses) {
+      const ba = c.bonusAnswer;
+      if (ba && ba.bonusIndex >= b) {
+        const blank = !(ba.parts || []).some((p) => p && p.points);
+        if (!(i === cycleIndex && ba.bonusIndex === b && blank)) return { error: late(i) };
+      }
+      if ([...(c.thrownOutBonuses || []), ...(c.bonusProtests || [])].some((x) => x && x.questionIndex >= b)) {
+        return { error: late(i) };
+      }
+    }
+  }
+  return { t, b };
 }
 
 /** Per-question rows for the reader's tiebreaker panel: id, kind, and who

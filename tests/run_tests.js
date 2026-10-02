@@ -29,7 +29,7 @@ import { checkPacket } from '../app/engine/packetcheck.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -2327,6 +2327,103 @@ test('tbUsedIds maps read questions past the base packet', () => {
   assert.deepEqual(tbUsedIds(match, tb), ['TU1', 'TU2', 'B1']);
   assert.deepEqual(tbUsedIds(match, null), []);
   assert.deepEqual(tbUsedIds({}, tb), []);
+});
+
+test('tbRecordAdd: appends and mid-packet inserts, legacy meta converted', () => {
+  // legacy meta: two tossups appended after a 20-tossup packet
+  const legacy = { t: 20, b: 20, tu: ['TU1', 'TU2'], bo: [] };
+  assert.deepEqual(tbState(legacy).tuAt, { 20: 'TU1', 21: 'TU2' });
+  // TU3 replaces a thrown-out question: inserted at game index 5, so the
+  // appended ones move down one
+  let tb = tbRecordAdd(legacy, { t: 22, b: 20 }, { t: 5, b: 20 }, { tu: ['TU3'], bo: [] });
+  assert.deepEqual(tb.tuAt, { 5: 'TU3', 21: 'TU1', 22: 'TU2' });
+  assert.equal(tb.t, 20, 'base packet size kept');
+  // a packet-file question inserted at the same spot records an empty id
+  tb = tbRecordAdd(tb, { t: 23, b: 20 }, { t: 5, b: 20 }, { tu: [''], bo: [] });
+  assert.deepEqual(tb.tuAt, { 5: '', 6: 'TU3', 22: 'TU1', 23: 'TU2' });
+  assert.deepEqual(tbAddedIds(tb), ['TU3', 'TU1', 'TU2']);
+  // first add on a fresh game starts the mapping at the dialog's base
+  const fresh = tbRecordAdd(null, { t: 20, b: 20 }, { t: 8, b: 7 }, { tu: ['TU1'], bo: ['B1'] });
+  assert.deepEqual(fresh, { t: 20, b: 20, tuAt: { 8: 'TU1' }, boAt: { 7: 'B1' } });
+});
+
+test('tbRemapMatch numbers an inserted tiebreaker as if appended', () => {
+  // packet of 20; TU1 inserted at game index 5 (game question 6) after
+  // packet tossup 5 was thrown out; B1 inserted at game bonus index 3
+  const tb = tbRecordAdd(null, { t: 20, b: 20 }, { t: 5, b: 3 }, { tu: ['TU1'], bo: ['B1'] });
+  const num = tbNumbering(tb);
+  assert.equal(num.tu(5), 5, 'before the insert: unchanged');
+  assert.equal(num.tu(6), 21, 'the inserted tossup follows the packet');
+  assert.equal(num.tu(7), 6, 'packet tossup 6 keeps its number');
+  assert.equal(num.tu(21), 20);
+  assert.equal(num.bo(4), 21);
+  assert.equal(num.bo(5), 4);
+  const match = { match_questions: [
+    { tossup_question: { question_number: 5 }, replacement_tossup_question: { question_number: 6 },
+      bonus: { question: { question_number: 4 } } },
+    { tossup_question: { question_number: 7 }, bonus: { question: { question_number: 5 } } },
+  ] };
+  const out = tbRemapMatch(match, tb);
+  assert.equal(out.match_questions[0].replacement_tossup_question.question_number, 21);
+  assert.equal(out.match_questions[0].bonus.question.question_number, 21);
+  assert.equal(out.match_questions[1].tossup_question.question_number, 6);
+  assert.equal(out.match_questions[1].bonus.question.question_number, 4);
+  assert.equal(match.match_questions[1].tossup_question.question_number, 7, 'input untouched');
+  assert.deepEqual(tbUsedIds(out, tb), ['TU1', 'B1']);
+  // legacy appended-only metas number exactly as before
+  const legacy = { t: 20, b: 20, tu: ['TU1'], bo: [] };
+  assert.equal(tbNumbering(legacy).tu(21), 21);
+  assert.equal(tbNumbering(legacy).tu(3), 3);
+});
+
+test('buzzpoints: a room that inserted a tiebreaker lines up with one that did not', () => {
+  const buzz = (name, word, value) => ({ player: { name }, team: { name: 'A' },
+    buzz_position: { word_index: word }, result: { value } });
+  // room 1: packet tossup 5 thrown out, TU1 inserted and read in its place,
+  // then packet tossup 6 read next (game question 7)
+  const tb = tbRecordAdd(null, { t: 20, b: 20 }, { t: 5, b: 20 }, { tu: ['TU1'], bo: [] });
+  const room1 = tbRemapMatch({ match_questions: [
+    { tossup_question: { question_number: 5 }, replacement_tossup_question: { question_number: 6 },
+      buzzes: [buzz('Ann', 30, 10)] },
+    { tossup_question: { question_number: 7 }, buzzes: [buzz('Bob', 12, 15)] },
+  ] }, tb);
+  // room 2: no throw-out, packet tossup 6 read in order
+  const room2 = { match_questions: [
+    { tossup_question: { question_number: 6 }, buzzes: [buzz('Cy', 20, 10)] },
+  ] };
+  const byTu = roundTossupBuzzes([{ round: 1, qbj: room1 }, { round: 1, qbj: room2 }], 1);
+  const t6 = byTu.find((x) => x.tossup === 6);
+  assert.deepEqual(t6.buzzes.map((b) => b.player), ['Bob', 'Cy'], 'both rooms on packet tossup 6');
+  assert.deepEqual(byTu.find((x) => x.tossup === 21).buzzes.map((b) => b.player), ['Ann'],
+    'the tiebreaker stays off the packet questions');
+});
+
+test('readerInsertPoint: allowed after a throw-out, refused once records point past it', () => {
+  // cycle 4 read packet tossup index 4, threw it out (a neg stays on it);
+  // the reader now shows index 5
+  const cycles = [{}, {}, {}, {}, {
+    wrongBuzzes: [{ tossupIndex: 4 }], thrownOutTossups: [{ questionIndex: 4 }],
+  }, {}, {}];
+  const base = { cycles, cycleIndex: 4, curT: 5, curB: 4, bonusCount: 20, tossups: true, bonuses: false };
+  assert.deepEqual(readerInsertPoint(base), { t: 5, b: 4 });
+  // a buzz already on the question now showing: only the end is safe
+  const buzzed = cycles.map((c, i) => (i === 4 ? { ...c, wrongBuzzes: [{ tossupIndex: 4 }, { tossupIndex: 5 }] } : c));
+  assert.deepEqual(readerInsertPoint({ ...base, cycles: buzzed }), { error: 'current' });
+  // the mod went back a cycle: later cycles have results
+  const later = cycles.map((c, i) => (i === 6 ? { correctBuzz: { tossupIndex: 6 } } : c));
+  assert.deepEqual(readerInsertPoint({ ...base, cycles: later }), { error: 'later' });
+  // bonus thrown out: its emptied answer points at the next bonus, which
+  // is exactly the slot the replacement takes
+  const tob = [{}, {}, {}, {}, {
+    correctBuzz: { tossupIndex: 4 }, thrownOutBonuses: [{ questionIndex: 3 }],
+    bonusAnswer: { bonusIndex: 4, parts: [{ points: 0 }, { points: 0 }, { points: 0 }] },
+  }];
+  const bonusOnly = { cycles: tob, cycleIndex: 4, curT: 4, curB: 4, bonusCount: 20, tossups: false, bonuses: true };
+  assert.deepEqual(readerInsertPoint(bonusOnly), { t: 4, b: 4 });
+  const scored = tob.map((c, i) => (i === 4 ? { ...c, bonusAnswer: { bonusIndex: 4, parts: [{ points: 10 }] } } : c));
+  assert.deepEqual(readerInsertPoint({ ...bonusOnly, cycles: scored }), { error: 'current' });
+  // bonuses ran out: curB -1 means insert at the end of the bonuses
+  assert.equal(readerInsertPoint({ ...bonusOnly, cycles: [], curB: -1 }).b, 20);
 });
 
 test('combinedUpload carries tb.used when given, omits it otherwise', () => {

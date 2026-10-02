@@ -23,6 +23,7 @@ import {
   normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
   staleGameKeys, roundRows, normalizeTbPool, tbUsedIds, tbPanelRows,
+  tbRecordAdd, tbAddedIds, tbRemapMatch, tbNumbering,
 } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
 import { protestReport } from './protests.js';
@@ -138,16 +139,13 @@ function mountMODAQ(id, meta, isNew) {
   setHeader(meta.t, meta.room, meta.round, meta.a + ' vs ' + meta.b);
 
   // The Add Questions dialog (tb_add_dialog.js) reads the pool and reports
-  // what the mod appended; the meta keeps the id mapping so the upload can
-  // say exactly which tiebreakers this game read.
+  // every question it adds and where; the meta keeps the positions so the
+  // upload can number the packet's own questions as the TD's packet does
+  // and say exactly which tiebreakers this game read.
   tbBridge.pool = tbPool;
-  tbBridge.addedIds = () => (meta.tb ? [...meta.tb.tu, ...meta.tb.bo] : []);
-  tbBridge.onAdd = (sel, base) => {
-    // games from before the meta carried tb: start the mapping at the
-    // packet size the dialog saw before this append
-    if (!meta.tb) meta.tb = { t: base.t, b: base.b, tu: [], bo: [] };
-    meta.tb.tu.push(...sel.tu);
-    meta.tb.bo.push(...sel.bo);
+  tbBridge.addedIds = () => tbAddedIds(meta.tb);
+  tbBridge.onAdd = (sel, base, at) => {
+    meta.tb = tbRecordAdd(meta.tb, base, at || base, sel);
     localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
   };
 
@@ -170,8 +168,15 @@ function mountMODAQ(id, meta, isNew) {
           let protests = null;
           try { protests = protestReport(JSON.parse(storeText), props.gameFormat || null, Tossup); }
           catch (e) { /* the Worker falls back to the qbj's notes */ }
-          const body = combinedUpload(match, meta.round, storeText,
-            meta.tb ? tbUsedIds(match, meta.tb) : null, protests);
+          // questions added mid-packet shift MODAQ's numbering; number them
+          // as if appended so stats keyed on packet numbers line up
+          const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
+          if (meta.tb && protests) {
+            const num = tbNumbering(meta.tb);
+            protests = protests.map((p) => ({ ...p, q: p.kind === 'b' ? num.bo(p.q) : num.tu(p.q) }));
+          }
+          const body = combinedUpload(qbj, meta.round, storeText,
+            meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests);
           const out = await pub(
             `/b/${secret}/upload?round=${meta.round}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body });
@@ -206,14 +211,14 @@ function mountMODAQ(id, meta, isNew) {
 // Tiebreaker pool in the side panel: every question, and who has already
 // heard it — the mod checks with the TD which one to read, and this shows
 // at a glance which are burned for which teams. During a game the pool is
-// under MODAQ's Actions -> Add questions, which appends the picked
-// question to the end of the packet.
+// under MODAQ's Actions -> Add questions, which puts the picked question at
+// the reader's place or at the end of the packet.
 function renderTbPanel() {
   const rows = tbPanelRows(tbPool);
   if (!rows.length) return;
   $('tbpanel').hidden = false;
   $('tbbase').textContent =
-    'During a game: Actions → Add questions… lists these; the one you pick is appended to the packet.';
+    'During a game, you can add these from Actions → Add questions, either in place of a thrown-out question or at the end of the packet.';
   $('tbrows').innerHTML = rows.map((r) => `
     <tr>
       <td class="roundcell">${esc(r.id)}</td>

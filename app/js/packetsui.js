@@ -10,6 +10,7 @@
 import { esc } from './api.js';
 import { guessRound } from '../engine/qbj.js';
 import { readZip } from '../engine/zip.js';
+import { readPacket } from './buzzview.js';
 import { busy } from './busy.js';
 
 function stripTags(s) { return String(s || '').replace(/<[^>]*>/g, ''); }
@@ -102,7 +103,7 @@ export function renderPacketsUi(box, o) {
     <p class="secnote">${o.tbNote}</p>
     <div class="row" style="margin-bottom:8px">
       <button id="picktb" class="primary">Upload tiebreaker packet</button>
-      <input id="tbfile" type="file" accept=".json" hidden>
+      <input id="tbfile" type="file" accept=".json,.docx" hidden>
       <span class="slotdrop" id="tbdrop">Or drop a staged .json packet chip here to split it</span>
       ${tbQuestions.length ? '<span class="spacer" style="flex:1"></span><button id="tbclear" class="small">Delete pool</button>' : ''}
     </div>
@@ -166,8 +167,16 @@ export function renderPacketsUi(box, o) {
     const raw = e.dataTransfer.getData('text/plain');
     return /^\d+$/.test(raw) ? staged[Number(raw)] || null : null;
   };
+  // The Worker splits JSON only, so a .docx goes through YAPP here first,
+  // the same parser the reader uses for docx packets
   const uploadTb = async (name, data) => {
-    if (!/\.json$/i.test(name)) { o.say('Tiebreaker packets must be .json', true); return false; }
+    if (/\.docx$/i.test(name)) {
+      let packet;
+      try { packet = await readPacket(new Response(data), name); }
+      catch (e) { o.say(`${name} couldn't be read as a packet: ${e.message}`, true); return false; }
+      return o.uploadTb(name.replace(/\.docx$/i, '.json'), JSON.stringify(packet));
+    }
+    if (!/\.json$/i.test(name)) { o.say('Tiebreaker packets need to be .json or .docx files.', true); return false; }
     return o.uploadTb(name, data);
   };
   $('tbfile').onchange = async () => {

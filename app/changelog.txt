@@ -1,3 +1,11 @@
+Release Notes for 10/2/2026
+
+[ READER ]
+- Add questions can put a tiebreaker "Here", in place of a thrown-out question, or "At the end of the packet".
+
+[ SETUP ]
+- Tiebreaker packets can be uploaded as .docx as well as .json.
+
 Release Notes for 10/1/2026
 
 [ DEMO ]
