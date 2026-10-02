@@ -1,3 +1,11 @@
+Release Notes for 10/1/2026
+
+[ DEMO ]
+- The demo page gets the new look and drops its scenario blurb.
+
+[ SETS ]
+- The set editor link is off the home page for now.
+
 Release Notes for 9/30/2026
 
 [ PUBLIC PAGE ]

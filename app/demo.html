@@ -6,40 +6,25 @@
 <meta name="referrer" content="no-referrer">
 <title>qb-td demo</title>
 <link rel="stylesheet" href="css/td.css">
+<link rel="stylesheet" href="css/hub.css">
 </head>
 <body>
 <div class="wrap narrow">
-  <header>
+  <header class="sitehead">
     <h1>qb-td demo</h1>
-    <span class="spacer"></span>
-    <span class="sub">simulated tournament</span>
+    <a href="index.html" class="muted">All tournaments</a>
   </header>
   <div id="msg"></div>
 
-  <div class="card">
-    <p>A 4-team triple round robin, mid-event. Rounds 1 through 6 are in
-    and round 7 is live. Stanford and Berkeley split their first two
-    games; both are 5-1, and Room A reads their rubber match.</p>
-    <p class="muted" style="margin-top:8px;font-size:13px">Questions:
-    2022 ACF Winter.</p>
-  </div>
+  <h2>Open as</h2>
+  <div><a href="index.html?a=demo">TD hub</a></div>
+  <div><a href="read.html?b=demo">Moderator room</a></div>
+  <div><a href="t.html?t=demo">Public page</a></div>
 
-  <div class="card">
-    <a href="index.html?a=demo"><strong>TD hub</strong></a>
-  </div>
-
-  <div class="card">
-    <a href="read.html?b=demo"><strong>Moderator Room</strong></a>
-  </div>
-
-  <div class="card">
-    <a href="t.html?t=demo"><strong>Public Page</strong></a>
-  </div>
-
-  <div class="row" style="margin-top:14px">
+  <div class="row" style="margin-top:24px">
     <a href="index.html">Create a real tournament</a>
-    <span class="spacer"></span>
-    <a href="#" id="reset" class="muted">reset demo data</a>
+    <span style="flex:1"></span>
+    <a href="#" id="reset" class="muted">Reset demo data</a>
   </div>
 </div>
 <script type="module">

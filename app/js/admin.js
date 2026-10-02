@@ -126,9 +126,6 @@ function showList() {
       <input id="newslug" placeholder="Slug (public URL)" size="18">
       <button id="newbtn" class="primary">Create</button>
     </div>
-    <h2>Question sets</h2>
-    <div><a href="set.html">Set editors</a>
-      <span class="muted">upload a set to generate mirror links and aggregate set-wide stats</span></div>
     <h2>Archive</h2>
     <div><a href="archive.html">Past tournaments</a></div>
     <h2>Demo</h2>
