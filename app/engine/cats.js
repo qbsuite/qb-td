@@ -91,7 +91,8 @@ export function categoryStats(entries, catmap) {
     if (!e || !e.qbj) continue;
     const cats = roundCats(catmap, e.round);
     if (!cats) continue;
-    for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
+    for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
+      if (tb) continue; // tiebreakers have no packet category
       const info = catInfo(cats.t, tossup);
       if (!info) continue;
       const bb = bouncebacks(buzzes);
@@ -129,7 +130,8 @@ export function categoryTeamStats(entries, catmap) {
     if (!e || !e.qbj) continue;
     const cats = roundCats(catmap, e.round);
     if (!cats) continue;
-    for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
+    for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
+      if (tb) continue; // tiebreakers have no packet category
       const info = catInfo(cats.t, tossup);
       if (!info) continue;
       const bb = bouncebacks(buzzes);
@@ -144,7 +146,7 @@ export function categoryTeamStats(entries, catmap) {
       });
     }
     for (const bn of matchBonuses(e.qbj)) {
-      if (!bn.team) continue;
+      if (!bn.team || bn.tb) continue;
       const info = catInfo(cats.b, bn.bonus);
       if (!info) continue;
       const r = rowFor(bn.team, info.cat, info.sub);
@@ -264,7 +266,8 @@ export function categoryQuestionStats(entries, catmap) {
     if (!e || !e.qbj) continue;
     const cats = roundCats(catmap, e.round);
     if (!cats) continue;
-    for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
+    for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
+      if (tb) continue; // tiebreakers have no packet category
       const info = catInfo(cats.t, tossup);
       if (!info) continue;
       const r = slice(tossups, info.cat, info.sub, tInit, e.round + ':' + tossup);
@@ -278,7 +281,7 @@ export function categoryQuestionStats(entries, catmap) {
       if (buzzes.some((b) => b.value < 0)) r.negs++;
     }
     for (const bn of matchBonuses(e.qbj)) {
-      if (!bn.team) continue; // a bonus nobody controlled wasn't read
+      if (!bn.team || bn.tb) continue; // a bonus nobody controlled wasn't read
       const info = catInfo(cats.b, bn.bonus);
       if (!info) continue;
       const r = slice(bonuses, info.cat, info.sub, bInit, e.round + ':' + bn.bonus);

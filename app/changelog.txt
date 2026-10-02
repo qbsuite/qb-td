@@ -6,6 +6,9 @@ Release Notes for 10/2/2026
 [ SETUP ]
 - Tiebreaker packets can be uploaded as .docx as well as .json.
 
+[ BUZZPOINTS ]
+- Replacement questions are left out of each round and listed under Replacements, which opens once the tournament closes.
+
 Release Notes for 10/1/2026
 
 [ DEMO ]

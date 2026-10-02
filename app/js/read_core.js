@@ -172,18 +172,25 @@ export function tbNumbering(tb) {
 }
 
 /** A copy of MODAQ's match qbj with every tossup and bonus numbered by
-    tbNumbering, for the upload. */
+    tbNumbering, for the upload. Pool tiebreakers also carry their pool id
+    (qbtd_tiebreaker), so buzzpoints list each one under its own id even
+    when rooms read different tiebreakers. */
 export function tbRemapMatch(match, tb) {
   if (!tb || !match) return match;
+  const st = tbState(tb);
   const num = tbNumbering(tb);
   const out = JSON.parse(JSON.stringify(match));
+  const fix = (qq, map, renumber) => {
+    if (!qq || !Number.isInteger(qq.question_number)) return;
+    const id = map[qq.question_number - 1];
+    if (id) qq.qbtd_tiebreaker = id;
+    qq.question_number = renumber(qq.question_number);
+  };
   for (const q of out.match_questions || []) {
     if (!q) continue;
-    for (const k of ['tossup_question', 'replacement_tossup_question']) {
-      if (q[k] && Number.isInteger(q[k].question_number)) q[k].question_number = num.tu(q[k].question_number);
-    }
-    const bq = q.bonus && q.bonus.question;
-    if (bq && Number.isInteger(bq.question_number)) bq.question_number = num.bo(bq.question_number);
+    fix(q.tossup_question, st.tuAt, num.tu);
+    fix(q.replacement_tossup_question, st.tuAt, num.tu);
+    fix(q.bonus && q.bonus.question, st.boAt, num.bo);
   }
   return out;
 }

@@ -855,6 +855,31 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('re-export replaces the game log',
     r.body.uses.length === 1 && r.body.uses[0].q === 'TU3', r.body.uses);
 
+  // the Replacements view: the text of every tiebreaker read, ciphertext at
+  // rest, buzz-gated, and shut until the tournament closes
+  ok('read tiebreakers stored as ciphertext',
+    r2get(`t/${tid}/tbread.json`).length > 0 && !r2get(`t/${tid}/tbread.json`).includes('Krebs'));
+  r = await call(A, { method: 'POST', json: { buzz_token: kdfToken, settings: { gameFormat: 'acf', buzz: kdfSettings } } });
+  ok('buzz back on for the replacements check', r.status === 200);
+  const qtb = () => fetch(`${BASE}/pub/${slug}/qtiebreakers`, { headers: { Authorization: 'Buzz ' + kdfToken } });
+  let res = await fetch(`${BASE}/pub/${slug}/qtiebreakers`);
+  ok('replacements 401 without password', res.status === 401, res.status);
+  res = await qtb();
+  ok('replacements shut while the tournament runs', res.status === 403
+    && (await res.json()).error === 'tournament not closed yet');
+  const startedAt = d1row(`SELECT started FROM tournaments WHERE slug = '${slug}'`).started;
+  d1exec(`UPDATE tournaments SET started = ${Date.now() - 49 * 3600 * 1000} WHERE slug = '${slug}'`);
+  res = await qtb();
+  const read = res.status === 200 ? await res.json() : null;
+  ok('replacements open once closed, read questions only',
+    read && read.tossups.map((x) => x.id).sort().join(',') === 'TU2,TU3'
+    && read.bonuses.map((x) => x.id).join(',') === 'B1'
+    && read.tossups.some((x) => x.answer === 'the Krebs cycle')
+    && !JSON.stringify(read).includes('Mozart') && read.uses.length === 0, read || res.status);
+  d1exec(`UPDATE tournaments SET started = ${startedAt} WHERE slug = '${slug}'`);
+  r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: { mode: 'public' } } } });
+  ok('buzz off again', r.status === 200);
+
   // clean up so the later file counts hold
   await call(`${A}/files/${tbFile1}`, { method: 'DELETE' });
   await call(`${A}/files/${tbFile2}`, { method: 'DELETE' });

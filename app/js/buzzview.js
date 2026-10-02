@@ -125,14 +125,14 @@ export function buzzTrackHtml(buzzes, words) {
     `label` replaces the "T4" in front (buzzpoints by category: "R3 T4").
     Without `heard` (one tournament's rounds) the buzzes show as a track;
     with it (a set's editors, over every room) as rates. */
-export function tossupHtml(tossup, buzzes, packet, heard, label) {
-  const tu = packet && packet.tossups && packet.tossups[tossup - 1];
+export function tossupHtml(tossup, buzzes, packet, heard, label, tb) {
+  const tu = !tb && packet && packet.tossups && packet.tossups[tossup - 1];
   const meta = heard ? tossupMetaHtml(buzzes, heard)
     : buzzTrackHtml(buzzes, tu ? tokenizeQuestionHtml(tu.question).length : 0);
   return `
     <details class="qd">
-      <summary><span class="roundcell">${label || 'T' + tossup}</span>
-        ${tu ? mainAnswerHtml(tu.answer) : '<span class="muted">(No packet text)</span>'}
+      <summary><span class="roundcell">${label || tb || 'T' + tossup}</span>
+        ${tu ? mainAnswerHtml(tu.answer) : `<span class="muted">${tb ? 'Tiebreaker' : '(No packet text)'}</span>`}
         <span class="qdmeta${heard ? '' : ' track'}">${meta}</span></summary>
       <div class="qdbody">
         ${tossupTextHtml(tu, buzzes)}
@@ -181,22 +181,22 @@ export function bonusBodyHtml(bz, results) {
 }
 
 /** A bonus's answerlines, as its collapsed label. */
-export function bonusAnswersHtml(bz) {
+export function bonusAnswersHtml(bz, tb) {
   const answers = bz && Array.isArray(bz.answers) ? bz.answers : [];
   return answers.length
     ? answers.map((a) => mainAnswerHtml(a)).join(' <span class="muted">/</span> ')
-    : '<span class="muted">(No packet text)</span>';
+    : `<span class="muted">${tb ? 'Tiebreaker' : '(No packet text)'}</span>`;
 }
 
 /** One bonus, collapsed to its answerlines. It sits indented under the
     tossup it was read with unless `nest` is false (a list of bonuses on
     their own); `label` replaces the "B4" in front. */
-export function bonusHtml(bonus, results, packet, { label, nest = true } = {}) {
-  const bz = packet && Array.isArray(packet.bonuses) && packet.bonuses[bonus - 1];
+export function bonusHtml(bonus, results, packet, { label, nest = true, tb = '' } = {}) {
+  const bz = !tb && packet && Array.isArray(packet.bonuses) && packet.bonuses[bonus - 1];
   return `
     <details class="qd${nest ? ' bonus' : ''}">
-      <summary><span class="roundcell">${label || 'B' + bonus}</span>
-        ${bonusAnswersHtml(bz)}
+      <summary><span class="roundcell">${label || tb || 'B' + bonus}</span>
+        ${bonusAnswersHtml(bz, tb)}
         <span class="qdmeta">${bonusMetaHtml(results)}</span></summary>
       <div class="qdbody">${bonusBodyHtml(bz, results)}</div>
     </details>`;
@@ -204,12 +204,13 @@ export function bonusHtml(bonus, results, packet, { label, nest = true } = {}) {
 
 /**
  * A round, interleaved by packet position: tossup N, then the bonus N
- * read with it. tossups/bonuses are buzz.js roundTossupBuzzes /
- * roundBonuses output.
+ * read with it. Tiebreakers are left out (they may be read again later in
+ * the tournament); replacementsHtml lists them once it has closed.
+ * tossups/bonuses are buzz.js roundTossupBuzzes / roundBonuses output.
  */
 export function roundHtml(tossups, bonuses, packet) {
-  const tossupByNo = new Map(tossups.map((t) => [t.tossup, t]));
-  const bonusByNo = new Map(bonuses.map((b) => [b.bonus, b]));
+  const tossupByNo = new Map(tossups.filter((t) => !t.tb).map((t) => [t.tossup, t]));
+  const bonusByNo = new Map(bonuses.filter((b) => !b.tb).map((b) => [b.bonus, b]));
   const numbers = [...new Set([...tossupByNo.keys(), ...bonusByNo.keys()])].sort((a, b) => a - b);
   return numbers.map((n) => {
     let html = '';
@@ -217,6 +218,30 @@ export function roundHtml(tossups, bonuses, packet) {
     if (bonusByNo.has(n)) html += bonusHtml(n, bonusByNo.get(n).results, packet);
     return html;
   }).join('');
+}
+
+/**
+ * The Replacements view: every tiebreaker read in the tournament (buzz.js
+ * tiebreakerBuzzes), each under its pool id, with its text when `text`
+ * (the Worker's read-tiebreakers pool, {tossups, bonuses} with ids) has it.
+ */
+export function replacementsHtml(read, text) {
+  const find = (list, id) => (text && (text[list] || []).find((q) => q.id === id)) || null;
+  const tu = (t) => {
+    const q = find('tossups', t.tb);
+    return q ? tossupHtml(1, t.buzzes, { tossups: [q] }, undefined, t.tb)
+      : tossupHtml(t.tossup, t.buzzes, null, undefined, '', t.tb);
+  };
+  const bo = (b) => {
+    const q = find('bonuses', b.tb);
+    return q ? bonusHtml(1, b.results, { bonuses: [q] }, { nest: false, label: b.tb })
+      : bonusHtml(b.bonus, b.results, null, { nest: false, tb: b.tb });
+  };
+  return `
+    <div class="rhead">Tossups <span class="muted">${read.tossups.length}</span></div>
+    ${read.tossups.map(tu).join('') || '<div class="muted">None</div>'}
+    <div class="rhead" style="margin-top:18px">Bonuses <span class="muted">${read.bonuses.length}</span></div>
+    ${read.bonuses.map(bo).join('') || '<div class="muted">None</div>'}`;
 }
 
 /** buzz.js buzzSummary rows as a table; rows carrying `site` get a column. */

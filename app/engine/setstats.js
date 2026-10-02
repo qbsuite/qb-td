@@ -109,7 +109,8 @@ export function setCategories(sites, setCatmap) {
     for (const e of site.entries) {
       const cats = roundCats(catmap, e.round);
       if (!cats) continue;
-      for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
+      for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
+        if (tb) continue; // tiebreakers have no packet category
         const info = catInfo(cats.t, tossup);
         if (!info) continue;
         const s = slice(info);
@@ -120,7 +121,7 @@ export function setCategories(sites, setCatmap) {
         s.negs += buzzes.filter((b) => b.value < 0).length;
       }
       for (const bn of matchBonuses(e.qbj)) {
-        const info = bn.team ? catInfo(cats.b, bn.bonus) : null;
+        const info = bn.team && !bn.tb ? catInfo(cats.b, bn.bonus) : null;
         if (!info) continue;
         const s = slice(info);
         s.bh++;
@@ -228,11 +229,13 @@ export function setQuestionPlays(sites, catmap) {
       for (const e of s.entries) {
         if (e.round !== round) continue;
         const room = e.room ? s.label + ' · ' + e.room : s.label;
-        for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
+        for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
+          if (tb) continue; // tiebreakers aren't the set's questions
           const g = groupFor('t', p, v, tossup);
           for (const b of buzzes) g.buzzes.push({ ...b, room });
         }
         for (const bn of matchBonuses(e.qbj)) {
+          if (bn.tb) continue; // tiebreakers aren't the set's questions
           groupFor('b', p, v, bn.bonus).results.push({ ...bn, room });
         }
       }

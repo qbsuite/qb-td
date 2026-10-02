@@ -2368,6 +2368,11 @@ async function bucketSchedule(env, secret) {
    same trust level as packets. */
 
 const TB_KEY = (tid) => `t/${tid}/tiebreakers.json`;
+// Every pool question the tournament's games actually read, in the pool's
+// blob shape, for the buzzpoints tab's Replacements view
+// (pubQTiebreakers). A replacement may be read again later in the
+// tournament, so this opens only once the tournament has closed.
+const TB_READ_KEY = (tid) => `t/${tid}/tbread.json`;
 // A set's pool: same blob shape, under the set's key. Starting a mirror
 // copies it (without the usage log) into the new tournament's own pool.
 const SET_TB_KEY = (sid) => `s/${sid}/tiebreakers.json`;
@@ -2525,6 +2530,17 @@ async function logTbUses(env, b, roomName, round, teams, usedIds) {
       pool.uses.push({ q, round, room: roomName, teams, at: now });
     }
     pool.uses = pool.uses.slice(-MAX_TB_USES);
+  });
+  // copy the read questions' text into the Replacements blob
+  const read = (list) => list.filter((q) => usedIds.includes(q.id));
+  const tus = read(merged.tossups);
+  const bos = read(merged.bonuses);
+  if (!tus.length && !bos.length) return;
+  await writeTbPool(env, TB_READ_KEY(tid), rawKey, (pool) => {
+    const have = new Set([...pool.tossups, ...pool.bonuses].map((q) => q.id));
+    const strip = ({ from, ...q }) => q;
+    pool.tossups.push(...tus.filter((q) => !have.has(q.id)).map(strip));
+    pool.bonuses.push(...bos.filter((q) => !have.has(q.id)).map(strip));
   });
 }
 
@@ -3105,6 +3121,25 @@ async function pubQPacket(request, url, env, slug) {
   if (!obj) return err(env, 404, 'packet missing');
   // the token opens the tournament's key; on a mirror that opens the set's
   return gatedPacket(request, env, obj, results[0].packet_r2_key, results[0].packet_name,
+    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }));
+}
+
+// Text of every tiebreaker the tournament read (TB_READ_KEY), for the
+// buzzpoints tab's Replacements view: buzz-gated like pubQPacket, and only
+// once the tournament has closed, since until then a replacement may still
+// be read in a later round. 404 when none was read.
+async function pubQTiebreakers(request, url, env, slug) {
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return err(env, 404, 'not found');
+  const b = buzzConfig(t);
+  if (!b) return err(env, 404, 'not found');
+  const denied = await buzzGate(request, env, slug, b);
+  if (denied) return denied;
+  if (!tournamentFinal(t)) return err(env, 403, 'tournament not closed yet');
+  const key = TB_READ_KEY(t.id);
+  const obj = await env.DATA.get(key);
+  if (!obj) return err(env, 404, 'no tiebreakers read');
+  return gatedPacket(request, env, obj, key, 'tiebreakers.json',
     t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }));
 }
 
@@ -4565,6 +4600,7 @@ export default {
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubQPacket(request, url, env, m[1]);
+    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qtiebreakers$/)) && method === 'GET') return pubQTiebreakers(request, url, env, m[1]);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubCats(env, m[1]);
 
     // Public set routes — gated by the set's own publish flag inside.

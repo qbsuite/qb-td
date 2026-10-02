@@ -16,7 +16,7 @@ import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
-import { matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
+import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
@@ -2394,8 +2394,41 @@ test('buzzpoints: a room that inserted a tiebreaker lines up with one that did n
   const byTu = roundTossupBuzzes([{ round: 1, qbj: room1 }, { round: 1, qbj: room2 }], 1);
   const t6 = byTu.find((x) => x.tossup === 6);
   assert.deepEqual(t6.buzzes.map((b) => b.player), ['Bob', 'Cy'], 'both rooms on packet tossup 6');
-  assert.deepEqual(byTu.find((x) => x.tossup === 21).buzzes.map((b) => b.player), ['Ann'],
-    'the tiebreaker stays off the packet questions');
+  const tbRow = byTu.find((x) => x.tb === 'TU1');
+  assert.deepEqual(tbRow.buzzes.map((b) => b.player), ['Ann'], 'the tiebreaker stays off the packet questions');
+  assert.equal(byTu[byTu.length - 1], tbRow, 'tiebreakers after the packet questions');
+});
+
+test('buzzpoints: different tiebreakers in different rooms stay apart', () => {
+  const buzz = (name) => ({ player: { name }, team: { name: 'A' }, buzz_position: { word_index: 3 }, result: { value: 10 } });
+  const room = (id, who) => tbRemapMatch({ match_questions: [
+    { tossup_question: { question_number: 21 }, buzzes: [buzz(who)],
+      bonus: { question: { question_number: 21 }, parts: [{ controlled_points: 10 }] } },
+  ] }, tbRecordAdd(null, { t: 20, b: 20 }, { t: 20, b: 20 }, { tu: [id], bo: ['B' + id.slice(2)] }));
+  const entries = [{ round: 2, qbj: room('TU2', 'Ann') }, { round: 2, qbj: room('TU10', 'Bob') },
+    { round: 2, qbj: room('TU2', 'Cy') }];
+  const tus = roundTossupBuzzes(entries, 2);
+  assert.deepEqual(tus.map((t) => [t.tb, t.buzzes.map((b) => b.player)]),
+    [['TU2', ['Ann', 'Cy']], ['TU10', ['Bob']]], 'one row per tiebreaker, TU2 before TU10');
+  assert.deepEqual(roundBonuses(entries, 2).map((b) => [b.tb, b.results.length]), [['B2', 2], ['B10', 1]]);
+  // games uploaded before the tag keep grouping by number
+  const old = { match_questions: [{ tossup_question: { question_number: 21 }, buzzes: [buzz('Dee')] }] };
+  assert.equal(roundTossupBuzzes([{ round: 2, qbj: old }], 2)[0].tossup, 21);
+});
+
+test('tiebreakerBuzzes: one row per replacement across rounds and rooms', () => {
+  const buzz = (name) => ({ player: { name }, team: { name: 'A' }, buzz_position: { word_index: 3 }, result: { value: 10 } });
+  const game = (id, who) => tbRemapMatch({ match_questions: [
+    { tossup_question: { question_number: 3 }, buzzes: [buzz('Pat')] },
+    { tossup_question: { question_number: 21 }, buzzes: [buzz(who)] },
+  ] }, tbRecordAdd(null, { t: 20, b: 20 }, { t: 20, b: 20 }, { tu: [id], bo: [] }));
+  const read = tiebreakerBuzzes([
+    { round: 3, room: 'A', qbj: game('TU1', 'Ann') }, { round: 7, room: 'B', qbj: game('TU1', 'Bob') },
+    { round: 7, room: 'C', qbj: game('TU2', 'Cy') },
+  ]);
+  assert.deepEqual(read.tossups.map((t) => [t.tb, t.buzzes.map((b) => b.player + '@' + b.round)]),
+    [['TU1', ['Ann@3', 'Bob@7']], ['TU2', ['Cy@7']]]);
+  assert.deepEqual(read.bonuses, []);
 });
 
 test('readerInsertPoint: allowed after a throw-out, refused once records point past it', () => {

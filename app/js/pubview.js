@@ -18,8 +18,8 @@ import { dedupeMatches, aggregate } from '../engine/stats.js';
 import { buildReport } from '../engine/report.js';
 import { mountReport } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
-import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries } from '../engine/buzz.js';
-import { roundHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
+import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes } from '../engine/buzz.js';
+import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
@@ -450,6 +450,24 @@ function buzzAuthHeaders() {
   return state.buzz && s ? { Authorization: 'Buzz ' + s.tok } : {};
 }
 
+// Text of every tiebreaker the tournament read, for the Replacements view:
+// {text} once the tournament has closed, {closed: false} before, or
+// {text: null} when it can't be had (none stored, older games).
+let buzzTiebreakers = null;
+function fetchBuzzTiebreakers() {
+  if (!buzzTiebreakers) {
+    buzzTiebreakers = (async () => {
+      let res = await pub('/pub/' + slug + '/qtiebreakers', { headers: buzzAuthHeaders() });
+      if (res instanceof Response) res = await res.json();
+      return { text: res && Array.isArray(res.tossups) ? res : null };
+    })().catch((e) => {
+      buzzTiebreakers = null;
+      return String(e.message).includes('not closed') ? { closed: false } : { text: null };
+    });
+  }
+  return buzzTiebreakers;
+}
+
 function fetchBuzzPacket(round) {
   if (!buzzPackets[round]) {
     buzzPackets[round] = (async () => {
@@ -617,6 +635,18 @@ async function renderBuzzCategory(box, rounds) {
       { label: `R${b.round} B${b.bonus}`, nest: false })).join('') || '<div class="muted">None</div>'}`;
 }
 
+async function renderBuzzReplacements(box, read) {
+  box.innerHTML = '<div class="muted">Loading replacements</div>';
+  const got = await fetchBuzzTiebreakers();
+  if (tab !== 'buzz' || buzzMode !== 'replacements') return; // user moved on mid-fetch
+  if (got.closed === false) {
+    box.innerHTML = '<div class="muted">Replacement questions can come up again in later rounds, '
+      + 'so their buzzpoints appear here once the tournament closes.</div>';
+    return;
+  }
+  box.innerHTML = replacementsHtml(read, got.text);
+}
+
 function renderBuzz(box) {
   if (!state.buzz) { box.innerHTML = '<div class="muted">Not enabled</div>'; return; }
   if (!buzzStored()) {
@@ -638,9 +668,14 @@ function renderBuzz(box) {
     if (rounds.length) buzzView = rounds[rounds.length - 1];
     else buzzMode = 'summary';
   }
+  // tiebreakers read anywhere: their own view, opened once the tournament closes
+  const replacements = tiebreakerBuzzes(rawEntries);
+  const anyReplacements = replacements.tossups.length + replacements.bonuses.length > 0;
+  if (buzzMode === 'replacements' && !anyReplacements) buzzMode = 'round';
   box.innerHTML = `
     ${viewsHtml([{ v: 'round', label: 'By Round' },
       ...(byCat ? [{ v: 'category', label: 'By Category' }] : []),
+      ...(anyReplacements ? [{ v: 'replacements', label: 'Replacements' }] : []),
       { grow: true }, { v: 'summary', label: 'Summary' }], buzzMode, 'buzzmode')}
     ${buzzMode === 'round' ? `<div class="chipstack">${chipsHtml([
       ...rounds.map((n) => ({ v: String(n), label: 'Round ' + n })),
@@ -650,6 +685,7 @@ function renderBuzz(box) {
   wire(box, 'buzzmode', (v) => { buzzMode = v; });
   wire(box, 'buzzround', (v) => { buzzView = Number(v); });
   if (buzzMode === 'summary') renderBuzzSummary($('buzzout'));
+  else if (buzzMode === 'replacements') renderBuzzReplacements($('buzzout'), replacements);
   else if (buzzMode === 'category') renderBuzzCategory($('buzzout'), rounds);
   else renderBuzzRound($('buzzout'), buzzView);
 }

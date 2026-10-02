@@ -29,10 +29,11 @@ export function matchBuzzes(json) {
   const out = [];
   for (const mq of questions) {
     if (!mq) continue;
-    const tossup = (mq.replacement_tossup_question && mq.replacement_tossup_question.question_number)
-      || (mq.tossup_question && mq.tossup_question.question_number)
-      || mq.question_number;
+    const read = (mq.replacement_tossup_question && mq.replacement_tossup_question.question_number)
+      ? mq.replacement_tossup_question : mq.tossup_question;
+    const tossup = (read && read.question_number) || mq.question_number;
     if (!Number.isInteger(tossup) || tossup < 1) continue;
+    const tb = read && typeof read.qbtd_tiebreaker === 'string' ? read.qbtd_tiebreaker : '';
     const buzzes = [];
     for (const b of (Array.isArray(mq.buzzes) ? mq.buzzes : [])) {
       const player = b && b.player && typeof b.player.name === 'string' ? b.player.name.trim() : '';
@@ -42,7 +43,7 @@ export function matchBuzzes(json) {
       if (!player || !Number.isInteger(position) || position < 0 || !Number.isFinite(value)) continue;
       buzzes.push({ player, team, position, value });
     }
-    out.push({ tossup, buzzes: buzzes.sort((x, y) => x.position - y.position) });
+    out.push({ tossup, ...(tb ? { tb } : {}), buzzes: buzzes.sort((x, y) => x.position - y.position) });
   }
   return out;
 }
@@ -72,6 +73,14 @@ export function dedupeEntries(entries) {
   return [...byGame.values()];
 }
 
+// Packet questions in packet order, then tiebreakers by pool id (TU2
+// before TU10).
+const byPacketThenTiebreaker = (num) => (a, b) => {
+  if (!a.tb !== !b.tb) return a.tb ? 1 : -1;
+  if (a.tb) return a.tb.localeCompare(b.tb, 'en', { numeric: true });
+  return num(a) - num(b);
+};
+
 /**
  * One round's buzzes across every room, merged per packet tossup.
  * entries: [{round, room, qbj}] (the raw stats-bundle rows). Returns
@@ -82,14 +91,15 @@ export function roundTossupBuzzes(entries, round) {
   const byTossup = new Map();
   for (const e of entries) {
     if (!e || e.round !== round) continue;
-    for (const { tossup, buzzes } of matchBuzzes(e.qbj)) {
-      if (!byTossup.has(tossup)) byTossup.set(tossup, []);
-      for (const b of buzzes) byTossup.get(tossup).push({ ...b, room: e.room || '' });
+    for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
+      const key = tb ? 'tb:' + tb : tossup;
+      if (!byTossup.has(key)) byTossup.set(key, { tossup, ...(tb ? { tb } : {}), buzzes: [] });
+      for (const b of buzzes) byTossup.get(key).buzzes.push({ ...b, room: e.room || '' });
     }
   }
-  return [...byTossup.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([tossup, buzzes]) => ({ tossup, buzzes: buzzes.sort((x, y) => x.position - y.position) }));
+  return [...byTossup.values()]
+    .sort(byPacketThenTiebreaker((q) => q.tossup))
+    .map((q) => ({ ...q, buzzes: q.buzzes.sort((x, y) => x.position - y.position) }));
 }
 
 /**
@@ -108,6 +118,7 @@ export function matchBonuses(json) {
     if (!b || !Array.isArray(b.parts) || !b.parts.length) continue;
     const bonus = b.question && b.question.question_number;
     if (!Number.isInteger(bonus) || bonus < 1) continue;
+    const tb = typeof b.question.qbtd_tiebreaker === 'string' ? b.question.qbtd_tiebreaker : '';
     const correct = Array.isArray(mq.buzzes)
       ? mq.buzzes.find((x) => x && x.result && Number(x.result.value) > 0) : null;
     const team = correct && correct.team && typeof correct.team.name === 'string'
@@ -115,7 +126,7 @@ export function matchBonuses(json) {
     const parts = b.parts.map((p) => Number(p && p.controlled_points) || 0);
     const bounce = b.parts.map((p) => Number(p && p.bounceback_points) || 0);
     out.push({
-      bonus, team, parts, bounce,
+      bonus, ...(tb ? { tb } : {}), team, parts, bounce,
       total: parts.reduce((n, x) => n + x, 0),
       bounceTotal: bounce.reduce((n, x) => n + x, 0),
     });
@@ -133,13 +144,42 @@ export function roundBonuses(entries, round) {
   for (const e of entries) {
     if (!e || e.round !== round) continue;
     for (const r of matchBonuses(e.qbj)) {
-      if (!byBonus.has(r.bonus)) byBonus.set(r.bonus, []);
-      byBonus.get(r.bonus).push({ ...r, room: e.room || '' });
+      const key = r.tb ? 'tb:' + r.tb : r.bonus;
+      if (!byBonus.has(key)) byBonus.set(key, { bonus: r.bonus, ...(r.tb ? { tb: r.tb } : {}), results: [] });
+      byBonus.get(key).results.push({ ...r, room: e.room || '' });
     }
   }
-  return [...byBonus.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([bonus, results]) => ({ bonus, results }));
+  return [...byBonus.values()].sort(byPacketThenTiebreaker((q) => q.bonus));
+}
+
+/**
+ * Every pool tiebreaker read in any round, for the Replacements view: one
+ * row per pool id over all rooms and rounds (a replacement read in rounds
+ * 3 and 7 is one row). {tossups: [{tb, tossup, buzzes}], bonuses: [{tb,
+ * bonus, results}]}, sorted by id.
+ */
+export function tiebreakerBuzzes(entries) {
+  const tus = new Map();
+  const bos = new Map();
+  for (const e of entries) {
+    if (!e) continue;
+    const at = { room: e.room || '', round: e.round };
+    for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
+      if (!tb) continue;
+      if (!tus.has(tb)) tus.set(tb, { tb, tossup, buzzes: [] });
+      for (const b of buzzes) tus.get(tb).buzzes.push({ ...b, ...at });
+    }
+    for (const r of matchBonuses(e.qbj)) {
+      if (!r.tb) continue;
+      if (!bos.has(r.tb)) bos.set(r.tb, { tb: r.tb, bonus: r.bonus, results: [] });
+      bos.get(r.tb).results.push({ ...r, ...at });
+    }
+  }
+  const sort = byPacketThenTiebreaker(() => 0);
+  return {
+    tossups: [...tus.values()].sort(sort).map((q) => ({ ...q, buzzes: q.buzzes.sort((x, y) => x.position - y.position) })),
+    bonuses: [...bos.values()].sort(sort),
+  };
 }
 
 /**
