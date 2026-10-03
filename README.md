@@ -991,6 +991,51 @@ What would make it viable on the free plan, roughly in order of payoff:
 3. Move the room's expiry alarm off the per-message path (re-arm at most
    once an hour).
 
+## Potential: live scores during games (not built)
+
+An idea for later, written down 10/3/2026 with the reasoning so far.
+Today stats are semi-live: a game shows on the public page once its room
+uploads it. Live scores would show each room's score while the game is
+still being played.
+
+**Rooms to the Worker (cheap).** The reader already sends the protest
+list whenever it changes (`read_main.js` `watchProtests`); a live score
+would ride the same way. Send only when the moderator moves to the next
+question, not on every buzz or bonus part, since a bonus alone could be
+four score changes. That is at most one small request per tossup: about
+5 rooms x 10 games x 24 tossups = 1,200 a day for a Terrapin-sized
+tournament, each one Worker request and one small write, around 1% of
+the free daily allowances.
+
+**The Worker to viewers (where the cost is).** Three ways, priced for
+100 viewers over a 9-hour day:
+
+| Option | Cost | How fresh |
+|---|---|---|
+| A. The page polls `/pub/:slug` | ~108k Worker requests at 30 s, over the free 100k/day; ~54k at 60 s | 30-60 s |
+| B. The cron writes the scores to qb-td-live; the page re-reads that static file while open | Viewers free (static assets, see "Public state on qb-td-live"); ~540 publishes a day | ~1-2 min |
+| C. A Durable Object per tournament pushes to viewers over WebSockets | ~1,200 pushes in + a few hundred connections; likely within the free allowance | Instant |
+
+**Chosen direction: B.** It keeps the no-polling-the-Worker rule, costs
+nothing per viewer, and a minute is fine for a scoreboard. To do it well:
+
+- Keep live scores in their own small file on qb-td-live, separate from
+  the full public rebuild, so the tournament doesn't rebuild its shards
+  and commit to the GitHub snapshot every minute all day.
+- Send only teams, scores and the tossup number: never question text,
+  answers, protest reasons or notes (the public-copy rule).
+- The page polls the static file only while the tab is visible and a
+  round is live.
+
+**Open question to test before relying on it.** Publishing about once a
+minute means about 540 qb-td-live deploys a day per active tournament.
+The static reads are known to be free (measured 9/30/2026, and `LIVE=1
+tests/sim_day.js`), but each deploy stores a version, and there is no
+delete endpoint and no documented cap (see "Watching it" above), and the
+Cloudflare API has rate limits. Try it during a low-stakes event and
+watch `node tools/cf_watch.mjs` for the version count and any refused
+deploys; if it is a problem, publish every few minutes or move to C.
+
 ## Deleting a tournament (operator runbook)
 
 There is deliberately no delete API — nothing reachable from the
