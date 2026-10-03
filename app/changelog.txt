@@ -1,5 +1,8 @@
 Release Notes for 10/3/2026
 
+[ STATS ]
+- Team and player links in the Classic layout go to the team or player you clicked.
+
 [ READER ]
 - A replacement bonus can go "Here" after a thrown-out bonus, like a tossup.
 

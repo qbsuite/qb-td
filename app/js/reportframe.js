@@ -34,22 +34,30 @@ export function reportSrcdoc(pages) {
   // Links are followed by hand, never by the browser: a srcdoc document's
   // base URL is its parent's, so letting "#teamdetail-X" navigate would
   // load the surrounding page inside the frame.
+  // The parent does the scrolling, not the frame: the frame is resized to
+  // each page's height, so a scroll made inside it before the resize is
+  // undone by it, and a target further down than the previous page was
+  // tall would land off screen. The frame reports where the target is
+  // (`y`, from the top of its document) and the parent scrolls there once
+  // the frame is its new size. `go` is set for clicks only, so loading
+  // the tab never moves the page.
   const script = `
     var files = ${JSON.stringify(FILES)};
     var current = '';
-    function show(hash) {
+    function show(hash, go) {
       current = hash;
       var pg = files.filter(function (f) { return hash === f + '-top' || hash.indexOf(f + '-') === 0; })[0] || files[0];
       files.forEach(function (f) { document.getElementById('page-' + f).hidden = f !== pg; });
+      window.scrollTo(0, 0);
       var el = hash ? document.getElementById(hash) : null;
-      if (el) el.scrollIntoView(); else window.scrollTo(0, 0);
-      parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight }, '*');
+      var y = el ? el.getBoundingClientRect().top : 0;
+      parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight, y: y, go: !!go }, '*');
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
       if (!a) return;
       e.preventDefault();
-      show(a.getAttribute('href').slice(1));
+      show(a.getAttribute('href').slice(1), true);
     });
     window.addEventListener('load', function () { show(current); });
     show('');`;
@@ -91,6 +99,11 @@ export function mountReport(box, pages) {
   const onMessage = (e) => {
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'height') {
       frame.style.height = Math.max(400, e.data.height + 16) + 'px';
+      // a followed link: bring its target (or the page's top) into view
+      if (e.data.go) {
+        const y = frame.getBoundingClientRect().top + window.scrollY + (Number(e.data.y) || 0);
+        window.scrollTo(0, Math.max(0, y - 8));
+      }
     }
   };
   window.addEventListener('message', onMessage);
