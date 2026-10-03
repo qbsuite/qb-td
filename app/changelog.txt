@@ -1,6 +1,7 @@
 Release Notes for 10/3/2026
 
 [ STATS ]
+- In the Classic layout, the team, player or game you clicked is marked with a bar, with a link back to where you were.
 - Team and player links in the Classic layout go to the team or player you clicked.
 
 [ READER ]

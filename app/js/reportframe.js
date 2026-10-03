@@ -17,6 +17,9 @@ function styleOf(html) {
   return m ? m[0] : '';
 }
 
+const PAGE_NAMES = { standings: 'Standings', individuals: 'Individuals', games: 'Scoreboard',
+  teamdetail: 'Team Detail', playerdetail: 'Player Detail', rounds: 'Round Report' };
+
 /** buildReport()'s pages -> the srcdoc of a frame that shows them. */
 export function reportSrcdoc(pages) {
   const sections = pages.map((page) => {
@@ -41,22 +44,77 @@ export function reportSrcdoc(pages) {
   // (`y`, from the top of its document) and the parent scrolls there once
   // the frame is its new size. `go` is set for clicks only, so loading
   // the tab never moves the page.
+  // A followed link marks where it landed: a bar down the target's whole
+  // section (a team with its games and players, a player's game log, a
+  // game's box score), with a link next to its heading back to the link
+  // that was followed. Both stay until the next click.
   const script = `
     var files = ${JSON.stringify(FILES)};
+    var names = ${JSON.stringify(PAGE_NAMES)};
     var current = '';
-    function show(hash, go) {
+    var marked = null; // {box, back}: undone on the next click
+    var from = null;   // the link last followed, and its page
+    function pageOf(hash) {
+      return files.filter(function (f) { return hash === f + '-top' || hash.indexOf(f + '-') === 0; })[0] || files[0];
+    }
+    // what a reader sees for an anchor: the anchor itself, or for an empty
+    // anchor div (a game's, which carries YF's 30px of space above the box
+    // score) the element after it
+    function visible(el) {
+      return el && !el.textContent.trim() && el.nextElementSibling ? el.nextElementSibling : el;
+    }
+    function unmark() {
+      if (!marked) return;
+      var box = marked.box;
+      while (box.firstChild) box.parentNode.insertBefore(box.firstChild, box);
+      box.remove();
+      if (marked.back) marked.back.remove();
+      marked = null;
+    }
+    // the section: from what the reader sees of the anchor up to the next
+    // anchor, in one box
+    function mark(el, pg) {
+      unmark();
+      if (!el || /-top$/.test(el.id)) return;
+      var start = visible(el);
+      var box = document.createElement('div');
+      box.className = 'qt-mark';
+      start.parentNode.insertBefore(box, start);
+      var n = start;
+      do { var next = n.nextElementSibling; box.appendChild(n); n = next; } while (n && !n.id);
+      var back = null;
+      if (from && from.page !== pg) {
+        back = document.createElement('a');
+        back.href = '#';
+        back.className = 'qt-back';
+        back.textContent = '\u2190 Back to ' + (names[from.page] || 'the last page');
+        var to = from;
+        back.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          unmark();
+          show(to.page + '-top', false, to.link);
+        });
+        start.appendChild(back);
+      }
+      marked = { box: box, back: back };
+    }
+    // link: land on this element instead of the hash's own (Back)
+    function show(hash, go, link) {
       current = hash;
-      var pg = files.filter(function (f) { return hash === f + '-top' || hash.indexOf(f + '-') === 0; })[0] || files[0];
+      var pg = pageOf(hash);
       files.forEach(function (f) { document.getElementById('page-' + f).hidden = f !== pg; });
       window.scrollTo(0, 0);
-      var el = hash ? document.getElementById(hash) : null;
+      var el = link || (hash ? document.getElementById(hash) : null);
+      if (go) mark(el, pg);
       var y = el ? el.getBoundingClientRect().top : 0;
-      parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight, y: y, go: !!go }, '*');
+      parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight, y: y, go: !!(go || link) }, '*');
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
-      if (!a) return;
+      if (!a || a.classList.contains('qt-back')) return;
       e.preventDefault();
+      from = { page: pageOf(current), link: a };
       show(a.getAttribute('href').slice(1), true);
     });
     window.addEventListener('load', function () { show(current); });
@@ -82,10 +140,16 @@ export function reportSrcdoc(pages) {
       .floatingTOC{background-color:#2c2c31;box-shadow:none}
       .inlineDivider{background-color:#4d4d55}
     }`;
+  // the mark's colours, light and dark
+  const marks = `
+    :root{--qtBar:#1d4ed8}
+    @media (prefers-color-scheme: dark){:root{--qtBar:#7aa2f7}}
+    .qt-mark{border-left:4px solid var(--qtBar);padding-left:4px;margin-left:-8px}
+    .qt-back{font-size:14px;font-weight:normal;margin-left:14px;white-space:nowrap}`;
   return `<!doctype html><html><head><meta charset="utf-8">${styleOf(pages[0].text)}
     <style>body{margin:0 8px 8px;background:#fff}
     .floatingTOC{position:static;box-shadow:none;margin:8px 0}
-    .html-rpt-hide-in-yft-app{display:none}${dark}</style></head>
+    .html-rpt-hide-in-yft-app{display:none}${marks}${dark}</style></head>
     <body>${sections.join('\n')}<script>${script}</script></body></html>`;
 }
 
