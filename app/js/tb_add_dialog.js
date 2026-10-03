@@ -19,7 +19,7 @@ import { ModalVisibilityStatus } from 'modaq/src/state/ModalVisibilityStatus';
 import { ModalDialog } from 'modaq/src/components/dialogs/ModalDialog';
 import { PacketState } from 'modaq/src/state/PacketState';
 import { tbBridge } from './tb_bridge.js';
-import { tbSelection, readerInsertPoint } from './read_core.js';
+import { tbSelection, readerInsertPoint, addCounts } from './read_core.js';
 
 const h = React.createElement;
 const strip = (s) => String(s || '').replace(/<[^>]*>/g, '');
@@ -92,9 +92,7 @@ export const AddQuestionsDialog = observer(function AddQuestionsDialog() {
   const [where, setWhere] = React.useState('here');
   const pending = appState.uiState.dialogState.addQuestions && appState.uiState.dialogState.addQuestions.newPacket;
   const sel = tbSelection(pool, selected);
-  const adds = pending && !selected.size
-    ? { tossups: pending.tossups.length, bonuses: pending.bonuses.length }
-    : { tossups: sel.tossups.length || 1, bonuses: sel.bonuses.length };
+  const adds = addCounts(selected.size > 0, sel, pending);
   const point = insertPoint(appState, adds);
   const here = where === 'here' && !point.error;
 

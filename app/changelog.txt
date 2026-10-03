@@ -1,5 +1,8 @@
 Release Notes for 10/3/2026
 
+[ READER ]
+- A replacement bonus can go "Here" after a thrown-out bonus, like a tossup.
+
 [ PUBLIC PAGE ]
 - "Live now" stays on the round being played until a room starts the next one, even when rooms already have it.
 

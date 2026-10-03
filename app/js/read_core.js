@@ -258,6 +258,18 @@ export function readerInsertPoint({ cycles, cycleIndex, curT, curB, bonusCount, 
   return { t, b };
 }
 
+/** What the Add questions dialog would add, for readerInsertPoint: the
+    picked pool questions, or a loaded file's when nothing is picked.
+    With neither yet, "Here" is judged as for a tossup. Bonuses alone
+    check only the bonus place: a bonus is read after a correct buzz on
+    the current tossup, so checking the tossup place too would always
+    refuse it. */
+export function addCounts(picked, sel, pending) {
+  if (picked) return { tossups: sel.tossups.length, bonuses: sel.bonuses.length };
+  if (pending) return { tossups: pending.tossups.length, bonuses: pending.bonuses.length };
+  return { tossups: 1, bonuses: 0 };
+}
+
 /** Per-question rows for the reader's tiebreaker panel: id, kind, and who
     has already heard it ({heard: [{round, room, teams}]}). */
 export function tbPanelRows(pool) {

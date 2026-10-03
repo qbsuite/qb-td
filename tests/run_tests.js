@@ -29,7 +29,7 @@ import { checkPacket } from '../app/engine/packetcheck.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -2457,6 +2457,26 @@ test('readerInsertPoint: allowed after a throw-out, refused once records point p
   assert.deepEqual(readerInsertPoint({ ...bonusOnly, cycles: scored }), { error: 'current' });
   // bonuses ran out: curB -1 means insert at the end of the bonuses
   assert.equal(readerInsertPoint({ ...bonusOnly, cycles: [], curB: -1 }).b, 20);
+});
+
+test('addCounts: a replacement bonus can go Here after a thrown-out bonus', () => {
+  // the dialog's own path: pick one pool bonus after the reader threw out
+  // the bonus that followed a correct buzz on the current tossup
+  const cycles = [{}, {}, {}, {}, {
+    correctBuzz: { tossupIndex: 4 }, thrownOutBonuses: [{ questionIndex: 3 }],
+    bonusAnswer: { bonusIndex: 4, parts: [{ points: 0 }, { points: 0 }, { points: 0 }] },
+  }];
+  const at = { cycles, cycleIndex: 4, curT: 4, curB: 4, bonusCount: 20 };
+  const bonus = addCounts(true, { tossups: [], bonuses: [{}] }, null);
+  assert.deepEqual(bonus, { tossups: 0, bonuses: 1 });
+  assert.deepEqual(readerInsertPoint({ ...at, tossups: bonus.tossups > 0, bonuses: bonus.bonuses > 0 }), { t: 4, b: 4 });
+  // a tossup picked as well still can't go Here: the current tossup was answered
+  const both = addCounts(true, { tossups: [{}], bonuses: [{}] }, null);
+  assert.deepEqual(readerInsertPoint({ ...at, tossups: both.tossups > 0, bonuses: both.bonuses > 0 }), { error: 'current' });
+  // a loaded file with just a bonus, nothing picked
+  assert.deepEqual(addCounts(false, { tossups: [], bonuses: [] }, { tossups: [], bonuses: [{}] }), { tossups: 0, bonuses: 1 });
+  // nothing yet: judged as a tossup
+  assert.deepEqual(addCounts(false, { tossups: [], bonuses: [] }, null), { tossups: 1, bonuses: 0 });
 });
 
 test('combinedUpload carries tb.used when given, omits it otherwise', () => {
