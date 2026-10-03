@@ -2833,6 +2833,14 @@ async function noteRoomStart(env, b, round, place) {
   const out = await env.DB.prepare(
     'INSERT OR IGNORE INTO room_starts (bucket_id, tournament_id, round, at) VALUES (?1, ?2, ?3, ?4)'
   ).bind(b.id, b.tournament_id, round, Date.now()).run();
+  // the first room into a round moves the public page's Live now
+  // (pubStateBody live_round)
+  if (out.meta.changes) {
+    const { results } = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM room_starts WHERE tournament_id = ?1 AND round >= ?2 AND bucket_id != ?3'
+    ).bind(b.tournament_id, round, b.id).all();
+    if (!results[0].n) await markPub(env, b.tournament_id);
+  }
   // a room's start moves only its own bracket (brackets.js)
   const at = place ? place.round : b.current_round;
   if (out.meta.changes && round === at) {
@@ -3193,7 +3201,7 @@ async function pubQTiebreakers(request, url, env, slug) {
 // (same query, same order), so building the prebuilt state doesn't read
 // them twice
 async function pubStateBody(env, t, pub, loaded = null) {
-  const [files, buckets, schedObj, packetRounds, catsHead, manifest] = await Promise.all([
+  const [files, buckets, schedObj, packetRounds, catsHead, manifest, started] = await Promise.all([
     loaded && loaded.rows ? { results: loaded.rows } : env.DB.prepare(
       "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
     ).bind(t.id).all(),
@@ -3206,6 +3214,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
     ).bind(t.id, t.current_round).all(),
     env.DATA.get(`t/${t.id}/catmap.json`),
     loaded && loaded.manifest ? loaded.manifest : readManifest(env, t.id),
+    env.DB.prepare('SELECT MAX(round) AS n FROM room_starts WHERE tournament_id = ?1').bind(t.id).all(),
   ]);
   // an empty map is a "checked, nothing found" backfill marker: the
   // tab stays hidden
@@ -3231,6 +3240,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
   return {
     name: t.name,
     current_round: t.current_round,
+    live_round: liveRound(t, started.results[0] && started.results[0].n, rows),
     roster: !!t.roster_r2_key,
     // stamp for the schedule tab: refetch only when this moves
     schedule: schedObj ? schedObj.uploaded.getTime() : null,
@@ -3272,6 +3282,22 @@ async function pubStateBody(env, t, pub, loaded = null) {
     // answer caches for a week.
     final: tournamentFinal(t),
   };
+}
+
+// The round being played, for the public page's Live now. Rooms get the
+// next round as soon as it opens (auto-advance opens it once every room
+// has started the current one), but the round on the floor is the newest
+// one a room has actually started (room_starts: its reader pressed Start,
+// or it downloaded the packet) or sent a game from, never past the open
+// round(s). Nothing started yet: the open round.
+function liveRound(t, maxStarted, rows) {
+  let open = t.current_round;
+  if (t.bracket_rounds) {
+    try { open = Math.max(open, ...Object.values(JSON.parse(t.bracket_rounds)).map(Number).filter(Number.isInteger)); }
+    catch (e) { /* keep current_round */ }
+  }
+  const played = Math.max(Number(maxStarted) || 0, ...rows.map((f) => f.round));
+  return played ? Math.min(played, open) : t.current_round;
 }
 
 /* The public state, prebuilt. pubStateBody reads every game row, the

@@ -285,7 +285,7 @@ function gameCell(g, round, results) {
 
 function renderScheduleGrid(box) {
   const results = resultMap();
-  const cur = state.current_round;
+  const cur = liveRound();
   box.innerHTML = schedule.phases.map((phase) => {
     if (!phase.rounds.some((r) => r.games.some(keepGame))) return '';
     // byes aren't in any pool: shown only when the whole schedule is
@@ -319,7 +319,7 @@ function renderScheduleGrid(box) {
 // on a wide screen, stacked on a phone.
 function renderNow(box) {
   const results = resultMap();
-  const cur = state.current_round;
+  const cur = liveRound();
   const blocks = [[cur, 'Live now', 'live'], [cur + 1, 'Up next', '']]
     .map(([n, tag, cls]) => ({ n, tag, cls, r: findRound(n) })).filter((b) => b.r);
   const named = poolsIn(blocks.map((b) => b.r)).length > 1;
@@ -363,7 +363,7 @@ function renderTeamView(box, team) {
               : `<span class="muted">L ${mine.points}–${theirs.points}</span>`;
           }
         }
-        rows.push(`<tr${round.round === state.current_round ? ' class="nowrow"' : ''}><td class="roundcell">${round.round}</td>
+        rows.push(`<tr${round.round === liveRound() ? ' class="nowrow"' : ''}><td class="roundcell">${round.round}</td>
           <td class="name${oppSlot && oppSlot.label ? ' ph' : ''}">${esc(opp) || '—'}</td>
           <td class="muted">${esc(room)}</td><td class="num">${result}</td></tr>`);
       } else if (round.byes.some((s) => slotText(s) === team)) {
@@ -389,12 +389,19 @@ function scheduleTeams() {
   return [...names].sort();
 }
 
+// The round on the floor (worker.js liveRound): rooms may already have
+// the next one, but it's live here once a room starts it. Older states
+// and frozen copies carry only current_round.
+function liveRound() {
+  return Number.isInteger(state.live_round) ? state.live_round : state.current_round;
+}
+
 function renderSchedule(box) {
   if (!schedule) {
     box.innerHTML = '<div class="muted">No schedule</div>';
     return;
   }
-  const cur = state.current_round;
+  const cur = liveRound();
   const hasNow = Boolean(findRound(cur));
   if (!schedView) {
     const kept = readPref(SCHED_VIEW_KEY);
@@ -1035,7 +1042,7 @@ async function load() {
     if (storedKey && storedKey.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
     $('tname').textContent = state.name;
-    $('round').textContent = 'Round ' + state.current_round;
+    $('round').textContent = 'Round ' + liveRound();
     $('tab-buzz').hidden = !state.buzz;
     $('tab-cats').hidden = !state.cats;
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);

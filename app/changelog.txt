@@ -1,5 +1,8 @@
 Release Notes for 10/3/2026
 
+[ PUBLIC PAGE ]
+- "Live now" stays on the round being played until a room starts the next one, even when rooms already have it.
+
 [ LIVE HUB ]
 - Protests show in the Protests drawer as soon as the moderator logs them, marked "Game in progress" until the game is uploaded.
 

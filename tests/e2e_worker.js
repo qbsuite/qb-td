@@ -1105,11 +1105,16 @@ ok('bucket link dead', r.status === 404);
   const settings = JSON.parse((await call(AA)).body.tournament.settings || '{}');
   r = await call(AA, { method: 'POST', json: { settings: { ...settings, autoAdvance: true } } });
   ok('switching on with every room started opens the next round', r.body.advanced === true && await round() === 2, r.body);
+  // the public page's Live now stays on the round being played until a
+  // room starts the next one
+  const pubLive = async () => { await tick(); const p = (await call('/pub/' + aslug)).body; return [p.current_round, p.live_round]; };
+  ok('public: round 2 open, round 1 still live', JSON.stringify(await pubLive()) === '[2,1]');
 
   // round 2: Room 2 has the bye, so Rooms 1 and 3 are the ones waited on.
   // Round 3 has no packet yet, so even then it stays.
   await call(`/b/${r1.secret}/start?round=2`, { method: 'POST' });
   ok('one room of two: still round 2', await round() === 2);
+  ok('public: a room starting round 2 makes it live', JSON.stringify(await pubLive()) === '[2,2]');
   // a download from the uploads page counts too (rooms reading off paper)
   await fetch(`${BASE}/b/${r3.secret}/packet?round=2`);
   ok('every room started, but no packet for round 3: stays', await round() === 2);
@@ -1121,6 +1126,7 @@ ok('bucket link dead', r.status === 404);
   await call(`/b/${r2.secret}/start?round=1`, { method: 'POST' });
   await fetch(`${BASE}/b/${r1.secret}/packet?round=1`);
   ok('a round the TD set back is not pushed on by old starts', await round() === 1);
+  ok('public: never live past the open round', JSON.stringify(await pubLive()) === '[1,1]');
   r = await call(`/b/${r1.secret}/start?round=9`, { method: 'POST' });
   ok('a start for a round not open yet is refused', r.status === 400, r.body);
 }

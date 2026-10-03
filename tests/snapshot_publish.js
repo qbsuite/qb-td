@@ -91,6 +91,10 @@ function fakeDb(state) {
       if (/SELECT number FROM rounds/.test(sql)) {
         return { results: (state.rounds || []).filter((r) => r.tournament_id === args[0] && r.number <= args[1]) };
       }
+      if (/SELECT MAX\(round\) AS n FROM room_starts/.test(sql)) {
+        const rs = (state.starts || []).filter((x) => x.tournament_id === args[0]).map((x) => x.round);
+        return { results: [{ n: rs.length ? Math.max(...rs) : null }] };
+      }
       throw new Error('unexpected all(): ' + sql);
     },
     async run() {
