@@ -14,9 +14,9 @@
 
 import { pub, esc, usingStaticData, LIVE } from './api.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
-import { dedupeMatches, aggregate } from '../engine/stats.js';
-import { buildReport } from '../engine/report.js';
-import { mountReport } from './reportframe.js';
+import { dedupeMatches } from '../engine/stats.js';
+import { buildReport, reportData } from '../engine/report.js';
+import { mountReport, reportPlace } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes } from '../engine/buzz.js';
 import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
@@ -863,61 +863,238 @@ function pendingNote() {
 
 // The stats tab has two layouts, picked per viewer. Classic, the default,
 // is the YellowFruit-style report (engine/report.js): the same six pages
-// the TO can download, shown in place. New draws standings and
-// individuals in the page's own style, per pool when there are pools; the
-// report's other pages stay a click away under Classic.
+// the TO can download, shown in place. New draws the same six in the
+// page's own style (standings per pool when there are pools) from
+// report.js reportData, so the two layouts always show the same numbers.
+// Its links work like Classic's: a team, player, game or round opens on
+// its own page, marked with a bar and a link back to where you were.
 const STATS_LAYOUT_KEY = 'qbtdStatsLayout';
 let statsLayout = null;    // 'classic' | 'new'
-let statsSec = 'standings'; // New layout: 'standings' | 'individuals'
+let statsSec = 'standings'; // New layout: a NEW_SECS key
 let unmountReport = null;
+const NEW_SECS = [['standings', 'Standings'], ['individuals', 'Individuals'], ['games', 'Scoreboard'],
+  ['teams', 'Teams'], ['players', 'Players'], ['rounds', 'Rounds']];
+let newMark = null; // the id a followed link landed on (marked)
+let newFrom = null; // {sec, y}: where the Back link returns to
 
-const pct3 = (w, l, t) => {
-  const gp = w + l + t;
-  return gp ? ((w + t / 2) / gp).toFixed(3).replace(/^0/, '') : '–';
-};
+const fx = (v, d) => (v === null || v === undefined ? '–' : v.toFixed(d));
+const pctText = (v) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
 
-function standingsTable(teams, vals, ties) {
-  return `<div class="tablewrap"><table class="nstats">
-    <tr><th class="num"></th><th class="name">Team</th><th class="num">W</th><th class="num">L</th>${ties ? '<th class="num">T</th>' : ''}
-      <th class="num">Pct</th><th class="num" title="Points per 20 tossups heard">PP20TUH</th>
-      ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
-      <th class="num" title="Tossups heard">TUH</th><th class="num" title="Points per bonus">PPB</th></tr>
-    ${teams.map((tm, i) => `<tr>
-      <td class="num muted">${i + 1}</td><td class="name">${esc(tm.name)}</td>
-      <td class="num">${tm.w}</td><td class="num">${tm.l}</td>${ties ? `<td class="num">${tm.t}</td>` : ''}
-      <td class="num">${pct3(tm.w, tm.l, tm.t)}</td><td class="num">${tm.pp20tuh.toFixed(2)}</td>
-      ${vals.map((v) => `<td class="num">${tm.counts[v] || 0}</td>`).join('')}
-      <td class="num">${tm.tuh}</td><td class="num">${tm.ppb.toFixed(2)}</td></tr>`).join('')}
-  </table></div>`;
+// ids for the New layout's anchors: by position, so any name is safe
+function newIds(rd) {
+  const team = new Map(rd.teams.map((t, i) => [t.name, 'nt-' + i]));
+  const player = new Map(rd.players.map((p, i) => [p.team + '\n' + p.name, 'np-' + i]));
+  const game = new Map(rd.games.map((g, i) => [g.id, 'ng-' + i]));
+  return {
+    team: (n) => team.get(n), player: (t, n) => player.get(t + '\n' + n),
+    game: (id) => game.get(id), round: (r) => 'nr-' + r,
+  };
 }
+const goLink = (sec, id, text) => (id ? `<a href="#" data-go="${sec}|${esc(id)}">${text}</a>` : text);
 
-function renderNewStats(box) {
-  const agg = aggregate(dedupeMatches(matches), roster);
-  const vals = agg.values.filter((v) => v !== 0);
-  const ties = agg.teams.some((t) => t.t > 0);
-  if (statsSec === 'individuals') {
-    box.innerHTML = `<div class="tablewrap"><table class="nstats">
-      <tr><th class="num"></th><th class="name">Player</th><th class="name teamcol">Team</th><th class="num">GP</th>
-        ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
-        <th class="num">TUH</th><th class="num">Pts</th><th class="num" title="Points per 20 tossups heard">PP20TUH</th></tr>
-      ${agg.players.map((p, i) => `<tr>
-        <td class="num muted">${i + 1}</td><td class="name">${esc(p.name)}<span class="subteam">${esc(p.team)}</span></td>
-        <td class="name muted teamcol">${esc(p.team)}</td><td class="num">${p.gp}</td>
-        ${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
-        <td class="num">${p.tuh}</td><td class="num">${p.points}</td><td class="num">${p.pp20tuh.toFixed(2)}</td></tr>`).join('')}
-    </table></div>`;
-    return;
-  }
+function newStandings(rd, ids, vals, pp) {
+  const table = (teams, ranked) => `<div class="tablewrap"><table class="nstats">
+    <tr><th class="num"></th><th class="name">Team</th><th class="num">W</th><th class="num">L</th>${rd.anyTies ? '<th class="num">T</th>' : ''}
+      <th class="num">Pct</th><th class="num" title="Points scored in regulation per ${rd.regTossups} regulation tossups heard">${pp}</th>
+      ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
+      <th class="num" title="Tossups heard in regulation">TUH</th><th class="num" title="Points per bonus">PPB</th></tr>
+    ${teams.map((tm, i) => `<tr>
+      <td class="num muted">${ranked ? esc(tm.rank) : i + 1}</td><td class="name">${goLink('teams', ids.team(tm.name), esc(tm.name))}</td>
+      <td class="num">${tm.w}</td><td class="num">${tm.l}</td>${rd.anyTies ? `<td class="num">${tm.t}</td>` : ''}
+      <td class="num">${pctText(tm.pct)}</td><td class="num">${fx(tm.pp, 1)}</td>
+      ${vals.map((v) => `<td class="num">${tm.counts[v] || 0}</td>`).join('')}
+      <td class="num">${tm.regTuh}</td><td class="num">${fx(tm.ppb, 2)}</td></tr>`).join('')}
+  </table></div>`;
   // per pool when the schedule seeded pools; teams in none go last
   const pools = (schedule && schedule.pools) || {};
   const keys = Object.keys(pools).sort();
-  if (keys.length < 2) { box.innerHTML = standingsTable(agg.teams, vals, ties); return; }
+  if (keys.length < 2) return table(rd.teams, true);
   const inPool = new Set(keys.flatMap((k) => pools[k]));
-  const groups = keys.map((k) => ['Pool ' + k, agg.teams.filter((t) => pools[k].includes(t.name))])
-    .concat([['Other teams', agg.teams.filter((t) => !inPool.has(t.name))]])
-    .filter(([, teams]) => teams.length);
-  box.innerHTML = groups.map(([name, teams]) =>
-    `<h3 class="poolhead">${esc(name)}</h3>${standingsTable(teams, vals, ties)}`).join('');
+  return keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name))])
+    .concat([['Other teams', rd.teams.filter((t) => !inPool.has(t.name))]])
+    .filter(([, teams]) => teams.length)
+    .map(([name, teams]) => `<h3 class="poolhead">${esc(name)}</h3>${table(teams, false)}`).join('');
+}
+
+function newIndividuals(rd, ids, vals, pp) {
+  return `<div class="tablewrap"><table class="nstats">
+    <tr><th class="num"></th><th class="name">Player</th><th class="name teamcol">Team</th><th class="num" title="Games played">GP</th>
+      ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
+      <th class="num" title="Tossups heard">TUH</th><th class="num">Pts</th><th class="num" title="Points per ${rd.regTossups} tossups heard">${pp}</th></tr>
+    ${rd.players.map((p) => `<tr>
+      <td class="num muted">${esc(p.rank)}</td>
+      <td class="name">${goLink('players', ids.player(p.team, p.name), esc(p.name))}<span class="subteam">${esc(p.team)}</span></td>
+      <td class="name muted teamcol">${goLink('teams', ids.team(p.team), esc(p.team))}</td><td class="num">${p.gp.toFixed(1)}</td>
+      ${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
+      <td class="num">${p.tuh}</td><td class="num">${p.points}</td><td class="num">${fx(p.pp, 2)}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+// a game row of a team's or player's log: round, opponent, result, score
+const logCells = (ids, g) => `<td class="num muted">${g.round}</td>
+  <td class="name">${goLink('teams', ids.team(g.opp), esc(g.opp))}</td><td>${g.result}</td>
+  <td class="name">${goLink('games', ids.game(g.gameId), esc(g.score))}</td>`;
+const logHead = '<th class="num">Rd</th><th class="name">Opponent</th><th></th><th class="name">Score</th>';
+// `at`: the Classic report's id for the same thing (reportData anchor)
+const secHead = (id, title, meta, at) => `<div class="nsec" id="${id}" data-at="${esc(at)}"><h3 class="nhead"><span>${title}</span>${
+  meta ? `<span class="meta">${meta}</span>` : ''}</h3>`;
+
+function newGames(rd, ids, vals) {
+  const rounds = [...new Set(rd.games.map((g) => g.round))];
+  const box = (g) => {
+    const head = `Round ${g.round} · Tossups read: ${g.tossupsRead}${g.otTossups ? ` (${g.otTossups} in OT)` : ''}`;
+    const w = g.teams.find((t) => t.name === g.winner);
+    const l = g.teams.find((t) => t.name === g.loser);
+    const title = `${esc(w.name)} ${w.points}, ${esc(l.name)} ${l.points}${g.otTossups ? ' (OT)' : ''}`;
+    return `${secHead(ids.game(g.id), title, head, g.anchor)}
+      <div class="nbox">${g.teams.map((t) => `<div class="tablewrap"><table class="nstats">
+        <tr><th class="name">${goLink('teams', ids.team(t.name), esc(t.name))}</th><th class="num">TUH</th>
+          ${vals.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th></tr>
+        ${t.players.map((p) => `<tr><td class="name">${goLink('players', ids.player(t.name, p.name), esc(p.name))}</td>
+          <td class="num">${p.tuh}</td>${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
+          <td class="num">${p.points}</td></tr>`).join('')}
+        <tr class="ntot"><td class="name">Total</td><td></td>${vals.map((v) => `<td class="num">${t.counts[v] || 0}</td>`).join('')}
+          <td class="num">${t.tossupPoints}</td></tr>
+      </table></div>`).join('')}</div>
+      <div class="tablewrap"><table class="nstats nbonus">
+        <tr><th class="name">Bonuses</th><th class="num">Heard</th><th class="num">Pts</th><th class="num">PPB</th></tr>
+        ${g.teams.map((t) => `<tr><td class="name">${esc(t.name)}</td><td class="num">${t.bonusesHeard}</td>
+          <td class="num">${t.bonusPoints}</td><td class="num">${fx(t.ppb, 2)}</td></tr>`).join('')}
+      </table></div></div>`;
+  };
+  return `<div class="chips njump">${rounds.map((r) => `<a href="#" class="chip" data-go="games|${ids.round(r)}">Round ${r}</a>`).join('')}</div>`
+    + rounds.map((r) => `<h3 class="poolhead" id="${ids.round(r)}" data-at="games-Round-${r}">Round ${r}</h3>${
+      rd.games.filter((g) => g.round === r).map(box).join('')}`).join('');
+}
+
+function newTeams(rd, ids, vals, pp) {
+  const byName = [...rd.teams].sort((a, b) => a.name.toLocaleUpperCase().localeCompare(b.name.toLocaleUpperCase()));
+  return byName.map((t) => {
+    const players = rd.players.filter((p) => p.team === t.name);
+    return `${secHead(ids.team(t.name), esc(t.name), esc(t.record), t.anchor)}
+      <div class="tablewrap"><table class="nstats">
+        <tr>${logHead}${vals.map((v) => `<th class="num">${v}</th>`).join('')}
+          <th class="num" title="Tossups heard">TUH</th><th class="num" title="Bonuses heard">BHrd</th>
+          <th class="num" title="Points scored on bonuses">BPts</th><th class="num" title="Points per bonus">PPB</th></tr>
+        ${t.games.map((g) => `<tr>${logCells(ids, g)}${vals.map((v) => `<td class="num">${g.counts[v] || 0}</td>`).join('')}
+          <td class="num">${g.tuh}</td><td class="num">${g.bonusesHeard}</td><td class="num">${g.bonusPoints}</td>
+          <td class="num">${fx(g.ppb, 2)}</td></tr>`).join('')}
+        <tr class="ntot"><td></td><td class="name">Total</td><td>${esc(t.record)}</td><td></td>
+          ${vals.map((v) => `<td class="num">${t.counts[v] || 0}</td>`).join('')}
+          <td class="num">${t.tuh}</td><td class="num">${t.bonusesHeard}</td><td class="num">${t.bonusPoints}</td>
+          <td class="num">${fx(t.ppb, 2)}</td></tr>
+      </table></div>
+      ${players.length ? `<div class="tablewrap"><table class="nstats">
+        <tr><th class="name">Player</th><th class="num" title="Games played">GP</th>${vals.map((v) => `<th class="num">${v}</th>`).join('')}
+          <th class="num" title="Tossups heard">TUH</th><th class="num">${pp}</th></tr>
+        ${players.map((p) => `<tr><td class="name">${goLink('players', ids.player(p.team, p.name), esc(p.name))}</td>
+          <td class="num">${p.gp.toFixed(1)}</td>${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
+          <td class="num">${p.tuh}</td><td class="num">${fx(p.pp, 2)}</td></tr>`).join('')}
+      </table></div>` : ''}</div>`;
+  }).join('');
+}
+
+function newPlayers(rd, ids, vals) {
+  const sorted = [...rd.players].sort((a, b) =>
+    a.team.toLocaleUpperCase().localeCompare(b.team.toLocaleUpperCase())
+    || a.name.toLocaleUpperCase().localeCompare(b.name.toLocaleUpperCase()));
+  return sorted.map((p) => `${secHead(ids.player(p.team, p.name), esc(p.name), goLink('teams', ids.team(p.team), esc(p.team)), p.anchor)}
+    <div class="tablewrap"><table class="nstats">
+      <tr>${logHead}<th class="num" title="Games played">GP</th>${vals.map((v) => `<th class="num">${v}</th>`).join('')}
+        <th class="num" title="Tossups heard">TUH</th><th class="num">Pts</th></tr>
+      ${p.games.map((g) => `<tr>${logCells(ids, g)}<td class="num">${g.gp.toFixed(1)}</td>
+        ${vals.map((v) => `<td class="num">${g.counts[v] || 0}</td>`).join('')}
+        <td class="num">${g.tuh}</td><td class="num">${g.points}</td></tr>`).join('')}
+      <tr class="ntot"><td></td><td class="name">Total</td><td></td><td></td><td class="num">${p.gp.toFixed(1)}</td>
+        ${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
+        <td class="num">${p.tuh}</td><td class="num">${p.points}</td></tr>
+    </table></div></div>`).join('');
+}
+
+function newRounds(rd, ids) {
+  const n = rd.regTossups;
+  const cells = (r) => `<td class="num">${r.games}</td><td class="num">${fx(r.ppTeam, 1)}</td>
+    ${rd.hasPowers ? `<td class="num">${r.powerPct === null ? '–' : r.powerPct.toFixed(0) + '%'}</td>` : ''}
+    <td class="num">${r.convPct === null ? '–' : r.convPct.toFixed(0) + '%'}</td>
+    ${rd.hasNegs ? `<td class="num">${fx(r.negsTeam, 1)}</td>` : ''}<td class="num">${fx(r.ppb, 2)}</td>`;
+  return `<div class="tablewrap"><table class="nstats">
+    <tr><th class="num">Round</th><th class="num">Games</th>
+      <th class="num" title="Points per team per ${n} tossups heard">Pts/Tm/${n}TUH</th>
+      ${rd.hasPowers ? '<th class="num" title="Tossups powered by either team">TU Powered</th>' : ''}
+      <th class="num" title="Tossups answered correctly by either team">TU Converted</th>
+      ${rd.hasNegs ? `<th class="num" title="Incorrect interrupts per team per ${n} tossups heard">Negs/Tm/${n}TUH</th>` : ''}
+      <th class="num" title="Points per bonus">PPB</th></tr>
+    ${rd.rounds.map((r) => `<tr><td class="num">${goLink('games', ids.round(r.round), String(r.round))}</td>${cells(r)}</tr>`).join('')}
+    <tr class="ntot"><td class="num">Total</td>${cells(rd.total)}</tr>
+  </table></div>`;
+}
+
+// Switching layouts keeps the place: the same page, at the same team,
+// player, game or round. Classic's pages map onto New's sections one to
+// one, and New's sections carry Classic's ids (data-at).
+const PAGE_SEC = { standings: 'standings', individuals: 'individuals', games: 'games',
+  teamdetail: 'teams', playerdetail: 'players', rounds: 'rounds' };
+let pendingPlace = null; // {page, anchor}: where the layout switch was made
+
+function newPlace(box) {
+  const page = Object.keys(PAGE_SEC).find((k) => PAGE_SEC[k] === statsSec) || 'standings';
+  const mark = box && box.querySelector('.nmark[data-at]');
+  if (mark) return { page, anchor: mark.dataset.at, marked: true };
+  let anchor = null;
+  for (const el of (box ? box.querySelectorAll('[data-at]') : [])) {
+    if (el.getBoundingClientRect().top > 80) break;
+    anchor = el.dataset.at;
+  }
+  return { page, anchor };
+}
+
+function renderNewStats(box) {
+  const rd = reportData({ name: state.name, matches: dedupeMatches(matches), roster,
+    settings: effectiveFormat(state.format) });
+  const ids = newIds(rd);
+  const vals = rd.vals.filter((v) => v !== 0);
+  const pp = `PP${rd.regTossups}TUH`;
+  const draw = { standings: () => newStandings(rd, ids, vals, pp), individuals: () => newIndividuals(rd, ids, vals, pp),
+    games: () => newGames(rd, ids, vals), teams: () => newTeams(rd, ids, vals, pp),
+    players: () => newPlayers(rd, ids, vals), rounds: () => newRounds(rd, ids) };
+  box.innerHTML = (draw[statsSec] || draw.standings)();
+  // a followed link: mark where it landed, with the way back (a round's
+  // heading gets only the way back)
+  const el = newMark && document.getElementById(newMark);
+  if (el) {
+    const sec = el.classList.contains('nsec');
+    if (sec) el.classList.add('nmark');
+    if (newFrom) {
+      const label = (NEW_SECS.find(([k]) => k === newFrom.sec) || [])[1];
+      (sec ? el.querySelector('.nhead') : el).insertAdjacentHTML('beforeend',
+        ` <a href="#" class="nback" data-back="1">← Back to ${esc(label || 'the last page')}</a>`);
+    }
+  }
+  if (pendingPlace) {
+    const at = pendingPlace.anchor && [...box.querySelectorAll('[data-at]')].find((x) => x.dataset.at === pendingPlace.anchor);
+    if (at && pendingPlace.marked && at.classList.contains('nsec')) at.classList.add('nmark'); // its bar, carried over
+    pendingPlace = null;
+    if (at) window.scrollTo(0, Math.max(0, at.getBoundingClientRect().top + window.scrollY - 8));
+  }
+  box.onclick = (e) => {
+    const a = e.target.closest('[data-go], [data-back]');
+    if (!a) return;
+    e.preventDefault();
+    if (a.dataset.back) {
+      const from = newFrom;
+      statsSec = from.sec; newMark = null; newFrom = null;
+      render();
+      window.scrollTo(0, from.y);
+      return;
+    }
+    const [sec, id] = a.dataset.go.split('|');
+    newFrom = sec === statsSec && sec === 'games' && id.startsWith('nr-') ? newFrom : { sec: statsSec, y: window.scrollY };
+    statsSec = sec;
+    newMark = id;
+    render();
+    const target = document.getElementById(id);
+    if (target) window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - 8));
+  };
 }
 
 function renderStatsTab(box) {
@@ -933,21 +1110,29 @@ function renderStatsTab(box) {
   const sec = (v, label) => `<a href="#" class="view${statsSec === v ? ' on' : ''}" data-statssec="${v}">${label}</a>`;
   box.innerHTML = statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('') + pendingNote()
     + `<div class="views statsbar">
-        ${isNew ? sec('standings', 'Standings') + sec('individuals', 'Individuals') : ''}
+        ${isNew ? NEW_SECS.map(([k, label]) => sec(k, label)).join('') : ''}
         <span class="grow"></span>
         <span class="layoutpick"><span class="muted">Layout</span>${chipsHtml([{ v: 'classic', label: 'Classic' },
           { v: 'new', label: 'New' }], statsLayout, 'layout')}</span>
       </div>`
-    + (isNew ? '<div id="newstats"></div><p class="muted statsnote">Scoreboard, team and player detail, and the round report are in the Classic layout.</p>'
+    + (isNew ? '<div id="newstats"></div>'
       : '<div class="reportbox"></div>');
-  wire(box, 'layout', (v) => { statsLayout = v; savePref(STATS_LAYOUT_KEY, v); });
-  wire(box, 'statssec', (v) => { statsSec = v; });
+  wire(box, 'layout', (v) => {
+    if (v === statsLayout) return;
+    pendingPlace = statsLayout === 'new' ? newPlace($('newstats')) : reportPlace(box.querySelector('.reportbox'));
+    if (v === 'new' && pendingPlace) statsSec = PAGE_SEC[pendingPlace.page] || 'standings';
+    newMark = null; newFrom = null;
+    statsLayout = v; savePref(STATS_LAYOUT_KEY, v);
+  });
+  wire(box, 'statssec', (v) => { statsSec = v; newMark = null; newFrom = null; });
   if (isNew) { renderNewStats($('newstats')); return; }
   unmountReport = mountReport(box.querySelector('.reportbox'),
     buildReport({ name: state.name, matches: dedupeMatches(matches), roster,
       // same rules the TO's own download uses: the report is scaled and
       // its overtime split by the tournament's regulation tossup count
-      settings: effectiveFormat(state.format) }));
+      settings: effectiveFormat(state.format) }),
+    { start: pendingPlace });
+  pendingPlace = null;
 }
 
 /* ---------- shell ---------- */

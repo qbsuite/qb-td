@@ -598,6 +598,29 @@ function playerDetailHtml(m) {
 
 /* ---------- round report ---------- */
 
+// YF's round figures, as it computes them: every point over regulation
+// tossups (negs likewise), powers and conversion over all tossups read,
+// and every get — overtime's too — counted as a bonus heard.
+function roundTotals(games) {
+  const s = { games: games.length, tuh: 0, regTuh: 0, points: 0, powers: 0, gets: 0, negs: 0, bonusPts: 0, bonusesHeard: 0 };
+  for (const g of games) {
+    s.tuh += g.tossupsRead;
+    s.regTuh += g.tossupsRead - g.overtime.tossups;
+    for (const mt of g.teams) {
+      s.points += mt.points;
+      s.bonusPts += mt.bonusPoints;
+      s.bonusesHeard += teamGets(mt);
+      for (const [v, n] of Object.entries(teamCounts(mt))) {
+        const val = Number(v);
+        if (val > 10) s.powers += n;
+        if (val > 0) s.gets += n;
+        if (val < 0) s.negs += n;
+      }
+    }
+  }
+  return s;
+}
+
 function roundReportHtml(m) {
   const cw = '10%';
   const rows = [trTag([
@@ -610,29 +633,6 @@ function roundReportHtml(m) {
       `Incorrect tossup interrupts per team per ${m.regTossups} tossups heard`), true, cw)] : []),
     th(abbr('PPB', 'Points per bonus'), true, cw),
   ])];
-
-  // YF's round figures, as it computes them: every point over regulation
-  // tossups (negs likewise), powers and conversion over all tossups read,
-  // and every get — overtime's too — counted as a bonus heard.
-  const roundTotals = (games) => {
-    const s = { games: games.length, tuh: 0, regTuh: 0, points: 0, powers: 0, gets: 0, negs: 0, bonusPts: 0, bonusesHeard: 0 };
-    for (const g of games) {
-      s.tuh += g.tossupsRead;
-      s.regTuh += g.tossupsRead - g.overtime.tossups;
-      for (const mt of g.teams) {
-        s.points += mt.points;
-        s.bonusPts += mt.bonusPoints;
-        s.bonusesHeard += teamGets(mt);
-        for (const [v, n] of Object.entries(teamCounts(mt))) {
-          const val = Number(v);
-          if (val > 10) s.powers += n;
-          if (val > 0) s.gets += n;
-          if (val < 0) s.negs += n;
-        }
-      }
-    }
-    return s;
-  };
 
   const statCells = (s, cell) => [
     cell(String(s.games)),
@@ -653,6 +653,86 @@ function roundReportHtml(m) {
   }
   rows.push(trFoot([th('Total'), ...statCells(roundTotals(m.games), asFoot)]));
   return tableTag(rows);
+}
+
+/* ---------- the same numbers, as data ---------- */
+
+/**
+ * Everything the report shows, as plain data rather than YF's HTML: the
+ * public page's New layout draws its own tables from this, so the two
+ * layouts can never disagree on a number. Same model, same formulas, same
+ * order; rates are numbers (null where the report shows a dash).
+ * `anchor`s are the ids the on-page Classic report gives the same team,
+ * player or game (reportframe.js), so switching layouts keeps the place.
+ * @param opts as buildReport
+ */
+export function reportData(opts) {
+  const m = reportModel(opts);
+  const ratio = (a, b) => (b ? a / b : null);
+  const regPer = (pts, tuh) => (tuh ? (pts / tuh) * m.regTossups : null);
+  const round = (r, g) => {
+    const s = roundTotals(g);
+    return {
+      round: r, games: s.games,
+      ppTeam: s.regTuh ? (m.regTossups * s.points) / s.regTuh / 2 : null,
+      powerPct: s.tuh ? (100 * s.powers) / s.tuh : null,
+      convPct: s.tuh ? (100 * s.gets) / s.tuh : null,
+      negsTeam: s.regTuh ? (m.regTossups * s.negs) / s.regTuh / 2 : null,
+      ppb: ratio(s.bonusPts, s.bonusesHeard),
+    };
+  };
+  const gameRow = ({ g, mt, opp }) => ({
+    gameId: g.id, round: g.round, opp: opp.name, result: resultLetter(mt, opp),
+    score: scoreOnly(g, mt, opp),
+  });
+  return {
+    name: m.name, vals: m.vals, regTossups: m.regTossups, anyTies: m.anyTies,
+    hasPowers: m.hasPowers, hasNegs: m.hasNegs,
+    teams: m.teams.map((t, i) => {
+      const pct = winPct(t);
+      return {
+        name: t.name, anchor: `teamdetail-${alphaOnly(t.name)}`,
+        rank: m.teamRanks[i], w: t.w, l: t.l, t: t.t, record: record(t),
+        pct: Number.isNaN(pct) ? null : pct, pp: t.regTuh ? pptuh(t) * m.regTossups : null,
+        counts: t.counts, regTuh: t.regTuh, tuh: t.tuh,
+        bonusesHeard: t.bonusesHeard, bonusPoints: t.bonusPoints, ppb: ratio(t.bonusPoints, t.bonusesHeard),
+        games: (m.perTeam.get(t.name) || []).map((x) => ({
+          ...gameRow(x), counts: teamCounts(x.mt), tuh: x.g.tossupsRead,
+          bonusesHeard: teamBonusesHeard(x.mt), bonusPoints: x.mt.bonusPoints,
+          ppb: ratio(x.mt.bonusPoints, teamBonusesHeard(x.mt)),
+        })),
+      };
+    }),
+    players: m.players.map((p, i) => ({
+      name: p.name, team: p.team, anchor: `playerdetail-${alphaOnly(p.team)}-${alphaOnly(p.name)}`,
+      rank: m.playerRanks[i], gp: p.gp, counts: p.counts,
+      tuh: p.tuh, points: p.points, pp: regPer(p.points, p.tuh),
+      games: p.games.map((x) => ({
+        ...gameRow(x), gp: x.mp.tossupsHeard / x.g.tossupsRead,
+        counts: Object.fromEntries(x.mp.counts.map((c) => [c.value, c.n])),
+        tuh: x.mp.tossupsHeard, points: playerPoints(x.mp),
+      })),
+    })),
+    games: m.games.map((g) => {
+      const [a, b] = g.teams;
+      const win = b.points > a.points ? b : a;
+      return {
+        id: g.id, anchor: `games-${gameAnchor(g)}`, round: g.round, tossupsRead: g.tossupsRead, otTossups: g.overtime.tossups,
+        winner: win.name, loser: (win === a ? b : a).name,
+        teams: g.teams.map((mt) => ({
+          name: mt.name, points: mt.points, tossupPoints: mt.tossupPoints, counts: teamCounts(mt),
+          bonusesHeard: teamBonusesHeard(mt), bonusPoints: mt.bonusPoints,
+          ppb: ratio(mt.bonusPoints, teamBonusesHeard(mt)),
+          players: mt.players.filter((p) => p.tossupsHeard).map((p) => ({
+            name: p.name, tuh: p.tossupsHeard,
+            counts: Object.fromEntries(p.counts.map((c) => [c.value, c.n])), points: playerPoints(p),
+          })),
+        })),
+      };
+    }),
+    rounds: m.rounds.map((r) => round(r, m.games.filter((g) => g.round === r))),
+    total: round(null, m.games),
+  };
 }
 
 /* ---------- entry point ---------- */

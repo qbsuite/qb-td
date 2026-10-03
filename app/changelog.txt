@@ -1,6 +1,9 @@
 Release Notes for 10/3/2026
 
 [ STATS ]
+- The New layout has all six Classic pages (Scoreboard, Teams, Players and Rounds too), with the same numbers and links.
+- The New layout's tables are compact: bold headers, striped rows, and only as wide as they need to be.
+- Switching between Classic and New keeps your place.
 - In the Classic layout, the team, player or game you clicked is marked with a bar, with a link back to where you were.
 - Team and player links in the Classic layout go to the team or player you clicked.
 

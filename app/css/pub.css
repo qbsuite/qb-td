@@ -46,7 +46,29 @@ tr.nowrow td { background: var(--sel); }
 .layoutpick .chips { flex-wrap: nowrap; }
 .poolhead { font-size: 17px; font-weight: 600; margin: 18px 0 4px; }
 .poolhead:first-child { margin-top: 4px; }
-.statsnote { font-size: 13px; margin-top: 12px; }
+/* New layout: a team, player or game is a section; a followed link's
+   target gets a bar down its left and a link back */
+.nsec { margin: 0 0 30px; }
+.nhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: 17px; font-weight: 600; margin: 0 0 6px; }
+.nhead .meta { font-size: 13px; font-weight: normal; color: var(--muted); }
+.nback { font-size: 14px; font-weight: normal; white-space: nowrap; }
+.nmark { border-left: 4px solid var(--link); padding-left: 10px; margin-left: -14px; }
+.nbox { display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: flex-start; }
+.nbox > .tablewrap { flex: 1 1 300px; }
+/* compact tables: only as wide as their content, bold headers with one
+   rule, tight striped rows, each row on one line (a wide table scrolls
+   sideways in its tablewrap) */
+.nstats { width: auto; max-width: 100%; }
+.nstats th {
+  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 700;
+  color: var(--fg); padding: 5px 10px; border-bottom: 1.5px solid var(--fg);
+}
+.nstats td { padding: 4px 10px; border-bottom: none; white-space: nowrap; }
+.nstats tr:nth-child(even) td { background: var(--sel); }
+.nstats tr.ntot td { font-weight: 600; background: transparent; border-top: 1px solid var(--muted); }
+.nsec > .tablewrap + .tablewrap { margin-top: 12px; }
+.nbonus { margin-top: 6px; }
+.njump { margin-bottom: 4px; }
 
 /* on a phone a player's team rides under the name instead of a column */
 .subteam { display: none; }
@@ -82,6 +104,7 @@ details.qd .qdmeta.track { line-height: 20px; }
   .subteam { display: block; font-size: 13px; color: var(--muted); }
   th.teamcol, td.teamcol { display: none; }
   th.name, td.name { min-width: 0; }
+  .nmark { padding-left: 8px; margin-left: -12px; }
   /* the track takes its own full-width line under the answer */
   /* summary numbers and the track take their own line under the answer
      instead of floating into the next row */

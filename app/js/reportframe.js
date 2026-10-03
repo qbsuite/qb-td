@@ -21,7 +21,7 @@ const PAGE_NAMES = { standings: 'Standings', individuals: 'Individuals', games: 
   teamdetail: 'Team Detail', playerdetail: 'Player Detail', rounds: 'Round Report' };
 
 /** buildReport()'s pages -> the srcdoc of a frame that shows them. */
-export function reportSrcdoc(pages) {
+export function reportSrcdoc(pages, { start = null } = {}) {
   const sections = pages.map((page) => {
     const pg = page.name.replace(/\.html$/, '');
     let body = bodyOf(page.text).replace(/<style>[\s\S]*?<\/style>/i, '');
@@ -52,6 +52,7 @@ export function reportSrcdoc(pages) {
     var files = ${JSON.stringify(FILES)};
     var names = ${JSON.stringify(PAGE_NAMES)};
     var current = '';
+    var startAt = ${JSON.stringify(start || null)};
     var marked = null; // {box, back}: undone on the next click
     var from = null;   // the link last followed, and its page
     function pageOf(hash) {
@@ -118,7 +119,13 @@ export function reportSrcdoc(pages) {
       show(a.getAttribute('href').slice(1), true);
     });
     window.addEventListener('load', function () { show(current); });
-    show('');`;
+    // opened from the other layout: the same page, scrolled to the same
+    // team, player, game or round when there is one
+    if (startAt && startAt.anchor && document.getElementById(startAt.anchor)) {
+      var startEl = document.getElementById(startAt.anchor);
+      if (startAt.marked) mark(startEl, pageOf(startAt.anchor)); // its bar, carried over
+      show(startAt.anchor, false, startEl);
+    } else show(startAt && startAt.page ? startAt.page + '-top' : '');`;
   // Dark mode lives HERE, never in engine/report.js. The report YF writes
   // is a white page, and the files a TD downloads must stay exactly that —
   // byte-identical to YellowFruit's own (tools/yf_parity.mjs), and legible
@@ -154,12 +161,13 @@ export function reportSrcdoc(pages) {
 }
 
 /** Mount the report in `box`; the frame grows to its content. */
-export function mountReport(box, pages) {
+// opts.start: {page, anchor} to open at (reportPlace from the other layout)
+export function mountReport(box, pages, opts = {}) {
   // transparent, not white: the frame's own document paints its background
   // (light or dark), so a dark reader gets no white flash before it loads
   box.innerHTML = '<iframe class="report" title="stat report" style="width:100%;border:0;min-height:60vh;background:transparent"></iframe>';
   const frame = box.querySelector('iframe');
-  frame.srcdoc = reportSrcdoc(pages);
+  frame.srcdoc = reportSrcdoc(pages, opts);
   const onMessage = (e) => {
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'height') {
       frame.style.height = Math.max(400, e.data.height + 16) + 'px';
@@ -172,4 +180,30 @@ export function mountReport(box, pages) {
   };
   window.addEventListener('message', onMessage);
   return () => window.removeEventListener('message', onMessage);
+}
+
+/** Where the reader is in a mounted report: its page, and the anchor (a
+    team, player, game or round) nearest above the top of the screen, or
+    null. The srcdoc frame shares the page's origin, so it's read directly. */
+export function reportPlace(box) {
+  const frame = box && box.querySelector('iframe.report');
+  const doc = frame && frame.contentDocument;
+  const sec = doc && [...doc.querySelectorAll('section[id^="page-"]')].find((x) => !x.hidden);
+  if (!sec) return null;
+  const page = sec.id.slice('page-'.length);
+  // a section marked by a followed link is what the reader is on, even
+  // when the page can't scroll it to the top
+  const mark = sec.querySelector('.qt-mark');
+  if (mark) {
+    const own = mark.querySelector('[id]') || mark.previousElementSibling;
+    if (own && own.id && !/-top$/.test(own.id)) return { page, anchor: own.id, marked: true };
+  }
+  const top = frame.getBoundingClientRect().top;
+  let anchor = null;
+  for (const el of sec.querySelectorAll('[id]')) {
+    if (/-top$/.test(el.id)) continue;
+    if (top + el.getBoundingClientRect().top > 80) break;
+    anchor = el.id;
+  }
+  return { page, anchor };
 }
