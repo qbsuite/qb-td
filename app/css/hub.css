@@ -406,6 +406,8 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
   background: none; padding: 6px 0; font: inherit; font-size: 13px; color: var(--fg); cursor: pointer; }
 .sgcheck.ok { cursor: default; }
 .sgcheck .bad, .sgcheck .warnc, .sgcheck .ok { font-weight: 700; }
+.sgfix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0 8px 22px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.sgfix select { font-size: 13px; }
 .warnc { color: var(--warn); }
 .sghelp { line-height: 1.45; }
 /* narrow (the usual Setup width): the panel and checks sit in a band

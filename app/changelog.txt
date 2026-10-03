@@ -1,3 +1,13 @@
+Release Notes for 10/3/2026
+
+[ LIVE HUB ]
+- Protests show in the Protests drawer as soon as the moderator logs them, marked "Game in progress" until the game is uploaded.
+
+[ SCHEDULE ]
+- Renaming a team on the roster renames it in the schedule too.
+- Uploaded rosters match renamed teams by their players, so a rename survives a reseed; the preview lists what it found.
+- A team in the schedule that isn't on the roster can be replaced with a roster team or removed, right from Checks.
+
 Release Notes for 10/2/2026
 
 [ READER ]

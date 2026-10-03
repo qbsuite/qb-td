@@ -14,7 +14,7 @@ import { busy } from './busy.js';
 import {
   formatsFor, allFormats, buildSchedule, validateSchedule, slotText, insertRound, removeRound,
   addRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, fillPlaceholders,
-  tagBrackets, bracketRooms, phaseLanes, scheduleChecks,
+  tagBrackets, bracketRooms, phaseLanes, scheduleChecks, renameTeams, removeTeam,
 } from '../engine/schedule.js';
 
 /* ---------- view state (per page load) ---------- */
@@ -215,15 +215,24 @@ function renderEditor(box, env) {
   /* -- facts the grid, checks and panel share -- */
   const roundNo = phases.map((ph) => ph.rounds.map((r) => r.round));
   const checks = scheduleChecks(s);
-  const warn = validateSchedule(s, env.teams).filter((w) => /^not on roster/.test(w))
-    .map((w) => ({ sev: 1, kind: 'roster', text: w[0].toUpperCase() + w.slice(1) }));
+  // a team the roster no longer has (renamed or dropped after the
+  // schedule was made): each gets Replace with… and Remove right here
+  const rosterWarn = validateSchedule(s, env.teams).filter((w) => /^not on roster: /.test(w))
+    .map((w) => ({ sev: 1, kind: 'roster', team: w.slice('not on roster: '.length), text: w[0].toUpperCase() + w.slice(1) }));
+  const placed = new Set();
+  for (const ph of phases) for (const r of ph.rounds) {
+    for (const g of r.games) for (const x of [g.a, g.b]) if (x && x.team) placed.add(x.team);
+    for (const x of r.byes) if (x && x.team) placed.add(x.team);
+  }
+  const unplaced = env.teams.filter((x) => !placed.has(x));
+  const warn = [];
   const norm = (x) => String(x || '').trim().toLowerCase();
   for (const b of env.buckets) {
     if (!s.rooms.some((r) => r.bucket === b.id || norm(r.name) === norm(b.room_name))) {
       warn.push({ sev: 1, kind: 'room', text: 'Room not on the schedule: ' + b.room_name });
     }
   }
-  const allChecks = [...checks, ...warn];
+  const allChecks = [...rosterWarn, ...checks, ...warn];
   const bad = new Map(); // refKey -> 'twice' | 'again'
   for (const c of checks) {
     if (c.kind === 'twice') {
@@ -407,7 +416,10 @@ function renderEditor(box, env) {
         <div class="sgchecks">
           <div class="sgchecktitle"><b>Checks</b> <span class="muted">${allChecks.length ? allChecks.length + ' to look at' : 'all clear'}</span></div>
           ${allChecks.length ? allChecks.slice(0, 12).map((c, i) => `
-            <button class="sgcheck" data-check="${i}"><span class="${c.sev ? 'warnc' : 'bad'}">${c.sev ? '!' : '✕'}</span><span>${esc(c.text)}</span></button>`).join('')
+            <button class="sgcheck" data-check="${i}"><span class="${c.sev ? 'warnc' : 'bad'}">${c.sev ? '!' : '✕'}</span><span>${esc(c.text)}</span></button>${
+            c.kind === 'roster' ? `<div class="sgfix">${unplaced.length ? `<select data-fixto="${i}" aria-label="Replace ${esc(c.team)} with">
+                <option value="">Replace with…</option>${unplaced.map((x) => `<option>${esc(x)}</option>`).join('')}</select>` : ''}
+              <button class="linkbtn" data-fixdel="${i}">Remove from schedule</button></div>` : ''}`).join('')
             + (allChecks.length > 12 ? `<div class="muted small">${allChecks.length - 12} more</div>` : '')
             : '<div class="sgcheck ok"><span class="ok">✓</span><span>Every team plays once a round, no repeat pairings, no half-empty games</span></div>'}
         </div>
@@ -429,6 +441,20 @@ function renderEditor(box, env) {
   $$('[data-phase]').forEach((b) => { b.onclick = () => { const p = Number(b.dataset.phase); if (ui.closed.has(p)) ui.closed.delete(p); else ui.closed.add(p); again(); }; });
   if (q('scheddense')) q('scheddense').onclick = () => { ui.dense = !ui.dense; again(); };
   $$('[data-jump]').forEach((b) => { b.onclick = () => { ui.view = 'grid'; ui.filter = ''; setSel(parse(b.dataset.jump)); scrollToSel(box); }; });
+  $$('[data-fixto]').forEach((el) => {
+    el.onchange = () => {
+      const c = allChecks[Number(el.dataset.fixto)];
+      if (!el.value) return;
+      const to = el.value;
+      edit(`${c.team} replaced with ${to}. Please save the schedule to keep it.`, (ss) => renameTeams(ss, { [c.team]: to }));
+    };
+  });
+  $$('[data-fixdel]').forEach((b) => {
+    b.onclick = () => {
+      const c = allChecks[Number(b.dataset.fixdel)];
+      edit(`${c.team} removed from the schedule. Please fill the open slots and save the schedule.`, (ss) => removeTeam(ss, c.team));
+    };
+  });
   $$('[data-check]').forEach((b) => {
     b.onclick = () => {
       const c = allChecks[Number(b.dataset.check)];

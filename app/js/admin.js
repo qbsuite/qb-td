@@ -26,7 +26,7 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { slotText, roundIntake, poolStandings, roundRooms, flatRounds } from '../engine/schedule.js';
+import { slotText, roundIntake, poolStandings, roundRooms, flatRounds, renameTeams, rosterRenames } from '../engine/schedule.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials } from './buzzkey.js';
@@ -230,7 +230,7 @@ const staged = [];      // packets staged from a zip or loose files (packetsui.j
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
 
 let rosterOpen = false;
-let rosterTeams = null; // structured editor working copy [{name, players}]
+let rosterTeams = null; // structured editor working copy [{name, players, was}]; was: the saved name
 let rosterUpload = null; // parsed upload awaiting confirmation
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
@@ -916,7 +916,7 @@ function renderRosterSec(a, t) {
       if (t.roster_r2_key) {
         try {
           rosterTeams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key))
-            .map((tm) => ({ name: tm.name, players: [...tm.players] }));
+            .map((tm) => ({ name: tm.name, players: [...tm.players], was: tm.name }));
         } catch (e) { /* unparseable upload: start blank */ }
       }
       if (rosterTeams === null) rosterTeams = [{ name: '', players: ['', '', '', ''] }];
@@ -927,11 +927,29 @@ function renderRosterSec(a, t) {
   renderRosterEditor(a, t);
 }
 
+// What an uploaded roster renames, against the saved one ({} if none).
+async function upRenames(a) {
+  const t = lastDetail.tournament;
+  if (!t.roster_r2_key || !rosterUpload) return {};
+  try { return rosterRenames(parseRoster(await fetchOwnedJson(a, t.roster_r2_key)), rosterUpload.teams); }
+  catch (e) { return {}; }
+}
+
 function renderUpPreview(a) {
   const box = $('upreview');
   if (!box) return;
   if (!rosterUpload) { box.innerHTML = ''; return; }
   const u = rosterUpload;
+  // Renamed teams, matched against the roster being replaced: shown here
+  // before saving, and followed into the schedule on save
+  if (u.renames === undefined) {
+    u.renames = null;
+    upRenames(a).then((r) => {
+      u.renames = r;
+      if (rosterUpload === u) renderUpPreview(a);
+    });
+  }
+  const renamed = Object.entries(u.renames || {});
   box.innerHTML = `
     <div class="card" style="margin-top:8px">
       <div class="row">
@@ -945,9 +963,13 @@ function renderUpPreview(a) {
       <div class="muted" style="font-size:13px;margin-top:4px">${
         u.teams.slice(0, 4).map((tm) => esc(tm.name)).join(' &middot; ')}${
         u.teams.length > 4 ? ' &hellip;' : ''}</div>
+      ${renamed.length ? `<div style="font-size:13px;margin-top:6px">Renamed teams, matched by their players or seed.
+        The schedule will use the new names: ${renamed.map(([x, y]) => `${esc(x)} &rarr; <b>${esc(y)}</b>`).join(' &middot; ')}</div>` : ''}
     </div>`;
   $('upconfirm').onclick = async () => {
     try {
+      const t = lastDetail.tournament;
+      const renames = u.renames || await upRenames(a);
       // Save the roster rebuilt from its parsed teams, not the file as
       // uploaded: MODAQ reads only a versioned tournament with a name, and
       // a file qb-td can parse may be neither. Names are all either keeps.
@@ -959,7 +981,7 @@ function renderUpPreview(a) {
       // …and has the new names at once, so a schedule generated before
       // that refetch lands is built from this roster, not the last one
       schedTeams = u.teams.map((tm) => tm.name);
-      say('Roster saved');
+      say(await savedNote(a, t, renames));
       showDetail();
     } catch (e) { say('Roster: ' + e.message, true); }
   };
@@ -1104,18 +1126,52 @@ function renderRosterEditor(a, t) {
     const clean = validated();
     if (!clean) return;
     const run = busy($('rostersave'), { label: 'Saving' });
+    const renames = {};
+    rosterTeams.forEach((tm, i) => {
+      if (tm.was && tm.was !== clean[i].name) renames[tm.was] = clean[i].name;
+    });
     try {
       await pub(`${a}/roster?name=roster.qbj`,
         { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, clean), null, 2) });
-      rosterTeams = clean.map((tm) => ({ name: tm.name, players: [...tm.players] }));
+      rosterTeams = clean.map((tm) => ({ name: tm.name, players: [...tm.players], was: tm.name }));
       rosterOpen = false;
       schedFetched = false; // schedule editor re-reads the team list
       schedTeams = clean.map((tm) => tm.name); // …and has the new names at once
-      say('Roster saved');
+      say(await savedNote(a, t, renames));
       showDetail();
     } catch (e) { say('Roster: ' + e.message, true); }
     run.end();
   };
+}
+
+// After a roster save: renamed teams keep their place in the schedule.
+// The schedule holds team names, so without this a renamed team would
+// stay in it under its old name, next to the new one. The saved schedule
+// is rewritten and saved; a working copy with unsaved edits is renamed in
+// place and stays unsaved.
+async function followRenames(a, t, renames) {
+  if (!Object.keys(renames).length) return 0;
+  let saved = null;
+  try { saved = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); } catch (e) { /* none saved */ }
+  let n = 0;
+  if (saved && saved.phases && renameTeams(saved, renames)) {
+    await pub(a + '/schedule', { method: 'POST', json: saved });
+    n = 1;
+  }
+  if (sched && schedDirty) n = renameTeams(sched, renames) || n;
+  else if (sched && saved) sched = saved;
+  return n;
+}
+
+async function savedNote(a, t, renames) {
+  try {
+    if (await followRenames(a, t, renames)) {
+      return 'Roster saved. The schedule now uses the new team names.';
+    }
+  } catch (e) {
+    return 'Roster saved, but the schedule could not be updated with the new team names: ' + e.message;
+  }
+  return 'Roster saved';
 }
 
 /* ---------- Schedule ----------
@@ -1423,11 +1479,12 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         .filter((q) => (tbPool.uses || []).some((u) => u && u.q === q.id)).length
     : 0;
   const tbTotal = tbPool ? (tbPool.tossups || []).length + (tbPool.bonuses || []).length : 0;
-  // protests: every upload's summary joined with the TD's rulings
+  // protests: every upload's summary, plus those lodged in games not
+  // uploaded yet, joined with the TD's rulings
   let rulings = {};
   try { rulings = JSON.parse(t.rulings || '{}') || {}; } catch (e) { /* keep {} */ }
   const roomOf = (bid) => { const b = buckets.find((x) => x.id === bid); return b ? b.room_name : '#' + bid; };
-  const { rows: prows, byFile: pfiles } = protestRows(files, rulings, roomOf);
+  const { rows: prows, byFile: pfiles } = protestRows(files, rulings, roomOf, lastDetail.live_protests || []);
   const popen = prows.filter((r) => r.ruling === 'open');
   const openProt = protOpen === null ? !!popen.length : protOpen;
 
@@ -1670,7 +1727,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
           <div class="pcompact">
             <span>R${pfirst.round} &middot; ${esc(pfirst.room)} &middot; ${qLabel(pfirst.p)}</span>
             <span class="muted">${esc(pfirst.p.team)}${pfirst.p.given ? `: <span class="given">${esc(pfirst.p.given)}</span>` : ''}</span>
-            ${pfirst.known ? `<span class="${pfirst.flips ? 'warntext' : 'muted'} small">${pfirst.flips ? 'Can flip' : 'Result stands'} &middot;
+            ${pfirst.live ? '<span class="muted small">Game in progress</span>' : ''}
+            ${pfirst.known && !pfirst.live ? `<span class="${pfirst.flips ? 'warntext' : 'muted'} small">${pfirst.flips ? 'Can flip' : 'Result stands'} &middot;
               ${esc(pfirst.teams[0])} ${pfirst.upheld[0]} &ndash; ${pfirst.upheld[1]} ${esc(pfirst.teams[1])} if upheld</span>` : ''}
             <select data-rule="${esc(pfirst.key)}" aria-label="Ruling">${RULINGS.map(([v, l]) =>
               `<option value="${v}" ${pfirst.ruling === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -1956,11 +2014,11 @@ function renderProtests(rows, open, isOpen) {
             <td><span class="q">${qLabel(r.p)}</span>${r.p.word ? `<br><span class="muted" style="font-size:13px">word ${r.p.word}</span>` : ''}</td>
             <td><b>${esc(r.p.team)}</b>${r.p.given ? ` answered <span class="given">${esc(r.p.given)}</span>` : ''}
               <span class="reason">${esc(r.p.reason)}</span></td>
-            <td><span class="score">${esc(r.teams[0])} ${r.score[0]}<br>${esc(r.teams[1])} ${r.score[1]}</span><br>
-              ${!r.known ? '' : r.flips
+            <td>${r.live ? '<span class="pill">Game in progress</span><br>' : `<span class="score">${esc(r.teams[0])} ${r.score[0]}<br>${esc(r.teams[1])} ${r.score[1]}</span><br>`}
+              ${!r.known || r.live ? '' : r.flips
                 ? '<span class="pill warn">Can flip the result</span>'
                 : '<span class="pill">Result stands</span>'}
-              ${r.known ? `<span class="swing">If upheld: ${esc(r.teams[0])} ${r.upheld[0]} &ndash; ${esc(r.teams[1])} ${r.upheld[1]}</span>` : ''}
+              ${r.known && !r.live ? `<span class="swing">If upheld: ${esc(r.teams[0])} ${r.upheld[0]} &ndash; ${esc(r.teams[1])} ${r.upheld[1]}</span>` : ''}
               ${swingLines(r).map((x) => `<span class="swing">${esc(x)}</span>`).join('')}</td>
             <td><div class="ruling">
               <select data-rule="${esc(r.key)}">${RULINGS.map(([v, l]) =>
@@ -1976,7 +2034,7 @@ function renderProtests(rows, open, isOpen) {
         <div class="muted" style="font-size:13px;margin-top:8px">
           ${rows.length
             ? 'For your records only. The moderator should fix the game in MODAQ and re-export.'
-            : 'Protests moderators log in MODAQ show up here with each upload, with the score swing an upheld ruling would produce.'}
+            : 'Protests show up here as soon as a moderator logs them in MODAQ, with the score swing an upheld ruling would produce.'}
         </div>
       </div>
     </details>`;

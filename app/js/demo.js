@@ -30,6 +30,7 @@ import { protestsFromNotes } from './protests.js';
 const UPLOADS_KEY = 'qbtdDemoUploads';
 const ROUND_KEY = 'qbtdDemoRound'; // TD-hub advance-round override
 const RULINGS_KEY = 'qbtdDemoRulings'; // TD-hub protest rulings
+const LIVE_KEY = 'qbtdDemoLiveProtests'; // protests in games not uploaded yet
 const BUZZ_KEY = 'qbtdBuzzKey:demo'; // pubview's sessionStorage slot for slug 'demo'
 const FIRST_LOCAL_ID = 1000; // sorts after every fixture id, so re-reads win dedupe
 
@@ -74,6 +75,7 @@ export function reset() {
   local.removeItem(UPLOADS_KEY);
   local.removeItem(ROUND_KEY);
   local.removeItem(RULINGS_KEY);
+  local.removeItem(LIVE_KEY);
   const stale = [];
   for (let i = 0; i < local.length; i++) {
     const k = local.key(i);
@@ -157,6 +159,34 @@ function bucketState(room) {
     uploads: [...list].reverse().map(({ qbj, room: _r, ...u }) => u),
     upload_count: list.length,
   };
+}
+
+function liveProtests() {
+  try {
+    const list = JSON.parse(local.getItem(LIVE_KEY));
+    return Array.isArray(list) ? list : [];
+  } catch (e) { return []; }
+}
+
+// POST /b/:secret/protests — a game's protests before its upload. `at`
+// sits between upload ids (a demo upload's `created` is its id), so the
+// game's next upload replaces these on the hub, as on the Worker.
+async function liveProtestsPost(room, query, opts) {
+  const game = query.get('g') || '';
+  const round = Number(query.get('round'));
+  let body = null;
+  try { body = JSON.parse(opts && opts.body); } catch (e) { err('bad json'); }
+  if (!game || !Number.isInteger(round) || !body || !Array.isArray(body.protests)
+    || !Array.isArray(body.teams) || body.teams.length !== 2) err('bad protests');
+  const bucket_id = room + 1; // adminDetail: buckets are room index + 1
+  const list = liveProtests().filter((l) => !(l.bucket_id === bucket_id && l.game === game));
+  if (body.protests.length) {
+    const at = uploads().reduce((n, u) => Math.max(n, u.id), FIRST_LOCAL_ID - 1) + 0.5;
+    list.push({ bucket_id, round, game, at,
+      summary: JSON.stringify({ teams: body.teams.map(String), protests: body.protests }) });
+  }
+  local.setItem(LIVE_KEY, JSON.stringify(list));
+  return { ok: true };
 }
 
 async function upload(room, query, opts) {
@@ -261,6 +291,7 @@ function adminDetail() {
       created: e.id >= FIRST_LOCAL_ID ? e.id : fixtureBase + e.id * 60000,
       summary: summaryOf(e),
     })).sort((x, y) => y.created - x.created),
+    live_protests: liveProtests(),
   };
 }
 
@@ -339,6 +370,7 @@ export async function demoPub(path, opts = {}) {
       case '/roster': return fixture.roster;
       case '/schedule': return { room, schedule: fixture.schedule };
       case '/upload': return upload(room, query, opts);
+      case '/protests': return liveProtestsPost(room, query, opts);
       default: err('not in the demo'); // tiebreakers etc.
     }
   }

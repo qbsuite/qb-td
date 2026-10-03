@@ -12,6 +12,9 @@ import path from 'node:path';
 export const WORKER_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'worker');
 
 export const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
+// QBTD_PERSIST: the dev Worker's --persist-to folder, when it runs on its
+// own local state rather than worker/.wrangler/state
+const PERSIST = process.env.QBTD_PERSIST ? ` --persist-to "${process.env.QBTD_PERSIST}"` : '';
 
 // What credential columns hold for new rows (worker.js secretHash): the
 // backdating UPDATEs match on it, and the at-rest checks assert it.
@@ -21,7 +24,7 @@ export const storedCred = (secret) =>
 // One row from the local D1 behind the dev Worker.
 export function d1row(sql) {
   const out = execSync(
-    `npx wrangler d1 execute qb-td --local --json --command "${sql}"`,
+    `npx wrangler d1 execute qb-td --local --json --command "${sql}"${PERSIST}`,
     { cwd: WORKER_DIR },
   ).toString();
   return JSON.parse(out.slice(out.indexOf('[')))[0].results[0] || null;
@@ -29,7 +32,7 @@ export function d1row(sql) {
 
 // A statement against the local D1, result ignored (backdating rows).
 export function d1exec(sql) {
-  execSync(`npx wrangler d1 execute qb-td --local --command "${sql}"`,
+  execSync(`npx wrangler d1 execute qb-td --local --command "${sql}"${PERSIST}`,
     { cwd: WORKER_DIR, stdio: 'ignore' });
 }
 
@@ -37,7 +40,7 @@ export function d1exec(sql) {
 // operator browsing the bucket would see.
 export function r2get(key) {
   const tmp = path.join(tmpdir(), 'qbtd-e2e-' + Math.random().toString(36).slice(2));
-  execSync(`npx wrangler r2 object get qb-td-data/${key} --local --file "${tmp}"`,
+  execSync(`npx wrangler r2 object get qb-td-data/${key} --local --file "${tmp}"${PERSIST}`,
     { cwd: WORKER_DIR, stdio: 'ignore' });
   const buf = readFileSync(tmp);
   rmSync(tmp);

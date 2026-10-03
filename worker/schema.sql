@@ -215,6 +215,24 @@ CREATE TABLE IF NOT EXISTS room_starts (
 );
 CREATE INDEX IF NOT EXISTS idx_room_starts_tournament ON room_starts(tournament_id, round);
 
+-- Protests a reader has logged in a game it hasn't uploaded yet
+-- (worker.js bucketLiveProtests): the reader sends the game's protest list
+-- whenever it changes, so the TD sees a protest the moment it's lodged
+-- rather than at upload. One row per game on a reader (game = the reader's
+-- game id); an empty list deletes it. summary is {teams, protests}, the
+-- shape of files.summary without a score. Admin route only. Existing
+-- databases get it from migrate-liveprotests.sql (or by re-running this file).
+CREATE TABLE IF NOT EXISTS live_protests (
+  bucket_id INTEGER NOT NULL,
+  tournament_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  game TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (bucket_id, game)
+);
+CREATE INDEX IF NOT EXISTS idx_live_protests_tournament ON live_protests(tournament_id);
+
 -- ---------- Live Hub rev + cron dirty indexes ----------
 -- (same statements as migrate-rev.sql, which also adds the rev column
 -- to existing databases)
@@ -275,6 +293,13 @@ CREATE TRIGGER IF NOT EXISTS rev_file_del AFTER DELETE ON files
 CREATE TRIGGER IF NOT EXISTS rev_start_ins AFTER INSERT ON room_starts
   BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
 CREATE TRIGGER IF NOT EXISTS rev_start_del AFTER DELETE ON room_starts
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = OLD.tournament_id; END;
+
+CREATE TRIGGER IF NOT EXISTS rev_liveprot_ins AFTER INSERT ON live_protests
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_liveprot_upd AFTER UPDATE ON live_protests
+  BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = NEW.tournament_id; END;
+CREATE TRIGGER IF NOT EXISTS rev_liveprot_del AFTER DELETE ON live_protests
   BEGIN UPDATE tournaments SET rev = rev + 1 WHERE id = OLD.tournament_id; END;
 
 -- a set's name, page switch and settings, and its packet list, show on

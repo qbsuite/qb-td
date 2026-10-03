@@ -75,6 +75,7 @@ const MAX_TB_BLOB = 8 * 1024 * 1024;     // tiebreaker pool blob cap
 const MAX_TB_USES = 500;                 // usage log cap (griefing backstop)
 const MAX_PROTESTS = 50;                 // protests kept per uploaded game
 const MAX_PROTEST_TEXT = 500;            // reason / given-answer text cap
+const MAX_LIVE_GAMES = 50;               // games with live protests per room
 const MAX_RULINGS = 500;                 // TD rulings per tournament
 const MAX_RULING_NOTE = 300;
 const MAX_RULINGS_JSON = 64 * 1024;
@@ -1574,11 +1575,12 @@ async function rotateAdmin(env, t) {
 
 async function getTournament(env, t, ctx) {
   const id = t.id;
-  const [buckets, rounds, files, starts, catsHead, sets, setPackets] = await Promise.all([
+  const [buckets, rounds, files, starts, liveProtests, catsHead, sets, setPackets] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, secret_enc, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created, summary FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
     env.DB.prepare('SELECT bucket_id, round, at FROM room_starts WHERE tournament_id = ?1').bind(id).all(),
+    env.DB.prepare('SELECT bucket_id, round, game, summary, at FROM live_protests WHERE tournament_id = ?1').bind(id).all(),
     env.DATA.head(`t/${id}/catmap.json`),
     t.set_id
       ? env.DB.prepare('SELECT slug, name, published, settings FROM sets WHERE id = ?1').bind(t.set_id).all()
@@ -1624,6 +1626,8 @@ async function getTournament(env, t, ctx) {
     // which rooms have started which rounds (noteRoomStart): the Live
     // Hub's auto-advance chips
     starts: starts.results,
+    // protests in games not uploaded yet (bucketLiveProtests)
+    live_protests: liveProtests.results,
     // each room's round (its bracket's, when brackets keep their own) and
     // the game files uploaded for a round their room hasn't reached
     ...(await roomRoundsDetail(env, t, buckets.results, files.results)),
@@ -1780,6 +1784,9 @@ async function deleteBucket(env, t, bucketId) {
   // Files already uploaded stay downloadable; only the mod's access dies.
   await env.DB.prepare(
     'DELETE FROM buckets WHERE id = ?1 AND tournament_id = ?2'
+  ).bind(bucketId, t.id).run();
+  await env.DB.prepare(
+    'DELETE FROM live_protests WHERE bucket_id = ?1 AND tournament_id = ?2'
   ).bind(bucketId, t.id).run();
   await markPub(env, t.id); // room count feeds buzz_done's expected-games math
   return json(env, { ok: true });
@@ -2743,6 +2750,41 @@ async function bucketStartRound(env, secret, url) {
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1 || round > place.round) return err(env, 400, 'bad round');
   await noteRoomStart(env, b, round, place);
+  return json(env, { ok: true });
+}
+
+// POST /b/:secret/protests?round=n&g=<game> — the reader's protest list
+// for a game it hasn't uploaded yet, sent whenever the list changes (and
+// so a protest reaches the hub the moment it's lodged, not at upload).
+// Body {teams: [a, b], protests: [...]} (protests.js protestReport); an
+// empty list clears the game's row. The uploaded game replaces these on
+// the hub (protests.js protestRows).
+async function bucketLiveProtests(request, url, env, secret) {
+  const b = await getBucketRow(env, secret);
+  const gate = bucketGate(env, b);
+  if (gate) return gate;
+  const game = String(url.searchParams.get('g') || '');
+  if (!/^[a-z0-9]{1,24}$/.test(game)) return err(env, 400, 'bad game');
+  const round = Number(url.searchParams.get('round'));
+  if (!Number.isInteger(round) || round < 1 || round > 999) return err(env, 400, 'bad round');
+  const text = await request.text();
+  if (text.length > 64 * 1024) return err(env, 413, 'too large');
+  let body;
+  try { body = JSON.parse(text); } catch (e) { return err(env, 400, 'bad json'); }
+  const protests = cleanProtests(body && body.protests);
+  const teams = Array.isArray(body && body.teams) ? body.teams.map((x) => String(x ?? '').slice(0, MAX_NAME)) : [];
+  if (!protests || teams.length !== 2 || !teams[0] || !teams[1]) return err(env, 400, 'bad protests');
+  if (!protests.length) {
+    await env.DB.prepare('DELETE FROM live_protests WHERE bucket_id = ?1 AND game = ?2').bind(b.id, game).run();
+    return json(env, { ok: true });
+  }
+  const { results } = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM live_protests WHERE bucket_id = ?1 AND game != ?2'
+  ).bind(b.id, game).all();
+  if (results[0].n >= MAX_LIVE_GAMES) return err(env, 403, 'too many games');
+  await env.DB.prepare(
+    'INSERT OR REPLACE INTO live_protests (bucket_id, tournament_id, round, game, summary, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+  ).bind(b.id, b.tournament_id, round, game, JSON.stringify({ teams, protests }), Date.now()).run();
   return json(env, { ok: true });
 }
 
@@ -4589,6 +4631,7 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/protests$/)) && method === 'POST') return bucketLiveProtests(request, url, env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1]);

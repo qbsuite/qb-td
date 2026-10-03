@@ -10,7 +10,9 @@
 // from this device, with zero network requests; the bare room link always
 // fetches fresh (state + packet + roster) and shows the team picker plus
 // any games in progress on this device. Uploads are the only other
-// traffic: two per export click. Nothing polls.
+// traffic: two per export click, plus the game's protest list each time
+// it changes (watchProtests), so the TD sees a protest when it's lodged.
+// Nothing polls the network.
 //
 // docx packets are parsed in the browser by the same YAPP service MODAQ's
 // own demo uses (CORS *); JSON packets load directly.
@@ -134,6 +136,49 @@ function setHeader(t, room, round, game, bracket) {
   $('newgame').href = roomLink();
 }
 
+// The game's protests as the hub reads them (protests.js protestReport),
+// numbered the way the upload numbers questions. null if the store won't
+// parse.
+function gameProtests(storeText, meta, format) {
+  let protests;
+  try { protests = protestReport(JSON.parse(storeText), format, Tossup); }
+  catch (e) { return null; }
+  if (!meta.tb) return protests;
+  const num = tbNumbering(meta.tb);
+  return protests.map((p) => ({ ...p, q: p.kind === 'b' ? num.bo(p.q) : num.tu(p.q) }));
+}
+
+// MODAQ saves the game to localStorage as it changes; every few seconds
+// this reads it back (local only) and, when the protest list differs from
+// what the hub last got, sends it. A failed send is retried on the next
+// change check, so a protest lodged offline arrives once the room is back.
+const PROTEST_CHECK_MS = 5000;
+function watchProtests(id, meta, format) {
+  let lastText = null;
+  let sent = JSON.stringify([]); // a game with none has nothing to say
+  let busy = false;
+  const check = async () => {
+    const text = localStorage.getItem(gameKey(secret, id));
+    if (busy || !text || text === lastText) return;
+    const protests = gameProtests(text, meta, format);
+    if (!protests) return;
+    const body = JSON.stringify(protests);
+    if (body === sent) { lastText = text; return; }
+    busy = true;
+    try {
+      const out = await pub(`/b/${secret}/protests?round=${meta.round}&g=${encodeURIComponent(id)}`,
+        { method: 'POST', body: JSON.stringify({ teams: [meta.a, meta.b], protests }) });
+      if (!(out && out.error)) sent = body;
+      lastText = text;
+    } catch (e) {
+      // offline (fetch's TypeError): the next check tries again; a refusal
+      // waits for the game to change
+      if (!(e instanceof TypeError)) lastText = text;
+    } finally { busy = false; }
+  };
+  setInterval(check, PROTEST_CHECK_MS);
+}
+
 function mountMODAQ(id, meta, isNew) {
   document.body.classList.add('reading');
   setHeader(meta.t, meta.room, meta.round, meta.a + ' vs ' + meta.b);
@@ -164,17 +209,13 @@ function mountMODAQ(id, meta, isNew) {
           // so the TD's usage log stays exact (worker logTbUses); logged
           // protests go up structured, swing included, for the hub's
           // Protests drawer (the qbj's notes carry them as text only)
+          // (null if the store won't parse: the Worker falls back to the
+          // qbj's notes)
           const storeText = localStorage.getItem(gameKey(secret, id));
-          let protests = null;
-          try { protests = protestReport(JSON.parse(storeText), props.gameFormat || null, Tossup); }
-          catch (e) { /* the Worker falls back to the qbj's notes */ }
+          const protests = gameProtests(storeText, meta, props.gameFormat || null);
           // questions added mid-packet shift MODAQ's numbering; number them
           // as if appended so stats keyed on packet numbers line up
           const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
-          if (meta.tb && protests) {
-            const num = tbNumbering(meta.tb);
-            protests = protests.map((p) => ({ ...p, q: p.kind === 'b' ? num.bo(p.q) : num.tu(p.q) }));
-          }
           const body = combinedUpload(qbj, meta.round, storeText,
             meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests);
           const out = await pub(
@@ -204,6 +245,7 @@ function mountMODAQ(id, meta, isNew) {
     if (format) props.gameFormat = format;
   }
   ReactDOM.render(React.createElement(ModaqControl, props), $('modaq'));
+  watchProtests(id, meta, props.gameFormat || null);
 }
 
 /* ---------- schedule defaults (bare-link path) ---------- */

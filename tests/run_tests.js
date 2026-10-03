@@ -11,7 +11,7 @@ import { buildYft } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32 } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -2861,6 +2861,85 @@ test('protestsFromNotes: MODAQ\'s two note templates', () => {
   assert.equal(ps[1].reason, 'said "Juárez", got prompt');
   assert.equal(ps[0].gain, undefined, 'no swing from a note');
   assert.deepEqual(protestsFromNotes(undefined), []);
+});
+
+test('renameTeams: a renamed team keeps its games, byes and pool', () => {
+  const sc = {
+    v: 1, rooms: [{ name: 'R1', bucket: null }],
+    phases: [{ name: 'Prelims', rounds: [
+      { round: 1, games: [{ room: 0, a: { team: 'Old' }, b: { team: 'B' } }], byes: [{ team: 'C' }] },
+      { round: 2, games: [{ room: 0, a: { team: 'C' }, b: { team: 'B' } }], byes: [{ team: 'Old' }, null] },
+      { round: 3, games: [{ room: 0, a: { label: 'A1' }, b: { team: 'Old', from: 'A2' } }], byes: [] },
+    ] }],
+    pools: { A: ['Old', 'B', 'C'] },
+  };
+  assert.equal(renameTeams(sc, { Old: 'New' }), 4);
+  const names = JSON.stringify(sc);
+  assert.ok(!names.includes('"Old"') && validateSchedule(sc, ['New', 'B', 'C']).every((w) => !/roster/i.test(w)), names);
+  assert.deepEqual(sc.phases[0].rounds[2].games[0].b, { team: 'New', from: 'A2' });
+  assert.deepEqual(sc.pools.A, ['New', 'B', 'C']);
+  // two teams trading names
+  renameTeams(sc, { B: 'C', C: 'B' });
+  assert.deepEqual(sc.pools.A, ['New', 'C', 'B']);
+  assert.equal(renameTeams(sc, {}), 0);
+});
+
+test('rosterRenames: renamed teams found by their players, then by seed', () => {
+  const T = (name, ...players) => ({ name, players });
+  const old = [T('A', 'a1', 'a2', 'a3', 'a4'), T('B', 'b1', 'b2', 'b3', 'b4'), T('C', 'c1', 'c2', 'c3')];
+  assert.deepEqual(rosterRenames(old, [T('A', 'a1'), T('Bee', 'b1', 'b2', 'b3', 'b4'), T('C', 'c1')]), { B: 'Bee' });
+  // renamed and reseeded at once, with a player swapped out
+  assert.deepEqual(rosterRenames(old, [T('Bee', 'b1', 'b2', 'b3', 'b9'), T('A', 'a1'), T('C', 'c1')]), { B: 'Bee' });
+  // two renamed and swapped seeds: players decide, not position
+  assert.deepEqual(rosterRenames(old, [T('Cee', 'c1', 'C2', ' c3 '), T('Bee', 'b1', 'b2'), T('A')]), { B: 'Bee', C: 'Cee' });
+  // no players in common: the same seed is the same team
+  assert.deepEqual(rosterRenames(old, [T('A'), T('Bee', 'x'), T('C')]), { B: 'Bee' });
+  // reordered, dropped, or added: nothing renamed
+  assert.deepEqual(rosterRenames(old, [old[2], old[0], old[1]]), {});
+  assert.deepEqual(rosterRenames(old, [old[0], old[1]]), {});
+  assert.deepEqual(rosterRenames(old, [...old, T('D', 'd1')]), {});
+  // a replacement team in a dropped team's seed takes its place
+  assert.deepEqual(rosterRenames(old, [old[0], T('New', 'n1', 'n2'), old[2]]), { B: 'New' });
+});
+
+test('removeTeam: a dropped team leaves open game slots, no byes, no pool place', () => {
+  const sc = { phases: [{ rounds: [
+    { round: 1, games: [{ room: 0, a: { team: 'X' }, b: { team: 'B' } }], byes: [{ team: 'C' }, null] },
+    { round: 2, games: [{ room: 0, a: { team: 'C' }, b: { team: 'B' } }], byes: [{ team: 'X' }] },
+  ] }], pools: { A: ['X', 'B', 'C'] } };
+  assert.equal(removeTeam(sc, 'X'), 3);
+  assert.equal(sc.phases[0].rounds[0].games[0].a, null);
+  assert.deepEqual(sc.phases[0].rounds[0].byes, [{ team: 'C' }, null]);
+  assert.deepEqual(sc.phases[0].rounds[1].byes, []);
+  assert.deepEqual(sc.pools.A, ['B', 'C']);
+});
+
+test('protestRows: protests lodged before the upload show until the game arrives', () => {
+  const sum = (teams, score, protests) => JSON.stringify({ teams, score, protests });
+  const tu4 = { kind: 'tu', q: 4, team: 'Alpha', word: 9, given: 'x', reason: 'r', to: 'Alpha', from: 'Beta', gain: 20, loss: 0, detail: { tu: 10, neg: 0, bonus: 10 } };
+  const tu9 = { ...tu4, q: 9 };
+  const live = [
+    { bucket_id: 1, round: 2, game: 'g1', at: 500, summary: JSON.stringify({ teams: ['Alpha', 'Beta'], protests: [tu4] }) },
+    { bucket_id: 2, round: 2, game: 'g2', at: 500, summary: JSON.stringify({ teams: ['Gamma', 'Delta'], protests: [tu4] }) },
+    { bucket_id: 1, round: 2, game: 'bad', at: 500, summary: '{not json' },
+  ];
+  // nothing uploaded yet: both games' protests are listed, with no score
+  let { rows } = protestRows([], {}, (b) => 'Room ' + b, live);
+  assert.equal(rows.length, 2);
+  assert.deepEqual([rows[0].live, rows[0].score, rows[0].flips, rows[0].known], [true, null, false, true]);
+  assert.equal(rows[0].key, rulingKey(2, ['Alpha', 'Beta'], tu4));
+  assert.deepEqual(swingLines(rows[0]), ['+20 Alpha: 0 neg back, 10 tossup, 10 bonus']);
+  // a ruling made while the game is in progress keys the same as the upload's
+  ({ rows } = protestRows([], { [rulingKey(2, ['Beta', 'Alpha'], tu4)]: { r: 'upheld', note: '', at: 600 } }, () => 'x', live));
+  assert.equal(rows.find((r) => r.teams[0] === 'Alpha').ruling, 'upheld');
+  // the game uploaded after them: the upload's rows replace them
+  const up = { id: 7, bucket_id: 1, round: 2, kind: 'combined', error: null, created: 800, summary: sum(['Beta', 'Alpha'], [100, 90], [tu4]) };
+  ({ rows } = protestRows([up], {}, () => 'x', live));
+  assert.deepEqual(rows.map((r) => [r.file.id, !!r.live, r.teams[0]]).sort(), [[0, true, 'Gamma'], [7, false, 'Beta']]);
+  // a protest lodged after the upload is added; the ones it has are not doubled
+  const later = [{ ...live[0], at: 900, summary: JSON.stringify({ teams: ['Alpha', 'Beta'], protests: [tu4, tu9] }) }];
+  ({ rows } = protestRows([up], {}, () => 'x', later));
+  assert.deepEqual(rows.map((r) => [r.file.id, r.p.q]).sort(), [[0, 9], [7, 4]]);
 });
 
 test('protestRows: newest upload per game, rulings keyed by game + question, corrected detection', () => {

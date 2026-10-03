@@ -810,6 +810,104 @@ export function fillPlaceholders(schedule, poolRanks) {
 }
 
 /**
+ * Follow roster renames ({old: new}) through a schedule, in place: every
+ * game and bye slot and the pool lists. Names swap all at once, so two
+ * teams trading names works. Returns how many names changed.
+ */
+export function renameTeams(schedule, renames) {
+  let n = 0;
+  const has = (x) => Object.prototype.hasOwnProperty.call(renames, x);
+  const slot = (s) => {
+    if (!s || !s.team || !has(s.team)) return s;
+    n++;
+    return { ...s, team: renames[s.team] };
+  };
+  for (const ph of schedule.phases || []) {
+    for (const round of ph.rounds || []) {
+      for (const g of round.games || []) {
+        g.a = slot(g.a);
+        g.b = slot(g.b);
+      }
+      round.byes = (round.byes || []).map(slot);
+    }
+  }
+  for (const k of Object.keys(schedule.pools || {})) {
+    schedule.pools[k] = schedule.pools[k].map((x) => (has(x) ? (n++, renames[x]) : x));
+  }
+  return n;
+}
+
+/**
+ * Take a team out of a schedule, in place: its game slots go empty (the
+ * editor shows them as open slots to fill), its byes and its pool place
+ * go. Returns how many places it was in.
+ */
+export function removeTeam(schedule, team) {
+  let n = 0;
+  const slot = (s) => (s && s.team === team ? (n++, null) : s);
+  for (const ph of schedule.phases || []) {
+    for (const round of ph.rounds || []) {
+      for (const g of round.games || []) {
+        g.a = slot(g.a);
+        g.b = slot(g.b);
+      }
+      const byes = round.byes || [];
+      round.byes = byes.filter((x) => !(x && x.team === team));
+      n += byes.length - round.byes.length;
+    }
+  }
+  for (const k of Object.keys(schedule.pools || {})) {
+    const before = schedule.pools[k].length;
+    schedule.pools[k] = schedule.pools[k].filter((x) => x !== team);
+    n += before - schedule.pools[k].length;
+  }
+  return n;
+}
+
+/**
+ * Renames implied by replacing one roster with another when nothing says
+ * which team became which (an uploaded file). Teams are [{name, players}].
+ * Only a team whose name left the roster can have been renamed, and only
+ * to a name that wasn't on it. Such teams pair up by their players first
+ * (a renamed team keeps most of them, so a rename survives a reseed and a
+ * player or two changing), most shared first, needing at least half of
+ * the smaller team; any left over pair by seed. Returns {old: new}.
+ */
+export function rosterRenames(oldTeams, newTeams) {
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  const before = new Set(oldTeams.map((t) => t.name));
+  const after = new Set(newTeams.map((t) => t.name));
+  const gone = oldTeams.map((t, i) => ({ t, i })).filter((x) => !after.has(x.t.name));
+  const fresh = newTeams.map((t, i) => ({ t, i })).filter((x) => !before.has(x.t.name));
+  const players = (t) => new Set((t.players || []).map(norm).filter(Boolean));
+  const pairs = [];
+  for (const o of gone) {
+    const op = players(o.t);
+    for (const n of fresh) {
+      const np = players(n.t);
+      const shared = [...op].filter((x) => np.has(x)).length;
+      if (shared && shared * 2 >= Math.min(op.size, np.size)) pairs.push({ o, n, shared });
+    }
+  }
+  pairs.sort((x, y) => y.shared - x.shared || x.o.i - y.o.i);
+  const out = {};
+  const usedNew = new Set();
+  for (const { o, n } of pairs) {
+    if (o.t.name in out || usedNew.has(n.t.name)) continue;
+    out[o.t.name] = n.t.name;
+    usedNew.add(n.t.name);
+  }
+  for (const o of gone) {
+    if (o.t.name in out) continue;
+    const n = fresh.find((x) => x.i === o.i && !usedNew.has(x.t.name));
+    if (!n) continue;
+    out[o.t.name] = n.t.name;
+    usedNew.add(n.t.name);
+  }
+  return out;
+}
+
+/**
  * Warnings for the editor: unknown team names, a team playing twice in
  * one round, repeat matchups within a phase. Placeholders and empty
  * slots are legal (they're visible in the grid) and not flagged.

@@ -16,6 +16,11 @@
 //     (tournaments.rulings, keyed by round + team pair + question, so a
 //     re-uploaded corrected game keeps its ruling).
 //
+// The reader also sends a game's list whenever it changes, before any
+// upload (worker.js bucketLiveProtests, the `live_protests` rows), so the
+// TD sees a protest as soon as it's lodged. Those rows carry no score —
+// the game isn't over — and the uploaded game replaces them.
+//
 // Nothing here is public: the Worker's public copies carry neither notes
 // nor summaries, and rulings only ride on the admin route.
 //
@@ -242,9 +247,13 @@ export function projectUpheld(summary, p) {
  * @param files admin file rows (with `summary`)
  * @param rulings {key: {r, note, at}}
  * @param roomOf bucket_id -> room name
+ * @param live live_protests rows ({bucket_id, round, game, summary, at}):
+ *   protests in games not uploaded yet. A game's are listed only while no
+ *   upload of it is newer, and only those its newest upload doesn't
+ *   already list; such rows have `live` set and no score.
  * @returns {rows, byFile} — byFile: file id -> {n, open, superseded}
  */
-export function protestRows(files, rulings, roomOf) {
+export function protestRows(files, rulings, roomOf, live = []) {
   const latest = new Map();
   const sums = new Map();
   for (const f of files) {
@@ -284,6 +293,32 @@ export function protestRows(files, rulings, roomOf) {
         superseded: state.superseded,
         // a newer upload of this game landed after the ruling
         corrected: state.superseded || !!(r && Number.isFinite(r.at) && f.created > r.at),
+      });
+    });
+  }
+  const listed = new Set(rows.filter((x) => !x.superseded).map((x) => x.key));
+  for (const l of live || []) {
+    let s = l && l.summary;
+    if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { continue; } }
+    if (!s || !Array.isArray(s.teams) || s.teams.length !== 2 || !Array.isArray(s.protests)) continue;
+    const teams = s.teams.map(String);
+    const up = latest.get(l.round + '\n' + [...teams].sort().join('\n'));
+    if (up && up.created >= l.at) continue; // the uploaded game has them
+    const f = { id: 0, kind: 'live', round: l.round, bucket_id: l.bucket_id, created: l.at };
+    s.protests.forEach((p, i) => {
+      if (!p || typeof p !== 'object') return;
+      const key = rulingKey(l.round, teams, p);
+      if (listed.has(key)) return;
+      listed.add(key);
+      const r = (rulings && rulings[key]) || null;
+      const ruling = r && RULINGS.some(([v]) => v === r.r) ? r.r : 'open';
+      rows.push({
+        id: `live:${l.bucket_id}:${l.game}:${i}`, file: f, round: l.round, room: roomOf(l.bucket_id),
+        teams, score: null, p, key,
+        ruling, note: r && typeof r.note === 'string' ? r.note : '',
+        at: r && Number.isFinite(r.at) ? r.at : 0,
+        upheld: null, known: p.gain != null || p.loss != null, flips: false,
+        superseded: false, corrected: false, live: true,
       });
     });
   }

@@ -58,7 +58,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   page downloads that round's packet — with a chip per room showing who
   has; it never opens a round with no packet, and never pushes on a
   round the TD set back by hand; the **protests** drawer (every protest
-  moderators logged in MODAQ, from the newest upload of each game — round,
+  moderators logged in MODAQ — shown as soon as it's lodged, marked "Game
+  in progress" until the game is uploaded, then from the newest upload of
+  each game — round,
   room, question and buzz word, the answer given, the reason, and the
   score an upheld ruling would produce, computed the way MODAQ's own
   protest-swing check does it, flagged when it can flip the result; the
@@ -418,7 +420,8 @@ dashboard shows which invites are still unused, and revokes them.
   per-game qbj downloads, the GitHub snapshot repo and archive captures
   are ever built from — so none of them carry it; the TO's admin downloads keep it
   for the `.yft`. The structured protest list the reader sends with each
-  upload (`files.summary`, with the teams and score) and the TD's rulings
+  upload (`files.summary`, with the teams and score), the list it sends
+  whenever a game's protests change before upload (`live_protests`), and the TD's rulings
   (`tournaments.rulings`) ride on the admin route only. Rooms likewise receive only the reader game format
   from `settings` — never the buzzpoints config, whose stored hash would
   otherwise invite an offline attack on the TO's password.
@@ -672,6 +675,9 @@ first.
    `npx wrangler d1 execute qb-td --remote --file migrate-live.sql`
    BEFORE a Worker with `LIVE_SCRIPT` set is deployed (the cron and the
    admin routes name the `live_*` columns),
+   and one from before protests showed before upload needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-liveprotests.sql`
+   BEFORE the Worker (the admin route reads `live_protests`),
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy

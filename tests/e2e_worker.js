@@ -756,6 +756,28 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     && sum2.protests[0].detail.oppBonus === 20 && sum2.protests[1].part === 2
     && sum2.protests[1].reason.length === 500, sum2);
 
+  // protests lodged in a game not uploaded yet: the reader sends the list
+  // whenever it changes, and the admin detail carries it
+  const lp = { kind: 'tu', q: 6, team: 'Beta', word: 4, given: 'PROTESTLEAKANSWER', reason: 'early',
+    to: 'Beta', from: 'Alpha', gain: 20, loss: 0, detail: { tu: 10, neg: 0, bonus: 10 } };
+  r = await call(`/b/${secret}/protests?round=3&g=abc123`, { method: 'POST',
+    json: { teams: ['Alpha', 'Beta'], protests: [lp] } });
+  ok('live protests accepted', r.status === 200 && r.body.ok, r.body);
+  r = await call(`/b/${secret}/protests?round=3&g=ABC!`, { method: 'POST', json: { teams: ['Alpha', 'Beta'], protests: [lp] } });
+  ok('live protests: bad game id refused', r.status === 400, r.body);
+  r = await call(`/b/${secret}/protests?round=3&g=abc123`, { method: 'POST', json: { teams: ['Alpha'], protests: [lp] } });
+  ok('live protests: two teams required', r.status === 400, r.body);
+  const revBefore = (await call(A)).body.tournament.rev;
+  r = await call(A);
+  const lrow = (r.body.live_protests || []).find((x) => x.game === 'abc123');
+  ok('admin detail carries live protests', lrow && lrow.round === 3
+    && JSON.parse(lrow.summary).protests[0].reason === 'early', r.body.live_protests);
+  r = await call(`/b/${secret}/protests?round=3&g=abc123`, { method: 'POST', json: { teams: ['Alpha', 'Beta'], protests: [] } });
+  r = await call(A);
+  ok('an empty list clears the game, and the hub sees it move',
+    !(r.body.live_protests || []).some((x) => x.game === 'abc123') && r.body.tournament.rev > revBefore, r.body.live_protests);
+  r = await call(`/b/${secret}/protests?round=3&g=abc123`, { method: 'POST', json: { teams: ['Alpha', 'Beta'], protests: [lp] } });
+
   await tick();
   r = await call('/pub/' + slug + '/rounds?n=3');
   ok('round shard carries no summary', !JSON.stringify(r.body).includes('"summary"')
