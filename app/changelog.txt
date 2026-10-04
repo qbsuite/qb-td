@@ -1,3 +1,8 @@
+Release Notes for 10/4/2026
+
+[ SECURITY ]
+- Wrong buzzpoints passwords past the attempt limit are turned away sooner and cost less to serve.
+
 Release Notes for 10/3/2026
 
 [ STATS ]

@@ -3108,22 +3108,30 @@ async function roundDone(env, t, round) {
   return files.results.length >= expected;
 }
 
-// The password gate itself, for a tournament's qpacket route and a set's:
+// The password gate, in two halves. buzzLimit runs first thing in each
+// gated route, before any D1 or R2 read, so a flood of guesses costs only
+// the Worker requests themselves: no database rows, no storage reads.
+// buzzGate then checks the password against the stored hash. Each returns
 // null when the request may proceed, else the response to send. `scope`
 // keys the attempt counter (a set's slugs are their own namespace).
-async function buzzGate(request, env, scope, b) {
+async function buzzLimit(request, env, scope) {
+  // a request with no password at all needs no lookup to turn away
+  const auth = request.headers.get('Authorization') || '';
+  if (!/^Buzz ./.test(auth) || auth.length > 1024) return err(env, 401, 'bad password');
   // Guessing the password is an online attack, so cap attempts per IP.
   // Generous enough for a viewer opening every round of a long tournament,
   // tight enough that a wordlist is hopeless. Two limits of what this is:
   // Cloudflare's rate limiter counts per colo rather than globally, and it
-  // runs inside the Worker, so it protects the password but not the
-  // request budget — a WAF rate-limiting rule on this path is the outer
-  // layer for that (README).
+  // runs inside the Worker, so it spares the password and the database
+  // but not the request count itself (README).
   if (env.BUZZ_LIMIT) {
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
     const { success } = await env.BUZZ_LIMIT.limit({ key: scope + ':' + ip });
     if (!success) return err(env, 429, 'too many attempts, wait a minute');
   }
+  return null;
+}
+async function buzzGate(request, env, b) {
   if (!(await buzzAllowed(request, b))) return err(env, 401, 'bad password');
   return null;
 }
@@ -3153,11 +3161,13 @@ async function gatedPacket(request, env, obj, key, name, wrap, holderOf) {
 // same question-security rule as the moderator route — played rounds
 // only, where played means every room has turned the round in.
 async function pubQPacket(request, url, env, slug) {
+  const limited = await buzzLimit(request, env, slug);
+  if (limited) return limited;
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
   const b = buzzConfig(t);
   if (!b) return err(env, 404, 'not found');
-  const denied = await buzzGate(request, env, slug, b);
+  const denied = await buzzGate(request, env, b);
   if (denied) return denied;
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) return err(env, 400, 'bad round');
@@ -3179,11 +3189,13 @@ async function pubQPacket(request, url, env, slug) {
 // once the tournament has closed, since until then a replacement may still
 // be read in a later round. 404 when none was read.
 async function pubQTiebreakers(request, url, env, slug) {
+  const limited = await buzzLimit(request, env, slug);
+  if (limited) return limited;
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
   const b = buzzConfig(t);
   if (!b) return err(env, 404, 'not found');
-  const denied = await buzzGate(request, env, slug, b);
+  const denied = await buzzGate(request, env, b);
   if (denied) return denied;
   if (!tournamentFinal(t)) return err(env, 403, 'tournament not closed yet');
   const key = TB_READ_KEY(t.id);
@@ -4547,11 +4559,13 @@ async function pubSetCats(env, slug) {
 // the same played-rounds-only rule one level up — a version of a packet
 // is served once some mirror has every room in for a round it ran it on.
 async function pubSetQPacket(request, url, env, slug) {
+  const limited = await buzzLimit(request, env, 'set:' + slug);
+  if (limited) return limited;
   const s = await getPublishedSet(env, slug);
   if (!s) return err(env, 404, 'not found');
   const b = buzzConfig(s);
   if (!b) return err(env, 404, 'not found');
-  const denied = await buzzGate(request, env, 'set:' + slug, b);
+  const denied = await buzzGate(request, env, b);
   if (denied) return denied;
   const packet = Number(url.searchParams.get('packet'));
   const version = Number(url.searchParams.get('v'));

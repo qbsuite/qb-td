@@ -1101,12 +1101,17 @@ to attack offline, and if a settings row ever did leak, each guess costs a
 full PBKDF2 run rather than one SHA-256.
 
 **Online guessing is capped** at 30 attempts per minute per IP per
-tournament (`BUZZ_LIMIT` in `wrangler.toml`). Two honest limits: Cloudflare's
-rate limiter counts per colo rather than globally, and it runs inside the
-Worker, so it protects the password but not the request budget. A WAF
-rate-limiting rule on `/pub/*/qpacket` is the outer layer for that, and
-worth adding if anyone ever points a script at this — a flood would burn
-the daily request allowance and take the live public page down with it.
+tournament (`BUZZ_LIMIT` in `wrangler.toml`). The cap is checked before
+anything is looked up, and a request with no password is turned away
+before that, so a flood past the cap reads no D1 rows and no R2 objects:
+each extra guess costs one Worker request and nothing else. Two honest
+limits: Cloudflare's rate limiter counts per colo rather than globally,
+and it runs inside the Worker, so the requests themselves still count
+toward the daily allowance. The outer layer for that is a WAF
+rate-limiting rule on `/pub/*/qpacket`, which stops requests before they
+reach the Worker — but WAF rules need the Worker on a custom domain in a
+Cloudflare zone, and this one is on `workers.dev`, where they can't be
+set.
 
 **What is still on the TD.** None of the above rescues a guessable
 password. 30 attempts a minute is a wall for a wordlist but not for
