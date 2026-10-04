@@ -875,7 +875,9 @@ let unmountReport = null;
 const NEW_SECS = [['standings', 'Standings'], ['individuals', 'Individuals'], ['games', 'Scoreboard'],
   ['teams', 'Teams'], ['players', 'Players'], ['rounds', 'Rounds']];
 let newMark = null; // the id a followed link landed on (marked)
-let newFrom = null; // {sec, y}: where the Back link returns to
+// {sec, y, mark}: the places links were followed from, latest last. Back
+// returns to the latest as it was, its own mark and Back link included.
+let newBack = [];
 
 const fx = (v, d) => (v === null || v === undefined ? '–' : v.toFixed(d));
 const pctText = (v) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
@@ -1064,8 +1066,9 @@ function renderNewStats(box) {
   if (el) {
     const sec = el.classList.contains('nsec');
     if (sec) el.classList.add('nmark');
-    if (newFrom) {
-      const label = (NEW_SECS.find(([k]) => k === newFrom.sec) || [])[1];
+    const from = newBack[newBack.length - 1];
+    if (from) {
+      const label = (NEW_SECS.find(([k]) => k === from.sec) || [])[1];
       (sec ? el.querySelector('.nhead') : el).insertAdjacentHTML('beforeend',
         ` <a href="#" class="nback" data-back="1">← Back to ${esc(label || 'the last page')}</a>`);
     }
@@ -1081,14 +1084,14 @@ function renderNewStats(box) {
     if (!a) return;
     e.preventDefault();
     if (a.dataset.back) {
-      const from = newFrom;
-      statsSec = from.sec; newMark = null; newFrom = null;
+      const from = newBack.pop();
+      statsSec = from.sec; newMark = from.mark;
       render();
       window.scrollTo(0, from.y);
       return;
     }
     const [sec, id] = a.dataset.go.split('|');
-    newFrom = sec === statsSec && sec === 'games' && id.startsWith('nr-') ? newFrom : { sec: statsSec, y: window.scrollY };
+    if (!(sec === statsSec && sec === 'games' && id.startsWith('nr-'))) newBack.push({ sec: statsSec, y: window.scrollY, mark: newMark });
     statsSec = sec;
     newMark = id;
     render();
@@ -1121,10 +1124,10 @@ function renderStatsTab(box) {
     if (v === statsLayout) return;
     pendingPlace = statsLayout === 'new' ? newPlace($('newstats')) : reportPlace(box.querySelector('.reportbox'));
     if (v === 'new' && pendingPlace) statsSec = PAGE_SEC[pendingPlace.page] || 'standings';
-    newMark = null; newFrom = null;
+    newMark = null; newBack = [];
     statsLayout = v; savePref(STATS_LAYOUT_KEY, v);
   });
-  wire(box, 'statssec', (v) => { statsSec = v; newMark = null; newFrom = null; });
+  wire(box, 'statssec', (v) => { statsSec = v; newMark = null; newBack = []; });
   if (isNew) { renderNewStats($('newstats')); return; }
   unmountReport = mountReport(box.querySelector('.reportbox'),
     buildReport({ name: state.name, matches: dedupeMatches(matches), roster,

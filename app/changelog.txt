@@ -1,6 +1,7 @@
 Release Notes for 10/3/2026
 
 [ STATS ]
+- Back links in both layouts go back as many steps as you clicked, not just one.
 - The New layout has all six Classic pages (Scoreboard, Teams, Players and Rounds too), with the same numbers and links.
 - The New layout's tables are compact: bold headers, striped rows, and only as wide as they need to be.
 - Switching between Classic and New keeps your place.

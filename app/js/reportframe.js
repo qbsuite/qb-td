@@ -47,14 +47,16 @@ export function reportSrcdoc(pages, { start = null } = {}) {
   // A followed link marks where it landed: a bar down the target's whole
   // section (a team with its games and players, a player's game log, a
   // game's box score), with a link next to its heading back to the link
-  // that was followed. Both stay until the next click.
+  // that was followed. Both stay until the next click. Back returns to the
+  // page as it was, with its own mark and Back link, so a reader can step
+  // back as many links as they followed; going to a page's top starts over.
   const script = `
     var files = ${JSON.stringify(FILES)};
     var names = ${JSON.stringify(PAGE_NAMES)};
     var current = '';
     var startAt = ${JSON.stringify(start || null)};
-    var marked = null; // {box, back}: undone on the next click
-    var from = null;   // the link last followed, and its page
+    var marked = null; // {el, box, back}: undone on the next click
+    var trail = [];    // {page, link, el}: each link followed to another page, and what was marked there
     function pageOf(hash) {
       return files.filter(function (f) { return hash === f + '-top' || hash.indexOf(f + '-') === 0; })[0] || files[0];
     }
@@ -84,30 +86,33 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       var n = start;
       do { var next = n.nextElementSibling; box.appendChild(n); n = next; } while (n && !n.id);
       var back = null;
+      var from = trail[trail.length - 1];
       if (from && from.page !== pg) {
         back = document.createElement('a');
         back.href = '#';
         back.className = 'qt-back';
         back.textContent = '\u2190 Back to ' + (names[from.page] || 'the last page');
-        var to = from;
         back.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
+          var to = trail.pop();
           unmark();
-          show(to.page + '-top', false, to.link);
+          show(to.page + '-top', false, to.link, to.el);
         });
         start.appendChild(back);
       }
-      marked = { box: box, back: back };
+      marked = { el: el, box: box, back: back };
     }
-    // link: land on this element instead of the hash's own (Back)
-    function show(hash, go, link) {
+    // link: land on this element instead of the hash's own (Back);
+    // remark: the section to mark again there (Back)
+    function show(hash, go, link, remark) {
       current = hash;
       var pg = pageOf(hash);
       files.forEach(function (f) { document.getElementById('page-' + f).hidden = f !== pg; });
       window.scrollTo(0, 0);
       var el = link || (hash ? document.getElementById(hash) : null);
       if (go) mark(el, pg);
+      else if (remark) mark(remark, pg);
       var y = el ? el.getBoundingClientRect().top : 0;
       parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight, y: y, go: !!(go || link) }, '*');
     }
@@ -115,8 +120,10 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
       if (!a || a.classList.contains('qt-back')) return;
       e.preventDefault();
-      from = { page: pageOf(current), link: a };
-      show(a.getAttribute('href').slice(1), true);
+      var hash = a.getAttribute('href').slice(1);
+      if (/-top$/.test(hash)) trail = [];
+      else if (pageOf(hash) !== pageOf(current)) trail.push({ page: pageOf(current), link: a, el: marked && marked.el });
+      show(hash, true);
     });
     window.addEventListener('load', function () { show(current); });
     // opened from the other layout: the same page, scrolled to the same
