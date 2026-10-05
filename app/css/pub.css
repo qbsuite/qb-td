@@ -54,19 +54,45 @@ tr.nowrow td { background: var(--sel); }
 .nback { font-size: 14px; font-weight: normal; white-space: nowrap; }
 .nmark { border-left: 4px solid var(--link); padding-left: 10px; margin-left: -14px; }
 .nbox { display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: flex-start; }
-.nbox > .tablewrap { flex: 1 1 300px; }
-/* compact tables: only as wide as their content, bold headers with one
-   rule, tight striped rows, each row on one line (a wide table scrolls
-   sideways in its tablewrap) */
-.nstats { width: auto; max-width: 100%; }
+.nbox > .nfade { flex: 1 1 300px; min-width: 0; }
+/* compact tables, fit the way the Classic report's are: only as wide as
+   their content, a bold full-color header, 5px cells at normal line
+   height, rows striped from the first one, Classic's columns in its order
+   with a gap before each group, the row under the pointer highlighted. Every cell paints its own background so sticky cells
+   cover what scrolls under them. */
+.nstats { width: auto; max-width: none; border-collapse: separate; border-spacing: 0; }
 .nstats th {
-  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 700;
-  color: var(--fg); padding: 5px 10px; border-bottom: 1.5px solid var(--fg);
+  text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 700;
+  color: var(--fg); padding: 5px; border-bottom: 1px solid var(--line); background: var(--bg);
 }
-.nstats td { padding: 4px 10px; border-bottom: none; white-space: nowrap; }
-.nstats tr:nth-child(even) td { background: var(--sel); }
-.nstats tr.ntot td { font-weight: 600; background: transparent; border-top: 1px solid var(--muted); }
-.nsec > .tablewrap + .tablewrap { margin-top: 12px; }
+.nstats thead { position: sticky; top: 0; z-index: 2; }
+/* Classic's row height: 11pt-ish text, a tight line, 5px cells */
+.nstats { font-size: 14px; line-height: 1.15; }
+.nstats .g0 { padding-left: 16px; }
+/* alignment is Classic's: numbers and their headers right, text (names,
+   ranks, rounds, results, scores) left */
+.nstats td { padding: 5px; border-bottom: none; white-space: nowrap; background: var(--bg); }
+/* a neutral stripe, mixed from the text color so it reads the same in both themes */
+.nstats tbody tr:nth-child(odd) td { background: color-mix(in srgb, var(--fg) 6%, var(--bg)); }
+.nstats td.nrkcol, .nstats .nrk { color: var(--fg); }
+@media (hover: hover) {
+  .nstats tbody tr:hover td { background: color-mix(in srgb, var(--link) 14%, var(--bg)); }
+}
+.nstats tr.ntot td { font-weight: 600; background: var(--bg); border-top: 1px solid var(--muted); }
+.nstats .nrk { display: none; }
+/* a long team name wraps rather than push the numbers out of view */
+.nstats td.teamcol, .nstats td.nstick { white-space: normal; min-width: 12ch; max-width: 20em; }
+.nfade { position: relative; min-width: 0; }
+.nfade + .nfade { margin-top: 12px; }
+.tablewrap.nfit { overflow: visible; }
+.tablewrap.nscroll { overflow: auto; max-height: 78vh; }
+/* the first column stays while the numbers scroll */
+.nscroll .nstats .nstick { position: sticky; left: 0; z-index: 1; box-shadow: 1px 0 0 var(--line); }
+.nscroll .nstats thead .nstick { z-index: 3; }
+.nfade.more::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 24px; pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--bg));
+}
 .nbonus { margin-top: 6px; }
 .njump { margin-bottom: 4px; }
 
@@ -102,6 +128,15 @@ details.qd .qdmeta.track { line-height: 20px; }
   .nowgrid { grid-template-columns: minmax(0, 1fr); }
   .schedviews select { flex: 1 1 100%; }
   .subteam { display: block; font-size: 13px; color: var(--muted); }
+  /* the rank or round rides in the sticky cell instead of its own column */
+  .nstats .nrkcol { display: none; }
+  .nstats td.nstick:has(.nrk) { padding-left: calc(5px + 2em); }
+  .nstats .nrk {
+    display: block; position: absolute; left: 5px; width: 1.8em;
+    color: var(--fg); font-variant-numeric: tabular-nums;
+  }
+  .nstats td.nstick { position: relative; }
+  .nscroll .nstats .nstick { position: sticky; min-width: 36vw; max-width: 52vw; white-space: normal; }
   th.teamcol, td.teamcol { display: none; }
   th.name, td.name { min-width: 0; }
   .nmark { padding-left: 8px; margin-left: -12px; }

@@ -1,5 +1,10 @@
 Release Notes for 10/5/2026
 
+[ STATS ]
+- The New layout's tables match Classic's columns, order, alignment and fit, without Pct.
+- New layout: the header stays on screen while you scroll, and the row under the pointer is highlighted.
+- New layout on a phone: names stay put while you swipe through the numbers.
+
 [ ROOM PAGE ]
 - Drag players into seating order on the start card, and drag a team's column to swap sides.
 - Removed the note under Start game.

@@ -902,7 +902,6 @@ let newMark = null; // the id a followed link landed on (marked)
 let newBack = [];
 
 const fx = (v, d) => (v === null || v === undefined ? '–' : v.toFixed(d));
-const pctText = (v) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
 
 // ids for the New layout's anchors: by position, so any name is safe
 function newIds(rd) {
@@ -916,18 +915,27 @@ function newIds(rd) {
 }
 const goLink = (sec, id, text) => (id ? `<a href="#" data-go="${sec}|${esc(id)}">${text}</a>` : text);
 
+// The New layout's tables share one shape: Classic's columns in Classic's
+// order, a header (in <thead>, so it can stay on screen), and a sticky
+// first column on a phone. Related columns sit together, and the first
+// column of each group gets the class g0, which opens a gap before it. A
+// rank or round column (nrkcol) hides on a phone, where the sticky cell
+// carries it instead (span.nrk).
+const rk = (v) => `<span class="nrk">${esc(String(v))}</span>`;
+
 function newStandings(rd, ids, vals, pp) {
   const table = (teams, ranked) => `<div class="tablewrap"><table class="nstats">
-    <tr><th class="num"></th><th class="name">Team</th><th class="num">W</th><th class="num">L</th>${rd.anyTies ? '<th class="num">T</th>' : ''}
-      <th class="num">Pct</th><th class="num" title="Points scored in regulation per ${rd.regTossups} regulation tossups heard">${pp}</th>
-      ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
-      <th class="num" title="Tossups heard in regulation">TUH</th><th class="num" title="Points per bonus">PPB</th></tr>
-    ${teams.map((tm, i) => `<tr>
-      <td class="num muted">${ranked ? esc(tm.rank) : i + 1}</td><td class="name">${goLink('teams', ids.team(tm.name), esc(tm.name))}</td>
-      <td class="num">${tm.w}</td><td class="num">${tm.l}</td>${rd.anyTies ? `<td class="num">${tm.t}</td>` : ''}
-      <td class="num">${pctText(tm.pct)}</td><td class="num">${fx(tm.pp, 1)}</td>
-      ${vals.map((v) => `<td class="num">${tm.counts[v] || 0}</td>`).join('')}
-      <td class="num">${tm.regTuh}</td><td class="num">${fx(tm.ppb, 2)}</td></tr>`).join('')}
+    <thead><tr><th class="nrkcol"></th><th class="name nstick">Team</th><th class="num g0">W</th><th class="num">L</th>${rd.anyTies ? '<th class="num">T</th>' : ''}
+      <th class="num g0" title="Points scored in regulation per ${rd.regTossups} regulation tossups heard">${pp}</th>
+      ${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
+      <th class="num" title="Tossups heard in regulation">TUH</th><th class="num g0" title="Points per bonus">PPB</th></tr></thead>
+    <tbody>${teams.map((tm, i) => `<tr>
+      <td class="muted nrkcol">${ranked ? esc(tm.rank) : i + 1}</td>
+      <td class="name nstick">${rk(ranked ? tm.rank : i + 1)}${goLink('teams', ids.team(tm.name), esc(tm.name))}</td>
+      <td class="num g0">${tm.w}</td><td class="num">${tm.l}</td>${rd.anyTies ? `<td class="num">${tm.t}</td>` : ''}
+      <td class="num g0">${fx(tm.pp, 1)}</td>
+      ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${tm.counts[v] || 0}</td>`).join('')}
+      <td class="num">${tm.regTuh}</td><td class="num g0">${fx(tm.ppb, 2)}</td></tr>`).join('')}</tbody>
   </table></div>`;
   // per pool when the schedule seeded pools; teams in none go last
   const pools = (schedule && schedule.pools) || {};
@@ -942,23 +950,26 @@ function newStandings(rd, ids, vals, pp) {
 
 function newIndividuals(rd, ids, vals, pp) {
   return `<div class="tablewrap"><table class="nstats">
-    <tr><th class="num"></th><th class="name">Player</th><th class="name teamcol">Team</th><th class="num" title="Games played">GP</th>
-      ${vals.map((v) => `<th class="num">${v}</th>`).join('')}
-      <th class="num" title="Tossups heard">TUH</th><th class="num">Pts</th><th class="num" title="Points per ${rd.regTossups} tossups heard">${pp}</th></tr>
-    ${rd.players.map((p) => `<tr>
-      <td class="num muted">${esc(p.rank)}</td>
-      <td class="name">${goLink('players', ids.player(p.team, p.name), esc(p.name))}<span class="subteam">${esc(p.team)}</span></td>
-      <td class="name muted teamcol">${goLink('teams', ids.team(p.team), esc(p.team))}</td><td class="num">${p.gp.toFixed(1)}</td>
-      ${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
-      <td class="num">${p.tuh}</td><td class="num">${p.points}</td><td class="num">${fx(p.pp, 2)}</td></tr>`).join('')}
+    <thead><tr><th class="nrkcol"></th><th class="name nstick">Player</th><th class="name teamcol">Team</th>
+      <th class="num g0" title="Games played">GP</th>
+      ${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
+      <th class="num" title="Tossups heard">TUH</th>
+      <th class="num g0">Pts</th><th class="num" title="Points per ${rd.regTossups} tossups heard">${pp}</th></tr></thead>
+    <tbody>${rd.players.map((p) => `<tr>
+      <td class="muted nrkcol">${esc(p.rank)}</td>
+      <td class="name nstick">${rk(p.rank)}${goLink('players', ids.player(p.team, p.name), esc(p.name))}<span class="subteam">${esc(p.team)}</span></td>
+      <td class="name muted teamcol">${goLink('teams', ids.team(p.team), esc(p.team))}</td>
+      <td class="num g0">${p.gp.toFixed(1)}</td>
+      ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
+      <td class="num">${p.tuh}</td><td class="num g0">${p.points}</td><td class="num">${fx(p.pp, 2)}</td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 
 // a game row of a team's or player's log: round, opponent, result, score
-const logCells = (ids, g) => `<td class="num muted">${g.round}</td>
-  <td class="name">${goLink('teams', ids.team(g.opp), esc(g.opp))}</td><td>${g.result}</td>
+const logCells = (ids, g) => `<td class="muted nrkcol">${g.round}</td>
+  <td class="name nstick">${rk(g.round)}${goLink('teams', ids.team(g.opp), esc(g.opp))}</td><td>${g.result}</td>
   <td class="name">${goLink('games', ids.game(g.gameId), esc(g.score))}</td>`;
-const logHead = '<th class="num">Rd</th><th class="name">Opponent</th><th></th><th class="name">Score</th>';
+const logHead = '<th class="nrkcol">Rd</th><th class="name nstick">Opponent</th><th></th><th class="name">Score</th>';
 // `at`: the Classic report's id for the same thing (reportData anchor)
 const secHead = (id, title, meta, at) => `<div class="nsec" id="${id}" data-at="${esc(at)}"><h3 class="nhead"><span>${title}</span>${
   meta ? `<span class="meta">${meta}</span>` : ''}</h3>`;
@@ -972,18 +983,18 @@ function newGames(rd, ids, vals) {
     const title = `${esc(w.name)} ${w.points}, ${esc(l.name)} ${l.points}${g.otTossups ? ' (OT)' : ''}`;
     return `${secHead(ids.game(g.id), title, head, g.anchor)}
       <div class="nbox">${g.teams.map((t) => `<div class="tablewrap"><table class="nstats">
-        <tr><th class="name">${goLink('teams', ids.team(t.name), esc(t.name))}</th><th class="num">TUH</th>
-          ${vals.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th></tr>
-        ${t.players.map((p) => `<tr><td class="name">${goLink('players', ids.player(t.name, p.name), esc(p.name))}</td>
+        <thead><tr><th class="name nstick">${goLink('teams', ids.team(t.name), esc(t.name))}</th><th class="num">TUH</th>
+          ${vals.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th></tr></thead>
+        <tbody>${t.players.map((p) => `<tr><td class="name nstick">${goLink('players', ids.player(t.name, p.name), esc(p.name))}</td>
           <td class="num">${p.tuh}</td>${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
           <td class="num">${p.points}</td></tr>`).join('')}
-        <tr class="ntot"><td class="name">Total</td><td></td>${vals.map((v) => `<td class="num">${t.counts[v] || 0}</td>`).join('')}
-          <td class="num">${t.tossupPoints}</td></tr>
+        <tr class="ntot"><td class="name nstick">Total</td><td></td>${vals.map((v) => `<td class="num">${t.counts[v] || 0}</td>`).join('')}
+          <td class="num">${t.tossupPoints}</td></tr></tbody>
       </table></div>`).join('')}</div>
       <div class="tablewrap"><table class="nstats nbonus">
-        <tr><th class="name">Bonuses</th><th class="num">Heard</th><th class="num">Pts</th><th class="num">PPB</th></tr>
-        ${g.teams.map((t) => `<tr><td class="name">${esc(t.name)}</td><td class="num">${t.bonusesHeard}</td>
-          <td class="num">${t.bonusPoints}</td><td class="num">${fx(t.ppb, 2)}</td></tr>`).join('')}
+        <thead><tr><th class="name nstick">Bonuses</th><th class="num">Heard</th><th class="num">Pts</th><th class="num">PPB</th></tr></thead>
+        <tbody>${g.teams.map((t) => `<tr><td class="name nstick">${esc(t.name)}</td><td class="num">${t.bonusesHeard}</td>
+          <td class="num">${t.bonusPoints}</td><td class="num">${fx(t.ppb, 2)}</td></tr>`).join('')}</tbody>
       </table></div></div>`;
   };
   return `<div class="chips njump">${rounds.map((r) => `<a href="#" class="chip" data-go="games|${ids.round(r)}">Round ${r}</a>`).join('')}</div>`
@@ -997,23 +1008,23 @@ function newTeams(rd, ids, vals, pp) {
     const players = rd.players.filter((p) => p.team === t.name);
     return `${secHead(ids.team(t.name), esc(t.name), esc(t.record), t.anchor)}
       <div class="tablewrap"><table class="nstats">
-        <tr>${logHead}${vals.map((v) => `<th class="num">${v}</th>`).join('')}
-          <th class="num" title="Tossups heard">TUH</th><th class="num" title="Bonuses heard">BHrd</th>
-          <th class="num" title="Points scored on bonuses">BPts</th><th class="num" title="Points per bonus">PPB</th></tr>
-        ${t.games.map((g) => `<tr>${logCells(ids, g)}${vals.map((v) => `<td class="num">${g.counts[v] || 0}</td>`).join('')}
-          <td class="num">${g.tuh}</td><td class="num">${g.bonusesHeard}</td><td class="num">${g.bonusPoints}</td>
+        <thead><tr>${logHead}${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
+          <th class="num" title="Tossups heard">TUH</th><th class="num g0" title="Bonuses heard">BHrd</th>
+          <th class="num" title="Points scored on bonuses">BPts</th><th class="num" title="Points per bonus">PPB</th></tr></thead>
+        <tbody>${t.games.map((g) => `<tr>${logCells(ids, g)}${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${g.counts[v] || 0}</td>`).join('')}
+          <td class="num">${g.tuh}</td><td class="num g0">${g.bonusesHeard}</td><td class="num">${g.bonusPoints}</td>
           <td class="num">${fx(g.ppb, 2)}</td></tr>`).join('')}
-        <tr class="ntot"><td></td><td class="name">Total</td><td>${esc(t.record)}</td><td></td>
-          ${vals.map((v) => `<td class="num">${t.counts[v] || 0}</td>`).join('')}
-          <td class="num">${t.tuh}</td><td class="num">${t.bonusesHeard}</td><td class="num">${t.bonusPoints}</td>
-          <td class="num">${fx(t.ppb, 2)}</td></tr>
+        <tr class="ntot"><td class="nrkcol"></td><td class="name nstick">Total</td><td>${esc(t.record)}</td><td></td>
+          ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${t.counts[v] || 0}</td>`).join('')}
+          <td class="num">${t.tuh}</td><td class="num g0">${t.bonusesHeard}</td><td class="num">${t.bonusPoints}</td>
+          <td class="num">${fx(t.ppb, 2)}</td></tr></tbody>
       </table></div>
       ${players.length ? `<div class="tablewrap"><table class="nstats">
-        <tr><th class="name">Player</th><th class="num" title="Games played">GP</th>${vals.map((v) => `<th class="num">${v}</th>`).join('')}
-          <th class="num" title="Tossups heard">TUH</th><th class="num">${pp}</th></tr>
-        ${players.map((p) => `<tr><td class="name">${goLink('players', ids.player(p.team, p.name), esc(p.name))}</td>
-          <td class="num">${p.gp.toFixed(1)}</td>${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
-          <td class="num">${p.tuh}</td><td class="num">${fx(p.pp, 2)}</td></tr>`).join('')}
+        <thead><tr><th class="name nstick">Player</th><th class="num g0" title="Games played">GP</th>${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
+          <th class="num" title="Tossups heard">TUH</th><th class="num g0">${pp}</th></tr></thead>
+        <tbody>${players.map((p) => `<tr><td class="name nstick">${goLink('players', ids.player(p.team, p.name), esc(p.name))}</td>
+          <td class="num g0">${p.gp.toFixed(1)}</td>${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
+          <td class="num">${p.tuh}</td><td class="num g0">${fx(p.pp, 2)}</td></tr>`).join('')}</tbody>
       </table></div>` : ''}</div>`;
   }).join('');
 }
@@ -1024,14 +1035,14 @@ function newPlayers(rd, ids, vals) {
     || a.name.toLocaleUpperCase().localeCompare(b.name.toLocaleUpperCase()));
   return sorted.map((p) => `${secHead(ids.player(p.team, p.name), esc(p.name), goLink('teams', ids.team(p.team), esc(p.team)), p.anchor)}
     <div class="tablewrap"><table class="nstats">
-      <tr>${logHead}<th class="num" title="Games played">GP</th>${vals.map((v) => `<th class="num">${v}</th>`).join('')}
-        <th class="num" title="Tossups heard">TUH</th><th class="num">Pts</th></tr>
-      ${p.games.map((g) => `<tr>${logCells(ids, g)}<td class="num">${g.gp.toFixed(1)}</td>
-        ${vals.map((v) => `<td class="num">${g.counts[v] || 0}</td>`).join('')}
-        <td class="num">${g.tuh}</td><td class="num">${g.points}</td></tr>`).join('')}
-      <tr class="ntot"><td></td><td class="name">Total</td><td></td><td></td><td class="num">${p.gp.toFixed(1)}</td>
-        ${vals.map((v) => `<td class="num">${p.counts[v] || 0}</td>`).join('')}
-        <td class="num">${p.tuh}</td><td class="num">${p.points}</td></tr>
+      <thead><tr>${logHead}<th class="num g0" title="Games played">GP</th>${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
+        <th class="num" title="Tossups heard">TUH</th><th class="num g0">Pts</th></tr></thead>
+      <tbody>${p.games.map((g) => `<tr>${logCells(ids, g)}<td class="num g0">${g.gp.toFixed(1)}</td>
+        ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${g.counts[v] || 0}</td>`).join('')}
+        <td class="num">${g.tuh}</td><td class="num g0">${g.points}</td></tr>`).join('')}
+      <tr class="ntot"><td class="nrkcol"></td><td class="name nstick">Total</td><td></td><td></td><td class="num g0">${p.gp.toFixed(1)}</td>
+        ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
+        <td class="num">${p.tuh}</td><td class="num g0">${p.points}</td></tr></tbody>
     </table></div></div>`).join('');
 }
 
@@ -1042,14 +1053,14 @@ function newRounds(rd, ids) {
     <td class="num">${r.convPct === null ? '–' : r.convPct.toFixed(0) + '%'}</td>
     ${rd.hasNegs ? `<td class="num">${fx(r.negsTeam, 1)}</td>` : ''}<td class="num">${fx(r.ppb, 2)}</td>`;
   return `<div class="tablewrap"><table class="nstats">
-    <tr><th class="num">Round</th><th class="num">Games</th>
+    <thead><tr><th class="nstick">Round</th><th class="num">Games</th>
       <th class="num" title="Points per team per ${n} tossups heard">Pts/Tm/${n}TUH</th>
       ${rd.hasPowers ? '<th class="num" title="Tossups powered by either team">TU Powered</th>' : ''}
       <th class="num" title="Tossups answered correctly by either team">TU Converted</th>
       ${rd.hasNegs ? `<th class="num" title="Incorrect interrupts per team per ${n} tossups heard">Negs/Tm/${n}TUH</th>` : ''}
-      <th class="num" title="Points per bonus">PPB</th></tr>
-    ${rd.rounds.map((r) => `<tr><td class="num">${goLink('games', ids.round(r.round), String(r.round))}</td>${cells(r)}</tr>`).join('')}
-    <tr class="ntot"><td class="num">Total</td>${cells(rd.total)}</tr>
+      <th class="num" title="Points per bonus">PPB</th></tr></thead>
+    <tbody>${rd.rounds.map((r) => `<tr><td class="nstick">${goLink('games', ids.round(r.round), String(r.round))}</td>${cells(r)}</tr>`).join('')}
+    <tr class="ntot"><td class="nstick">Total</td>${cells(rd.total)}</tr></tbody>
   </table></div>`;
 }
 
@@ -1072,6 +1083,37 @@ function newPlace(box) {
   return { page, anchor };
 }
 
+// A sticky header only sticks inside its nearest scrolling box. A table
+// that fits its width doesn't scroll sideways (nfit), so its header
+// sticks to the page. One that doesn't (a phone, mostly) becomes its own
+// scroll box, both ways and at most most of a screen tall (nscroll), so
+// its header and first column stay put inside it; an edge fade (more)
+// says there's more to the right until the end is reached.
+function fitTables(box) {
+  for (const table of box.querySelectorAll('table.nstats')) {
+    const wrap = table.parentElement;
+    let fade = wrap.parentElement;
+    if (!fade.classList.contains('nfade')) {
+      fade = document.createElement('div');
+      fade.className = 'nfade';
+      wrap.replaceWith(fade);
+      fade.appendChild(wrap);
+    }
+    wrap.classList.remove('nfit', 'nscroll');
+    const over = table.scrollWidth > wrap.clientWidth + 1;
+    wrap.classList.add(over ? 'nscroll' : 'nfit');
+    const edge = () => fade.classList.toggle('more',
+      over && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2);
+    wrap.onscroll = edge;
+    edge();
+  }
+}
+let refitTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(refitTimer);
+  refitTimer = setTimeout(() => { const b = $('newstats'); if (b) fitTables(b); }, 150);
+});
+
 function renderNewStats(box) {
   const rd = reportData({ name: state.name, matches: dedupeMatches(matches), roster,
     settings: effectiveFormat(state.format) });
@@ -1082,6 +1124,7 @@ function renderNewStats(box) {
     games: () => newGames(rd, ids, vals), teams: () => newTeams(rd, ids, vals, pp),
     players: () => newPlayers(rd, ids, vals), rounds: () => newRounds(rd, ids) };
   box.innerHTML = (draw[statsSec] || draw.standings)();
+  fitTables(box);
   // a followed link: mark where it landed, with the way back (a round's
   // heading gets only the way back)
   const el = newMark && document.getElementById(newMark);
