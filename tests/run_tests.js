@@ -1375,13 +1375,13 @@ test('categoryStats credits only the players who buzzed', () => {
   const rows = categoryStats(entries, CATMAP);
   const ann = (sub) => rows.find((r) => r.player === 'Ann' && r.sub === sub);
   assert.deepEqual(ann('American Literature'),
-    { player: 'Ann', team: 'Alpha', cat: 'Literature', sub: 'American Literature',
+    { player: 'Ann', team: 'Alpha', cat: 'Literature', sub: 'American Literature', sub2: '',
       powers: 1, gets: 0, negs: 0, bb: 0, pts: 15 });
   assert.deepEqual(ann('British Literature').pts, 10);
   // Ann's 10 came after Beta's neg: a bounceback, counted beside the get, not added to points
   assert.deepEqual({ gets: ann('British Literature').gets, bb: ann('British Literature').bb }, { gets: 1, bb: 1 });
   assert.deepEqual(rows.find((r) => r.player === 'Bob' && r.sub === 'British Literature'),
-    { player: 'Bob', team: 'Beta', cat: 'Literature', sub: 'British Literature',
+    { player: 'Bob', team: 'Beta', cat: 'Literature', sub: 'British Literature', sub2: '',
       powers: 0, gets: 0, negs: 1, bb: 0, pts: -5 });
   // no buzz, no row: Bob never appears in Mythology, Ann's zeroed buzz counts nothing
   assert.equal(rows.some((r) => r.cat === 'Mythology'), false);
@@ -1421,10 +1421,10 @@ test('categoryTeamStats joins team buzzes + controlled bonuses; catTeamLines doe
   const rows = categoryTeamStats(entries, CATMAP);
   // bonus 1 (Amer Lit, 20 pts) and bonus 2 (Sci - Biology, 10 pts) both went to Alpha
   assert.deepEqual(rows.find((r) => r.team === 'Alpha' && r.sub === 'American Literature'),
-    { team: 'Alpha', cat: 'Literature', sub: 'American Literature',
+    { team: 'Alpha', cat: 'Literature', sub: 'American Literature', sub2: '',
       powers: 1, gets: 0, negs: 0, bb: 0, pts: 15, bh: 1, bpts: 20 });
   assert.deepEqual(rows.find((r) => r.team === 'Alpha' && r.cat === 'Science'),
-    { team: 'Alpha', cat: 'Science', sub: 'Biology',
+    { team: 'Alpha', cat: 'Science', sub: 'Biology', sub2: '',
       powers: 0, gets: 0, negs: 0, bb: 0, pts: 0, bh: 1, bpts: 10 });
   // Beta only negged: no bonus slice
   assert.equal(rows.filter((r) => r.team === 'Beta').every((r) => r.bh === 0), true);
@@ -1509,14 +1509,14 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
   // American Lit tossup: one question, read in both rooms — converted twice,
   // one power, words 5 and 11. Readings never pass for questions: with two
   // rooms, heard is double the question count.
-  assert.deepEqual({ ...t('American Literature') }, { cat: 'Literature', sub: 'American Literature',
+  assert.deepEqual({ ...t('American Literature') }, { cat: 'Literature', sub: 'American Literature', sub2: '',
     questions: 1, heard: 2, conv: 2, powers: 1, negs: 0, words: [5, 11] });
   // British Lit: read twice, converted once (after a neg), negged both times
   assert.deepEqual({ heard: t('British Literature').heard, conv: t('British Literature').conv,
     negs: t('British Literature').negs }, { heard: 2, conv: 1, negs: 2 });
   const b = (cat) => q.bonuses.find((r) => r.cat === cat);
   // marked 'hem': game 1 got parts 2+3 (e, m), game 2 got parts 1+2 (h, e)
-  assert.deepEqual({ ...b('Literature') }, { cat: 'Literature', sub: 'American Literature',
+  assert.deepEqual({ ...b('Literature') }, { cat: 'Literature', sub: 'American Literature', sub2: '',
     questions: 1, heard: 2, pts: 40, dHeard: 2, e: 2, m: 1, h: 1, marked: 1, ranked: 0 });
   // biology was read once (game 2 had no correct buzz on tossup 2): ranked by
   // its only reading, the converted part is the easy one
@@ -1546,13 +1546,39 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
 });
 
 test('catOfEntry: RMPSS is a parent, an unread tag is Unknown, and it sorts last', () => {
-  assert.deepEqual(catOfEntry({ c: 'Beliefs', s: '' }), { cat: 'RMPSS', sub: 'Beliefs' });
-  assert.deepEqual(catOfEntry({ c: 'Social Science', s: 'Economics' }), { cat: 'RMPSS', sub: 'Social Science' });
-  assert.deepEqual(catOfEntry({ c: 'Literature', s: 'American' }), { cat: 'Literature', sub: 'American' });
-  assert.deepEqual(catOfEntry({ u: 'Visual Culture' }), { cat: 'Unknown', sub: 'Visual Culture' });
+  assert.deepEqual(catOfEntry({ c: 'Beliefs', s: '' }), { cat: 'RMPSS', sub: 'Beliefs', sub2: '' });
+  assert.deepEqual(catOfEntry({ c: 'Social Science', s: 'Economics' }), { cat: 'RMPSS', sub: 'Social Science', sub2: 'Economics' });
+  assert.deepEqual(catOfEntry({ c: 'Beliefs', s: 'Narratives' }), { cat: 'RMPSS', sub: 'Beliefs', sub2: 'Narratives' });
+  assert.deepEqual(catOfEntry({ c: 'Literature', s: 'American' }), { cat: 'Literature', sub: 'American', sub2: '' });
+  assert.deepEqual(catOfEntry({ u: 'Visual Culture' }), { cat: 'Unknown', sub: 'Visual Culture', sub2: '' });
   assert.equal(catOfEntry(null), null);
   assert.deepEqual(['Unknown', 'Trash', 'Zoology', 'RMPSS', 'Literature'].sort(catCompare),
     ['Literature', 'RMPSS', 'Trash', 'Zoology', 'Unknown']);
+});
+
+test('questionLines and catBreakdown: an RMPSS category\'s own split is a third level', () => {
+  const rows = [
+    { cat: 'RMPSS', sub: 'Beliefs', sub2: 'Narratives', questions: 2, heard: 4 },
+    { cat: 'RMPSS', sub: 'Beliefs', sub2: 'Practices', questions: 1, heard: 2 },
+    { cat: 'RMPSS', sub: 'Philosophy', sub2: '', questions: 1, heard: 2 },
+  ];
+  const at = (cat, sub, sub2) => questionLines(rows, cat, sub, sub2).map((l) => [l.level, l.sub2 || l.sub || l.cat, l.questions]);
+  assert.deepEqual(at('', '', ''), [[0, 'RMPSS', 4], [1, 'Beliefs', 3], [2, 'Narratives', 2], [2, 'Practices', 1], [1, 'Philosophy', 1]]);
+  // a picked subcategory keeps its split under it; a picked split is alone
+  assert.deepEqual(at('RMPSS', 'Beliefs', ''), [[1, 'Beliefs', 3], [2, 'Narratives', 2], [2, 'Practices', 1]]);
+  assert.deepEqual(at('RMPSS', 'Beliefs', 'Practices'), [[2, 'Practices', 1]]);
+  const line = (pts) => ({ powers: 0, gets: pts / 10, negs: 0, bb: 0, pts });
+  const bd = catBreakdown([
+    { team: 'A', player: 'Ann', cat: 'RMPSS', sub: 'Beliefs', sub2: 'Narratives', ...line(20) },
+    { team: 'A', player: 'Ann', cat: 'RMPSS', sub: 'Beliefs', sub2: 'Practices', ...line(30) },
+    { team: 'A', player: 'Ann', cat: 'RMPSS', sub: 'Philosophy', sub2: '', ...line(10) },
+  ], 'A', 'Ann');
+  assert.deepEqual(bd[0].subs.map((x) => [x.sub, x.line.pts, x.subs.map((y) => [y.sub, y.line.pts])]),
+    [['Beliefs', 50, [['Practices', 30], ['Narratives', 20]]], ['Philosophy', 10, []]]);
+  assert.equal(catPlayerLines([
+    { team: 'A', player: 'Ann', cat: 'RMPSS', sub: 'Beliefs', sub2: 'Narratives', ...line(20) },
+    { team: 'A', player: 'Ann', cat: 'RMPSS', sub: 'Beliefs', sub2: 'Practices', ...line(30) },
+  ], 'RMPSS', 'Beliefs', 'Practices')[0].pts, 30);
 });
 
 test('categoryQuestions: one category across rounds, oldest first, with its category', () => {

@@ -45,11 +45,13 @@ let buzzMode = 'round';    // 'round' | 'category' | 'summary'
 let buzzView = null;       // the round By Round shows
 let buzzCat = '';          // the category By Category shows
 let buzzSub = '';
+let buzzSub2 = '';
 let catmap = null;         // text-free per-tossup categories from /pub/:slug/cats
 let lastCats;              // its stamp
 let catView = 'cat';       // 'cat' (players) | 'team' | 'player' | 'questions'
 let catSel = '';
 let catSubSel = '';
+let catSub2Sel = '';       // the third level: a split under an RMPSS category
 let catPlayerSel = null;   // {team, player}
 const buzzPackets = {};    // round -> Promise<normalized packet>
 const BUZZ_KEY = 'qbtdBuzzKey:' + slug;
@@ -531,8 +533,9 @@ function viewsHtml(items, cur, attr) {
 }
 // Filter chips. items [{v, label, n?, off?, cls?}]; `sub` hangs the row
 // off a rule, for the level under another.
+// `sub` is true for the second row, 'sub2' for the third.
 function chipsHtml(items, cur, attr, sub = false) {
-  return `<div class="chips${sub ? ' sub' : ''}">${items.map((i) => i.off
+  return `<div class="chips${sub ? ' sub' : ''}${sub === 'sub2' ? ' sub2' : ''}">${items.map((i) => i.off
     ? `<span class="chip off">${esc(i.label)}</span>`
     : `<a href="#" class="chip${i.v === cur ? ' on' : ''}${i.cls ? ' ' + i.cls : ''}" data-${attr}="${esc(i.v)}"${
       i.v === cur ? ' aria-current="true"' : ''}>${esc(i.label)}${i.n ? `<span class="n">${i.n}</span>` : ''}</a>`).join('')}</div>`;
@@ -542,24 +545,31 @@ function wire(box, attr, pick) {
     el.onclick = (e) => { e.preventDefault(); pick(el.dataset[attr]); render(); };
   });
 }
-// Category chips, then the picked category's subcategories under them.
-// `items` are [{cat, sub}] with a count each (`n`); a subcategory named
-// like its category adds nothing and isn't offered. `all` offers an All
-// chip for no category.
-function catChipsHtml(items, cat, sub, catAttr, subAttr, all = true) {
+// Category chips, then the picked category's subcategories under them,
+// then the picked subcategory's own split (RMPSS → Beliefs → Narratives).
+// `items` are [{cat, sub, sub2}] with a count each (`n`); a subcategory
+// named like its category adds nothing and isn't offered. `all` offers an
+// All chip for no category.
+function catChipsHtml(items, [cat, sub, sub2], [catAttr, subAttr, sub2Attr], all = true) {
   const count = new Map();
+  const bump = (k, n) => count.set(k, (count.get(k) || 0) + n);
   for (const i of items) {
-    count.set(i.cat, (count.get(i.cat) || 0) + i.n);
-    if (i.sub && i.sub !== i.cat) count.set(i.cat + '\n' + i.sub, (count.get(i.cat + '\n' + i.sub) || 0) + i.n);
+    bump(i.cat, i.n);
+    if (i.sub && i.sub !== i.cat) bump(i.cat + '\n' + i.sub, i.n);
+    if (i.sub2) bump(i.cat + '\n' + i.sub + '\n' + i.sub2, i.n);
   }
   const cats = [...new Set(items.map((i) => i.cat))].sort(catCompare);
   const subs = cat ? [...new Set(items.filter((i) => i.cat === cat && i.sub && i.sub !== cat)
     .map((i) => i.sub))].sort() : [];
+  const subs2 = cat && sub ? [...new Set(items.filter((i) => i.cat === cat && i.sub === sub && i.sub2)
+    .map((i) => i.sub2))].sort() : [];
   return `<div class="chipstack">
     ${chipsHtml([...(all ? [{ v: '', label: 'All' }] : []),
       ...cats.map((c) => ({ v: c, label: c, n: count.get(c), cls: c === UNKNOWN_CAT ? 'unc' : '' }))], cat, catAttr)}
     ${subs.length ? chipsHtml([{ v: '', label: 'All' },
       ...subs.map((s) => ({ v: s, label: s, n: count.get(cat + '\n' + s) }))], sub, subAttr, true) : ''}
+    ${subs2.length ? chipsHtml([{ v: '', label: 'All' },
+      ...subs2.map((s) => ({ v: s, label: s, n: count.get(cat + '\n' + sub + '\n' + s) }))], sub2, sub2Attr, 'sub2') : ''}
   </div>`;
 }
 
@@ -610,27 +620,29 @@ function buzzCategoryIndex(rounds) {
 
 async function renderBuzzCategory(box, rounds) {
   const all = buzzCategoryIndex(rounds);
-  const items = all.tossups.map((t) => ({ cat: t.cat, sub: t.sub, n: 1 }))
-    .concat(all.bonuses.map((b) => ({ cat: b.cat, sub: b.sub, n: 0 })));
+  const items = all.tossups.map((t) => ({ cat: t.cat, sub: t.sub, sub2: t.sub2, n: 1 }))
+    .concat(all.bonuses.map((b) => ({ cat: b.cat, sub: b.sub, sub2: b.sub2, n: 0 })));
   if (!items.length) { box.innerHTML = '<div class="muted">No categorized questions yet</div>'; return; }
   const cats = [...new Set(items.map((i) => i.cat))].sort(catCompare);
-  if (!cats.includes(buzzCat)) { buzzCat = cats[0]; buzzSub = ''; }
-  const pick = (q) => q.cat === buzzCat && (!buzzSub || q.sub === buzzSub);
+  if (!cats.includes(buzzCat)) { buzzCat = cats[0]; buzzSub = ''; buzzSub2 = ''; }
+  const pick = (q) => q.cat === buzzCat && (!buzzSub || q.sub === buzzSub) && (!buzzSub2 || q.sub2 === buzzSub2);
   const tossups = all.tossups.filter(pick);
   const bonuses = all.bonuses.filter(pick);
   // no All here: every category at once is just every round again
-  const filter = catChipsHtml(items, buzzCat, buzzSub, 'buzzcat', 'buzzsub', false);
+  const filter = catChipsHtml(items, [buzzCat, buzzSub, buzzSub2], ['buzzcat', 'buzzsub', 'buzzsub2'], false);
   box.innerHTML = `${filter}<div id="buzzcatout"><div class="muted">Loading packets</div></div>`;
-  wire(box, 'buzzcat', (v) => { buzzCat = v; buzzSub = ''; });
-  wire(box, 'buzzsub', (v) => { buzzSub = v; });
-  const at = { cat: buzzCat, sub: buzzSub };
+  wire(box, 'buzzcat', (v) => { buzzCat = v; buzzSub = ''; buzzSub2 = ''; });
+  wire(box, 'buzzsub', (v) => { buzzSub = v; buzzSub2 = ''; });
+  wire(box, 'buzzsub2', (v) => { buzzSub2 = v; });
+  const at = { cat: buzzCat, sub: buzzSub, sub2: buzzSub2 };
   const want = [...new Set([...tossups, ...bonuses].map((q) => q.round))];
   const packets = new Map();
   for (const [n, p] of await Promise.all(want.map(async (n) => [n, await buzzPacketOrNull(n)]))) {
     if (p === false) return;
     packets.set(n, p);
   }
-  if (tab !== 'buzz' || buzzMode !== 'category' || buzzCat !== at.cat || buzzSub !== at.sub) return;
+  if (tab !== 'buzz' || buzzMode !== 'category' || buzzCat !== at.cat || buzzSub !== at.sub
+    || buzzSub2 !== at.sub2) return;
   const out = box.querySelector('#buzzcatout');
   if (!out) return;
   out.innerHTML = `
@@ -719,20 +731,21 @@ function lineCells(l, pw) {
 // many tossups each had (distinct questions, not readings: with two rooms
 // every tossup is read twice).
 function catFilterHtml(q) {
-  const items = q.tossups.map((r) => ({ cat: r.cat, sub: r.sub, n: r.questions }))
-    .concat(q.bonuses.map((r) => ({ cat: r.cat, sub: r.sub, n: 0 })));
+  const items = q.tossups.map((r) => ({ cat: r.cat, sub: r.sub, sub2: r.sub2, n: r.questions }))
+    .concat(q.bonuses.map((r) => ({ cat: r.cat, sub: r.sub, sub2: r.sub2, n: 0 })));
   const cats = new Set(items.map((i) => i.cat));
-  if (catSel && !cats.has(catSel)) { catSel = ''; catSubSel = ''; }
-  return catChipsHtml(items, catSel, catSubSel, 'cat', 'catsub');
+  if (catSel && !cats.has(catSel)) { catSel = ''; catSubSel = ''; catSub2Sel = ''; }
+  return catChipsHtml(items, [catSel, catSubSel, catSub2Sel], ['cat', 'catsub', 'catsub2']);
 }
 function wireCatFilter(box) {
-  wire(box, 'cat', (v) => { catSel = v; catSubSel = ''; });
-  wire(box, 'catsub', (v) => { catSubSel = v; });
+  wire(box, 'cat', (v) => { catSel = v; catSubSel = ''; catSub2Sel = ''; });
+  wire(box, 'catsub', (v) => { catSubSel = v; catSub2Sel = ''; });
+  wire(box, 'catsub2', (v) => { catSub2Sel = v; });
 }
 const noneHere = '<div class="muted">No buzzes in this category</div>';
 
 function renderByCategory(box, rows, q) {
-  const lines = catPlayerLines(rows, catSel, catSubSel);
+  const lines = catPlayerLines(rows, catSel, catSubSel, catSub2Sel);
   const pw = showPowers(lines);
   // on a phone the team rides under the player's name (pub.css)
   box.innerHTML = `${catFilterHtml(q)}
@@ -746,7 +759,7 @@ function renderByCategory(box, rows, q) {
 }
 
 function renderByTeam(box, teamRows, q) {
-  const lines = catTeamLines(teamRows, catSel, catSubSel);
+  const lines = catTeamLines(teamRows, catSel, catSubSel, catSub2Sel);
   const pw = showPowers(lines);
   box.innerHTML = `${catFilterHtml(q)}
     ${lines.length ? `<div class="tablewrap"><table>
@@ -779,8 +792,10 @@ function renderByPlayer(box, rows) {
       <tr><th>Category</th>${catHead(pw)}</tr>
       ${bd.map(({ cat, line, subs }) =>
         `<tr><td><b>${esc(cat)}</b></td>${lineCells(line, pw)}</tr>`
-        + subs.map(({ sub, line: sl }) =>
-          `<tr class="muted"><td style="padding-left:28px">${esc(sub)}</td>${lineCells(sl, pw)}</tr>`).join('')
+        + subs.map(({ sub, line: sl, subs: s2 }) =>
+          `<tr class="muted"><td style="padding-left:28px">${esc(sub)}</td>${lineCells(sl, pw)}</tr>`
+          + s2.map(({ sub: x, line: l2 }) =>
+            `<tr class="muted"><td style="padding-left:48px">${esc(x)}</td>${lineCells(l2, pw)}</tr>`).join('')).join('')
       ).join('')}
     </table></div>`;
   $('catplayersel').onchange = () => {
@@ -796,12 +811,17 @@ function renderQuestions(box, q) {
   // Unknown is marked, and its tags are quoted: they're the packet's
   // own words, not a category this site recognized
   const unc = (l) => l.cat === UNKNOWN_CAT;
-  const rowCls = (l) => (l.isSub ? 'catsub' : 'cattop') + (unc(l) ? ' uncat' : '');
-  const name = (l) => (l.isSub && unc(l) ? `\u201C${esc(l.sub)}\u201D` : esc(l.isSub ? l.sub : l.cat));
-  const tl = questionLines(q.tossups, catSel, catSubSel);
-  const bl = questionLines(q.bonuses, catSel, catSubSel);
-  // the difficulty notice counts the bonuses on screen, once each
-  const top = bl.filter((l) => !l.isSub || catSubSel);
+  // RMPSS's own categories read a step stronger than a plain subcategory
+  const rowCls = (l) => ['cattop', l.cat === 'RMPSS' ? 'catsub catmid' : 'catsub', 'catsub2'][l.level]
+    + (unc(l) ? ' uncat' : '');
+  const name = (l) => (l.isSub && unc(l) ? `\u201C${esc(l.sub)}\u201D`
+    : esc([l.cat, l.sub, l.sub2][l.level]));
+  const tl = questionLines(q.tossups, catSel, catSubSel, catSub2Sel);
+  const bl = questionLines(q.bonuses, catSel, catSubSel, catSub2Sel);
+  // the difficulty notice counts the bonuses on screen, once each: the
+  // lines at the shallowest level shown
+  const shallow = Math.min(...bl.map((l) => l.level));
+  const top = bl.filter((l) => l.level === shallow);
   const ranked = top.reduce((n, l) => n + (l.ranked || 0), 0);
   const marked = top.reduce((n, l) => n + (l.marked || 0), 0);
   const note = !ranked ? '' : `<p class="ranknote" role="note"><span class="i" aria-hidden="true">i</span>${

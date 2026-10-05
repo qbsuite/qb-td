@@ -26,8 +26,9 @@ import { matchBuzzes, matchBonuses } from './buzz.js';
 export const CAT_ORDER = ['Literature', 'History', 'Science', 'Fine Arts',
   'RMPSS', 'Current Events', 'Geography', 'Other Academic', 'Trash'];
 export const UNKNOWN_CAT = 'Unknown';
-// RMPSS is a parent like Literature: its categories are its subcategories
-// (and a set's split below them, Social Science's Economics say, folds in)
+// RMPSS is a parent like Literature: its categories are its subcategories,
+// and a split a packet names below them (Beliefs' Narratives, Social
+// Science's Economics) is a third level, `sub2`
 const RMPSS = ['Religion', 'Mythology', 'Beliefs', 'Philosophy', 'Social Science'];
 export function catCompare(a, b) {
   if (a === UNKNOWN_CAT || b === UNKNOWN_CAT) return (a === UNKNOWN_CAT) - (b === UNKNOWN_CAT);
@@ -49,15 +50,17 @@ export function roundCats(catmap, round) {
   return null;
 }
 
-// One map entry as {cat, sub}, or null: an RMPSS category reads as RMPSS
-// with itself as the subcategory, and a tag nothing recognized (`u`) as
-// Unknown with the tag as the subcategory.
+// One map entry as {cat, sub, sub2}, or null: an RMPSS category reads as
+// RMPSS with itself as the subcategory and its own split as sub2, and a
+// tag nothing recognized (`u`) as Unknown with the tag as the
+// subcategory. sub2 is '' everywhere else.
 export function catOfEntry(info) {
   if (!info) return null;
-  if (typeof info.u === 'string' && info.u) return { cat: UNKNOWN_CAT, sub: info.u };
+  if (typeof info.u === 'string' && info.u) return { cat: UNKNOWN_CAT, sub: info.u, sub2: '' };
   if (typeof info.c !== 'string' || !info.c) return null;
-  if (RMPSS.includes(info.c)) return { cat: 'RMPSS', sub: info.c };
-  return { cat: info.c, sub: typeof info.s === 'string' ? info.s : '' };
+  const s = typeof info.s === 'string' ? info.s : '';
+  if (RMPSS.includes(info.c)) return { cat: 'RMPSS', sub: info.c, sub2: s === info.c ? '' : s };
+  return { cat: info.c, sub: s, sub2: '' };
 }
 
 export function catInfo(list, number) {
@@ -94,10 +97,10 @@ function bouncebacks(buzzes) {
  */
 export function categoryStats(entries, catmap) {
   const rows = new Map();
-  const rowFor = (player, team, cat, sub) => {
-    const key = JSON.stringify([team, player, cat, sub]);
+  const rowFor = (player, team, { cat, sub, sub2 }) => {
+    const key = JSON.stringify([team, player, cat, sub, sub2]);
     if (!rows.has(key)) {
-      rows.set(key, { player, team, cat, sub, powers: 0, gets: 0, negs: 0, bb: 0, pts: 0 });
+      rows.set(key, { player, team, cat, sub, sub2, powers: 0, gets: 0, negs: 0, bb: 0, pts: 0 });
     }
     return rows.get(key);
   };
@@ -112,7 +115,7 @@ export function categoryStats(entries, catmap) {
       const bb = bouncebacks(buzzes);
       buzzes.forEach((b, i) => {
         if (!b.value) return;
-        const r = rowFor(b.player, b.team, info.cat, info.sub);
+        const r = rowFor(b.player, b.team, info);
         if (b.value > 10) r.powers++;
         else if (b.value > 0) r.gets++;
         else r.negs++;
@@ -133,10 +136,10 @@ export function categoryStats(entries, catmap) {
  */
 export function categoryTeamStats(entries, catmap) {
   const rows = new Map();
-  const rowFor = (team, cat, sub) => {
-    const key = JSON.stringify([team, cat, sub]);
+  const rowFor = (team, { cat, sub, sub2 }) => {
+    const key = JSON.stringify([team, cat, sub, sub2]);
     if (!rows.has(key)) {
-      rows.set(key, { team, cat, sub, powers: 0, gets: 0, negs: 0, bb: 0, pts: 0, bh: 0, bpts: 0 });
+      rows.set(key, { team, cat, sub, sub2, powers: 0, gets: 0, negs: 0, bb: 0, pts: 0, bh: 0, bpts: 0 });
     }
     return rows.get(key);
   };
@@ -151,7 +154,7 @@ export function categoryTeamStats(entries, catmap) {
       const bb = bouncebacks(buzzes);
       buzzes.forEach((b, i) => {
         if (!b.value) return;
-        const r = rowFor(b.team, info.cat, info.sub);
+        const r = rowFor(b.team, info);
         if (b.value > 10) r.powers++;
         else if (b.value > 0) r.gets++;
         else r.negs++;
@@ -163,7 +166,7 @@ export function categoryTeamStats(entries, catmap) {
       if (!bn.team || bn.tb) continue;
       const info = catInfo(cats.b, bn.bonus);
       if (!info) continue;
-      const r = rowFor(bn.team, info.cat, info.sub);
+      const r = rowFor(bn.team, info);
       r.bh++;
       r.bpts += bn.total;
     }
@@ -172,11 +175,12 @@ export function categoryTeamStats(entries, catmap) {
 }
 
 /** Aggregate team rows over a filter into per-team lines, best first. */
-export function catTeamLines(rows, cat, sub) {
+export function catTeamLines(rows, cat, sub, sub2 = '') {
   const out = new Map();
   for (const r of rows) {
     if (cat && r.cat !== cat) continue;
     if (sub && r.sub !== sub) continue;
+    if (sub2 && r.sub2 !== sub2) continue;
     if (!out.has(r.team)) {
       out.set(r.team, { team: r.team, powers: 0, gets: 0, negs: 0, bb: 0, pts: 0, bh: 0, bpts: 0 });
     }
@@ -195,11 +199,12 @@ export function catTeamLines(rows, cat, sub) {
 }
 
 /** Aggregate rows over a filter into per-player lines, best first. */
-export function catPlayerLines(rows, cat, sub) {
+export function catPlayerLines(rows, cat, sub, sub2 = '') {
   const out = new Map();
   for (const r of rows) {
     if (cat && r.cat !== cat) continue;
     if (sub && r.sub !== sub) continue;
+    if (sub2 && r.sub2 !== sub2) continue;
     const key = JSON.stringify([r.team, r.player]);
     if (!out.has(key)) {
       out.set(key, { player: r.player, team: r.team, powers: 0, gets: 0, negs: 0, bb: 0, pts: 0 });
@@ -216,8 +221,9 @@ export function catPlayerLines(rows, cat, sub) {
 }
 
 /**
- * One player's per-category breakdown: [{cat, line, subs: [{sub,
- * line}]}] in canonical category order, sub-slices by points.
+ * One player's per-category breakdown: [{cat, line, subs: [{sub, line,
+ * subs: [{sub, line}]}]}] in canonical category order, sub-slices (and
+ * the third level under them) by points.
  */
 export function catBreakdown(rows, team, player) {
   const mine = rows.filter((r) => r.team === team && r.player === player);
@@ -235,9 +241,14 @@ export function catBreakdown(rows, team, player) {
     .map(([cat, list]) => ({
       cat,
       line: sum(list),
-      subs: list.filter((r) => r.sub)
-        .sort((a, b) => b.pts - a.pts)
-        .map((r) => ({ sub: r.sub, line: sum([r]) })),
+      subs: [...new Set(list.filter((r) => r.sub).map((r) => r.sub))]
+        .map((sub) => {
+          const under = list.filter((r) => r.sub === sub);
+          return { sub, line: sum(under),
+            subs: under.filter((r) => r.sub2).sort((a, b) => b.pts - a.pts)
+              .map((r) => ({ sub: r.sub2, line: sum([r]) })) };
+        })
+        .sort((a, b) => b.line.pts - a.line.pts),
     }));
 }
 
@@ -264,9 +275,9 @@ export function categoryQuestionStats(entries, catmap) {
   const tossups = new Map();
   const bonuses = new Map();
   const seen = new Map(); // slice row -> Set of "round:number" read in it
-  const slice = (map, cat, sub, init, qkey) => {
-    const key = JSON.stringify([cat, sub]);
-    if (!map.has(key)) map.set(key, { cat, sub, questions: 0, ...init() });
+  const slice = (map, { cat, sub, sub2 }, init, qkey) => {
+    const key = JSON.stringify([cat, sub, sub2]);
+    if (!map.has(key)) map.set(key, { cat, sub, sub2, questions: 0, ...init() });
     const row = map.get(key);
     if (!seen.has(row)) seen.set(row, new Set());
     if (!seen.get(row).has(qkey)) { seen.get(row).add(qkey); row.questions++; }
@@ -284,7 +295,7 @@ export function categoryQuestionStats(entries, catmap) {
       if (tb) continue; // tiebreakers have no packet category
       const info = catInfo(cats.t, tossup);
       if (!info) continue;
-      const r = slice(tossups, info.cat, info.sub, tInit, e.round + ':' + tossup);
+      const r = slice(tossups, info, tInit, e.round + ':' + tossup);
       r.heard++;
       const right = buzzes.find((b) => b.value > 0);
       if (right) {
@@ -298,7 +309,7 @@ export function categoryQuestionStats(entries, catmap) {
       if (!bn.team || bn.tb) continue; // a bonus nobody controlled wasn't read
       const info = catInfo(cats.b, bn.bonus);
       if (!info) continue;
-      const r = slice(bonuses, info.cat, info.sub, bInit, e.round + ':' + bn.bonus);
+      const r = slice(bonuses, info, bInit, e.round + ':' + bn.bonus);
       r.heard++;
       r.pts += bn.total;
       if (bn.parts.length !== 3) continue;
@@ -329,11 +340,13 @@ export function categoryQuestionStats(entries, catmap) {
 
 /**
  * Slices summed into display lines: each category, then its
- * subcategories (a subcategory named like its category adds nothing and
- * is folded in). `cat`/`sub` filter the way the other views do.
- * Returns [{cat, sub, isSub, ...summed fields}].
+ * subcategories, each followed by its own split (sub2) when it has one
+ * (a subcategory named like its category adds nothing and is folded
+ * in). `cat`/`sub`/`sub2` filter the way the other views do; a picked
+ * subcategory still lists its split under it.
+ * Returns [{cat, sub, sub2, isSub, level, ...summed fields}], level 0-2.
  */
-export function questionLines(rows, cat, sub) {
+export function questionLines(rows, cat, sub, sub2 = '') {
   const add = (a, r) => {
     for (const [k, v] of Object.entries(r)) {
       if (typeof v === 'number') a[k] = (a[k] || 0) + v;
@@ -344,18 +357,30 @@ export function questionLines(rows, cat, sub) {
   const cats = [...new Set(rows.map((r) => r.cat))].sort(catCompare)
     .filter((c) => !cat || c === cat);
   const out = [];
+  const line = (c, s, s2, level, list) =>
+    add({ cat: c, sub: s, sub2: s2, isSub: level > 0, level }, list.reduce(add, {}));
+  // a subcategory's line, then its split
+  const subLines = (c, s, list) => {
+    const under = list.filter((r) => r.sub === s);
+    if (sub2) {
+      const only = under.filter((r) => r.sub2 === sub2);
+      if (only.length) out.push(line(c, s, sub2, 2, only));
+      return;
+    }
+    out.push(line(c, s, '', 1, under));
+    for (const s2 of [...new Set(under.map((r) => r.sub2).filter(Boolean))].sort()) {
+      out.push(line(c, s, s2, 2, under.filter((r) => r.sub2 === s2)));
+    }
+  };
   for (const c of cats) {
     const mine = rows.filter((r) => r.cat === c);
     const subs = [...new Set(mine.map((r) => r.sub).filter((s) => s && s !== c))].sort();
     if (sub) {
-      const only = mine.filter((r) => r.sub === sub);
-      if (only.length) out.push(add({ cat: c, sub, isSub: true }, only.reduce(add, {})));
+      if (mine.some((r) => r.sub === sub)) subLines(c, sub, mine);
       continue;
     }
-    out.push(add({ cat: c, sub: '', isSub: false }, mine.reduce(add, {})));
-    for (const s of subs) {
-      out.push(add({ cat: c, sub: s, isSub: true }, mine.filter((r) => r.sub === s).reduce(add, {})));
-    }
+    out.push(line(c, '', '', 0, mine));
+    for (const s of subs) subLines(c, s, mine);
   }
   return out;
 }
@@ -368,8 +393,9 @@ export function questionLines(rows, cat, sub) {
  * first. `tossupsOf(round)` / `bonusesOf(round)` are buzz.js
  * roundTossupBuzzes / roundBonuses bound to the entries.
  */
-export function categoryQuestions(catmap, rounds, cat, sub, tossupsOf, bonusesOf) {
-  const hit = (info) => info && (!cat || info.cat === cat) && (!sub || info.sub === sub);
+export function categoryQuestions(catmap, rounds, cat, sub, tossupsOf, bonusesOf, sub2 = '') {
+  const hit = (info) => info && (!cat || info.cat === cat) && (!sub || info.sub === sub)
+    && (!sub2 || info.sub2 === sub2);
   const tossups = [];
   const bonuses = [];
   for (const round of [...rounds].sort((x, y) => x - y)) {
