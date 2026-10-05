@@ -1586,6 +1586,13 @@ test('categoryFromMetadata: Beliefs is a category, its named half the subcategor
   assert.deepEqual(categoryFromMetadata('Jordan Patel, Beliefs - Practices'), { c: 'Beliefs', s: 'Practices' });
   assert.deepEqual(categoryFromMetadata('JP, Beliefs (Narratives and Practices)'), { c: 'Beliefs', s: '' });
   assert.deepEqual(categoryFromMetadata('Beliefs'), { c: 'Beliefs', s: '' });
+  // 2026 Terrapin's own tags: the half alone, after the writers' initials
+  assert.deepEqual(categoryFromMetadata('Narratives'), { c: 'Beliefs', s: 'Narratives' });
+  assert.deepEqual(categoryFromMetadata('JPMT, Practices'), { c: 'Beliefs', s: 'Practices' });
+  assert.deepEqual(categoryFromMetadata('JPMT/AY, Narratives'), { c: 'Beliefs', s: 'Narratives' });
+  assert.deepEqual(categoryFromMetadata('IBP/MS, Practices'), { c: 'Beliefs', s: 'Practices' });
+  // inside a longer tag the word is left alone
+  assert.notDeepEqual(categoryFromMetadata('Christian Practices'), { c: 'Beliefs', s: 'Practices' });
 });
 
 test('tagWithoutWriter drops a leading name or initials, and nothing else', () => {
@@ -1593,6 +1600,8 @@ test('tagWithoutWriter drops a leading name or initials, and nothing else', () =
   assert.equal(tagWithoutWriter('J. Patel, Interdisciplinary - Space'), 'Interdisciplinary - Space');
   assert.equal(tagWithoutWriter('JP, Misc. (Food)'), 'Misc. (Food)');
   assert.equal(tagWithoutWriter('María José García-López, Beliefs'), 'Beliefs');
+  assert.equal(tagWithoutWriter('JPMT/AY, Visual Culture'), 'Visual Culture');
+  assert.equal(tagWithoutWriter('Ann Lee & Bo Kim, Visual Culture'), 'Visual Culture');
   // topics, category words and a lone word stay
   assert.equal(tagWithoutWriter('CE, Politics'), 'CE, Politics');
   assert.equal(tagWithoutWriter('Visual Arts, Film'), 'Visual Arts, Film');

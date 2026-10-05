@@ -6,6 +6,7 @@ Release Notes for 10/5/2026
 
 [ CATEGORIES ]
 - Beliefs is a category.
+- Questions tagged only "Narratives" or "Practices" count as Beliefs.
 - Religion, Mythology, Beliefs, Philosophy and Social Science are grouped under RMPSS.
 - Questions whose category tag can't be read are listed under Uncategorized, with the tag as written.
 

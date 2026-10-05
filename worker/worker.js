@@ -1883,7 +1883,14 @@ function categoryFromLabel(label) {
 // category — it may sit anywhere ("Author - History - European"), and
 // whatever follows it is the subcategory, kept in the set's own words.
 // A chunk with no dashes falls back to the bare-label vocabulary.
+// Beliefs' halves on their own: 2026 Terrapin tags those questions just
+// "Narratives" or "Practices" (after the writers' initials). Matched only
+// as a whole comma-chunk, where the bare word can't be anything else.
+const BELIEF_HALVES = new Map([['narratives', 'Narratives'], ['practices', 'Practices']]);
+
 function categoryFromChunk(chunk) {
+  const half = BELIEF_HALVES.get(chunk.toLowerCase());
+  if (half) return { c: 'Beliefs', s: half };
   const segs = chunk.split(/\s+-\s+|\s*[–—]\s*/)
     .map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < segs.length; i++) {
@@ -1990,7 +1997,13 @@ function categoryFromVocab(meta) {
 // a topic to count.
 const NAME_PARTICLES = new Set(['de', 'da', 'di', 'del', 'della', 'der', 'van', 'von', 'la', 'le', 'du', 'bin', 'ibn', 'al', 'y']);
 let vocabWords = null;
+// several writers share a tag as "JPMT/AY", "IBP/MS" or "Ann Lee & Bo
+// Kim": each of them must read as a name
 function looksLikeName(seg) {
+  const writers = seg.split(/\s*[\/&]\s*|\s+and\s+/).filter(Boolean);
+  return writers.length > 0 && writers.every(looksLikeOneName);
+}
+function looksLikeOneName(seg) {
   if (!vocabWords) {
     vocabWords = new Set([...META_CATS.keys()].flatMap(metaTokens)
       .concat(VOCAB.flatMap((v) => v.tokens)));
@@ -2001,7 +2014,7 @@ function looksLikeName(seg) {
   for (const w of words) {
     if (NAME_PARTICLES.has(w.toLowerCase())) continue;
     if (vocabWords.has(w.toLowerCase().replace(/[.'’]/g, ''))) return false;
-    const initials = /^(\p{Lu}\.?){1,3}$/u.test(w);
+    const initials = /^(\p{Lu}\.?){1,4}$/u.test(w);
     const word = /^\p{Lu}[\p{Ll}\p{Lu}'’-]*\p{Ll}[\p{L}'’-]*\.?$/u.test(w);
     if (!initials && !word) return false;
     if (!initials) initialsOnly = false;
@@ -2072,7 +2085,8 @@ export function packetCategories(body, filename) {
 // improvement without a re-upload.
 // '3': bonuses carry their e/m/h difficulty marks.
 // '4': Beliefs is a category; unrecognized tags are kept (`u`).
-const CATMAP_VERSION = '4';
+// '5': bare "Narratives" / "Practices" are Beliefs; slash-joined writers.
+const CATMAP_VERSION = '5';
 
 // Backfill for packets uploaded before category extraction existed (or
 // before the current parser understood their format): recompute the
