@@ -21,7 +21,7 @@ import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes } from '../engine/buzz.js';
 import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
-  categoryQuestionStats, questionLines, categoryQuestions, UNCATEGORIZED } from '../engine/cats.js';
+  categoryQuestionStats, questionLines, categoryQuestions, UNKNOWN_CAT } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
 import { effectiveFormat } from './read_core.js';
 
@@ -557,7 +557,7 @@ function catChipsHtml(items, cat, sub, catAttr, subAttr, all = true) {
     .map((i) => i.sub))].sort() : [];
   return `<div class="chipstack">
     ${chipsHtml([...(all ? [{ v: '', label: 'All' }] : []),
-      ...cats.map((c) => ({ v: c, label: c, n: count.get(c), cls: c === UNCATEGORIZED ? 'unc' : '' }))], cat, catAttr)}
+      ...cats.map((c) => ({ v: c, label: c, n: count.get(c), cls: c === UNKNOWN_CAT ? 'unc' : '' }))], cat, catAttr)}
     ${subs.length ? chipsHtml([{ v: '', label: 'All' },
       ...subs.map((s) => ({ v: s, label: s, n: count.get(cat + '\n' + s) }))], sub, subAttr, true) : ''}
   </div>`;
@@ -793,9 +793,9 @@ function renderByPlayer(box, rows) {
 // sites show them, bonuses with PPB and their easy / medium / hard parts.
 function renderQuestions(box, q) {
   const pct = (n, d) => (d ? Math.round((n / d) * 100) + '%' : '–');
-  // Uncategorized is marked, and its tags are quoted: they're the packet's
+  // Unknown is marked, and its tags are quoted: they're the packet's
   // own words, not a category this site recognized
-  const unc = (l) => l.cat === UNCATEGORIZED;
+  const unc = (l) => l.cat === UNKNOWN_CAT;
   const rowCls = (l) => (l.isSub ? 'catsub' : 'cattop') + (unc(l) ? ' uncat' : '');
   const name = (l) => (l.isSub && unc(l) ? `\u201C${esc(l.sub)}\u201D` : esc(l.isSub ? l.sub : l.cat));
   const tl = questionLines(q.tossups, catSel, catSubSel);

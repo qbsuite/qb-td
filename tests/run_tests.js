@@ -1545,14 +1545,14 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
     .map((l) => [l.sub, l.isSub, l.heard]), [['', false, 3]]);
 });
 
-test('catOfEntry: RMPSS is a parent, an unread tag is Uncategorized, and it sorts last', () => {
+test('catOfEntry: RMPSS is a parent, an unread tag is Unknown, and it sorts last', () => {
   assert.deepEqual(catOfEntry({ c: 'Beliefs', s: '' }), { cat: 'RMPSS', sub: 'Beliefs' });
   assert.deepEqual(catOfEntry({ c: 'Social Science', s: 'Economics' }), { cat: 'RMPSS', sub: 'Social Science' });
   assert.deepEqual(catOfEntry({ c: 'Literature', s: 'American' }), { cat: 'Literature', sub: 'American' });
-  assert.deepEqual(catOfEntry({ u: 'Visual Culture' }), { cat: 'Uncategorized', sub: 'Visual Culture' });
+  assert.deepEqual(catOfEntry({ u: 'Visual Culture' }), { cat: 'Unknown', sub: 'Visual Culture' });
   assert.equal(catOfEntry(null), null);
-  assert.deepEqual(['Uncategorized', 'Trash', 'Zoology', 'RMPSS', 'Literature'].sort(catCompare),
-    ['Literature', 'RMPSS', 'Trash', 'Zoology', 'Uncategorized']);
+  assert.deepEqual(['Unknown', 'Trash', 'Zoology', 'RMPSS', 'Literature'].sort(catCompare),
+    ['Literature', 'RMPSS', 'Trash', 'Zoology', 'Unknown']);
 });
 
 test('categoryQuestions: one category across rounds, oldest first, with its category', () => {

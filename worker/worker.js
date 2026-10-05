@@ -2053,7 +2053,7 @@ export function packetCategories(body, filename) {
   if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) return null;
   // a question whose tag nothing recognizes keeps the tag itself (`u`),
   // minus the writer's name, so the Categories tab can list it under
-  // Uncategorized instead of leaving it out
+  // Unknown instead of leaving it out
   const catOf = (q) => {
     if (!q) return null;
     if (typeof q.category === 'string' && q.category) {
