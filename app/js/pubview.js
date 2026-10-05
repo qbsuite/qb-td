@@ -811,8 +811,7 @@ function renderQuestions(box, q) {
   // Unknown is marked, and its tags are quoted: they're the packet's
   // own words, not a category this site recognized
   const unc = (l) => l.cat === UNKNOWN_CAT;
-  // RMPSS's own categories read a step stronger than a plain subcategory
-  const rowCls = (l) => ['cattop', l.cat === 'RMPSS' ? 'catsub catmid' : 'catsub', 'catsub2'][l.level]
+  const rowCls = (l) => ['cattop', 'catsub', 'catsub2'][l.level]
     + (unc(l) ? ' uncat' : '');
   const name = (l) => (l.isSub && unc(l) ? `\u201C${esc(l.sub)}\u201D`
     : esc([l.cat, l.sub, l.sub2][l.level]));
