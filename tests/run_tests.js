@@ -1548,7 +1548,9 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
 test('catOfEntry: RMPSS is a parent, an unread tag is Unknown, and it sorts last', () => {
   assert.deepEqual(catOfEntry({ c: 'Beliefs', s: '' }), { cat: 'RMPSS', sub: 'Beliefs', sub2: '' });
   assert.deepEqual(catOfEntry({ c: 'Social Science', s: 'Economics' }), { cat: 'RMPSS', sub: 'Social Science', sub2: 'Economics' });
-  assert.deepEqual(catOfEntry({ c: 'Beliefs', s: 'Narratives' }), { cat: 'RMPSS', sub: 'Beliefs', sub2: 'Narratives' });
+  // Beliefs' halves sit beside Philosophy, not under Beliefs
+  assert.deepEqual(catOfEntry({ c: 'Beliefs', s: 'Narratives' }), { cat: 'RMPSS', sub: 'Narratives', sub2: '' });
+  assert.deepEqual(catOfEntry({ c: 'Beliefs', s: 'Practices' }), { cat: 'RMPSS', sub: 'Practices', sub2: '' });
   assert.deepEqual(catOfEntry({ c: 'Literature', s: 'American' }), { cat: 'Literature', sub: 'American', sub2: '' });
   assert.deepEqual(catOfEntry({ u: 'Visual Culture' }), { cat: 'Unknown', sub: 'Visual Culture', sub2: '' });
   assert.equal(catOfEntry(null), null);

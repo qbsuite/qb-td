@@ -30,6 +30,7 @@ export const UNKNOWN_CAT = 'Unknown';
 // and a split a packet names below them (Beliefs' Narratives, Social
 // Science's Economics) is a third level, `sub2`
 const RMPSS = ['Religion', 'Mythology', 'Beliefs', 'Philosophy', 'Social Science'];
+const BELIEF_HALVES = ['Narratives', 'Practices'];
 export function catCompare(a, b) {
   if (a === UNKNOWN_CAT || b === UNKNOWN_CAT) return (a === UNKNOWN_CAT) - (b === UNKNOWN_CAT);
   const ia = CAT_ORDER.indexOf(a);
@@ -59,6 +60,10 @@ export function catOfEntry(info) {
   if (typeof info.u === 'string' && info.u) return { cat: UNKNOWN_CAT, sub: info.u, sub2: '' };
   if (typeof info.c !== 'string' || !info.c) return null;
   const s = typeof info.s === 'string' ? info.s : '';
+  // Beliefs' halves are RMPSS categories in their own right (Narratives
+  // is mythology's share, Practices religion's), so they sit beside
+  // Philosophy rather than under Beliefs; a bare Beliefs stays Beliefs
+  if (info.c === 'Beliefs' && BELIEF_HALVES.includes(s)) return { cat: 'RMPSS', sub: s, sub2: '' };
   if (RMPSS.includes(info.c)) return { cat: 'RMPSS', sub: info.c, sub2: s === info.c ? '' : s };
   return { cat: info.c, sub: s, sub2: '' };
 }
