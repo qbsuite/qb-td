@@ -21,7 +21,7 @@ import { slotText } from '../engine/schedule.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes } from '../engine/buzz.js';
 import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
-  categoryQuestionStats, questionLines, categoryQuestions } from '../engine/cats.js';
+  categoryQuestionStats, questionLines, categoryQuestions, UNCATEGORIZED } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
 import { effectiveFormat } from './read_core.js';
 
@@ -529,12 +529,12 @@ function viewsHtml(items, cur, attr) {
     : `<a href="#" class="view${i.v === cur ? ' on' : ''}" data-${attr}="${esc(i.v)}"${
       i.v === cur ? ' aria-current="true"' : ''}>${esc(i.label)}</a>`).join('')}</div>`;
 }
-// Filter chips. items [{v, label, n?, off?}]; `sub` hangs the row off a
-// rule, for the level under another.
+// Filter chips. items [{v, label, n?, off?, cls?}]; `sub` hangs the row
+// off a rule, for the level under another.
 function chipsHtml(items, cur, attr, sub = false) {
   return `<div class="chips${sub ? ' sub' : ''}">${items.map((i) => i.off
     ? `<span class="chip off">${esc(i.label)}</span>`
-    : `<a href="#" class="chip${i.v === cur ? ' on' : ''}" data-${attr}="${esc(i.v)}"${
+    : `<a href="#" class="chip${i.v === cur ? ' on' : ''}${i.cls ? ' ' + i.cls : ''}" data-${attr}="${esc(i.v)}"${
       i.v === cur ? ' aria-current="true"' : ''}>${esc(i.label)}${i.n ? `<span class="n">${i.n}</span>` : ''}</a>`).join('')}</div>`;
 }
 function wire(box, attr, pick) {
@@ -557,7 +557,7 @@ function catChipsHtml(items, cat, sub, catAttr, subAttr, all = true) {
     .map((i) => i.sub))].sort() : [];
   return `<div class="chipstack">
     ${chipsHtml([...(all ? [{ v: '', label: 'All' }] : []),
-      ...cats.map((c) => ({ v: c, label: c, n: count.get(c) }))], cat, catAttr)}
+      ...cats.map((c) => ({ v: c, label: c, n: count.get(c), cls: c === UNCATEGORIZED ? 'unc' : '' }))], cat, catAttr)}
     ${subs.length ? chipsHtml([{ v: '', label: 'All' },
       ...subs.map((s) => ({ v: s, label: s, n: count.get(cat + '\n' + s) }))], sub, subAttr, true) : ''}
   </div>`;
@@ -793,8 +793,11 @@ function renderByPlayer(box, rows) {
 // sites show them, bonuses with PPB and their easy / medium / hard parts.
 function renderQuestions(box, q) {
   const pct = (n, d) => (d ? Math.round((n / d) * 100) + '%' : '–');
-  const rowCls = (l) => (l.isSub ? 'catsub' : 'cattop');
-  const name = (l) => esc(l.isSub ? l.sub : l.cat);
+  // Uncategorized is marked, and its tags are quoted: they're the packet's
+  // own words, not a category this site recognized
+  const unc = (l) => l.cat === UNCATEGORIZED;
+  const rowCls = (l) => (l.isSub ? 'catsub' : 'cattop') + (unc(l) ? ' uncat' : '');
+  const name = (l) => (l.isSub && unc(l) ? `\u201C${esc(l.sub)}\u201D` : esc(l.isSub ? l.sub : l.cat));
   const tl = questionLines(q.tossups, catSel, catSubSel);
   const bl = questionLines(q.bonuses, catSel, catSubSel);
   // the difficulty notice counts the bonuses on screen, once each

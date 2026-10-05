@@ -1836,6 +1836,11 @@ const META_CATS = new Map([
   ['philosophy', 'Philosophy'], ['social science', 'Social Science'],
   ['current events', 'Current Events'], ['geography', 'Geography'],
   ['other academic', 'Other Academic'], ['trash', 'Trash'], ['pop culture', 'Trash'],
+  // newer distributions (2026 Terrapin) tag Religion and Mythology's share
+  // "Beliefs (Narratives and Practices)"; Beliefs is one category, its
+  // half kept as the subcategory when the tag names it ("Beliefs -
+  // Narratives")
+  ['beliefs', 'Beliefs'], ['beliefs (narratives and practices)', 'Beliefs'],
 ]);
 
 // Bare distribution labels ("American History", "Physics", "Painting /
@@ -1975,6 +1980,41 @@ function categoryFromVocab(meta) {
   return null;
 }
 
+// A tag without its writer: ACF-style metadata leads with who wrote the
+// question ("Jordan Patel, Visual Culture"), sometimes as initials ("JP,
+// ..."). The first comma-segment is dropped when it reads as a person's
+// name and something follows it. A name is initials, or two to four
+// capitalized words (particles like "van" or "de" allowed), none of them
+// a word the category vocabulary knows — so "CE, Politics" and "Visual
+// Arts, Film" stay whole. One capitalized word ("Politics") is too often
+// a topic to count.
+const NAME_PARTICLES = new Set(['de', 'da', 'di', 'del', 'della', 'der', 'van', 'von', 'la', 'le', 'du', 'bin', 'ibn', 'al', 'y']);
+let vocabWords = null;
+function looksLikeName(seg) {
+  if (!vocabWords) {
+    vocabWords = new Set([...META_CATS.keys()].flatMap(metaTokens)
+      .concat(VOCAB.flatMap((v) => v.tokens)));
+  }
+  const words = seg.trim().split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 4) return false;
+  let named = 0, initialsOnly = true;
+  for (const w of words) {
+    if (NAME_PARTICLES.has(w.toLowerCase())) continue;
+    if (vocabWords.has(w.toLowerCase().replace(/[.'’]/g, ''))) return false;
+    const initials = /^(\p{Lu}\.?){1,3}$/u.test(w);
+    const word = /^\p{Lu}[\p{Ll}\p{Lu}'’-]*\p{Ll}[\p{L}'’-]*\.?$/u.test(w);
+    if (!initials && !word) return false;
+    if (!initials) initialsOnly = false;
+    named++;
+  }
+  return named >= 2 || (named === 1 && initialsOnly);
+}
+export function tagWithoutWriter(meta) {
+  if (typeof meta !== 'string') return '';
+  const parts = meta.split(',').map((p) => p.trim()).filter(Boolean);
+  return (parts.length > 1 && looksLikeName(parts[0]) ? parts.slice(1) : parts).join(', ');
+}
+
 export function categoryFromMetadata(meta) {
   if (typeof meta !== 'string' || !meta) return null;
   let best = null;
@@ -1998,12 +2038,17 @@ export function packetCategories(body, filename) {
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return null; }
   if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) return null;
+  // a question whose tag nothing recognizes keeps the tag itself (`u`),
+  // minus the writer's name, so the Categories tab can list it under
+  // Uncategorized instead of leaving it out
   const catOf = (q) => {
     if (!q) return null;
     if (typeof q.category === 'string' && q.category) {
       return { c: q.category, s: typeof q.subcategory === 'string' ? q.subcategory : '' };
     }
-    return categoryFromMetadata(q.metadata);
+    const meta = typeof q.metadata === 'string' ? q.metadata.replace(/<[^>]*>/g, '').trim() : '';
+    if (!meta) return null;
+    return categoryFromMetadata(meta) || { u: tagWithoutWriter(meta).slice(0, 120) };
   };
   const marksOf = (q) => {
     const m = q && Array.isArray(q.difficultyModifiers) ? q.difficultyModifiers : null;
@@ -2026,7 +2071,8 @@ export function packetCategories(body, filename) {
 // backfills them, so already-uploaded tournaments pick up the
 // improvement without a re-upload.
 // '3': bonuses carry their e/m/h difficulty marks.
-const CATMAP_VERSION = '3';
+// '4': Beliefs is a category; unrecognized tags are kept (`u`).
+const CATMAP_VERSION = '4';
 
 // Backfill for packets uploaded before category extraction existed (or
 // before the current parser understood their format): recompute the

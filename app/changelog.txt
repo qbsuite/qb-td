@@ -1,3 +1,14 @@
+Release Notes for 10/5/2026
+
+[ ROOM PAGE ]
+- Drag players into seating order on the start card, and drag a team's column to swap sides.
+- Removed the note under Start game.
+
+[ CATEGORIES ]
+- Beliefs is a category.
+- Religion, Mythology, Beliefs, Philosophy and Social Science are grouped under RMPSS.
+- Questions whose category tag can't be read are listed under Uncategorized, with the tag as written.
+
 Release Notes for 10/4/2026
 
 [ SECURITY ]

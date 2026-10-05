@@ -45,6 +45,22 @@ export function pickTeams(teams, nameA, nameB) {
   return [...a.players, ...b.players];
 }
 
+/** Players in the moderator's seating order: `order` maps a team name to
+    its players' names as arranged on the start card. A team without an
+    order, and any player missing from it, keeps the roster's order (after
+    the ordered ones). */
+export function orderPlayers(players, order) {
+  if (!order) return players;
+  const rank = (pl) => {
+    const i = (order[pl.teamName] || []).indexOf(pl.name);
+    return i === -1 ? Infinity : i;
+  };
+  const teams = [...new Set(players.map((pl) => pl.teamName))];
+  return teams.flatMap((t) => players.filter((pl) => pl.teamName === t)
+    .map((pl, i) => ({ pl, i })).sort((x, y) => (rank(x.pl) - rank(y.pl)) || (x.i - y.i))
+    .map((x) => x.pl));
+}
+
 /** MODAQ-convention filenames. The reader uploads only `combined`
     (one `.qbtd.json` = {qbj, game} per game); `qbj`/`game` are the names
     consumers derive when splitting it back apart. */

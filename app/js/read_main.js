@@ -22,7 +22,7 @@ import ReactDOM from 'react-dom';
 import { ModaqControl, GameFormats, parseQbjRegistration } from 'modaq';
 import { pub, esc } from './api.js';
 import {
-  normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload,
+  normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
   staleGameKeys, roundRows, normalizeTbPool, tbUsedIds, tbPanelRows,
   tbRecordAdd, tbAddedIds, tbRemapMatch, tbNumbering,
@@ -51,6 +51,7 @@ let schedBrackets = null; // [{key, name, phase, color}] when brackets keep thei
 let schedGame = null;  // {a, b}: what the schedule has this room playing in the selected round
 let locked = false;    // the scheduled matchup is showing, pickers hidden
 const starterSel = new Map(); // team name -> Set of the player names starting
+const orderSel = new Map();   // team name -> its player names in seating order
 let tbPool = null;  // TO's tiebreaker pool (offered in Add Questions)
 
 // Non-blocking pool fetch: fills the Add Questions dialog whenever it
@@ -234,9 +235,9 @@ function mountMODAQ(id, meta, isNew) {
     // these props would clobber it.
     props.packet = packet;
     props.packetName = meta.packet;
-    // the moderator's starters; games from before they were chosen keep
-    // the roster's default (MODAQ starts the first four of each team)
-    const players = pickTeams(teams, meta.a, meta.b);
+    // the moderator's starters and seating order; games from before they
+    // were chosen keep the roster's (MODAQ starts the first four of each)
+    const players = orderPlayers(pickTeams(teams, meta.a, meta.b), meta.order);
     props.players = meta.starters
       ? players.map((pl) => ({ name: pl.name, teamName: pl.teamName,
         isStarter: (meta.starters[pl.teamName] || []).includes(pl.name) }))
@@ -352,6 +353,10 @@ function renderTeamPick() {
 // Starters for the two picked teams: every player, the roster's first
 // four ticked (MODAQ's own default), and the moderator ticks as many or as
 // few as are actually playing — at least one a team, checked at Start.
+// Players are dragged by their grip (or moved with Alt+↑/↓) into seating
+// order, which is the order MODAQ lists them in. A team's column is
+// dragged onto the other's (or its grip pressed) to swap sides: the left
+// column is the left team in MODAQ.
 function renderStarters() {
   const names = [$('teama').value, $('teamb').value].filter((n, i, all) => n && all.indexOf(n) === i);
   const picked = names.map((n) => teams.find((t) => t.name === n)).filter(Boolean);
@@ -359,17 +364,100 @@ function renderStarters() {
     if (!starterSel.has(t.name)) {
       starterSel.set(t.name, new Set(t.players.filter((pl) => pl.isStarter).map((pl) => pl.name)));
     }
+    if (!orderSel.has(t.name)) orderSel.set(t.name, t.players.map((pl) => pl.name));
   }
   $('starters').innerHTML = picked.length ? `
     <div class="lineups">${picked.map((t) => {
       const on = starterSel.get(t.name);
-      return `<div class="lineup">
-        <h4><span>${esc(t.name)}</span><span class="count${on.size ? '' : ' none'}">${on.size} starting</span></h4>
-        <div class="plist">${t.players.map((pl) => `<button type="button" class="p${on.has(pl.name) ? ' on' : ''}"
-          data-team="${esc(t.name)}" data-player="${esc(pl.name)}" aria-pressed="${on.has(pl.name)}"><span class="box">${
-          on.has(pl.name) ? '\u2713' : ''}</span>${esc(pl.name)}${on.has(pl.name) ? '' : '<span class="bench">bench</span>'}</button>`).join('')}</div>
+      return `<div class="lineup" draggable="true" data-side="${esc(t.name)}">
+        <h4><span class="lname"><button type="button" class="grip tgrip" data-swap="1" title="Drag to the other side, or press to swap sides"
+          aria-label="Swap sides">\u22EE\u22EE</button>${esc(t.name)}</span><span class="count${on.size ? '' : ' none'}">${on.size} starting</span></h4>
+        <div class="plist" data-team="${esc(t.name)}">${orderSel.get(t.name).map((name) => `<div class="prow" draggable="true"
+          data-name="${esc(name)}"><span class="grip" title="Drag to reorder" aria-hidden="true">\u22EE\u22EE</span><button type="button"
+          class="p${on.has(name) ? ' on' : ''}" data-team="${esc(t.name)}" data-player="${esc(name)}" aria-pressed="${on.has(name)}"><span class="box">${
+          on.has(name) ? '\u2713' : ''}</span>${esc(name)}${on.has(name) ? '' : '<span class="bench">bench</span>'}</button></div>`).join('')}</div>
       </div>`;
     }).join('')}</div>` : '';
+}
+
+// Dragging moves the row itself while the pointer is over its team's
+// list; the new order is read back from the rows on drop. Alt+↑/↓ on a
+// player does the same from the keyboard.
+function wireReorder(box) {
+  let dragged = null;
+  let side = null; // a team's column being dragged
+  const finish = () => {
+    if (side) {
+      const target = box.querySelector('.lineup.target');
+      side = null;
+      if (target) swapSides(); else renderStarters();
+      return;
+    }
+    if (!dragged) return;
+    const list = dragged.parentNode;
+    orderSel.set(list.dataset.team, [...list.children].map((r) => r.dataset.name));
+    dragged = null;
+    renderStarters();
+  };
+  box.ondragstart = (e) => {
+    dragged = e.target.closest && e.target.closest('.prow');
+    if (!dragged) {
+      side = e.target.closest && e.target.closest('.lineup');
+      if (!side) return;
+      side.classList.add('lift');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', side.dataset.side); } catch (err) { /* older browsers */ }
+      return;
+    }
+    dragged.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', dragged.dataset.name); } catch (err) { /* older browsers */ }
+  };
+  box.ondragover = (e) => {
+    if (side && e.target.closest) {
+      const over = e.target.closest('.lineup');
+      box.querySelectorAll('.lineup.target').forEach((x) => { if (x !== over) x.classList.remove('target'); });
+      if (!over || over === side) return;
+      e.preventDefault();
+      over.classList.add('target');
+      return;
+    }
+    if (!dragged || !e.target.closest) return;
+    const list = e.target.closest('.plist');
+    if (list !== dragged.parentNode) return;
+    e.preventDefault();
+    const over = e.target.closest('.prow');
+    if (!over || over === dragged) return;
+    const r = over.getBoundingClientRect();
+    list.insertBefore(dragged, e.clientY > r.top + r.height / 2 ? over.nextSibling : over);
+  };
+  box.ondrop = (e) => { e.preventDefault(); finish(); };
+  box.ondragend = finish;
+  box.onkeydown = (e) => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    const btn = e.target.closest && e.target.closest('[data-player]');
+    if (!btn) return;
+    e.preventDefault();
+    const names = orderSel.get(btn.dataset.team);
+    const i = names.indexOf(btn.dataset.player);
+    const j = i + (e.key === 'ArrowUp' ? -1 : 1);
+    if (j < 0 || j >= names.length) return;
+    [names[i], names[j]] = [names[j], names[i]];
+    renderStarters();
+    const again = [...box.querySelectorAll('[data-player]')].find((x) =>
+      x.dataset.team === btn.dataset.team && x.dataset.player === btn.dataset.player);
+    if (again) again.focus();
+  };
+}
+
+// The other team on the left. The scheduled matchup turns with it, so
+// Start doesn't read the swap as a change of teams.
+function swapSides() {
+  const a = $('teama').value;
+  $('teama').value = $('teamb').value;
+  $('teamb').value = a;
+  if (schedGame) schedGame = { a: schedGame.b, b: schedGame.a };
+  renderTeamPick();
 }
 
 /* ---------- round + team picker (bare-link path) ---------- */
@@ -409,6 +497,7 @@ function showTeams() {
   $('changeteams').onclick = () => { locked = false; renderTeamPick(); };
   $('useschedteams').onclick = () => { applySchedDefault(); };
   $('starters').onclick = (e) => {
+    if (e.target.closest('[data-swap]')) { swapSides(); return; }
     const btn = e.target.closest('[data-player]');
     if (!btn) return;
     const on = starterSel.get(btn.dataset.team);
@@ -416,6 +505,7 @@ function showTeams() {
     else on.add(btn.dataset.player);
     renderStarters();
   };
+  wireReorder($('starters'));
   renderTeamPick();
   $('start').onclick = async () => {
     const a = $('teama').value, b = $('teamb').value;
@@ -449,6 +539,7 @@ function showTeams() {
       // starts at the packet's own size and grows as the mod adds them
       tb: { t: packet.tossups.length, b: (packet.bonuses || []).length, tu: [], bo: [] },
       starters: { [a]: [...starterSel.get(a)], [b]: [...starterSel.get(b)] },
+      order: { [a]: orderSel.get(a), [b]: orderSel.get(b) },
     };
     // the room has started this round (auto-advance); nothing waits on it
     pub('/b/' + secret + '/start?round=' + round, { method: 'POST' }).catch(() => {});

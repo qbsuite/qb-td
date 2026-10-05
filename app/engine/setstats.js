@@ -17,7 +17,7 @@
 import { parseMatch } from './qbj.js';
 import { aggregate } from './stats.js';
 import { dedupeEntries, matchBuzzes, matchBonuses, buzzSummary } from './buzz.js';
-import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, roundCats, catInfo,
+import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, roundCats, catInfo, catOfEntry,
   catCompare } from './cats.js';
 
 /** One mirror's state entry + its round shards' entries -> a site. */
@@ -334,8 +334,8 @@ function questionCat(catmap, homes, current, kind) {
   const pick = homes.find((h) => (current || {})[h.p] === h.v) || homes[0];
   if (!pick) return { cat: '', sub: '' };
   const cats = catmap && catmap.packets && catmap.packets[pick.p] && catmap.packets[pick.p][pick.v];
-  const info = cats && Array.isArray(cats[kind]) ? cats[kind][pick.pos - 1] : null;
-  return { cat: info && typeof info.c === 'string' ? info.c : '', sub: info && typeof info.s === 'string' ? info.s : '', home: pick };
+  const info = catOfEntry(cats && Array.isArray(cats[kind]) ? cats[kind][pick.pos - 1] : null);
+  return { cat: info ? info.cat : '', sub: info ? info.sub : '', home: pick };
 }
 
 /**

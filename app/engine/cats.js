@@ -21,11 +21,16 @@
 
 import { matchBuzzes, matchBonuses } from './buzz.js';
 
-// display order for primary categories (unknowns sort after, A-Z)
+// display order for primary categories (unknowns sort after, A-Z, then
+// Uncategorized last)
 export const CAT_ORDER = ['Literature', 'History', 'Science', 'Fine Arts',
-  'Religion', 'Mythology', 'Philosophy', 'Social Science', 'Current Events',
-  'Geography', 'Other Academic', 'Trash'];
+  'RMPSS', 'Current Events', 'Geography', 'Other Academic', 'Trash'];
+export const UNCATEGORIZED = 'Uncategorized';
+// RMPSS is a parent like Literature: its categories are its subcategories
+// (and a set's split below them, Social Science's Economics say, folds in)
+const RMPSS = ['Religion', 'Mythology', 'Beliefs', 'Philosophy', 'Social Science'];
 export function catCompare(a, b) {
+  if (a === UNCATEGORIZED || b === UNCATEGORIZED) return (a === UNCATEGORIZED) - (b === UNCATEGORIZED);
   const ia = CAT_ORDER.indexOf(a);
   const ib = CAT_ORDER.indexOf(b);
   if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
@@ -44,10 +49,19 @@ export function roundCats(catmap, round) {
   return null;
 }
 
-export function catInfo(list, number) {
-  const info = list[number - 1];
-  if (!info || typeof info.c !== 'string' || !info.c) return null;
+// One map entry as {cat, sub}, or null: an RMPSS category reads as RMPSS
+// with itself as the subcategory, and a tag nothing recognized (`u`) as
+// Uncategorized with the tag as the subcategory.
+export function catOfEntry(info) {
+  if (!info) return null;
+  if (typeof info.u === 'string' && info.u) return { cat: UNCATEGORIZED, sub: info.u };
+  if (typeof info.c !== 'string' || !info.c) return null;
+  if (RMPSS.includes(info.c)) return { cat: 'RMPSS', sub: info.c };
   return { cat: info.c, sub: typeof info.s === 'string' ? info.s : '' };
+}
+
+export function catInfo(list, number) {
+  return catOfEntry(list[number - 1]);
 }
 
 // A bonus's difficulty marks from the map ('emh', one letter per part in

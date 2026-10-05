@@ -18,7 +18,7 @@ import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
-  categoryQuestionStats, questionLines, categoryQuestions } from '../app/engine/cats.js';
+  categoryQuestionStats, questionLines, categoryQuestions, catOfEntry } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
 import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
 import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
@@ -29,7 +29,7 @@ import { checkPacket } from '../app/engine/packetcheck.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -636,6 +636,16 @@ test('groupTeams keeps roster order', () => {
   assert.deepEqual(teams.map((t) => t.name), ['Alpha', 'Beta', 'Gamma']);
   assert.equal(teams[0].players.length, 2);
   assert.throws(() => groupTeams([]), /no teams/);
+});
+
+test('orderPlayers puts each team in seating order; the rest keep the roster\'s', () => {
+  const pl = (teamName, name) => ({ teamName, name });
+  const players = [pl('A', 'a1'), pl('A', 'a2'), pl('A', 'a3'), pl('B', 'b1'), pl('B', 'b2')];
+  const names = (ps) => ps.map((p) => p.name).join(' ');
+  assert.equal(names(orderPlayers(players, null)), 'a1 a2 a3 b1 b2');
+  assert.equal(names(orderPlayers(players, { A: ['a3', 'a1', 'a2'], B: ['b2', 'b1'] })), 'a3 a1 a2 b2 b1');
+  // a player the order doesn't name (added to the roster since) goes last
+  assert.equal(names(orderPlayers(players, { A: ['a2', 'a1'] })), 'a2 a1 a3 b1 b2');
 });
 
 test('pickTeams returns both teams\' players, A first', () => {
@@ -1396,7 +1406,8 @@ test('catPlayerLines filters + aggregates; catBreakdown nests subs', () => {
   assert.deepEqual(bd.map((c) => c.cat), ['Literature']); // canonical order, buzzed cats only
   assert.deepEqual(bd[0].line, { powers: 1, gets: 1, negs: 0, bb: 0, pts: 25 });
   assert.deepEqual(bd[0].subs.map((s) => s.sub), ['American Literature', 'British Literature']);
-  assert.deepEqual(catBreakdown(rows, 'Beta', 'Bob')[0].subs, []); // Mythology has no subcategory
+  // Mythology sits under RMPSS, as its subcategory
+  assert.deepEqual(catBreakdown(rows, 'Beta', 'Bob').map((c) => [c.cat, c.subs.map((x) => x.sub)]), [['RMPSS', ['Mythology']]]);
   assert.ok(catCompare('Literature', 'History') < 0);
   assert.ok(catCompare('Trash', 'Zzz-unknown') < 0);
 });
@@ -1513,8 +1524,8 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
     h: b('Science').h, ranked: b('Science').ranked }, { heard: 1, e: 1, m: 0, h: 0, ranked: 1 });
   // malformed marks fall back to ranking: part 2 converted twice (easy),
   // part 1 and 3 once each, ties in packet order (part 1 medium)
-  assert.deepEqual({ e: b('Mythology').e, m: b('Mythology').m, h: b('Mythology').h,
-    dHeard: b('Mythology').dHeard, ranked: b('Mythology').ranked, marked: b('Mythology').marked },
+  assert.deepEqual({ e: b('RMPSS').e, m: b('RMPSS').m, h: b('RMPSS').h,
+    dHeard: b('RMPSS').dHeard, ranked: b('RMPSS').ranked, marked: b('RMPSS').marked },
     { e: 2, m: 1, h: 1, dHeard: 2, ranked: 1, marked: 0 });
 
   // display lines: a category, then its subcategories; filters narrow
@@ -1523,7 +1534,8 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
     ['Literature', '', false, 2, 4],
     ['Literature', 'American Literature', true, 1, 2],
     ['Literature', 'British Literature', true, 1, 2],
-    ['Mythology', '', false, 1, 2],
+    ['RMPSS', '', false, 1, 2],
+    ['RMPSS', 'Mythology', true, 1, 2],
   ]);
   assert.deepEqual(questionLines(q.tossups, 'Literature', 'British Literature').map((l) => [l.sub, l.heard]),
     [['British Literature', 2]]);
@@ -1531,6 +1543,16 @@ test('categoryQuestionStats: tossup readings, and bonus difficulty from marks or
   // a subcategory named like its category folds into it
   assert.deepEqual(questionLines([{ cat: 'Geography', sub: 'Geography', heard: 3 }], '', '')
     .map((l) => [l.sub, l.isSub, l.heard]), [['', false, 3]]);
+});
+
+test('catOfEntry: RMPSS is a parent, an unread tag is Uncategorized, and it sorts last', () => {
+  assert.deepEqual(catOfEntry({ c: 'Beliefs', s: '' }), { cat: 'RMPSS', sub: 'Beliefs' });
+  assert.deepEqual(catOfEntry({ c: 'Social Science', s: 'Economics' }), { cat: 'RMPSS', sub: 'Social Science' });
+  assert.deepEqual(catOfEntry({ c: 'Literature', s: 'American' }), { cat: 'Literature', sub: 'American' });
+  assert.deepEqual(catOfEntry({ u: 'Visual Culture' }), { cat: 'Uncategorized', sub: 'Visual Culture' });
+  assert.equal(catOfEntry(null), null);
+  assert.deepEqual(['Uncategorized', 'Trash', 'Zoology', 'RMPSS', 'Literature'].sort(catCompare),
+    ['Literature', 'RMPSS', 'Trash', 'Zoology', 'Uncategorized']);
 });
 
 test('categoryQuestions: one category across rounds, oldest first, with its category', () => {
@@ -1557,7 +1579,28 @@ globalThis.localStorage = globalThis.localStorage || {};
 
 /* ---------- Worker category extraction ---------- */
 
-const { categoryFromMetadata, packetCategories } = await import('../worker/worker.js');
+const { categoryFromMetadata, packetCategories, tagWithoutWriter } = await import('../worker/worker.js');
+
+test('categoryFromMetadata: Beliefs is a category, its named half the subcategory', () => {
+  assert.deepEqual(categoryFromMetadata('Jordan Patel, Beliefs - Narratives'), { c: 'Beliefs', s: 'Narratives' });
+  assert.deepEqual(categoryFromMetadata('Jordan Patel, Beliefs - Practices'), { c: 'Beliefs', s: 'Practices' });
+  assert.deepEqual(categoryFromMetadata('JP, Beliefs (Narratives and Practices)'), { c: 'Beliefs', s: '' });
+  assert.deepEqual(categoryFromMetadata('Beliefs'), { c: 'Beliefs', s: '' });
+});
+
+test('tagWithoutWriter drops a leading name or initials, and nothing else', () => {
+  assert.equal(tagWithoutWriter('Jordan Patel, Visual Culture'), 'Visual Culture');
+  assert.equal(tagWithoutWriter('J. Patel, Interdisciplinary - Space'), 'Interdisciplinary - Space');
+  assert.equal(tagWithoutWriter('JP, Misc. (Food)'), 'Misc. (Food)');
+  assert.equal(tagWithoutWriter('María José García-López, Beliefs'), 'Beliefs');
+  // topics, category words and a lone word stay
+  assert.equal(tagWithoutWriter('CE, Politics'), 'CE, Politics');
+  assert.equal(tagWithoutWriter('Visual Arts, Film'), 'Visual Arts, Film');
+  assert.equal(tagWithoutWriter('Visual Culture, Space'), 'Visual Culture, Space');
+  assert.equal(tagWithoutWriter('Patel, Beliefs'), 'Patel, Beliefs');
+  // a name with nothing after it is the whole tag
+  assert.equal(tagWithoutWriter('Jordan Patel'), 'Jordan Patel');
+});
 
 test('categoryFromMetadata: ACF/YAPP forms', () => {
   assert.deepEqual(categoryFromMetadata('History - World, Khang Le'), { c: 'History', s: 'World' });
@@ -1641,6 +1684,7 @@ test('packetCategories: metadata-only packets map tossups and bonuses', () => {
       { question: 'q', answer: 'a', metadata: 'American History' },
       { question: 'q', answer: 'a', metadata: 'Religion' },
       { question: 'q', answer: 'a' },
+      { question: 'q', answer: 'a', metadata: '<b>Jordan Patel, Visual Culture</b>' },
     ],
     bonuses: [
       { leadin: 'l', metadata: 'Physics' },
@@ -1648,7 +1692,8 @@ test('packetCategories: metadata-only packets map tossups and bonuses', () => {
     ],
   }));
   assert.deepEqual(packetCategories(body, 'Packet 1.json'), {
-    t: [{ c: 'History', s: 'American' }, { c: 'Religion', s: '' }, null],
+    // no tag: nothing; a tag nothing recognizes: kept, without its writer
+    t: [{ c: 'History', s: 'American' }, { c: 'Religion', s: '' }, null, { u: 'Visual Culture' }],
     b: [{ c: 'Science', s: 'Physics' }, { c: 'Literature', s: 'World Literature' }],
   });
   assert.equal(packetCategories(body, 'Packet 1.docx'), null);
