@@ -1,3 +1,8 @@
+Release Notes for 10/10/2026
+
+[ MISC ]
+- The site's operator can get a Discord alert when a tournament is created or started.
+
 Release Notes for 10/5/2026
 
 [ STATS ]
