@@ -1465,6 +1465,88 @@ function liveMark(env, t) {
   return { state: 'pending' };
 }
 
+/* ---------- new-activity alerts (optional) ----------
+   A Discord webhook ping when someone puts this instance to use, so a
+   real tournament running on it isn't something you find out about days
+   later by reading the analytics.
+
+   Two alerts, because "created" and "started" are different news: most
+   rows are somebody typing `asdf` to see what the thing does, while a TD
+   pressing Start tournament means an event is about to happen. Neither
+   needs bookkeeping: a row is created once, and startTournament's own
+   once-only UPDATE decides who announces a start.
+
+   Alerts never carry a credential. An admin link is the whole of a
+   tournament's security and this posts to a third party, so what goes out
+   is the slug and the name — the slug is already public on a published
+   tournament, and the webhook is private.
+
+   Config: the DISCORD_WEBHOOK secret. Unset and this section is dead
+   code. Nothing is stored either way, so switching it on announces the
+   next thing that happens rather than replaying the backlog. */
+
+const ALERT_COLOR = { created: 0x5865f2, started: 0x57f287 };
+const ALERT_TIMEOUT_MS = 5000;
+
+function alertsEnabled(env) {
+  return !!(env.DISCORD_WEBHOOK || '').trim();
+}
+
+// Fire-and-forget. A webhook that is down, slow, rate-limited or simply
+// wrong must never turn a tournament creation or a room's upload into an
+// error, so every failure here is swallowed and logged. Callers hand this
+// to ctx.waitUntil rather than awaiting it.
+async function postAlert(env, { kind, title, lines }) {
+  try {
+    const res = await fetch(env.DISCORD_WEBHOOK.trim(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          color: ALERT_COLOR[kind] || ALERT_COLOR.created,
+          description: lines.filter(Boolean).join('\n'),
+          timestamp: new Date().toISOString(),
+        }],
+      }),
+      signal: AbortSignal.timeout(ALERT_TIMEOUT_MS),
+    });
+    if (!res.ok) console.log('alert rejected (' + res.status + ')');
+  } catch (e) {
+    console.log('alert failed:', e.message);
+  }
+}
+
+// The public page for a slug, when this instance has a site to point at.
+function publicLink(env, slug) {
+  const origin = (env.ALLOWED_ORIGIN || '').split(',')[0].trim();
+  return origin ? origin + '/t.html?t=' + slug : null;
+}
+
+// `what` distinguishes the three ways a row is born: an open
+// creation, a question set, and a set's mirror (someone accepting an
+// invite is using the instance just as much as someone starting fresh).
+function alertCreated(env, ctx, { what, name, slug }) {
+  if (!alertsEnabled(env)) return;
+  ctx.waitUntil(postAlert(env, {
+    kind: 'created',
+    title: 'New ' + what + ': ' + name,
+    lines: ['`' + slug + '`', what === 'set' ? null : publicLink(env, slug)],
+  }));
+}
+
+// The TD pressed Start tournament: the setup week is over and the run
+// clock is going. The caller only gets here after winning the once-only
+// UPDATE, so this cannot announce twice.
+function alertStarted(env, ctx, { name, slug }) {
+  if (!alertsEnabled(env)) return;
+  ctx.waitUntil(postAlert(env, {
+    kind: 'started',
+    title: 'Started: ' + name,
+    lines: ['`' + slug + '`', publicLink(env, slug)],
+  }));
+}
+
 /* ---------- TO admin API (/a/*, admin-link-authed) ----------
    The router resolves the admin secret and expiry once; every handler
    receives the tournament row `t`. */
@@ -1535,7 +1617,7 @@ async function insertTournament(env, { slug, name, ip, settings, set }) {
   }
 }
 
-async function createTournament(request, env) {
+async function createTournament(request, env, ctx) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
   const slug = cleanSlug(body.slug);
@@ -1555,6 +1637,7 @@ async function createTournament(request, env) {
 
   const made = await insertTournament(env, { slug, name, ip, settings: body.settings });
   if (!made) return err(env, 409, 'slug already taken');
+  alertCreated(env, ctx, { what: 'tournament', name, slug });
   return json(env, {
     id: made.id, slug, name,
     admin_secret: made.adminSecret, closes: made.created + SETUP_TTL,
@@ -1769,7 +1852,7 @@ async function createBucket(request, env, t) {
 // Start the tournament: room links begin serving packets and taking
 // games, and every link closes RUN_TTL from now — replacing whatever the
 // setup clock had left. Once only; there is no un-start.
-async function startTournament(env, t) {
+async function startTournament(env, t, ctx) {
   if (t.started) return err(env, 409, 'already started');
   const started = Date.now();
   const out = await env.DB.prepare(
@@ -1777,6 +1860,7 @@ async function startTournament(env, t) {
   ).bind(t.id, started).run();
   if (!out.meta.changes) return err(env, 409, 'already started');
   await markPub(env, t.id);
+  alertStarted(env, ctx, { name: t.name, slug: t.slug });
   return json(env, { started, closes: started + RUN_TTL });
 }
 
@@ -3622,7 +3706,7 @@ function setClosed(s) {
   return Date.now() > s.created + SET_TTL;
 }
 
-async function createSet(request, env) {
+async function createSet(request, env, ctx) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
   const slug = cleanSlug(body.slug);
@@ -3646,6 +3730,7 @@ async function createSet(request, env) {
       'INSERT INTO sets (slug, name, admin_secret, admin_wrap, creator_ip, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
     ).bind(slug, name, await secretHash(adminSecret), await wrapKey(adminSecret, 'set', rawKey),
       ip, created).run();
+    alertCreated(env, ctx, { what: 'set', name, slug });
     return json(env, {
       id: out.meta.last_row_id, slug, name,
       admin_secret: adminSecret, closes: created + SET_TTL,
@@ -4251,7 +4336,7 @@ async function fillMirrorCatmap(env, setId, tid, fill) {
 
 // POST /i/:secret {name, slug} — start the mirror: an ordinary tournament
 // (the 48h clocks start now), prefilled from the set.
-async function startInvite(request, env, secret) {
+async function startInvite(request, env, secret, ctx) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
   const slug = cleanSlug(body.slug);
@@ -4310,6 +4395,7 @@ async function startInvite(request, env, secret) {
   }
   await markPub(env, made.id);
   await markSet(env, m.set_id);
+  alertCreated(env, ctx, { what: 'mirror of ' + m.set_name, name, slug });
   return json(env, {
     id: made.id, slug, name, admin_secret: made.adminSecret,
     closes: made.created + SETUP_TTL, set: m.set_name, rounds: linked.fill.length,
@@ -4754,12 +4840,12 @@ export default {
 
     // Open (rate-limited) tournament creation; the response carries the
     // admin secret, shown to the TO exactly once by the dashboard.
-    if (path === '/api/tournaments' && method === 'POST') return createTournament(request, env);
-    if (path === '/api/sets' && method === 'POST') return createSet(request, env);
+    if (path === '/api/tournaments' && method === 'POST') return createTournament(request, env, ctx);
+    if (path === '/api/sets' && method === 'POST') return createSet(request, env, ctx);
 
     // A mirror invite: read what it is, or start it (once).
     if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'GET') return getInvite(env, m[1]);
-    if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'POST') return startInvite(request, env, m[1]);
+    if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'POST') return startInvite(request, env, m[1], ctx);
 
     // Set editor routes — the set link is the credential (SET_TTL).
     if ((m = path.match(/^\/s\/([a-z0-9]{10,40})(\/.*)?$/))) {
@@ -4814,7 +4900,7 @@ export default {
       if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
       if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
-      if (sub === '/start' && method === 'POST') return startTournament(env, t);
+      if (sub === '/start' && method === 'POST') return startTournament(env, t, ctx);
       if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
       if (sub === '/tiebreakers' && method === 'POST') return bumpRev(env, t.id, await uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey));
       if (sub === '/tiebreakers' && method === 'DELETE') return bumpRev(env, t.id, await deleteTiebreakers(env, TB_KEY(t.id)));

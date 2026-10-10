@@ -526,6 +526,8 @@ dashboard shows which invites are still unused, and revokes them.
   `e2e_lib.js` is what they share), `e2e_brackets.js` (per-bracket
   rounds: pools advancing on their own, packet locks, the playoffs
   opening together, the TD's buttons; same dev Worker),
+  `e2e_alerts.js` (the Discord new-activity alerts against a webhook
+  sink the suite runs itself),
   `snapshot_publish.js` (the cron tick, mocked).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
@@ -579,9 +581,14 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 # ...and one from before the hub's public page mark (once, same reason):
 #   npx wrangler d1 execute qb-td --local --file migrate-pubbuilt.sql
 # --test-scheduled is required: the cron builds the round shards the
-# public routes serve, and the tests trigger it via /__scheduled
+# public routes serve, and the tests trigger it via /__scheduled.
+# e2e_alerts.js additionally needs the dev Worker pointed at the sink it
+# runs itself, which means a line in worker/.dev.vars *before* this
+# starts — .dev.vars is read once, at startup:
+#   DISCORD_WEBHOOK=http://127.0.0.1:8798/hook
 npx wrangler dev --local --port 8799 --test-scheduled &
-cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js && node tests/e2e_brackets.js
+cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js && node tests/e2e_brackets.js \
+  && node tests/e2e_alerts.js
 
 # the pages themselves, in headless Chrome (no npm deps): the dev Worker
 # started with --var ALLOWED_ORIGIN:http://localhost:8765, plus
@@ -847,6 +854,43 @@ its tournament was active. If the first deploy of the day keeps failing,
 viewers stay on the file from setup (served with a 200, heartbeat long
 expired), so the page can't tell. The hub's Delayed mark is the signal;
 check `tools/cf_watch.mjs` and the Worker's logs.
+
+## New-activity alerts (optional)
+
+A Discord ping when someone puts your instance to use, so a tournament
+running on it isn't something you find out about days later from the
+analytics. Two alerts, because "created" and "started" are different
+news: most rows are somebody typing `asdf` to see what the thing does,
+while a TD pressing Start tournament means an event is about to happen.
+
+- **created** — a tournament, a question set, or a set's mirror started
+  from an invite. Title, slug, and a link to the public page.
+- **started** — the TD pressed Start tournament: setup is over and the
+  48-hour clock is running. Once, since a tournament starts once.
+
+Alerts never carry a credential. An admin link is the whole of a
+tournament's security and this posts to a third party, so what goes out
+is the slug and the name — the slug is already public on a published
+tournament, and the webhook is private. A webhook that is down, slow or
+misconfigured cannot fail the request it rode on: the post is handed to
+`ctx.waitUntil` and every failure is swallowed.
+
+Setup:
+
+```bash
+# Discord > Server Settings > Integrations > New Webhook > Copy URL
+npx wrangler secret put DISCORD_WEBHOOK
+npx wrangler deploy
+```
+
+Leave `DISCORD_WEBHOOK` unset and the whole feature is dead code. Nothing
+is stored either way — no column, no migration — so switching the webhook
+on announces the next thing that happens rather than replaying the
+backlog.
+
+Cost: two HTTP POSTs per tournament that gets started, against a free
+Discord webhook, and no database reads or writes. Nothing measurable
+against any Cloudflare limit.
 
 ## Known scaling limits (none of this bites yet)
 

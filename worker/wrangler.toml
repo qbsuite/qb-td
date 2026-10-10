@@ -76,8 +76,15 @@ GITHUB_INSTALLATION_ID = "153087044"
 LIVE_SCRIPT = "qb-td-live"
 LIVE_ACCOUNT_ID = "905b6a6cd745425d70d3c4d9612ba2d8"
 
-# The only secrets are the snapshot publisher's GitHub credential and
-# LIVE_TOKEN (above);
+# New-activity alerts (worker.js "new-activity alerts"): a Discord webhook
+# pinged when someone creates a tournament or set here, and again when a
+# TD presses Start tournament. Optional — with the DISCORD_WEBHOOK secret
+# unset the whole feature is dead code. To enable: Discord > Server
+# Settings > Integrations > New Webhook, copy the URL, then
+# `npx wrangler secret put DISCORD_WEBHOOK`.
+
+# The only secrets are the snapshot publisher's GitHub credential,
+# LIVE_TOKEN (above) and DISCORD_WEBHOOK;
 # all request access is via unguessable link secrets (see worker.js).
 
 # Workers Logs, for counting how often the public page falls back to the Worker
