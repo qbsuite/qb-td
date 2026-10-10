@@ -861,8 +861,8 @@ check `tools/cf_watch.mjs` and the Worker's logs.
 
 A Discord ping when someone puts your instance to use, so a tournament
 running on it isn't something you find out about days later from the
-analytics. A tournament has **one message** in the channel, which follows
-it:
+analytics. A tournament has **one message** in the channel — its name as
+the title, a `Status:` line, then its link — which follows it:
 
 - **New** — a tournament, or a set's mirror started from an invite, was
   created. Title, slug, and a link to the public page. (A new question

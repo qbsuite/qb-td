@@ -1470,10 +1470,10 @@ function liveMark(env, t) {
    real tournament running on it isn't something you find out about days
    later by reading the analytics.
 
-   A tournament has one message in the channel, and it follows the
-   tournament: "New" when it is created, "Started" when its TD presses
-   Start tournament, "Finished" with what was played once its links have
-   closed. Created and started are different news — most rows are somebody
+   A tournament has one message in the channel — its name, a "Status:"
+   line and its link — and it follows the tournament: "New" when it is
+   created, "Started" when its TD presses Start tournament, "Finished"
+   with what was played once its links have closed. Created and started are different news — most rows are somebody
    typing `asdf` to see what the thing does — so each step is posted
    afresh and the previous message deleted: Discord notifies on a post and
    stays silent on an edit, and the channel still ends up with one line
@@ -1535,11 +1535,13 @@ async function hook(env, method, id, payload) {
   }
 }
 
-const alertBody = ({ kind, title, lines }) => ({
+// What a message looks like: the tournament's (or set's) name as the
+// title, then "Status: ...", then its link, then anything more to say.
+const alertBody = ({ kind, name, status, link, more = [] }) => ({
   embeds: [{
-    title,
+    title: name,
     color: ALERT_COLOR[kind] || ALERT_COLOR.created,
-    description: lines.filter(Boolean).join('\n'),
+    description: ['Status: ' + status, link, ...more].filter(Boolean).join('\n'),
     timestamp: new Date().toISOString(),
   }],
 });
@@ -1581,10 +1583,11 @@ function publicLink(env, slug) {
 // tournament's id; a set has none, and its message is simply posted.
 function alertCreated(env, ctx, { what, name, slug, tid }) {
   if (!alertsEnabled(env)) return;
+  // a set has no public page to link until its editors publish it, so its
+  // slug stands in
   const alert = {
-    kind: 'created',
-    title: 'New ' + what + ': ' + name,
-    lines: ['`' + slug + '`', tid ? publicLink(env, slug) : null],
+    kind: 'created', name, status: 'New ' + what,
+    link: tid ? publicLink(env, slug) : '`' + slug + '`',
   };
   ctx.waitUntil(tid ? setTournamentAlert(env, { id: tid, alert_msg: null }, alert) : postAlert(env, alert));
 }
@@ -1595,9 +1598,7 @@ function alertCreated(env, ctx, { what, name, slug, tid }) {
 function alertStarted(env, ctx, t) {
   if (!alertsEnabled(env)) return;
   ctx.waitUntil(setTournamentAlert(env, t, {
-    kind: 'started',
-    title: 'Started: ' + t.name,
-    lines: ['`' + t.slug + '`', publicLink(env, t.slug)],
+    kind: 'started', name: t.name, status: 'Started', link: publicLink(env, t.slug),
   }));
 }
 
@@ -1622,7 +1623,7 @@ async function alertWrapUps(env) {
     if (!claim.meta.changes) continue;
     if (!t.started) {
       await setTournamentAlert(env, t, {
-        kind: 'unused', title: 'Never started: ' + t.name, lines: ['`' + t.slug + '`'],
+        kind: 'unused', name: t.name, status: 'Never started', link: publicLink(env, t.slug),
       }, { quiet: true });
       continue;
     }
@@ -1632,11 +1633,10 @@ async function alertWrapUps(env) {
       "WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL"
     ).bind(t.id).all()).results[0];
     await setTournamentAlert(env, t, {
-      kind: 'finished',
-      title: 'Finished: ' + t.name,
-      lines: [
-        '`' + t.slug + '` — ' + [count(n.rooms, 'room'), count(n.games, 'game'), count(n.rounds, 'round')].join(', '),
-        t.published ? publicLink(env, t.slug) : 'Public page off',
+      kind: 'finished', name: t.name, status: 'Finished',
+      link: t.published ? publicLink(env, t.slug) : '`' + t.slug + '` (public page off)',
+      more: [
+        [count(n.rooms, 'room'), count(n.games, 'game'), count(n.rounds, 'round')].join(', '),
         t.published && n.games ? 'To archive: `node tools/archive.mjs add ' + t.slug + '`' : null,
       ],
     });

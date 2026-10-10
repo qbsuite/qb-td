@@ -70,7 +70,8 @@ async function quiet(ms = 1500) {
   return log.length === before;
 }
 const embed = (id) => (channel.get(id) && channel.get(id).embeds && channel.get(id).embeds[0]) || {};
-const titles = () => [...channel.keys()].map((id) => embed(id).title);
+const status = (id) => String(embed(id).description || '').split('\n')[0];
+const titles = () => [...channel.keys()].map((id) => embed(id).title + ' / ' + status(id));
 const posts = () => log.filter((c) => c.method === 'POST').length;
 const msgOf = (tid) => d1row(`SELECT alert_msg FROM tournaments WHERE id = ${tid}`).alert_msg;
 // The hourly trigger, as wrangler dev --test-scheduled exposes it.
@@ -110,9 +111,10 @@ const tid = r.body.id;
 
 ok('creation posts one message', (await until(() => channel.size === 1)) && posts() === 1, titles());
 const created = [...channel.keys()][0];
-ok('it names the tournament', embed(created).title === 'New tournament: Alert E2E', titles());
-ok('it carries the slug', embed(created).description.includes(slug), embed(created));
-ok('it links the public page', embed(created).description.includes('/t.html?t=' + slug), embed(created));
+ok('its title is the tournament name', embed(created).title === 'Alert E2E', titles());
+ok('then its status', status(created) === 'Status: New tournament', embed(created));
+ok('then the public page link, on its own line',
+  embed(created).description.split('\n')[1].endsWith('/t.html?t=' + slug), embed(created));
 ok('the post asked for the message back', log[0].url.includes('wait=true'), log[0].url);
 ok('the message id is remembered', await until(() => msgOf(tid) === created), msgOf(tid));
 
@@ -135,10 +137,10 @@ ok('starting posts a new message', await until(() => posts() === 2), log.map((c)
 ok('the channel still has one message for it',
   (await until(() => channel.size === 1 && !channel.has(created))), [...channel.keys()]);
 const startedMsg = [...channel.keys()][0];
-ok('it says the tournament started', embed(startedMsg).title === 'Started: Alert E2E', titles());
-ok('it carries the slug and the public page',
-  embed(startedMsg).description.includes(slug) && embed(startedMsg).description.includes('/t.html?t=' + slug),
-  embed(startedMsg));
+ok('it says the tournament started',
+  embed(startedMsg).title === 'Alert E2E' && status(startedMsg) === 'Status: Started', titles());
+ok('with the public page link under it',
+  embed(startedMsg).description.split('\n')[1].endsWith('/t.html?t=' + slug), embed(startedMsg));
 ok('the new message id is remembered', await until(() => msgOf(tid) === startedMsg), msgOf(tid));
 r = await call(A + '/start', { method: 'POST' });
 ok('a second start is refused and does not alert', r.status === 409 && (await quiet()), [r.status, log.length]);
@@ -169,7 +171,8 @@ await hourly();
 ok('the wrap-up posts a new message', await until(() => posts() === 3), log.map((c) => c.method));
 ok('and it is again the only one', await until(() => channel.size === 1 && !channel.has(startedMsg)), [...channel.keys()]);
 const done = [...channel.keys()][0];
-ok('it says the tournament finished', embed(done).title === 'Finished: Alert E2E', titles());
+ok('it says the tournament finished',
+  embed(done).title === 'Alert E2E' && status(done) === 'Status: Finished', titles());
 ok('it counts rooms, games and rounds',
   embed(done).description.includes('2 rooms, 2 games, 1 round'), embed(done).description);
 ok('it gives the archive command',
@@ -191,7 +194,8 @@ const before = posts();
 d1exec(`UPDATE tournaments SET created = ${Date.now() - 8 * DAY} WHERE id = ${tidU}`);
 await hourly();
 ok('an unused tournament is relabelled in place',
-  (await until(() => embed(unusedMsg).title === 'Never started: Unused E2E')) && posts() === before,
+  (await until(() => status(unusedMsg) === 'Status: Never started')) && posts() === before
+    && embed(unusedMsg).title === 'Unused E2E',
   titles());
 ok('by an edit, which does not notify', log[log.length - 1].method === 'PATCH', log[log.length - 1].method);
 
@@ -203,11 +207,11 @@ const tidO = r.body.id;
 const secretO = r.body.admin_secret;
 await until(() => channel.size === 3);
 await call('/a/' + secretO + '/start', { method: 'POST' });
-await until(() => titles().includes('Started: Old E2E'));
+await until(() => titles().includes('Old E2E / Status: Started'));
 d1exec(`UPDATE tournaments SET created = ${Date.now() - 40 * DAY}, started = ${Date.now() - 30 * DAY} WHERE id = ${tidO}`);
 await hourly();
 ok('a tournament closed weeks ago is not summarized',
-  (await quiet()) && titles().includes('Started: Old E2E'), titles());
+  (await quiet()) && titles().includes('Old E2E / Status: Started'), titles());
 
 /* ----- what must never go out ----- */
 
