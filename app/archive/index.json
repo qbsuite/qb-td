@@ -1,6 +1,24 @@
 {
   "tournaments": [
     {
+      "slug": "2026terrapinopenatusc",
+      "name": "2026 Terrapin Open at USC",
+      "date": "2026-10-03",
+      "host": "USC",
+      "teams": 10,
+      "rounds": 10,
+      "games": 50
+    },
+    {
+      "slug": "pbplaytest-19sep",
+      "name": "2026 Penn Bowl Play Test",
+      "date": "2026-09-19",
+      "host": "",
+      "teams": 4,
+      "rounds": 10,
+      "games": 20
+    },
+    {
       "slug": "ug-nats-stanford",
       "name": "UG Nats @ Stanford",
       "date": "2026-07-25",

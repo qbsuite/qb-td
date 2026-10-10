@@ -1187,6 +1187,7 @@ approval.
 ```bash
 node tools/archive.mjs list                    # published tournaments, and which are archived
 node tools/archive.mjs add <slug> --date 2026-07-25 --host "Stanford"
+#   --name "Title" archives it under a different name than its TD gave it
 node tools/archive.mjs refresh <slug>          # recapture after a late correction
 node tools/archive.mjs remove <slug>           # un-approve
 ```

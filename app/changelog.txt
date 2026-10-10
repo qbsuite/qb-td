@@ -3,6 +3,9 @@ Release Notes for 10/10/2026
 [ MISC ]
 - The site's operator can get a Discord alert when a tournament is created or started.
 
+[ ARCHIVE ]
+- Added 2026 Terrapin Open at USC and 2026 Penn Bowl Play Test.
+
 Release Notes for 10/5/2026
 
 [ STATS ]

@@ -12,7 +12,7 @@
 // which already exist. Nothing here writes to the backend.
 //
 //   node tools/archive.mjs list
-//   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "..."]
+//   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "..."] [--name "..."]
 //   node tools/archive.mjs refresh <slug>
 //   node tools/archive.mjs remove <slug>
 //
@@ -211,7 +211,7 @@ async function cmdList(opts) {
   const ready = rows.filter((r) => r.published && !archived.has(r.slug));
   console.log(`\n${rows.length} tournaments, ${archived.size} archived, ${ready.length} published and not archived`);
   if (ready.length) console.log('approve one with: node tools/archive.mjs add ' + ready[0].slug);
-  if (opts.date || opts.host) console.log('(--date and --host apply to add/refresh, not list)');
+  if (opts.date || opts.host || opts.name) console.log('(--date, --host and --name apply to add/refresh, not list)');
 }
 
 async function cmdAdd(slug, opts, { refresh = false } = {}) {
@@ -232,14 +232,25 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
   const games = dedupeMatches(matches);
   const teams = new Set(games.flatMap((m) => m.teams.map((t) => t.name)));
 
-  writeCapture(slug, state.name, data);
-  const pages = writeReport(slug, state.name, matches, parsedRoster);
+  // The archive's own title for it: --name, else the one it was archived
+  // under (a refresh must not undo a rename), else what its TD called it.
+  // The capture carries it too — the archived page reads its title there.
+  const name = opts.name || (existing && existing.name) || state.name;
+  data[`/pub/${slug}`].name = name;
+  // ...and the roster names the tournament too (a QBJ Tournament object)
+  const frozenRoster = data[`/pub/${slug}/roster`];
+  for (const o of (frozenRoster && frozenRoster.objects) || []) {
+    if (o && o.type === 'Tournament' && o.name === state.name) o.name = name;
+  }
+
+  writeCapture(slug, name, data);
+  const pages = writeReport(slug, name, matches, parsedRoster);
 
   const date = opts.date || (existing && existing.date) || new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('--date must be YYYY-MM-DD');
   const entry = {
     slug,
-    name: state.name,
+    name,
     date,
     host: opts.host || (existing && existing.host) || '',
     teams: parsedRoster ? parsedRoster.length : teams.size,
@@ -279,6 +290,7 @@ function parseArgs(argv) {
     if (a === '--server') opts.api = argv[++i];
     else if (a === '--date') opts.date = argv[++i];
     else if (a === '--host') opts.host = argv[++i];
+    else if (a === '--name') opts.name = argv[++i];
     else if (a.startsWith('--')) throw new Error('unknown flag ' + a);
     else rest.push(a);
   }
@@ -287,7 +299,7 @@ function parseArgs(argv) {
 
 const USAGE = `usage:
   node tools/archive.mjs list
-  node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "Stanford"]
+  node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "Stanford"] [--name "Title"]
   node tools/archive.mjs refresh <slug>
   node tools/archive.mjs remove <slug>`;
 
