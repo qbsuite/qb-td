@@ -14,7 +14,7 @@ export const WORKER_DIR = path.join(path.dirname(fileURLToPath(import.meta.url))
 export const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
 // QBTD_PERSIST: the dev Worker's --persist-to folder, when it runs on its
 // own local state rather than worker/.wrangler/state
-const PERSIST = process.env.QBTD_PERSIST ? ` --persist-to "${process.env.QBTD_PERSIST}"` : '';
+export const PERSIST = process.env.QBTD_PERSIST ? ` --persist-to "${process.env.QBTD_PERSIST}"` : '';
 
 // What credential columns hold for new rows (worker.js secretHash): the
 // backdating UPDATEs match on it, and the at-rest checks assert it.

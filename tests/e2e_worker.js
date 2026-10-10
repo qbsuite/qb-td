@@ -8,7 +8,7 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-import { WORKER_DIR, BASE, storedCred, d1row, d1exec, r2get, call, maxAge, tick, ok, summary } from './e2e_lib.js';
+import { WORKER_DIR, PERSIST, BASE, storedCred, d1row, d1exec, r2get, call, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
@@ -274,7 +274,9 @@ r = await call('/pub/' + slug);
 ok('buzz off by default', r.body.buzz === null && r.body.buzz_v === null
   && r.body.packet_rounds.length === 0, r.body.buzz);
 {
-  const res = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
+  const bare = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
+  ok('qpacket 401 with no password, before any lookup', bare.status === 401);
+  const res = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`, { headers: { Authorization: 'Buzz x' } });
   ok('qpacket 404 when buzz off', res.status === 404);
 }
 const buzzSalt = 'testsalt';
@@ -409,8 +411,9 @@ r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz:
 r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: { mode: 'public' } } } });
 ok('legacy public settings write accepted', r.status === 200);
 {
+  // (the attempt cap above is spent, so only the password-less path can be asked)
   const open = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`);
-  ok('qpacket 404 for legacy public mode', open.status === 404);
+  ok('qpacket stays shut for legacy public mode', open.status === 401, open.status);
 }
 r = await call('/pub/' + slug);
 ok('legacy public mode reads as off', r.body.buzz === null && r.body.buzz_v === null, r.body.buzz);
@@ -477,7 +480,7 @@ ok('metadata categories parsed', r.status === 200
   && r.body.rounds['3'].t[0].c === 'History' && r.body.rounds['3'].t[0].s === 'World'
   && r.body.rounds['3'].t[1].c === 'Literature' && r.body.rounds['3'].t[1].s === 'American'
   && r.body.rounds['3'].t[2].c === 'Science' && r.body.rounds['3'].t[2].s === 'Math'
-  && r.body.rounds['3'].t[3] === null, r.body.rounds['3']);
+  && r.body.rounds['3'].t[3].u === 'Just An Author' && !r.body.rounds['3'].t[3].c, r.body.rounds['3']);
 
 // bare distribution labels (one label per question, 2026 UG Nats style)
 r = await call(`${A}/packet?round=4&name=Packet4.json`, { method: 'POST',
@@ -508,7 +511,7 @@ r = await call('/pub/' + slug + '/cats');
 
 // backfill: wipe the map (as if the packets predate extraction), then a
 // dashboard load rebuilds it off the response path
-execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/catmap.json --local`,
+execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/catmap.json --local${PERSIST}`,
   { cwd: WORKER_DIR, stdio: 'ignore' });
 r = await call('/pub/' + slug);
 ok('cats gone after wipe', r.body.cats === null, r.body.cats);
@@ -525,7 +528,7 @@ ok('backfilled map has both rounds', r.status === 200
 
 // a map written by an older parser (no version metadata) reads as stale:
 // the next dashboard load rebuilds it with the current parser
-execSync(`node -e "process.stdout.write(JSON.stringify({rounds:{}}))" | npx wrangler r2 object put qb-td-data/t/${tid}/catmap.json --pipe --content-type application/json --local`,
+execSync(`node -e "process.stdout.write(JSON.stringify({rounds:{}}))" | npx wrangler r2 object put qb-td-data/t/${tid}/catmap.json --pipe --content-type application/json --local${PERSIST}`,
   { cwd: WORKER_DIR, stdio: 'ignore', shell: true });
 r = await call('/pub/' + slug + '/cats');
 ok('stale map planted', r.status === 200 && !Object.keys(r.body.rounds).length, r.body);
@@ -669,7 +672,7 @@ ok('second rebuild restores the room', r.body.rounds[0].entries[0].room === 'Roo
 // (pubstate.json came later still), which is what sends a view down the
 // live path at all.
 for (const key of ['rounds.json', 'pubstate.json']) {
-  execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/${key} --local`,
+  execSync(`npx wrangler r2 object delete qb-td-data/t/${tid}/${key} --local${PERSIST}`,
     { cwd: WORKER_DIR, stdio: 'ignore' });
 }
 r = await call('/pub/' + slug);

@@ -15,7 +15,7 @@
 // - broadcasts are gone, and auto-advance needs no open Live Hub
 
 import { execSync } from 'node:child_process';
-import { BASE, WORKER_DIR, call, d1exec, tick, ok, summary } from './e2e_lib.js';
+import { BASE, WORKER_DIR, call, d1exec, tick, ok, summary, PERSIST } from './e2e_lib.js';
 
 async function meter() {
   const res = await fetch(BASE + '/__meter');
@@ -32,7 +32,7 @@ async function rowsRead(fn) {
 
 // Every row of a local D1 query (e2e_lib's d1row returns only the first).
 function d1rows(sql) {
-  const out = execSync(`npx wrangler d1 execute qb-td --local --json --command "${sql}"`,
+  const out = execSync(`npx wrangler d1 execute qb-td --local --json --command "${sql}"${PERSIST}`,
     { cwd: WORKER_DIR }).toString();
   return JSON.parse(out.slice(out.indexOf('[')))[0].results;
 }

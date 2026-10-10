@@ -1060,7 +1060,10 @@ await click('[data-layout="new"]');
 await waitJs(`document.querySelectorAll('table.nstats').length > 0`, 'the New layout');
 {
   const rows = await js(`[...document.querySelectorAll('table.nstats tr')].slice(0).filter((r) => r.querySelector('td.name'))
-    .map((r) => { const c = [...r.querySelectorAll('td')]; return [c[1].textContent, Number(c[2].textContent), Number(c[3].textContent)]; })`);
+    .map((r) => { const c = [...r.querySelectorAll('td')];
+      // the name cell also carries the rank a phone shows in place of the rank column (span.nrk)
+      const rank = c[1].querySelector('.nrk');
+      return [c[1].textContent.slice(rank ? rank.textContent.length : 0), Number(c[2].textContent), Number(c[3].textContent)]; })`);
   const want = expectAgg.teams.map((t) => [t.name, t.w, t.l]);
   const sort = (x) => JSON.stringify([...x].sort((a, b) => a[0].localeCompare(b[0])));
   ok('21 stats: New standings W/L match the games, per pool', sort(rows) === sort(want)
