@@ -48,7 +48,9 @@ simple = { limit = 30, period = 60 }
 # minute so viewers fetch them from raw.githubusercontent.com instead of
 # this Worker. Apply migrate-pub.sql before enabling.
 [triggers]
-crons = ["* * * * *"]
+# The second trigger is the alerts' hourly wrap-up (worker.js ALERT_CRON);
+# it does nothing unless DISCORD_WEBHOOK is set.
+crons = ["* * * * *", "0 * * * *"]
 
 [vars]
 # Origin of the GitHub Pages site — used for CORS.
@@ -77,11 +79,12 @@ LIVE_SCRIPT = "qb-td-live"
 LIVE_ACCOUNT_ID = "905b6a6cd745425d70d3c4d9612ba2d8"
 
 # New-activity alerts (worker.js "new-activity alerts"): a Discord webhook
-# pinged when someone creates a tournament or set here, and again when a
-# TD presses Start tournament. Optional — with the DISCORD_WEBHOOK secret
+# pinged when someone creates a tournament or set here, when a TD presses
+# Start tournament, and with a summary once its links close. Optional — with the DISCORD_WEBHOOK secret
 # unset the whole feature is dead code. To enable: Discord > Server
 # Settings > Integrations > New Webhook, copy the URL, then
-# `npx wrangler secret put DISCORD_WEBHOOK`.
+# `npx wrangler secret put DISCORD_WEBHOOK`. Apply migrate-alertmsg.sql
+# first.
 
 # The only secrets are the snapshot publisher's GitHub credential,
 # LIVE_TOKEN (above) and DISCORD_WEBHOOK;

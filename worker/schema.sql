@@ -77,7 +77,14 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- detail shows changes (triggers at the end of this file), so a refresh
   -- holding the current rev is answered "unchanged" for the price of the
   -- admin lookup. Existing databases get it from migrate-rev.sql.
-  rev INTEGER NOT NULL DEFAULT 0
+  rev INTEGER NOT NULL DEFAULT 0,
+  -- New-activity alerts (worker.js "new-activity alerts"), both written
+  -- only while a webhook is configured. alert_msg: the id of this
+  -- tournament's one message in the operator's Discord channel, so the
+  -- next step can replace it. wrapped: 1 once its closing summary has
+  -- been claimed. Existing databases get them from migrate-alertmsg.sql.
+  alert_msg TEXT,
+  wrapped INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_tournaments_created ON tournaments(created);
 

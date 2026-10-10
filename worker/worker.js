@@ -1470,11 +1470,20 @@ function liveMark(env, t) {
    real tournament running on it isn't something you find out about days
    later by reading the analytics.
 
-   Two alerts, because "created" and "started" are different news: most
-   rows are somebody typing `asdf` to see what the thing does, while a TD
-   pressing Start tournament means an event is about to happen. Neither
-   needs bookkeeping: a row is created once, and startTournament's own
-   once-only UPDATE decides who announces a start.
+   A tournament has one message in the channel, and it follows the
+   tournament: "New" when it is created, "Started" when its TD presses
+   Start tournament, "Finished" with what was played once its links have
+   closed. Created and started are different news — most rows are somebody
+   typing `asdf` to see what the thing does — so each step is posted
+   afresh and the previous message deleted: Discord notifies on a post and
+   stays silent on an edit, and the channel still ends up with one line
+   per tournament. tournaments.alert_msg holds that message's id. The one
+   silent edit is "Never started", which is not news.
+
+   The wrap-up has no request to ride on (nothing happens when links
+   close), so an hourly cron (ALERT_CRON, wrangler.toml) looks for
+   tournaments that closed since it last looked; tournaments.wrapped is
+   its claim, so each is summarized once.
 
    Alerts never carry a credential. An admin link is the whole of a
    tournament's security and this posts to a third party, so what goes out
@@ -1482,40 +1491,81 @@ function liveMark(env, t) {
    tournament, and the webhook is private.
 
    Config: the DISCORD_WEBHOOK secret. Unset and this section is dead
-   code. Nothing is stored either way, so switching it on announces the
-   next thing that happens rather than replaying the backlog. */
+   code: no fetch, no query, no write. Switching it on later announces
+   what happens next rather than replaying the backlog (WRAP_WINDOW).
+   Apply migrate-alertmsg.sql first. */
 
-const ALERT_COLOR = { created: 0x5865f2, started: 0x57f287 };
+const ALERT_COLOR = { created: 0x5865f2, started: 0x57f287, finished: 0xfee75c, unused: 0x99aab5 };
 const ALERT_TIMEOUT_MS = 5000;
+const ALERT_CRON = '0 * * * *';
+// A wrap-up only reaches this far back, so a webhook switched on (or back
+// on) after a quiet spell does not summarize months of old tournaments.
+const WRAP_WINDOW = 7 * 24 * 3600 * 1000;
+// Each wrap-up is a handful of subrequests; the rest wait an hour.
+const WRAP_PER_RUN = 10;
 
 function alertsEnabled(env) {
   return !!(env.DISCORD_WEBHOOK || '').trim();
 }
 
-// Fire-and-forget. A webhook that is down, slow, rate-limited or simply
-// wrong must never turn a tournament creation or a room's upload into an
-// error, so every failure here is swallowed and logged. Callers hand this
-// to ctx.waitUntil rather than awaiting it.
-async function postAlert(env, { kind, title, lines }) {
+// One call to the webhook: POST a message, or PATCH / DELETE one it posted
+// earlier (`id`). Never throws. A webhook that is down, slow, rate-limited
+// or simply wrong must not turn a tournament creation into an error, so
+// every failure is swallowed and logged, and callers on a request path
+// hand this to ctx.waitUntil rather than awaiting it. Answers the posted
+// message (POST), true (PATCH, DELETE), or null on failure.
+async function hook(env, method, id, payload) {
   try {
-    const res = await fetch(env.DISCORD_WEBHOOK.trim(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeds: [{
-          title,
-          color: ALERT_COLOR[kind] || ALERT_COLOR.created,
-          description: lines.filter(Boolean).join('\n'),
-          timestamp: new Date().toISOString(),
-        }],
-      }),
+    const u = new URL(env.DISCORD_WEBHOOK.trim());
+    if (id) u.pathname += '/messages/' + id;
+    else u.searchParams.set('wait', 'true'); // answer with the message, for its id
+    const res = await fetch(u, {
+      method,
+      headers: payload ? { 'Content-Type': 'application/json' } : {},
+      body: payload ? JSON.stringify(payload) : undefined,
       signal: AbortSignal.timeout(ALERT_TIMEOUT_MS),
     });
-    if (!res.ok) console.log('alert rejected (' + res.status + ')');
+    if (!res.ok) { console.log('alert rejected (' + res.status + ')'); return null; }
+    return method === 'POST' ? await res.json() : true;
   } catch (e) {
     // the error's name, never its message: an "Invalid URL" message quotes
     // the secret's value, and the webhook URL is a credential
     console.log('alert failed:', e.name);
+    return null;
+  }
+}
+
+const alertBody = ({ kind, title, lines }) => ({
+  embeds: [{
+    title,
+    color: ALERT_COLOR[kind] || ALERT_COLOR.created,
+    description: lines.filter(Boolean).join('\n'),
+    timestamp: new Date().toISOString(),
+  }],
+});
+
+// Post, and answer the new message's id (a Discord snowflake) or null.
+async function postAlert(env, alert) {
+  const msg = await hook(env, 'POST', null, alertBody(alert));
+  return msg && /^\d{5,25}$/.test(String(msg.id)) ? String(msg.id) : null;
+}
+
+// Move a tournament's one message on to `alert`. The new message is
+// posted before the old one is deleted, so a webhook failing halfway
+// leaves the channel with the old line rather than none. `quiet` edits in
+// place instead, for a change that should not notify anyone.
+async function setTournamentAlert(env, t, alert, { quiet = false } = {}) {
+  if (quiet) {
+    if (t.alert_msg) await hook(env, 'PATCH', t.alert_msg, alertBody(alert));
+    return;
+  }
+  const id = await postAlert(env, alert);
+  if (!id) return;
+  if (t.alert_msg) await hook(env, 'DELETE', t.alert_msg);
+  try {
+    await env.DB.prepare('UPDATE tournaments SET alert_msg = ?2 WHERE id = ?1').bind(t.id, id).run();
+  } catch (e) {
+    console.log('alert id not saved:', e.message);
   }
 }
 
@@ -1525,28 +1575,72 @@ function publicLink(env, slug) {
   return origin ? origin + '/t.html?t=' + slug : null;
 }
 
-// `what` distinguishes the three ways a row is born: an open
-// creation, a question set, and a set's mirror (someone accepting an
-// invite is using the instance just as much as someone starting fresh).
-function alertCreated(env, ctx, { what, name, slug }) {
+// `what` distinguishes the three ways a row is born: an open creation, a
+// question set, and a set's mirror (someone accepting an invite is using
+// the instance just as much as someone starting fresh). `tid` is the new
+// tournament's id; a set has none, and its message is simply posted.
+function alertCreated(env, ctx, { what, name, slug, tid }) {
   if (!alertsEnabled(env)) return;
-  ctx.waitUntil(postAlert(env, {
+  const alert = {
     kind: 'created',
     title: 'New ' + what + ': ' + name,
-    lines: ['`' + slug + '`', what === 'set' ? null : publicLink(env, slug)],
-  }));
+    lines: ['`' + slug + '`', tid ? publicLink(env, slug) : null],
+  };
+  ctx.waitUntil(tid ? setTournamentAlert(env, { id: tid, alert_msg: null }, alert) : postAlert(env, alert));
 }
 
 // The TD pressed Start tournament: the setup week is over and the run
 // clock is going. The caller only gets here after winning the once-only
-// UPDATE, so this cannot announce twice.
-function alertStarted(env, ctx, { name, slug }) {
+// UPDATE, so this cannot announce twice. `t` is the admin row.
+function alertStarted(env, ctx, t) {
   if (!alertsEnabled(env)) return;
-  ctx.waitUntil(postAlert(env, {
+  ctx.waitUntil(setTournamentAlert(env, t, {
     kind: 'started',
-    title: 'Started: ' + name,
-    lines: ['`' + slug + '`', publicLink(env, slug)],
+    title: 'Started: ' + t.name,
+    lines: ['`' + t.slug + '`', publicLink(env, t.slug)],
   }));
+}
+
+// The hourly look for tournaments whose links have closed. A started one
+// gets its summary, with the archive tool's command when there is
+// something to archive; one that sat out its setup week unused has its
+// "New" message quietly relabelled. Awaited by the cron, not a request.
+async function alertWrapUps(env) {
+  if (!alertsEnabled(env)) return;
+  const now = Date.now();
+  const closes = `(CASE WHEN started IS NULL THEN created + ${SETUP_TTL} ELSE started + ${RUN_TTL} END)`;
+  const { results } = await env.DB.prepare(
+    `SELECT id, slug, name, started, published, alert_msg FROM tournaments ` +
+    `WHERE wrapped = 0 AND ${closes} <= ?1 AND ${closes} > ?2 ORDER BY id LIMIT ${WRAP_PER_RUN}`
+  ).bind(now, now - WRAP_WINDOW).all();
+  const count = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+  for (const t of results) {
+    // the claim: two overlapping runs cannot both summarize it
+    const claim = await env.DB.prepare(
+      'UPDATE tournaments SET wrapped = 1 WHERE id = ?1 AND wrapped = 0'
+    ).bind(t.id).run();
+    if (!claim.meta.changes) continue;
+    if (!t.started) {
+      await setTournamentAlert(env, t, {
+        kind: 'unused', title: 'Never started: ' + t.name, lines: ['`' + t.slug + '`'],
+      }, { quiet: true });
+      continue;
+    }
+    const n = (await env.DB.prepare(
+      'SELECT (SELECT COUNT(*) FROM buckets WHERE tournament_id = ?1) AS rooms, ' +
+      'COUNT(*) AS games, COUNT(DISTINCT round) AS rounds FROM files ' +
+      "WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL"
+    ).bind(t.id).all()).results[0];
+    await setTournamentAlert(env, t, {
+      kind: 'finished',
+      title: 'Finished: ' + t.name,
+      lines: [
+        '`' + t.slug + '` — ' + [count(n.rooms, 'room'), count(n.games, 'game'), count(n.rounds, 'round')].join(', '),
+        t.published ? publicLink(env, t.slug) : 'Public page off',
+        t.published && n.games ? 'To archive: `node tools/archive.mjs add ' + t.slug + '`' : null,
+      ],
+    });
+  }
 }
 
 /* ---------- TO admin API (/a/*, admin-link-authed) ----------
@@ -1639,7 +1733,7 @@ async function createTournament(request, env, ctx) {
 
   const made = await insertTournament(env, { slug, name, ip, settings: body.settings });
   if (!made) return err(env, 409, 'slug already taken');
-  alertCreated(env, ctx, { what: 'tournament', name, slug });
+  alertCreated(env, ctx, { what: 'tournament', name, slug, tid: made.id });
   return json(env, {
     id: made.id, slug, name,
     admin_secret: made.adminSecret, closes: made.created + SETUP_TTL,
@@ -1691,7 +1785,7 @@ async function getTournament(env, t, ctx) {
     ...b, secret: secret_enc && t.ckey ? await decField(t.ckey, secret_enc) : b.secret,
   })));
   // announce: the retired broadcasts column, still on old rows
-  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, skey, set_key_enc, announce, ...pub_t } = t;
+  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, skey, set_key_enc, announce, alert_msg, wrapped, ...pub_t } = t;
   return json(env, {
     // `set` is what the dashboard's mirror notice reads: whose packets
     // these are, that the games are shared with that set's editors, and
@@ -1862,7 +1956,7 @@ async function startTournament(env, t, ctx) {
   ).bind(t.id, started).run();
   if (!out.meta.changes) return err(env, 409, 'already started');
   await markPub(env, t.id);
-  alertStarted(env, ctx, { name: t.name, slug: t.slug });
+  alertStarted(env, ctx, t);
   return json(env, { started, closes: started + RUN_TTL });
 }
 
@@ -4397,7 +4491,7 @@ async function startInvite(request, env, secret, ctx) {
   }
   await markPub(env, made.id);
   await markSet(env, m.set_id);
-  alertCreated(env, ctx, { what: 'mirror of ' + m.set_name, name, slug });
+  alertCreated(env, ctx, { what: 'mirror of ' + m.set_name, name, slug, tid: made.id });
   return json(env, {
     id: made.id, slug, name, admin_secret: made.adminSecret,
     closes: made.created + SETUP_TTL, set: m.set_name, rounds: linked.fill.length,
@@ -4924,6 +5018,8 @@ export default {
   // Cron (wrangler.toml [triggers]): rebuilds dirty tournaments' round
   // shards and, when configured, publishes them to the GitHub data repo.
   async scheduled(event, env, ctx) {
+    // the hourly trigger is the alerts' wrap-up; everything else is the tick
+    if (event.cron === ALERT_CRON) { ctx.waitUntil(alertWrapUps(env)); return; }
     ctx.waitUntil(tickDirty(metered(env)));
   },
 };

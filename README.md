@@ -580,6 +580,8 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-brackets.sql
 # ...and one from before the hub's public page mark (once, same reason):
 #   npx wrangler d1 execute qb-td --local --file migrate-pubbuilt.sql
+# ...and one from before the alerts' wrap-up:
+#   npx wrangler d1 execute qb-td --local --file migrate-alertmsg.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled.
 # e2e_alerts.js additionally needs the dev Worker pointed at the sink it
@@ -859,38 +861,55 @@ check `tools/cf_watch.mjs` and the Worker's logs.
 
 A Discord ping when someone puts your instance to use, so a tournament
 running on it isn't something you find out about days later from the
-analytics. Two alerts, because "created" and "started" are different
-news: most rows are somebody typing `asdf` to see what the thing does,
-while a TD pressing Start tournament means an event is about to happen.
+analytics. A tournament has **one message** in the channel, which follows
+it:
 
-- **created** — a tournament, a question set, or a set's mirror started
-  from an invite. Title, slug, and a link to the public page.
-- **started** — the TD pressed Start tournament: setup is over and the
-  48-hour clock is running. Once, since a tournament starts once.
+- **New** — a tournament, or a set's mirror started from an invite, was
+  created. Title, slug, and a link to the public page. (A new question
+  set gets a plain message of its own.)
+- **Started** — the TD pressed Start tournament: setup is over and the
+  48-hour clock is running.
+- **Finished** — its links have closed: rooms, games and rounds, and the
+  `tools/archive.mjs add` command when there is something to archive.
+
+"Created" and "started" are different news — most rows are somebody
+typing `asdf` to see what the thing does — so each step is posted afresh
+and the previous message deleted. Discord notifies on a post and stays
+silent on an edit, and this way the channel still holds one line per
+tournament, always showing where it stands. The one silent edit is
+**Never started**, for a tournament that sat out its setup week unused.
+
+Nothing happens on the backend when links close, so the wrap-up runs from
+a second, hourly cron trigger (`0 * * * *` in `wrangler.toml`). It only
+reaches a week back: switching the webhook on does not summarize months
+of old tournaments.
 
 Alerts never carry a credential. An admin link is the whole of a
 tournament's security and this posts to a third party, so what goes out
 is the slug and the name — the slug is already public on a published
 tournament, and the webhook is private. A webhook that is down, slow or
-misconfigured cannot fail the request it rode on: the post is handed to
+misconfigured cannot fail the request it rode on: the calls are handed to
 `ctx.waitUntil` and every failure is swallowed.
 
 Setup:
 
 ```bash
+# once, on an existing database, BEFORE the deploy
+npx wrangler d1 execute qb-td --remote --file migrate-alertmsg.sql
+
 # Discord > Server Settings > Integrations > New Webhook > Copy URL
 npx wrangler secret put DISCORD_WEBHOOK
 npx wrangler deploy
 ```
 
-Leave `DISCORD_WEBHOOK` unset and the whole feature is dead code. Nothing
-is stored either way — no column, no migration — so switching the webhook
-on announces the next thing that happens rather than replaying the
-backlog.
+Leave `DISCORD_WEBHOOK` unset and the whole feature is dead code: no
+fetch, no query, no write.
 
-Cost: two HTTP POSTs per tournament that gets started, against a free
-Discord webhook, and no database reads or writes. Nothing measurable
-against any Cloudflare limit.
+Cost, per tournament and only while the webhook is set: up to five calls
+to a free Discord webhook (three posts, two deletes) and three one-row D1
+writes (the message id at creation and start, the claim at the wrap-up).
+The hourly trigger is 24 invocations a day, each one small read of the
+tournaments table. Nothing measurable against any Cloudflare limit.
 
 ## Known scaling limits (none of this bites yet)
 
