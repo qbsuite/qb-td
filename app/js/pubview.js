@@ -12,7 +12,7 @@
 // the cron has published them and the file has deployed (a minute or
 // so behind a moderator's upload).
 
-import { pub, esc, usingStaticData, LIVE } from './api.js';
+import { pub, esc, usingStaticData, usingArchive, LIVE } from './api.js';
 import { parseMatch, parseRoster } from '../engine/qbj.js';
 import { dedupeMatches } from '../engine/stats.js';
 import { buildReport, reportData } from '../engine/report.js';
@@ -404,7 +404,8 @@ function renderSchedule(box) {
     return;
   }
   const cur = liveRound();
-  const hasNow = Boolean(findRound(cur));
+  // an archived tournament is over: no Now view, no "Live now"
+  const hasNow = !usingArchive() && Boolean(findRound(cur));
   if (!schedView) {
     const kept = readPref(SCHED_VIEW_KEY);
     schedView = kept === 'all' || (kept === 'now' && hasNow) ? kept : hasNow ? 'now' : 'all';
@@ -1352,7 +1353,8 @@ async function load() {
       const wanted = (location.hash || '').replace('#', '');
       setTab(wanted === 'stats' || wanted === 'schedule'
         || (wanted === 'buzz' && state.buzz) || (wanted === 'cats' && state.cats)
-        ? wanted : schedule ? 'schedule' : 'stats', false);
+        // an archived tournament opens on how it ended
+        ? wanted : schedule && !usingArchive() ? 'schedule' : 'stats', false);
     } else render();
     say('');
   } catch (e) { say(e.message, true); }

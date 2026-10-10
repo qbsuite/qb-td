@@ -4,37 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
+<!-- The demo's three ways in live on the home page now ("Try a simulated
+     tournament"); this address is kept for the links already out there. -->
+<meta http-equiv="refresh" content="0; url=index.html#try">
 <title>qb-td demo</title>
 <link rel="stylesheet" href="css/td.css">
-<link rel="stylesheet" href="css/hub.css">
 </head>
 <body>
 <div class="wrap narrow">
-  <header class="sitehead">
-    <h1>qb-td demo</h1>
-    <a href="index.html" class="muted">All tournaments</a>
-  </header>
-  <div id="msg"></div>
-
-  <h2>Open as</h2>
-  <div><a href="index.html?a=demo">TD hub</a></div>
-  <div><a href="read.html?b=demo">Moderator room</a></div>
-  <div><a href="t.html?t=demo">Public page</a></div>
-
-  <div class="row" style="margin-top:24px">
-    <a href="index.html">Create a real tournament</a>
-    <span style="flex:1"></span>
-    <a href="#" id="reset" class="muted">Reset demo data</a>
-  </div>
+  <a href="index.html#try">Try a simulated tournament</a>
 </div>
-<script type="module">
-import { reset } from './js/demo.js';
-const $ = (id) => document.getElementById(id);
-$('reset').onclick = (e) => {
-  e.preventDefault();
-  reset();
-  $('msg').textContent = 'demo data cleared';
-};
-</script>
 </body>
 </html>

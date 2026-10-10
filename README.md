@@ -527,15 +527,21 @@ dashboard shows which invites are still unused, and revokes them.
   rounds: pools advancing on their own, packet locks, the playoffs
   opening together, the TD's buttons; same dev Worker),
   `e2e_alerts.js` (the Discord new-activity alerts against a webhook
-  sink the suite runs itself),
+  sink the suite runs itself), `e2e_directory.js` (the home page's list
+  of tournaments: who is listed, linked or not, and the hourly sweep),
   `snapshot_publish.js` (the cron tick, mocked).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
 - `tools/yf_parity.mjs` + `tools/yf_parity/` — `npm run yf-parity`: the
   `.yft` export checked against YellowFruit's own import and save code
   (see "YellowFruit fidelity").
-- `app/demo.html` + `js/demo.js` + `demo/fixture.js` — the demo
-  tournament. Opening any page with `?t=demo`, `?a=demo`, or
+- `app/js/sidebar.js` — the tournaments running on this instance and
+  the ones that have ("The directory", below), merged with the archive:
+  the home page's sidebar, the archive list, and the sidebar beside an
+  archived tournament.
+- `js/demo.js` + `demo/fixture.js` — the demo tournament, reached from
+  the home page's "Try a simulated tournament" (`demo.html` only
+  redirects there). Opening any page with `?t=demo`, `?a=demo`, or
   `?b=demo` / `?b=demo-b` (the slug is reserved; real bucket secrets are
   long random tokens) makes `api.js` serve every `pub()` call from
   `demo.js` in the browser: the committed fixture holds a 4-team triple
@@ -582,6 +588,9 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-pubbuilt.sql
 # ...and one from before the alerts' wrap-up:
 #   npx wrangler d1 execute qb-td --local --file migrate-alertmsg.sql
+# ...and one from before the directory (then schema.sql again, for its
+# two indexes):
+#   npx wrangler d1 execute qb-td --local --file migrate-directory.sql
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled.
 # e2e_alerts.js additionally needs the dev Worker pointed at the sink it
@@ -593,7 +602,7 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   CF_API_BASE=http://127.0.0.1:8798/cf
 npx wrangler dev --local --port 8799 --test-scheduled &
 cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js && node tests/e2e_brackets.js \
-  && node tests/e2e_alerts.js
+  && node tests/e2e_alerts.js && node tests/e2e_directory.js
 
 # the pages themselves, in headless Chrome (no npm deps): the dev Worker
 # started with --var ALLOWED_ORIGIN:http://localhost:8765, plus
@@ -690,6 +699,10 @@ first.
    and one from before protests showed before upload needs
    `npx wrangler d1 execute qb-td --remote --file migrate-liveprotests.sql`
    BEFORE the Worker (the admin route reads `live_protests`),
+   and one from before the directory needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-directory.sql`
+   BEFORE the Worker (the tick reads and writes `tournaments.dir_entry`),
+   then `schema.sql` again for its two indexes,
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
    tournaments created before the migration stay on the legacy
@@ -859,6 +872,58 @@ its tournament was active. If the first deploy of the day keeps failing,
 viewers stay on the file from setup (served with a 200, heartbeat long
 expired), so the page can't tell. The hub's Delayed mark is the signal;
 check `tools/cf_watch.mjs` and the Worker's logs.
+
+## The directory: tournaments run here
+
+The home page lists, down its right side, the tournaments running on the
+instance now and the ones that have run on it. The same list is the
+archive page, and sits beside an archived tournament.
+
+**Who is listed** is decided by use, never by a tournament merely
+existing, so the rows people make to see what the thing does stay out:
+
+- **live** — started, and two rooms have each uploaded a game;
+- **past** — ten games over five rounds.
+
+**Linked or not.** A listed tournament is linked while its TD has the
+public page on. With it off, the tournament is still listed — by name and
+date only, in grey, with no link and nothing else about it. That is a
+choice this instance makes for every TD: switching the public page off
+hides the results, not the fact that the tournament was held here.
+
+Archived tournaments (`tools/archive.mjs`) join the same list with their
+host and counts, and link to their frozen capture rather than to the live
+page it was taken from.
+
+**How it is served.** The list is one file, `directory.json`. With
+qb-td-live on it rides every deploy there as a static file, so a view of
+the home page costs the Worker nothing — no request, no D1 read. Without
+it the page asks `GET /pub/directory` (cached five minutes).
+
+**What it costs to keep.** Each tournament's entry is stored on its row
+(`tournaments.dir_entry`). The tick recomputes it for the tournaments it
+was already rebuilding from game rows it had already read; a tournament
+with its public page off, which the tick otherwise never visits, costs one
+indexed count of its own games when it changes. The row is written and
+the file rebuilt only when an entry actually moves — a threshold crossed,
+a rename, the public page switched — a handful of times in a tournament's
+life. An hourly sweep rebuilds the file regardless, so a row deleted by
+hand or a deploy that failed cannot leave it wrong for long.
+
+Measured 2026-10-10 with the Worker's meter (`--var METER:1`), one whole
+tournament through `tests/e2e_day.js`, before and after the feature:
+
+| | before | after |
+|---|---|---|
+| D1 queries | 448 | 454 |
+| D1 rows read | 1,299 | 1,305 |
+| D1 rows written | 297 | 299 |
+| R2 Class A (writes) | 56 | 57 |
+| R2 Class B (reads) | 101 | 102 |
+
+So a tournament day costs six more rows read, two more written and one
+more R2 write and read. An idle minute is one more query, on a partial
+index, that finds nothing.
 
 ## New-activity alerts (optional)
 

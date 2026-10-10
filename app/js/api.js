@@ -43,6 +43,30 @@ export function usingStaticData() {
   return DEMO || frozen !== null;
 }
 
+/** True on an archived tournament's page: the data is final, so nothing
+    on it is "now". (The demo is static data too, but plays a live one.) */
+export function usingArchive() {
+  return frozen !== null;
+}
+
+/** The directory: the tournaments running on this instance and the ones
+    that have (worker.js "the directory"), as { v, t: [{ n, s, d, c, live,
+    past }] }. With LIVE it is a static file there and never the Worker's
+    business — a missing file is an empty list, not a reason to ask — so a
+    view of the home page costs the Worker nothing. Without LIVE (a test or
+    self-hosted backend) the Worker's /pub/directory serves it. Never
+    throws: the list is a nicety on every page that shows it. */
+export async function directory() {
+  try {
+    const res = await fetch(LIVE ? LIVE + '/directory.json' : API + '/pub/directory');
+    if (!res.ok) return { v: 1, t: [] };
+    const out = await res.json();
+    return out && Array.isArray(out.t) ? out : { v: 1, t: [] };
+  } catch (e) {
+    return { v: 1, t: [] };
+  }
+}
+
 /** JSON call to any Worker route. Throws Error(message) on failure.
     Pass opts.json to send a JSON body. Non-JSON responses (blobs) return
     the raw Response. */

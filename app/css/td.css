@@ -45,6 +45,28 @@ body {
 }
 .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 64px; }
 .wrap.narrow { max-width: 560px; }
+/* a page with the tournaments sidebar beside it */
+.wrap.wide { max-width: 1120px; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 32px; align-items: start; }
+.split:has(> .tside[hidden]) { grid-template-columns: minmax(0, 1fr); }
+/* the tournaments running here and the ones that have (sidebar.js): a
+   blue name is a link; a grey one has its public page off */
+.tside { font-size: 14px; border-left: 1px solid var(--line); padding-left: 18px; min-width: 0; }
+.tside[hidden] { display: none; }
+.tside .sh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 4px; }
+.tside .sh:first-child { margin-top: 0; }
+.tside .it { display: block; padding: 4px 0; line-height: 1.35; }
+.tside span.it { color: var(--muted); }
+.tside .it.on { color: var(--fg); font-weight: 600; }
+.tside .it small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.tside .dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ok); margin-right: 6px; vertical-align: 1px;
+}
+@media (max-width: 760px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .tside { border-left: none; border-top: 1px solid var(--line); padding: 14px 0 0; }
+}
 header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 24px; }
 header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 header .sub { color: var(--muted); }
@@ -252,6 +274,7 @@ tr.fresh td { animation: arrive .6s ease; }
   padding: 5px 16px; display: flex; gap: 10px; align-items: baseline; font-size: 13px;
 }
 .annstrip[hidden] { display: none; }
+.annstrip { flex-wrap: wrap; }
 .annstrip .k {
   font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.08em; color: var(--muted); flex: none;
@@ -292,6 +315,7 @@ details.rgroup summary { padding: 6px 10px; border-bottom: 1px solid var(--line)
 details.rgroup summary:hover { background: var(--hover-bg); }
 details.rgroup summary .pill { margin: 0 4px; }
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.tabs[hidden] { display: none; } /* display:flex would otherwise beat [hidden] */
 .tab {
   font: inherit; background: none; border: none; border-bottom: 2px solid transparent;
   border-radius: 0; color: var(--muted); padding: 7px 14px; cursor: pointer;

@@ -84,7 +84,12 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- next step can replace it. wrapped: 1 once its closing summary has
   -- been claimed. Existing databases get them from migrate-alertmsg.sql.
   alert_msg TEXT,
-  wrapped INTEGER NOT NULL DEFAULT 0
+  wrapped INTEGER NOT NULL DEFAULT 0,
+  -- The directory (worker.js "the directory"): this tournament's line in
+  -- the list of tournaments run here, as JSON, exactly as last computed;
+  -- NULL while it isn't listed. Rewritten only when the line changes.
+  -- Existing databases get it from migrate-directory.sql.
+  dir_entry TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tournaments_created ON tournaments(created);
 
@@ -253,6 +258,11 @@ CREATE INDEX IF NOT EXISTS idx_live_protests_tournament ON live_protests(tournam
 -- pub_dirty-only index would still grow with every one of those.
 CREATE INDEX IF NOT EXISTS idx_tournaments_dirty ON tournaments(pub_dirty_at)
   WHERE pub_dirty = 1 AND (published = 1 OR pub_snapshot IS NOT NULL OR set_id IS NOT NULL);
+-- The directory's two reads: dirty tournaments the tick's main pass
+-- never visits (tickUnlisted), and the listed rows (dirBuild).
+CREATE INDEX IF NOT EXISTS idx_tournaments_dirty_unlisted ON tournaments(pub_dirty_at)
+  WHERE pub_dirty = 1 AND published = 0 AND pub_snapshot IS NULL AND set_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_tournaments_dir ON tournaments(started) WHERE dir_entry IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sets_dirty ON sets(id) WHERE state_dirty = 1;
 
 -- The cron's qb-td-live questions (worker.js liveCandidates), asked every

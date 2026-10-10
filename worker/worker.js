@@ -999,7 +999,17 @@ function retractEntries(t) {
 async function tickDirty(env) {
   // after the GitHub commit, so each live file carries the snapshot the
   // tick just recorded (pub_snapshot) — as /pub/:slug would serve it
-  await tickLive(env, await tickTournaments(env));
+  const { rebuilt, dir } = await tickTournaments(env);
+  // the directory file, when an entry moved this tick; it rides the same
+  // deploy as the tournaments' own files
+  let dirChanged = false;
+  try {
+    const unlisted = await tickUnlisted(env);
+    if (dir || unlisted) dirChanged = (await dirBuild(env)).changed;
+  } catch (e) {
+    console.log('directory:', e.message);
+  }
+  await tickLive(env, rebuilt, dirChanged);
   await tickSets(env);
 }
 
@@ -1036,7 +1046,8 @@ async function rebuildInline(env, t) {
   const { manifest, rows } = await materialize(env, t);
   // /pub/:slug serves this instead of re-deriving it per view
   if (t.published) await putPubState(env, t, { rows, manifest });
-  return { manifest };
+  // counts: for the directory entry, from rows this already read
+  return { manifest, counts: dirCounts(rows) };
 }
 
 // Through the binding when there is one (production, wrangler dev); in
@@ -1048,15 +1059,17 @@ async function rebuildTournament(env, t) {
   return res.json();
 }
 
-// Answers the ids of the published tournaments it rebuilt: the files
-// tickLive redeploys.
+// Answers { rebuilt, dir }: the ids of the published tournaments it
+// rebuilt (the files tickLive redeploys), and whether any tournament's
+// directory entry moved.
 async function tickTournaments(env) {
   const { results } = await env.DB.prepare(TICK_ROW_SELECT +
     'WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ' +
     'ORDER BY t.pub_dirty_at, t.created LIMIT 4'
   ).all();
   const rebuilt = [];
-  if (!results.length) return rebuilt;
+  let dir = false;
+  if (!results.length) return { rebuilt, dir };
   // a failed rebuild goes to the back of the queue, so one that keeps
   // failing can't hold a slot every tick
   const reflag = (id) =>
@@ -1081,7 +1094,16 @@ async function tickTournaments(env) {
   for (const t of results) {
     try {
       const isPublic = t.published || t.set_published;
-      const { manifest } = isPublic || t.set_id ? await rebuildTournament(env, t) : {};
+      const { manifest, counts } = isPublic || t.set_id ? await rebuildTournament(env, t) : {};
+      // its line in the directory: free when the rebuild counted its games,
+      // one indexed count otherwise (a page being retracted). Never fails
+      // the rebuild it rides on.
+      try {
+        const c = counts || (t.started ? await dirCountsOf(env, t.id) : { rooms: 0, games: 0, rounds: 0 });
+        if (await dirNote(env, t, c)) dir = true;
+      } catch (e) {
+        console.log('directory entry for', t.slug, e.message);
+      }
       // the hub's "Up to date" mark: public data rebuilt as of now. Only a
       // hint, so it never fails the rebuild it describes
       if (isPublic) {
@@ -1099,7 +1121,7 @@ async function tickTournaments(env) {
       await reflag(t.id);
     }
   }
-  if (!pubs.length && !retracts.length) return rebuilt;
+  if (!pubs.length && !retracts.length) return { rebuilt, dir };
 
   try {
     const batch = [...pubs, ...retracts].flatMap((p) => p.entries);
@@ -1125,7 +1147,137 @@ async function tickTournaments(env) {
     console.log('snapshot batch failed:', e.message);
     for (const p of [...pubs, ...retracts]) await reflag(p.t.id);
   }
-  return rebuilt;
+  return { rebuilt, dir };
+}
+
+/* ---------- the directory: tournaments run on this instance ----------
+   The home page lists the tournaments that are running here now and the
+   ones that have run here, so the site shows what it is used for. The
+   list is one small file, directory.json, and like the public state it
+   costs the Worker nothing to serve: it rides the qb-td-live deploy as a
+   static file (GET /pub/directory is the fallback, and what a self-host
+   without qb-td-live reads).
+
+   What gets listed is decided by use, not by anyone's approval, so a row
+   somebody made to see what the thing does never shows:
+     live — started, and DIR_LIVE_ROOMS rooms have each uploaded a game
+     past — DIR_PAST_GAMES games over DIR_PAST_ROUNDS rounds
+   An entry carries the name and when it started and closes (the page
+   decides "live" from the clock, so the file does not change when a
+   tournament ends). The slug — the link — is only there while the TD has
+   the public page on; with it off the tournament is listed by name alone.
+
+   Cost. tournaments.dir_entry holds each tournament's entry as last
+   computed (NULL: not listed). The tick already knows a published
+   tournament's game rows when it rebuilds it, so recomputing its entry
+   reads nothing more; an unpublished one, which the tick otherwise never
+   visits, costs one indexed count of its own games when it is dirty.
+   Either way the row is only written, and the file only rebuilt, when the
+   entry actually changes — a threshold crossed, a rename, the public page
+   switched — which is a handful of times in a tournament's life. An
+   hourly sweep rebuilds the file regardless (one read of the listed rows)
+   so a row deleted by hand or a deploy that failed cannot leave it wrong
+   for long. Apply migrate-directory.sql first. */
+
+const DIR_KEY = 'directory.json';
+// the hash of the directory the last forced deploy shipped (hourly sweep)
+const DIR_LIVE_KEY = 'directory.live';
+const DIR_LIVE_PATH = '/directory.json';
+const DIR_LIVE_ROOMS = 2;
+const DIR_PAST_GAMES = 10;
+const DIR_PAST_ROUNDS = 5;
+const DIR_MAX = 500;
+const DIR_EMPTY = '{"v":1,"t":[]}';
+
+// rooms / games / rounds over a tournament's readable game files
+function dirCounts(rows) {
+  return {
+    rooms: new Set(rows.map((f) => f.bucket_id)).size,
+    games: rows.length,
+    rounds: new Set(rows.map((f) => f.round)).size,
+  };
+}
+async function dirCountsOf(env, tid) {
+  return (await env.DB.prepare(
+    'SELECT COUNT(DISTINCT bucket_id) AS rooms, COUNT(*) AS games, COUNT(DISTINCT round) AS rounds ' +
+    "FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL"
+  ).bind(tid).all()).results[0];
+}
+
+// A tournament's line in the directory, or null when it isn't listed.
+function dirEntry(t, counts) {
+  if (!t.started) return null;
+  const live = counts.rooms >= DIR_LIVE_ROOMS;
+  const past = counts.games >= DIR_PAST_GAMES && counts.rounds >= DIR_PAST_ROUNDS;
+  if (!live && !past) return null;
+  return JSON.stringify({
+    n: t.name, s: t.published ? t.slug : null, d: t.started, c: t.started + RUN_TTL, live, past,
+  });
+}
+
+// Record t's entry if it moved; true when it did (the file is then stale).
+async function dirNote(env, t, counts) {
+  const entry = dirEntry(t, counts);
+  if (entry === (t.dir_entry ?? null)) return false;
+  await env.DB.prepare('UPDATE tournaments SET dir_entry = ?2 WHERE id = ?1').bind(t.id, entry).run();
+  return true;
+}
+
+// Rebuild directory.json from the listed rows. Answers { changed, text };
+// R2 is only written when the text differs from what is there.
+async function dirBuild(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT dir_entry FROM tournaments WHERE dir_entry IS NOT NULL ORDER BY started DESC, id DESC LIMIT ${DIR_MAX}`
+  ).all();
+  const text = '{"v":1,"t":[' + results.map((r) => r.dir_entry).join(',') + ']}';
+  const cur = await env.DATA.get(DIR_KEY);
+  if (cur ? (await cur.text()) === text : text === DIR_EMPTY) return { changed: false, text };
+  await env.DATA.put(DIR_KEY, text, { httpMetadata: { contentType: 'application/json' } });
+  return { changed: true, text };
+}
+
+// The tick's half for tournaments its main pass never visits: dirty, with
+// the public page off, no snapshot to retract and no set. Their flag is
+// cleared (nothing else is waiting on it) and their entry recounted.
+// Rides its own partial index, so an idle minute finds nothing to read.
+async function tickUnlisted(env) {
+  const { results } = await env.DB.prepare(
+    'SELECT id, slug, name, published, started, dir_entry FROM tournaments ' +
+    'WHERE pub_dirty = 1 AND published = 0 AND pub_snapshot IS NULL AND set_id IS NULL ' +
+    'ORDER BY pub_dirty_at LIMIT 4'
+  ).all();
+  let moved = false;
+  for (const t of results) {
+    try {
+      // claim before working, as the main pass does
+      await env.DB.prepare('UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ?1').bind(t.id).run();
+      const counts = t.started ? await dirCountsOf(env, t.id) : { rooms: 0, games: 0, rounds: 0 };
+      if (await dirNote(env, t, counts)) moved = true;
+    } catch (e) {
+      console.log('directory entry for', t.slug, e.message);
+    }
+  }
+  return moved;
+}
+
+// The hourly sweep: rebuild the file whatever the flags say, and deploy it
+// when it changed or when the last deploy that should have carried it
+// did not land.
+async function dirSweep(env) {
+  const { changed, text } = await dirBuild(env);
+  if (!liveEnabled(env)) return;
+  const shipped = await env.DATA.get(DIR_LIVE_KEY);
+  if (changed || !shipped || (await shipped.text()) !== (await liveHash(text, 'json'))) {
+    await tickLive(env, [], true);
+  }
+}
+
+// GET /pub/directory — the fallback for the static file.
+async function pubDirectory(env) {
+  const obj = await env.DATA.get(DIR_KEY);
+  return new Response(obj ? obj.body : DIR_EMPTY, {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', ...corsHeaders(env) },
+  });
 }
 
 /* ---------- public state on qb-td-live ----------
@@ -1303,13 +1455,19 @@ const inList = (n) => Array.from({ length: n }, (_, i) => '?' + (i + 1)).join(',
 
 // The deploy. tickIds: the tournaments the tick just rebuilt. Never
 // throws: a failure is recorded on the rows (live_failed_at) and retried.
-async function livePublish(env, tickIds = []) {
+async function livePublish(env, tickIds = [], dirChanged = false) {
   const now = Date.now();
   const ids = [...new Set([...tickIds, ...(await liveCandidates(env, now, LIVE_MAX_PER_RUN))])]
     .slice(0, LIVE_MAX_PER_RUN);
-  if (!ids.length) return { deployed: false };
+  if (!ids.length && !dirChanged) return { deployed: false };
 
   const texts = new Map([[await liveHash(LIVE_HEALTH, 'json'), LIVE_HEALTH]]);
+  // The directory rides every deploy (a deploy carries the whole site), as
+  // it stands in R2 now. dirChanged: it is why this deploy is happening.
+  const dirObj = await env.DATA.get(DIR_KEY);
+  const dirText = dirObj ? await dirObj.text() : null;
+  const dirHash = dirText === null ? null : await liveHash(dirText, 'json');
+  if (dirHash) texts.set(dirHash, dirText);
   const built = new Map(); // id -> { slug, hash, size, at } | { slug, remove: true }
   const unbuildable = [];
   const build = async (rows) => {
@@ -1327,7 +1485,7 @@ async function livePublish(env, tickIds = []) {
   const wanted = () => JSON.stringify([...built].map(([id, b]) => ({ id, w: b.remove ? null : b.hash })));
 
   try {
-    await build(await rowsFor(ids));
+    if (ids.length) await build(await rowsFor(ids));
     // Intent before the deploy: a slower run that lands after this one
     // then leaves live_hash != live_want, and the next run repairs it.
     // The failure stamp goes on now too and success clears it, so a run
@@ -1344,7 +1502,7 @@ async function livePublish(env, tickIds = []) {
       ).bind(JSON.stringify(unbuildable), now).run();
     }
     // nothing to ship (only parked rows came up): no deploy
-    if (!built.size) return { deployed: false };
+    if (!built.size && !dirChanged) return { deployed: false };
 
     let deployed = null;
     let dropped = []; // lost files this run can't rebuild: re-added by backfill
@@ -1353,6 +1511,7 @@ async function livePublish(env, tickIds = []) {
         'SELECT id, slug, published, live_hash, live_size FROM tournaments WHERE live_hash IS NOT NULL'
       ).all();
       const manifest = { '/health.json': { hash: [...texts.keys()][0], size: LIVE_HEALTH.length } };
+      if (dirHash) manifest[DIR_LIVE_PATH] = { hash: dirHash, size: new TextEncoder().encode(dirText).byteLength };
       const files = []; // what this deploy ships, for the live_hash write
       for (const r of live) {
         // An unpublished tournament's file goes, whatever its columns say:
@@ -1411,6 +1570,11 @@ async function livePublish(env, tickIds = []) {
         'live_failed_at = NULL WHERE id IN (SELECT value FROM json_each(?1))'
       ).bind(JSON.stringify(removed)).run();
     }
+    // what the hourly sweep checks, written only when the directory is
+    // what this deploy was for
+    if (dirChanged && dirHash) {
+      await env.DATA.put(DIR_LIVE_KEY, dirHash).catch((e) => console.log('directory.live:', e.message));
+    }
     return { deployed: true, files: deployed.length, built: built.size };
   } catch (e) {
     console.log('live publish failed:', e.message);
@@ -1432,19 +1596,19 @@ export const LivePublish = {
     if (env.METER) meter.live_invocations++;
     const ids = (new URL(request.url).searchParams.get('ids') || '').split(',')
       .map(Number).filter((n) => Number.isInteger(n) && n > 0);
-    return Response.json(await livePublish(env, ids));
+    return Response.json(await livePublish(env, ids, new URL(request.url).searchParams.get('dir') === '1'));
   },
 };
 
 // From the tick: deploy when it rebuilt something public, or when a
 // retry, heartbeat or backfill is due — never otherwise, so an idle
 // minute costs three index lookups and no request.
-async function tickLive(env, ids) {
+async function tickLive(env, ids, dirChanged = false) {
   if (!liveEnabled(env)) return;
   try {
-    if (!ids.length && !(await liveCandidates(env, Date.now(), 1)).length) return;
-    if (!env.LIVE) { await livePublish(env, ids); return; }
-    const res = await env.LIVE.fetch('https://live/?ids=' + ids.join(','));
+    if (!ids.length && !dirChanged && !(await liveCandidates(env, Date.now(), 1)).length) return;
+    if (!env.LIVE) { await livePublish(env, ids, dirChanged); return; }
+    const res = await env.LIVE.fetch('https://live/?ids=' + ids.join(',') + (dirChanged ? '&dir=1' : ''));
     // read it either way: a binding call whose answer is never read ends
     // as clientDisconnected in the analytics, an error that isn't one
     const text = await res.text();
@@ -1821,7 +1985,8 @@ function slugNameError(slug, name) {
     return { status: 400, message: 'slug must be 3-40 chars: a-z, 0-9, hyphens' };
   }
   // the in-browser demo tournament owns t.html?t=demo
-  if (slug === 'demo') return { status: 409, message: 'slug is reserved' };
+  // ...and /pub/directory is the list of tournaments (pubDirectory)
+  if (slug === 'demo' || slug === 'directory') return { status: 409, message: 'slug is reserved' };
   if (!name) return { status: 400, message: 'name required' };
   return null;
 }
@@ -1921,7 +2086,7 @@ async function getTournament(env, t, ctx) {
     ...b, secret: secret_enc && t.ckey ? await decField(t.ckey, secret_enc) : b.secret,
   })));
   // announce: the retired broadcasts column, still on old rows
-  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, skey, set_key_enc, announce, alert_msg, wrapped, ...pub_t } = t;
+  const { admin_secret, creator_ip, admin_wrap, buzz_wrap, ckey, skey, set_key_enc, announce, alert_msg, wrapped, dir_entry, ...pub_t } = t;
   return json(env, {
     // `set` is what the dashboard's mirror notice reads: whose packets
     // these are, that the games are shared with that set's editors, and
@@ -5055,6 +5220,7 @@ export default {
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1]);
 
     // Public stats routes — publish-gated inside.
+    if (path === '/pub/directory' && method === 'GET') return pubDirectory(env);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1], ctx, url.searchParams.get('fb'));
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubRounds(env, m[1], url);
     if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
@@ -5154,9 +5320,13 @@ export default {
   // Cron (wrangler.toml [triggers]): rebuilds dirty tournaments' round
   // shards and, when configured, publishes them to the GitHub data repo.
   async scheduled(event, env, ctx) {
-    // the hourly trigger is the alerts' wrap-up and the Monday one their
-    // usage digest; everything else is the tick
-    if (event.cron === ALERT_CRON) { ctx.waitUntil(alertWrapUps(env)); return; }
+    // the hourly trigger is the directory's sweep and the alerts' wrap-up,
+    // the Monday one their usage digest; everything else is the tick
+    if (event.cron === ALERT_CRON) {
+      ctx.waitUntil(dirSweep(metered(env)).catch((e) => console.log('directory sweep:', e.message)));
+      ctx.waitUntil(alertWrapUps(env));
+      return;
+    }
     if (event.cron === DIGEST_CRON) { ctx.waitUntil(alertDigest(env)); return; }
     ctx.waitUntil(tickDirty(metered(env)));
   },

@@ -101,35 +101,78 @@ function showLinkModal(link, closes, onDone) {
   };
 }
 
-/* ---------- tournament list ---------- */
+/* ---------- the home page ----------
+   What qb-td is, the create form, this device's tournaments and the demo
+   (each a section that folds, the choice kept per device), and on the
+   right the tournaments running here and the ones that have (sidebar.js). */
+
+const FOLDS_KEY = 'qbtdHomeFolds';
+function foldState() {
+  try { return JSON.parse(localStorage.getItem(FOLDS_KEY)) || {}; } catch (e) { return {}; }
+}
+function keepFold(name, open) {
+  try { localStorage.setItem(FOLDS_KEY, JSON.stringify({ ...foldState(), [name]: open })); }
+  catch (e) { /* storage blocked: the fold just isn't remembered */ }
+}
+const shortDay = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 function showList() {
   const links = savedLinks();
+  const folds = foldState();
+  // "#try" is where the demo's own links (and the old demo.html) point
+  const wantTry = location.hash === '#try';
+  const open = {
+    yours: folds.yours !== false,
+    // someone with nothing here yet is most likely looking around
+    try: wantTry || (folds.try === undefined ? !links.length : folds.try),
+  };
+  document.body.classList.add('homepage');
+  $('wrap').classList.add('wide');
   view.innerHTML = `
-    <h2>Tournaments on this device</h2>
-    ${links.map((e) => {
-      const open = Date.now() < e.closes;
-      return `
-      <div class="card row">
-        ${open ? `<a href="${esc(adminLink(e.secret))}"><b>${esc(e.name)}</b></a>`
-               : `<b class="muted">${esc(e.name)}</b>`}
-        <span class="mono muted">${esc(e.slug)}</span>
-        <span class="spacer" style="flex:1"></span>
-        ${open ? `<span class="muted">Open until ${new Date(e.closes).toLocaleString()}</span>`
-               : `<span class="pill">Closed</span> <a href="${esc(statsLink(e.slug))}">Page</a>`}
-        <button class="small" data-forget="${esc(e.secret)}" title="Remove from this device's list">Remove</button>
-      </div>`;
-    }).join('') || '<div class="muted">None yet</div>'}
-    <h2>New tournament</h2>
-    <div class="row">
-      <input id="newname" placeholder="Name" size="24">
-      <input id="newslug" placeholder="Slug (public URL)" size="18">
-      <button id="newbtn" class="primary">Create</button>
-    </div>
-    <h2>Archive</h2>
-    <div><a href="archive.html">Past tournaments</a></div>
-    <h2>Demo</h2>
-    <div><a href="demo.html">Simulated tournament</a></div>`;
+    <div class="split">
+      <div>
+        <p class="hometag">Run a quizbowl tournament from one link: room pages for moderators, live stats for everyone else.</p>
+        <div class="row newrow">
+          <input id="newname" placeholder="Name" aria-label="Tournament name">
+          <input id="newslug" placeholder="Slug (public URL)" aria-label="Slug">
+          <button id="newbtn" class="primary">Create tournament</button>
+        </div>
+        <details class="fold" data-fold="yours"${open.yours ? ' open' : ''}>
+          <summary><h2>Your tournaments</h2><span class="muted">${links.length} on this device</span></summary>
+          ${links.map((e) => {
+            const live = Date.now() < e.closes;
+            return `
+          <div class="trow">
+            ${live ? `<a class="nm" href="${esc(adminLink(e.secret))}">${esc(e.name)}</a>`
+                   : `<span class="nm muted">${esc(e.name)}</span>`}
+            <span class="st">${live ? 'open until ' + esc(shortDay(e.closes)) : 'closed'}</span>
+            ${live ? '' : `<a href="${esc(statsLink(e.slug))}">Public page</a>`}
+            <button class="linkbtn muted" data-forget="${esc(e.secret)}" title="Remove from this device's list">Remove</button>
+          </div>`;
+          }).join('') || '<div class="trow none">None yet. Create one above, or open a tournament with its admin link.</div>'}
+        </details>
+        <details class="fold" id="try" data-fold="try"${open.try ? ' open' : ''}>
+          <summary><h2>Try a simulated tournament</h2><span class="muted">stored in this browser</span></summary>
+          <div class="trow"><a class="nm" href="index.html?a=demo">Tournament director</a><span class="st">set rounds, watch uploads, export stats</span></div>
+          <div class="trow"><a class="nm" href="read.html?b=demo">Moderator</a><span class="st">read the packet, keep score, upload</span></div>
+          <div class="trow"><a class="nm" href="t.html?t=demo">Player or spectator</a><span class="st">schedule, standings, categories</span></div>
+          <div class="trow none"><span class="nm" style="font-weight:400">Nothing here leaves your browser.</span><button class="linkbtn muted" id="demoreset">Reset demo data</button></div>
+        </details>
+      </div>
+      <nav id="tside" class="tside" aria-label="Tournaments on qb-td" hidden></nav>
+    </div>`;
+  view.querySelectorAll('details[data-fold]').forEach((d) => {
+    d.addEventListener('toggle', () => keepFold(d.dataset.fold, d.open));
+  });
+  if (wantTry) $('try').scrollIntoView();
+  $('demoreset').onclick = async () => {
+    // demo.js carries the whole fixture: only fetched when asked for
+    const { reset } = await import('./demo.js');
+    reset();
+    say('Demo data cleared');
+  };
+  // the sidebar is a nicety: the page is complete without it
+  import('./sidebar.js').then((m) => m.renderSidebar($('tside'))).catch(() => {});
   view.querySelectorAll('[data-forget]').forEach((b) => {
     b.onclick = () => {
       const e = links.find((x) => x.secret === b.dataset.forget);

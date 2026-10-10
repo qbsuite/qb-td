@@ -275,7 +275,7 @@ ok('1 create: Copy puts the link on the clipboard',
 }
 ok('1 create: Saved it closes the modal and opens the tournament', here.includes('a=' + secret), here);
 await goto(`${PAGES}/index.html`);
-await waitJs(`document.querySelector('#view').textContent.includes('Tournaments on this device')`, 'the list');
+await waitJs(`document.querySelector('#view').textContent.includes('Your tournaments')`, 'the list');
 ok('1 create: the tournament is on this device\'s list',
   await js(`[...document.querySelectorAll('#view a')].some((a) => a.textContent === ${q(NAME)} && a.href.includes('a=${secret}'))`));
 const A = '/a/' + secret;
