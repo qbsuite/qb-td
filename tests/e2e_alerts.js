@@ -1,9 +1,12 @@
 // e2e_alerts.js — the new-activity alerts (worker.js "new-activity
 // alerts") end to end against a locally running Worker.
 //
-// The dev Worker has to be pointed at this suite's own webhook sink,
-// which only exists while this file is running:
+// The dev Worker has to be pointed at this suite's own sink, which only
+// exists while this file is running — as the webhook, and as Cloudflare's
+// analytics API for the usage digest:
 //   worker/.dev.vars:  DISCORD_WEBHOOK=http://127.0.0.1:8798/hook
+//                      CF_API_TOKEN=e2e-token
+//                      CF_API_BASE=http://127.0.0.1:8798/cf
 //   cd worker && npx wrangler dev --local --port 8799 --test-scheduled
 // then: node tests/e2e_alerts.js
 //
@@ -15,8 +18,10 @@
 // New to Started to Finished (each step a fresh post, the old one
 // deleted); games coming in announce nothing; the hourly wrap-up
 // summarizes a closed tournament once and quietly relabels one that was
-// never started; no credential ever leaves the Worker; and a webhook that
-// is refusing connections cannot fail the request it rode on.
+// never started; the Monday digest reports the week's usage against the
+// Free plan's limits, and says so when Cloudflare refuses a section; no
+// credential ever leaves the Worker; and a webhook that is refusing
+// connections cannot fail the request it rode on.
 
 import { createServer } from 'node:http';
 import { BASE, call, d1exec, d1row, ok, summary } from './e2e_lib.js';
@@ -32,6 +37,7 @@ const sink = createServer((req, res) => {
   req.on('end', () => {
     let body = null;
     try { body = raw ? JSON.parse(raw) : null; } catch (e) { body = { unparsed: raw }; }
+    if (req.url === '/cf/graphql') { cloudflare(req, res, body); return; }
     const m = /^\/hook(?:\/messages\/(\d+))?(?:\?.*)?$/.exec(req.url);
     const id = m && m[1];
     log.push({ method: req.method, id: id || null, body, url: req.url });
@@ -54,6 +60,47 @@ const sink = createServer((req, res) => {
   });
 });
 await new Promise((resolve) => sink.listen(HOOK_PORT, '127.0.0.1', resolve));
+
+// Cloudflare's GraphQL Analytics API, as far as the digest uses it: each
+// query names one dataset, and gets a week of rows for it.
+const cf = { calls: [], refuseD1: false };
+function cloudflare(req, res, body) {
+  const q = String(body && body.query);
+  cf.calls.push({ auth: req.headers.authorization, query: q });
+  const account = {};
+  if (q.includes('workersInvocationsAdaptive')) {
+    account.w = [
+      { sum: { requests: 1200 }, dimensions: { date: '2026-01-05' } },
+      { sum: { requests: 300 }, dimensions: { date: '2026-01-05' } },   // a second script, same day
+      { sum: { requests: 45000 }, dimensions: { date: '2026-01-06' } },
+    ];
+  }
+  if (q.includes('d1AnalyticsAdaptiveGroups')) {
+    if (cf.refuseD1) {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ data: null, errors: [{ message: 'not authorized for that account' }] }));
+      return;
+    }
+    account.d = [
+      { sum: { rowsRead: 250000, rowsWritten: 900 }, dimensions: { date: '2026-01-05' } },
+      { sum: { rowsRead: 1000000, rowsWritten: 100 }, dimensions: { date: '2026-01-06' } },
+    ];
+  }
+  if (q.includes('r2OperationsAdaptiveGroups')) {
+    account.ops = [
+      { sum: { requests: 2000 }, dimensions: { actionType: 'PutObject' } },
+      { sum: { requests: 500 }, dimensions: { actionType: 'ListObjects' } },
+      { sum: { requests: 30000 }, dimensions: { actionType: 'GetObject' } },
+      { sum: { requests: 70 }, dimensions: { actionType: 'DeleteObject' } },   // free
+    ];
+    account.store = [
+      { max: { payloadSize: 120e6, metadataSize: 3e6 }, dimensions: { bucketName: 'qb-td-data', date: '2026-01-06' } },
+      { max: { payloadSize: 90e6, metadataSize: 2e6 }, dimensions: { bucketName: 'qb-td-data', date: '2026-01-05' } },
+    ];
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+    .end(JSON.stringify({ data: { viewer: { accounts: [account] } }, errors: null }));
+}
 
 // Alerts ride on ctx.waitUntil: they are sent just after the response the
 // caller already has, so an assertion waits for the sink to settle rather
@@ -213,6 +260,45 @@ await hourly();
 ok('a tournament closed weeks ago is not summarized',
   (await quiet()) && titles().includes('Old E2E / Status: Started'), titles());
 
+/* ----- the Monday usage digest ----- */
+
+async function monday() {
+  const res = await fetch(BASE + '/__scheduled?cron=' + encodeURIComponent('0 15 * * MON'));
+  if (!res.ok) throw new Error('cron trigger failed (' + res.status + ')');
+  await res.text();
+}
+const digests = () => [...channel.keys()].filter((id) => String(embed(id).title).startsWith('Usage, '));
+{
+  const before = digests().length;
+  await monday();
+  ok('the digest posts one message', await until(() => digests().length === before + 1), titles());
+  const d = embed(digests().pop());
+  const text = d.description || '';
+  ok('it is titled with the week it covers', /^Usage, \d{4}-\d\d-\d\d to \d{4}-\d\d-\d\d$/.test(d.title), d.title);
+  ok('it leads with a status', text.split('\n')[0] === 'Status: Worth watching', text);
+  ok('Worker requests: the week, and the busiest day against the daily limit',
+    text.includes('**Worker requests:** 46,500 this week, busiest day 45,000 (45.0% of 100,000 a day)'), text);
+  ok('D1 rows read', text.includes('**D1 rows read:** 1,250,000 this week, busiest day 1,000,000 (20.0% of 5,000,000 a day)'), text);
+  ok('D1 rows written', text.includes('**D1 rows written:** 1,000 this week, busiest day 900 (0.9% of 100,000 a day)'), text);
+  ok('R2 storage is each bucket at its newest day', text.includes('**R2 storage:** 123.0 MB (1.2% of 10 GB)'), text);
+  ok('R2 operations by class, deletes not counted',
+    text.includes('writes 2,500 (0.3% of 1,000,000 a month), reads 30,000 (0.3% of 10,000,000 a month)'), text);
+  ok('the token went to Cloudflare as a bearer, and only there',
+    cf.calls.length === 3 && cf.calls.every((x) => x.auth === 'Bearer e2e-token')
+      && !JSON.stringify(log).includes('e2e-token'), cf.calls.map((x) => x.auth));
+  ok('each query covers the last seven full days',
+    cf.calls.every((x) => /date_geq:"\d{4}-\d\d-\d\d", date_leq:"\d{4}-\d\d-\d\d"/.test(x.query)), cf.calls[0].query);
+
+  // a section Cloudflare refuses is named, and the rest still arrives
+  cf.refuseD1 = true;
+  await monday();
+  ok('a refused section does not sink the digest', await until(() => digests().length === before + 2), titles());
+  const text2 = embed(digests().pop()).description || '';
+  ok('it says which section, and why',
+    text2.includes('**D1:** unavailable (not authorized for that account)') && text2.includes('**Worker requests:** 46,500'), text2);
+  cf.refuseD1 = false;
+}
+
 /* ----- what must never go out ----- */
 
 const sent = JSON.stringify(log);
@@ -240,6 +326,8 @@ d1exec(`UPDATE tournaments SET started = ${Date.now() - 2 * DAY - 3600 * 1000} W
 await hourly();
 ok('the hourly run survives a dead webhook',
   await until(() => d1row(`SELECT wrapped FROM tournaments WHERE id = ${tid2}`).wrapped === 1));
+await monday();
+ok('the digest survives a dead webhook and a dead Cloudflare', (await fetch(BASE + '/pub/nope')).status === 404);
 ok('the ordinary tick still runs', (await fetch(BASE + '/__scheduled')).ok);
 
 summary('alerts e2e');

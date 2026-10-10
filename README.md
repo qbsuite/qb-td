@@ -586,8 +586,11 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 # public routes serve, and the tests trigger it via /__scheduled.
 # e2e_alerts.js additionally needs the dev Worker pointed at the sink it
 # runs itself, which means a line in worker/.dev.vars *before* this
-# starts — .dev.vars is read once, at startup:
+# starts — .dev.vars is read once, at startup (the last two stand the
+# sink in for Cloudflare's analytics API, for the usage digest):
 #   DISCORD_WEBHOOK=http://127.0.0.1:8798/hook
+#   CF_API_TOKEN=e2e-token
+#   CF_API_BASE=http://127.0.0.1:8798/cf
 npx wrangler dev --local --port 8799 --test-scheduled &
 cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js && node tests/e2e_brackets.js \
   && node tests/e2e_alerts.js
@@ -904,6 +907,26 @@ npx wrangler deploy
 
 Leave `DISCORD_WEBHOOK` unset and the whole feature is dead code: no
 fetch, no query, no write.
+
+**Weekly usage digest.** With a second secret the same channel gets one
+message every Monday (15:00 UTC, a third cron trigger): the last seven
+full UTC days of Worker requests and D1 rows read and written — the
+week's total, and its busiest day against the Free plan's daily limit —
+plus R2 storage and operations. It turns yellow when the busiest day
+passes 40% of a limit and red at 70%. The numbers come from Cloudflare's
+GraphQL Analytics API, so the Worker needs a token that can read them and
+nothing else:
+
+```bash
+# dash.cloudflare.com > My Profile > API Tokens > Create Custom Token,
+# with the single permission Account > Account Analytics > Read
+npx wrangler secret put CF_API_TOKEN
+```
+
+The account is `LIVE_ACCOUNT_ID` (or `CF_ACCOUNT_ID`, if you don't run
+qb-td-live). A section Cloudflare refuses is reported as unavailable, with
+its reason, and the rest still arrives. `tools/cf_watch.mjs` is the same
+look for a single day from your laptop, in more detail.
 
 Cost, per tournament and only while the webhook is set: up to five calls
 to a free Discord webhook (three posts, two deletes) and three one-row D1

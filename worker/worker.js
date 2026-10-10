@@ -1495,7 +1495,10 @@ function liveMark(env, t) {
    what happens next rather than replaying the backlog (WRAP_WINDOW).
    Apply migrate-alertmsg.sql first. */
 
-const ALERT_COLOR = { created: 0x5865f2, started: 0x57f287, finished: 0xfee75c, unused: 0x99aab5 };
+const ALERT_COLOR = {
+  created: 0x5865f2, started: 0x57f287, finished: 0xfee75c, unused: 0x99aab5,
+  watch: 0xfee75c, high: 0xed4245,
+};
 const ALERT_TIMEOUT_MS = 5000;
 const ALERT_CRON = '0 * * * *';
 // A wrap-up only reaches this far back, so a webhook switched on (or back
@@ -1641,6 +1644,139 @@ async function alertWrapUps(env) {
       ],
     });
   }
+}
+
+/* The weekly usage digest: one message every Monday (DIGEST_CRON) with
+   the last seven full UTC days of what can hit a Free-plan limit — Worker
+   requests, D1 rows read and written, R2 storage and operations — so a
+   trend shows up in the channel before it shows up as an outage. The
+   limits that bite are daily, so each line gives the week's busiest day
+   against its limit; R2's are monthly and its line is the week's total.
+
+   The numbers come from Cloudflare's GraphQL Analytics API, read with the
+   CF_API_TOKEN secret (an API token with Account Analytics: Read, nothing
+   else). Unset, or with no webhook, the digest is dead code. tools/
+   cf_watch.mjs is the same look for one day from a laptop, in more
+   detail. A section Cloudflare refuses is reported as unavailable rather
+   than sinking the rest. */
+
+const DIGEST_CRON = '0 15 * * MON';
+const CF_API = 'https://api.cloudflare.com/client/v4';
+const FREE = {
+  requests: 100000,          // Worker requests a day, account-wide
+  rowsRead: 5000000,         // D1 rows read a day
+  rowsWritten: 100000,       // D1 rows written a day
+  r2Bytes: 10e9,             // R2 storage
+  r2A: 1000000,              // R2 Class A (writes, lists) a month
+  r2B: 10000000,             // R2 Class B (reads) a month
+};
+// Class A = mutating or listing; everything else that is billed is a read.
+const R2_CLASS_A = /^(List|Put|Copy|CompleteMultipartUpload|CreateMultipartUpload|UploadPart|LifecycleStorageTierTransition)/;
+const R2_FREE_OPS = /^(Delete|AbortMultipartUpload)/;
+
+function digestAccount(env) {
+  return (env.CF_ACCOUNT_ID || env.LIVE_ACCOUNT_ID || '').trim();
+}
+
+// One GraphQL query against the account; answers the account node or
+// throws with Cloudflare's reason (never the token).
+async function cfAnalytics(env, body) {
+  const res = await fetch((env.CF_API_BASE || CF_API) + '/graphql', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + env.CF_API_TOKEN.trim(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: `{ viewer { accounts(filter:{accountTag:"${digestAccount(env)}"}) { ${body} } } }` }),
+    signal: AbortSignal.timeout(ALERT_TIMEOUT_MS * 2),
+  });
+  const out = await res.json().catch(() => null);
+  if (!res.ok || !out || out.errors || !out.data) {
+    const why = out && out.errors && out.errors[0] && out.errors[0].message;
+    throw new Error(String(why || 'HTTP ' + res.status).slice(0, 80));
+  }
+  return out.data.viewer.accounts[0] || {};
+}
+
+// "1,234 this week, busiest day 456 (0.5% of 100,000 a day)"
+function digestLine(label, byDay, limit) {
+  const days = Object.values(byDay);
+  const total = days.reduce((a, b) => a + b, 0);
+  const peak = Math.max(0, ...days);
+  return {
+    pct: peak / limit,
+    text: `**${label}:** ${total.toLocaleString('en-US')} this week, busiest day ` +
+      `${peak.toLocaleString('en-US')} (${(100 * peak / limit).toFixed(1)}% of ${limit.toLocaleString('en-US')} a day)`,
+  };
+}
+
+async function alertDigest(env, now = Date.now()) {
+  if (!alertsEnabled(env) || !(env.CF_API_TOKEN || '').trim() || !digestAccount(env)) return;
+  const day = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const from = day(now - 7 * 86400000);
+  const to = day(now - 86400000);
+  const range = `filter:{date_geq:"${from}", date_leq:"${to}"}`;
+  const sumBy = (rows, pick) => {
+    const out = {};
+    for (const r of rows || []) out[r.dimensions.date] = (out[r.dimensions.date] || 0) + (pick(r) || 0);
+    return out;
+  };
+  const lines = [];
+  let worst = 0;
+  const section = async (label, fn) => {
+    try {
+      for (const l of await fn()) { lines.push(l.text); worst = Math.max(worst, l.pct || 0); }
+    } catch (e) {
+      console.log('digest:', label, 'unavailable:', e.message);
+      lines.push(`**${label}:** unavailable (${e.message})`);
+    }
+  };
+
+  await section('Worker requests', async () => {
+    const a = await cfAnalytics(env,
+      `w: workersInvocationsAdaptive(limit:10000, ${range}) { sum { requests } dimensions { date } }`);
+    return [digestLine('Worker requests', sumBy(a.w, (r) => r.sum.requests), FREE.requests)];
+  });
+  await section('D1', async () => {
+    const a = await cfAnalytics(env,
+      `d: d1AnalyticsAdaptiveGroups(limit:10000, ${range}) { sum { rowsRead rowsWritten } dimensions { date } }`);
+    return [
+      digestLine('D1 rows read', sumBy(a.d, (r) => r.sum.rowsRead), FREE.rowsRead),
+      digestLine('D1 rows written', sumBy(a.d, (r) => r.sum.rowsWritten), FREE.rowsWritten),
+    ];
+  });
+  await section('R2', async () => {
+    const a = await cfAnalytics(env,
+      `ops: r2OperationsAdaptiveGroups(limit:10000, ${range}) { sum { requests } dimensions { actionType } } ` +
+      `store: r2StorageAdaptiveGroups(limit:1000, ${range}, orderBy:[date_DESC]) { max { payloadSize metadataSize } dimensions { bucketName date } }`);
+    let classA = 0;
+    let classB = 0;
+    for (const r of a.ops || []) {
+      const t = String(r.dimensions.actionType);
+      if (R2_FREE_OPS.test(t)) continue;
+      if (R2_CLASS_A.test(t)) classA += r.sum.requests; else classB += r.sum.requests;
+    }
+    // each bucket's newest day in the window
+    const seen = new Set();
+    let bytes = 0;
+    for (const r of a.store || []) {
+      if (seen.has(r.dimensions.bucketName)) continue;
+      seen.add(r.dimensions.bucketName);
+      bytes += (r.max.payloadSize || 0) + (r.max.metadataSize || 0);
+    }
+    // a week's operations against a month's allowance, as a share of the month
+    const month = (n, limit) => `${n.toLocaleString('en-US')} (${(100 * n / limit).toFixed(1)}% of ${limit.toLocaleString('en-US')} a month)`;
+    return [
+      { pct: bytes / FREE.r2Bytes,
+        text: `**R2 storage:** ${(bytes / 1e6).toFixed(1)} MB (${(100 * bytes / FREE.r2Bytes).toFixed(1)}% of 10 GB)` },
+      { pct: Math.max(classA / FREE.r2A, classB / FREE.r2B) * 4,
+        text: `**R2 operations this week:** writes ${month(classA, FREE.r2A)}, reads ${month(classB, FREE.r2B)}` },
+    ];
+  });
+
+  const kind = worst >= 0.7 ? 'high' : worst >= 0.4 ? 'watch' : 'unused';
+  await postAlert(env, {
+    kind, name: `Usage, ${from} to ${to}`,
+    status: worst >= 0.7 ? 'Close to a Free-plan limit' : worst >= 0.4 ? 'Worth watching' : 'Well within the Free plan',
+    more: lines,
+  });
 }
 
 /* ---------- TO admin API (/a/*, admin-link-authed) ----------
@@ -5018,8 +5154,10 @@ export default {
   // Cron (wrangler.toml [triggers]): rebuilds dirty tournaments' round
   // shards and, when configured, publishes them to the GitHub data repo.
   async scheduled(event, env, ctx) {
-    // the hourly trigger is the alerts' wrap-up; everything else is the tick
+    // the hourly trigger is the alerts' wrap-up and the Monday one their
+    // usage digest; everything else is the tick
     if (event.cron === ALERT_CRON) { ctx.waitUntil(alertWrapUps(env)); return; }
+    if (event.cron === DIGEST_CRON) { ctx.waitUntil(alertDigest(env)); return; }
     ctx.waitUntil(tickDirty(metered(env)));
   },
 };

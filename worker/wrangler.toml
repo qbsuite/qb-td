@@ -48,9 +48,11 @@ simple = { limit = 30, period = 60 }
 # minute so viewers fetch them from raw.githubusercontent.com instead of
 # this Worker. Apply migrate-pub.sql before enabling.
 [triggers]
-# The second trigger is the alerts' hourly wrap-up (worker.js ALERT_CRON);
-# it does nothing unless DISCORD_WEBHOOK is set.
-crons = ["* * * * *", "0 * * * *"]
+# The second trigger is the alerts' hourly wrap-up (worker.js ALERT_CRON)
+# and the third their Monday usage digest (DIGEST_CRON, 15:00 UTC); both
+# do nothing unless DISCORD_WEBHOOK is set, and the digest also needs
+# the CF_API_TOKEN secret (Account Analytics: Read).
+crons = ["* * * * *", "0 * * * *", "0 15 * * MON"]
 
 [vars]
 # Origin of the GitHub Pages site — used for CORS.
@@ -87,7 +89,7 @@ LIVE_ACCOUNT_ID = "905b6a6cd745425d70d3c4d9612ba2d8"
 # first.
 
 # The only secrets are the snapshot publisher's GitHub credential,
-# LIVE_TOKEN (above) and DISCORD_WEBHOOK;
+# LIVE_TOKEN (above), DISCORD_WEBHOOK and CF_API_TOKEN;
 # all request access is via unguessable link secrets (see worker.js).
 
 # Workers Logs, for counting how often the public page falls back to the Worker
