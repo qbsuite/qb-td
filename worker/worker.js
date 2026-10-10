@@ -1513,7 +1513,9 @@ async function postAlert(env, { kind, title, lines }) {
     });
     if (!res.ok) console.log('alert rejected (' + res.status + ')');
   } catch (e) {
-    console.log('alert failed:', e.message);
+    // the error's name, never its message: an "Invalid URL" message quotes
+    // the secret's value, and the webhook URL is a credential
+    console.log('alert failed:', e.name);
   }
 }
 
