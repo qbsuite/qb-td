@@ -432,7 +432,7 @@ if (typeof document !== 'undefined' && inDemoPage) {
     + '<span class="muted">simulated tournament, stored in this browser</span>'
     + '<span class="spacer" style="flex:1"></span>'
     + '<a href="index.html?a=demo">TD</a> <a href="read.html?b=demo">Moderator</a> <a href="t.html?t=demo">Public</a>'
-    + '<span class="muted">·</span> <a href="index.html#try">about</a> <a href="#" id="demoreset">reset</a>';
+    + '<span class="muted">·</span> <a href="about.html#demo">about</a> <a href="#" id="demoreset">reset</a>';
   document.body.prepend(strip);
   strip.querySelector('#demoreset').onclick = (e) => {
     e.preventDefault();

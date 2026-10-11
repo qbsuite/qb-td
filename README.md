@@ -538,9 +538,9 @@ dashboard shows which invites are still unused, and revokes them.
 - `app/js/sidebar.js` — the tournaments running on this instance ("The
   directory", below) and the approved past ones (the archive): the home
   page's sidebar and the archive list.
+- `app/about.html` — what qb-td is, and the way into the demo.
 - `js/demo.js` + `demo/fixture.js` — the demo tournament, reached from
-  the home page's "Try a simulated tournament" (`demo.html` only
-  redirects there). Opening any page with `?t=demo`, `?a=demo`, or
+  the About page (`demo.html` only redirects there). Opening any page with `?t=demo`, `?a=demo`, or
   `?b=demo` / `?b=demo-b` (the slug is reserved; real bucket secrets are
   long random tokens) makes `api.js` serve every `pub()` call from
   `demo.js` in the browser: the committed fixture holds a 4-team triple

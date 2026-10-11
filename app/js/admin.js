@@ -102,9 +102,11 @@ function showLinkModal(link, closes, onDone) {
 }
 
 /* ---------- the home page ----------
-   What qb-td is, the create form, this device's tournaments and the demo
-   (each a section that folds, the choice kept per device), and on the
-   right the tournaments running here and the ones that have (sidebar.js). */
+   Laid out like a tournament's Live tab (hub.css): the create form, then
+   this device's tournaments as a tight list that folds (the choice kept
+   per device), and on the right the rail — the tournaments running here
+   and the ones that have (sidebar.js). What qb-td is, and the demo, are
+   on about.html. */
 
 const FOLDS_KEY = 'qbtdHomeFolds';
 function foldState() {
@@ -125,25 +127,16 @@ const shortDay = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'sh
 
 function showList() {
   const links = savedLinks();
-  const folds = foldState();
-  // "#try" is where the demo's own links (and the old demo.html) point
-  const wantTry = location.hash === '#try';
-  const open = {
-    yours: folds.yours !== false,
-    // someone with nothing here yet is most likely looking around
-    try: wantTry || (folds.try === undefined ? !links.length : folds.try),
-  };
-  document.body.classList.add('homepage');
-  $('wrap').classList.add('wide');
+  document.body.classList.add('hubpage', 'homepage');
   view.innerHTML = `
-    <div class="split">
+    <div class="livegrid homegrid">
       <div>
         <div class="row newrow">
           <input id="newname" placeholder="Name" aria-label="Tournament name">
           <input id="newslug" placeholder="Slug (public URL)" aria-label="Slug">
           <button id="newbtn" class="primary">Create tournament</button>
         </div>
-        <details class="fold" data-fold="yours"${open.yours ? ' open' : ''}>
+        <details class="fold" data-fold="yours"${foldState().yours === false ? '' : ' open'}>
           <summary><h2>Your tournaments</h2><span class="muted">${links.length} on this device</span></summary>
           ${links.map((e) => {
             const live = Date.now() < e.closes;
@@ -155,29 +148,15 @@ function showList() {
             ${live ? '' : `<a href="${esc(statsLink(e.slug))}">Public page</a>`}
             <button class="linkbtn muted" data-forget="${esc(e.secret)}" title="Remove from this device's list">Remove</button>
           </div>`;
-          }).join('') || '<div class="trow none">None yet. Create one above, or open a tournament with its admin link.</div>'}
-        </details>
-        <details class="fold" id="try" data-fold="try"${open.try ? ' open' : ''}>
-          <summary><h2>Try a simulated tournament</h2><span class="muted">stored in this browser</span></summary>
-          <div class="trow"><a class="nm" href="index.html?a=demo">Tournament director</a><span class="st">set rounds, watch uploads, export stats</span></div>
-          <div class="trow"><a class="nm" href="read.html?b=demo">Moderator</a><span class="st">read the packet, keep score, upload</span></div>
-          <div class="trow"><a class="nm" href="t.html?t=demo">Player or spectator</a><span class="st">schedule, standings, categories</span></div>
-          <div class="trow none"><span class="nm" style="font-weight:400">Nothing here leaves your browser.</span><button class="linkbtn muted" id="demoreset">Reset demo data</button></div>
+          }).join('') || `<div class="trow none">None yet. Create one above, or see <a href="about.html#demo">how it works</a> first.</div>`}
         </details>
       </div>
-      <nav id="tside" class="tside" aria-label="Tournaments on qb-td" hidden></nav>
+      <nav id="tside" class="liverail tside" aria-label="Tournaments on qb-td" hidden></nav>
     </div>`;
   view.querySelectorAll('details[data-fold]').forEach((d) => {
     d.addEventListener('toggle', () => keepFold(d.dataset.fold, d.open));
   });
-  if (wantTry) $('try').scrollIntoView();
-  $('demoreset').onclick = async () => {
-    // demo.js carries the whole fixture: only fetched when asked for
-    const { reset } = await import('./demo.js');
-    reset();
-    say('Demo data cleared');
-  };
-  // the sidebar is a nicety: the page is complete without it
+  // the rail is a nicety: the page is complete without it
   import('./sidebar.js').then((m) => m.renderSidebar($('tside'))).catch(() => {});
   view.querySelectorAll('[data-forget]').forEach((b) => {
     b.onclick = () => {

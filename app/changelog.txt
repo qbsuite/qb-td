@@ -10,12 +10,12 @@ Release Notes for 10/10/2026
 
 [ UI ]
 - New home page: tournaments running on qb-td now, and past ones, are listed down the right.
-- Your tournaments is one line each and folds away, and the demo is on the home page.
+- Your tournaments is a compact list that folds away.
 - The slug is filled in from the tournament's name as you type; you can still change it.
 - A running tournament with its public page off is listed by name only, without a link.
 
 [ DEMO ]
-- The demo's banner switches between the TD, moderator and public views.
+- The demo moved to a new About page, and its banner switches between the TD, moderator and public views.
 
 Release Notes for 10/5/2026
 

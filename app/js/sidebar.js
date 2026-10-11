@@ -51,28 +51,29 @@ export async function tournamentLists(now = Date.now()) {
   return { live, past };
 }
 
-// name over date; a live one that isn't linked says why
-const itemHtml = (t, { current, dot }) => {
-  const sub = day(t.at) + (dot && !t.href ? ' · public page off' : '');
-  const body = `${dot ? '<span class="dot"></span>' : ''}${esc(t.name)}<small>${esc(sub)}</small>`;
-  if (current && t.slug === current) return `<span class="it on" aria-current="page">${body}</span>`;
+// name, with its date at the right; a live one that isn't linked says why
+const itemHtml = (t, { dot } = {}) => {
+  const body = `<span>${dot ? '<span class="dot"></span>' : ''}${esc(t.name)}${
+    dot && !t.href ? ' <small>public page off</small>' : ''}</span><small>${esc(day(t.at))}</small>`;
   return t.href ? `<a class="it" href="${esc(t.href)}">${body}</a>` : `<span class="it">${body}</span>`;
 };
 
-/** Fill `el` with the sidebar. current: the slug of the tournament on
-    screen, shown as where you are rather than as a link. */
-export async function renderSidebar(el, { current = '' } = {}) {
+/** Fill `el` with the rail (hub.css .railblock): what is live now, then
+    the past tournaments, a year label above each year once there is more
+    than one. Hidden when there is nothing to list. */
+export async function renderSidebar(el) {
   const { live, past } = await tournamentLists();
   if (!live.length && !past.length) { el.hidden = true; return; }
-  const years = new Map();
-  for (const t of past) {
-    const y = new Date(t.at).getFullYear();
-    if (!years.has(y)) years.set(y, []);
-    years.get(y).push(t);
-  }
+  const years = [...new Set(past.map((t) => new Date(t.at).getFullYear()))];
+  const pastHtml = years.map((y) =>
+    (years.length > 1 ? `<div class="yr">${y}</div>` : '')
+    + past.filter((t) => new Date(t.at).getFullYear() === y).map((t) => itemHtml(t)).join('')).join('');
   el.innerHTML =
-    (live.length ? `<div class="sh">Live now</div>${live.map((t) => itemHtml(t, { current, dot: true })).join('')}` : '')
-    + [...years].map(([y, list]) =>
-      `<div class="sh">${y}</div>${list.map((t) => itemHtml(t, { current })).join('')}`).join('');
+    (live.length ? `<div class="railblock">
+      <div class="railhead"><b>Live now</b><span class="muted">${live.length}</span></div>
+      <div class="tlist">${live.map((t) => itemHtml(t, { dot: true })).join('')}</div></div>` : '')
+    + (past.length ? `<div class="railblock">
+      <div class="railhead"><b>Past tournaments</b><a href="archive.html">All</a></div>
+      <div class="tlist">${pastHtml}</div></div>` : '');
   el.hidden = false;
 }
