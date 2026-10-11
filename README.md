@@ -87,15 +87,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   replaces its entries instead of double-counting, and a question is
   logged only when it was truly read (an added-but-unreached question
   stays unused).
-- **Moderator bucket page** (`app/bucket.html?b=<secret>`, no login,
-  mobile-first): shows the live current round, downloads any played
-  round's packet (the live round is highlighted; future rounds stay
-  locked), and uploads the game's `.qbj` + MODAQ game file. It is
-  the fallback path, not the main one — the reader page below is — but it
-  is not redundant: it is the only way to hand a moderator a packet MODAQ
-  cannot open (a PDF), and the only way to submit a `.qbj` produced
-  elsewhere when a reader session is lost. It shares the reader's link
-  secret, so a mod can always reach it by editing the URL.
+- **No room upload page.** A room has one page, the reader below, and the
+  only thing a moderator sends is MODAQ's "Upload to qb-td". A game that
+  exists only as files (a lost reader session, a game scored elsewhere)
+  goes to the TD, who puts it in with **Add a game** on the Live hub's
+  Uploads. There used to be a second per-room page for uploading files by
+  hand; a moderator took it for where packets go and uploaded those, so it
+  was removed. `app/bucket.html` is kept only to send old links to the
+  reader.
 - **Moderator reader page** (`app/read.html?b=<secret>`, same link secret):
   an embedded [MODAQ](https://github.com/alopezlago/MODAQ) preloaded with
   a round's packet (the live round by default; played rounds stay

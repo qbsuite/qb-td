@@ -318,13 +318,13 @@ await fill(`[data-roomrename="${d.buckets[0].id}"]`, LONG, ['change']);
 d = await until(async () => { const x = await detail(); return x.buckets[0].room_name === LONG && x; }, 'rename saved');
 ok('3 rooms: an inline rename reaches the Worker', d.buckets[0].room_name === LONG);
 await waitJs(`document.querySelector('[data-roomrename="${d.buckets[0].id}"]').value === ${q(LONG)}`, 'renamed row');
-ok('3 rooms: every room has its reader and upload-page links', await js(`(() => {
+ok('3 rooms: every room has its reader link, and no other', await js(`(() => {
   const hrefs = [...document.querySelectorAll('.roomtable a')].map((a) => a.getAttribute('href'));
-  return ${q(d.buckets.map((b) => b.secret))}.every((s) => hrefs.some((h) => h.endsWith('read.html?b=' + s))
-    && hrefs.some((h) => h.endsWith('bucket.html?b=' + s)));
+  return hrefs.length === 6
+    && ${q(d.buckets.map((b) => b.secret))}.every((s) => hrefs.some((h) => h.endsWith('read.html?b=' + s)));
 })()`));
-ok('3 rooms: Copy buttons for both links on every row',
-  await js(`document.querySelectorAll('.roomtable .linkpair button').length === 12`));
+ok('3 rooms: a Copy button for the link on every row',
+  await js(`document.querySelectorAll('.roomtable .linkpair button').length === 6`));
 await click('.roomtable tr:nth-child(2) .linkpair button');
 await waitJs(`/Copied/.test(document.querySelector('#msg').textContent)`, 'room link copied');
 ok('3 rooms: Copy puts the room\'s reader link on the clipboard',
@@ -705,18 +705,15 @@ const gameFiles = (round, room, flip) => {
   const base = `Round_${round}_${g.a.team}_${g.b.team}`.replace(/ /g, '_');
   return { g, qbj, base };
 };
+// A room turns its files in over its own upload route, as the reader's
+// "Upload to qb-td" does; the answers are what the Worker said of each.
 async function roomUpload(bucket, round, files) {
-  await goto(`${PAGES}/bucket.html?b=${bucket.secret}`);
-  await waitJs(`!document.querySelector('#roundcard').hidden && document.querySelectorAll('#rounds a').length > 0`, 'the upload page');
-  const chips = await js(`[...document.querySelectorAll('#rounds a')].map((a) => a.textContent + (a.classList.contains('on') ? '*' : ''))`);
-  ok(`10 upload page: ${bucket.room_name} shows round chips, the live round marked`,
-    chips.includes(`Round ${(await detail()).tournament.current_round}*`), chips);
-  const before = (await js(`document.querySelectorAll('#uploads .u').length`));
-  await fill('#upround', String(round));
-  await setFiles('#upfiles', files.map((f) => f.path));
-  await click('#upbtn');
-  await waitJs(`document.querySelectorAll('#uploads .u').length === ${before + files.length}`, 'uploads listed');
-  return js(`[...document.querySelectorAll('#uploads .u')].slice(0, ${files.length}).map((u) => u.textContent)`);
+  const out = [];
+  for (const f of files) {
+    out.push((await call(`/b/${bucket.secret}/upload?round=${round}&name=${encodeURIComponent(path.basename(f.path))}`,
+      { method: 'POST', body: readFileSync(f.path, 'utf8') })).body);
+  }
+  return out;
 }
 
 // room 3 reads round 1 in the browser: pre-game screen, then Start
@@ -759,14 +756,14 @@ for (let room = 0; room < 6; room++) {
     played.push({ round: 1, bucket: b.id, qbj, filename: base + '.qbj' });
   }
   const rows = await roomUpload(b, 1, files);
-  ok(`10 upload page: ${b.room_name} shows its round chips and the upload with a ✓`,
-    rows.length === files.length && rows.every((r) => r.includes('✓')), rows);
+  ok(`10 room upload: ${b.room_name}'s files are taken`,
+    rows.length === files.length && rows.every((r) => r && !r.error), rows);
   d = await detail();
   const mine = d.files.filter((f) => f.bucket_id === b.id && f.round === 1);
   const kinds = mine.map((f) => f.kind).sort().join(',');
-  ok(`10 upload page: ${b.room_name}'s files reach the Worker (${kinds})`,
+  ok(`10 room upload: ${b.room_name}'s files reach the Worker (${kinds})`,
     room === 0 ? kinds === 'game,qbj' : room === 1 ? kinds === 'combined' : kinds === 'qbj', mine);
-  ok(`10 upload page: ${b.room_name}'s files parse`, mine.every((f) => !f.error), mine.map((f) => f.error));
+  ok(`10 room upload: ${b.room_name}'s files parse`, mine.every((f) => !f.error), mine.map((f) => f.error));
 }
 
 /* ---------- 12, 15. Live Hub: round 1, advance, set round ---------- */
@@ -1268,7 +1265,7 @@ async function openHubOf(adminSecret) {
   ok('12b brackets: the hub follows', (await text('.roundline')).replace(/\s+/g, ' ').includes('Prelims · round 3 of 5')
     && !(await text('.roundline')).includes('still on round'));
 
-  // the reader and the upload page of a Pool B room say which pool it is in
+  // the reader of a Pool B room says which pool it is in
   const gB = P.games(3, 'B')[0];
   const bB = P.room(gB);
   await goto(`${PAGES}/read.html?b=${bB.secret}`);
@@ -1283,10 +1280,11 @@ async function openHubOf(adminSecret) {
   ok('12b reader: playoff games read as placeholders until filled',
     (await js(`[...document.querySelectorAll('#schedrows tr:not(.bhrow)')].slice(-1)[0].textContent`)).match(/Pool [AB] \d+(st|nd|rd|th) v Pool [AB] \d+(st|nd|rd|th)/) !== null,
     await js(`[...document.querySelectorAll('#schedrows tr:not(.bhrow)')].slice(-1)[0].textContent`));
+  // the upload page is gone; its old address lands on the reader
   await goto(`${PAGES}/bucket.html?b=${bB.secret}`);
-  await waitJs(`!!document.querySelector('#curround .bname')`, 'the Pool B upload page');
-  ok('12b room page: Now on round 3 · Pool B · the game',
-    (await text('#curround')).replace(/\s+/g, ' ').trim() === `Now on round 3 · Pool B · ${gB.a.team} vs ${gB.b.team}`, await text('#curround'));
+  await waitJs(`location.pathname.endsWith('/read.html') && !document.querySelector('#schedpanel').hidden`, 'the old upload-page link');
+  ok('12b room page: an old upload-page link opens the reader',
+    (await js('location.search')) === '?b=' + bB.secret && !(await exists('#bucketlink')), await js('location.href'));
 }
 {
   // a round robin: one bracket, no bracket anything
@@ -1304,9 +1302,6 @@ async function openHubOf(adminSecret) {
   await waitJs(`!document.querySelector('#schedpanel').hidden`, 'the round robin reader');
   ok('12b round robin: the reader header has no bracket', (await text('#room')).replace(/\s+/g, ' ').trim() === `${R.rooms[0].room_name} · Round 2`
     && !(await exists('#schedrows tr.bhrow')), await text('#room'));
-  await goto(`${PAGES}/bucket.html?b=${R.rooms[0].secret}`);
-  await waitJs(`!document.querySelector('#roundcard').hidden`, 'the round robin upload page');
-  ok('12b round robin: the upload page says the round alone', (await text('#curround')).trim() === 'Now on round 2', await text('#curround'));
 }
 
 /* ---------- 24b. the public state from qb-td-live ----------

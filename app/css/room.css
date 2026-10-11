@@ -1,5 +1,5 @@
-/* Room pages: the reader before a game starts (read.html) and the room's
-   upload page (bucket.html). Loaded after td.css and uses its variables.
+/* The room page: the reader before a game starts (read.html). Loaded after
+   td.css and uses its variables.
    Nothing here reaches MODAQ: once a game starts, body.reading hides all of
    this but the top bar, and MODAQ renders as it always has. */
 
@@ -130,49 +130,4 @@ a.rnd:hover { text-decoration: none; background: var(--hover-bg); }
   .rmsg { padding: 0 16px; }
 }
 
-/* ---------- room upload page ---------- */
-.bwrap { max-width: 640px; margin: 0 auto; padding: 40px 16px 64px; display: flex; flex-direction: column; gap: 28px; }
-.bhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
-.bhead #tname { font-size: 14px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
-.bhead #room { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; color: var(--fg); margin-top: 4px; display: block; }
-.bhead a { font-size: 14px; }
-.bsec h2 {
-  font-size: 17px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--fg); margin: 0;
-}
-.bsechead {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
-  min-height: 40px; border-bottom: 1px solid var(--fg);
-}
-.bsechead .muted { font-size: 13px; }
-.bsechead label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
-.bsechead input { width: 64px; }
-.bchips { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 12px; }
-.bchips a {
-  height: 34px; padding: 0 12px; display: inline-grid; place-items: center; border-radius: 8px;
-  box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-size: 14px;
-}
-.bchips a:hover { text-decoration: none; color: var(--fg); background: var(--hover-bg); }
-.bchips a.on { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--link); color: var(--fg); font-weight: 600; }
-.drop {
-  margin-top: 14px; border: 1.5px dashed var(--pick-line); border-radius: 12px; padding: 22px;
-  text-align: center; display: flex; flex-direction: column; gap: 6px; cursor: pointer;
-}
-.drop.dragover { border-color: var(--link); background: var(--hover-bg); }
-.drop .muted { font-size: 13px; }
-.drop input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.drop .picked { font-size: 13px; color: var(--fg); }
-.uprow { display: flex; justify-content: flex-end; margin-top: 12px; }
-.ulist .u {
-  display: grid; grid-template-columns: 76px minmax(0, 1fr) 64px 28px; gap: 12px; align-items: center;
-  padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px;
-}
-.ulist .u .brk { overflow-wrap: anywhere; }
-.ulist .u .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-.ulist .u .st { text-align: center; font-weight: 700; }
-.ulist .u .err { grid-column: 2 / -1; color: var(--bad); font-size: 13px; margin-top: -6px; }
-.ulist .none { color: var(--muted); padding: 12px 0; }
-.bstack { display: flex; flex-direction: column; gap: 28px; }
-.bstack[hidden], .bsec[hidden] { display: none; }
 body.reading .rmsg #msg { display: none; }
-.bwrap #msg:empty { display: none; }
-.bwrap #msg { margin: 0; }

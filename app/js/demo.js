@@ -4,7 +4,7 @@
 // or ?b=demo / ?b=demo-b (the slug is reserved server-side; real bucket
 // secrets are 20-char random tokens, so the two demo secrets can never
 // collide with one), so the REAL pages — index.html (the TD hub), t.html,
-// read.html, bucket.html — run unmodified against a committed fixture
+// read.html — run unmodified against a committed fixture
 // instead of the Worker, the same idea as the archive's useFrozenData.
 // Unlike the archive, the demo is live: games a visitor reads in the
 // embedded MODAQ upload into localStorage and flow into stats,

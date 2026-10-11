@@ -54,7 +54,6 @@ function pageDir() {
   return location.href.split(/[?#]/)[0].replace(/index\.html$/, '').replace(/\/$/, '');
 }
 function adminLink(secret) { return pageDir() + '/index.html?a=' + secret; }
-function bucketLink(secret) { return pageDir() + '/bucket.html?b=' + secret; }
 function readLink(secret) { return pageDir() + '/read.html?b=' + secret; }
 function statsLink(slug) { return pageDir() + '/t.html?t=' + slug; }
 function setLink(slug) { return pageDir() + '/s.html?s=' + slug; }
@@ -637,7 +636,7 @@ function renderRoomsSec(a, t, buckets, files) {
   box.innerHTML = `
     <h2>Rooms</h2>
     ${buckets.length ? `<div class="tablewrap"><table class="roomtable">
-      <tr><th>Name</th><th>Reader link</th><th>Upload page</th><th class="num">Files</th><th></th></tr>
+      <tr><th>Name</th><th>Reader link</th><th class="num">Files</th><th></th></tr>
       ${buckets.map((b) => {
         // names go into a JS string inside an attribute: escape for both
         const js = (s) => esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
@@ -645,8 +644,6 @@ function renderRoomsSec(a, t, buckets, files) {
           <td><input class="inlinename" data-roomrename="${b.id}" value="${esc(b.room_name)}" aria-label="Room name"></td>
           <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(readLink(b.secret))}', '${js(b.room_name)} reader link')">Copy</button>
             <a class="muted" href="${esc(readLink(b.secret))}" target="_blank">Open</a></td>
-          <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(bucketLink(b.secret))}', '${js(b.room_name)} upload page')">Copy</button>
-            <a class="muted" href="${esc(bucketLink(b.secret))}" target="_blank">Open</a></td>
           <td class="num muted">${files.filter((f) => f.bucket_id === b.id).length}</td>
           <td class="num"><button class="linkbtn muted" data-delbucket="${b.id}">Remove</button></td>
         </tr>`;
@@ -673,7 +670,7 @@ function renderRoomsSec(a, t, buckets, files) {
         const holder = [...box.children].find((el) => el.classList && el.classList.contains('muted'));
         const wrap = document.createElement('div');
         wrap.className = 'tablewrap';
-        wrap.innerHTML = '<table class="roomtable"><tr><th>Name</th><th>Reader link</th><th>Upload page</th><th class="num">Files</th><th></th></tr></table>';
+        wrap.innerHTML = '<table class="roomtable"><tr><th>Name</th><th>Reader link</th><th class="num">Files</th><th></th></tr></table>';
         if (holder) holder.replaceWith(wrap); else box.querySelector('h2').after(wrap);
         tbody = wrap.querySelector('table');
       }
@@ -2216,7 +2213,7 @@ async function computeStats(a, t, buckets, files, settings) {
     };
     for (const r of raw) add(r.round, r.filename, r.text);
     for (const g of games) add(g.round, g.filename, g.text);
-    // game files uploaded separately through the bucket page
+    // game files that went up separately from their .qbj (Add a game)
     for (const f of files.filter((x) => x.kind === 'game')) {
       try { add(f.round, f.filename, JSON.stringify(await fetchOwnedJson(a, f.r2_key))); }
       catch (e) { /* bundle still useful without it */ }

@@ -340,7 +340,7 @@ function extractMatch(text) {
    included, computed the way MODAQ does) and sends it as the .qbtd.json's
    `protests`; the Worker keeps it on the file row as `summary`, with the
    teams and final score, so the hub's Protests drawer needs no blob
-   reads. A bare .qbj (bucket page, or a file produced elsewhere) has only
+   reads. A bare .qbj (one the TD adds, produced elsewhere) has only
    the notes, so those are parsed instead — no swing, since the buzz
    position isn't in the note. Summaries ride only on the admin route;
    public copies carry neither notes nor summaries. */

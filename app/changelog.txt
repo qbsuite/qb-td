@@ -1,3 +1,12 @@
+Release Notes for 10/11/2026
+
+[ ROOM PAGE ]
+- Removed the room upload page. Rooms send games with "Upload to qb-td"; anything else goes to the TD.
+- Old upload-page links open the room page.
+
+[ SETUP ]
+- Rooms lists one link per room.
+
 Release Notes for 10/10/2026
 
 [ MISC ]

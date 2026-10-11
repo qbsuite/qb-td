@@ -133,7 +133,6 @@ function setHeader(t, room, round, game, bracket) {
       ` · <span class="bname"><i class="lane-${Number(bracket.color) || 0}"></i>${esc(bracket.name)}</span>`);
   }
   if (game) $('game').textContent = game;
-  $('bucketlink').href = 'bucket.html?b=' + encodeURIComponent(secret);
   $('newgame').href = roomLink();
 }
 
