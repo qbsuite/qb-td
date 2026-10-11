@@ -131,10 +131,11 @@ function showList() {
   view.innerHTML = `
     <div class="livegrid homegrid">
       <div>
-        <div class="row newrow">
-          <input id="newname" placeholder="Name" aria-label="Tournament name">
-          <input id="newslug" placeholder="Slug (public URL)" aria-label="Slug">
-          <button id="newbtn" class="primary">Create tournament</button>
+        <div class="newrow">
+          <label>Name<input id="newname" autocomplete="off"></label>
+          <label>URL name<input id="newslug" autocomplete="off" spellcheck="false"></label>
+          <button id="newbtn" class="primary advance">Create tournament</button>
+          <div class="newhint muted" id="newhint"></div>
         </div>
         <details class="fold" data-fold="yours"${foldState().yours === false ? '' : ' open'}>
           <summary><h2>Your tournaments</h2><span class="muted">${links.length} on this device</span></summary>
@@ -175,8 +176,12 @@ function showList() {
   // The slug follows the name as it is typed, until the TD types a slug of
   // their own; clearing the slug box hands it back to the name.
   let ownSlug = false;
-  $('newname').oninput = () => { if (!ownSlug) $('newslug').value = slugFor($('newname').value); };
-  $('newslug').oninput = () => { ownSlug = $('newslug').value !== ''; };
+  // what the URL name is for: the public page's address, as it will be
+  const hint = () => {
+    $('newhint').textContent = $('newslug').value ? 'Public page: ' + statsLink($('newslug').value) : '';
+  };
+  $('newname').oninput = () => { if (!ownSlug) $('newslug').value = slugFor($('newname').value); hint(); };
+  $('newslug').oninput = () => { ownSlug = $('newslug').value !== ''; hint(); };
   $('newbtn').onclick = async () => {
     const run = busy($('newbtn'), { label: 'Creating' });
     try {
@@ -230,7 +235,7 @@ async function showInvite() {
       under Tournament Setup &rarr; Packets &rarr; Join a set.</p>
     <div class="row">
       <input id="invname" placeholder="Name" size="24" value="${esc(inv.name)}">
-      <input id="invslug" placeholder="Slug (public URL)" size="18" value="${esc(inv.slug || '')}">
+      <input id="invslug" placeholder="URL name" size="18" value="${esc(inv.slug || '')}">
       <button id="invstart" class="primary">Create tournament</button>
     </div>`;
   $('invstart').onclick = async () => {

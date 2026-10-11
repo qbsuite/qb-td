@@ -11,7 +11,7 @@ Release Notes for 10/10/2026
 [ UI ]
 - New home page: tournaments running on qb-td now, and past ones, are listed down the right.
 - Your tournaments is a compact list that folds away.
-- The slug is filled in from the tournament's name as you type; you can still change it.
+- The slug is now called the URL name, and is filled in from the tournament's name as you type; you can still change it.
 - A running tournament with its public page off is listed by name only, without a link.
 
 [ DEMO ]

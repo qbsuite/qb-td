@@ -98,7 +98,7 @@ function showList() {
     <h2>New set</h2>
     <div class="row">
       <input id="newname" placeholder="Name" size="24">
-      <input id="newslug" placeholder="Slug (public URL)" size="18">
+      <input id="newslug" placeholder="URL name" size="18">
       <button id="newbtn" class="primary">Create</button>
     </div>
     <div class="muted" style="font-size:13px;margin-top:8px">
@@ -613,7 +613,7 @@ function renderMirrors() {
       <input id="mname" placeholder="Name (e.g. Stanford mirror)" size="26">
       <input id="mhost" placeholder="Host" size="14">
       <input id="mdate" type="date" title="Event date">
-      <input id="mslug" placeholder="Suggested slug (optional)" size="20">
+      <input id="mslug" placeholder="Suggested URL name (optional)" size="20">
       <button id="madd" class="primary">Create invite</button>
     </div>
     <div class="muted" style="font-size:13px;margin-top:6px">

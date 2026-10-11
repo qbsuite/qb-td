@@ -1975,11 +1975,11 @@ const cleanSlug = (s) => String(s || '').trim().toLowerCase();
 // null. Shared by tournaments, sets, and mirrors started from an invite.
 function slugNameError(slug, name) {
   if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(slug)) {
-    return { status: 400, message: 'slug must be 3-40 chars: a-z, 0-9, hyphens' };
+    return { status: 400, message: 'URL name must be 3-40 characters: a-z, 0-9, hyphens' };
   }
   // the in-browser demo tournament owns t.html?t=demo
   // ...and /pub/directory is the list of tournaments (pubDirectory)
-  if (slug === 'demo' || slug === 'directory') return { status: 409, message: 'slug is reserved' };
+  if (slug === 'demo' || slug === 'directory') return { status: 409, message: 'that URL name is reserved' };
   if (!name) return { status: 400, message: 'name required' };
   return null;
 }
@@ -2026,7 +2026,7 @@ async function createTournament(request, env, ctx) {
   }
 
   const made = await insertTournament(env, { slug, name, ip, settings: body.settings });
-  if (!made) return err(env, 409, 'slug already taken');
+  if (!made) return err(env, 409, 'that URL name is already taken');
   alertCreated(env, ctx, { what: 'tournament', name, slug, tid: made.id });
   return json(env, {
     id: made.id, slug, name,
@@ -4126,7 +4126,7 @@ async function createSet(request, env, ctx) {
       admin_secret: adminSecret, closes: created + SET_TTL,
     });
   } catch (e) {
-    return err(env, 409, 'slug already taken');
+    return err(env, 409, 'that URL name is already taken');
   }
 }
 
@@ -4752,7 +4752,7 @@ async function startInvite(request, env, secret, ctx) {
   });
   if (!made) {
     await release();
-    return err(env, 409, 'slug already taken');
+    return err(env, 409, 'that URL name is already taken');
   }
   let linked;
   try {

@@ -20,25 +20,16 @@
 
   <div class="hubtitle"><h1>About</h1></div>
   <div class="about">
-    <p>qb-td runs the logistics of a quizbowl tournament from one link. The
-      tournament director sets up rooms, packets, a roster and a schedule;
-      each moderator gets a room link that hands them the right packet and
-      takes their finished game; and everyone else follows the schedule and
-      the stats on a public page as games come in.</p>
-    <p>There are no accounts. Creating a tournament gives you an admin link,
-      and that link is the only key to it. You have a week to set up; pressing
-      <b>Start tournament</b> opens the rooms, and every link then works for 48
-      hours. Stats export to YellowFruit and to a standard HTML stat report.</p>
-    <p>qb-td is part of <a href="https://qbsuite.github.io/">qbsuite</a>.</p>
+    <p>qb-td consolidates the logistics of a tournament by allowing tournament directors to set up rooms, packets, a roster and a schedule before the start of a tournament. Each moderator is given a room link that automatically chooses team and packet for the round number the tournament is on. When moderators are done reading a game in MODAQ, they click on an export button that is sent to the TD and automatically processed. Players are given a page which contains schedule and detailed stats that are updated as games are exported.</p>
+    <p>Importantly, qb-td is compatible with all the standard procedures for holding MODAQ tournaments. TDs can export to yellowfruit, directly to the html stat reports, and download QBJ files to send to set editors.</p>
 
     <!-- A walkthrough video of each part belongs here when there is one. -->
 
-    <div class="sechead" id="demo"><h2>Try it</h2><button class="linkbtn muted" id="demoreset">Reset demo data</button></div>
-    <p class="muted" style="margin:10px 0 2px">A simulated tournament, partway through its day. It is stored in this
-      browser, so nothing you do in it is sent anywhere.</p>
-    <a class="arow" href="index.html?a=demo"><b>Tournament director</b><span>The hub: set the round, watch games arrive, rule on protests, export stats</span></a>
-    <a class="arow" href="read.html?b=demo"><b>Moderator</b><span>A room: open the packet, read and keep score, upload the game</span></a>
-    <a class="arow" href="t.html?t=demo"><b>Player or spectator</b><span>The public page: schedule, standings, categories, buzzpoints</span></a>
+    <div class="sechead" id="demo"><h2>Example Tournament</h2><button class="linkbtn muted" id="demoreset">Reset demo data</button></div>
+    <p class="muted" style="margin:10px 0 2px">Below is an example tournament on a simulated tournament.</p>
+    <a class="arow" href="index.html?a=demo"><b>Tournament director</b><span>The TD can set up the tournament, set the round number, watch games arrive, rule on protests, and export stats.</span></a>
+    <a class="arow" href="read.html?b=demo"><b>Moderator</b><span>Moderators are shown their room's schedule and are provided links to MODAQ pages with teams and packet loaded in.</span></a>
+    <a class="arow" href="t.html?t=demo"><b>Player or spectator</b><span>Players and the public can view schedules, stats, category stats, and buzzpoints if the TD chooses to enable them.</span></a>
   </div>
 </div>
 <script type="module">

@@ -430,15 +430,18 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
    tournaments — a blue name is a link, a grey one has nothing to open. */
 body.homepage .sitehead a[href="index.html"].muted { display: none; } /* "All tournaments": already here */
 .homegrid { padding-top: 0; }
-.newrow { margin-bottom: 18px; }
-.newrow input { flex: 1 1 150px; max-width: 240px; min-width: 0; }
+/* the one thing the page is for: labelled fields a size up, and the hub's
+   filled button */
+.newrow { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-end; margin-bottom: 24px; }
+.newrow label { display: grid; gap: 4px; flex: 1 1 180px; max-width: 280px; min-width: 0; font-size: 13px; font-weight: 600; }
+.newrow input { height: 44px; font-size: 16px; font-weight: 400; width: 100%; min-width: 0; }
+.newrow .advance { height: 44px; padding: 0 20px; font-size: 16px; }
+.newrow .newhint { flex-basis: 100%; font-size: 13px; min-height: 1.5em; }
 details.fold > summary {
   cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px;
   min-height: 40px; border-bottom: 1px solid var(--fg); font-size: 14px;
 }
 details.fold > summary::-webkit-details-marker { display: none; }
-details.fold > summary::before { content: "\25B8"; color: var(--muted); width: 10px; font-size: 12px; }
-details.fold[open] > summary::before { content: "\25BE"; }
 details.fold:not([open]) > summary { border-bottom-color: var(--line); }
 details.fold > summary h2 { flex: 1; }
 .trow {
