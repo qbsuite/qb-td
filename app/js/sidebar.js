@@ -1,15 +1,15 @@
 // sidebar.js — the tournaments that are running on this instance and the
-// ones that have run on it: the home page's sidebar, the archive list and
-// the sidebar beside an archived tournament.
+// ones that have run on it: the home page's sidebar and the archive list.
 //
-// Two sources, merged here:
-//   the directory  (worker.js "the directory", read through api.js) — what
-//     is live now and what has been played, listed by use. An entry has a
-//     slug only while its TD has the public page on; without one the
-//     tournament is named but not linked.
-//   the archive    (archive/index.json) — the approved, frozen captures.
-//     An archived tournament links to its capture rather than to the live
-//     page, and carries its host and counts.
+// Two sources:
+//   live — the directory (worker.js "the directory", read through api.js):
+//     what is running now, listed by use. An entry has a slug only while
+//     its TD has the public page on; without one the tournament is named
+//     but not linked.
+//   past — the archive (archive/index.json), which a tournament joins only
+//     with the operator's approval (tools/archive.mjs): `tournaments`, the
+//     frozen captures, each linked to its capture; and `named`, tournaments
+//     approved to be listed by name and date with nothing to open.
 
 import { directory, esc } from './api.js';
 
@@ -26,36 +26,34 @@ const dateMs = (s) => {
 async function archiveIndex() {
   try {
     const res = await fetch(new URL('archive/index.json', document.baseURI));
-    return res.ok ? (await res.json()).tournaments || [] : [];
-  } catch (e) { return []; }
+    return res.ok ? await res.json() : {};
+  } catch (e) { return {}; }
 }
 
 /** { live, past }: live is what's running now, past is newest first.
     Items: { name, at, href (null: not linked), slug, host, archived,
     teams, rounds, games }. */
 export async function tournamentLists(now = Date.now()) {
-  const [dir, archive] = await Promise.all([directory(), archiveIndex()]);
-  const archived = new Set(archive.map((t) => t.slug));
-  const live = [];
-  const past = archive.map((t) => ({
-    name: t.name, at: dateMs(t.date), href: 'archive.html?t=' + encodeURIComponent(t.slug),
-    slug: t.slug, host: t.host || '', archived: true, teams: t.teams, rounds: t.rounds, games: t.games,
+  const [dir, index] = await Promise.all([directory(), archiveIndex()]);
+  const live = (dir.t || []).filter((e) => now < e.c).map((e) => ({
+    name: e.n, at: e.d, slug: e.s, host: '', archived: false,
+    href: e.s ? 't.html?t=' + encodeURIComponent(e.s) : null,
   }));
-  for (const e of dir.t || []) {
-    const item = {
-      name: e.n, at: e.d, slug: e.s, host: '', archived: false,
-      href: e.s ? 't.html?t=' + encodeURIComponent(e.s) : null,
-    };
-    if (now < e.c) { if (e.live) live.push(item); }
-    // the archived capture stands in for the live page it was taken from
-    else if (e.past && !(e.s && archived.has(e.s))) past.push(item);
-  }
-  past.sort((a, b) => b.at - a.at);
+  const past = [
+    ...(index.tournaments || []).map((t) => ({
+      name: t.name, at: dateMs(t.date), href: 'archive.html?t=' + encodeURIComponent(t.slug),
+      slug: t.slug, host: t.host || '', archived: true, teams: t.teams, rounds: t.rounds, games: t.games,
+    })),
+    ...(index.named || []).map((t) => ({
+      name: t.name, at: dateMs(t.date), href: null, slug: null, host: t.host || '', archived: false,
+    })),
+  ].sort((a, b) => b.at - a.at);
   return { live, past };
 }
 
+// name over date; a live one that isn't linked says why
 const itemHtml = (t, { current, dot }) => {
-  const sub = [day(t.at), t.host, t.href ? '' : 'public page off'].filter(Boolean).join(' · ');
+  const sub = day(t.at) + (dot && !t.href ? ' · public page off' : '');
   const body = `${dot ? '<span class="dot"></span>' : ''}${esc(t.name)}<small>${esc(sub)}</small>`;
   if (current && t.slug === current) return `<span class="it on" aria-current="page">${body}</span>`;
   return t.href ? `<a class="it" href="${esc(t.href)}">${body}</a>` : `<span class="it">${body}</span>`;

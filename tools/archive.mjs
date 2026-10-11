@@ -15,6 +15,13 @@
 //   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "..."] [--name "..."]
 //   node tools/archive.mjs refresh <slug>
 //   node tools/archive.mjs remove <slug>
+//   node tools/archive.mjs name "<name>" --date YYYY-MM-DD
+//   node tools/archive.mjs unname "<name>"
+//
+// `name` approves a tournament to be LISTED without being archived: its
+// name and date on the home page and the archive list, nothing to open.
+// For one whose TD keeps the public page off — there is nothing public to
+// capture — but which was held here all the same.
 //
 // Common flags: --server <url> to read from a different backend.
 
@@ -42,6 +49,10 @@ function readIndex() {
 // Newest first, which is the order the archive page lists them in.
 function writeIndex(index) {
   index.tournaments.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  if (index.named) {
+    index.named.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    if (!index.named.length) delete index.named;
+  }
   mkdirSync(ARCHIVE, { recursive: true });
   writeFileSync(INDEX, JSON.stringify(index, null, 2) + '\n');
 }
@@ -280,6 +291,24 @@ function cmdRemove(slug) {
   console.log(`removed ${slug} from the archive`);
 }
 
+function cmdName(name, opts) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.date || '')) throw new Error('name needs --date YYYY-MM-DD');
+  const index = readIndex();
+  index.named = (index.named || []).filter((t) => t.name !== name);
+  index.named.push({ name, date: opts.date, ...(opts.host ? { host: opts.host } : {}) });
+  writeIndex(index);
+  console.log(`listed "${name}" (${opts.date}) by name only\n\ncommit the result to approve it.`);
+}
+
+function cmdUnname(name) {
+  const index = readIndex();
+  const before = (index.named || []).length;
+  index.named = (index.named || []).filter((t) => t.name !== name);
+  if (index.named.length === before) throw new Error(`"${name}" is not listed by name`);
+  writeIndex(index);
+  console.log(`removed "${name}" from the list`);
+}
+
 /* ---------- entry ---------- */
 
 function parseArgs(argv) {
@@ -301,15 +330,20 @@ const USAGE = `usage:
   node tools/archive.mjs list
   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "Stanford"] [--name "Title"]
   node tools/archive.mjs refresh <slug>
-  node tools/archive.mjs remove <slug>`;
+  node tools/archive.mjs remove <slug>
+  node tools/archive.mjs name "<name>" --date YYYY-MM-DD
+  node tools/archive.mjs unname "<name>"`;
 
 try {
   const { opts, rest } = parseArgs(process.argv.slice(2));
   const [cmd, slug] = rest;
   if (cmd !== 'list' && !slug) throw new Error(USAGE);
-  if (slug && !/^[a-z0-9-]{3,40}$/.test(slug)) throw new Error('bad slug: ' + slug);
+  const byName = cmd === 'name' || cmd === 'unname';
+  if (slug && !byName && !/^[a-z0-9-]{3,40}$/.test(slug)) throw new Error('bad slug: ' + slug);
 
-  if (cmd === 'list') await cmdList(opts);
+  if (cmd === 'name') cmdName(slug, opts);
+  else if (cmd === 'unname') cmdUnname(slug);
+  else if (cmd === 'list') await cmdList(opts);
   else if (cmd === 'add') await cmdAdd(slug, opts);
   else if (cmd === 'refresh') await cmdAdd(slug, opts, { refresh: true });
   else if (cmd === 'remove') cmdRemove(slug);

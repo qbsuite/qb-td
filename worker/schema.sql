@@ -86,8 +86,8 @@ CREATE TABLE IF NOT EXISTS tournaments (
   alert_msg TEXT,
   wrapped INTEGER NOT NULL DEFAULT 0,
   -- The directory (worker.js "the directory"): this tournament's line in
-  -- the list of tournaments run here, as JSON, exactly as last computed;
-  -- NULL while it isn't listed. Rewritten only when the line changes.
+  -- the list of tournaments running here, as JSON, exactly as last
+  -- computed; NULL while it isn't listed. Rewritten only when the line changes.
   -- Existing databases get it from migrate-directory.sql.
   dir_entry TEXT
 );

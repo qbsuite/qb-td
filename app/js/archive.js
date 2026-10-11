@@ -9,7 +9,7 @@
 // data instead of the Worker.
 
 import { useFrozenData, esc } from './api.js';
-import { tournamentLists, renderSidebar, fullDay } from './sidebar.js';
+import { tournamentLists, fullDay } from './sidebar.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
@@ -22,8 +22,7 @@ function say(text, bad) {
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // A past tournament as one of the public page's filled cards. Archived:
-// what was played, and its stat report. Listed by the directory only: a
-// link to its own public page while that is on, its name alone otherwise.
+// what was played, and its stat report. Named only: nothing to open.
 function cardHtml(t) {
   const when = [fullDay(t.at), t.host].filter(Boolean).join(' · ');
   const name = t.href
@@ -32,7 +31,7 @@ function cardHtml(t) {
   const meta = t.archived
     ? `${plural(t.teams, 'team')} · ${plural(t.rounds, 'round')} · ${plural(t.games, 'game')}<br>
        <a href="archive/${encodeURIComponent(t.slug)}/standings.html">Stat report</a>`
-    : t.href ? 'Not archived yet' : 'Public page off';
+    : 'Results not public';
   return `<div class="acard"><div class="groom">${esc(when)}</div>${name}<div class="ameta">${meta}</div></div>`;
 }
 
@@ -81,11 +80,10 @@ async function openTournament(entry) {
   const { default: data } = await import(`../archive/${entry.slug}.js`);
   useFrozenData(data);
 
+  // From here down it is the public page as it was on the day (minus
+  // buzzpoints, which need the packet password and are never archived).
   archivedStrip(entry);
-  $('wrap').classList.add('wide');
   $('tabs').hidden = false;
-  // beside it, the other tournaments; never in the way of the page itself
-  renderSidebar($('tside'), { current: entry.slug }).catch(() => { $('tside').hidden = true; });
 
   await import('./pubview.js');
 }

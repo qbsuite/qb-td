@@ -2071,6 +2071,14 @@ test('archive manifest entries are well formed', () => {
   assert.deepEqual(dates, [...dates].sort().reverse(), 'sorted newest first');
 });
 
+test('archive entries listed by name only are a name and a date', () => {
+  for (const t of archiveIndex.named || []) {
+    assert.ok(t.name && typeof t.name === 'string', 'named entry has a name');
+    assert.match(t.date, /^\d{4}-\d{2}-\d{2}$/, t.name + ' date');
+    assert.ok(!('slug' in t), t.name + ' carries no slug: there is nothing to open');
+  }
+});
+
 test('archive captures and report pages are all committed', () => {
   for (const t of archiveIndex.tournaments) {
     assert.ok(captures.has(t.slug), 'missing capture for ' + t.slug);

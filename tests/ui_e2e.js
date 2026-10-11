@@ -257,8 +257,13 @@ await goto(`${PAGES}/index.html`);
 await waitJs(`!!document.querySelector('#newname')`, 'the new-tournament form');
 const slug = 'ui-e2e-' + Math.random().toString(36).slice(2, 7);
 const NAME = 'UI E2E Open';
-await fill('#newname', NAME);
+await fill('#newname', 'Café Open @ USC, 2026!');
+ok('1 create: the slug is written from the name as it is typed',
+  (await js(`document.querySelector('#newslug').value`)) === 'cafe-open-usc-2026');
 await fill('#newslug', slug);
+await fill('#newname', NAME);
+ok('1 create: a slug the TD typed is left alone when the name changes',
+  (await js(`document.querySelector('#newslug').value`)) === slug);
 await click('#newbtn');
 await waitJs(`!document.querySelector('#linkmodal').hidden`, 'the save-this-link modal');
 const adminLinkText = await text('#modallink');

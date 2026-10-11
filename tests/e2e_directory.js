@@ -1,15 +1,16 @@
 // e2e_directory.js — the directory (worker.js "the directory": the home
-// page's list of tournaments run on this instance) end to end against a
-// locally running Worker:
+// page's list of tournaments running on this instance) end to end against
+// a locally running Worker:
 //   cd worker && npx wrangler dev --local --port 8799 --test-scheduled
 // then: node tests/e2e_directory.js
 //
 // What it pins down: a tournament is listed by use and never by merely
-// existing (live once two rooms have uploaded, past at ten games over five
-// rounds); the link is only there while the public page is on, and a
+// existing (once two rooms have uploaded), however many games one room
+// puts in; the link is only there while the public page is on, and a
 // tournament with it off is listed by name alone; a rename reaches the
 // list; nothing a moderator or TD holds as a credential is in it; and the
-// hourly sweep rebuilds it from the rows whatever the flags say.
+// hourly sweep takes a closed tournament out — the past is the archive's
+// list, by approval, never this one's.
 
 import { BASE, call, d1exec, d1row, tick, ok, summary } from './e2e_lib.js';
 
@@ -74,7 +75,6 @@ await tick();
 d = await directory();
 let e = entryOf(d, nameA);
 ok('two rooms reporting lists it', Boolean(e), d.body);
-ok('as live, not yet as past', e && e.live === true && e.past === false, e);
 ok('with its link, the public page being on', e && e.s === a.slug, e);
 const row = d1row(`SELECT started FROM tournaments WHERE id = ${a.id}`);
 ok('and when it started and closes', e && e.d === row.started && e.c === row.started + 48 * 3600 * 1000, e);
@@ -108,22 +108,17 @@ await tick();
 e = entryOf(await directory(), nameA + ' II');
 ok('turning it back on brings the link back', e && e.s === a.slug, e);
 
-/* ----- past: ten games over five rounds ----- */
+/* ----- one room is not a tournament, however busy ----- */
 
-const nameB = 'Dir Past ' + rnd();
+const nameB = 'Dir Solo ' + rnd();
 const b = await make(nameB, 1);
 await call(b.A + '/start', { method: 'POST' });
-for (let round = 1; round <= 4; round++) {
+for (let round = 1; round <= 5; round++) {
   await upload(b.rooms[0], round);
   await upload(b.rooms[0], round, '_b');
 }
-await upload(b.rooms[0], 5);
 await tick();
-ok('nine games over five rounds is not enough (one room, so not live either)', !entryOf(await directory(), nameB));
-await upload(b.rooms[0], 5, '_b');
-await tick();
-e = entryOf(await directory(), nameB);
-ok('ten games over five rounds lists it as past', e && e.past === true && e.live === false, e);
+ok('ten games over five rounds from one room is not listed', !entryOf(await directory(), nameB));
 
 const nameC = 'Dir Test ' + rnd();
 const c = await make(nameC, 1);
@@ -140,22 +135,25 @@ ok('newest first', starts.every((v, i) => i === 0 || starts[i - 1] >= v), starts
 const raw = JSON.stringify(d.body);
 ok('no admin or room secret in the directory',
   ![a.admin, b.admin, c.admin, ...a.rooms, ...b.rooms, ...c.rooms].some((s) => raw.includes(s)));
-ok('an entry is name, link, dates and the two flags, nothing more',
-  d.body.t.every((x) => Object.keys(x).sort().join() === 'c,d,live,n,past,s'), d.body.t[0]);
+ok('an entry is name, link and the two dates, nothing more',
+  d.body.t.every((x) => Object.keys(x).sort().join() === 'c,d,n,s'), d.body.t[0]);
 
 /* ----- the hourly sweep ----- */
 
-// a row removed by hand (the operator runbook) is not something any flag
-// records; the sweep rebuilds the list from the rows regardless
-d1exec(`UPDATE tournaments SET dir_entry = NULL WHERE id = ${b.id}`);
-ok('a row changed behind the tick is still in the file', Boolean(entryOf(await directory(), nameB)));
+// Nothing happens on the backend when a tournament closes, so nothing
+// marks it dirty: the sweep is what takes it out of the file. (It is also
+// what repairs a row removed by hand.) Its 48 hours ran out an hour ago:
+const full = nameA + ' II';
+d1exec(`UPDATE tournaments SET started = ${Date.now() - 49 * 3600 * 1000} WHERE id = ${a.id}`);
+await tick();
+ok('a tournament that has closed is still in the file until the sweep', Boolean(entryOf(await directory(), full)));
 const res = await fetch(BASE + '/__scheduled?cron=' + encodeURIComponent('0 * * * *'));
 await res.text();
 let gone = false;
 for (let i = 0; i < 40 && !gone; i++) {
-  gone = !entryOf(await directory(), nameB);
+  gone = !entryOf(await directory(), full);
   if (!gone) await new Promise((resolve) => setTimeout(resolve, 100));
 }
-ok('the hourly sweep rebuilds the file from the rows', gone);
+ok('the hourly sweep takes it out', gone);
 
 summary('directory e2e');

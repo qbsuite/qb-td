@@ -10,27 +10,22 @@
 </head>
 <body>
 <div class="wrap" id="wrap">
-  <div class="split">
-    <div>
-      <header>
-        <h1 id="tname">Past tournaments</h1>
-        <span class="spacer"></span>
-        <span id="archsub" class="sub"></span>
-        <span id="round" class="sub" hidden></span>
-        <button id="refresh" hidden>Refresh</button>
-      </header>
-      <!-- pubview.js drives these; hidden on the list. -->
-      <div class="tabs" id="tabs" hidden>
-        <button class="tab" id="tab-schedule" data-tab="schedule">Schedule</button>
-        <button class="tab" id="tab-stats" data-tab="stats">Stats</button>
-        <button class="tab" id="tab-cats" data-tab="cats" hidden>Categories</button>
-        <button class="tab" id="tab-buzz" data-tab="buzz" hidden>Buzzpoints</button>
-      </div>
-      <div id="msg"></div>
-      <div id="out"></div>
-    </div>
-    <nav id="tside" class="tside" aria-label="Tournaments on qb-td" hidden></nav>
+  <header>
+    <h1 id="tname">Past tournaments</h1>
+    <span class="spacer"></span>
+    <span id="archsub" class="sub"></span>
+    <span id="round" class="sub" hidden></span>
+    <button id="refresh" hidden>Refresh</button>
+  </header>
+  <!-- pubview.js drives these; hidden on the list. -->
+  <div class="tabs" id="tabs" hidden>
+    <button class="tab" id="tab-schedule" data-tab="schedule">Schedule</button>
+    <button class="tab" id="tab-stats" data-tab="stats">Stats</button>
+    <button class="tab" id="tab-cats" data-tab="cats" hidden>Categories</button>
+    <button class="tab" id="tab-buzz" data-tab="buzz" hidden>Buzzpoints</button>
   </div>
+  <div id="msg"></div>
+  <div id="out"></div>
 </div>
 <script type="module" src="js/archive.js"></script>
 </body>

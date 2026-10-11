@@ -528,17 +528,16 @@ dashboard shows which invites are still unused, and revokes them.
   opening together, the TD's buttons; same dev Worker),
   `e2e_alerts.js` (the Discord new-activity alerts against a webhook
   sink the suite runs itself), `e2e_directory.js` (the home page's list
-  of tournaments: who is listed, linked or not, and the hourly sweep),
+  of running tournaments: who is listed, linked or not, the hourly sweep),
   `snapshot_publish.js` (the cron tick, mocked).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
 - `tools/yf_parity.mjs` + `tools/yf_parity/` — `npm run yf-parity`: the
   `.yft` export checked against YellowFruit's own import and save code
   (see "YellowFruit fidelity").
-- `app/js/sidebar.js` — the tournaments running on this instance and
-  the ones that have ("The directory", below), merged with the archive:
-  the home page's sidebar, the archive list, and the sidebar beside an
-  archived tournament.
+- `app/js/sidebar.js` — the tournaments running on this instance ("The
+  directory", below) and the approved past ones (the archive): the home
+  page's sidebar and the archive list.
 - `js/demo.js` + `demo/fixture.js` — the demo tournament, reached from
   the home page's "Try a simulated tournament" (`demo.html` only
   redirects there). Opening any page with `?t=demo`, `?a=demo`, or
@@ -873,29 +872,32 @@ viewers stay on the file from setup (served with a 200, heartbeat long
 expired), so the page can't tell. The hub's Delayed mark is the signal;
 check `tools/cf_watch.mjs` and the Worker's logs.
 
-## The directory: tournaments run here
+## The directory: tournaments running here
 
 The home page lists, down its right side, the tournaments running on the
-instance now and the ones that have run on it. The same list is the
-archive page, and sits beside an archived tournament.
+instance now and, under them, the ones that have run on it.
 
-**Who is listed** is decided by use, never by a tournament merely
-existing, so the rows people make to see what the thing does stay out:
+**Live now** is automatic, and decided by use, never by a tournament
+merely existing — so the rows people make to see what the thing does stay
+out. A tournament is listed once it has started and two rooms have each
+uploaded a game, and drops off when its links close. It is linked while
+its TD has the public page on; with it off it is still listed, by name
+only, in grey. That is a choice this instance makes for every TD:
+switching the public page off hides the results, not the fact that the
+tournament is being held here.
 
-- **live** — started, and two rooms have each uploaded a game;
-- **past** — ten games over five rounds.
+**Past tournaments** are never automatic. The list is the archive
+(`tools/archive.mjs`, "Archiving a tournament"): the tournaments you
+approved with `add`, each linked to its frozen capture, and the ones you
+approved with `name` — listed by name and date, nothing to open, for a
+tournament whose TD keeps the public page off:
 
-**Linked or not.** A listed tournament is linked while its TD has the
-public page on. With it off, the tournament is still listed — by name and
-date only, in grey, with no link and nothing else about it. That is a
-choice this instance makes for every TD: switching the public page off
-hides the results, not the fact that the tournament was held here.
+```bash
+node tools/archive.mjs name "2026 Quartz" --date 2026-09-19
+node tools/archive.mjs unname "2026 Quartz"
+```
 
-Archived tournaments (`tools/archive.mjs`) join the same list with their
-host and counts, and link to their frozen capture rather than to the live
-page it was taken from.
-
-**How it is served.** The list is one file, `directory.json`. With
+**How the live list is served.** It is one file, `directory.json`. With
 qb-td-live on it rides every deploy there as a static file, so a view of
 the home page costs the Worker nothing — no request, no D1 read. Without
 it the page asks `GET /pub/directory` (cached five minutes).
@@ -905,10 +907,11 @@ it the page asks `GET /pub/directory` (cached five minutes).
 was already rebuilding from game rows it had already read; a tournament
 with its public page off, which the tick otherwise never visits, costs one
 indexed count of its own games when it changes. The row is written and
-the file rebuilt only when an entry actually moves — a threshold crossed,
-a rename, the public page switched — a handful of times in a tournament's
-life. An hourly sweep rebuilds the file regardless, so a row deleted by
-hand or a deploy that failed cannot leave it wrong for long.
+the file rebuilt only when an entry actually moves — the threshold
+crossed, a rename, the public page switched — a handful of times in a
+tournament's life. An hourly sweep rebuilds the file regardless, which is
+what takes a closed tournament out of it, and means a row deleted by hand
+or a deploy that failed cannot leave it wrong for long.
 
 Measured 2026-10-10 with the Worker's meter (`--var METER:1`), one whole
 tournament through `tests/e2e_day.js`, before and after the feature:

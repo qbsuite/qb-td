@@ -4,14 +4,15 @@ Release Notes for 10/10/2026
 - The site's operator can get a Discord alert when a tournament is created, started or finished.
 
 [ ARCHIVE ]
-- Added 2026 Terrapin Open at USC and 2026 Penn Bowl Play Test.
+- Added 2026 Terrapin Open at USC and 2026 Penn Bowl Play Test; 2026 Quartz is listed by name.
 - The archive list uses the public page's cards, and an archived tournament opens on Stats.
 - Fixed: archived tournaments no longer show "Live now", and the archive list no longer shows empty tabs.
 
 [ UI ]
-- New home page: the tournaments running on qb-td and the ones that have are listed down the right.
+- New home page: tournaments running on qb-td now, and past ones, are listed down the right.
 - Your tournaments is one line each and folds away, and the demo is on the home page.
-- A tournament with its public page off is listed by name only, without a link.
+- The slug is filled in from the tournament's name as you type; you can still change it.
+- A running tournament with its public page off is listed by name only, without a link.
 
 [ DEMO ]
 - The demo's banner switches between the TD, moderator and public views.

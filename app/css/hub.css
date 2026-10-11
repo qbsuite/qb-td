@@ -428,7 +428,6 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
    sections that fold (the choice is kept per device), with the
    tournaments sidebar on the right. Rows are one line each. */
 body.homepage h2 { font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--fg); margin: 0; }
-.hometag { color: var(--muted); max-width: 60ch; margin: -10px 0 16px; }
 .newrow { margin-bottom: 14px; }
 .newrow input { flex: 1 1 150px; max-width: 240px; min-width: 0; }
 details.fold { border-bottom: 1px solid var(--line); }

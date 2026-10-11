@@ -114,6 +114,13 @@ function keepFold(name, open) {
   try { localStorage.setItem(FOLDS_KEY, JSON.stringify({ ...foldState(), [name]: open })); }
   catch (e) { /* storage blocked: the fold just isn't remembered */ }
 }
+// A name as the Worker's slug rule takes it (a-z, 0-9, hyphens, 3-40
+// long): "2026 Terrapin Open @ USC" -> "2026-terrapin-open-usc". Accents
+// fold to their letters. Too short to be a slug is left for the TD to fix.
+function slugFor(name) {
+  return String(name).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+}
 const shortDay = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 function showList() {
@@ -131,7 +138,6 @@ function showList() {
   view.innerHTML = `
     <div class="split">
       <div>
-        <p class="hometag">Run a quizbowl tournament from one link: room pages for moderators, live stats for everyone else.</p>
         <div class="row newrow">
           <input id="newname" placeholder="Name" aria-label="Tournament name">
           <input id="newslug" placeholder="Slug (public URL)" aria-label="Slug">
@@ -187,6 +193,11 @@ function showList() {
       showList();
     };
   });
+  // The slug follows the name as it is typed, until the TD types a slug of
+  // their own; clearing the slug box hands it back to the name.
+  let ownSlug = false;
+  $('newname').oninput = () => { if (!ownSlug) $('newslug').value = slugFor($('newname').value); };
+  $('newslug').oninput = () => { ownSlug = $('newslug').value !== ''; };
   $('newbtn').onclick = async () => {
     const run = busy($('newbtn'), { label: 'Creating' });
     try {

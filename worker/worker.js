@@ -1099,7 +1099,7 @@ async function tickTournaments(env) {
       // one indexed count otherwise (a page being retracted). Never fails
       // the rebuild it rides on.
       try {
-        const c = counts || (t.started ? await dirCountsOf(env, t.id) : { rooms: 0, games: 0, rounds: 0 });
+        const c = counts || (t.started ? await dirCountsOf(env, t.id) : { rooms: 0 });
         if (await dirNote(env, t, c)) dir = true;
       } catch (e) {
         console.log('directory entry for', t.slug, e.message);
@@ -1150,22 +1150,23 @@ async function tickTournaments(env) {
   return { rebuilt, dir };
 }
 
-/* ---------- the directory: tournaments run on this instance ----------
-   The home page lists the tournaments that are running here now and the
-   ones that have run here, so the site shows what it is used for. The
-   list is one small file, directory.json, and like the public state it
-   costs the Worker nothing to serve: it rides the qb-td-live deploy as a
-   static file (GET /pub/directory is the fallback, and what a self-host
-   without qb-td-live reads).
+/* ---------- the directory: tournaments running on this instance ----------
+   The home page lists the tournaments that are running here now, so the
+   site shows it is in use. The list is one small file, directory.json,
+   and like the public state it costs the Worker nothing to serve: it
+   rides the qb-td-live deploy as a static file (GET /pub/directory is the
+   fallback, and what a self-host without qb-td-live reads). The
+   tournaments that HAVE run here are not this file's business: that list
+   is the archive's, and joining it takes the operator's approval
+   (tools/archive.mjs).
 
-   What gets listed is decided by use, not by anyone's approval, so a row
-   somebody made to see what the thing does never shows:
-     live — started, and DIR_LIVE_ROOMS rooms have each uploaded a game
-     past — DIR_PAST_GAMES games over DIR_PAST_ROUNDS rounds
-   An entry carries the name and when it started and closes (the page
-   decides "live" from the clock, so the file does not change when a
-   tournament ends). The slug — the link — is only there while the TD has
-   the public page on; with it off the tournament is listed by name alone.
+   A tournament is listed by use, not by merely existing, so a row
+   somebody made to see what the thing does never shows: it has started,
+   and DIR_LIVE_ROOMS rooms have each uploaded a game. An entry carries
+   the name and when it started and closes (the page drops it once it has
+   closed; the hourly sweep then takes it out of the file). The slug — the
+   link — is only there while the TD has the public page on; with it off
+   the tournament is listed by name alone.
 
    Cost. tournaments.dir_entry holds each tournament's entry as last
    computed (NULL: not listed). The tick already knows a published
@@ -1173,46 +1174,36 @@ async function tickTournaments(env) {
    reads nothing more; an unpublished one, which the tick otherwise never
    visits, costs one indexed count of its own games when it is dirty.
    Either way the row is only written, and the file only rebuilt, when the
-   entry actually changes — a threshold crossed, a rename, the public page
-   switched — which is a handful of times in a tournament's life. An
+   entry actually changes — the threshold crossed, a rename, the public
+   page switched — which is a handful of times in a tournament's life. An
    hourly sweep rebuilds the file regardless (one read of the listed rows)
-   so a row deleted by hand or a deploy that failed cannot leave it wrong
-   for long. Apply migrate-directory.sql first. */
+   so a tournament that closed, a row deleted by hand or a deploy that
+   failed cannot leave it wrong for long. Apply migrate-directory.sql
+   first. */
 
 const DIR_KEY = 'directory.json';
 // the hash of the directory the last forced deploy shipped (hourly sweep)
 const DIR_LIVE_KEY = 'directory.live';
 const DIR_LIVE_PATH = '/directory.json';
 const DIR_LIVE_ROOMS = 2;
-const DIR_PAST_GAMES = 10;
-const DIR_PAST_ROUNDS = 5;
-const DIR_MAX = 500;
+const DIR_MAX = 200;
 const DIR_EMPTY = '{"v":1,"t":[]}';
 
-// rooms / games / rounds over a tournament's readable game files
+// how many rooms have a readable game in
 function dirCounts(rows) {
-  return {
-    rooms: new Set(rows.map((f) => f.bucket_id)).size,
-    games: rows.length,
-    rounds: new Set(rows.map((f) => f.round)).size,
-  };
+  return { rooms: new Set(rows.map((f) => f.bucket_id)).size };
 }
 async function dirCountsOf(env, tid) {
   return (await env.DB.prepare(
-    'SELECT COUNT(DISTINCT bucket_id) AS rooms, COUNT(*) AS games, COUNT(DISTINCT round) AS rounds ' +
+    'SELECT COUNT(DISTINCT bucket_id) AS rooms ' +
     "FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL"
   ).bind(tid).all()).results[0];
 }
 
 // A tournament's line in the directory, or null when it isn't listed.
 function dirEntry(t, counts) {
-  if (!t.started) return null;
-  const live = counts.rooms >= DIR_LIVE_ROOMS;
-  const past = counts.games >= DIR_PAST_GAMES && counts.rounds >= DIR_PAST_ROUNDS;
-  if (!live && !past) return null;
-  return JSON.stringify({
-    n: t.name, s: t.published ? t.slug : null, d: t.started, c: t.started + RUN_TTL, live, past,
-  });
+  if (!t.started || counts.rooms < DIR_LIVE_ROOMS) return null;
+  return JSON.stringify({ n: t.name, s: t.published ? t.slug : null, d: t.started, c: t.started + RUN_TTL });
 }
 
 // Record t's entry if it moved; true when it did (the file is then stale).
@@ -1223,12 +1214,14 @@ async function dirNote(env, t, counts) {
   return true;
 }
 
-// Rebuild directory.json from the listed rows. Answers { changed, text };
-// R2 is only written when the text differs from what is there.
+// Rebuild directory.json from the listed rows that are still open.
+// Answers { changed, text }; R2 is only written when the text differs
+// from what is there.
 async function dirBuild(env) {
   const { results } = await env.DB.prepare(
-    `SELECT dir_entry FROM tournaments WHERE dir_entry IS NOT NULL ORDER BY started DESC, id DESC LIMIT ${DIR_MAX}`
-  ).all();
+    'SELECT dir_entry FROM tournaments WHERE dir_entry IS NOT NULL AND started > ?1 ' +
+    `ORDER BY started DESC, id DESC LIMIT ${DIR_MAX}`
+  ).bind(Date.now() - RUN_TTL).all();
   const text = '{"v":1,"t":[' + results.map((r) => r.dir_entry).join(',') + ']}';
   const cur = await env.DATA.get(DIR_KEY);
   if (cur ? (await cur.text()) === text : text === DIR_EMPTY) return { changed: false, text };
@@ -1251,7 +1244,7 @@ async function tickUnlisted(env) {
     try {
       // claim before working, as the main pass does
       await env.DB.prepare('UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ?1').bind(t.id).run();
-      const counts = t.started ? await dirCountsOf(env, t.id) : { rooms: 0, games: 0, rounds: 0 };
+      const counts = t.started ? await dirCountsOf(env, t.id) : { rooms: 0 };
       if (await dirNote(env, t, counts)) moved = true;
     } catch (e) {
       console.log('directory entry for', t.slug, e.message);
