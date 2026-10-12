@@ -480,3 +480,16 @@ body.aboutpage .wrap { max-width: 820px; }
 .arow b { color: var(--link); font-weight: 600; }
 .arow span { color: var(--muted); font-size: 14px; }
 @media (max-width: 560px) { .arow { grid-template-columns: minmax(0, 1fr); } }
+.credits { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 22px 0 8px; }
+.credit { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--fg); }
+.credit:hover { text-decoration: none; }
+.credit:hover b { color: var(--link); }
+.credit b { font-weight: 600; font-size: 14px; }
+.credit .logo {
+  display: grid; place-items: center; width: 88px; max-width: 100%; aspect-ratio: 1;
+  border: 1px solid var(--line); border-radius: 50%; overflow: hidden;
+  color: var(--fg); font-weight: 700; font-size: 18px;
+}
+.credit:hover .logo { border-color: var(--link); }
+.credit .logo img { width: 60%; height: 60%; object-fit: contain; }
+@media (max-width: 560px) { .credits { gap: 2px; } .credit b { font-size: 11px; overflow-wrap: normal; } .credit .logo { width: 56px; font-size: 13px; } }
