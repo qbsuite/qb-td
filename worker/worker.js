@@ -2867,9 +2867,9 @@ async function pubSchedule(env, slug) {
 // bucket is (rooms[].bucket link), so it can preselect the round's teams.
 // Fetched once per page load — deliberately not part of the polled
 // bucket state.
-async function bucketSchedule(env, secret) {
+async function bucketSchedule(env, secret, url) {
   const b = await getBucketRow(env, secret);
-  const gate = bucketGate(env, b);
+  const gate = bucketGate(env, b, await testAccess(env, b, url));
   if (gate) return gate;
   const obj = await env.DATA.get(`t/${b.tournament_id}/schedule.json`);
   if (!obj) return err(env, 404, 'no schedule');
@@ -3040,9 +3040,9 @@ async function adminTiebreakers(env, t) {
 // GET /b/:secret/tiebreakers — the reader's copy of the pool: full
 // question text (packet trust level) plus the usage log, so the mod can
 // see which teams have already heard each question.
-async function bucketTiebreakers(env, secret) {
+async function bucketTiebreakers(env, secret, url) {
   const b = await getBucketRow(env, secret);
-  const gate = bucketGate(env, b);
+  const gate = bucketGate(env, b, await testAccess(env, b, url));
   if (gate) return gate;
   const pool = await mergedTbPool(env, b, b.tournament_id, b.set_id);
   return pool ? json(env, pool) : err(env, 404, 'no tiebreakers');
@@ -3112,11 +3112,22 @@ function bucketClosed(b) {
 // says. The message is what the mod's page shows.
 const NOT_STARTED = "Tournament hasn't started";
 // The two gates every /b/ route passes, as one error response or null.
-function bucketGate(env, b) {
+function bucketGate(env, b, test) {
   if (!b) return err(env, 404, 'bad link');
   if (bucketClosed(b)) return err(env, 410, 'room closed');
-  if (!b.started) return err(env, 403, NOT_STARTED);
+  if (!b.started && !test) return err(env, 403, NOT_STARTED);
   return null;
+}
+// The TD's Test link (admin.js renderRoomsSec): a room link that also
+// carries the tournament's own admin secret (?test=) reads the room
+// before Start, so the TD can try a game with the real packets. Reads
+// only — uploads, round starts and protests keep the gate — and only
+// until Start: from then on the link is the plain room link.
+async function testAccess(env, b, url) {
+  const key = url.searchParams.get('test');
+  if (!key || !b || b.started) return false;
+  const t = await getAdminTournament(env, key);
+  return !!t && t.id === b.tournament_id && !adminClosed(t);
 }
 
 // Where this room is: its round and bracket. With brackets off
@@ -3137,15 +3148,17 @@ async function roomPlace(env, b) {
   return { round, bracket: info ? { key: info.key, name: info.name, color: info.color } : null, model, state, room };
 }
 
-async function bucketState(env, secret) {
+async function bucketState(env, secret, url) {
   const b = await getBucketRow(env, secret);
-  const gate = bucketGate(env, b);
+  const test = await testAccess(env, b, url);
+  const gate = bucketGate(env, b, test);
   if (gate) return gate;
   const place = await roomPlace(env, b);
   const [rounds, uploads, count] = await Promise.all([
     env.DB.prepare(
       'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
-    ).bind(b.tournament_id, place.round).all(),
+    // a test reads any round's packet, not only those reached so far
+    ).bind(b.tournament_id, test ? 1e9 : place.round).all(),
     env.DB.prepare(
       'SELECT id, round, kind, filename, size, error, created FROM files WHERE bucket_id = ?1 ORDER BY created DESC LIMIT ?2'
     ).bind(b.id, BUCKET_LIST_LIMIT).all(),
@@ -3163,6 +3176,7 @@ async function bucketState(env, secret) {
   return json(env, {
     tournament: b.tournament_name,
     room: b.room_name,
+    ...(test ? { test: true } : {}),
     // this room's round (its bracket's, when brackets keep their own)
     current_round: place.round,
     // the tournament's (lowest bracket's) round, and this room's bracket
@@ -3245,14 +3259,15 @@ async function bucketUpload(request, url, env, secret) {
 
 async function bucketPacket(env, secret, url) {
   const b = await getBucketRow(env, secret);
-  const gate = bucketGate(env, b);
+  const test = await testAccess(env, b, url);
+  const gate = bucketGate(env, b, test);
   if (gate) return gate;
   // Played rounds stay readable (a room running behind still needs them);
   // future rounds stay locked (question security).
   const place = await roomPlace(env, b);
   let round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) round = place.round;
-  if (round > place.round) return err(env, 403, 'not the live round yet');
+  if (round > place.round && !test) return err(env, 403, 'not the live round yet');
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
   ).bind(b.tournament_id, round).all();
@@ -3263,7 +3278,8 @@ async function bucketPacket(env, secret, url) {
   // here on some moderator is reading this text, so a fix the editors
   // upload must not swap the round underneath the others (mirrorsOpenFor).
   // A write only the first time; the WHERE makes every later one a no-op.
-  if (b.set_key_enc) {
+  // (a TD's test reads it without pinning it or counting as a start)
+  if (b.set_key_enc && !test) {
     await env.DB.prepare(
       'UPDATE rounds SET served = 1 WHERE tournament_id = ?1 AND number = ?2 AND served = 0'
     ).bind(b.tournament_id, round).run();
@@ -3271,7 +3287,7 @@ async function bucketPacket(env, secret, url) {
   // The reader warms its cache on page load (warm=1) and says when a game
   // really starts (bucketStartRound); any other fetch is a room taking the
   // packet to read — the uploads page's download link.
-  if (url.searchParams.get('warm') !== '1') await noteRoomStart(env, b, round, place);
+  if (url.searchParams.get('warm') !== '1' && !test) await noteRoomStart(env, b, round, place);
   return blobResponseDec(env, obj, await blobKey(b, results[0].packet_r2_key), results[0].packet_name);
 }
 
@@ -3461,9 +3477,9 @@ async function writeBracketRounds(env, tid, n, stored, res) {
 
 // The reader page (read.html) preloads the roster into its embedded MODAQ so
 // the mod only picks teams. Same credential + lifetime rules as the packet.
-async function bucketRoster(env, secret) {
+async function bucketRoster(env, secret, url) {
   const b = await getBucketRow(env, secret);
-  const gate = bucketGate(env, b);
+  const gate = bucketGate(env, b, await testAccess(env, b, url));
   if (gate) return gate;
   if (!b.roster_r2_key) return err(env, 404, 'no roster');
   const obj = await env.DATA.get(b.roster_r2_key);
@@ -5203,14 +5219,14 @@ export default {
 
     // Moderator bucket routes — the secret is the credential.
     let m;
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1]);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url);
     if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/protests$/)) && method === 'POST') return bucketLiveProtests(request, url, env, m[1]);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1]);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1]);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1]);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1], url);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1], url);
+    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1], url);
 
     // Public stats routes — publish-gated inside.
     if (path === '/pub/directory' && method === 'GET') return pubDirectory(env);

@@ -80,6 +80,26 @@ for (const route of ['packet', 'tiebreakers', 'roster', 'schedule']) {
   const res = await fetch(`${BASE}/b/${secret}/${route}`);
   ok(`room before Start serves no ${route}`, res.status === 403, res.status);
 }
+// The TD's Test link: the room link plus the tournament's own admin
+// secret reads the room before Start — reads only, and nothing counts.
+{
+  const T = '?test=' + A.slice(3);
+  r = await call('/b/' + secret + T);
+  ok('test link reads the room before Start', r.status === 200 && r.body.test === true
+    && r.body.packets.length === 1, r.body);
+  let res = await fetch(`${BASE}/b/${secret}/packet${T}&round=1`);
+  ok('test link reads the packet', res.status === 200 && (await res.text()) === 'PDFBYTES', res.status);
+  res = await fetch(`${BASE}/b/${secret}/roster${T}`);
+  ok('test link reads the roster', res.status === 200, res.status);
+  r = await call('/b/' + secret + '?test=abcdefghjkmnpqrstuvw');
+  ok('a wrong test key is the plain room link', r.status === 403, r.body);
+  r = await call(`/b/${secret}/upload${T}&round=1&name=early.qbj`, { method: 'POST', body: MATCH });
+  ok('test link takes no upload', r.status === 403, r.body);
+  r = await call(`/b/${secret}/start${T}&round=1`, { method: 'POST' });
+  ok('test link starts no round', r.status === 403, r.body);
+  r = await call(A);
+  ok('a test leaves no trace', !r.body.files.length && !(r.body.starts || []).length, r.body.starts);
+}
 r = await call(A);
 ok('detail before Start: not started, a week of setup',
   !r.body.tournament.started && r.body.tournament.closes > Date.now() + 6 * 24 * 3600 * 1000, r.body.tournament);

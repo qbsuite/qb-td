@@ -17,7 +17,12 @@ Part of [qbsuite](https://qbsuite.github.io/).
   "Not started" banner on the Live Hub, behind a confirmation), it and
   every room link work for **48 hours from then** — replacing whatever
   the week had left, earlier or later — and until then room links show
-  "Tournament hasn't started" and serve nothing. Two views. **Tournament
+  "Tournament hasn't started" and serve nothing. (Setup's Rooms step has
+  a **Test** link per room for the TD: the room link plus the admin
+  secret, which reads the room before Start so a game can be tried with
+  the real packets, roster and settings. It is read-only — a test game
+  uploads nothing and starts no round — and marked as a test throughout.)
+  Two views. **Tournament
   Setup** is the before-the-day work, a tab per step with a done-state
   pill each (MODAQ Settings is done once a format is saved, Stats
   settings once the public page is on — it also holds the buzzpoints

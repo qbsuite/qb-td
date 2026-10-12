@@ -1,3 +1,9 @@
+Release Notes for 10/12/2026
+
+[ SETUP ]
+- Added a Test link beside each room. It opens the room with your packets, roster and settings before Start.
+- Games exported from a test room are not saved, and the test room is marked so it isn't mistaken for a real one.
+
 Release Notes for 10/11/2026
 
 [ ROOM PAGE ]

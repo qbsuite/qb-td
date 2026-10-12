@@ -16,6 +16,11 @@ body:not(.reading) #game, body:not(.reading) #newgame { display: none; }
 .rmsg { padding: 0 24px; }
 .rmsg #msg:empty { display: none; }
 .rmsg #notfound { padding: 12px 0; }
+/* the TD's Test link (read_main.js testKey) */
+.rbar .testtag { color: var(--warn); }
+/* a bar across the top of the room and of the game, so the link is never mistaken for a room's */
+.teststrip { background: var(--warn); color: var(--bg); padding: 10px 24px; font-size: 15px; text-align: center; }
+.testtag[hidden], .teststrip[hidden] { display: none; }
 
 /* ---------- reader: before the game ---------- */
 .rstart {

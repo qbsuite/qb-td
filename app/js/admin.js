@@ -643,7 +643,8 @@ function renderRoomsSec(a, t, buckets, files) {
         return `<tr>
           <td><input class="inlinename" data-roomrename="${b.id}" value="${esc(b.room_name)}" aria-label="Room name"></td>
           <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(readLink(b.secret))}', '${js(b.room_name)} reader link')">Copy</button>
-            <a class="muted" href="${esc(readLink(b.secret))}" target="_blank">Open</a></td>
+            <a class="muted" href="${esc(readLink(b.secret))}" target="_blank">Open</a>${t.started ? ''
+              : `<a href="${esc(readLink(b.secret) + '&test=' + adminSecret)}" target="_blank">Test</a>`}</td>
           <td class="num muted">${files.filter((f) => f.bucket_id === b.id).length}</td>
           <td class="num"><button class="linkbtn muted" data-delbucket="${b.id}">Remove</button></td>
         </tr>`;
@@ -651,7 +652,9 @@ function renderRoomsSec(a, t, buckets, files) {
     </table></div>
     <p class="muted" style="font-size:13px;margin:6px 0 0">${t.started
       ? `Room links work until ${esc(new Date(t.closes).toLocaleString())}, when the tournament closes.`
-      : 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament.'}</p>`
+      : 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament. '
+        + 'Test simulates a room for json testing purposes without needing to start the tournament. '
+        + 'Games that are exported from test rooms are NOT saved.'}</p>`
     : '<div class="muted">No rooms yet</div>'}
     <div class="row" style="margin-top:10px">
       <label>${buckets.length ? 'Add' : 'Create'}

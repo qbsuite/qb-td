@@ -41,6 +41,13 @@ const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const secret = params.get('b') || '';
 const gid = params.get('g') || '';
+// The TD's Test link (admin.js): the room before Start, read with the
+// admin secret (worker.js testAccess). A test game is this device's only:
+// it sends nothing, and keeps its storage apart from the room's games.
+const testKey = params.get('test') || '';
+const store = testKey ? secret + '-test' : secret;
+const tq = (path) => (testKey
+  ? path + (path.includes('?') ? '&' : '?') + 'test=' + encodeURIComponent(testKey) : path);
 
 let state = null;   // /b/:secret response (bare-link path only)
 let teams = null;   // [{name, players}] from the roster
@@ -57,7 +64,7 @@ let tbPool = null;  // TO's tiebreaker pool (offered in Add Questions)
 // Non-blocking pool fetch: fills the Add Questions dialog whenever it
 // lands; a resumed game stays fully usable offline without it.
 function fetchTbPool() {
-  pub('/b/' + secret + '/tiebreakers').then((r) => {
+  pub(tq('/b/' + secret + '/tiebreakers')).then((r) => {
     tbPool = normalizeTbPool(r instanceof Response ? null : r);
     tbBridge.pool = tbPool;
     renderTbPanel();
@@ -70,7 +77,7 @@ function say(text, bad = false) {
 }
 
 function roomLink() {
-  return location.pathname + '?b=' + encodeURIComponent(secret);
+  return tq(location.pathname + '?b=' + encodeURIComponent(secret));
 }
 function gameLink(id) {
   return roomLink() + '&g=' + encodeURIComponent(id);
@@ -95,7 +102,7 @@ function fetchPacket(round, name) {
 async function loadPacket(round, name) {
   // warm=1: fetching isn't starting — the Worker counts a room as having
   // started a round (auto-advance) from the Start button's own signal
-  const res = await pub('/b/' + secret + '/packet?round=' + round + '&warm=1');
+  const res = await pub(tq('/b/' + secret + '/packet?round=' + round + '&warm=1'));
   // pub() returns parsed JSON when the blob was stored with a JSON content
   // type, and the raw Response otherwise.
   let parsed;
@@ -113,7 +120,7 @@ async function loadPacket(round, name) {
 }
 
 async function fetchTeams() {
-  const roster = await pub('/b/' + secret + '/roster');
+  const roster = await pub(tq('/b/' + secret + '/roster'));
   const text = roster instanceof Response ? await roster.text() : JSON.stringify(roster);
   const parsed = parseQbjRegistration(text);
   if (!parsed.success) throw new Error('roster: ' + parsed.message);
@@ -125,7 +132,7 @@ async function fetchTeams() {
 // bracket: {name, color} on a schedule whose brackets keep their own
 // rounds (the room's round is its bracket's)
 function setHeader(t, room, round, game, bracket) {
-  document.title = t + ' - ' + room;
+  document.title = (testKey ? 'TEST - ' : '') + t + ' - ' + room;
   $('tname').textContent = t;
   $('room').textContent = room + ' · Round ' + round;
   if (bracket) {
@@ -154,11 +161,12 @@ function gameProtests(storeText, meta, format) {
 // change check, so a protest lodged offline arrives once the room is back.
 const PROTEST_CHECK_MS = 5000;
 function watchProtests(id, meta, format) {
+  if (testKey) return;
   let lastText = null;
   let sent = JSON.stringify([]); // a game with none has nothing to say
   let busy = false;
   const check = async () => {
-    const text = localStorage.getItem(gameKey(secret, id));
+    const text = localStorage.getItem(gameKey(store, id));
     if (busy || !text || text === lastText) return;
     const protests = gameProtests(text, meta, format);
     if (!protests) return;
@@ -191,18 +199,24 @@ function mountMODAQ(id, meta, isNew) {
   tbBridge.addedIds = () => tbAddedIds(meta.tb);
   tbBridge.onAdd = (sel, base, at) => {
     meta.tb = tbRecordAdd(meta.tb, base, at || base, sel);
-    localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
+    localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
   };
 
   const props = {
     persistState: true,
-    storeName: gameKey(secret, id),
+    storeName: gameKey(store, id),
     hideNewGame: true,
     yappServiceUrl: YAPP,
     customExport: {
       label: 'Upload to qb-td',
       type: 'QBJ',
       onExport: async (match) => {
+        if (testKey) {
+          // MODAQ words its own result dialog ("Export succeeded"), which a
+          // test must not show: say it here and leave MODAQ waiting
+          alert('This is a test game, so nothing was uploaded.');
+          return new Promise(() => {});
+        }
         try {
           const name = matchFilenames(meta.round, meta.a, meta.b).combined;
           // games with appended tiebreakers report which ones were read,
@@ -211,7 +225,7 @@ function mountMODAQ(id, meta, isNew) {
           // Protests drawer (the qbj's notes carry them as text only)
           // (null if the store won't parse: the Worker falls back to the
           // qbj's notes)
-          const storeText = localStorage.getItem(gameKey(secret, id));
+          const storeText = localStorage.getItem(gameKey(store, id));
           const protests = gameProtests(storeText, meta, props.gameFormat || null);
           // questions added mid-packet shift MODAQ's numbering; number them
           // as if appended so stats keyed on packet numbers line up
@@ -464,8 +478,8 @@ function swapSides() {
 let selectedRound = 0;
 
 function deviceMetas() {
-  return gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), secret)
-    .filter((m) => storeIntact(localStorage.getItem(gameKey(secret, m.id))));
+  return gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), store)
+    .filter((m) => storeIntact(localStorage.getItem(gameKey(store, m.id))));
 }
 
 // One small button per round (dot = the live round the TD set, outlined =
@@ -528,8 +542,8 @@ function showTeams() {
     catch (e) { say(e.message, true); $('start').disabled = false; return; }
     $('start').disabled = false;
     say('');
-    const metas = gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), secret);
-    for (const k of staleGameKeys(metas, secret, 7)) localStorage.removeItem(k);
+    const metas = gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), store);
+    for (const k of staleGameKeys(metas, store, 7)) localStorage.removeItem(k);
     const id = randId();
     const meta = {
       a, b, round, packet: info.packet_name,
@@ -541,8 +555,8 @@ function showTeams() {
       order: { [a]: orderSel.get(a), [b]: orderSel.get(b) },
     };
     // the room has started this round (auto-advance); nothing waits on it
-    pub('/b/' + secret + '/start?round=' + round, { method: 'POST' }).catch(() => {});
-    localStorage.setItem(metaKey(secret, id), JSON.stringify(meta));
+    if (!testKey) pub('/b/' + secret + '/start?round=' + round, { method: 'POST' }).catch(() => {});
+    localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
     history.replaceState(null, '', gameLink(id));
     $('picker').hidden = true;
     mountMODAQ(id, meta, true);
@@ -553,12 +567,17 @@ function showTeams() {
 
 async function boot() {
   if (!secret) { say('bad link', true); return; }
+  if (testKey) {
+    $('testtag').hidden = false;
+    $('teststrip').hidden = false;
+    $('start').textContent = 'Start test game';
+  }
 
   // Game link: resume that exact game from this device. No fetches — the
   // meta + MODAQ's persisted store hold everything.
   if (gid) {
-    const meta = parseMeta(localStorage.getItem(metaKey(secret, gid)));
-    if (!meta || !storeIntact(localStorage.getItem(gameKey(secret, gid)))) {
+    const meta = parseMeta(localStorage.getItem(metaKey(store, gid)));
+    if (!meta || !storeIntact(localStorage.getItem(gameKey(store, gid)))) {
       say('game not on this device', true);
       $('notfound').hidden = false;
       $('roomlink').href = roomLink();
@@ -572,7 +591,7 @@ async function boot() {
 
   // Room link: always a fresh game against the live current round.
   try {
-    state = await pub('/b/' + secret);
+    state = await pub(tq('/b/' + secret));
   } catch (e) {
     say(e.message === NOT_STARTED ? NOT_STARTED + '. Reload this page once the TD starts it.'
       : e.message === 'room closed' ? 'room closed' : e.message, true);
@@ -580,7 +599,7 @@ async function boot() {
   }
   setHeader(state.tournament, state.room, state.current_round, '', state.bracket);
   // schedule-less tournaments: this quietly 404s and nothing changes
-  const schedP = pub('/b/' + secret + '/schedule').then((r) => r, () => null);
+  const schedP = pub(tq('/b/' + secret + '/schedule')).then((r) => r, () => null);
   // likewise tournaments without a tiebreaker pool
   fetchTbPool();
 
