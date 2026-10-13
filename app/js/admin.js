@@ -1243,7 +1243,8 @@ async function ensureSched(a, t) {
 
 function renderScheduleSec(a, t, buckets, files) {
   const outer = $('setupsec');
-  outer.innerHTML = '<h2>Schedule</h2><div id="schedsec"></div>';
+  // the heading's corner holds the editor's Full screen button (schededit.js)
+  outer.innerHTML = '<div class="schedhead"><h2>Schedule</h2><button id="schedfull" class="iconbtn" hidden></button></div><div id="schedsec"></div>';
   renderSchedule(a, t, buckets, files);
 }
 

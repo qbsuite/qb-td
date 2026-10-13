@@ -52,6 +52,11 @@ export function schedEscape() {
 // the browser allows it, the page takes the whole screen. The cover is
 // what matters; the browser's part is a bonus and may be refused.
 let redrawFull = null; // the editor's own redraw, for when the browser leaves full screen
+const ICON = (d) => `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const ICON_FULL = ICON('M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4');
+const ICON_EXIT = ICON('M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4');
+// the button in the Schedule heading's corner (admin.js renderScheduleSec)
+const fullBtn = () => document.getElementById('schedfull');
 function setFull(on) {
   ui.full = on;
   ui.scrollPos = null;
@@ -95,7 +100,11 @@ const slotShow = (s) => {
  */
 export function renderSchedStep(box, env) {
   const sched = env.sched();
-  if (!sched || ui.creator) { box.classList.remove('sgfull'); renderCreator(box, env); return; }
+  if (!sched || ui.creator) {
+    box.classList.remove('sgfull');
+    renderCreator(box, env);
+    return;
+  }
 
   // A schedule we haven't seen yet (fresh from the Worker, or after a
   // Discard): tag its brackets in place and take it as the saved copy.
@@ -109,6 +118,7 @@ export function renderSchedStep(box, env) {
 /* ================= format picker ================= */
 
 function renderCreator(box, env) {
+  if (fullBtn()) fullBtn().hidden = true; // nothing to fill the screen with yet
   const teams = env.teams;
   const nRooms = env.roomsN();
   const fmts = formatsFor(teams.length, nRooms);
@@ -392,6 +402,7 @@ function renderEditor(box, env) {
   const panel = sidePanel(s, env, { roundNo, bracketName, edit });
 
   box.innerHTML = `
+    ${ui.full ? `<button id="schedexit" class="iconbtn sgexit" title="Exit full screen (Esc)" aria-label="Exit full screen">${ICON_EXIT}</button>` : ''}
     <div class="sghead">
       <span class="muted">${env.teams.length} teams · ${s.rooms.length} rooms · ${nRounds} rounds${fmtName ? ' · ' + esc(fmtName) : ''}</span>
       <button id="schedregen" class="linkbtn">Change format…</button>
@@ -400,7 +411,6 @@ function renderEditor(box, env) {
         ${[['grid', 'Grid'], ['teams', 'By team'], ['brackets', 'Brackets']].map(([k, l]) =>
           `<button class="view${ui.view === k ? ' on' : ''}" data-view2="${k}">${l}</button>`).join('')}
       </div>
-      <button class="small" id="schedfull">${ui.full ? 'Exit full screen' : 'Full screen'}</button>
     </div>
     <div class="chips sgchips">
       <button class="chip${!ui.filter ? ' on' : ''}" data-filter="">All</button>
@@ -471,7 +481,16 @@ function renderEditor(box, env) {
   if (q('scheddense')) q('scheddense').onclick = () => { ui.dense = !ui.dense; again(); };
   box.classList.toggle('sgfull', ui.full);
   redrawFull = () => { if (box.isConnected) again(); };
-  q('schedfull').onclick = () => { setFull(!ui.full); again(); };
+  // the cover hides the heading, so full screen carries its own way out
+  const fb = fullBtn();
+  if (fb) {
+    fb.hidden = false;
+    fb.innerHTML = ICON_FULL;
+    fb.title = 'Full screen';
+    fb.setAttribute('aria-label', 'Full screen');
+    fb.onclick = () => { setFull(true); again(); };
+  }
+  if (q('schedexit')) q('schedexit').onclick = () => { setFull(false); again(); };
   $$('[data-jump]').forEach((b) => { b.onclick = () => { ui.view = 'grid'; ui.filter = ''; setSel(parse(b.dataset.jump)); scrollToSel(box); }; });
   $$('[data-fixto]').forEach((el) => {
     el.onchange = () => {
