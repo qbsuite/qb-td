@@ -42,7 +42,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   before it saves), and **Schedule** (pick a format for the team/room
   count — full round robin; double, triple, or quadruple RR for small
   fields; 2 pools with carryover crossover playoffs; 3-4 pools
-  regrouping by finish position — clean-room circle-method pairings,
+  regrouping by finish position, or into playoff brackets of two
+  places from each pool (22 teams: 6/6/6/4) with pool-mates' prelim
+  games carried over — clean-room circle-method pairings,
   snake-seeded from roster order — then edit anywhere in the grid:
   click a slot for a dropdown of teams still free that round, drag
   chips to swap teams, drag a match box (or its ⇄ handle) to trade

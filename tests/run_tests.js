@@ -617,6 +617,15 @@ test('normalizePacket accepts MODAQ packet JSON', () => {
   assert.equal(named.bonuses.length, 1);
 });
 
+test('normalizePacket takes a bonus-only packet only when asked (tiebreaker pool uploads)', () => {
+  const bonuses = [{ leadin: 'L', parts: ['p'], answers: ['a'], values: [10] }];
+  const p = normalizePacket({ bonuses }, 'Spare bonuses.json', { bonusOnly: true });
+  assert.deepEqual(p, { tossups: [], bonuses, name: 'Spare bonuses.json' });
+  assert.deepEqual(normalizePacket({ tossups: [], bonuses }, 'x.json', { bonusOnly: true }).tossups, []);
+  assert.throws(() => normalizePacket({ bonuses }, 'x.json'), /no tossups/);
+  assert.throws(() => normalizePacket({ tossups: [], bonuses: [] }, 'x.json', { bonusOnly: true }), /no tossups/);
+});
+
 test('normalizePacket rejects junk', () => {
   assert.throws(() => normalizePacket({}), /no tossups/);
   assert.throws(() => normalizePacket({ tossups: [] }), /no tossups/);
@@ -1011,6 +1020,72 @@ test('buildSchedule pools3: playoff pools regroup by finish position', () => {
       // same finish position, different pools
       assert.equal(g.a.label.slice(1), g.b.label.slice(1));
       assert.notEqual(g.a.label[0], g.b.label[0]);
+    }
+  }
+});
+
+test('buildSchedule pools3x2: 22 teams into playoff brackets of 6/6/6/4, pool-mates carried over', () => {
+  const teams = Array.from({ length: 22 }, (_, i) => 'Team ' + (i + 1));
+  const rooms = (n) => Array.from({ length: n }, (_, i) => ({ name: 'Room ' + (i + 1), bucket: null }));
+  const fmt = allFormats(22).find((f) => f.key === 'pools3x2');
+  assert.equal(fmt.rounds, 11);
+  assert.equal(fmt.roomsNeeded, 11);
+  assert.ok(/6\/6\/6\/4/.test(fmt.desc), fmt.desc);
+  // one room short: not offered, and not buildable
+  assert.ok(!formatsFor(22, 10).some((f) => f.key === 'pools3x2'));
+  assert.throws(() => buildSchedule('pools3x2', teams, rooms(10)), /Needs 11 rooms/);
+
+  const s = buildSchedule('pools3x2', teams, rooms(11));
+  assert.deepEqual(validateSchedule(s, teams), []);
+  assert.deepEqual(scheduleChecks(s), []);
+  // prelims are pools3's, game for game
+  assert.deepEqual(s.phases[0], buildSchedule('pools3', teams, rooms(11)).phases[0]);
+  assert.deepEqual(s.brackets.filter((b) => b.phase === 1).map((b) => b.name),
+    ['1st\u20132nd place', '3rd\u20134th place', '5th\u20136th place', '7th\u20138th place']);
+
+  const po = s.phases[1];
+  assert.deepEqual(po.rounds.map((r) => r.round), [8, 9, 10, 11]);
+  // nobody sits while the last bracket is still playing; it finishes a round early
+  assert.deepEqual(po.rounds.map((r) => r.games.length), [11, 11, 11, 9]);
+  assert.deepEqual(po.rounds.map((r) => r.byes.map((b) => b.label).sort()), [[], [], [], ['A7', 'A8', 'B7', 'C7']]);
+  const met = new Map();
+  for (const r of po.rounds) for (const g of r.games) {
+    const k = [g.a.label, g.b.label].sort().join(' ');
+    met.set(k, (met.get(k) || 0) + 1);
+  }
+  // a full bracket: every pair from different pools once, pool-mates never
+  [['T1', [1, 2]], ['T2', [3, 4]], ['T3', [5, 6]]].forEach(([key, places]) => {
+    const members = ['A', 'B', 'C'].flatMap((l) => places.map((n) => l + n));
+    for (const x of members) for (const y of members) {
+      if (x >= y) continue;
+      assert.equal(met.get(x + ' ' + y) || 0, x[0] === y[0] ? 0 : 1, x + ' v ' + y);
+    }
+    assert.ok(po.rounds.flatMap((r) => r.games).filter((g) => members.includes(g.a.label)).every((g) => g.bracket === key));
+  });
+  // the short last bracket plays everyone, its two pool-mates included
+  for (const pair of ['A7 A8', 'A7 B7', 'A7 C7', 'A8 B7', 'A8 C7', 'B7 C7']) assert.equal(met.get(pair), 1, pair);
+
+  // brackets keep their own rounds, and the placeholders fill from pool finish
+  const m = bracketModel(s);
+  assert.ok(m.multi);
+  assert.deepEqual(m.phases[1].keys, ['T1', 'T2', 'T3', 'T4']);
+  assert.equal(fillPlaceholders(s, s.pools), 2 * (11 * 3 + 9) + 4);
+  assert.deepEqual(scheduleChecks(s), []);
+  assert.deepEqual(bracketModel(s).phases[1].keys, ['T1', 'T2', 'T3', 'T4']);
+});
+
+test('pools x2 formats: every size builds clean, full brackets have no byes', () => {
+  for (let n = 9; n <= 36; n++) {
+    for (const f of allFormats(n).filter((x) => /x2$/.test(x.key))) {
+      const rooms = Array.from({ length: f.roomsNeeded }, (_, i) => ({ name: 'R' + i, bucket: null }));
+      const teams = Array.from({ length: n }, (_, i) => 'T' + i);
+      const s = buildSchedule(f.key, teams, rooms, { rooms: 'blocks' });
+      assert.deepEqual(scheduleChecks(s), [], n + ' ' + f.key);
+      assert.equal(s.phases.reduce((a, p) => a + p.rounds.length, 0), f.rounds, n + ' ' + f.key);
+      assert.ok(Math.max(...s.phases.flatMap((p) => p.rounds.map((r) => r.games.length))) <= f.roomsNeeded, n + ' ' + f.key);
+      const k = Number(f.key[5]);
+      const first = s.phases[1].rounds[0];
+      if (n % k === 0 && (n / k) % 2 === 0) assert.equal(first.byes.length, 0, n + ' ' + f.key);
     }
   }
 });
@@ -2144,7 +2219,8 @@ test('buildSchedule defaults are unchanged (brackets aside) for every format, 3-
   const out = {};
   for (let n = 3; n <= 36; n++) {
     const teams = Array.from({ length: n }, (_, i) => 'T' + (i + 1));
-    for (const f of allFormats(n)) {
+    // (the x2 bracket formats came later and have their own tests)
+    for (const f of allFormats(n).filter((x) => !/x2$/.test(x.key))) {
       const rooms = Array.from({ length: f.roomsNeeded + 1 }, (_, i) => ({ name: 'R' + (i + 1), bucket: null }));
       out[n + ':' + f.key] = JSON.stringify(strip(buildSchedule(f.key, teams, rooms)));
     }

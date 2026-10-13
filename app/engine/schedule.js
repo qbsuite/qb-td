@@ -193,6 +193,47 @@ function crossPhase(name, groupA, groupB, nRooms, firstRound, slotFor) {
 }
 
 /**
+ * Playoff brackets of two finish positions per pool: [[{pool, pos}]],
+ * best bracket first, each in finish order (A1 B1 C1 A2 B2 C2). A pool
+ * too short for a position simply isn't in that bracket.
+ */
+function tierBrackets(sizes) {
+  const out = [];
+  const maxSize = Math.max(...sizes);
+  for (let from = 0; from < maxSize; from += 2) {
+    const members = [];
+    for (let pos = from; pos < from + 2; pos++) {
+      sizes.forEach((n, pool) => { if (n > pos) members.push({ pool, pos }); });
+    }
+    out.push(members);
+  }
+  return out;
+}
+
+/**
+ * One bracket's rounds: [{pairs: [[i, j]], byes: [i]}] over indices into
+ * `members`. A full bracket (two from each of the k pools) skips the
+ * games between pool-mates — their prelim game carries over — by seating
+ * every pool's pair opposite each other in the circle method's first
+ * round and leaving that round out, so nobody ever sits. Anything else
+ * (the short last bracket) is a plain round robin.
+ */
+function tierRounds(members, k) {
+  const rr = roundRobinRounds(members.length);
+  const full = members.length === 2 * k
+    && new Set(members.map((m) => m.pool)).size === k;
+  if (!full) return rr;
+  // seat[circle index] = member index
+  const seat = [];
+  rr[0].pairs.forEach(([x, y], pool) => {
+    const [first, second] = members.map((m, i) => [m, i]).filter(([m]) => m.pool === pool).map(([, i]) => i);
+    seat[x] = first;
+    seat[y] = second;
+  });
+  return rr.slice(1).map((r) => ({ pairs: r.pairs.map(([x, y]) => [seat[x], seat[y]]), byes: [] }));
+}
+
+/**
  * Concrete formats available for a team count. Each entry:
  * {key, name, desc, rounds, roomsNeeded, teams}. Filter by your room
  * count with formatsFor(). build with buildSchedule().
@@ -250,6 +291,21 @@ export function allFormats(nTeams) {
         rounds: prelim + playoff, roomsNeeded: Math.max(prelimRooms, playRooms),
         desc: `pools of ${sizes.join('/')}, then teams regroup by finish position`,
       });
+      // the same pools into bigger playoff brackets: two finish positions
+      // from every pool (the top two of each, the next two, ...)
+      const tiers = tierBrackets(sizes);
+      if (tiers.length > 1 || tiers[0].length > k) {
+        const tRounds = Math.max(...tiers.map((t) => tierRounds(t, k).length));
+        const tRooms = tiers.reduce((n, t) => n + Math.floor(t.length / 2), 0);
+        const tSizes = tiers.map((t) => t.length);
+        const byes = tSizes.some((n) => n % 2) || new Set(tiers.map((t) => tierRounds(t, k).length)).size > 1;
+        out.push({
+          key: 'pools' + k + 'x2', name: `${k} pools, playoff brackets of ${2 * k}`, teams: nTeams,
+          rounds: prelim + tRounds, roomsNeeded: Math.max(prelimRooms, tRooms),
+          desc: `pools of ${sizes.join('/')}, then brackets of ${tSizes.join('/')} by finish, two places from each pool ` +
+            `(prelim games between pool-mates carry over${byes ? '; a smaller last bracket plays a round robin' : ''})`,
+        });
+      }
     }
   }
   return out;
@@ -291,6 +347,7 @@ function buildBase(key, teams, rooms) {
   const phases = [];
   const all = teams.map((_, i) => i);
   let poolRecord = null; // pool formats record membership for fillPlaceholders
+  let tierList = null;   // bracket list a format names itself
 
   const repeat = /^rr([234])$/.exec(key);
   if (key === 'rr') {
@@ -304,7 +361,8 @@ function buildBase(key, teams, rooms) {
       phases.push(ph);
     }
   } else {
-    const k = Number(key.slice(5));
+    const km = /^pools([234])(x2)?$/.exec(key);
+    const k = Number(km[1]);
     const sizes = poolSizes(teams.length, k);
     const pools = snakePools(teams.length, sizes);
     poolRecord = {};
@@ -354,6 +412,46 @@ function buildBase(key, teams, rooms) {
         champ.rounds.push(cons.rounds[i]);
       }
       phases.push(prelim, champ);
+    } else if (km[2]) {
+      // brackets of two finish positions per pool, played side by side
+      const tiers = tierBrackets(sizes);
+      const perTier = tiers.map((t) => tierRounds(t, k));
+      const nRounds = Math.max(...perTier.map((r) => r.length));
+      const slot = (m) => ph(m.pool, m.pos);
+      const name = (t) => {
+        const lo = Math.min(...t.map((m) => m.pos)) + 1;
+        const hi = Math.max(...t.map((m) => m.pos)) + 1;
+        return lo === hi ? ORD(lo) + ' place' : ORD(lo) + '\u2013' + ORD(hi) + ' place';
+      };
+      const rounds = [];
+      const prevRoom = new Map();
+      for (let r = 0; r < nRounds; r++) {
+        const pairs = [];
+        const byes = [];
+        perTier.forEach((tr, t) => {
+          const pr = tr[r];
+          // a shorter bracket has finished: its teams sit this round out
+          if (!pr) { byes.push(...tiers[t].map(slot)); return; }
+          for (const [x, y] of pr.pairs) pairs.push({ t, a: slot(tiers[t][x]), b: slot(tiers[t][y]) });
+          byes.push(...pr.byes.map((x) => slot(tiers[t][x])));
+        });
+        const roomOf = assignRooms(pairs.map((g) => [g.a.label, g.b.label]), rooms.length, prevRoom);
+        prevRoom.clear();
+        pairs.forEach((g, i) => { prevRoom.set(g.a.label, roomOf[i]); prevRoom.set(g.b.label, roomOf[i]); });
+        rounds.push({
+          round: next + r,
+          games: pairs.map((g, i) => ({ room: roomOf[i], a: g.a, b: g.b, bracket: 'T' + (g.t + 1) }))
+            .sort((g1, g2) => g1.room - g2.room),
+          byes,
+        });
+      }
+      phases.push(prelim, { name: 'Playoffs', rounds });
+      // tagBrackets reads a game across finish positions as a crossover
+      // (Championship/Consolation), so these brackets are named here
+      tierList = [
+        ...pools.map((_, p) => ({ key: POOL_LETTERS[p], name: 'Pool ' + POOL_LETTERS[p], phase: 0 })),
+        ...tiers.map((t, i) => ({ key: 'T' + (i + 1), name: name(t), phase: 1 })),
+      ];
     } else {
       const maxSize = sizes[0];
       const slots = [];
@@ -374,6 +472,7 @@ function buildBase(key, teams, rooms) {
     rooms: rooms.map((r) => ({ name: r.name, bucket: r.bucket ?? null })),
     phases,
     ...(poolRecord ? { pools: poolRecord } : {}),
+    ...(tierList ? { brackets: tierList } : {}),
     updated: 0,
   };
 }
