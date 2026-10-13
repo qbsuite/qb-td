@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pool grid artboard</title>
 <!-- One artboard of mockups/pool-grids.html: the public page's New stats
-     layout, drawn with the app's real stylesheets. ?v=before|a|b|c
+     layout, drawn with the app's real stylesheets. ?v=before|a1|a2|c
      &theme=lt|dk. Results are made up (pool-grids-data.js); rounds 1-4
      count as played, 5-7 as still to come. -->
 <link rel="stylesheet" href="../app/css/td.css">
@@ -29,8 +29,20 @@ html.dk {
 .pgrid { border-collapse: separate; border-spacing: 2px; width: auto; font-size: 12px; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .pgrid th, .pgrid td { border: none; padding: 0; text-align: center; }
 .pgrid th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; height: 22px; }
-.pgrid th.rowh { text-align: right; padding-right: 4px; white-space: nowrap; }
+.pgrid th.rowh { text-align: right; padding-right: 6px; white-space: nowrap; color: var(--fg); }
 .pgrid:not(.big) td { font-size: 11px; }
+/* short names on both sides: narrow enough to sit beside the table */
+.pgrid.short td { width: 35px; height: 35px; }
+.pgrid.short th { font-size: 11px; }
+/* full names, the top ones at an angle */
+.pgrid.angled { margin-top: 10px; }
+.pgrid.angled td { width: 40px; height: 40px; }
+.pgrid.angled th.rowh { font-size: 13px; }
+.pgrid.angled th.colh { height: 96px; vertical-align: bottom; padding: 0; position: relative; }
+.pgrid.angled th.colh span {
+  position: absolute; left: 50%; bottom: 4px; transform-origin: 0 100%; transform: rotate(-50deg);
+  white-space: nowrap; color: var(--fg); font-size: 12px;
+}
 .pgrid td { width: 36px; height: 36px; border-radius: 6px; background: color-mix(in srgb, var(--fg) 5%, var(--bg)); }
 .pgrid td.won { background: var(--win-bg); color: var(--win-fg); font-weight: 600; }
 .pgrid td.lost { color: var(--muted); }
@@ -60,7 +72,9 @@ html.dk {
 .pgrid.big th.rowh { color: var(--fg); font-size: 13px; }
 .pgrid.big td.rec { width: 48px; background: none; font-weight: 600; }
 @media (max-width: 560px) {
-  .pgrid td { width: 34px; height: 36px; font-size: 11px; }
+  .pgrid td, .pgrid.short td { width: 33px; height: 34px; font-size: 10.5px; }
+  .pgrid.angled td { width: 32px; height: 34px; font-size: 10.5px; }
+  .pgrid.angled th.rowh { font-size: 12px; }
   .pgrid.big td { width: 46px; height: 40px; }
   .pgridscroll { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
 }
@@ -146,25 +160,33 @@ function table(teams, extra) {
   </table></div>`;
 }
 
-function grid(teams, big) {
+// labels: 'short' (Ill A on both sides), 'angled' (full names, the top ones
+// at an angle), 'big' (full names down the side, short ones across, record)
+function grid(teams, labels) {
+  const big = labels === 'big';
   const cell = (tm, o) => {
     if (tm === o) return '<td class="self"></td>';
     const m = meet(tm.name, o.name);
     if (!m.played) return `<td class="todo" title="Round ${m.round}">R${m.round}</td>`;
     return `<td class="${m.won ? 'won' : 'lost'}" title="${esc(tm.name)} ${m.mine}, ${esc(o.name)} ${m.theirs}">${m.mine}<span class="opp">${m.theirs}</span></td>`;
   };
-  return `<div class="pgridscroll"><table class="pgrid${big ? ' big' : ''}">
-    <tr><th></th>${teams.map((t, i) => `<th class="colh" title="${esc(t.name)}">${big ? esc(short(t.name)) : i + 1}</th>`).join('')}${big ? '<th class="colh">W–L</th>' : ''}</tr>
-    ${teams.map((tm, i) => `<tr><th class="rowh">${big ? esc(tm.name) : i + 1}</th>${teams.map((o) => cell(tm, o)).join('')}${
+  const colName = (t) => labels === 'angled' ? `<span>${esc(t.name)}</span>` : esc(short(t.name));
+  const rowName = (t) => labels === 'short' ? esc(short(t.name)) : esc(t.name);
+  return `<div class="pgridscroll"><table class="pgrid ${labels}">
+    <tr><th></th>${teams.map((t) => `<th class="colh" title="${esc(t.name)}">${colName(t)}</th>`).join('')}${big ? '<th class="colh">W–L</th>' : ''}</tr>
+    ${teams.map((tm) => `<tr><th class="rowh" title="${esc(tm.name)}">${rowName(tm)}</th>${teams.map((o) => cell(tm, o)).join('')}${
       big ? `<td class="rec">${tm.w}–${tm.l}</td>` : ''}</tr>`).join('')}
   </table></div>`;
 }
-const NOTE = 'Each row is that team&rsquo;s games: its own score above its opponent&rsquo;s, and a green square for a win. R6 means the game is in round 6.';
+const NOTE = 'Each row is that team&rsquo;s games, with its own score above its opponent&rsquo;s and a green square for a win. R6 means the game is in round 6.';
 
 document.getElementById('newstats').innerHTML = Object.keys(pools).sort().map((k, n) => {
   const teams = ranked(k);
-  if (V === 'a') {
-    return `<h3 class="poolhead">Pool ${k}</h3><div class="poolrow">${table(teams)}<div>${grid(teams)}${n === 0 ? `<div class="pgridnote">${NOTE} The numbers are the teams&rsquo; places in the table.</div>` : ''}</div></div>`;
+  if (V === 'a1') {
+    return `<h3 class="poolhead">Pool ${k}</h3><div class="poolrow">${table(teams)}<div>${grid(teams, 'short')}${n === 0 ? `<div class="pgridnote">${NOTE}</div>` : ''}</div></div>`;
+  }
+  if (V === 'a2') {
+    return `<h3 class="poolhead">Pool ${k}</h3>${table(teams)}${grid(teams, 'angled')}${n === 0 ? `<div class="pgridnote">${NOTE}</div>` : ''}`;
   }
   if (V === 'b') {
     return `<h3 class="poolhead">Pool ${k}</h3>${table(teams, true)}${n === 0 ? '<div class="pgridnote">The numbered columns are each team&rsquo;s games against the team in that place: W or L once played, or the round it is in.</div>' : ''}`;
@@ -173,7 +195,7 @@ document.getElementById('newstats').innerHTML = Object.keys(pools).sort().map((k
     // the first pool shows the grid, the others the table, so both sides of the switch are in view
     const showGrid = n === 0;
     return `<div class="poolbar"><h3 class="poolhead">Pool ${k}</h3><div class="chips"><a class="chip${showGrid ? '' : ' on'}">Table</a><a class="chip${showGrid ? ' on' : ''}">Grid</a></div></div>
-      ${showGrid ? grid(teams, true) + `<div class="pgridnote">${NOTE}</div>` : table(teams)}`;
+      ${showGrid ? grid(teams, 'big') + `<div class="pgridnote">${NOTE}</div>` : table(teams)}`;
   }
   return `<h3 class="poolhead">Pool ${k}</h3>${table(teams)}`;
 }).join('');

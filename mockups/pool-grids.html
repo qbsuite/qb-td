@@ -32,18 +32,18 @@ iframe { border: 1px solid var(--line); border-radius: 10px; display: block; bac
 
 <div class="mk-opts">
   <div>
-    <h3>A. A grid beside each table</h3>
-    <p>Every pool keeps its table and gains a grid of scores to its right, in the same order as the table. On a phone the grid sits under the table.</p>
-    <p class="lim">Teams are numbered by their place, so a reader matches a column to a team by its number.</p>
+    <h3>A1. A grid beside each table</h3>
+    <p>Every pool keeps its table and gains a grid of scores to its right. Short team names label both sides, and the full name shows on hover. On a phone the grid sits under the table.</p>
+    <p class="lim">The names are shortened (Ill A, NU B) so that the grid fits beside an eight-team table.</p>
   </div>
   <div>
-    <h3>B. Results inside the table</h3>
-    <p>The table itself gains one narrow column per opponent with a W, an L, or the round the game is in. It is the most compact, and adds nothing new to the page.</p>
-    <p class="lim">It shows no scores, and on a phone the extra columns are reached by scrolling the table sideways.</p>
+    <h3>A2. A grid under each table</h3>
+    <p>The grid sits under the table with full team names down the side and along the top, where they are set at an angle.</p>
+    <p class="lim">Each pool takes more height, so the three pools make a longer page.</p>
   </div>
   <div>
     <h3>C. A Table or Grid switch</h3>
-    <p>Each pool has a switch. The grid replaces the table and has team names along both sides, scores in every square and the record at the end.</p>
+    <p>Each pool has a switch. The grid replaces the table, with full names down the side, short names across, scores in every square and the record at the end.</p>
     <p class="lim">The table and the grid are never on screen together. The first pool is shown as Grid and the others as Table.</p>
   </div>
 </div>
@@ -51,7 +51,7 @@ iframe { border: 1px solid var(--line); border-radius: 10px; display: block; bac
 <div id="rows"></div>
 
 <script>
-const VARS = [['before', 'Before', 'the New layout today'], ['a', 'A', 'a grid beside each table'], ['b', 'B', 'results inside the table'], ['c', 'C', 'a Table or Grid switch']];
+const VARS = [['before', 'Before', 'the New layout today'], ['a1', 'A1', 'a grid beside each table'], ['a2', 'A2', 'a grid under each table'], ['c', 'C', 'a Table or Grid switch']];
 const row = (cls, theme) => `<div class="mk-row">${VARS.map(([v, name, sub]) =>
   `<div class="mk-col"><div class="mk-cap">${name} <span>${sub}</span></div><iframe class="${cls}" src="pool-grids-board.html?v=${v}&theme=${theme}" loading="eager"></iframe></div>`).join('')}</div>`;
 document.getElementById('rows').innerHTML =
