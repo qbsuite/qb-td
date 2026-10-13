@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test games before Start</title>
+<!-- Throwaway mock. The artboards use the app's real stylesheets, so they
+     follow the pages as they are today. -->
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/room.css">
+<link rel="stylesheet" href="../app/css/hub.css">
+<style>
+/* each artboard pins its own palette, whatever the OS is set to */
+.lt {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7; --link: #1d4ed8;
+  --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c; --pick: #e4e4df; --pick-line: #c9c9c2;
+  --warn: #b4410e; --card: #f1f1ec; --sel: #efefea;
+}
+.dk {
+  --bg: #232326; --fg: #e4e4e7; --muted: #a1a1aa; --line: #36363c; --link: #8fb0f5;
+  --hover-bg: #2c2c31; --ok: #6fc58d; --bad: #f08a8a; --pick: #38383f; --pick-line: #4d4d55;
+  --warn: #e7a177; --card: #2b2b2f; --sel: #303036;
+}
+body { padding: 28px 32px 80px; }
+.mk-h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+.mk-lede { max-width: 78ch; color: var(--muted); margin: 8px 0 0; }
+.mk-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin: 22px 0 8px; max-width: 1500px; }
+.mk-opts h3 { font-size: 16px; font-weight: 600; }
+.mk-opts p { font-size: 14px; margin-top: 6px; }
+.mk-opts .lim { color: var(--muted); }
+.mk-sec { font-size: 20px; font-weight: 600; margin: 44px 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--fg); text-transform: none; letter-spacing: 0; color: var(--fg); }
+.mk-row { display: flex; gap: 28px; overflow-x: auto; padding: 16px 0 12px; align-items: flex-start; }
+.mk-col { flex: none; }
+.mk-cap { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mk-cap span { font-weight: 400; color: var(--muted); }
+.board {
+  background: var(--bg); color: var(--fg); zoom: 0.62;
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.tdb { width: 1120px; }
+.tdb .wrap { max-width: 1180px; padding: 22px 32px 40px; }
+.roomb { width: 1040px; min-height: 420px; }
+.roomb .linkbtn { font-size: 13px; }
+.roomb .rstart { padding: 28px 40px 40px; gap: 44px; }
+/* what each proposal adds */
+.teststrip {
+  background: var(--sel); border-radius: 10px; padding: 10px 14px; margin: 16px 24px 0;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px;
+}
+.notyet { padding: 28px 40px; max-width: 620px; }
+.notyet h2 { font-size: 22px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--fg); margin: 0 0 6px; }
+.notyet .prac { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; }
+.notyet button { margin-top: 12px; font-size: 16px; padding: 12px 28px; }
+.new { box-shadow: 0 0 0 2px var(--ok); border-radius: 6px; }
+.mk-key { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.mk-key i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; box-shadow: 0 0 0 2px var(--ok); margin-right: 6px; }
+</style>
+</head>
+<body>
+<h1 class="mk-h1">Test games before Start</h1>
+<p class="mk-lede">Today a room link shows &ldquo;Tournament hasn&rsquo;t started&rdquo; until the TD presses Start tournament, and Start begins the 48-hour clock. A TD therefore cannot check that packets, rosters and MODAQ settings load correctly without spending the clock. Below are three ways to allow it.</p>
+
+<div class="mk-opts">
+  <div>
+    <h3>A. A test link for the TD</h3>
+    <p>Each room in Setup gets a Test link. It opens that room exactly as it will look on the day, with the real packets, teams and settings, on the TD&rsquo;s computer only. Nothing from a test game is sent anywhere.</p>
+    <p class="lim">Moderators&rsquo; own links stay closed, so they cannot rehearse, and the upload step is not exercised.</p>
+  </div>
+  <div>
+    <h3>B. Open the rooms for testing</h3>
+    <p>The TD can open every room link before Start without starting the clock. Moderators can read test games on their own laptops and upload them, and the TD sees them arrive. Test games are deleted when the tournament starts.</p>
+    <p class="lim">Anyone holding a room link can read the real packets while testing is open.</p>
+  </div>
+  <div>
+    <h3>C. A practice game on the room page</h3>
+    <p>Before Start, every room link offers a practice game with the tournament&rsquo;s real teams and MODAQ settings but a sample packet. Moderators can try it whenever they like and the TD does nothing.</p>
+    <p class="lim">The real packets are never loaded, so this does not show that they read correctly.</p>
+  </div>
+</div>
+<p class="mk-key"><i></i>A green outline marks what each proposal adds. It is not part of the design.</p>
+
+<h2 class="mk-sec">TD hub: Setup, Rooms</h2>
+<div class="mk-row" id="td-lt"></div>
+<div class="mk-row" id="td-dk"></div>
+
+<h2 class="mk-sec">Room page before Start</h2>
+<div class="mk-row" id="room-lt"></div>
+<div class="mk-row" id="room-dk"></div>
+
+<h2 class="mk-sec">TD hub: Live, before Start</h2>
+<div class="mk-row" id="live-lt"></div>
+<div class="mk-row" id="live-dk"></div>
+
+<script>
+const ROOMS = ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6'];
+const STEPS = [['Rooms', '6 rooms', true], ['Roster', 'Saved'], ['Schedule', 'Saved'],
+  ['Packets + Tiebreakers', '11/11 rounds'], ['MODAQ Settings', 'ACF (no powers)'], ['Public page', 'Public']];
+
+const hubHead = (view) => `
+  <header class="sitehead">
+    <h1>qb-td</h1><a class="muted">All tournaments</a><span class="spacer"></span>
+    <a class="muted">About</a><a class="muted">Changelog</a>
+  </header>
+  <div class="hubhead">
+    <div class="hubtitle">
+      <h1>2026 Fall Open</h1>
+      <span class="muted">Not started &middot; setup open until Oct 19, 9:00 AM</span>
+      <span class="mono muted slug">fall-open</span>
+    </div>
+    <nav class="hubnav">
+      <button class="hubtab ${view === 'setup' ? 'on' : ''}">Setup</button>
+      <button class="hubtab ${view === 'live' ? 'on' : ''}">Live</button>
+      <span class="spacer" style="flex:1"></span>
+      <button class="linkbtn">Copy public link</button><a>Open public page</a>
+      <button class="linkbtn">New admin link</button>
+    </nav>
+  </div>`;
+
+// v: 'before' | 'a' | 'b' | 'bon' | 'c'
+function tdBoard(theme, v) {
+  const start = v === 'b' ? `
+      <button class="primary">Start tournament</button>
+      <div class="muted" style="font-size:12px">Room links open for 48 hours from Start.</div>
+      <button class="new" style="height:38px">Open rooms for testing</button>
+      <div class="muted" style="font-size:12px">Room links work without starting the 48 hours. Test games are deleted when you start.</div>`
+    : v === 'bon' ? `
+      <div class="new" style="padding:8px 10px"><b>Rooms are open for testing</b>
+        <div class="muted" style="font-size:12px">2 test games have come in. They are deleted when you start.</div>
+        <button class="linkbtn" style="font-size:13px;margin-top:4px">Close the rooms again</button></div>
+      <button class="primary">Start tournament</button>
+      <div class="muted" style="font-size:12px">Room links open for 48 hours from Start.</div>`
+    : `
+      <button class="primary">Start tournament</button>
+      <div class="muted" style="font-size:12px">Room links open for 48 hours from Start.</div>`;
+  const note = v === 'a' ? 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament. <span class="new">Test opens a room on this computer with its real packets, and nothing from a test game is saved.</span>'
+    : v === 'bon' ? '<span class="new">Room links are open for testing. Games read now are deleted when you press Start tournament.</span>'
+    : v === 'c' ? 'Until you press Start tournament, <span class="new">room links offer a practice game with a sample packet instead of your packets.</span>'
+    : 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament.';
+  return `<div class="board tdb hubpage ${theme}"><div class="wrap">
+    ${hubHead('setup')}
+    <div class="setupgrid">
+      <aside class="steplist">
+        ${STEPS.map(([l, d, on]) => `<button class="stepbtn ${on ? 'on' : ''}">
+          <span class="mark done">&#10003;</span>
+          <span class="stext"><span class="slabel">${l}</span><span class="sdetail">${d}</span></span></button>`).join('')}
+        <div class="stepstart">${start}</div>
+      </aside>
+      <div id="setupsec">
+        <h2>Rooms</h2>
+        <div class="tablewrap"><table class="roomtable">
+          <tr><th>Name</th><th>Reader link</th><th class="num">Files</th><th></th></tr>
+          ${ROOMS.map((r, i) => `<tr>
+            <td><input class="inlinename" value="${r}"></td>
+            <td class="linkpair"><button class="linkbtn">Copy</button><a class="muted">Open</a>${
+              v === 'a' ? '<a class="new" style="padding:0 4px">Test</a>' : ''}</td>
+            <td class="num muted">${v === 'bon' && i < 2 ? '1 test' : 0}</td>
+            <td class="num"><button class="linkbtn muted">Remove</button></td></tr>`).join('')}
+        </table></div>
+        <p class="muted" style="font-size:13px;margin:6px 0 0">${note}</p>
+        <div class="row" style="margin-top:10px">
+          <label>Add <input type="number" value="2" style="width:64px"> more rooms</label>
+          <button class="primary">Add rooms</button>
+        </div>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+const PLAYERS = { Chicago: ['Ada', 'Boris', 'Camille', 'Dev'], Michigan: ['Elena', 'Farid', 'Grace', 'Hugo'] };
+const lineup = (team) => `<div class="lineup">
+  <h4><span class="lname"><button class="grip tgrip">&#8942;&#8942;</button>${team}</span><span class="count">4 starting</span></h4>
+  <div class="plist">${PLAYERS[team].map((p) => `<div class="prow"><span class="grip">&#8942;&#8942;</span>
+    <button class="p on"><span class="box">&#10003;</span>${p}</button></div>`).join('')}</div></div>`;
+
+const picker = (startLabel) => `
+  <div class="rstart">
+    <main id="picker">
+      <div>
+        <div class="rlabel">Round</div>
+        <div class="rounds"><a class="rnd live sel">1</a>${[2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => `<a class="rnd">${n}</a>`).join('')}</div>
+        <span class="muted" id="packetname">Packet: ${startLabel === 'Start practice game' ? 'Sample packet' : 'Fall Open Packet 1.docx'}</span>
+      </div>
+      <div id="teamrow">
+        <div class="matchrow">
+          <div class="grow">
+            <div id="schedfrom">From the schedule &middot; Round 1 in Room 1</div>
+            <div class="matchup">Chicago <span class="vs">vs</span> Michigan</div>
+          </div>
+          <div class="matchlinks"><button class="linkbtn">Change teams</button></div>
+        </div>
+        <div class="lineups">${lineup('Chicago')}${lineup('Michigan')}</div>
+        <div class="startrow"><button id="start" class="primary">${startLabel}</button></div>
+      </div>
+    </main>
+    <aside class="rside">
+      <div><h2>This room&rsquo;s schedule</h2>
+        <div class="tablewrap"><table id="schedrows">
+          <tr class="now"><td>1</td><td>Chicago v Michigan</td></tr>
+          <tr><td>2</td><td>Chicago v Ohio State</td></tr>
+          <tr><td>3</td><td>Michigan v Purdue</td></tr>
+          <tr><td>4</td><td>Ohio State v Purdue</td></tr>
+        </table></div></div>
+    </aside>
+  </div>`;
+
+const rbar = (name, sub, tag) => `<header class="rbar"><h1>${name}</h1>
+  ${sub ? `<span class="sub">${sub}</span>` : ''}${tag ? `<span class="sub warntext new" style="padding:0 6px">${tag}</span>` : ''}
+  <span class="spacer"></span></header>`;
+
+function roomBoard(theme, v) {
+  let body;
+  if (v === 'before') {
+    body = rbar('qb-td') + `<div class="rmsg"><div style="min-height:20px;color:var(--bad);margin:10px 0">Tournament hasn&rsquo;t started. Reload this page once the TD starts it.</div></div>`;
+  } else if (v === 'a') {
+    body = rbar('2026 Fall Open', 'Room 1 &middot; Round 1', 'Test game')
+      + `<div class="teststrip new"><b>This is a test.</b><span class="muted">It runs on this computer only, and nothing from it is sent to the tournament.</span></div>`
+      + picker('Start test game');
+  } else if (v === 'b') {
+    body = rbar('2026 Fall Open', 'Room 1 &middot; Round 1', 'Testing')
+      + `<div class="teststrip new"><b>The TD has opened this room for testing.</b><span class="muted">Games read now are deleted when the tournament starts.</span></div>`
+      + picker('Start test game');
+  } else if (v === 'c') {
+    body = rbar('2026 Fall Open', 'Room 1') + `<div class="notyet">
+      <h2>The tournament hasn&rsquo;t started</h2>
+      <p class="muted">This page will show your games once the TD starts the tournament. Please reload it then.</p>
+      <div class="prac new" style="padding:14px"><b>Would you like to try a practice game?</b>
+        <p class="muted" style="margin-top:4px">It uses this tournament&rsquo;s teams and MODAQ settings with a sample packet, and nothing from it is sent to the TD.</p>
+        <button class="primary">Try a practice game</button></div></div>`;
+  } else {
+    body = rbar('2026 Fall Open', 'Room 1 &middot; Practice', 'Practice game')
+      + `<div class="teststrip new"><b>This is a practice game with a sample packet.</b><span class="muted">Nothing from it is sent to the TD.</span></div>`
+      + picker('Start practice game');
+  }
+  return `<div class="board roomb ${theme}">${body}</div>`;
+}
+
+function liveBoard(theme, v) {
+  const banner = v === 'bon' ? `
+    <div class="banner new">
+      <span class="warntext" style="font-weight:600">Open for testing</span>
+      <span class="muted">Room links work and the 48 hours have not started. The 2 test games below are deleted when you start.</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="linkbtn">Close the rooms again</button>
+      <button class="primary">Start tournament</button>
+    </div>` : `
+    <div class="banner">
+      <span class="warntext" style="font-weight:600">Not started</span>
+      <span class="muted">Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you start it.</span>
+      <span class="spacer" style="flex:1"></span>
+      ${v === 'b' ? '<button class="new">Open rooms for testing</button>' : ''}
+      <button class="primary">Start tournament</button>
+    </div>`;
+  return `<div class="board tdb hubpage ${theme}"><div class="wrap" style="padding-bottom:28px">${hubHead('live')}${banner}</div></div>`;
+}
+
+const col = (cap, sub, html) => `<div class="mk-col"><div class="mk-cap">${cap} <span>${sub}</span></div>${html}</div>`;
+for (const [id, theme] of [['lt', 'lt'], ['dk', 'dk']]) {
+  document.getElementById('td-' + id).innerHTML =
+    col('Before', 'the page today', tdBoard(theme, 'before'))
+    + col('A', 'a Test link beside each room', tdBoard(theme, 'a'))
+    + col('B', 'a second button under Start', tdBoard(theme, 'b'))
+    + col('B', 'while the rooms are open for testing', tdBoard(theme, 'bon'))
+    + col('C', 'only the note under the table changes', tdBoard(theme, 'c'));
+  document.getElementById('room-' + id).innerHTML =
+    col('Before', 'what a moderator sees today', roomBoard(theme, 'before'))
+    + col('A', 'the TD&rsquo;s Test link; moderators still see Before', roomBoard(theme, 'a'))
+    + col('B', 'every room link, while testing is open', roomBoard(theme, 'b'))
+    + col('C', 'every room link, before Start', roomBoard(theme, 'c'))
+    + col('C', 'after choosing the practice game', roomBoard(theme, 'cgame'));
+  document.getElementById('live-' + id).innerHTML =
+    col('Before', 'A and C leave this as it is', liveBoard(theme, 'before'))
+    + col('B', 'the same button as in Setup', liveBoard(theme, 'b'))
+    + col('B', 'while the rooms are open for testing', liveBoard(theme, 'bon'));
+}
+</script>
+</body>
+</html>
