@@ -82,7 +82,7 @@ function board(theme, v) {
   const scroll = el.querySelector('#sgscroll');
   const zoomTo = (z) => { for (const ph of scroll.children) ph.style.zoom = z; };
   if (v === 'a') { el.classList.add('hasctl'); sec.insertAdjacentHTML('afterbegin', ctl(80)); zoomTo(0.8); }
-  if (v === 'b') { el.classList.add('fitctl'); sec.insertAdjacentHTML('afterbegin', ctl(82, true)); zoomTo(0.82); }
+  if (v === 'b') { el.classList.add('fitctl'); sec.insertAdjacentHTML('afterbegin', ctl(78, true)); zoomTo(0.78); }
   if (v === 'c') {
     el.querySelector('.sgside').remove();
     el.querySelector('.sgbody').style.gridTemplateColumns = 'minmax(0, 1fr)';
@@ -95,6 +95,15 @@ function board(theme, v) {
 }
 const VARS = [['before', 'Before', 'full screen today'], ['a', 'A', 'zoom buttons, after pressing minus twice'], ['b', 'B', 'fitted automatically on entering full screen'], ['c', 'C', 'panel tucked away, columns share the width']];
 const rows = document.getElementById('rows');
+// ?only=a&theme=dk: that one artboard alone at full size (for a screenshot)
+const only = new URLSearchParams(location.search);
+if (only.get('only')) {
+  const b = board(only.get('theme') === 'dk' ? 'dk' : 'lt', only.get('only'));
+  b.style.zoom = 1; b.style.border = 'none'; b.style.borderRadius = 0;
+  for (const n of b.querySelectorAll('.new')) n.classList.remove('new');
+  document.body.style.padding = 0;
+  document.body.replaceChildren(b);
+} else
 for (const [v, name, sub] of VARS) for (const theme of ['lt', 'dk']) {
   const col = document.createElement('div');
   col.innerHTML = '<div class="mk-cap">' + name + ' <span>' + sub + (theme === 'dk' ? ', dark' : '') + '</span></div>';
