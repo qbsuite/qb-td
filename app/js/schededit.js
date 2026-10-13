@@ -31,6 +31,9 @@ const ui = {
   baseline: { obj: null, json: '' }, // the schedule as saved
   creator: false,        // showing the format picker over a schedule
   full: false,           // the editor fills the screen
+  zoom: null,            // full screen: null = fit to the screen, else the TD's own zoom (1 = 100%)
+  zoomNow: 1,            // the zoom last applied (what minus and plus step from)
+  sideOpen: false,       // full screen: the panel was opened for its checks
   opts: { seeding: 'snake', roundOrder: 'asis', rooms: 'keep', seed: 1 + Math.floor(Math.random() * 9999) },
   fmt: null,
 };
@@ -40,6 +43,7 @@ const ui = {
 export function schedEscape() {
   if (!ui.sel && !ui.mode) {
     if (!ui.full) return false;
+    if (ui.sideOpen) { ui.sideOpen = false; return true; }
     setFull(false);
     return true;
   }
@@ -66,7 +70,64 @@ function setFull(on) {
     if (!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   } catch (e) { /* the cover alone */ }
 }
+// In full screen the grid uses the screen it is given: the room columns
+// share the width (COL_MIN..COL_MAX each), and Fit picks the zoom — down
+// when the rooms still don't fit, up when there is room to spare, never so
+// far up that the rounds stop fitting. ui.zoom set: the TD's own zoom, and
+// the columns share whatever width that leaves. Returns the zoom applied.
+const COL_MAX = 200;
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 1.5;
+const TRACKS_RE = /^(\d+)px repeat\((\d+), (\d+)px\) (\d+)px$/;
+function fitFull(box) {
+  const scroll = box.querySelector('#sgscroll');
+  if (!scroll) return 1;
+  const kids = [...scroll.children];
+  for (const k of kids) k.style.zoom = '';
+  const clamp = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+  const grids = [...scroll.querySelectorAll('.sggrid')].map((el) => ({ el, m: TRACKS_RE.exec(el.style.gridTemplateColumns) })).filter((g) => g.m);
+  let z = 1;
+  if (!grids.length) {
+    // By team and Brackets: no columns to share out, so only shrink to fit
+    z = ui.zoom || (scroll.scrollWidth > scroll.clientWidth + 1 ? clamp(scroll.clientWidth / scroll.scrollWidth) : 1);
+  } else {
+    const n = Math.max(...grids.map((g) => Number(g.m[2])));
+    const colMin = Math.min(...grids.map((g) => Number(g.m[3])));
+    const lead = Number(grids[0].m[1]);
+    const tail = Number(grids[0].m[4]);
+    // the tracks, a 4px gap after each but the last, and the grid's 10px of padding
+    const width = (col) => lead + n * (col + 4) + tail + 4 + 10;
+    const availW = scroll.clientWidth - 2;
+    const share = (zoom) => Math.max(colMin, Math.min(COL_MAX, Math.floor((availW / zoom - width(0)) / n)));
+    let col;
+    if (ui.zoom) {
+      z = ui.zoom;
+      col = share(z);
+    } else if (width(colMin) > availW) {
+      col = colMin;
+      z = clamp(availW / width(colMin));
+    } else {
+      col = share(1);
+    }
+    for (const g of grids) g.el.style.gridTemplateColumns = `${g.m[1]}px repeat(${g.m[2]}, ${col}px) ${g.m[4]}px`;
+    if (!ui.zoom && col === COL_MAX) {
+      const height = kids.reduce((h, k) => h + k.offsetHeight, 0);
+      z = Math.max(1, Math.min(ZOOM_MAX, availW / width(COL_MAX), (scroll.clientHeight - 2) / height));
+    }
+  }
+  z = Math.round(z * 100) / 100;
+  for (const k of kids) k.style.zoom = z === 1 ? '' : z;
+  return z;
+}
+
 if (typeof document !== 'undefined') {
+  // the window changed size: fit again
+  let resizing = null;
+  window.addEventListener('resize', () => {
+    if (!ui.full || !redrawFull) return;
+    clearTimeout(resizing);
+    resizing = setTimeout(() => { if (ui.full && redrawFull) redrawFull(); }, 150);
+  });
   // Esc in the browser's full screen never reaches the page as a key
   document.addEventListener('fullscreenchange', () => {
     if (document.fullscreenElement || !ui.full) return;
@@ -402,7 +463,9 @@ function renderEditor(box, env) {
   const panel = sidePanel(s, env, { roundNo, bracketName, edit });
 
   box.innerHTML = `
-    ${ui.full ? `<button id="schedexit" class="iconbtn sgexit" title="Exit full screen (Esc)" aria-label="Exit full screen">${ICON_EXIT}</button>` : ''}
+    ${ui.full ? `<span class="sgzoom"><button id="schedfit" class="fit${ui.zoom ? '' : ' on'}" title="Size the grid to fit the screen">Fit</button><i></i>
+      <button id="schedzout" aria-label="Zoom out" title="Zoom out">&minus;</button><b id="schedzpct"></b><button id="schedzin" aria-label="Zoom in" title="Zoom in">+</button></span>
+    <button id="schedexit" class="iconbtn sgexit" title="Exit full screen (Esc)" aria-label="Exit full screen">${ICON_EXIT}</button>` : ''}
     <div class="sghead">
       <span class="muted">${env.teams.length} teams · ${s.rooms.length} rooms · ${nRounds} rounds${fmtName ? ' · ' + esc(fmtName) : ''}</span>
       <button id="schedregen" class="linkbtn">Change format…</button>
@@ -426,6 +489,9 @@ function renderEditor(box, env) {
     <div class="sgbar${unsaved ? ' unsaved' : ''}">
       <b>${unsaved ? (ui.past.length ? ui.past.length + ' unsaved change' + (ui.past.length === 1 ? '' : 's') : 'Unsaved changes') : 'Saved'}</b>
       <span class="muted">${esc(ui.note)}</span>
+      ${!ui.full ? '' : allChecks.length
+        ? `<button id="schedchecksbtn" class="linkbtn warntext">${allChecks.length} ${allChecks.length === 1 ? 'check' : 'checks'} to look at</button>`
+        : '<span class="sgclear">Checks all clear</span>'}
       <span class="spacer" style="flex:1"></span>
       <button id="schedaddround" class="small">Add round</button>
       <button id="schedaddroom" class="small">Add room</button>
@@ -450,7 +516,8 @@ function renderEditor(box, env) {
     </div>
     <div class="sgbody">
       <div class="sgscroll" id="sgscroll">${ui.view === 'teams' ? teamHtml : ui.view === 'brackets' ? mapHtml : gridHtml}</div>
-      <aside class="sgside">
+      <aside class="sgside"${ui.full && !ui.sel && !ui.mode && !ui.sideOpen ? ' hidden' : ''}>
+        ${ui.full ? '<button class="linkbtn muted sgsidehide" id="schedsidehide">Hide this panel</button>' : ''}
         ${panel.html}
         <div class="sgchecks">
           <div class="sgchecktitle"><b>Checks</b> <span class="muted">${allChecks.length ? allChecks.length + ' to look at' : 'all clear'}</span></div>
@@ -491,6 +558,21 @@ function renderEditor(box, env) {
     fb.onclick = () => { setFull(true); again(); };
   }
   if (q('schedexit')) q('schedexit').onclick = () => { setFull(false); again(); };
+  if (ui.full) {
+    // tucked away until something is selected, or opened for its checks
+    if (q('schedchecksbtn')) q('schedchecksbtn').onclick = () => { ui.sideOpen = true; again(); };
+    q('schedsidehide').onclick = () => { ui.sideOpen = false; ui.sel = null; ui.mode = null; again(); };
+    ui.zoomNow = fitFull(box);
+    q('schedzpct').textContent = Math.round(ui.zoomNow * 100) + '%';
+    const step = (by) => {
+      ui.zoom = Math.min(2, Math.max(0.5, Math.round((ui.zoomNow + by) * 10) / 10));
+      ui.scrollPos = null;
+      again();
+    };
+    q('schedfit').onclick = () => { ui.zoom = null; ui.scrollPos = null; again(); };
+    q('schedzout').onclick = () => step(-0.1);
+    q('schedzin').onclick = () => step(0.1);
+  }
   $$('[data-jump]').forEach((b) => { b.onclick = () => { ui.view = 'grid'; ui.filter = ''; setSel(parse(b.dataset.jump)); scrollToSel(box); }; });
   $$('[data-fixto]').forEach((el) => {
     el.onchange = () => {

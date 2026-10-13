@@ -322,10 +322,30 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 }
 #schedsec.sgfull > * { flex: none; }
 #schedsec.sgfull > .sgexit { position: absolute; top: 8px; right: 16px; }
-#schedsec.sgfull > .sghead { padding-right: 36px; }
-#schedsec.sgfull > .sgbody { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+#schedsec.sgfull > .sghead { padding-right: 216px; }
+/* Fit, and the TD's own zoom, beside the way out */
+.sgzoom {
+  position: absolute; top: 8px; right: 56px; display: inline-flex; align-items: center; gap: 2px;
+  height: 32px; padding: 0 4px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
+}
+.sgzoom button { width: 26px; height: 24px; padding: 0; border: none; border-radius: 6px; font-size: 16px; line-height: 1; color: var(--fg); }
+.sgzoom button:hover { background: var(--hover-bg); border: none; }
+.sgzoom b { min-width: 44px; text-align: center; font-weight: 500; font-variant-numeric: tabular-nums; }
+.sgzoom .fit { width: auto; padding: 0 9px; font-size: 13px; }
+.sgzoom .fit.on { background: var(--sel); font-weight: 600; }
+.sgzoom i { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+.sgclear { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.sgclear::before { content: "\2713"; color: var(--ok); font-weight: 700; }
+/* the grid takes the whole width; the panel floats over its corner when it is wanted */
+#schedsec.sgfull > .sgbody { flex: 1; min-height: 0; position: relative; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
 #schedsec.sgfull .sgscroll { max-height: none; height: 100%; }
-#schedsec.sgfull .sgside { position: static; overflow: auto; min-height: 0; }
+#schedsec.sgfull .sgside {
+  position: absolute; top: 10px; right: 10px; z-index: 6; width: 280px; max-height: calc(100% - 20px); overflow: auto;
+  display: flex; flex-direction: column; gap: 12px; order: 0;
+  padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+#schedsec.sgfull .sgside[hidden] { display: none; }
+.sgsidehide { align-self: flex-end; font-size: 13px; }
 @media (max-width: 1100px) { .sgbody { grid-template-columns: minmax(0, 1fr); } }
 .sgscroll { overflow: auto; max-height: min(78vh, 1100px); border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overscroll-behavior: contain; }
 
@@ -436,7 +456,6 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 #schedsec { container-type: inline-size; }
 @container (max-width: 1150px) {
   .sgbody { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  #schedsec.sgfull > .sgbody { grid-template-rows: auto minmax(0, 1fr); }
   .sgside { order: -1; position: static; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px;
     max-height: 210px; }
   .sgside .sgpanel { overflow: auto; }
