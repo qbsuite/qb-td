@@ -305,6 +305,16 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 .sgroomspanel { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--hover-bg); margin-bottom: 10px; }
 .sgroomspanel[hidden] { display: none; }
 .sgbody { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: start; }
+/* Full screen (schededit.js setFull): the step covers the page, under
+   the modals and the message, and the grid takes all the height left */
+#schedsec.sgfull {
+  position: fixed; inset: 0; z-index: 8; background: var(--bg); padding: 14px 20px 16px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#schedsec.sgfull > * { flex: none; }
+#schedsec.sgfull > .sgbody { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+#schedsec.sgfull .sgscroll { max-height: none; height: 100%; }
+#schedsec.sgfull .sgside { position: static; overflow: auto; min-height: 0; }
 @media (max-width: 1100px) { .sgbody { grid-template-columns: minmax(0, 1fr); } }
 .sgscroll { overflow: auto; max-height: min(78vh, 1100px); border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overscroll-behavior: contain; }
 
@@ -415,6 +425,7 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 #schedsec { container-type: inline-size; }
 @container (max-width: 1150px) {
   .sgbody { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  #schedsec.sgfull > .sgbody { grid-template-rows: auto minmax(0, 1fr); }
   .sgside { order: -1; position: static; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px;
     max-height: 210px; }
   .sgside .sgpanel { overflow: auto; }

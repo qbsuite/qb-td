@@ -30,16 +30,44 @@ const ui = {
   note: '',
   baseline: { obj: null, json: '' }, // the schedule as saved
   creator: false,        // showing the format picker over a schedule
+  full: false,           // the editor fills the screen
   opts: { seeding: 'snake', roundOrder: 'asis', rooms: 'keep', seed: 1 + Math.floor(Math.random() * 9999) },
   fmt: null,
 };
 
-/** Escape: drop the selection or a half-done swap. True if it did. */
+/** Escape: drop the selection or a half-done swap, then leave full
+    screen. True if it did. */
 export function schedEscape() {
-  if (!ui.sel && !ui.mode) return false;
+  if (!ui.sel && !ui.mode) {
+    if (!ui.full) return false;
+    setFull(false);
+    return true;
+  }
   ui.sel = null;
   ui.mode = null;
   return true;
+}
+
+// Full screen: the editor covers the page (hub.css .sgfull) and, where
+// the browser allows it, the page takes the whole screen. The cover is
+// what matters; the browser's part is a bonus and may be refused.
+let redrawFull = null; // the editor's own redraw, for when the browser leaves full screen
+function setFull(on) {
+  ui.full = on;
+  ui.scrollPos = null;
+  const root = document.documentElement;
+  try {
+    if (on && !document.fullscreenElement && root.requestFullscreen) root.requestFullscreen().catch(() => {});
+    if (!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  } catch (e) { /* the cover alone */ }
+}
+if (typeof document !== 'undefined') {
+  // Esc in the browser's full screen never reaches the page as a key
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement || !ui.full) return;
+    ui.full = false;
+    if (redrawFull) redrawFull();
+  });
 }
 
 const COLORS = 8; // lane tints cycle (td.css .lane-0..7)
@@ -67,7 +95,7 @@ const slotShow = (s) => {
  */
 export function renderSchedStep(box, env) {
   const sched = env.sched();
-  if (!sched || ui.creator) { renderCreator(box, env); return; }
+  if (!sched || ui.creator) { box.classList.remove('sgfull'); renderCreator(box, env); return; }
 
   // A schedule we haven't seen yet (fresh from the Worker, or after a
   // Discard): tag its brackets in place and take it as the saved copy.
@@ -372,6 +400,7 @@ function renderEditor(box, env) {
         ${[['grid', 'Grid'], ['teams', 'By team'], ['brackets', 'Brackets']].map(([k, l]) =>
           `<button class="view${ui.view === k ? ' on' : ''}" data-view2="${k}">${l}</button>`).join('')}
       </div>
+      <button class="small" id="schedfull">${ui.full ? 'Exit full screen' : 'Full screen'}</button>
     </div>
     <div class="chips sgchips">
       <button class="chip${!ui.filter ? ' on' : ''}" data-filter="">All</button>
@@ -440,6 +469,9 @@ function renderEditor(box, env) {
   $$('[data-filter]').forEach((b) => { b.onclick = () => { ui.filter = b.dataset.filter; if (ui.view === 'brackets') ui.view = 'grid'; ui.scrollPos = null; again(); }; });
   $$('[data-phase]').forEach((b) => { b.onclick = () => { const p = Number(b.dataset.phase); if (ui.closed.has(p)) ui.closed.delete(p); else ui.closed.add(p); again(); }; });
   if (q('scheddense')) q('scheddense').onclick = () => { ui.dense = !ui.dense; again(); };
+  box.classList.toggle('sgfull', ui.full);
+  redrawFull = () => { if (box.isConnected) again(); };
+  q('schedfull').onclick = () => { setFull(!ui.full); again(); };
   $$('[data-jump]').forEach((b) => { b.onclick = () => { ui.view = 'grid'; ui.filter = ''; setSel(parse(b.dataset.jump)); scrollToSel(box); }; });
   $$('[data-fixto]').forEach((el) => {
     el.onchange = () => {

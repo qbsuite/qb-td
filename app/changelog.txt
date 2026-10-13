@@ -12,6 +12,7 @@ Release Notes for 10/12/2026
 [ SCHEDULE ]
 - Added playoff brackets of two places from each pool: 3 pools into brackets of 6, or 4 pools into brackets of 8.
 - In these brackets, games between pool-mates carry over from prelims. 22 teams play 6/6/6/4 in 11 rooms.
+- Added a Full screen button to the schedule editor. Press Esc to leave it.
 
 [ MISC ]
 - Added credits to the About page for the quizbowl software that qb-td is built on or uses.
