@@ -13,6 +13,11 @@ Release Notes for 10/12/2026
 - Added playoff brackets of two places from each pool: 3 pools into brackets of 6, or 4 pools into brackets of 8.
 - In these brackets, games between pool-mates carry over from prelims. 22 teams play 6/6/6/4 in 11 rooms.
 - Added a Full screen symbol in the corner of the Schedule heading. Press Esc to leave full screen.
+- In full screen the grid fits itself to the screen, with a Fit button and zoom buttons beside the exit symbol.
+- In full screen the selection panel stays out of the way until you select something.
+
+[ STATS ]
+- New layout: tournaments with pools get a Table or Grid switch. Grid shows who has played whom in every pool.
 
 [ MISC ]
 - Added credits to the About page for the quizbowl software that qb-td is built on or uses.

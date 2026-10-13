@@ -46,6 +46,29 @@ tr.nowrow td { background: var(--sel); }
 .layoutpick .chips { flex-wrap: nowrap; }
 .poolhead { font-size: 17px; font-weight: 600; margin: 18px 0 4px; }
 .poolhead:first-child { margin-top: 4px; }
+/* New layout, pools: the Table | Grid switch and the grid (pubview.js poolGrid) */
+.poolbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 0 0 10px; }
+.poolbar .chip { font-size: 13px; }
+.poolbar .pgridnote { font-size: 12px; }
+.pgridwrap { margin-bottom: 4px; }
+.pgrid { border-collapse: separate; border-spacing: 2px; width: auto; font-size: 12px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.pgrid th, .pgrid td { border: none; padding: 0; text-align: center; }
+.pgrid th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; }
+.pgrid th.colh { height: 30px; vertical-align: bottom; padding-bottom: 3px; white-space: nowrap; }
+.pgrid th.rowh { text-align: right; padding-right: 6px; white-space: nowrap; font-size: 13px; }
+.pgrid td { width: 62px; height: 44px; border-radius: 6px; background: color-mix(in srgb, var(--fg) 5%, var(--bg)); color: var(--muted); }
+.pgrid td a { display: block; color: inherit; }
+.pgrid td a:hover { text-decoration: none; }
+.pgrid td:has(a):hover { box-shadow: inset 0 0 0 1.5px var(--link); }
+.pgrid td.won { background: var(--win-bg); color: var(--win-fg); font-weight: 600; }
+.pgrid td.self { background: color-mix(in srgb, var(--fg) 16%, var(--bg)); }
+.pgrid td.todo { background: none; box-shadow: inset 0 0 0 1px var(--line); font-size: 11px; }
+.pgrid td .opp { display: block; font-weight: 400; opacity: 0.8; }
+.pgrid td.rec { width: 48px; background: none; color: var(--fg); font-weight: 600; }
+@media (max-width: 560px) {
+  .pgrid td { width: 46px; height: 40px; }
+  .pgrid th.rowh { font-size: 12px; white-space: normal; max-width: 9em; }
+}
 /* New layout: a team, player or game is a section; a followed link's
    target gets a bar down its left and a link back */
 .nsec { margin: 0 0 30px; }

@@ -892,6 +892,8 @@ function pendingNote() {
 // Its links work like Classic's: a team, player, game or round opens on
 // its own page, marked with a bar and a link back to where you were.
 const STATS_LAYOUT_KEY = 'qbtdStatsLayout';
+const STAND_VIEW_KEY = 'qbtdStandView';
+let standView = null;      // New layout, pools: 'table' | 'grid', for every pool at once
 let statsLayout = null;    // 'classic' | 'new'
 let statsSec = 'standings'; // New layout: a NEW_SECS key
 let unmountReport = null;
@@ -943,10 +945,84 @@ function newStandings(rd, ids, vals, pp) {
   const keys = Object.keys(pools).sort();
   if (keys.length < 2) return table(rd.teams, true);
   const inPool = new Set(keys.flatMap((k) => pools[k]));
-  return keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name))])
-    .concat([['Other teams', rd.teams.filter((t) => !inPool.has(t.name))]])
-    .filter(([, teams]) => teams.length)
-    .map(([name, teams]) => `<h3 class="poolhead">${esc(name)}</h3>${table(teams, false)}`).join('');
+  // one switch for every pool: all tables, or all grids of who has played whom
+  if (!standView) standView = readPref(STAND_VIEW_KEY) === 'grid' ? 'grid' : 'table';
+  const grid = standView === 'grid';
+  return `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}
+      ${grid ? '<span class="muted pgridnote">Each row is that team&rsquo;s games, with its own score above its opponent&rsquo;s. A green square is a win, and R6 means the game is in round 6.</span>' : ''}</div>`
+    + keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name)), true])
+      .concat([['Other teams', rd.teams.filter((t) => !inPool.has(t.name)), false]])
+      .filter(([, teams]) => teams.length)
+      .map(([name, teams, isPool]) => `<h3 class="poolhead">${esc(name)}</h3>${
+        grid && isPool ? poolGrid(rd, ids, teams) : table(teams, false)}`).join('');
+}
+
+// "Illinois A" -> "Ill A", "Notre Dame B" -> "ND B", "University of Iowa A"
+// -> "Iowa A": a team's name short enough to head a grid column.
+function shortTeam(name) {
+  const words = String(name).trim().split(/\s+/);
+  const tail = words.length > 1 && /^[A-Z0-9]{1,2}$/.test(words[words.length - 1]) ? ' ' + words.pop() : '';
+  const base = words.filter((w, i) => !(/^(of|the|at)$/i.test(w) || (i === 0 && /^(university|college)$/i.test(w) && words.length > 1)));
+  const use = base.length ? base : words;
+  const core = use.length > 1 ? use.map((w) => w[0].toUpperCase()).join('')
+    : use[0].length > 5 ? use[0].slice(0, 3) : use[0];
+  return core + tail;
+}
+
+// One pool as a square grid, teams in standings order down the side and
+// across the top. A square is the row team's game against the column
+// team in the pool phase: both scores once played (a link to the game),
+// else the round it is scheduled for. The record at the end counts the
+// grid's own games.
+function poolGrid(rd, ids, teams) {
+  const first = schedule.phases[0];
+  const poolRounds = new Set(first.rounds.map((r) => r.round));
+  const names = new Set(teams.map((t) => t.name));
+  const key = (x, y) => (x < y ? x + '\n' + y : y + '\n' + x);
+  const played = new Map(); // pair -> the game (the first, should a pair meet twice)
+  for (const g of rd.games) {
+    const [a, b] = g.teams;
+    if (!poolRounds.has(g.round) || !names.has(a.name) || !names.has(b.name)) continue;
+    if (!played.has(key(a.name, b.name))) played.set(key(a.name, b.name), g);
+  }
+  const due = new Map(); // pair -> round
+  for (const r of first.rounds) {
+    for (const g of r.games) {
+      const a = g.a && g.a.team;
+      const b = g.b && g.b.team;
+      if (a && b && names.has(a) && names.has(b) && !due.has(key(a, b))) due.set(key(a, b), r.round);
+    }
+  }
+  const cell = (tm, o) => {
+    if (tm === o) return '<td class="self"></td>';
+    const g = played.get(key(tm.name, o.name));
+    if (!g) {
+      const r = due.get(key(tm.name, o.name));
+      return r ? `<td class="todo" title="Round ${r}">R${r}</td>` : '<td class="todo"></td>';
+    }
+    const mine = g.teams.find((x) => x.name === tm.name).points;
+    const theirs = g.teams.find((x) => x.name === o.name).points;
+    const tip = `${tm.name} ${mine}, ${o.name} ${theirs}`;
+    return `<td class="${mine > theirs ? 'won' : mine < theirs ? 'lost' : ''}" title="${esc(tip)}">${
+      goLink('games', ids.game(g.id), `${mine}<span class="opp">${theirs}</span>`)}</td>`;
+  };
+  const rec = (tm) => {
+    let w = 0;
+    let l = 0;
+    for (const o of teams) {
+      const g = o === tm ? null : played.get(key(tm.name, o.name));
+      if (!g) continue;
+      const mine = g.teams.find((x) => x.name === tm.name).points;
+      const theirs = g.teams.find((x) => x.name === o.name).points;
+      if (mine > theirs) w++; else if (mine < theirs) l++;
+    }
+    return `${w}\u2013${l}`;
+  };
+  return `<div class="tablewrap pgridwrap"><table class="pgrid">
+    <tr><th></th>${teams.map((t) => `<th class="colh" title="${esc(t.name)}">${esc(shortTeam(t.name))}</th>`).join('')}<th class="colh">W\u2013L</th></tr>
+    ${teams.map((tm) => `<tr><th class="rowh">${goLink('teams', ids.team(tm.name), esc(tm.name))}</th>${
+      teams.map((o) => cell(tm, o)).join('')}<td class="rec">${rec(tm)}</td></tr>`).join('')}
+  </table></div>`;
 }
 
 function newIndividuals(rd, ids, vals, pp) {
@@ -1125,6 +1201,7 @@ function renderNewStats(box) {
     games: () => newGames(rd, ids, vals), teams: () => newTeams(rd, ids, vals, pp),
     players: () => newPlayers(rd, ids, vals), rounds: () => newRounds(rd, ids) };
   box.innerHTML = (draw[statsSec] || draw.standings)();
+  wire(box, 'standview', (v) => { standView = v; savePref(STAND_VIEW_KEY, v); });
   fitTables(box);
   // a followed link: mark where it landed, with the way back (a round's
   // heading gets only the way back)
