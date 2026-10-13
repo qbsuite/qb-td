@@ -11,7 +11,10 @@ import { esc } from './api.js';
 import { guessRound } from '../engine/qbj.js';
 import { readZip } from '../engine/zip.js';
 import { readPacket } from './buzzview.js';
+import { parseDocxQuestions } from '../engine/docxq.js';
 import { busy } from './busy.js';
+
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many || one + 's');
 
 function stripTags(s) { return String(s || '').replace(/<[^>]*>/g, ''); }
 
@@ -173,7 +176,28 @@ export function renderPacketsUi(box, o) {
     if (/\.docx$/i.test(name)) {
       let packet;
       try { packet = await readPacket(new Response(data), name, { bonusOnly: true }); }
-      catch (e) { o.say(`${name} couldn't be read as a packet: ${e.message}`, true); return false; }
+      catch (e) {
+        // YAPP wants a whole packet, so it refuses a file of bonuses alone
+        // or tossups numbered its own way: qb-td's own reader (docxq.js)
+        // takes those, and the TD is told that it did
+        let own;
+        try { own = await parseDocxQuestions(new Uint8Array(data)); }
+        catch (e2) { o.say(`${name} couldn't be read as a packet: ${e.message}`, true); return false; }
+        const found = [own.tossups.length && plural(own.tossups.length, 'tossup'),
+          own.bonuses.length && plural(own.bonuses.length, 'bonus', 'bonuses')].filter(Boolean).join(' and ');
+        const left = own.skipped.length
+          ? `\n\nIt left out ${plural(own.skipped.length, 'line')} that it could not place:\n`
+            + own.skipped.slice(0, 5).map((t) => '  ' + (t.length > 70 ? t.slice(0, 70) + '…' : t)).join('\n')
+            + (own.skipped.length > 5 ? '\n  …' : '')
+          : '';
+        if (!confirm(`The usual packet parser (YAPP) could not read ${name}, so qb-td used its fallback parser instead. `
+          + `The fallback parser found ${found}.${left}\n\nIt is less thorough than YAPP, so please check each question `
+          + 'in the list after it is added.\n\nAdd these questions to the pool?')) return false;
+        const ok = await o.uploadTb(name.replace(/\.docx$/i, '.json'),
+          JSON.stringify({ tossups: own.tossups, bonuses: own.bonuses }));
+        if (ok) o.say(`${name} was read with the fallback parser and added ${found}. Please check each question.`);
+        return ok;
+      }
       return o.uploadTb(name.replace(/\.docx$/i, '.json'), JSON.stringify(packet));
     }
     if (!/\.json$/i.test(name)) { o.say('Tiebreaker packets need to be .json or .docx files.', true); return false; }
@@ -194,7 +218,7 @@ export function renderPacketsUi(box, o) {
     run.end();
     if (files.length > 1) {
       o.say(failed.length ? `${done} of ${files.length} files were added. These could not be read: ${failed.join(', ')}.`
-        : `All ${files.length} files were added to the pool.`, failed.length > 0);
+        : `${files.length} files were added to the pool.`, failed.length > 0);
     }
     if (done) o.refresh();
   };

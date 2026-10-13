@@ -11,6 +11,7 @@ import { buildYft } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
+import { parseDocxQuestions } from '../app/engine/docxq.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
@@ -580,6 +581,77 @@ async function deflateZip(name, text) {
   }
   return out;
 }
+
+/* ---------- docxq: the fallback .docx question reader ---------- */
+
+// a minimal Word document: each paragraph a list of [text, 'bui' flags]
+// runs; '\n' inside a paragraph is a line break
+const docxOf = (paras) => {
+  const x = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const run = ([t, f = '']) => '<w:r>' + (f ? '<w:rPr>' + (f.includes('b') ? '<w:b/>' : '') + (f.includes('i') ? '<w:i/>' : '')
+    + (f.includes('u') ? '<w:u w:val="single"/>' : '') + (f.includes('x') ? '<w:b w:val="0"/>' : '') + '</w:rPr>' : '')
+    + t.split('\n').map((piece) => `<w:t xml:space="preserve">${x(piece)}</w:t>`).join('<w:br/>') + '</w:r>';
+  const body = paras.map((p) => '<w:p><w:pPr><w:jc w:val="left"/></w:pPr>' + (typeof p === 'string' ? [[p]] : p).map(run).join('') + '</w:p>').join('');
+  const enc = new TextEncoder();
+  return makeZip([
+    { name: '[Content_Types].xml', data: enc.encode('<Types/>') },
+    { name: 'word/document.xml', data: enc.encode(`<?xml version="1.0"?><w:document xmlns:w="w"><w:body>${body}</w:body></w:document>`) },
+  ]);
+};
+const ANS = (t) => [['ANSWER: '], [t, 'bu']];
+
+await testA('docxq: tossups however they are numbered, and a file of bonuses alone', async () => {
+  // the three layouts YAPP refuses or reads as nothing
+  for (const label of [(i) => '1. ', (i) => `TB${i}. `, (i) => '', (i) => `Tiebreaker ${i}: `, (i) => `${i}) `]) {
+    const q = await parseDocxQuestions(docxOf([1, 2, 3].flatMap((i) => [`${label(i)}Tossup ${i} text. For 10 points, name it.`, ANS('answer ' + i), ''])));
+    assert.deepEqual(q.tossups, [1, 2, 3].map((i) => ({ question: `Tossup ${i} text. For 10 points, name it.`, answer: `<b><u>answer ${i}</u></b>` })), label(1));
+    assert.deepEqual([q.bonuses, q.skipped], [[], []]);
+  }
+  const b = await parseDocxQuestions(docxOf(['Bonuses', '', '1. Leadin one. For 10 points each:', '[10e] Easy part.', ANS('a'),
+    '[10m] Middle part.', ANS('b'), '[10h] Hard part.', ANS('c'), '<Science, Biology>', '',
+    '2. Leadin two:', '[10] P1', ANS('d'), '[15] P2', ANS('e')]));
+  assert.deepEqual(b.tossups, []);
+  assert.deepEqual(b.bonuses, [
+    { leadin: 'Leadin one. For 10 points each:', parts: ['Easy part.', 'Middle part.', 'Hard part.'],
+      answers: ['<b><u>a</u></b>', '<b><u>b</u></b>', '<b><u>c</u></b>'], values: [10, 10, 10],
+      difficultyModifiers: ['e', 'm', 'h'], metadata: 'Science, Biology' },
+    { leadin: 'Leadin two:', parts: ['P1', 'P2'], answers: ['<b><u>d</u></b>', '<b><u>e</u></b>'], values: [10, 15] },
+  ]);
+  assert.deepEqual(b.skipped, []);
+});
+
+await testA('docxq: a whole packet, with formatting, line breaks, headings and stray lines', async () => {
+  const q = await parseDocxQuestions(docxOf([
+    'ACF Fall 2026: Tiebreakers', 'Edited by Someone', 'Tossups', '',
+    // power in bold, a title in italics, the answer on a line break in the same paragraph
+    [['1. '], ['This author of ', ''], ['Emma', 'i'], [' wrote early clues (*)', 'b'], [' and later ones. For 10 points, name this author of Pride & Prejudice.\nANS'], ['WER: Jane '], ['Austen', 'bu'], [' [accept Jane <Austen>]']],
+    '<Literature, British>', '',
+    'Note to moderator: read slowly.',
+    [['2. Second tossup?', '']], [['ANSWER: ', 'b'], ['x', 'bu'], ['y', 'x']],
+    'Bonuses',
+    'A bonus leadin with no number. For 10 points each:', '[10] First\nANSWER: one', '[10] Second, which runs', 'onto a second line.', 'ANSWER: two', '[10] Third', 'ANSWER: three',
+    'ANSWER: an answer with no question',
+    'A trailing line with nothing after it.',
+  ]));
+  assert.deepEqual(q.tossups, [
+    { question: 'This author of <em>Emma</em> <b>wrote early clues (*)</b> and later ones. For 10 points, name this author of Pride &amp; Prejudice.',
+      answer: 'Jane <b><u>Austen</u></b> [accept Jane &lt;Austen&gt;]', metadata: 'Literature, British' },
+    { question: 'Second tossup?', answer: '<b><u>x</u></b>y' },
+  ]);
+  assert.deepEqual(q.bonuses, [{ leadin: 'A bonus leadin with no number. For 10 points each:',
+    parts: ['First', 'Second, which runs onto a second line.', 'Third'], answers: ['one', 'two', 'three'], values: [10, 10, 10] }]);
+  // everything it didn't use is reported, headings aside
+  assert.deepEqual(q.skipped, ['ACF Fall 2026: Tiebreakers', 'Edited by Someone', 'Note to moderator: read slowly.',
+    'ANSWER: an answer with no question', 'A trailing line with nothing after it.']);
+  // the pool takes it as it takes YAPP's JSON
+  assert.deepEqual(normalizePacket({ tossups: q.tossups, bonuses: q.bonuses }, 'tb.json').tossups.length, 2);
+});
+
+await testA('docxq: not a document, or one with no questions', async () => {
+  await assert.rejects(parseDocxQuestions(new TextEncoder().encode('{"tossups":[]}')), /not a \.docx file/);
+  await assert.rejects(parseDocxQuestions(makeZip([{ name: 'a.txt', data: new Uint8Array(1) }])), /not a \.docx file/);
+  await assert.rejects(parseDocxQuestions(docxOf(['Just a heading', 'and some prose.'])), /no questions found/);
+});
 
 await testA('readZip round-trips makeZip (store), skipping directories', async () => {
   const z = makeZip([
