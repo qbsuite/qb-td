@@ -19,16 +19,16 @@ const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
     through the same public YAPP service the reader uses. The bytes
     decide, not the Content-Type: a .json packet uploaded without one is
     still JSON. */
-export async function readPacket(res, label) {
-  if (!(res instanceof Response)) return normalizePacket(res, label);
+export async function readPacket(res, label, opts) {
+  if (!(res instanceof Response)) return normalizePacket(res, label, opts);
   const bytes = await res.arrayBuffer();
   let parsed = null;
   try { parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
   catch (e) { /* not JSON: a docx */ }
-  if (parsed) return normalizePacket(parsed, label);
+  if (parsed) return normalizePacket(parsed, label, opts);
   const yapp = await fetch(YAPP, { method: 'POST', body: bytes, mode: 'cors' });
   if (!yapp.ok) throw new Error('packet parser failed (' + yapp.status + ')');
-  return normalizePacket(await yapp.json(), label);
+  return normalizePacket(await yapp.json(), label, opts);
 }
 
 function buzzWordClass(hits) {

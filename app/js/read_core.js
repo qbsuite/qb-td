@@ -5,7 +5,12 @@
 /** Validate a parsed packet JSON into MODAQ's IPacket shape
     ({tossups: [{question, answer}], bonuses?}). Throws a user-facing
     Error on anything MODAQ would reject. */
-export function normalizePacket(json, name) {
+export function normalizePacket(json, name, opts = {}) {
+  // opts.bonusOnly: a tiebreaker pool packet may be bonuses alone
+  if (opts.bonusOnly && json && typeof json === 'object' && !(json.tossups || []).length
+    && Array.isArray(json.bonuses) && json.bonuses.length) {
+    return { tossups: [], bonuses: json.bonuses, name: json.name || name };
+  }
   if (!json || typeof json !== 'object' || !Array.isArray(json.tossups)) {
     throw new Error('packet JSON has no tossups array');
   }

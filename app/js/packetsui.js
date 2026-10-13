@@ -103,7 +103,7 @@ export function renderPacketsUi(box, o) {
     <p class="secnote">${o.tbNote}</p>
     <div class="row" style="margin-bottom:8px">
       <button id="picktb" class="primary">Upload tiebreaker packet</button>
-      <input id="tbfile" type="file" accept=".json,.docx" hidden>
+      <input id="tbfile" type="file" accept=".json,.docx" multiple hidden>
       <span class="slotdrop" id="tbdrop">Or drop a staged .json packet chip here to split it</span>
       ${tbQuestions.length ? '<span class="spacer" style="flex:1"></span><button id="tbclear" class="small">Delete pool</button>' : ''}
     </div>
@@ -172,7 +172,7 @@ export function renderPacketsUi(box, o) {
   const uploadTb = async (name, data) => {
     if (/\.docx$/i.test(name)) {
       let packet;
-      try { packet = await readPacket(new Response(data), name); }
+      try { packet = await readPacket(new Response(data), name, { bonusOnly: true }); }
       catch (e) { o.say(`${name} couldn't be read as a packet: ${e.message}`, true); return false; }
       return o.uploadTb(name.replace(/\.docx$/i, '.json'), JSON.stringify(packet));
     }
@@ -180,11 +180,22 @@ export function renderPacketsUi(box, o) {
     return o.uploadTb(name, data);
   };
   $('tbfile').onchange = async () => {
-    const f = $('tbfile').files[0];
-    if (!f) return;
+    const files = [...$('tbfile').files];
+    if (!files.length) return;
     const run = busy($('picktb'), { label: 'Splitting', scope: box });
-    const done = await uploadTb(f.name, await f.arrayBuffer());
+    // one after another, in the order picked: the pool numbers questions
+    // as they arrive, and a file that fails doesn't stop the rest
+    let done = 0;
+    const failed = [];
+    for (const f of files) {
+      if (await uploadTb(f.name, await f.arrayBuffer())) done++;
+      else failed.push(f.name);
+    }
     run.end();
+    if (files.length > 1) {
+      o.say(failed.length ? `${done} of ${files.length} files were added. These could not be read: ${failed.join(', ')}.`
+        : `All ${files.length} files were added to the pool.`, failed.length > 0);
+    }
     if (done) o.refresh();
   };
   if ($('tbclear')) {

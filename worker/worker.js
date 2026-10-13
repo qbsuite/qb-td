@@ -2967,22 +2967,24 @@ async function uploadTiebreakers(request, url, env, poolKey, rawKey) {
   if (body.byteLength > MAX_PACKET) return err(env, 413, 'packet too large');
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return err(env, 400, 'not valid JSON'); }
-  if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) {
-    return err(env, 400, 'packet JSON has no tossups array');
-  }
-  for (const q of parsed.tossups) {
+  // a pool packet may hold tossups, bonuses or both: spare bonuses come
+  // as a file of their own
+  if (!parsed || typeof parsed !== 'object') return err(env, 400, 'packet JSON has no questions');
+  const tossups = Array.isArray(parsed.tossups) ? parsed.tossups : [];
+  const bonuses = Array.isArray(parsed.bonuses) ? parsed.bonuses : [];
+  if (!tossups.length && !bonuses.length) return err(env, 400, 'packet JSON has no tossups or bonuses');
+  for (const q of tossups) {
     if (!q || typeof q.question !== 'string' || typeof q.answer !== 'string') {
       return err(env, 400, 'a tossup is missing question or answer text');
     }
   }
-  const bonuses = Array.isArray(parsed.bonuses) ? parsed.bonuses : [];
   for (const b of bonuses) {
     if (!b || !Array.isArray(b.parts) || !Array.isArray(b.answers)) {
       return err(env, 400, 'a bonus is missing parts or answers');
     }
   }
   const out = await writeTbPool(env, poolKey, rawKey, (pool) => {
-    for (const q of parsed.tossups) {
+    for (const q of tossups) {
       pool.tossups.push({ id: 'TU' + (++pool.seq.t), from: name, ...q });
     }
     for (const b of bonuses) {
@@ -2991,7 +2993,7 @@ async function uploadTiebreakers(request, url, env, poolKey, rawKey) {
   });
   if (out.error) return err(env, 400, out.error);
   return json(env, {
-    added: { tossups: parsed.tossups.length, bonuses: bonuses.length },
+    added: { tossups: tossups.length, bonuses: bonuses.length },
     tossups: out.pool.tossups.length,
     bonuses: out.pool.bonuses.length,
   });

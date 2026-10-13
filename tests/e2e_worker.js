@@ -863,6 +863,15 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     body: JSON.stringify({ tossups: [{ question: 'tb three', answer: 'Treaty of Ghent' }] }) });
   ok('second tiebreaker packet appends with continuing ids',
     r.status === 200 && r.body.tossups === 3, r.body);
+  // spare bonuses come as a file of their own: no tossups at all
+  r = await call(`${A}/tiebreakers?name=bonuses.json`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bonuses: [{ leadin: 'only', parts: ['p1', 'p2', 'p3'], answers: ['x', 'y', 'z'], values: [10, 10, 10] }] }) });
+  ok('a bonus-only tiebreaker packet splits', r.status === 200 && r.body.added.tossups === 0
+    && r.body.added.bonuses === 1 && r.body.tossups === 3 && r.body.bonuses === 2, r.body);
+  r = await call(`${A}/tiebreakers?name=empty.json`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tossups: [], bonuses: [] }) });
+  ok('a tiebreaker packet with no questions is rejected', r.status === 400, r.body);
   r = await call(`${A}/tiebreakers?name=bad.json`, { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tossups: [{ question: 'no answer' }] }) });
