@@ -39,6 +39,7 @@ export function stagedBlob(s) {
  *   slotName      what one slot is called ('Round', or 'Packet' for a set)
  *   uploadPacket(staged, round), uploadTb(name, data) -> true on success,
  *   clearTb()     the caller's routes
+ *   removeTb(id)  optional: take one question out (adds a Remove link per row)
  *   pool          the tiebreaker pool blob, or null
  *   showUses      list which teams have heard each question (a
  *                 tournament's pool has a usage log; a set's does not)
@@ -111,7 +112,7 @@ export function renderPacketsUi(box, o) {
       ${tbQuestions.length ? '<span class="spacer" style="flex:1"></span><button id="tbclear" class="small">Delete pool</button>' : ''}
     </div>
     ${tbQuestions.length ? `<div class="tablewrap"><table>
-      <tr><th>Question</th><th>Kind</th><th>Answer</th>${o.showUses ? '<th>Status</th>' : ''}</tr>
+      <tr><th>Question</th><th>Kind</th><th>Answer</th>${o.showUses ? '<th>Status</th>' : ''}${o.removeTb ? '<th></th>' : ''}</tr>
       ${tbQuestions.map((q) => {
         const uses = usesFor(q.id);
         return `<tr>
@@ -124,6 +125,7 @@ export function renderPacketsUi(box, o) {
                 (u.teams || []).map(esc).join(' &amp; ')}</b> <span class="muted">(Round ${
                 esc(String(u.round))}, ${esc(u.room || '')})</span>`).join('<br>')
             : '<span class="ok">Unused</span>'}</td>` : ''}
+          ${o.removeTb ? `<td class="num">${q.set ? '' : `<button class="linkbtn muted" data-tbremove="${esc(q.id)}">Remove</button>`}</td>` : ''}
         </tr>`;
       }).join('')}
     </table></div>` : '<div class="muted">No tiebreaker questions yet</div>'}`;
@@ -222,6 +224,21 @@ export function renderPacketsUi(box, o) {
     }
     if (done) o.refresh();
   };
+  // one question out of the pool (the set's own, on a mirror, stay)
+  box.querySelectorAll('[data-tbremove]').forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.tbremove;
+      const heard = usesFor(id).length;
+      if (!confirm(`Remove ${id} from the pool?` + (heard ? ' It has already been read in a game, and that game keeps its record.' : ''))) return;
+      const run = busy(btn, { label: 'Removing', scope: box });
+      try {
+        await o.removeTb(id);
+        run.end();
+        o.say(`${id} was removed from the pool.`);
+        o.refresh();
+      } catch (e) { run.end(); o.say(e.message, true); }
+    };
+  });
   if ($('tbclear')) {
     $('tbclear').onclick = async () => {
       if (!confirm(o.showUses ? 'Delete the tiebreaker pool? The usage log goes with it.'

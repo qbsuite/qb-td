@@ -322,6 +322,7 @@ function renderPackets() {
       } catch (e) { say(e.message, true); return false; }
     },
     clearTb: () => pub(S + '/tiebreakers', { method: 'DELETE' }),
+    removeTb: (id) => pub(S + '/tiebreakers?id=' + encodeURIComponent(id), { method: 'DELETE' }),
     pool: tbPool,
     showUses: false,
     packetsNote: `Packets are the set's own numbering: a mirror starts with packet N on round N, and its

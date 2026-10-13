@@ -809,6 +809,7 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
       } catch (e) { say(e.message, true); return false; }
     },
     clearTb: () => pub(a + '/tiebreakers', { method: 'DELETE' }),
+    removeTb: (id) => pub(a + '/tiebreakers?id=' + encodeURIComponent(id), { method: 'DELETE' }),
     pool: tbPool,
     showUses: true,
     intro: `Each round's room links load the packet assigned to it. Upload a zip or files, then

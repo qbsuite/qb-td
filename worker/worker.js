@@ -3004,6 +3004,25 @@ async function deleteTiebreakers(env, poolKey) {
   return json(env, { ok: true });
 }
 
+// DELETE /a/:secret/tiebreakers?id=TU3 (and /s/:secret/...) — take one
+// question out of the pool. Ids are never handed out again (the counter
+// stays), and the usage log keeps what was read: a game that heard the
+// question still heard it. A mirror removes only its own questions; the
+// set's (S-TU1 here) aren't in this pool to find.
+async function removeTiebreaker(env, poolKey, rawKey, id) {
+  let found = false;
+  const out = await writeTbPool(env, poolKey, rawKey, (pool) => {
+    const keep = (q) => q.id !== id;
+    found = pool.tossups.some((q) => q.id === id) || pool.bonuses.some((q) => q.id === id);
+    if (!found) return { error: 'no such question' };
+    pool.tossups = pool.tossups.filter(keep);
+    pool.bonuses = pool.bonuses.filter(keep);
+    return null;
+  });
+  if (out.error) return err(env, found ? 400 : 404, out.error);
+  return json(env, { ok: true, tossups: out.pool.tossups.length, bonuses: out.pool.bonuses.length });
+}
+
 // A set's pool is emptied, not deleted: its id counter must survive, or a
 // re-upload would hand out TU1 again and every mirror's "heard by" log
 // would attach to a different question.
@@ -5276,7 +5295,10 @@ export default {
       if (sub === '/file' && method === 'GET') return setPacketFile(url, env, s);
       if (sub === '/tiebreakers' && method === 'GET') return setTiebreakers(env, s);
       if (sub === '/tiebreakers' && method === 'POST') return bumpSetRev(env, s.id, await uploadTiebreakers(request, url, env, SET_TB_KEY(s.id), s.ckey));
-      if (sub === '/tiebreakers' && method === 'DELETE') return bumpSetRev(env, s.id, await clearSetTiebreakers(env, s));
+      if (sub === '/tiebreakers' && method === 'DELETE') {
+        const one = url.searchParams.get('id');
+        return bumpSetRev(env, s.id, one ? await removeTiebreaker(env, SET_TB_KEY(s.id), s.ckey, one) : await clearSetTiebreakers(env, s));
+      }
       if (sub === '/mirrors' && method === 'POST') return createMirror(request, env, s);
       if ((mm = sub.match(/^\/mirrors\/(\d+)$/)) && method === 'POST') return updateMirror(request, env, s, Number(mm[1]));
       if (sub === '/state' && method === 'GET') return json(env, await setStateBody(env, s));
@@ -5312,7 +5334,10 @@ export default {
       if (sub === '/start' && method === 'POST') return startTournament(env, t, ctx);
       if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
       if (sub === '/tiebreakers' && method === 'POST') return bumpRev(env, t.id, await uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey));
-      if (sub === '/tiebreakers' && method === 'DELETE') return bumpRev(env, t.id, await deleteTiebreakers(env, TB_KEY(t.id)));
+      if (sub === '/tiebreakers' && method === 'DELETE') {
+        const one = url.searchParams.get('id');
+        return bumpRev(env, t.id, one ? await removeTiebreaker(env, TB_KEY(t.id), t.ckey, one) : await deleteTiebreakers(env, TB_KEY(t.id)));
+      }
       if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
       if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
       if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);

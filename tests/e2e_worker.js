@@ -869,6 +869,19 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     body: JSON.stringify({ bonuses: [{ leadin: 'only', parts: ['p1', 'p2', 'p3'], answers: ['x', 'y', 'z'], values: [10, 10, 10] }] }) });
   ok('a bonus-only tiebreaker packet splits', r.status === 200 && r.body.added.tossups === 0
     && r.body.added.bonuses === 1 && r.body.tossups === 3 && r.body.bonuses === 2, r.body);
+  // one question can be taken out again; its id is not handed out twice
+  r = await call(`${A}/tiebreakers?id=B2`, { method: 'DELETE' });
+  ok('one tiebreaker question is removed', r.status === 200 && r.body.tossups === 3 && r.body.bonuses === 1, r.body);
+  r = await call(`${A}/tiebreakers?id=B2`, { method: 'DELETE' });
+  ok('removing it twice is a 404', r.status === 404, r.body);
+  r = await call(`${A}/tiebreakers?name=bonuses2.json`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bonuses: [{ leadin: 'again', parts: ['p1'], answers: ['x'], values: [10] }] }) });
+  r = await call(A + '/tiebreakers');
+  ok('a later upload takes the next id, not the removed one',
+    r.body.bonuses.map((b) => b.id).join(',') === 'B1,B3', r.body.bonuses.map((b) => b.id));
+  r = await call(`${A}/tiebreakers?id=B3`, { method: 'DELETE' });
+  ok('and that one goes too', r.status === 200 && r.body.bonuses === 1, r.body);
   r = await call(`${A}/tiebreakers?name=empty.json`, { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tossups: [], bonuses: [] }) });
   ok('a tiebreaker packet with no questions is rejected', r.status === 400, r.body);

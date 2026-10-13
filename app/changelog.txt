@@ -5,6 +5,7 @@ Release Notes for 10/12/2026
 - Games exported from a test room are not saved, and the test room is marked so it isn't mistaken for a real one.
 - Tiebreaker packets can hold bonuses only, and several tiebreaker files can be uploaded at once.
 - A .docx tiebreaker file that YAPP cannot read is read by a fallback parser instead, with a warning to check it.
+- Added a Remove link beside each tiebreaker question, to take one out of the pool without deleting the pool.
 
 [ LIVE HUB ]
 - Auto-advance is switched on for new tournaments. Tournaments that already exist keep their setting.
