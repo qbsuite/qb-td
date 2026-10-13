@@ -318,10 +318,12 @@ await fill(`[data-roomrename="${d.buckets[0].id}"]`, LONG, ['change']);
 d = await until(async () => { const x = await detail(); return x.buckets[0].room_name === LONG && x; }, 'rename saved');
 ok('3 rooms: an inline rename reaches the Worker', d.buckets[0].room_name === LONG);
 await waitJs(`document.querySelector('[data-roomrename="${d.buckets[0].id}"]').value === ${q(LONG)}`, 'renamed row');
-ok('3 rooms: every room has its reader link, and no other', await js(`(() => {
+// before Start each room also has the TD's Test link (the reader link plus the admin secret)
+ok('3 rooms: every room has its reader link and its Test link, and no other', await js(`(() => {
   const hrefs = [...document.querySelectorAll('.roomtable a')].map((a) => a.getAttribute('href'));
-  return hrefs.length === 6
-    && ${q(d.buckets.map((b) => b.secret))}.every((s) => hrefs.some((h) => h.endsWith('read.html?b=' + s)));
+  return hrefs.length === 12
+    && ${q(d.buckets.map((b) => b.secret))}.every((s) => hrefs.some((h) => h.endsWith('read.html?b=' + s))
+      && hrefs.some((h) => h.endsWith('read.html?b=' + s + '&test=' + ${q(secret)})));
 })()`));
 ok('3 rooms: a Copy button for the link on every row',
   await js(`document.querySelectorAll('.roomtable .linkpair button').length === 6`));
@@ -803,6 +805,13 @@ async function expectLive(label, round) {
   ok(`12 live: ${label}: auto-advance says ${k}/6 started`, railText.includes(`${k}/6 started`), railText);
 }
 await expectLive('round 1, all in', 1);
+// a tournament made on the home page starts with auto-advance on
+ok('12 live: auto-advance is on from creation', settingsOf(await detail()).autoAdvance === true
+  && await js(`document.querySelector('#autoadv').checked`));
+await click('#autoadv');
+d = await until(async () => { const x = await detail(); return !settingsOf(x).autoAdvance && x; }, 'auto-advance off');
+ok('12 live: switching auto-advance off persists', d.tournament.current_round === 1);
+await waitJs(`!!document.querySelector('#autoadv') && !document.querySelector('#autoadv').checked`, 'switch shown off');
 await click('#autoadv');
 d = await until(async () => { const x = await detail(); return settingsOf(x).autoAdvance === true && x; }, 'auto-advance on');
 ok('12 live: the auto-advance switch persists', d.tournament.current_round === 1);

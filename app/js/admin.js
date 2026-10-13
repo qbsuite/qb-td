@@ -186,6 +186,8 @@ function showList() {
     try {
       const out = await pub('/api/tournaments', { method: 'POST', json: {
         name: $('newname').value, slug: $('newslug').value,
+        // rounds open themselves unless the TD switches it off (Live Hub)
+        settings: { autoAdvance: true },
       } });
       run.end();
       saveLink({ secret: out.admin_secret, slug: out.slug, name: out.name,

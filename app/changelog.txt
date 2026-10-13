@@ -6,6 +6,9 @@ Release Notes for 10/12/2026
 - Tiebreaker packets can hold bonuses only, and several tiebreaker files can be uploaded at once.
 - A .docx tiebreaker file that YAPP cannot read is read by a fallback parser instead, with a warning to check it.
 
+[ LIVE HUB ]
+- Auto-advance is switched on for new tournaments. Tournaments that already exist keep their setting.
+
 [ SCHEDULE ]
 - Added playoff brackets of two places from each pool: 3 pools into brackets of 6, or 4 pools into brackets of 8.
 - In these brackets, games between pool-mates carry over from prelims. 22 teams play 6/6/6/4 in 11 rooms.
