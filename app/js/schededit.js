@@ -34,6 +34,8 @@ const ui = {
   zoom: null,            // full screen: null = fit to the screen, else the TD's own zoom (1 = 100%)
   zoomNow: 1,            // the zoom last applied (what minus and plus step from)
   sideOpen: false,       // full screen: the panel was opened for its checks
+  colW: {},              // 'laneKey@phase' -> px: room columns the TD dragged to a width of their own
+  byeW: null,            // the Byes column, likewise
   opts: { seeding: 'snake', roundOrder: 'asis', rooms: 'keep', seed: 1 + Math.floor(Math.random() * 9999) },
   fmt: null,
 };
@@ -78,41 +80,65 @@ function setFull(on) {
 const COL_MAX = 200;
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 1.5;
-const TRACKS_RE = /^(\d+)px repeat\((\d+), (\d+)px\) (\d+)px$/;
+const COL_LO = 64;   // as narrow and as wide as a dragged column goes
+const COL_HI = 420;
+const LEAD = 40;     // the round-number column
+
+// A grid's columns. Its lanes ride on data-lanes ("A@0:4,B@0:3" = lane id
+// and room count); a lane the TD dragged has its width in ui.colW, the
+// others take `auto`. Returns [{w, own}] per room column.
+function gridTracks(el, auto) {
+  return (el.dataset.lanes || '').split(',').filter(Boolean).flatMap((part) => {
+    const at = part.lastIndexOf(':');
+    const own = ui.colW[part.slice(0, at)];
+    return Array.from({ length: Number(part.slice(at + 1)) }, () => ({ w: own || auto, own: !!own }));
+  });
+}
+const gridBye = (el) => ui.byeW || Number(el.dataset.bye);
+function setTracks(el, auto) {
+  el.dataset.auto = auto;
+  el.style.gridTemplateColumns = `${LEAD}px ${gridTracks(el, auto).map((t) => t.w + 'px').join(' ')} ${gridBye(el)}px`;
+}
+
 function fitFull(box) {
   const scroll = box.querySelector('#sgscroll');
   if (!scroll) return 1;
   const kids = [...scroll.children];
   for (const k of kids) k.style.zoom = '';
   const clamp = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
-  const grids = [...scroll.querySelectorAll('.sggrid')].map((el) => ({ el, m: TRACKS_RE.exec(el.style.gridTemplateColumns) })).filter((g) => g.m);
+  const grids = [...scroll.querySelectorAll('.sggrid')];
   let z = 1;
   if (!grids.length) {
     // By team and Brackets: no columns to share out, so only shrink to fit
     z = ui.zoom || (scroll.scrollWidth > scroll.clientWidth + 1 ? clamp(scroll.clientWidth / scroll.scrollWidth) : 1);
   } else {
-    const n = Math.max(...grids.map((g) => Number(g.m[2])));
-    const colMin = Math.min(...grids.map((g) => Number(g.m[3])));
-    const lead = Number(grids[0].m[1]);
-    const tail = Number(grids[0].m[4]);
-    // the tracks, a 4px gap after each but the last, and the grid's 10px of padding
-    const width = (col) => lead + n * (col + 4) + tail + 4 + 10;
+    const colMin = Number(grids[0].dataset.col);
+    // per grid: what its fixed parts take (round column, dragged columns,
+    // Byes, a 4px gap after each track but the last, 10px of padding) and
+    // how many columns are left to share the rest
+    const shape = grids.map((el) => {
+      const tracks = gridTracks(el, 0);
+      return { fixed: LEAD + tracks.reduce((n, t) => n + t.w, 0) + gridBye(el) + (tracks.length + 1) * 4 + 10,
+        auto: tracks.filter((t) => !t.own).length };
+    });
+    const width = (col) => Math.max(...shape.map((g) => g.fixed + g.auto * col));
+    const anyAuto = shape.some((g) => g.auto);
     const availW = scroll.clientWidth - 2;
-    const share = (zoom) => Math.max(colMin, Math.min(COL_MAX, Math.floor((availW / zoom - width(0)) / n)));
-    let col;
+    const share = (zoom) => Math.max(colMin, Math.min(COL_MAX,
+      ...shape.filter((g) => g.auto).map((g) => Math.floor((availW / zoom - g.fixed) / g.auto))));
+    let col = colMin;
     if (ui.zoom) {
       z = ui.zoom;
-      col = share(z);
+      if (anyAuto) col = share(z);
     } else if (width(colMin) > availW) {
-      col = colMin;
       z = clamp(availW / width(colMin));
-    } else {
+    } else if (anyAuto) {
       col = share(1);
     }
-    for (const g of grids) g.el.style.gridTemplateColumns = `${g.m[1]}px repeat(${g.m[2]}, ${col}px) ${g.m[4]}px`;
-    if (!ui.zoom && col === COL_MAX) {
+    for (const el of grids) setTracks(el, col);
+    if (!ui.zoom && width(col) < availW && (!anyAuto || col === COL_MAX)) {
       const height = kids.reduce((h, k) => h + k.offsetHeight, 0);
-      z = Math.max(1, Math.min(ZOOM_MAX, availW / width(COL_MAX), (scroll.clientHeight - 2) / height));
+      z = Math.max(1, Math.min(ZOOM_MAX, availW / width(col), (scroll.clientHeight - 2) / height));
     }
   }
   z = Math.round(z * 100) / 100;
@@ -363,17 +389,21 @@ function renderEditor(box, env) {
     const open = !ui.closed.has(p);
     const first = roundNo[p][0];
     const last = roundNo[p][roundNo[p].length - 1];
-    const tmpl = `40px repeat(${colList.length}, ${w}px) ${ui.dense ? 84 : 96}px`;
+    // a lane the TD dragged keeps its own width (gridTracks); the rest take w
+    const byeW = ui.dense ? 84 : 96;
+    const tmpl = `${LEAD}px ${lanes.flatMap((l) => l.rooms.map(() => (ui.colW[l.key + '@' + p] || w) + 'px')).join(' ')} ${ui.byeW || byeW}px`;
+    const grip = (id, n) => `<span class="sgresize" data-resize="${esc(id)}" data-n="${n}" title="Drag to change the width. Double-click to reset it."></span>`;
     return `
     <section class="sgphase">
       <button class="sgphasehead" data-phase="${p}"><span class="caret">${open ? '▾' : '▸'}</span>
         <b>${esc(ph.name)}</b><span class="muted">${ph.rounds.length ? `rounds ${first}–${last}` : 'no rounds'}${
         (ph.meet || 1) > 1 ? ` · pairs meet ${ph.meet} times` : ''}</span></button>
       ${open ? `
-      <div class="sggrid${ui.dense ? ' dense' : ''}" style="grid-template-columns:${tmpl}">
+      <div class="sggrid${ui.dense ? ' dense' : ''}" style="grid-template-columns:${tmpl}" data-col="${w}" data-auto="${w}" data-bye="${byeW}"
+        data-lanes="${esc(lanes.map((l) => l.key + '@' + p + ':' + l.rooms.length).join(','))}">
         <div class="sgcorner"></div>
-        ${lanes.map((l) => `<div class="sglane lane-${colorOf.get(l.key + '@' + p) ?? 'x'}" style="grid-column:span ${l.rooms.length}"><i></i>${esc(l.name)}</div>`).join('')}
-        <div class="sglane sglane-byes">Byes</div>
+        ${lanes.map((l) => `<div class="sglane lane-${colorOf.get(l.key + '@' + p) ?? 'x'}" style="grid-column:span ${l.rooms.length}"><i></i>${esc(l.name)}${grip(l.key + '@' + p, l.rooms.length)}</div>`).join('')}
+        <div class="sglane sglane-byes">Byes${grip('bye', 1)}</div>
         <div class="sgcorner sgcorner2"></div>
         ${colList.map((room) => `<button class="sgroom${isSel({ kind: 'room', room }) ? ' on' : ''}" data-room="${room}" title="${esc((s.rooms[room] || {}).name || '')}">${esc((s.rooms[room] || {}).name || 'Room ' + (room + 1))}</button>`).join('')}
         <div class="sgroom sgroom-byes"></div>
@@ -546,6 +576,32 @@ function renderEditor(box, env) {
   $$('[data-filter]').forEach((b) => { b.onclick = () => { ui.filter = b.dataset.filter; if (ui.view === 'brackets') ui.view = 'grid'; ui.scrollPos = null; again(); }; });
   $$('[data-phase]').forEach((b) => { b.onclick = () => { const p = Number(b.dataset.phase); if (ui.closed.has(p)) ui.closed.delete(p); else ui.closed.add(p); again(); }; });
   if (q('scheddense')) q('scheddense').onclick = () => { ui.dense = !ui.dense; again(); };
+  // Drag the right edge of a pool's heading (or of Byes) to set the width
+  // of its columns; the drag is spread over the lane's rooms. Widths live
+  // in ui.colW / ui.byeW until the page is reloaded.
+  $$('.sgresize').forEach((h) => {
+    const id = h.dataset.resize;
+    const n = Number(h.dataset.n) || 1;
+    const grid = h.closest('.sggrid');
+    const put = (v) => { if (id === 'bye') ui.byeW = v; else if (v) ui.colW[id] = v; else delete ui.colW[id]; };
+    h.onpointerdown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const zoom = ui.full ? ui.zoomNow : 1;
+      const from = id === 'bye' ? gridBye(grid) : (ui.colW[id] || Number(grid.dataset.auto));
+      const x0 = e.clientX;
+      h.setPointerCapture(e.pointerId);
+      h.classList.add('on');
+      h.onpointermove = (ev) => {
+        put(Math.round(Math.max(COL_LO, Math.min(COL_HI, from + (ev.clientX - x0) / zoom / n))));
+        for (const el of box.querySelectorAll('.sggrid')) setTracks(el, Number(el.dataset.auto));
+      };
+      // a full redraw settles it: full screen fits the other columns around the new width
+      h.onpointerup = h.onpointercancel = () => { h.onpointermove = null; again(); };
+    };
+    h.ondblclick = (e) => { e.stopPropagation(); put(null); again(); };
+    h.onclick = (e) => e.stopPropagation();
+  });
   box.classList.toggle('sgfull', ui.full);
   redrawFull = () => { if (box.isConnected) again(); };
   // the cover hides the heading, so full screen carries its own way out

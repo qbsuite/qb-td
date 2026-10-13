@@ -360,6 +360,10 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 .sglane { position: sticky; top: 0; z-index: 3; height: 30px; box-sizing: border-box; display: flex; align-items: center; gap: 6px;
   padding: 0 8px; border-radius: 8px 8px 0 0; background: var(--lt); font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; }
 .sglane-byes { background: var(--bg); color: var(--muted); font-weight: 400; }
+/* the right edge of a lane's heading: drag to set the width of its columns */
+.sgresize { position: absolute; top: 0; right: 0; bottom: 0; width: 9px; cursor: col-resize; touch-action: none; }
+.sgresize::after { content: ""; position: absolute; top: 7px; bottom: 7px; right: 3px; width: 2px; border-radius: 2px; background: currentColor; opacity: 0.28; }
+.sgresize:hover::after, .sgresize.on::after { opacity: 0.9; background: var(--link); }
 .sgroom { position: sticky; top: 30px; z-index: 3; height: 26px; border: none; border-bottom: 1px solid var(--line); border-radius: 0;
   background: var(--bg); padding: 0 8px; text-align: left; font: inherit; font-size: 11px; color: var(--muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
