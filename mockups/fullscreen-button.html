@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Full screen button</title>
+<!-- Throwaway mock. The artboards use the app's real stylesheets. -->
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/hub.css">
+<style>
+.lt {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7; --link: #1d4ed8;
+  --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c; --pick: #e4e4df; --pick-line: #c9c9c2;
+  --warn: #b4410e; --card: #f1f1ec; --sel: #efefea;
+}
+.dk {
+  --bg: #232326; --fg: #e4e4e7; --muted: #a1a1aa; --line: #36363c; --link: #8fb0f5;
+  --hover-bg: #2c2c31; --ok: #6fc58d; --bad: #f08a8a; --pick: #38383f; --pick-line: #4d4d55;
+  --warn: #e7a177; --card: #2b2b2f; --sel: #303036;
+}
+body { padding: 28px 32px 80px; }
+.mk-h1 { font-size: 26px; font-weight: 600; }
+.mk-lede { max-width: 78ch; color: var(--muted); margin: 8px 0 0; }
+.mk-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 28px; padding: 18px 0 6px; max-width: 1700px; }
+.mk-cap { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mk-cap span { font-weight: 400; color: var(--muted); }
+.board { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px 0; overflow: hidden; }
+.board h2 { font-size: 20px; padding-bottom: 10px; margin: 0 0 12px; border-bottom: 1px solid var(--fg); }
+.board .sghead { flex-wrap: nowrap; }
+.board .sgscroll { height: 96px; border-bottom: none; border-radius: 10px 10px 0 0; position: relative; }
+.stub { padding: 12px; font-size: 13px; color: var(--muted); }
+.stub b { color: var(--fg); font-size: 15px; margin-right: 8px; }
+/* the proposals */
+.h2row { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--fg); margin: 0 0 12px; }
+#setupsec .h2row h2 { border: none; margin: 0; padding-bottom: 8px; }
+.iconbtn {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: none; border-radius: 8px; background: none; color: var(--muted); cursor: pointer;
+}
+.iconbtn:hover, .iconbtn.hover { background: var(--hover-bg); color: var(--fg); border: none; }
+.iconbtn.boxed { border: 1px solid var(--line); background: var(--bg); }
+.iconbtn svg { width: 16px; height: 16px; }
+.corner { position: absolute; top: 6px; right: 6px; z-index: 5; }
+.tip { position: absolute; top: 40px; right: 0; background: var(--fg); color: var(--bg); font-size: 12px; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.new { box-shadow: 0 0 0 2px var(--ok); }
+.mk-key { font-size: 13px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<h1 class="mk-h1">Full screen button for the schedule editor</h1>
+<p class="mk-lede">Today the button is the words &ldquo;Full screen&rdquo; beside Grid, By team and Brackets. Below are three ways to make it a symbol in the corner. In each, the symbol flips to &ldquo;leave full screen&rdquo; while the editor fills the screen, and hovering shows the words. A green outline marks the button and is not part of the design.</p>
+
+<div class="mk-row" id="rows"></div>
+
+<script>
+const EXPAND = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>';
+const SHRINK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg>';
+const icon = (cls, full, tip) => `<span style="position:relative;display:inline-flex"><button class="iconbtn new ${cls}" aria-label="Full screen">${full ? SHRINK : EXPAND}</button>${tip ? `<span class="tip">${full ? 'Exit full screen (Esc)' : 'Full screen'}</span>` : ''}</span>`;
+
+function board(theme, v, full) {
+  const head = v === 'a'
+    ? `<div class="h2row"><h2>Schedule</h2>${icon('', full, true)}</div>`
+    : (full ? '' : '<h2>Schedule</h2>');
+  const views = `<div class="views sgviews"><button class="view on">Grid</button><button class="view">By team</button><button class="view">Brackets</button></div>`;
+  return `<div class="board hubpage ${theme}" id="setupsec" style="${full ? 'padding-top:14px' : ''}">
+    ${full && v === 'a' ? `<div class="h2row" style="border:none;margin:0 0 4px"><span></span>${icon('', true, false)}</div>` : head}
+    <div class="sghead">
+      <span class="muted">22 teams · 11 rooms · 11 rounds</span>
+      <button class="linkbtn">Change format…</button>
+      <span class="spacer" style="flex:1"></span>
+      ${views}
+      ${v === 'before' ? `<button class="small new">${full ? 'Exit full screen' : 'Full screen'}</button>` : ''}
+      ${v === 'c' ? icon('boxed', full, !full) : ''}
+    </div>
+    <div class="chips sgchips">
+      <button class="chip on">All</button><span class="sgchipphase">Prelims</span>
+      <button class="chip"><i class="lane-0"></i>Pool A</button><button class="chip"><i class="lane-1"></i>Pool B</button><button class="chip"><i class="lane-2"></i>Pool C</button>
+      <span class="spacer" style="flex:1"></span><button class="small">Compact</button>
+    </div>
+    <div class="sgbar"><b>Saved</b><span class="spacer" style="flex:1"></span>
+      <button class="small">Add round</button><button class="small">Add room</button><button class="small">Rooms</button>
+      <button class="small" disabled>Undo</button><button class="small" disabled>Redo</button>
+      <button class="primary" disabled>Save schedule</button></div>
+    <div class="sgscroll"><div class="stub"><b>Prelims</b> rounds 1–7</div>
+      ${v === 'b' ? `<span class="corner">${icon('boxed', full, !full)}</span>` : ''}</div>
+  </div>`;
+}
+const cap = (c, sub) => `<div class="mk-cap">${c} <span>${sub}</span></div>`;
+const rows = [
+  ['before', 'Before', 'the words, beside the views'],
+  ['a', 'A', 'a symbol at the right end of the Schedule heading'],
+  ['b', 'B', 'a symbol in the top right corner of the grid itself'],
+  ['c', 'C', 'a symbol where the words are now'],
+];
+let html = '';
+for (const [v, name, sub] of rows) {
+  for (const theme of ['lt', 'dk']) {
+    html += `<div>${cap(name, sub + (theme === 'dk' ? ', dark' : ''))}${board(theme, v, false)}
+      <div style="height:10px"></div>${cap(name, 'while full screen')}${board(theme, v, true)}</div>`;
+  }
+}
+document.getElementById('rows').innerHTML = html;
+</script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pool grid artboard</title>
+<!-- One artboard of mockups/pool-grids.html: the public page's New stats
+     layout, drawn with the app's real stylesheets. ?v=before|a|b|c
+     &theme=lt|dk. Results are made up (pool-grids-data.js); rounds 1-4
+     count as played, 5-7 as still to come. -->
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/pub.css">
+<style>
+html.lt {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7; --link: #1d4ed8;
+  --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c; --pick: #e4e4df; --pick-line: #c9c9c2;
+  --warn: #b4410e; --win-bg: #dcefe0; --win-fg: #14532d; --card: #f1f1ec; --sel: #efefea;
+}
+html.dk {
+  --bg: #232326; --fg: #e4e4e7; --muted: #a1a1aa; --line: #36363c; --link: #8fb0f5;
+  --hover-bg: #2c2c31; --ok: #6fc58d; --bad: #f08a8a; --pick: #38383f; --pick-line: #4d4d55;
+  --warn: #e7a177; --win-bg: #2a4032; --win-fg: #cfeeda; --card: #2b2b2f; --sel: #303036;
+}
+
+/* ---------- what the proposals add ---------- */
+/* A: the pool's table with its grid beside it (below it on a phone) */
+.poolrow { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-start; }
+.poolrow > .tablewrap { flex: none; width: auto; max-width: 100%; }
+.pgrid { border-collapse: separate; border-spacing: 2px; width: auto; font-size: 12px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.pgrid th, .pgrid td { border: none; padding: 0; text-align: center; }
+.pgrid th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; height: 22px; }
+.pgrid th.rowh { text-align: right; padding-right: 4px; white-space: nowrap; }
+.pgrid:not(.big) td { font-size: 11px; }
+.pgrid td { width: 36px; height: 36px; border-radius: 6px; background: color-mix(in srgb, var(--fg) 5%, var(--bg)); }
+.pgrid td.won { background: var(--win-bg); color: var(--win-fg); font-weight: 600; }
+.pgrid td.lost { color: var(--muted); }
+.pgrid td.self { background: color-mix(in srgb, var(--fg) 16%, var(--bg)); }
+.pgrid td.todo { background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-size: 11px; }
+.pgrid td .opp { display: block; font-weight: 400; opacity: 0.8; }
+.pgridnote { font-size: 12px; color: var(--muted); margin-top: 6px; max-width: 320px; }
+
+/* B: the results as extra columns of the table itself */
+.nstats th.vs, .nstats td.vs { padding: 3px 2px; text-align: center; }
+.nstats td.vs span {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px;
+  font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.nstats td.vs .w { background: var(--win-bg); color: var(--win-fg); }
+.nstats td.vs .l { box-shadow: inset 0 0 0 1px var(--line); }
+.nstats td.vs .x { background: color-mix(in srgb, var(--fg) 16%, var(--bg)); }
+.nstats td.vs .t { font-weight: 400; }
+
+/* C: a Table | Grid switch, and a grid with names on both sides */
+.poolbar { display: flex; align-items: baseline; gap: 14px; margin: 18px 0 6px; }
+.poolbar .poolhead { margin: 0; }
+.poolbar .chips { gap: 4px; }
+.poolbar .chip { font-size: 12px; padding: 1px 10px; }
+.pgrid.big td { width: 62px; height: 44px; }
+.pgrid.big th.colh { height: 30px; vertical-align: bottom; padding-bottom: 3px; white-space: nowrap; }
+.pgrid.big th.rowh { color: var(--fg); font-size: 13px; }
+.pgrid.big td.rec { width: 48px; background: none; font-weight: 600; }
+@media (max-width: 560px) {
+  .pgrid td { width: 34px; height: 36px; font-size: 11px; }
+  .pgrid.big td { width: 46px; height: 40px; }
+  .pgridscroll { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+}
+</style>
+<script src="pool-grids-data.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="tname">ACF Fall @ UIUC</h1>
+    <span class="spacer"></span>
+    <span id="round" class="sub">Round 5</span>
+    <button id="refresh">Refresh</button>
+  </header>
+  <div class="tabs">
+    <button class="tab">Schedule</button>
+    <button class="tab active">Stats</button>
+  </div>
+  <div id="out">
+    <div class="views statsbar">
+      <a class="view on">Standings</a><a class="view">Individuals</a><a class="view">Scoreboard</a>
+      <a class="view">Teams</a><a class="view">Players</a><a class="view">Rounds</a>
+      <span class="grow"></span>
+      <span class="layoutpick"><span class="muted">Layout</span><div class="chips"><a class="chip">Classic</a><a class="chip on">New</a></div></span>
+    </div>
+    <div id="newstats"></div>
+  </div>
+</div>
+<script>
+const qs = new URLSearchParams(location.search);
+const V = qs.get('v') || 'before';
+document.documentElement.className = qs.get('theme') === 'dk' ? 'dk' : 'lt';
+const PLAYED = 4; // rounds 1-4 are in; 5-7 are still to come
+const { pools, games } = window.SIM;
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+// a team's line, from the games played so far
+function line(team) {
+  const mine = games.filter((g) => g.round <= PLAYED && (g.a === team || g.b === team));
+  let w = 0, l = 0, pts = 0, tens = 0, negs = 0, bonus = 0;
+  for (const g of mine) {
+    const me = g.a === team ? [g.sa, g.sb, g.da] : [g.sb, g.sa, g.db];
+    if (me[0] > me[1]) w++; else l++;
+    pts += me[0]; tens += me[2].tens; negs += me[2].negs; bonus += me[2].bonus;
+  }
+  return { name: team, w, l, pp: mine.length ? pts / mine.length : 0, tens, negs, tuh: mine.length * 20, ppb: tens ? bonus / tens : 0 };
+}
+const ranked = (letter) => pools[letter].map(line).sort((x, y) => (y.w / Math.max(1, y.w + y.l)) - (x.w / Math.max(1, x.w + x.l)) || y.pp - x.pp);
+// the game between two teams, from the first one's side
+function meet(x, y) {
+  const g = games.find((m) => (m.a === x && m.b === y) || (m.a === y && m.b === x));
+  if (!g) return null;
+  const mine = g.a === x ? g.sa : g.sb;
+  const theirs = g.a === x ? g.sb : g.sa;
+  return { round: g.round, played: g.round <= PLAYED, mine, theirs, won: mine > theirs };
+}
+// "Illinois A" -> "Ill A", "University of Iowa A" -> "Iowa A"
+function short(name) {
+  const w = name.split(' ');
+  const tail = w[w.length - 1].length === 1 ? ' ' + w.pop() : '';
+  let base = w[0] === 'University' ? w[w.length - 1] : w.join(' ');
+  if (base.length > 5) base = base === 'Northwestern' ? 'NU' : base === 'Notre Dame' ? 'ND' : base.slice(0, 3);
+  return base + tail;
+}
+
+function table(teams, extra) {
+  return `<div class="tablewrap${extra ? ' nscroll' : ''}"><table class="nstats">
+    <thead><tr><th class="nrkcol"></th><th class="name nstick">Team</th><th class="num g0">W</th><th class="num">L</th>
+      <th class="num g0">PP20TUH</th><th class="num g0">10</th><th class="num">-5</th><th class="num">TUH</th><th class="num g0">PPB</th>
+      ${extra ? teams.map((_, i) => `<th class="vs${i ? '' : ' g0'}" title="${esc(teams[i].name)}">${i + 1}</th>`).join('') : ''}</tr></thead>
+    <tbody>${teams.map((tm, i) => `<tr>
+      <td class="muted nrkcol">${i + 1}</td>
+      <td class="name nstick"><span class="nrk">${i + 1}</span><a>${esc(tm.name)}</a></td>
+      <td class="num g0">${tm.w}</td><td class="num">${tm.l}</td>
+      <td class="num g0">${tm.pp.toFixed(1)}</td>
+      <td class="num g0">${tm.tens}</td><td class="num">${tm.negs}</td><td class="num">${tm.tuh}</td><td class="num g0">${tm.ppb.toFixed(2)}</td>
+      ${extra ? teams.map((o, j) => {
+        if (i === j) return `<td class="vs${j ? '' : ' g0'}"><span class="x"></span></td>`;
+        const m = meet(tm.name, o.name);
+        const tip = m.played ? `${tm.name} ${m.mine}, ${o.name} ${m.theirs}` : `Round ${m.round}`;
+        return `<td class="vs${j ? '' : ' g0'}" title="${esc(tip)}">${m.played ? `<span class="${m.won ? 'w' : 'l'}">${m.won ? 'W' : 'L'}</span>` : `<span class="t">${m.round}</span>`}</td>`;
+      }).join('') : ''}</tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function grid(teams, big) {
+  const cell = (tm, o) => {
+    if (tm === o) return '<td class="self"></td>';
+    const m = meet(tm.name, o.name);
+    if (!m.played) return `<td class="todo" title="Round ${m.round}">R${m.round}</td>`;
+    return `<td class="${m.won ? 'won' : 'lost'}" title="${esc(tm.name)} ${m.mine}, ${esc(o.name)} ${m.theirs}">${m.mine}<span class="opp">${m.theirs}</span></td>`;
+  };
+  return `<div class="pgridscroll"><table class="pgrid${big ? ' big' : ''}">
+    <tr><th></th>${teams.map((t, i) => `<th class="colh" title="${esc(t.name)}">${big ? esc(short(t.name)) : i + 1}</th>`).join('')}${big ? '<th class="colh">W–L</th>' : ''}</tr>
+    ${teams.map((tm, i) => `<tr><th class="rowh">${big ? esc(tm.name) : i + 1}</th>${teams.map((o) => cell(tm, o)).join('')}${
+      big ? `<td class="rec">${tm.w}–${tm.l}</td>` : ''}</tr>`).join('')}
+  </table></div>`;
+}
+const NOTE = 'Each row is that team&rsquo;s games: its own score above its opponent&rsquo;s, and a green square for a win. R6 means the game is in round 6.';
+
+document.getElementById('newstats').innerHTML = Object.keys(pools).sort().map((k, n) => {
+  const teams = ranked(k);
+  if (V === 'a') {
+    return `<h3 class="poolhead">Pool ${k}</h3><div class="poolrow">${table(teams)}<div>${grid(teams)}${n === 0 ? `<div class="pgridnote">${NOTE} The numbers are the teams&rsquo; places in the table.</div>` : ''}</div></div>`;
+  }
+  if (V === 'b') {
+    return `<h3 class="poolhead">Pool ${k}</h3>${table(teams, true)}${n === 0 ? '<div class="pgridnote">The numbered columns are each team&rsquo;s games against the team in that place: W or L once played, or the round it is in.</div>' : ''}`;
+  }
+  if (V === 'c') {
+    // the first pool shows the grid, the others the table, so both sides of the switch are in view
+    const showGrid = n === 0;
+    return `<div class="poolbar"><h3 class="poolhead">Pool ${k}</h3><div class="chips"><a class="chip${showGrid ? '' : ' on'}">Table</a><a class="chip${showGrid ? ' on' : ''}">Grid</a></div></div>
+      ${showGrid ? grid(teams, true) + `<div class="pgridnote">${NOTE}</div>` : table(teams)}`;
+  }
+  return `<h3 class="poolhead">Pool ${k}</h3>${table(teams)}`;
+}).join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pool grids</title>
+<!-- Throwaway mock. Every artboard is pool-grids-board.html in a frame,
+     so it is the public page's real stylesheets at a real laptop or
+     phone width. -->
+<link rel="stylesheet" href="../app/css/td.css">
+<style>
+body { padding: 28px 32px 80px; }
+.mk-h1 { font-size: 26px; font-weight: 600; }
+.mk-lede { max-width: 80ch; color: var(--muted); margin: 8px 0 0; }
+.mk-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin: 20px 0 4px; max-width: 1400px; }
+.mk-opts h3 { font-size: 16px; font-weight: 600; }
+.mk-opts p { font-size: 14px; margin-top: 6px; }
+.mk-opts .lim { color: var(--muted); }
+.mk-sec { font-size: 20px; font-weight: 600; margin: 40px 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--fg); text-transform: none; letter-spacing: 0; color: var(--fg); }
+.mk-row { display: flex; gap: 24px; overflow-x: auto; padding: 16px 0 10px; align-items: flex-start; }
+.mk-col { flex: none; }
+.mk-cap { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mk-cap span { font-weight: 400; color: var(--muted); }
+iframe { border: 1px solid var(--line); border-radius: 10px; display: block; background: var(--bg); }
+.lap { width: 1000px; height: 1180px; zoom: 0.62; }
+.phone { width: 390px; height: 1500px; zoom: 0.62; border-radius: 22px; }
+</style>
+</head>
+<body>
+<h1 class="mk-h1">Pool grids on the public stats page</h1>
+<p class="mk-lede">The New layout lists each pool&rsquo;s standings, but not who has played whom. Below are three ways to add a square grid for each pool. The page is ACF Fall @ UIUC with made-up results: rounds 1 to 4 are in and rounds 5 to 7 are still to come, so the grids show a pool partway through.</p>
+
+<div class="mk-opts">
+  <div>
+    <h3>A. A grid beside each table</h3>
+    <p>Every pool keeps its table and gains a grid of scores to its right, in the same order as the table. On a phone the grid sits under the table.</p>
+    <p class="lim">Teams are numbered by their place, so a reader matches a column to a team by its number.</p>
+  </div>
+  <div>
+    <h3>B. Results inside the table</h3>
+    <p>The table itself gains one narrow column per opponent with a W, an L, or the round the game is in. It is the most compact, and adds nothing new to the page.</p>
+    <p class="lim">It shows no scores, and on a phone the extra columns are reached by scrolling the table sideways.</p>
+  </div>
+  <div>
+    <h3>C. A Table or Grid switch</h3>
+    <p>Each pool has a switch. The grid replaces the table and has team names along both sides, scores in every square and the record at the end.</p>
+    <p class="lim">The table and the grid are never on screen together. The first pool is shown as Grid and the others as Table.</p>
+  </div>
+</div>
+
+<div id="rows"></div>
+
+<script>
+const VARS = [['before', 'Before', 'the New layout today'], ['a', 'A', 'a grid beside each table'], ['b', 'B', 'results inside the table'], ['c', 'C', 'a Table or Grid switch']];
+const row = (cls, theme) => `<div class="mk-row">${VARS.map(([v, name, sub]) =>
+  `<div class="mk-col"><div class="mk-cap">${name} <span>${sub}</span></div><iframe class="${cls}" src="pool-grids-board.html?v=${v}&theme=${theme}" loading="eager"></iframe></div>`).join('')}</div>`;
+document.getElementById('rows').innerHTML =
+  '<h2 class="mk-sec">Laptop</h2>' + row('lap', 'lt') + row('lap', 'dk')
+  + '<h2 class="mk-sec">Phone</h2>' + row('phone', 'lt') + row('phone', 'dk');
+</script>
+</body>
+</html>
