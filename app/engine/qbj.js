@@ -162,11 +162,12 @@ export function parseRosterLines(text) {
  * round-trips.
  *
  * Undergraduate and Division II marks ride in YellowFruit's own fields: a
- * team's {ug, d2} and its players' (`marks`, by player name) as
- * YfData.isUG / isD2, and which of the two the tournament tracks as the
- * Tournament's YfData.trackUG / trackDiv2. A mark the tournament does not
- * track is not written, so a roster that tracks neither is the file it
- * always was.
+ * player's (`marks`, by player name) and the team's as YfData.isUG / isD2,
+ * and which of the two the tournament tracks as the Tournament's
+ * YfData.trackUG / trackDiv2. Only players are marked; a team's marks
+ * follow from its players' (teamMarks), whatever `ug` / `d2` the entry
+ * carries. A mark the tournament does not track is not written, so a
+ * roster that tracks neither is the file it always was.
  */
 export function buildRosterQbj(tournamentName, teams, track = rosterTracking(teams)) {
   const mark = (m) => {
@@ -174,6 +175,7 @@ export function buildRosterQbj(tournamentName, teams, track = rosterTracking(tea
     const d2 = !!(track.trackDiv2 && m && m.d2);
     return ug || d2 ? { YfData: { isUG: ug, isD2: d2 } } : {};
   };
+  const teamMark = (t) => mark(teamMarks(t.players, t.marks, track));
   return {
     version: '2.1.1',
     objects: [{
@@ -182,10 +184,32 @@ export function buildRosterQbj(tournamentName, teams, track = rosterTracking(tea
       ...(track.trackUG || track.trackDiv2 ? { YfData: { trackUG: !!track.trackUG, trackDiv2: !!track.trackDiv2 } } : {}),
       registrations: teams.map((t) => ({
         name: t.name,
-        teams: [{ name: t.name, ...mark(t),
+        teams: [{ name: t.name, ...teamMark(t),
           players: t.players.map((p) => ({ name: p, ...mark((t.marks || {})[p]) })) }],
       })),
     }],
+  };
+}
+
+/**
+ * A team's marks, from its players': Division II when every player is
+ * Division II, otherwise Undergraduate when every player is Undergraduate
+ * or Division II. A team is one or the other, never both (an all-DII team
+ * is DII), and is never marked by hand. Only tracked marks count: with
+ * Division II untracked, a team is UG when every player is.
+ * @param players the team's player names
+ * @param marks {player name: {ug, d2}} for its marked players
+ * @returns {ug, d2}
+ */
+export function teamMarks(players, marks, track) {
+  const names = (players || []).filter(Boolean);
+  const of = (p) => (marks || {})[p] || {};
+  const d2 = (p) => !!(track.trackDiv2 && of(p).d2);
+  const ug = (p) => !!(track.trackUG && of(p).ug);
+  const allD2 = !!track.trackDiv2 && names.length > 0 && names.every(d2);
+  return {
+    ug: !allD2 && !!track.trackUG && names.length > 0 && names.every((p) => ug(p) || d2(p)),
+    d2: allD2,
   };
 }
 
@@ -205,8 +229,9 @@ export function rosterTracking(teams) {
  * Registration objects), a bare {registrations: [...]} object, or a bare
  * array of registrations/teams. A Registration's teams each become one entry.
  *
- * A marked entry also carries its marks — `ug` / `d2` (true) for the team
- * and `marks`, {player name: {ug, d2}}, for its marked players — and the
+ * A marked entry also carries its marks — `marks`, {player name: {ug, d2}},
+ * for its marked players, and `ug` / `d2` (true) for the team, which are
+ * worked out from those (teamMarks), not read from the file — and the
  * returned array a `track` property, {trackUG, trackDiv2} (see
  * rosterTracking; not enumerable, so a roster still compares and
  * serializes as its teams). A mark the roster does not track is dropped
@@ -266,13 +291,17 @@ export function parseRoster(json) {
   const y = holder && pick(holder, 'YfData', 'yf_data');
   const track = y ? { trackUG: !!y.trackUG, trackDiv2: !!y.trackDiv2 } : rosterTracking(out);
   for (const r of out) {
-    if (!(r.ug && track.trackUG)) delete r.ug;
-    if (!(r.d2 && track.trackDiv2)) delete r.d2;
     for (const [pn, m] of Object.entries(r.marks)) {
       m.ug = m.ug && track.trackUG;
       m.d2 = m.d2 && track.trackDiv2;
       if (!m.ug && !m.d2) delete r.marks[pn];
     }
+    // the team's own marks follow from its players', whatever the file says
+    const tm = teamMarks(r.players, r.marks, track);
+    delete r.ug;
+    delete r.d2;
+    if (tm.ug) r.ug = true;
+    if (tm.d2) r.d2 = true;
     if (!Object.keys(r.marks).length) delete r.marks;
   }
   Object.defineProperty(out, 'track', { value: track });

@@ -2,7 +2,8 @@ Release Notes for 10/13/2026
 
 [ SETUP ]
 - Added Track Undergrad and Track Division II switches to the roster editor.
-- With a switch on, each team and each player gets a UG or DII box. With both off, the roster is unchanged.
+- With a switch on, each player gets a UG or DII box. With both off, the roster is unchanged.
+- Teams are marked for you: DII when every player is DII, otherwise UG when every player is UG or DII.
 - An uploaded roster keeps the UG and Division II marks it carries, and its preview counts them.
 
 [ STATS ]

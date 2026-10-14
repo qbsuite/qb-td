@@ -95,17 +95,21 @@ const college = [
       P('Ana Ng', { 15: 3, 10: 1 }), P('Bo Chen', { 10: 2, '-5': 1 }), P('Cy Young', { 10: 1 }), P('Di Wu', {})] }),
 ];
 
-// The college roster with Undergraduate and Division II marks: on whole
-// teams, on single players of an unmarked team, both on one, and a team
-// with none. Run with both tracked, with each alone (the other's marks
-// must then be nowhere: not a column, not a line, not a flag in a file),
-// and with a switch on that nobody is marked for, which YellowFruit shows
-// as an empty column.
-const M = (ug, d2) => ({ ug, d2 });
+// The college roster with Undergraduate and Division II marks. Only
+// players are marked (a player is one or the other); a team's marks follow
+// from them (qbj.js teamMarks). Penn A has two marked players of five, so
+// the team is neither; Penn B is all Division II, so DII (and not UG);
+// St. John's is two UG and a DII, so UG; Laval has none. Run with both
+// tracked, with each alone (the other's marks must then be nowhere: not a
+// column, not a line, not a flag in a file — and St. John's is then not
+// UG, its DII player being unmarked), and with a switch on that nobody is
+// marked for, which YellowFruit shows as an empty column.
+const UG = { ug: true, d2: false };
+const D2 = { ug: false, d2: true };
 const MARKED = [
-  { ...ROSTER[0], marks: { 'Di Wu': M(true, false), 'Eve Holt': M(true, true) } },
-  { ...ROSTER[1], ug: true, d2: true, marks: { 'Fay Lin': M(true, true), 'Gus Park': M(true, false) } },
-  { ...ROSTER[2], ug: true, marks: { "Hal O'Neil": M(true, false), 'Ida Bloom': M(true, false), 'Jo Sato': M(true, true) } },
+  { ...ROSTER[0], marks: { 'Di Wu': UG, 'Eve Holt': D2 } },
+  { ...ROSTER[1], marks: { 'Fay Lin': D2, 'Gus Park': D2 } },
+  { ...ROSTER[2], marks: { "Hal O'Neil": UG, 'Ida Bloom': UG, 'Jo Sato': D2 } },
   ROSTER[3],
 ];
 const markedScenario = (key, name, teams, track) => ({

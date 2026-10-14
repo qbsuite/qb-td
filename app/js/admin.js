@@ -16,7 +16,7 @@
 // until setup is complete.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
-import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking } from '../engine/qbj.js';
+import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
@@ -269,9 +269,9 @@ const staged = [];      // packets staged from a zip or loose files (packetsui.j
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
 
 let rosterOpen = false;
-// structured editor working copy [{name, players, was, ug, d2, flags}];
-// was: the saved name; ug / d2: the team's marks; flags: {ug, d2} per
-// player, in step with players
+// structured editor working copy [{name, players, was, flags}]; was: the
+// saved name; flags: {ug, d2} per player, in step with players. A team's
+// own marks are never entered: they follow from its players' (teamMarks).
 let rosterTeams = null;
 // which marks the roster tracks (YellowFruit's Track Undergrad / Track
 // Division 2). A mark is shown, saved and exported only while its switch
@@ -890,18 +890,25 @@ function cleanRosterTeams() {
       const d2 = rosterTrack.trackDiv2 && !!f.d2;
       if (ug || d2) marks[pn] = { ug, d2 };
     });
-    if (rosterTrack.trackUG && tm.ug) out.ug = true;
-    if (rosterTrack.trackDiv2 && tm.d2) out.d2 = true;
     if (Object.keys(marks).length) out.marks = marks;
     return out;
   });
 }
-const blankRosterTeam = () => ({ name: '', players: ['', '', '', ''], ug: false, d2: false, flags: [{}, {}, {}, {}] });
+const blankRosterTeam = () => ({ name: '', players: ['', '', '', ''], flags: [{}, {}, {}, {}] });
+// what a team in the editor would be marked as saved, as tags
+function teamTagsHtml(tm) {
+  const names = [];
+  const marks = {};
+  tm.players.forEach((p, pi) => { if (p.trim()) { names.push(p.trim()); marks[p.trim()] = tm.flags[pi] || {}; } });
+  const m = teamMarks(names, marks, rosterTrack);
+  return (m.ug ? '<span class="ntag" title="Every player is UG or DII, and not all are DII">UG</span>' : '')
+    + (m.d2 ? '<span class="ntag d2" title="Every player is DII">DII</span>' : '');
+}
 // parseRoster's teams as the editor holds them, and the switches they set
 function editRoster(parsed) {
   rosterTrack = rosterTracking(parsed);
   return parsed.map((tm) => ({
-    name: tm.name, players: [...tm.players], was: tm.name, ug: !!tm.ug, d2: !!tm.d2,
+    name: tm.name, players: [...tm.players], was: tm.name,
     flags: tm.players.map((p) => ({ ...((tm.marks || {})[p] || {}) })),
   }));
 }
@@ -1076,17 +1083,23 @@ function renderRosterEditor(a, t) {
   if (!rosterOpen || rosterTeams === null) { box.innerHTML = ''; return; }
   const nPlayers = rosterTeams.reduce((n, tm) => n + tm.players.filter((p) => p.trim()).length, 0);
   const problems = rosterProblems();
-  // a UG and a DII box for a team (data-tmark) or a player (data-pmark),
-  // each only while the roster tracks that mark
-  const markBoxes = (attr, at, m) => {
-    const one = (k, label, on) => `<label class="rmark"><input type="checkbox" ${attr}="${at}.${k}" ${on ? 'checked' : ''}>${label}</label>`;
+  // a UG and a DII box for a player (data-pmark), each only while the
+  // roster tracks that mark
+  const markBoxes = (at, m) => {
+    const one = (k, label, on) => `<label class="rmark"><input type="checkbox" data-pmark="${at}.${k}" ${on ? 'checked' : ''}>${label}</label>`;
     const boxes = (rosterTrack.trackUG ? one('ug', 'UG', m.ug) : '') + (rosterTrack.trackDiv2 ? one('d2', 'DII', m.d2) : '');
     return boxes ? `<span class="rmarks">${boxes}</span>` : '';
   };
+  // teams are not marked by hand; say how they come to be
+  const teamRule = rosterTrack.trackUG && rosterTrack.trackDiv2
+    ? 'A team is DII when every player is DII. Otherwise it is UG when every player is UG or DII.'
+    : rosterTrack.trackUG ? 'A team is UG when every player is UG.'
+      : rosterTrack.trackDiv2 ? 'A team is DII when every player is DII.' : '';
   box.innerHTML = `
     <div class="rtrack">
       <label><input type="checkbox" id="trackug" ${rosterTrack.trackUG ? 'checked' : ''}>Track Undergrad</label>
       <label><input type="checkbox" id="trackd2" ${rosterTrack.trackDiv2 ? 'checked' : ''}>Track Division II</label>
+      <span class="muted">${teamRule}</span>
     </div>
     ${rosterTeams.map((tm, ti) => `
     <div class="card">
@@ -1100,14 +1113,14 @@ function renderRosterEditor(a, t) {
         <span class="pill" title="Roster order is seed order">Seed ${ti + 1}</span>
         <input data-tname="${ti}" value="${esc(tm.name)}" placeholder="Team name" size="24">
         <span class="muted" data-tcount="${ti}">${tm.players.filter((p) => p.trim()).length} players</span>
-        ${markBoxes('data-tmark', ti, tm)}
+        <span data-ttags="${ti}">${teamTagsHtml(tm)}</span>
         <span class="spacer" style="flex:1"></span>
         <button class="small" data-delteam="${ti}" tabindex="-1">Remove team</button>
       </div>
       ${tm.players.map((p, pi) => `
       <div class="playerline">
         <input data-pname="${ti}.${pi}" value="${esc(p)}" placeholder="Player name">
-        ${markBoxes('data-pmark', `${ti}.${pi}`, tm.flags[pi] || {})}
+        ${markBoxes(`${ti}.${pi}`, tm.flags[pi] || {})}
         <button class="xbtn" data-delplayer="${ti}.${pi}" title="Remove player" tabindex="-1">&times;</button>
       </div>`).join('')}
       <div class="row" style="margin-top:4px">
@@ -1132,6 +1145,8 @@ function renderRosterEditor(a, t) {
     rosterTeams.forEach((tm, ti) => {
       const el = box.querySelector(`[data-tcount="${ti}"]`);
       if (el) el.textContent = tm.players.filter((p) => p.trim()).length + ' players';
+      const tags = box.querySelector(`[data-ttags="${ti}"]`);
+      if (tags) tags.innerHTML = teamTagsHtml(tm);
     });
     const total = rosterTeams.reduce((n, tm) => n + tm.players.filter((p) => p.trim()).length, 0);
     $('rostercount').textContent = rosterTeams.length + ' teams · ' + total + ' players';
@@ -1139,15 +1154,12 @@ function renderRosterEditor(a, t) {
   };
   $('trackug').onchange = () => { rosterTrack.trackUG = $('trackug').checked; rerender(); };
   $('trackd2').onchange = () => { rosterTrack.trackDiv2 = $('trackd2').checked; rerender(); };
-  box.querySelectorAll('[data-tmark]').forEach((inp) => {
-    const [ti, k] = inp.dataset.tmark.split('.');
-    inp.onchange = () => { rosterTeams[Number(ti)][k] = inp.checked; };
-  });
   box.querySelectorAll('[data-pmark]').forEach((inp) => {
     const [ti, pi, k] = inp.dataset.pmark.split('.');
     inp.onchange = () => {
       const flags = rosterTeams[Number(ti)].flags;
       flags[Number(pi)] = { ...flags[Number(pi)], [k]: inp.checked };
+      refreshMeta(); // the team's own tags follow
     };
   });
   box.querySelectorAll('[data-tname]').forEach((inp) => {
