@@ -15,6 +15,7 @@ import {
   formatsFor, allFormats, buildSchedule, validateSchedule, slotText, insertRound, removeRound,
   addRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, fillPlaceholders,
   tagBrackets, bracketRooms, phaseLanes, scheduleChecks, renameTeams, removeTeam,
+  poolOf, tradePools, tradesLocked,
 } from '../engine/schedule.js';
 
 /* ---------- view state (per page load) ---------- */
@@ -25,7 +26,8 @@ const ui = {
   dense: false,
   closed: new Set(),     // collapsed phase indexes
   sel: null,             // {kind: slot|game|empty|room|round, ...}
-  mode: null,            // swapSlot | moveGame
+  mode: null,            // swapSlot | moveGame | trade
+  tradePick: null,       // Brackets view: the team picked to trade pools
   past: [], future: [],  // JSON snapshots for Undo / Redo
   note: '',
   baseline: { obj: null, json: '' }, // the schedule as saved
@@ -43,6 +45,7 @@ const ui = {
 /** Escape: drop the selection or a half-done swap, then leave full
     screen. True if it did. */
 export function schedEscape() {
+  if (ui.tradePick) { ui.tradePick = null; return true; }
   if (!ui.sel && !ui.mode) {
     if (!ui.full) return false;
     if (ui.sideOpen) { ui.sideOpen = false; return true; }
@@ -297,9 +300,17 @@ function roomList(env, n) {
   return out;
 }
 
+// The three checks every schedule passes, and which problems fall under each
+const CHECKS = [
+  ['Each team plays once a round', (c) => c.kind === 'twice' || c.kind === 'missing'],
+  ['No repeat pairings', (c) => c.kind === 'again'],
+  ['No half-empty games', (c) => c.kind === 'half'],
+];
+
 function resetEditor() {
   ui.sel = null;
   ui.mode = null;
+  ui.tradePick = null;
   ui.past = [];
   ui.future = [];
   ui.filter = '';
@@ -370,6 +381,15 @@ function renderEditor(box, env) {
   const bracketName = (k) => (brackets.find((b) => b.key === k) || {}).name || '';
   const colorOf = new Map();
   phases.forEach((_, p) => brackets.filter((b) => b.phase === p).forEach((b, i) => colorOf.set(b.key + '@' + p, i % COLORS)));
+
+  // pool trades: open until the first prelim game comes in
+  const pooled = Object.keys(s.pools || {}).length > 0;
+  const locked = tradesLocked(s, env.played ? env.played() : new Set());
+  const trade = (x, y) => {
+    const px = poolOf(s, x);
+    const py = poolOf(s, y);
+    edit(`Traded pools: ${x} to Pool ${py}, ${y} to Pool ${px}`, (ss) => tradePools(ss, x, y));
+  };
 
   const sel = ui.sel;
   const isSel = (o) => sel && Object.keys(o).every((k) => sel[k] === o[k]);
@@ -457,7 +477,9 @@ function renderEditor(box, env) {
       ${groups.filter((g) => !ui.filter || !brackets.some((b) => b.key === ui.filter && b.phase === 0) || ui.filter === g.key).map((g, gi) => `
         <div class="sgtgroup"><i class="lane-${gi % COLORS}"></i>${esc(g.name)}</div>
         ${g.teams.map((t) => `
-          <div class="sgtname">${esc(t)}</div>
+          ${g.key && pooled && !locked
+            ? `<div class="sgtname" draggable="true" data-team="${esc(t)}" data-pool="${esc(g.key)}" title="Drag onto a team in another pool to trade them">${esc(t)}</div>`
+            : `<div class="sgtname">${esc(t)}</div>`}
           ${flat.map(({ p, r, round }) => {
             const games = round.games.filter((x) => slotText(x.a) === t || slotText(x.b) === t);
             const bye = round.byes.some((x) => slotText(x) === t);
@@ -482,7 +504,18 @@ function renderEditor(box, env) {
         <span class="sgarrow">→</span>
         <div class="sgmapcol">
           <div class="muted sgmaphead">${esc(ph.name)} · ${ph.rounds.length ? `rounds ${roundNo[p][0]}–${roundNo[p][roundNo[p].length - 1]}` : 'no rounds'}</div>
-          ${brackets.filter((b) => b.phase === p).map((b, i) => `
+          ${p === 0 && pooled ? `<div class="small sgmapnote">${locked ? 'Pool trades close once prelims start.' : 'Select two teams in different pools to trade them.'}</div>` : ''}
+          ${brackets.filter((b) => b.phase === p).map((b, i) => p === 0 && s.pools && s.pools[b.key] ? `
+            <div class="sgmapcard sgmappool">
+              <button class="sgmaphd" data-filter="${esc(b.key)}"><i class="lane-${i % COLORS}"></i><b>${esc(b.name)}</b></button>
+              <div class="sgmaprows">${s.pools[b.key].map((t) => {
+                const picked = ui.tradePick === t;
+                const can = !locked && ui.tradePick && !picked && poolOf(s, ui.tradePick) !== b.key;
+                return locked ? `<span class="sgmaprow">${esc(t)}</span>`
+                  : `<button class="sgmaprow${picked ? ' on' : ''}" data-tradepick="${esc(t)}">${esc(t)}${picked ? '<span class="muted small">picked</span>' : can ? '<span class="small sgtradehint">Trade</span>' : ''}</button>`;
+              }).join('')}</div>
+              <span class="muted small">${b.rooms.map((i2) => esc((s.rooms[i2] || {}).name || '')).join(' · ') || 'no rooms yet'}</span>
+            </div>` : `
             <button class="sgmapcard" data-filter="${esc(b.key)}"><span><i class="lane-${i % COLORS}"></i><b>${esc(b.name)}</b></span>
               <span class="muted">${esc(s.pools && s.pools[b.key] ? s.pools[b.key].join(', ') : b.key === 'CH' ? 'Top half of each pool' : b.key === 'CO' ? 'Bottom half of each pool' : /^F\d+$/.test(b.key) ? 'Each pool’s ' + b.name.replace(' place', '') : '')}</span>
               <span class="muted small">${b.rooms.map((i2) => esc((s.rooms[i2] || {}).name || '')).join(' · ') || 'no rooms yet'}</span></button>`).join('')}
@@ -490,7 +523,7 @@ function renderEditor(box, env) {
     </div>`;
 
   /* -- side panel for the selection -- */
-  const panel = sidePanel(s, env, { roundNo, bracketName, edit });
+  const panel = sidePanel(s, env, { roundNo, bracketName, edit, trade, pooled, locked });
 
   box.innerHTML = `
     ${ui.full ? `<span class="sgzoom"><button id="schedfit" class="fit${ui.zoom ? '' : ' on'}" title="Size the grid to fit the screen">Fit</button><i></i>
@@ -546,18 +579,25 @@ function renderEditor(box, env) {
     </div>
     <div class="sgbody">
       <div class="sgscroll" id="sgscroll">${ui.view === 'teams' ? teamHtml : ui.view === 'brackets' ? mapHtml : gridHtml}</div>
-      <aside class="sgside"${ui.full && !ui.sel && !ui.mode && !ui.sideOpen ? ' hidden' : ''}>
+      <aside class="sgside${ui.mode === 'trade' ? ' trading' : ''}"${ui.full && !ui.sel && !ui.mode && !ui.sideOpen ? ' hidden' : ''}>
         ${ui.full ? '<button class="linkbtn muted sgsidehide" id="schedsidehide">Hide this panel</button>' : ''}
         ${panel.html}
         <div class="sgchecks">
-          <div class="sgchecktitle"><b>Checks</b> <span class="muted">${allChecks.length ? allChecks.length + ' to look at' : 'all clear'}</span></div>
-          ${allChecks.length ? allChecks.slice(0, 12).map((c, i) => `
-            <button class="sgcheck" data-check="${i}"><span class="${c.sev ? 'warnc' : 'bad'}">${c.sev ? '!' : '✕'}</span><span>${esc(c.text)}</span></button>${
-            c.kind === 'roster' ? `<div class="sgfix">${unplaced.length ? `<select data-fixto="${i}" aria-label="Replace ${esc(c.team)} with">
+          <div class="sgchecktitle"><b>Checks</b> <span class="${allChecks.length ? 'bad' : 'muted'}">${allChecks.length ? allChecks.length + ' to fix' : 'all clear'}</span></div>
+          ${CHECKS.map(([label, test]) => {
+            const items = checks.filter(test);
+            const mark = !items.length ? '<span class="ok">✓</span>' : items.some((c) => !c.sev) ? '<span class="bad">✕</span>' : '<span class="warnc">!</span>';
+            return `<div class="sgcheck${items.length ? ' off' : ' ok'}">${mark}<span>${label}</span></div>`
+              + items.slice(0, 8).map((c) => `<button class="sgcheckitem" data-check="${allChecks.indexOf(c)}">${esc(c.text)}</button>`).join('')
+              + (items.length > 8 ? `<div class="muted small sgcheckitem">${items.length - 8} more</div>` : '');
+          }).join('')}
+          ${[...rosterWarn, ...warn].map((c) => {
+            const i = allChecks.indexOf(c);
+            return `<button class="sgcheck" data-check="${i}"><span class="warnc">!</span><span>${esc(c.text)}</span></button>${
+              c.kind === 'roster' ? `<div class="sgfix">${unplaced.length ? `<select data-fixto="${i}" aria-label="Replace ${esc(c.team)} with">
                 <option value="">Replace with…</option>${unplaced.map((x) => `<option>${esc(x)}</option>`).join('')}</select>` : ''}
-              <button class="linkbtn" data-fixdel="${i}">Remove from schedule</button></div>` : ''}`).join('')
-            + (allChecks.length > 12 ? `<div class="muted small">${allChecks.length - 12} more</div>` : '')
-            : '<div class="sgcheck ok"><span class="ok">✓</span><span>Every team plays once a round, no repeat pairings, no half-empty games</span></div>'}
+              <button class="linkbtn" data-fixdel="${i}">Remove from schedule</button></div>` : ''}`;
+          }).join('')}
         </div>
         <div class="muted small sghelp">Drag a team onto another to swap them, or onto Byes. Drag a game card (or ⋯) onto another game to trade places, or onto an empty room to move it. Or click, then use this panel.</div>
       </aside>
@@ -739,8 +779,19 @@ function renderEditor(box, env) {
     };
   });
 
+  // Brackets view: pick a team, then a team in another pool
+  $$('[data-tradepick]').forEach((b) => {
+    b.onclick = () => {
+      const t = b.dataset.tradepick;
+      const picked = ui.tradePick;
+      if (picked && picked !== t && poolOf(s, picked) !== poolOf(s, t)) { ui.tradePick = null; trade(picked, t); return; }
+      ui.tradePick = picked === t ? null : t;
+      again();
+    };
+  });
+
   /* -- drag and drop -- */
-  wireDrag(box, s, { edit, moveGameTo, again });
+  wireDrag(box, s, { edit, moveGameTo, again, trade });
 
   /* -- panel actions -- */
   panel.wire(box);
@@ -890,17 +941,36 @@ function swapSlotsAt(s, r1, r2) {
 
 /* ---------- the side panel ---------- */
 
-function sidePanel(s, env, { roundNo, bracketName, edit }) {
+function sidePanel(s, env, { roundNo, bracketName, edit, trade, pooled, locked }) {
   const sel = ui.sel;
-  const btn = (id, label, cls = '') => `<button class="small ${cls}" data-act="${id}">${esc(label)}</button>`;
+  // actions read as a line of links
+  const link = (id, label) => `<button class="linkbtn" data-act="${id}">${esc(label)}</button>`;
+  const links = (...items) => `<div class="sglinks">${items.filter(Boolean).join('<span class="dot">·</span>')}</div>`;
+  const head = (title, sub) => `<b class="sgptitle">${esc(title)}</b>${sub ? `<span class="muted small">${esc(sub)}</span>` : ''}`;
   const acts = {};
   let html = '';
   if (ui.mode === 'swapSlot' && sel) {
-    html = `<b>Swap: pick the other team</b><span class="muted small">Click any team, in any round, or a bye. ${esc(slotShow(getSlot(s, sel)) || 'This slot')} goes there.</span>${btn('cancel', 'Cancel')}`;
+    html = head('Swap: pick the other team', `Click any team or a bye. ${slotShow(getSlot(s, sel)) || 'This slot'} goes there.`) + links(link('cancel', 'Cancel'));
     acts.cancel = () => { ui.mode = null; };
   } else if (ui.mode === 'moveGame' && sel) {
-    html = `<b>Pick where this game goes</b><span class="muted small">Click another game to trade places, or an empty room to move it — any round.</span>${btn('cancel', 'Cancel')}`;
+    html = head('Pick where this game goes', 'Click another game to trade places, or an empty room to move it.') + links(link('cancel', 'Cancel'));
     acts.cancel = () => { ui.mode = null; };
+  } else if (ui.mode === 'trade' && sel && sel.kind === 'slot') {
+    // the trade box: every other pool as a list, Find when they are long
+    const team = slotText(getSlot(s, sel));
+    const mine = poolOf(s, team);
+    const keys = Object.keys(s.pools).sort();
+    const others = keys.filter((k) => k !== mine);
+    const total = others.reduce((n, k) => n + s.pools[k].length, 0);
+    html = `<div class="tp">
+      ${head(`Trade ${team} into another pool`, 'Select a team from another pool to trade prelim positions.')}
+      ${total > 12 ? '<input class="tp-find" data-tpfind="1" placeholder="Find a team" aria-label="Find a team">' : ''}
+      <div class="tp-pools">${others.map((k) => `<div class="tp-pool"><div class="tp-ph lane-${keys.indexOf(k) % COLORS}"><i></i>Pool ${esc(k)}<span class="n">${s.pools[k].length}</span></div>${
+        s.pools[k].map((t) => `<button class="tp-t" data-tpteam="${esc(t)}">${esc(t)}</button>`).join('')}</div>`).join('')}
+        <div class="tp-none muted small" hidden>No team in another pool matches.</div></div>
+      <div class="tp-foot"><span class="muted">Pool ${esc(mine)} · ${s.pools[mine].length} teams</span>${link('cancel', 'Cancel')}</div></div>`;
+    acts.cancel = () => { ui.mode = null; };
+    acts.__trade = (other) => { ui.mode = null; trade(team, other); };
   } else if (sel && sel.kind === 'slot') {
     const cur = getSlot(s, sel);
     const round = s.phases[sel.p].rounds[sel.r];
@@ -916,13 +986,20 @@ function sidePanel(s, env, { roundNo, bracketName, edit }) {
     const everyone = new Map([...env.teams.map((t) => [t, { team: t }]), ...phaseSlots]);
     const free = [...everyone].filter(([k]) => !inRound.has(k));
     const onBye = [...inRound].filter(([, ref]) => ref.bye !== undefined && refKey(ref) !== refKey(sel));
+    const playing = [...everyone].filter(([k]) => inRound.has(k) && inRound.get(k).bye === undefined && k !== slotText(cur));
     const where = sel.bye !== undefined ? 'Byes' : (s.rooms[sel.room] || {}).name;
-    html = `<b>${esc(cur ? slotShow(cur) : 'Empty slot')}</b><span class="muted small">Round ${n} · ${esc(where)}</span>
-      ${free.length ? `<span class="sglabel">No game this round</span><div class="sgpick">${free.slice(0, 16).map(([k], i) => btn('free' + i, slotShow(everyone.get(k)), 'on')).join('')}</div>` : ''}
-      ${onBye.length ? `<span class="sglabel">On a bye</span><div class="sgpick">${onBye.map(([k], i) => btn('bye' + i, slotShow(everyone.get(k) || { team: k }))).join('')}</div>` : ''}
-      <label class="sglabel">Any team <select class="slotsel" data-act-sel="1"><option value="">Choose…</option>${[...everyone].map(([k, v]) =>
-        `<option value="${esc(k)}">${esc(slotShow(v))}${inRound.has(k) ? ' (swaps)' : ''}</option>`).join('')}${cur ? '<option value="__clear">— Clear slot</option>' : ''}</select></label>
-      <div class="sgpick">${btn('swap', 'Swap with…')}${cur && sel.bye === undefined ? btn('bench', 'Give a bye') : ''}${cur ? btn('clear', 'Clear') : ''}</div>`;
+    const opt = ([k, v]) => `<option value="${esc(k)}">${esc(slotShow(v))}</option>`;
+    const group = (label, list) => (list.length ? `<optgroup label="${esc(label)}">${list.map(opt).join('')}</optgroup>` : '');
+    // the team's pool, and the trade, in pool play only
+    const pool = cur && cur.team && sel.p === 0 && pooled ? poolOf(s, cur.team) : null;
+    const lane = pool ? Object.keys(s.pools).sort().indexOf(pool) % COLORS : 0;
+    html = head(cur ? slotShow(cur) : 'Empty slot', `Round ${n} · ${where}`)
+      + links(link('swap', 'Swap with…'), cur && sel.bye === undefined && link('bench', 'Give a bye'), cur && link('clear', 'Clear'))
+      + `<label class="sgrow">Replace with <select class="slotsel" data-act-sel="1"><option value="">Choose a team</option>${
+        group('No game this round', free)}${group('On a bye', onBye.map(([k]) => [k, everyone.get(k) || { team: k }]))}${
+        group('Playing this round (swaps)', playing)}${cur ? '<option value="__clear">Clear this slot</option>' : ''}</select></label>`
+      + (pool ? `<div class="sgpool"><span class="lane-${lane}"><i></i>Pool ${esc(pool)}</span>${
+        locked ? '<span class="muted small">Trades close once prelims start</span>' : link('trade', 'Trade pools…')}</div>` : '');
     const put = (k) => {
       const v = everyone.get(k) || { team: k };
       const other = inRound.get(k);
@@ -932,9 +1009,8 @@ function sidePanel(s, env, { roundNo, bracketName, edit }) {
         edit(`Round ${n}: ${cur ? slotShow(cur) + ' → ' : ''}${slotShow(v)}`, (ss) => setSlotAt(ss, sel, v));
       }
     };
-    free.slice(0, 16).forEach(([k], i) => { acts['free' + i] = () => put(k); });
-    onBye.forEach(([k], i) => { acts['bye' + i] = () => put(k); });
     acts.swap = () => { ui.mode = 'swapSlot'; };
+    acts.trade = () => { ui.mode = 'trade'; };
     acts.bench = () => { edit(`Round ${n}: ${slotShow(cur)} on a bye`, (ss) => { setSlotAt(ss, sel, null); ss.phases[sel.p].rounds[sel.r].byes.push(cur); }); ui.sel = null; };
     acts.clear = () => { edit('Cleared a slot', (ss) => setSlotAt(ss, sel, null)); };
     acts.__select = (value) => {
@@ -946,10 +1022,9 @@ function sidePanel(s, env, { roundNo, bracketName, edit }) {
     if (g && (g.a || g.b)) {
       const round = s.phases[sel.p].rounds[sel.r];
       const brs = bracketRooms(s).filter((b) => b.phase === sel.p);
-      html = `<b>${esc(slotShow(g.a) || '—')} v ${esc(slotShow(g.b) || '—')}</b>
-        <span class="muted small">Round ${round.round} · ${esc((s.rooms[sel.room] || {}).name || '')}</span>
-        ${brs.length > 1 ? `<label class="sglabel">Bracket <select data-act-br="1">${brs.map((b) => `<option value="${esc(b.key)}" ${b.key === g.bracket ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
-        <div class="sgpick">${btn('move', 'Move or swap…', 'on')}${btn('flip', 'Flip sides')}${btn('remove', 'Remove (teams get byes)')}</div>`;
+      html = head(`${slotShow(g.a) || '—'} v ${slotShow(g.b) || '—'}`, `Round ${round.round} · ${(s.rooms[sel.room] || {}).name || ''}`)
+        + links(link('move', 'Move or swap…'), link('flip', 'Flip sides'), link('remove', 'Remove'))
+        + (brs.length > 1 ? `<label class="sgrow">Bracket <select data-act-br="1">${brs.map((b) => `<option value="${esc(b.key)}" ${b.key === g.bracket ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : '');
       acts.move = () => { ui.mode = 'moveGame'; };
       acts.flip = () => edit('Flipped sides', (ss) => { const gg = gameAt(ss, sel.p, sel.r, sel.room); [gg.a, gg.b] = [gg.b, gg.a]; });
       acts.remove = () => {
@@ -965,17 +1040,16 @@ function sidePanel(s, env, { roundNo, bracketName, edit }) {
     }
   } else if (sel && sel.kind === 'empty') {
     const round = s.phases[sel.p].rounds[sel.r];
-    html = `<b>Empty room</b><span class="muted small">Round ${round.round} · ${esc((s.rooms[sel.room] || {}).name || '')}</span>
-      <div class="sgpick">${btn('add', 'Add a game here', 'on')}</div>`;
+    html = head('Empty room', `Round ${round.round} · ${(s.rooms[sel.room] || {}).name || ''}`) + links(link('add', 'Add a game here'));
     acts.add = () => { ui.sel = { kind: 'slot', p: sel.p, r: sel.r, room: sel.room, side: 'a' }; };
   } else if (sel && sel.kind === 'room') {
     const room = s.rooms[sel.room];
     if (room) {
-      html = `<b>${esc(room.name)}</b><span class="muted small">${esc(bracketRooms(s).filter((b) => b.rooms.includes(sel.room)).map((b) => b.name).join(', ') || 'No bracket')}</span>
-        <label class="sglabel">Name <input data-act-name="1" value="${esc(room.name)}"></label>
-        <label class="sglabel">Room page <select data-act-bucket="1"><option value="">Not linked</option>${env.buckets.map((b) =>
-          `<option value="${b.id}" ${b.id === room.bucket ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}</select></label>
-        <div class="sgpick">${btn('droproom', 'Remove room (its teams get byes)')}</div>`;
+      html = head(room.name, bracketRooms(s).filter((b) => b.rooms.includes(sel.room)).map((b) => b.name).join(', ') || 'No bracket')
+        + `<label class="sgrow">Name <input data-act-name="1" value="${esc(room.name)}"></label>
+        <label class="sgrow">Room page <select data-act-bucket="1"><option value="">Not linked</option>${env.buckets.map((b) =>
+          `<option value="${b.id}" ${b.id === room.bucket ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}</select></label>`
+        + links(link('droproom', 'Remove room'));
       acts.droproom = () => {
         const filled = s.phases.some((ph) => ph.rounds.some((r) => r.games.some((g) => g.room === sel.room && (g.a || g.b))));
         if (filled && !confirm(`Remove ${room.name}? Its teams drop to Byes (Undo brings them back).`)) return 'stay';
@@ -989,10 +1063,10 @@ function sidePanel(s, env, { roundNo, bracketName, edit }) {
       acts.__bucket = (v) => edit('Linked a room', (ss) => { ss.rooms[sel.room].bucket = v ? Number(v) : null; });
     }
   } else if (sel && sel.kind === 'round') {
-    html = `<b>Round ${s.phases[sel.p].rounds[sel.r].round}</b><span class="muted small">Problems in this round are outlined in red. Click a team to fix it.</span>`;
+    html = head(`Round ${s.phases[sel.p].rounds[sel.r].round}`, 'Problems in this round are outlined in red. Click a team to fix it.');
   }
   if (!html) {
-    html = `<b>Nothing selected</b><span class="muted small">${esc(ui.note || 'Click a team, a game’s ⋯, an empty room or a room name.')}</span>`;
+    html = head('Nothing selected', ui.note || 'Click a team, a game’s ⋯, an empty room or a room name.');
   }
   return {
     html: `<div class="sgpanel">${html}</div>`,
@@ -1006,6 +1080,29 @@ function sidePanel(s, env, { roundNo, bracketName, edit }) {
           redraw();
         };
       });
+      box.querySelectorAll('[data-tpteam]').forEach((b) => {
+        b.onclick = () => { acts.__trade(b.dataset.tpteam); redraw(); };
+      });
+      // Find filters the lists in place, so typing keeps its focus
+      const find = box.querySelector('[data-tpfind]');
+      if (find) {
+        find.oninput = () => {
+          const q = find.value.trim().toLowerCase();
+          let any = false;
+          box.querySelectorAll('.tp-pool').forEach((pool) => {
+            let shown = 0;
+            pool.querySelectorAll('[data-tpteam]').forEach((t) => {
+              const hit = !q || t.dataset.tpteam.toLowerCase().includes(q);
+              t.hidden = !hit;
+              if (hit) shown++;
+            });
+            pool.hidden = !shown;
+            if (shown) any = true;
+          });
+          box.querySelector('.tp-none').hidden = any;
+        };
+        find.focus();
+      }
       const sl = box.querySelector('[data-act-sel]');
       if (sl) sl.onchange = () => { acts.__select(sl.value); redraw(); };
       const br = box.querySelector('[data-act-br]');
@@ -1020,17 +1117,21 @@ function sidePanel(s, env, { roundNo, bracketName, edit }) {
 
 /* ---------- drag and drop ---------- */
 
-function wireDrag(box, s, { edit, moveGameTo }) {
+function wireDrag(box, s, { edit, moveGameTo, trade }) {
   const scroll = box.querySelector('#sgscroll');
   if (!scroll) return;
-  let drag = null; // {slot: ref} | {cell}
+  let drag = null; // {slot: ref} | {cell} | {team, pool} (By team: a pool trade)
   const clear = () => {
-    box.classList.remove('sg-drag-slot', 'sg-drag-game');
+    box.classList.remove('sg-drag-slot', 'sg-drag-game', 'sg-drag-team');
     box.querySelectorAll('.drop-ok').forEach((x) => x.classList.remove('drop-ok'));
     box.querySelectorAll('.dragging').forEach((x) => x.classList.remove('dragging'));
   };
   const targetOf = (el) => {
     if (!drag) return null;
+    if (drag.team) {
+      const row = el.closest('.sgtname[data-team]');
+      return row && row.dataset.pool !== drag.pool ? { el: row, kind: 'team', team: row.dataset.team } : null;
+    }
     if (drag.slot) {
       const slot = el.closest('.sgslot');
       if (slot) return { el: slot, kind: 'slot', ref: JSON.parse(slot.dataset.ref) };
@@ -1045,8 +1146,13 @@ function wireDrag(box, s, { edit, moveGameTo }) {
     return null;
   };
   scroll.addEventListener('dragstart', (ev) => {
+    const row = ev.target.closest && ev.target.closest('.sgtname[draggable="true"]');
     const slot = ev.target.closest && ev.target.closest('.sgslot');
-    if (slot && slot.draggable) {
+    if (row) {
+      drag = { team: row.dataset.team, pool: row.dataset.pool };
+      row.classList.add('dragging');
+      box.classList.add('sg-drag-team');
+    } else if (slot && slot.draggable) {
       drag = { slot: JSON.parse(slot.dataset.ref) };
       slot.classList.add('dragging');
       box.classList.add('sg-drag-slot');
@@ -1082,7 +1188,9 @@ function wireDrag(box, s, { edit, moveGameTo }) {
     clear();
     if (!t || !d) return;
     ev.preventDefault();
-    if (d.slot && t.kind === 'slot') {
+    if (d.team && t.kind === 'team') {
+      trade(d.team, t.team);
+    } else if (d.slot && t.kind === 'slot') {
       if (refKey(d.slot) === refKey(t.ref)) return;
       edit(`Swapped ${slotShow(getSlot(s, d.slot)) || 'empty'} and ${slotShow(getSlot(s, t.ref)) || 'empty'}`, (ss) => swapSlotsAt(ss, d.slot, t.ref));
     } else if (d.slot && t.kind === 'byes') {

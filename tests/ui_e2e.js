@@ -628,12 +628,67 @@ await js(`document.querySelector('.sgtc').click(); true`);
 await waitJs(`!!document.querySelector('.sggrid') && !!document.querySelector('.sgcell.on')`, 'jumped to the game');
 ok('5 schedule: clicking a By team cell selects that game in the grid', true);
 await click('[data-view2="brackets"]');
-await waitJs(`document.querySelectorAll('.sgmapcard[data-filter]').length === 4`, 'the brackets view');
+await waitJs(`document.querySelectorAll('.sgmapcard[data-filter], .sgmaphd[data-filter]').length === 4`, 'the brackets view');
 await js(`[...document.querySelectorAll('.sgmapcard[data-filter]')].find((b) => b.dataset.filter === 'CO').click(); true`);
 await waitJs(`!!document.querySelector('.sggrid') && document.querySelectorAll('.sggrid').length === 1
   && [...document.querySelectorAll('.sglane:not(.sglane-byes)')].map((l) => l.textContent.trim()).join() === 'Consolation'`, 'filtered to Consolation');
 ok('5 schedule: a bracket card filters the grid to that bracket', true);
 await js(`document.querySelector('.sgchips [data-filter=""]').click(); true`);
+
+// Pool trades: two teams in different pools trade every prelim game, from
+// the panel, from the Brackets view's pool cards, or by a drag in By team
+{
+  const before = await storedSched();
+  const later = JSON.stringify(before.phases.slice(1));
+  const poolOfIn = (sc, t) => Object.keys(sc.pools).find((k) => sc.pools[k].includes(t));
+  const inPools = (sc) => sc.phases[0].rounds.every((r) => r.games.every((g) => poolOfIn(sc, g.a.team) === poolOfIn(sc, g.b.team)));
+  await waitJs(`!!document.querySelector('.sgcell')`, 'the grid again');
+  const x = await js(`${slotEl(0, 0, 0, 'a')}.textContent.trim()`);
+  await js(`${slotEl(0, 0, 0, 'a')}.click(); true`);
+  await waitJs(`!!document.querySelector('.sgpanel [data-act="trade"]')`, 'Trade pools… in the panel');
+  ok('5 trades: the panel names the team\'s pool, with Trade pools…',
+    (await text('.sgpool')).includes('Pool ' + poolOfIn(before, x)) && (await text('.sgpool')).includes('Trade pools…'));
+  await click('.sgpanel [data-act="trade"]');
+  await waitJs(`document.querySelectorAll('[data-tpteam]').length > 0`, 'the trade box');
+  const y = await js(`document.querySelector('[data-tpteam]').dataset.tpteam`);
+  ok('5 trades: the trade box lists only the other pool\'s teams, and the checks step aside',
+    JSON.stringify(await js(`[...document.querySelectorAll('[data-tpteam]')].map((b) => b.dataset.tpteam)`))
+      === JSON.stringify(before.pools[poolOfIn(before, y)]) && poolOfIn(before, x) !== poolOfIn(before, y)
+      && /Trade .* into another pool/.test(await text('.sgpanel')));
+  await click(`[data-tpteam=${q(y)}]`);
+  await waitJs(`/Traded pools/.test(document.querySelector('.sgbar').textContent)`, 'the trade as an unsaved change');
+  await click('#schedsave');
+  const traded = await until(async () => { const sc = await storedSched(); return sc && poolOfIn(sc, x) === poolOfIn(before, y) && sc; }, 'the traded schedule saved');
+  const oppOf = (sc, t) => sc.phases[0].rounds.map((r) => { const g = r.games.find((gg) => gg.a.team === t || gg.b.team === t); return g ? (g.a.team === t ? g.b.team : g.a.team) : 'bye'; });
+  const swapName = (n) => (n === x ? y : n === y ? x : n);
+  ok('5 trades: each team takes the other\'s prelim games and pool; playoffs and checks unchanged',
+    poolOfIn(traded, y) === poolOfIn(before, x) && inPools(traded)
+      && JSON.stringify(oppOf(traded, x)) === JSON.stringify(oppOf(before, y).map(swapName))
+      && JSON.stringify(traded.phases.slice(1)) === later && /all clear/.test(await text('.sgchecks')),
+    { pools: traded.pools });
+  // Brackets view: pick one team, then one in another pool, to trade them back
+  await click('[data-view2="brackets"]');
+  await waitJs(`document.querySelectorAll('[data-tradepick]').length === 12`, 'the pool cards\' teams');
+  await click(`[data-tradepick=${q(x)}]`);
+  await waitJs(`document.querySelector('[data-tradepick=${q(x)}]').classList.contains('on')`, 'a picked team');
+  await click(`[data-tradepick=${q(y)}]`);
+  await waitJs(`/Traded pools/.test(document.querySelector('.sgbar').textContent)`, 'traded back');
+  await click('#schedsave');
+  await until(async () => { const sc = await storedSched(); return sc && poolOfIn(sc, x) === poolOfIn(before, x) && sc; }, 'traded back and saved');
+  ok('5 trades: trading back from the pool cards restores the generated schedule',
+    JSON.stringify((await storedSched()).phases) === generated);
+  // By team: a team row dragged onto another pool's team trades them
+  await click('[data-view2="teams"]');
+  await waitJs(`document.querySelectorAll('.sgtname[draggable="true"]').length === 12`, 'draggable team rows');
+  ok('5 trades: a team row is a valid drop on a team in another pool',
+    await dragOnto(`[...document.querySelectorAll('.sgtname')].find((e) => e.dataset.team === ${q(x)})`,
+      `[...document.querySelectorAll('.sgtname')].find((e) => e.dataset.team === ${q(y)})`));
+  await waitJs(`/Traded pools/.test(document.querySelector('.sgbar').textContent)`, 'a dragged trade');
+  ok('5 trades: dragging a team row onto another pool\'s team trades them', /1 unsaved change/.test(await text('.sgbar')));
+  await click('#schedundo');
+  await waitJs(`/Saved/.test(document.querySelector('.sgbar').textContent)`, 'undone');
+  await click('[data-view2="grid"]');
+}
 sched = await storedSched();
 const schedRounds = Math.max(...sched.phases.flatMap((p) => p.rounds.map((r) => r.round)));
 const gameIn = (n, room) => sched.phases.flatMap((p) => p.rounds).find((r) => r.round === n).games.find((g) => g.room === room);

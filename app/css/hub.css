@@ -438,6 +438,23 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 .sgmapcard .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 224px; }
 .sgmapcard:hover { border-color: var(--link); }
 .sgmapcard.static { cursor: default; }
+/* Brackets view: a pool card lists its teams; pick two in different pools to trade */
+.sgmapnote { max-width: 250px; margin-bottom: 2px; }
+.sgmappool:hover { border-color: var(--line); }
+.sgmaphd { display: flex; gap: 8px; align-items: center; font: inherit; color: var(--fg); background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
+.sgmaphd:hover b { color: var(--link); }
+.sgmaprows { display: flex; flex-direction: column; margin: 4px 0 2px; min-width: 224px; }
+.sgmaprow { display: flex; justify-content: space-between; align-items: center; gap: 8px; font: inherit; font-size: 14px; color: var(--fg);
+  background: none; border: none; border-radius: 6px; padding: 3px 8px; margin: 0 -8px; text-align: left; line-height: 1.35; }
+button.sgmaprow { cursor: pointer; }
+button.sgmaprow:hover { background: var(--sel); }
+.sgmaprow.on { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--link); }
+.sgtradehint { color: var(--link); }
+/* By team: a team row drags onto another pool's team to trade them */
+.sgtname[draggable="true"] { cursor: grab; }
+.sgtname[draggable="true"]::before { content: "⋮⋮"; color: var(--muted); margin-right: 6px; letter-spacing: -2px; }
+.sgtname.dragging { opacity: 0.4; }
+.sgtname.drop-ok { box-shadow: inset 0 0 0 2px var(--link); background: var(--sel); }
 
 /* side panel + checks */
 .sgside { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 12px; font-size: 14px; }
@@ -446,10 +463,35 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 .sglabel select, .sglabel input { font-size: 13px; }
 .sgpick { display: flex; flex-wrap: wrap; gap: 4px; }
 .sgpick button.on { border-color: var(--link); }
+.sgptitle { font-size: 15px; font-weight: 600; line-height: 1.3; }
+/* the panel's actions: a line of links */
+.sglinks { display: flex; flex-wrap: wrap; align-items: center; font-size: 14px; }
+.sglinks .dot { color: var(--muted); margin: 0 8px; }
+.sgrow { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.sgrow select, .sgrow input { flex: 1; min-width: 0; font-size: 14px; }
+.sgpool { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 14px; }
+.sgpool i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--lc); margin-right: 6px; }
+/* the trade box: every other pool as a plain list */
+.tp { display: flex; flex-direction: column; gap: 8px; }
+.tp-find { font: inherit; font-size: 14px; width: 100%; }
+.tp-pools { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px 20px; }
+.tp-ph { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--muted); padding-bottom: 4px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
+.tp-ph i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--lc); }
+.tp-ph .n { font-weight: 400; margin-left: auto; }
+.tp-t { display: block; width: calc(100% + 16px); margin: 0 -8px; padding: 3px 8px; text-align: left; font: inherit; font-size: 14px; color: var(--fg);
+  background: none; border: none; border-radius: 6px; cursor: pointer; line-height: 1.35; }
+.tp-t:hover, .tp-t:focus-visible { background: var(--sel); color: var(--link); }
+.tp-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
+.tp-pool[hidden], .tp-t[hidden] { display: none; }
 .sgchecktitle { padding-bottom: 6px; border-bottom: 1px solid var(--fg); }
 .sgcheck { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 6px; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line);
   background: none; padding: 6px 0; font: inherit; font-size: 13px; color: var(--fg); cursor: pointer; }
-.sgcheck.ok { cursor: default; }
+.sgcheck.ok, .sgcheck.off { cursor: default; }
+.sgcheck.off > span:last-child { font-weight: 600; }
+/* a problem under its check: a link to where it is */
+.sgcheckitem { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--link); background: none;
+  border: none; padding: 2px 0 2px 22px; cursor: pointer; }
+.sgcheckitem.muted { color: var(--muted); cursor: default; }
 .sgcheck .bad, .sgcheck .warnc, .sgcheck .ok { font-weight: 700; }
 .sgfix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0 8px 22px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .sgfix select { font-size: 13px; }
@@ -465,7 +507,12 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
   .sgside .sgpanel { overflow: auto; }
   .sgside .sgchecks { overflow: auto; max-height: 210px; }
   .sghelp { display: none; }
+  /* while trading, the band grows to hold the lists and the checks step aside */
+  .sgside.trading { max-height: none; grid-template-columns: minmax(0, 1fr); }
+  .sgside.trading .sgpanel { overflow: visible; }
+  .sgside.trading .sgchecks { display: none; }
 }
+#schedsec.sgfull .tp-pools { grid-template-columns: minmax(0, 1fr); }
 .sgchipphase { font-size: 12px; color: var(--muted); margin: 0 2px 0 8px; }
 
 /* ---------- the home page (index.html with no tournament open) ----------

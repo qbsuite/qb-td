@@ -963,6 +963,49 @@ export function removeTeam(schedule, team) {
   return n;
 }
 
+/* ---------- pool trades ---------- */
+
+// Pool play is the first phase of a pool format: the phase tagBrackets
+// files under the pools, and the one `pools` records membership for.
+
+/** The pool a team was seeded into ("A"), or null. */
+export function poolOf(schedule, team) {
+  for (const [k, members] of Object.entries(schedule.pools || {})) if (members.includes(team)) return k;
+  return null;
+}
+
+/** Whether pool trades are closed: a prelim game has come in.
+    playedRounds: round numbers with at least one game uploaded. */
+export function tradesLocked(schedule, playedRounds) {
+  const prelims = (schedule.phases || [])[0];
+  if (!prelims || !Object.keys(schedule.pools || {}).length) return true;
+  return prelims.rounds.some((r) => playedRounds.has(r.round));
+}
+
+/**
+ * Trade two teams from different pools, in place: each takes the other's
+ * place in every prelim round (opponents, rooms, byes) and in the pool
+ * lists. Pool sizes stay the same, so every round robin stays whole, and
+ * playoff slots ("A1") are untouched. Returns false (and changes nothing)
+ * unless both teams are in pools, and different ones.
+ */
+export function tradePools(schedule, x, y) {
+  const px = poolOf(schedule, x);
+  const py = poolOf(schedule, y);
+  if (!px || !py || px === py) return false;
+  const other = (s) => (s && s.team === x ? { ...s, team: y } : s && s.team === y ? { ...s, team: x } : s);
+  for (const round of (schedule.phases[0] || { rounds: [] }).rounds) {
+    for (const g of round.games) {
+      g.a = other(g.a);
+      g.b = other(g.b);
+    }
+    round.byes = round.byes.map(other);
+  }
+  schedule.pools[px] = schedule.pools[px].map((t) => (t === x ? y : t));
+  schedule.pools[py] = schedule.pools[py].map((t) => (t === y ? x : t));
+  return true;
+}
+
 /**
  * Renames implied by replacing one roster with another when nothing says
  * which team became which (an uploaded file). Teams are [{name, players}].

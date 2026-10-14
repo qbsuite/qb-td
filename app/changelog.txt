@@ -13,6 +13,11 @@ Release Notes for 10/13/2026
 [ EXPORTS ]
 - The YellowFruit 4 and YellowFruit 3 files and the stat report carry the UG and Division II marks.
 
+[ SCHEDULE ]
+- Trade two teams between pools before prelims start: Trade pools… on a selected team, the pool cards, or a drag in By team.
+- The selected-team panel shows its actions as one line of links, with the team's pool beneath.
+- Checks list their three rules separately, with each problem under the rule it breaks.
+
 Release Notes for 10/12/2026
 
 [ SETUP ]

@@ -12,7 +12,7 @@ import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -3327,6 +3327,57 @@ test('rosterRenames: renamed teams found by their players, then by seed', () => 
   assert.deepEqual(rosterRenames(old, [...old, T('D', 'd1')]), {});
   // a replacement team in a dropped team's seed takes its place
   assert.deepEqual(rosterRenames(old, [old[0], T('New', 'n1', 'n2'), old[2]]), { B: 'New' });
+});
+
+test('tradePools: two teams trade every prelim game and their pools, nothing else', () => {
+  const teams = Array.from({ length: 12 }, (_, i) => 'T' + (i + 1));
+  const rooms = Array.from({ length: 6 }, (_, i) => ({ name: 'R' + i, bucket: null }));
+  const sc = buildSchedule('pools3', teams, rooms);
+  const before = JSON.parse(JSON.stringify(sc));
+  const [x] = sc.pools.A;
+  const [y] = sc.pools.B;
+  const opp = (s, t) => s.phases[0].rounds.map((r) => {
+    const g = r.games.find((gg) => gg.a.team === t || gg.b.team === t);
+    return g ? [g.room, g.a.team === t ? g.b.team : g.a.team] : 'bye';
+  });
+  assert.equal(tradePools(sc, x, y), true);
+  assert.equal(poolOf(sc, x), 'B');
+  assert.equal(poolOf(sc, y), 'A');
+  assert.equal(sc.pools.A.indexOf(y), before.pools.A.indexOf(x)); // the same seed place
+  const swapName = (n) => (n === x ? y : n === y ? x : n);
+  // each takes the other's rooms and opponents, round by round
+  assert.deepEqual(opp(sc, x), opp(before, y).map((o) => (o === 'bye' ? o : [o[0], swapName(o[1])])));
+  assert.deepEqual(opp(sc, y), opp(before, x).map((o) => (o === 'bye' ? o : [o[0], swapName(o[1])])));
+  assert.deepEqual(sc.phases.slice(1), before.phases.slice(1)); // playoffs untouched
+  assert.deepEqual(scheduleChecks(sc), []);
+  // every prelim game is still inside one pool
+  for (const r of sc.phases[0].rounds) for (const g of r.games) assert.equal(poolOf(sc, g.a.team), poolOf(sc, g.b.team));
+  // trading back restores it exactly
+  tradePools(sc, x, y);
+  assert.deepEqual(sc, before);
+});
+
+test('tradePools: refuses teams in one pool, or not in a pool', () => {
+  const teams = Array.from({ length: 12 }, (_, i) => 'T' + (i + 1));
+  const sc = buildSchedule('pools3', teams, Array.from({ length: 6 }, (_, i) => ({ name: 'R' + i, bucket: null })));
+  const before = JSON.stringify(sc);
+  assert.equal(tradePools(sc, sc.pools.A[0], sc.pools.A[1]), false);
+  assert.equal(tradePools(sc, sc.pools.A[0], 'Nobody'), false);
+  assert.equal(JSON.stringify(sc), before);
+  assert.equal(poolOf(sc, 'Nobody'), null);
+});
+
+test('tradesLocked: open until a prelim round has a game in', () => {
+  const teams = Array.from({ length: 12 }, (_, i) => 'T' + (i + 1));
+  const sc = buildSchedule('pools3', teams, Array.from({ length: 6 }, (_, i) => ({ name: 'R' + i, bucket: null })));
+  const prelims = sc.phases[0].rounds.map((r) => r.round);
+  const playoff = sc.phases[1].rounds[0].round;
+  assert.equal(tradesLocked(sc, new Set()), false);
+  assert.equal(tradesLocked(sc, new Set([playoff])), false);
+  assert.equal(tradesLocked(sc, new Set([prelims[0]])), true);
+  assert.equal(tradesLocked(sc, new Set([prelims[prelims.length - 1]])), true);
+  // a format without pools has nothing to trade
+  assert.equal(tradesLocked(buildSchedule('rr', teams.slice(0, 6), Array.from({ length: 3 }, (_, i) => ({ name: 'R' + i, bucket: null }))), new Set()), true);
 });
 
 test('removeTeam: a dropped team leaves open game slots, no byes, no pool place', () => {

@@ -1347,6 +1347,9 @@ function renderSchedule(a, t, buckets, files) {
     setDirty: (d) => { schedDirty = d; },
     teams: schedTeams || [],
     buckets,
+    // rounds with a game in: pool trades close once a prelim round has one
+    played: () => new Set(files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error
+      && Number.isInteger(f.round)).map((f) => f.round)),
     roomsN: () => schedRoomsN,
     setRoomsN: (n) => { schedRoomsN = n; },
     save: (s) => pub(a + '/schedule', { method: 'POST', json: s }),
