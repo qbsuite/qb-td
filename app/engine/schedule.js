@@ -215,14 +215,15 @@ function tierBrackets(sizes) {
  * `members`. A full bracket (two from each of the k pools) skips the
  * games between pool-mates — their prelim game carries over — by seating
  * every pool's pair opposite each other in the circle method's first
- * round and leaving that round out, so nobody ever sits. Anything else
- * (the short last bracket) is a plain round robin.
+ * round and leaving that round out, so nobody ever sits. A short bracket
+ * (a pool too small to fill its places) skips its pool-mates' games too,
+ * in as few rounds as they fit (carryRounds).
  */
 function tierRounds(members, k) {
   const rr = roundRobinRounds(members.length);
   const full = members.length === 2 * k
     && new Set(members.map((m) => m.pool)).size === k;
-  if (!full) return rr;
+  if (!full) return carryRounds(members);
   // seat[circle index] = member index
   const seat = [];
   rr[0].pairs.forEach(([x, y], pool) => {
@@ -231,6 +232,46 @@ function tierRounds(members, k) {
     seat[y] = second;
   });
   return rr.slice(1).map((r) => ({ pairs: r.pairs.map(([x, y]) => [seat[x], seat[y]]), byes: [] }));
+}
+
+/**
+ * Every game between members of different pools, once each, in the
+ * fewest rounds: a search that splits the games into rounds where no
+ * team plays twice, from the lower bound up (brackets are at most 8
+ * teams, so this is quick). Members not playing in a round have a bye.
+ */
+function carryRounds(members) {
+  const n = members.length;
+  const games = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) if (members[i].pool !== members[j].pool) games.push([i, j]);
+  }
+  if (!games.length) return [];
+  const degree = (i) => games.filter((g) => g.includes(i)).length;
+  const lower = Math.max(Math.ceil(games.length / Math.floor(n / 2)), ...members.map((_, i) => degree(i)));
+  for (let R = lower; R <= games.length; R++) {
+    const busy = [...Array(R)].map(() => new Set());
+    const at = new Array(games.length);
+    const place = (e) => {
+      if (e === games.length) return true;
+      const [x, y] = games[e];
+      for (let r = 0; r < R; r++) {
+        if (busy[r].has(x) || busy[r].has(y)) continue;
+        busy[r].add(x); busy[r].add(y); at[e] = r;
+        if (place(e + 1)) return true;
+        busy[r].delete(x); busy[r].delete(y);
+        // an empty round is like any other empty round: try just one
+        if (!busy[r].size) break;
+      }
+      return false;
+    };
+    if (!place(0)) continue;
+    return busy.map((_, r) => ({
+      pairs: games.filter((_, e) => at[e] === r),
+      byes: members.map((_, i) => i).filter((i) => !busy[r].has(i)),
+    }));
+  }
+  return roundRobinRounds(n);
 }
 
 /**
@@ -303,7 +344,7 @@ export function allFormats(nTeams) {
           key: 'pools' + k + 'x2', name: `${k} pools, playoff brackets of ${2 * k}`, teams: nTeams,
           rounds: prelim + tRounds, roomsNeeded: Math.max(prelimRooms, tRooms),
           desc: `pools of ${sizes.join('/')}, then brackets of ${tSizes.join('/')} by finish, two places from each pool ` +
-            `(prelim games between pool-mates carry over${byes ? '; a smaller last bracket plays a round robin' : ''})`,
+            `(prelim games between pool-mates carry over${byes ? '; a smaller last bracket has byes' : ''})`,
         });
       }
     }
@@ -331,9 +372,7 @@ export function buildSchedule(key, teams, rooms, opts = {}) {
     renumber(schedule);
   }
   tagBrackets(schedule);
-  if (o.rooms !== 'keep') {
-    schedule.phases.forEach((ph) => reassignRooms(ph, o.rooms, rng, schedule.rooms.length));
-  }
+  schedule.phases.forEach((ph) => reassignRooms(ph, o.rooms, rng, schedule.rooms.length));
   schedule.brackets = bracketRooms(schedule, schedule.brackets);
   for (const ph of schedule.phases) ph.meet = 1;
   return schedule;
@@ -500,79 +539,82 @@ function shuffled(arr, rng) {
 }
 
 /**
- * Re-seat a phase's games in rooms. mode:
- *   blocks  — each bracket gets a fixed block of rooms, in bracket order,
- *             and teams keep their room within it where they can
+ * Re-seat a phase's games in rooms. Each bracket (a pool, a playoff
+ * bracket) gets a fixed block of rooms, in bracket order, and its games
+ * stay in that block. Within a block, mode:
+ *   keep    — teams keep their room where they can
  *   shuffle — every round's games land in random rooms
  *   rotate  — each game goes to the free room its two teams have used
  *             least so far (teams see the rooms evenly, best effort)
- * Only rooms the phase needs are used (its busiest round's game count).
+ * 'blocks' and 'blockrotate' are older names for keep and rotate. When
+ * the blocks would need more rooms than there are, the phase is one block.
  */
 function reassignRooms(phase, mode, rng, nRooms) {
-  const need = Math.min(nRooms, Math.max(0, ...phase.rounds.map((r) => r.games.filter((g) => g.a || g.b).length)));
-  if (!need) return;
+  mode = ROOM_MODES[mode] || 'keep';
   const tkey = (s) => (s ? s.team || s.label || '' : '');
-  if (mode === 'blocks') {
-    const order = [];
-    const size = new Map();
-    for (const r of phase.rounds) {
-      const per = new Map();
-      for (const g of r.games) {
-        const b = g.bracket || '';
-        if (!order.includes(b)) order.push(b);
-        per.set(b, (per.get(b) || 0) + 1);
-      }
-      for (const [b, n] of per) size.set(b, Math.max(size.get(b) || 0, n));
+  const order = [];
+  const size = new Map();
+  for (const r of phase.rounds) {
+    const per = new Map();
+    for (const g of r.games) {
+      const b = g.bracket || '';
+      if (!order.includes(b)) order.push(b);
+      per.set(b, (per.get(b) || 0) + 1);
     }
-    const start = new Map();
-    let at = 0;
-    for (const b of order) { start.set(b, at); at += size.get(b); }
-    const prev = new Map();
-    for (const r of phase.rounds) {
-      const next = new Map();
-      for (const b of order) {
-        const games = r.games.filter((g) => (g.bracket || '') === b);
+    for (const [b, n] of per) size.set(b, Math.max(size.get(b) || 0, n));
+  }
+  const start = new Map();
+  let at = 0;
+  for (const b of order) { start.set(b, at); at += size.get(b); }
+  // too many rooms for blocks: one block of every room
+  const blockOf = at <= nRooms ? (g) => g.bracket || '' : () => '';
+  if (at > nRooms) {
+    order.splice(0, order.length, '');
+    start.set('', 0);
+    size.set('', Math.max(0, ...phase.rounds.map((r) => r.games.length)));
+  }
+  const visits = new Map();
+  const seen = (t, room) => ((visits.get(t) || new Map()).get(room) || 0);
+  const prev = new Map();
+  for (const r of phase.rounds) {
+    const next = new Map();
+    for (const b of order) {
+      const games = r.games.filter((g) => blockOf(g) === b);
+      const rooms = [...Array(size.get(b)).keys()].map((i) => start.get(b) + i);
+      if (mode === 'shuffle') {
+        const pick = shuffled(rooms, rng);
+        games.forEach((g, i) => { g.room = pick[i]; });
+      } else if (mode === 'rotate') {
+        const free = new Set(rooms);
+        for (const g of shuffled(games, rng)) {
+          let best = -1;
+          let score = Infinity;
+          for (const room of [...free].sort((x, y) => x - y)) {
+            const sc = seen(tkey(g.a), room) + seen(tkey(g.b), room);
+            if (sc < score) { score = sc; best = room; }
+          }
+          g.room = best;
+          free.delete(best);
+          for (const t of [tkey(g.a), tkey(g.b)]) {
+            if (!t) continue;
+            if (!visits.has(t)) visits.set(t, new Map());
+            visits.get(t).set(best, seen(t, best) + 1);
+          }
+        }
+      } else {
         const pairs = games.map((g) => [tkey(g.a), tkey(g.b)]);
         const local = new Map([...prev].filter(([, room]) => room >= start.get(b) && room < start.get(b) + size.get(b))
           .map(([t, room]) => [t, room - start.get(b)]));
         const got = assignRooms(pairs, size.get(b), local);
         games.forEach((g, i) => { g.room = start.get(b) + got[i]; pairs[i].forEach((t) => next.set(t, g.room)); });
       }
-      prev.clear();
-      for (const [t, room] of next) prev.set(t, room);
-      r.games.sort((x, y) => x.room - y.room);
     }
-    return;
-  }
-  const visits = new Map();
-  const seen = (t, room) => ((visits.get(t) || new Map()).get(room) || 0);
-  for (const r of phase.rounds) {
-    const games = r.games.filter((g) => g.a || g.b);
-    if (mode === 'shuffle') {
-      const rooms = shuffled([...Array(need).keys()], rng);
-      games.forEach((g, i) => { g.room = rooms[i % need]; });
-    } else {
-      const free = new Set([...Array(need).keys()]);
-      for (const g of shuffled(games, rng)) {
-        let best = -1;
-        let score = Infinity;
-        for (const room of [...free].sort((x, y) => x - y)) {
-          const sc = seen(tkey(g.a), room) + seen(tkey(g.b), room);
-          if (sc < score) { score = sc; best = room; }
-        }
-        g.room = best;
-        free.delete(best);
-        for (const t of [tkey(g.a), tkey(g.b)]) {
-          if (!t) continue;
-          if (!visits.has(t)) visits.set(t, new Map());
-          visits.get(t).set(best, seen(t, best) + 1);
-        }
-      }
-    }
-    // placeholder rows with no teams (an inserted round) keep their rooms
+    prev.clear();
+    for (const [t, room] of next) prev.set(t, room);
     r.games.sort((x, y) => x.room - y.room);
   }
 }
+const ROOM_MODES = { keep: 'keep', shuffle: 'shuffle', rotate: 'rotate', blocks: 'keep', blockrotate: 'rotate' };
 
 /* ---------- brackets ---------- */
 

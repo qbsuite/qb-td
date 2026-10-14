@@ -1286,9 +1286,9 @@ test('buildSchedule pools3x2: 22 teams into playoff brackets of 6/6/6/4, pool-ma
 
   const po = s.phases[1];
   assert.deepEqual(po.rounds.map((r) => r.round), [8, 9, 10, 11]);
-  // nobody sits while the last bracket is still playing; it finishes a round early
-  assert.deepEqual(po.rounds.map((r) => r.games.length), [11, 11, 11, 9]);
-  assert.deepEqual(po.rounds.map((r) => r.byes.map((b) => b.label).sort()), [[], [], [], ['A7', 'A8', 'B7', 'C7']]);
+  // the last bracket skips its pool-mates' game, so it needs three rounds, not four
+  assert.deepEqual(po.rounds.map((r) => r.games.length), [11, 11, 10, 9]);
+  assert.deepEqual(po.rounds.map((r) => r.byes.map((b) => b.label).sort()), [[], [], ['A7', 'A8'], ['A7', 'A8', 'B7', 'C7']]);
   const met = new Map();
   for (const r of po.rounds) for (const g of r.games) {
     const k = [g.a.label, g.b.label].sort().join(' ');
@@ -1303,8 +1303,9 @@ test('buildSchedule pools3x2: 22 teams into playoff brackets of 6/6/6/4, pool-ma
     }
     assert.ok(po.rounds.flatMap((r) => r.games).filter((g) => members.includes(g.a.label)).every((g) => g.bracket === key));
   });
-  // the short last bracket plays everyone, its two pool-mates included
-  for (const pair of ['A7 A8', 'A7 B7', 'A7 C7', 'A8 B7', 'A8 C7', 'B7 C7']) assert.equal(met.get(pair), 1, pair);
+  // the short last bracket plays everyone once, except its two pool-mates: their prelim game carries over
+  for (const pair of ['A7 B7', 'A7 C7', 'A8 B7', 'A8 C7', 'B7 C7']) assert.equal(met.get(pair), 1, pair);
+  assert.equal(met.get('A7 A8'), undefined);
 
   // brackets keep their own rounds, and the placeholders fill from pool finish
   const m = bracketModel(s);
@@ -1320,13 +1321,15 @@ test('pools x2 formats: every size builds clean, full brackets have no byes', ()
     for (const f of allFormats(n).filter((x) => /x2$/.test(x.key))) {
       const rooms = Array.from({ length: f.roomsNeeded }, (_, i) => ({ name: 'R' + i, bucket: null }));
       const teams = Array.from({ length: n }, (_, i) => 'T' + i);
-      const s = buildSchedule(f.key, teams, rooms, { rooms: 'blocks' });
+      const s = buildSchedule(f.key, teams, rooms);
       assert.deepEqual(scheduleChecks(s), [], n + ' ' + f.key);
       assert.equal(s.phases.reduce((a, p) => a + p.rounds.length, 0), f.rounds, n + ' ' + f.key);
       assert.ok(Math.max(...s.phases.flatMap((p) => p.rounds.map((r) => r.games.length))) <= f.roomsNeeded, n + ' ' + f.key);
       const k = Number(f.key[5]);
       const first = s.phases[1].rounds[0];
       if (n % k === 0 && (n / k) % 2 === 0) assert.equal(first.byes.length, 0, n + ' ' + f.key);
+      // every bracket, the short last one too, carries pool-mates' prelim game instead of replaying it
+      for (const g of s.phases[1].rounds.flatMap((r) => r.games)) assert.notEqual(g.a.label[0], g.b.label[0], n + ' ' + f.key);
     }
   }
 });
@@ -2450,6 +2453,8 @@ test('archive captures carry no question text', () => {
 
 // every format and field size, generated with default options, minus the
 // new bracket fields: identical to the generator before options existed
+// rooms changed once on purpose: every pool and bracket now keeps its own
+// block of rooms (what { rooms: 'blocks' } used to build); pairings did not
 test('buildSchedule defaults are unchanged (brackets aside) for every format, 3-36 teams', () => {
   const strip = (x) => {
     const c = JSON.parse(JSON.stringify(x));
@@ -2468,7 +2473,7 @@ test('buildSchedule defaults are unchanged (brackets aside) for every format, 3-
   }
   assert.equal(Object.keys(out).length, 84);
   assert.equal(schedHash('sha256').update(JSON.stringify(out)).digest('hex'),
-    '0519ba33711b4396990004571ba0d8bc0e116ecb6ec0198888f455cd756bd584');
+    '195103b08e39a2a2cd10c817244f49f6ef7c1b7dd0969fe8601eb30c80ee4332');
 });
 
 const T12 = Array.from({ length: 12 }, (_, i) => 'T' + (i + 1));
@@ -2514,10 +2519,10 @@ test('generation options are seeded: same seed same schedule, and every option k
   const sig = (s) => JSON.stringify(s.phases.map((ph) => ph.rounds.map((r) => r.games.map((g) => [g.room, slotText(g.a), slotText(g.b)]))));
   const pairs = (s) => JSON.stringify(everyGame(s).map((g) => [slotText(g.a), slotText(g.b)].sort().join('|')).sort());
   const base = buildSchedule('pools2', T12, R6);
-  for (const opts of [{ seeding: 'random' }, { roundOrder: 'shuffle' }, { rooms: 'shuffle' }, { rooms: 'rotate' }, { rooms: 'blocks' }]) {
+  for (const opts of [{ seeding: 'random' }, { roundOrder: 'shuffle' }, { rooms: 'shuffle' }, { rooms: 'rotate' }, { rooms: 'keep' }]) {
     const a = buildSchedule('pools2', T12, R6, { ...opts, seed: 7 });
     assert.equal(sig(a), sig(buildSchedule('pools2', T12, R6, { ...opts, seed: 7 })), JSON.stringify(opts) + ' not reproducible');
-    if (opts.rooms !== 'blocks') assert.notEqual(sig(a), sig(buildSchedule('pools2', T12, R6, { ...opts, seed: 8 })), JSON.stringify(opts) + ' ignores the seed');
+    if (opts.rooms !== 'keep') assert.notEqual(sig(a), sig(buildSchedule('pools2', T12, R6, { ...opts, seed: 8 })), JSON.stringify(opts) + ' ignores the seed');
     assert.deepEqual(scheduleChecks(a), [], JSON.stringify(opts) + ' made a problem');
     for (const r of a.phases.flatMap((ph) => ph.rounds)) {
       assert.equal(new Set(r.games.map((g) => g.room)).size, r.games.length, 'two games in one room');
@@ -2538,12 +2543,40 @@ test('generation options are seeded: same seed same schedule, and every option k
     return [...seen.values()].reduce((n, x) => n + x.size, 0) / seen.size;
   };
   assert.ok(spread(buildSchedule('pools2', T12, R6, { rooms: 'rotate', seed: 3 })) > spread(base));
-  // blocks: a pool's games stay in its own block of rooms all prelims
-  const bl = buildSchedule('pools3', T12, R6, { rooms: 'blocks' });
-  for (const b of bl.brackets.filter((x) => x.phase === 0)) {
-    const rooms = new Set(bl.phases[0].rounds.flatMap((r) => r.games.filter((g) => g.bracket === b.key).map((g) => g.room)));
-    assert.equal(Math.max(...rooms) - Math.min(...rooms) + 1, rooms.size, b.name + ' rooms not contiguous');
+  // every option, in every phase: a pool's or bracket's games stay in
+  // its own block of rooms, the same block whichever option is picked
+  const blockOf = (s) => s.phases.map((ph) => {
+    const by = {};
+    for (const g of ph.rounds.flatMap((r) => r.games)) (by[g.bracket] = by[g.bracket] || new Set()).add(g.room);
+    return Object.entries(by).map(([k, v]) => k + ':' + [...v].sort((x, y) => x - y).join(',')).sort();
+  });
+  for (const key of ['pools2', 'pools3', 'pools3x2']) {
+    const keep = buildSchedule(key, T12, R6);
+    for (const p of blockOf(keep)) {
+      for (const b of p) {
+        const rooms = b.split(':')[1].split(',').map(Number);
+        assert.equal(rooms.at(-1) - rooms[0] + 1, rooms.length, key + ' ' + b + ' rooms not contiguous');
+      }
+    }
+    for (const rooms of ['shuffle', 'rotate']) assert.deepEqual(blockOf(buildSchedule(key, T12, R6, { rooms, seed: 3 })), blockOf(keep), key + ' ' + rooms);
   }
+  // rotate moves teams around their block, in the playoffs too
+  const spreadIn = (s, p) => {
+    const seen = new Map();
+    for (const r of s.phases[p].rounds) for (const g of r.games) for (const t of [slotText(g.a), slotText(g.b)]) {
+      if (!seen.has(t)) seen.set(t, new Set());
+      seen.get(t).add(g.room);
+    }
+    return [...seen.values()].reduce((n, x) => n + x.size, 0) / seen.size;
+  };
+  const T18 = Array.from({ length: 18 }, (_, i) => 'T' + (i + 1));
+  const R9 = Array.from({ length: 9 }, (_, i) => ({ name: 'R' + (i + 1), bucket: null }));
+  const rot = buildSchedule('pools3x2', T18, R9, { rooms: 'rotate', seed: 3 });
+  const kept = buildSchedule('pools3x2', T18, R9);
+  for (const p of [0, 1]) assert.ok(spreadIn(rot, p) > spreadIn(kept, p), 'phase ' + p);
+  // older saved options still build: blocks is keep, blockrotate is rotate
+  assert.equal(sig(buildSchedule('pools2', T12, R6, { rooms: 'blocks' })), sig(base));
+  assert.equal(sig(buildSchedule('pools2', T12, R6, { rooms: 'blockrotate', seed: 3 })), sig(buildSchedule('pools2', T12, R6, { rooms: 'rotate', seed: 3 })));
   // the PRNG itself is deterministic and in [0, 1)
   const g1 = mulberry32(42);
   const g2 = mulberry32(42);

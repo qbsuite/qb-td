@@ -1,3 +1,11 @@
+Release Notes for 10/14/2026
+
+[ SCHEDULE ]
+- Every pool and playoff bracket now keeps its own block of rooms.
+- "Rooms within each pool" picks how teams move inside that block: keep their room, shuffle, or rotate. This applies to playoffs too.
+- A short last playoff bracket no longer replays pool-mates. Their prelim game carries over, as in the other brackets.
+- Some bracket formats are a round shorter as a result. For example, 23 teams in pools of 8/8/7 now play 11 rounds instead of 12.
+
 Release Notes for 10/13/2026
 
 [ SETUP ]

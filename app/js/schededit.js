@@ -247,7 +247,8 @@ function renderCreator(box, env) {
     <div class="sgopts">
       <label>Seeding ${sel('optseed', o.seeding, [['snake', 'Snake by roster order'], ['random', 'Random']])}</label>
       <label>Round order ${sel('optorder', o.roundOrder, [['asis', 'As generated'], ['shuffle', 'Shuffled within each phase']])}</label>
-      <label>Rooms ${sel('optrooms', o.rooms, [['keep', 'Teams keep their room where possible'], ['blocks', 'Each pool keeps a block of rooms'],
+      <label title="Each pool and playoff bracket keeps its own block of rooms. This picks how teams move within it.">Rooms within each pool ${
+        sel('optrooms', o.rooms, [['keep', 'Teams keep their room where possible'],
         ['shuffle', 'Shuffle rooms every round'], ['rotate', 'Rotate so teams see rooms evenly']])}</label>
       <span class="sgseed ${random ? '' : 'muted'}">Seed <b>${o.seed}</b> <button id="optreroll" class="small" ${random ? '' : 'disabled'}>Reroll</button></span>
     </div>
@@ -881,6 +882,8 @@ function renderEditor(box, env) {
     ui.creator = true;
     ui.fmt = s.format || ui.fmt;
     if (s.options) ui.opts = { ...ui.opts, ...s.options };
+    // pools always keep a block of rooms now: the old names for that
+    ui.opts.rooms = { blocks: 'keep', blockrotate: 'rotate' }[ui.opts.rooms] || ui.opts.rooms;
     renderCreator(box, env);
   };
 }
