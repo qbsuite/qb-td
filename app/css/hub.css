@@ -284,6 +284,10 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 
 /* picker */
 .sgnotice { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--sel); margin-bottom: 12px; font-size: 14px; }
+.sgfillcheck { align-items: flex-start; justify-content: space-between; margin: 8px 0; }
+.sgfillcheck ul { margin: 6px 0; padding-left: 20px; }
+.sgfillcheck li { margin: 2px 0; }
+.sgfillcheck .row { flex-shrink: 0; }
 .sgcreatorhead { margin-bottom: 8px; }
 .sgfmts { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .sgfmt { display: flex; gap: 10px; align-items: baseline; padding: 10px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }

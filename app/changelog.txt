@@ -5,6 +5,9 @@ Release Notes for 10/14/2026
 - "Rooms within each pool" picks how teams move inside that block: keep their room, shuffle, or rotate. This applies to playoffs too.
 - A short last playoff bracket no longer replays pool-mates. Their prelim game carries over, as in the other brackets.
 - Some bracket formats are a round shorter as a result. For example, 23 teams in pools of 8/8/7 now play 11 rounds instead of 12.
+- Fill playoff slots from standings first lists any prelim game with no game file, and any uploaded game that is not on the schedule.
+- It also lists tied records that decide which bracket a team goes to, with the points per 20 tossups heard that breaks the tie.
+- Fill anyway or Cancel. With nothing to list, it fills right away as before.
 
 Release Notes for 10/13/2026
 

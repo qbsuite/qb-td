@@ -26,7 +26,7 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { slotText, roundIntake, poolStandings, roundRooms, flatRounds, renameTeams, rosterRenames } from '../engine/schedule.js';
+import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames } from '../engine/schedule.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials } from './buzzkey.js';
@@ -1357,7 +1357,7 @@ function renderSchedule(a, t, buckets, files) {
     fill: async () => {
       const { matches, roster } = await collectMatches(a, t, buckets, files);
       if (!matches.length) return null;
-      return poolStandings(sched.pools, aggregate(matches, roster).teams.map((x) => x.name));
+      return fillReport(sched, aggregate(matches, roster));
     },
     say,
     refresh: () => render(),

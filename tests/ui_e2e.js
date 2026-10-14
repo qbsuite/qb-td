@@ -1418,6 +1418,48 @@ async function openHubOf(adminSecret) {
     (await js('location.search')) === '?b=' + bB.secret && !(await exists('#bucketlink')), await js('location.href'));
 }
 {
+  // Fill playoff slots: every prelim game in but one, so the editor says
+  // which one before it fills; with that game in, nothing is missing
+  const F = await bracketDay('UI E2E Fill', 'pools2');
+  const prelims = F.s2.phases[0].rounds.map((r) => r.round);
+  const held = F.games(prelims[1])[0];
+  for (const n of prelims) {
+    for (const g of F.games(n)) {
+      await F.start(g, n);
+      if (g !== held) await F.upload(g, n);
+    }
+  }
+  await goto(`${PAGES}/index.html?a=${F.t.admin_secret}`);
+  await waitJs(`!!document.querySelector('[data-step="sched"]')`, 'the step list (fill)');
+  await click('[data-step="sched"]');
+  await waitJs(`!!document.querySelector('#schedfill')`, 'Fill playoff slots');
+  await click('#schedfill');
+  await waitJs(`!!document.querySelector('.sgfillcheck')`, 'the notes before filling');
+  const notes = await js(`[...document.querySelectorAll('.sgfillcheck li')].map((l) => l.textContent)`);
+  const want = `Round ${prelims[1]}, ${F.room(held).room_name}: there is no game file for ${held.a.team} vs ${held.b.team}.`;
+  ok('12c fill: the missing prelim game is named, with its round and room', notes.includes(want), notes);
+  ok('12c fill: nothing is filled until the TD says so', /Saved/.test(await text('.sgbar')) && (await js(`!!document.querySelector('#schedfill')`)));
+  await click('#schedfillno');
+  await waitJs(`!document.querySelector('.sgfillcheck')`, 'Cancel closes the notes');
+  await click('#schedfill');
+  await waitJs(`!!document.querySelector('#schedfillgo')`, 'the notes again');
+  await click('#schedfillgo');
+  await waitJs(`/Filled playoff slots/.test(document.querySelector('.sgbar').textContent)`, 'filled anyway');
+  ok('12c fill: Fill anyway fills every slot', !(await js(`!!document.querySelector('#schedfill')`)) && !(await exists('.sgfillcheck')));
+  await click('#scheddiscard');
+  await waitJs(`!!document.querySelector('#schedfill')`, 'discarded the fill');
+  // the held game comes in: no missing note now (ties may still be noted)
+  await F.upload(held, prelims[1]);
+  await goto(`${PAGES}/index.html?a=${F.t.admin_secret}`);
+  await waitJs(`!!document.querySelector('[data-step="sched"]')`, 'the step list (fill again)');
+  await click('[data-step="sched"]');
+  await waitJs(`!!document.querySelector('#schedfill')`, 'Fill playoff slots again');
+  await click('#schedfill');
+  await waitJs(`!!document.querySelector('.sgfillcheck') || /Filled playoff slots/.test(document.querySelector('.sgbar').textContent)`, 'filled or noted');
+  const after = await js(`[...document.querySelectorAll('.sgfillcheck li')].map((l) => l.textContent)`);
+  ok('12c fill: with every game in, no game is missing', after.every((l) => /^Pool [AB]: .* are tied at /.test(l)), after);
+}
+{
   // a round robin: one bracket, no bracket anything
   const R = await bracketDay('UI E2E Round Robin', 'rr');
   for (const g of R.games(1)) { await R.start(g, 1); await R.upload(g, 1); }

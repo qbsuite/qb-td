@@ -40,6 +40,7 @@ const ui = {
   byeW: null,            // the Byes column, likewise
   opts: { seeding: 'snake', roundOrder: 'asis', rooms: 'keep', seed: 1 + Math.floor(Math.random() * 9999) },
   fmt: null,
+  fillCheck: null,       // fillReport() with something to look at before filling
 };
 
 /** Escape: drop the selection or a half-done swap, then leave full
@@ -292,6 +293,27 @@ function renderCreator(box, env) {
   };
 }
 
+// The notes shown before filling playoff slots: prelim games with no
+// file, uploads the schedule doesn't have, and tied records that decide
+// a bracket. Filling still works; the TD decides.
+const andList = (xs) => (xs.length < 3 ? xs.join(' and ') : xs.slice(0, -1).join(', ') + ', and ' + xs.at(-1));
+function fillCheckHtml(r) {
+  const pp = (x) => (Math.round(x.pp20tuh * 100) / 100).toFixed(2);
+  const items = [
+    ...r.missing.map((m) => `Round ${m.round}, ${esc(m.room)}: there is no game file for ${esc(m.a)} vs ${esc(m.b)}.`),
+    ...r.extra.map((m) => `Round ${m.round}: a game file for ${esc(m.a)} vs ${esc(m.b)} was uploaded, but that game is not on the schedule.`),
+    ...r.ties.map((t) => `Pool ${esc(t.pool)}: ${andList(t.teams.map((x) => esc(x.name)))} are tied at ${t.record}. `
+      + 'Points per 20 tossups heard breaks the tie: '
+      + t.teams.map((x) => `${esc(x.name)} (${pp(x)}) goes to ${esc(x.bracket || 'no bracket')}`).join(', ') + '.'),
+  ];
+  return `<div class="sgnotice sgfillcheck">
+    <div><b>Before filling playoff slots</b>
+      <ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>
+      <div class="muted small">${r.missing.length ? 'Standings only count the games that have been uploaded. ' : ''}You can fill now, or fix these first and fill again.</div></div>
+    <div class="row"><button id="schedfillgo" class="small">Fill anyway</button><button id="schedfillno" class="small">Cancel</button></div>
+  </div>`;
+}
+
 function roomList(env, n) {
   const out = [];
   for (let i = 0; i < n; i++) {
@@ -312,6 +334,7 @@ function resetEditor() {
   ui.sel = null;
   ui.mode = null;
   ui.tradePick = null;
+  ui.fillCheck = null;
   ui.past = [];
   ui.future = [];
   ui.filter = '';
@@ -567,6 +590,7 @@ function renderEditor(box, env) {
       <button id="schedsave" class="primary" ${unsaved ? '' : 'disabled'}>Save schedule</button>
       <button id="scheddel" class="small sgdel">Delete</button>
     </div>
+    ${ui.fillCheck ? fillCheckHtml(ui.fillCheck) : ''}
     <div id="schedroomspanel" class="sgroomspanel" ${ui.roomsOpen ? '' : 'hidden'}>
       ${s.rooms.map((r, i) => `
       <div class="row">
@@ -811,14 +835,26 @@ function renderEditor(box, env) {
     q('schedfill').onclick = async () => {
       env.say('Computing standings…');
       try {
-        const ranks = await env.fill();
-        if (!ranks) { env.say('No game files uploaded yet — nothing to rank', true); return; }
-        let n = 0;
-        edit('Filled playoff slots from standings', (ss) => { n = fillPlaceholders(ss, ranks); });
-        env.say(n + ' playoff slots filled from standings — check the grid, then Save');
+        const report = await env.fill();
+        if (!report) { env.say('No game files uploaded yet — nothing to rank', true); return; }
+        if (report.missing.length || report.extra.length || report.ties.length) {
+          ui.fillCheck = report;
+          env.say('Please look over the notes above the grid before filling.');
+          again();
+          return;
+        }
+        fill(report);
       } catch (e) { env.say(e.message, true); }
     };
   }
+  const fill = (report) => {
+    let n = 0;
+    ui.fillCheck = null;
+    edit('Filled playoff slots from standings', (ss) => { n = fillPlaceholders(ss, report.ranks); });
+    env.say(n + ' playoff slots filled from standings — check the grid, then Save');
+  };
+  if (q('schedfillgo')) q('schedfillgo').onclick = () => fill(ui.fillCheck);
+  if (q('schedfillno')) q('schedfillno').onclick = () => { ui.fillCheck = null; env.say(''); again(); };
   q('schedundo').onclick = () => {
     if (!ui.past.length) return;
     const prev = ui.past.pop();

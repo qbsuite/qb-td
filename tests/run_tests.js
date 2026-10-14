@@ -12,7 +12,7 @@ import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -2689,6 +2689,58 @@ test('poolStandings ranks pool members by overall standings', () => {
     A: ['H', 'A', 'D', 'E'],
     B: ['B', 'G', 'C', 'F'],
   });
+});
+
+test('fillReport: missing prelim files, uploads off the schedule, and ties that decide a bracket', () => {
+  // 23 teams, pools of 8/8/7, brackets of two places per pool
+  const teams = Array.from({ length: 23 }, (_, i) => 'Team ' + (i + 1));
+  const rooms = Array.from({ length: 11 }, (_, i) => ({ name: 'Room ' + (i + 1), bucket: null }));
+  const s = buildSchedule('pools3x2', teams, rooms);
+  // the lower-numbered team always wins, so pools finish in seed order with no ties
+  const side = (name, points) => ({ name, points, bonusPoints: 0, players: [] });
+  const num = (t) => Number(t.split(' ')[1]);
+  const game = (round, a, b, pa, pb) => ({ round, tossupsRead: 20, teams: [side(a, pa), side(b, pb)] });
+  const prelimGames = s.phases[0].rounds.flatMap((r) => r.games.map((g) => {
+    const [w, l] = num(g.a.team) < num(g.b.team) ? [g.a.team, g.b.team] : [g.b.team, g.a.team];
+    return game(r.round, w, l, 400 - num(w), 100);
+  }));
+  const clean = fillReport(s, aggregate(prelimGames));
+  assert.deepEqual([clean.missing, clean.extra, clean.ties], [[], [], []]);
+  const filled = JSON.parse(JSON.stringify(s));
+  assert.equal(fillPlaceholders(filled, clean.ranks), 4 * 23);
+  assert.ok(!hasPlaceholders(filled));
+
+  // one file missing, and the same game uploaded under the wrong round
+  const lost = prelimGames[5];
+  const r = fillReport(s, aggregate([...prelimGames.filter((g) => g !== lost), { ...lost, round: lost.round + 1 }]));
+  assert.equal(r.missing.length, 1);
+  assert.equal(r.missing[0].round, lost.round);
+  assert.deepEqual([r.missing[0].a, r.missing[0].b].sort(), lost.teams.map((t) => t.name).sort());
+  assert.ok(/^Room \d+$/.test(r.missing[0].room));
+  assert.deepEqual(r.extra, [{ round: lost.round + 1, a: lost.teams[0].name, b: lost.teams[1].name }]);
+
+  // upsets: winner beats loser instead (pool A, in finish order: A[0] 7-0, A[1] 6-1, A[2] 5-2, ...)
+  const A = s.pools.A;
+  const upset = (pairs) => prelimGames.map((g) => {
+    const names = g.teams.map((x) => x.name);
+    const hit = pairs.find(([w, l]) => names.includes(w) && names.includes(l));
+    return hit ? game(g.round, hit[0], hit[1], 300, 200) : g;
+  });
+  // A[2] beats A[0]: A[0], A[1], A[2] all 6-1 for places 1-3, across 1st–2nd and 3rd–4th place
+  const agg = aggregate(upset([[A[2], A[0]]]));
+  const tied = fillReport(s, agg);
+  assert.equal(tied.ties.length, 1);
+  const t = tied.ties[0];
+  assert.equal(t.pool, 'A');
+  assert.equal(t.record, '6\u20131');
+  assert.deepEqual(t.teams.map((x) => x.name).sort(), [A[0], A[1], A[2]].sort());
+  assert.deepEqual(t.teams.map((x) => x.bracket), ['1st\u20132nd place', '1st\u20132nd place', '3rd\u20134th place']);
+  // in the order the fill uses: points per 20 tossups heard
+  for (let i = 1; i < t.teams.length; i++) assert.ok(t.teams[i - 1].pp20tuh >= t.teams[i].pp20tuh);
+  assert.deepEqual(tied.ranks.A.slice(0, 3), t.teams.map((x) => x.name));
+  // ties that stay inside one bracket are not notes: A[2] beats A[0] and A[3] beats A[1]
+  // gives A[0], A[2] at 6-1 (both 1st–2nd place) and A[1], A[3] at 5-2 (both 3rd–4th place)
+  assert.deepEqual(fillReport(s, aggregate(upset([[A[2], A[0]], [A[3], A[1]]]))).ties, []);
 });
 
 test('fillPlaceholders replaces placeholders from pool finish order', () => {

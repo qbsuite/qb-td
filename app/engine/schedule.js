@@ -925,6 +925,68 @@ export function poolStandings(pools, rankedNames) {
  * from per-pool finish order ({A: [names best-first]}). Slots whose pool
  * or position is unknown stay placeholders. Returns how many were filled.
  */
+/**
+ * What the TD should know before filling playoff slots. agg is
+ * aggregate()'s result (teams best-first, games). Returns
+ *   ranks   — poolStandings, what fillPlaceholders takes
+ *   missing — prelim games on the schedule with no game file:
+ *             [{round, room, a, b}]
+ *   extra   — prelim-round games uploaded that the schedule doesn't
+ *             have (often the reason one is missing): [{round, a, b}]
+ *   ties    — teams in a pool with the same record whose order sends
+ *             them to different playoff brackets: [{pool, record,
+ *             teams: [{name, pp20tuh, bracket}]}], in finish order
+ */
+export function fillReport(schedule, agg) {
+  const ranks = poolStandings(schedule.pools, agg.teams.map((x) => x.name));
+  const pair = (round, x, y) => round + '\n' + [x, y].sort().join('\n');
+  const prelim = schedule.phases[0] ? schedule.phases[0].rounds : [];
+  const prelimRounds = new Set(prelim.map((r) => r.round));
+  const played = new Set(agg.games.map((g) => pair(g.round, g.teams[0].name, g.teams[1].name)));
+  const scheduled = new Set();
+  const missing = [];
+  for (const r of prelim) {
+    for (const g of r.games) {
+      if (!g.a || !g.a.team || !g.b || !g.b.team) continue;
+      scheduled.add(pair(r.round, g.a.team, g.b.team));
+      if (!played.has(pair(r.round, g.a.team, g.b.team))) {
+        missing.push({ round: r.round, room: schedule.rooms[g.room] ? schedule.rooms[g.room].name : 'Room ' + (g.room + 1), a: g.a.team, b: g.b.team });
+      }
+    }
+  }
+  const extra = agg.games.filter((g) => prelimRounds.has(g.round) && !scheduled.has(pair(g.round, g.teams[0].name, g.teams[1].name)))
+    .map((g) => ({ round: g.round, a: g.teams[0].name, b: g.teams[1].name }));
+  // the bracket each placeholder plays in ("A3" -> "3rd–4th place")
+  const tagged = JSON.parse(JSON.stringify(schedule));
+  const names = new Map(tagBrackets(tagged).map((b) => [b.key + '@' + b.phase, b.name]));
+  const bracketOf = new Map();
+  tagged.phases.forEach((ph, p) => {
+    for (const r of ph.rounds) {
+      for (const g of r.games) {
+        for (const x of [g.a, g.b]) {
+          const lab = x && x.label;
+          if (lab && g.bracket && !bracketOf.has(lab)) bracketOf.set(lab, names.get(g.bracket + '@' + p) || g.bracket);
+        }
+      }
+    }
+  });
+  const row = new Map(agg.teams.map((x) => [x.name, x]));
+  const ties = [];
+  for (const [pool, list] of Object.entries(ranks)) {
+    for (let i = 0; i < list.length;) {
+      const rec = (n) => { const x = row.get(n); return x ? x.w + '–' + x.l + (x.t ? '–' + x.t : '') : null; };
+      let j = i + 1;
+      while (j < list.length && rec(list[j]) !== null && rec(list[j]) === rec(list[i])) j++;
+      if (j - i > 1) {
+        const teams = list.slice(i, j).map((name, k) => ({ name, pp20tuh: row.get(name).pp20tuh, bracket: bracketOf.get(pool + (i + k + 1)) || null }));
+        if (new Set(teams.map((x) => x.bracket)).size > 1) ties.push({ pool, record: rec(list[i]), teams });
+      }
+      i = j;
+    }
+  }
+  return { ranks, missing, extra, ties };
+}
+
 export function fillPlaceholders(schedule, poolRanks) {
   let filled = 0;
   const resolve = (slot) => {
