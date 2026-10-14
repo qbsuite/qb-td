@@ -22,6 +22,7 @@
 // tens and negs are filled in from the per-tossup record.
 
 import { answerTypes, importOrder, overtimeOf, REGULATION_TOSSUPS } from './yft.js';
+import { rosterTracking } from './qbj.js';
 
 // Files say which YF wrote them; YF refuses one from a later minor version.
 const YF3_VERSION = '3.0.2';
@@ -42,7 +43,13 @@ export function buildYft3(opts) {
 
   // Roster: given, else from the matches; either way every team and
   // player the games mention is on it (YF 3 rejects a game otherwise).
-  const roster = (opts.roster || []).map((r) => ({ name: r.name, players: [...r.players] }));
+  const roster = (opts.roster || []).map((r) => ({ ...r, players: [...r.players] }));
+  // UG / D2, as the roster tracks them. YF 3 has no switch for either in
+  // its file: it shows a column once any team or player is marked.
+  const tracked = rosterTracking(opts.roster);
+  const trackUG = rules.trackUG ?? tracked.trackUG;
+  const trackDiv2 = rules.trackDiv2 ?? tracked.trackDiv2;
+  const marked = (r, p) => (r.marks || {})[p] || {};
   const byTeam = new Map(roster.map((r) => [r.name, r]));
   for (const m of matches) for (const t of m.teams) {
     let entry = byTeam.get(t.name);
@@ -70,9 +77,10 @@ export function buildYft3(opts) {
     teamName: r.name,
     smallSchool: false,
     jrVarsity: false,
-    teamUGStatus: false,
-    teamD2Status: false,
-    roster: Object.fromEntries(r.players.map((p) => [p, { year: '', undergrad: false, div2: false }])),
+    teamUGStatus: !!(trackUG && r.ug),
+    teamD2Status: !!(trackDiv2 && r.d2),
+    roster: Object.fromEntries(r.players.map((p) => [p, {
+      year: '', undergrad: !!(trackUG && marked(r, p).ug), div2: !!(trackDiv2 && marked(r, p).d2) }])),
     divisions: {},
     rank: null,
   }));

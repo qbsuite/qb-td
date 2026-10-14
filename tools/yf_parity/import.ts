@@ -54,6 +54,9 @@ if (r.powers || r.negValue !== undefined) {
     .map((v: number) => new AnswerType(v));
 }
 tourn.trackPlayerYear = false; // a new-tournament checkbox; qb-td has no years
+// General -> Team/Player Attributes: Track Undergrad, Track Division 2
+if (cfg.trackUG) tourn.trackUG = true;
+if (cfg.trackDiv2) tourn.trackDiv2 = true;
 
 // --- teams (importQbjTeams)
 const rosterFile = JSON.parse(fs.readFileSync(`${inDir}/roster.qbj`, 'utf8'));

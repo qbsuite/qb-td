@@ -28,6 +28,8 @@
 // code against this output and fails on any difference; run it after
 // every change here.
 
+import { rosterTracking } from './qbj.js';
+
 const YF_VERSION = '4.0.18';
 
 // The stage and its pool, where YF would say "New Stage" / "New Pool".
@@ -213,6 +215,10 @@ const ref = ($ref) => ({ $ref });
  */
 export function buildYft(opts) {
   const settings = opts.settings || {};
+  // UG / D2: tracked as the roster says unless the caller says otherwise
+  const tracked = rosterTracking(opts.roster);
+  const trackUG = settings.trackUG ?? tracked.trackUG;
+  const trackDiv2 = settings.trackDiv2 ?? tracked.trackDiv2;
   if (!opts.matches || !opts.matches.length) throw new Error('No matches to export');
   const matches = importOrder(opts.matches);
 
@@ -228,7 +234,7 @@ export function buildYft(opts) {
     roster = [...byTeam.values()].sort((a, b) => a.name.localeCompare(b.name));
   } else {
     // matches may include teams/players a stale roster lacks — merge them in
-    roster = roster.map((r) => ({ name: r.name, players: [...r.players] }));
+    roster = roster.map((r) => ({ ...r, players: [...r.players] }));
     const byTeam = new Map(roster.map((r) => [r.name, r]));
     for (const m of matches) for (const t of m.teams) {
       let entry = byTeam.get(t.name);
@@ -255,12 +261,13 @@ export function buildYft(opts) {
     let reg = registrations.find((x) => x.name === school);
     if (!reg) registrations.push(reg = { YfData: { isSmallSchool: false }, name: school, teams: [] });
     reg.teams.push({
-      YfData: { letter, isJV: false, isUG: false, isD2: false },
+      YfData: { letter, isJV: false, isUG: !!(trackUG && r.ug), isD2: !!(trackDiv2 && r.d2) },
       name: r.name,
       players: r.players.map((pn) => {
         const id = `Player_${pn}_${playerNo++}`;
         playerIds.set(r.name + '\n' + pn, id);
-        return { YfData: { yearString: '', isUG: false, isD2: false }, name: pn, id };
+        const mk = (r.marks || {})[pn] || {};
+        return { YfData: { yearString: '', isUG: !!(trackUG && mk.ug), isD2: !!(trackDiv2 && mk.d2) }, name: pn, id };
       }),
       ranks: [{ ranking: ref('Ranking_Overall') }],
       id: `Team_${r.name}`, // parseSeedList re-derives ids from names; must match
@@ -341,8 +348,8 @@ export function buildYft(opts) {
       trackPlayerYear: settings.trackPlayerYear ?? false,
       trackSmallSchool: settings.trackSmallSchool ?? false,
       trackJV: settings.trackJV ?? false,
-      trackUG: settings.trackUG ?? false,
-      trackDiv2: settings.trackDiv2 ?? false,
+      trackUG,
+      trackDiv2,
       finalRankingsReady: false,
       usingScheduleTemplate: false,
     },

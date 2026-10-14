@@ -925,6 +925,12 @@ const goLink = (sec, id, text) => (id ? `<a href="#" data-go="${sec}|${esc(id)}"
 // rank or round column (nrkcol) hides on a phone, where the sticky cell
 // carries it instead (span.nrk).
 const rk = (v) => `<span class="nrk">${esc(String(v))}</span>`;
+// A team's or player's Undergraduate / Division II marks, as tags beside
+// the name (Classic gives each a column). reportData sets `ug` / `d2`
+// only for a mark the roster tracks, so an untracked one draws nothing.
+const markTags = (x) => (x.ug ? '<span class="ntag" title="Undergraduate">UG</span>' : '')
+  + (x.d2 ? '<span class="ntag d2" title="Division II">DII</span>' : '');
+const markWords = (x) => [x.ug && 'Undergraduate', x.d2 && 'Division II'].filter(Boolean).join(', ');
 
 function newStandings(rd, ids, vals, pp) {
   const table = (teams, ranked) => `<div class="tablewrap"><table class="nstats">
@@ -934,7 +940,7 @@ function newStandings(rd, ids, vals, pp) {
       <th class="num" title="Tossups heard in regulation">TUH</th><th class="num g0" title="Points per bonus">PPB</th></tr></thead>
     <tbody>${teams.map((tm, i) => `<tr>
       <td class="muted nrkcol">${ranked ? esc(tm.rank) : i + 1}</td>
-      <td class="name nstick">${rk(ranked ? tm.rank : i + 1)}${goLink('teams', ids.team(tm.name), esc(tm.name))}</td>
+      <td class="name nstick">${rk(ranked ? tm.rank : i + 1)}${goLink('teams', ids.team(tm.name), esc(tm.name))}${markTags(tm)}</td>
       <td class="num g0">${tm.w}</td><td class="num">${tm.l}</td>${rd.anyTies ? `<td class="num">${tm.t}</td>` : ''}
       <td class="num g0">${fx(tm.pp, 1)}</td>
       ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${tm.counts[v] || 0}</td>`).join('')}
@@ -1034,7 +1040,7 @@ function newIndividuals(rd, ids, vals, pp) {
       <th class="num g0">Pts</th><th class="num" title="Points per ${rd.regTossups} tossups heard">${pp}</th></tr></thead>
     <tbody>${rd.players.map((p) => `<tr>
       <td class="muted nrkcol">${esc(p.rank)}</td>
-      <td class="name nstick">${rk(p.rank)}${goLink('players', ids.player(p.team, p.name), esc(p.name))}<span class="subteam">${esc(p.team)}</span></td>
+      <td class="name nstick">${rk(p.rank)}${goLink('players', ids.player(p.team, p.name), esc(p.name))}${markTags(p)}<span class="subteam">${esc(p.team)}</span></td>
       <td class="name muted teamcol">${goLink('teams', ids.team(p.team), esc(p.team))}</td>
       <td class="num g0">${p.gp.toFixed(1)}</td>
       ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
@@ -1083,7 +1089,7 @@ function newTeams(rd, ids, vals, pp) {
   const byName = [...rd.teams].sort((a, b) => a.name.toLocaleUpperCase().localeCompare(b.name.toLocaleUpperCase()));
   return byName.map((t) => {
     const players = rd.players.filter((p) => p.team === t.name);
-    return `${secHead(ids.team(t.name), esc(t.name), esc(t.record), t.anchor)}
+    return `${secHead(ids.team(t.name), esc(t.name), [esc(t.record), markWords(t)].filter(Boolean).join(' · '), t.anchor)}
       <div class="tablewrap"><table class="nstats">
         <thead><tr>${logHead}${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
           <th class="num" title="Tossups heard">TUH</th><th class="num g0" title="Bonuses heard">BHrd</th>
@@ -1099,7 +1105,7 @@ function newTeams(rd, ids, vals, pp) {
       ${players.length ? `<div class="tablewrap"><table class="nstats">
         <thead><tr><th class="name nstick">Player</th><th class="num g0" title="Games played">GP</th>${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
           <th class="num" title="Tossups heard">TUH</th><th class="num g0">${pp}</th></tr></thead>
-        <tbody>${players.map((p) => `<tr><td class="name nstick">${goLink('players', ids.player(p.team, p.name), esc(p.name))}</td>
+        <tbody>${players.map((p) => `<tr><td class="name nstick">${goLink('players', ids.player(p.team, p.name), esc(p.name))}${markTags(p)}</td>
           <td class="num g0">${p.gp.toFixed(1)}</td>${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
           <td class="num">${p.tuh}</td><td class="num g0">${fx(p.pp, 2)}</td></tr>`).join('')}</tbody>
       </table></div>` : ''}</div>`;
@@ -1110,7 +1116,8 @@ function newPlayers(rd, ids, vals) {
   const sorted = [...rd.players].sort((a, b) =>
     a.team.toLocaleUpperCase().localeCompare(b.team.toLocaleUpperCase())
     || a.name.toLocaleUpperCase().localeCompare(b.name.toLocaleUpperCase()));
-  return sorted.map((p) => `${secHead(ids.player(p.team, p.name), esc(p.name), goLink('teams', ids.team(p.team), esc(p.team)), p.anchor)}
+  return sorted.map((p) => `${secHead(ids.player(p.team, p.name), esc(p.name),
+    [goLink('teams', ids.team(p.team), esc(p.team)), markWords(p)].filter(Boolean).join(' · '), p.anchor)}
     <div class="tablewrap"><table class="nstats">
       <thead><tr>${logHead}<th class="num g0" title="Games played">GP</th>${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
         <th class="num" title="Tossups heard">TUH</th><th class="num g0">Pts</th></tr></thead>

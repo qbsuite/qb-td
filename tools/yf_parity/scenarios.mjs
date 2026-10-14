@@ -95,6 +95,23 @@ const college = [
       P('Ana Ng', { 15: 3, 10: 1 }), P('Bo Chen', { 10: 2, '-5': 1 }), P('Cy Young', { 10: 1 }), P('Di Wu', {})] }),
 ];
 
+// The college roster with Undergraduate and Division II marks: on whole
+// teams, on single players of an unmarked team, both on one, and a team
+// with none. Run with both tracked, with each alone (the other's marks
+// must then be nowhere: not a column, not a line, not a flag in a file),
+// and with a switch on that nobody is marked for, which YellowFruit shows
+// as an empty column.
+const M = (ug, d2) => ({ ug, d2 });
+const MARKED = [
+  { ...ROSTER[0], marks: { 'Di Wu': M(true, false), 'Eve Holt': M(true, true) } },
+  { ...ROSTER[1], ug: true, d2: true, marks: { 'Fay Lin': M(true, true), 'Gus Park': M(true, false) } },
+  { ...ROSTER[2], ug: true, marks: { "Hal O'Neil": M(true, false), 'Ida Bloom': M(true, false), 'Jo Sato': M(true, true) } },
+  ROSTER[3],
+];
+const markedScenario = (key, name, teams, track) => ({
+  key, name, ruleSet: 'mAcfPowers', roster: buildRosterQbj(name, teams, track), games: college,
+});
+
 // A tournament that does NOT read 20 tossups a game. Every export scales
 // its rate stats by the regulation count and splits overtime on it, and
 // for a long time qb-td simply assumed 20: this event's last two tossups
@@ -144,6 +161,10 @@ const longRounds = [
 ];
 
 export const SCENARIOS = [
+  markedScenario('marks', 'Marked Open', MARKED, { trackUG: true, trackDiv2: true }),
+  markedScenario('marks-ug', 'Undergrad Open', MARKED, { trackUG: true, trackDiv2: false }),
+  markedScenario('marks-d2', 'Division II Open', MARKED, { trackUG: false, trackDiv2: true }),
+  markedScenario('marks-empty', 'Unmarked Open', ROSTER, { trackUG: true, trackDiv2: false }),
   {
     // the committed demo tournament: 10/-5, 13 games over 7 rounds, a
     // triple round robin that is one game short

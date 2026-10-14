@@ -216,6 +216,138 @@ test('buildRosterQbj output satisfies MODAQ parseRegistration', () => {
     ['Alpha/Ann', 'Alpha/Abe', 'Beta/Bob']);
 });
 
+/* ---------- Undergraduate / Division II marks ---------- */
+
+console.log('UG / DII marks');
+
+// Alpha is a UG and DII team; Ann is marked both, Abe UG only; Beta's Bob
+// is DII though Beta itself is unmarked
+const markedTeams = () => {
+  const teams = parseRoster(ROSTER).map((t) => ({ name: t.name, players: [...t.players] }));
+  Object.assign(teams[0], { ug: true, d2: true, marks: { Ann: { ug: true, d2: true }, Abe: { ug: true, d2: false } } });
+  teams[1].marks = { [teams[1].players[0]]: { ug: false, d2: true } };
+  return teams;
+};
+const TRACKS = {
+  neither: { trackUG: false, trackDiv2: false },
+  ug: { trackUG: true, trackDiv2: false },
+  d2: { trackUG: false, trackDiv2: true },
+  both: { trackUG: true, trackDiv2: true },
+};
+const markedRoster = (track) => parseRoster(buildRosterQbj('Open', markedTeams(), track));
+const MARK_MATCHES = () => [parseMatch(M1), parseMatch(M2)];
+const pageOf = (files, name) => files.find((f) => f.name === name).text;
+const hits = (text, re) => (text.match(re) || []).length;
+
+test('marks: with neither switch on, the roster file is the one it always was', () => {
+  const plain = parseRoster(ROSTER).map((t) => ({ name: t.name, players: [...t.players] }));
+  assert.equal(JSON.stringify(buildRosterQbj('Open', markedTeams(), TRACKS.neither)),
+    JSON.stringify(buildRosterQbj('Open', plain)));
+  assert.equal(JSON.stringify(buildRosterQbj('Open', plain)).includes('YfData'), false);
+  const back = markedRoster(TRACKS.neither);
+  assert.deepEqual(back, plain);
+  assert.deepEqual(back.track, TRACKS.neither);
+});
+
+test('marks: a roster round-trips its marks and its switches', () => {
+  const back = markedRoster(TRACKS.both);
+  assert.deepEqual(back.track, TRACKS.both);
+  assert.equal(back[0].ug, true);
+  assert.equal(back[0].d2, true);
+  assert.deepEqual(back[0].marks, { Ann: { ug: true, d2: true }, Abe: { ug: true, d2: false } });
+  assert.equal(back[1].ug, undefined);
+  assert.deepEqual(Object.values(back[1].marks), [{ ug: false, d2: true }]);
+  assert.deepEqual(back[2], parseRoster(ROSTER)[2]); // an unmarked team is {name, players}
+});
+
+test('marks: one switch on keeps that mark and drops the other everywhere', () => {
+  const ug = markedRoster(TRACKS.ug);
+  assert.deepEqual(ug.track, TRACKS.ug);
+  assert.equal(ug[0].ug, true);
+  assert.equal(ug[0].d2, undefined);
+  assert.deepEqual(ug[0].marks, { Ann: { ug: true, d2: false }, Abe: { ug: true, d2: false } });
+  assert.equal(ug[1].marks, undefined); // Bob was DII only
+  assert.equal(JSON.stringify(buildRosterQbj('Open', markedTeams(), TRACKS.ug)).includes('"isD2":true'), false);
+  const d2 = markedRoster(TRACKS.d2);
+  assert.deepEqual(d2[0].marks, { Ann: { ug: false, d2: true } });
+  assert.equal(JSON.stringify(buildRosterQbj('Open', markedTeams(), TRACKS.d2)).includes('"isUG":true'), false);
+});
+
+test('marks: an uploaded roster with marks and no switches tracks what it marks', () => {
+  const qbj = buildRosterQbj('Open', markedTeams(), TRACKS.both);
+  delete qbj.objects[0].YfData;
+  assert.deepEqual(parseRoster(qbj).track, TRACKS.both);
+  const ugOnly = buildRosterQbj('Open', markedTeams(), TRACKS.ug);
+  delete ugOnly.objects[0].YfData;
+  assert.deepEqual(parseRoster(ugOnly).track, TRACKS.ug);
+});
+
+test('marks: a marked roster still satisfies MODAQ parseRegistration', () => {
+  const out = parseRegistration(JSON.stringify(buildRosterQbj('Open', markedTeams(), TRACKS.both)));
+  assert.equal(out.success, true, out.message);
+  assert.deepEqual(out.value.slice(0, 3).map((p) => p.teamName + '/' + p.name), ['Alpha/Ann', 'Alpha/Abe', 'Beta/Bob']);
+});
+
+test('marks: the stat report gains one column per switch, and none with neither', () => {
+  const base = buildReport({ name: 'T', matches: MARK_MATCHES(), roster: parseRoster(ROSTER) });
+  const cols = (track) => {
+    const files = buildReport({ name: 'T', matches: MARK_MATCHES(), roster: markedRoster(track) });
+    return {
+      files,
+      ug: hits(pageOf(files, 'standings.html'), /<abbr title="Undergrad">\nUG\n<\/abbr>/g),
+      d2: hits(pageOf(files, 'standings.html'), /<abbr title="Division 2">\nD2\n<\/abbr>/g),
+      iug: hits(pageOf(files, 'individuals.html'), /<abbr title="Undergrad">\nUG\n<\/abbr>/g),
+      id2: hits(pageOf(files, 'individuals.html'), /<abbr title="Division 2">\nD2\n<\/abbr>/g),
+    };
+  };
+  const neither = cols(TRACKS.neither);
+  assert.deepEqual(neither.files, base); // every page, byte for byte
+  assert.deepEqual([neither.ug, neither.d2, neither.iug, neither.id2], [0, 0, 0, 0]);
+  const ug = cols(TRACKS.ug);
+  assert.deepEqual([ug.ug, ug.d2, ug.iug, ug.id2], [1, 0, 1, 0]);
+  assert.equal(pageOf(ug.files, 'teamdetail.html').includes('Division II'), false);
+  assert.equal(pageOf(ug.files, 'teamdetail.html').includes('font-style: italic">\nUndergraduate\n'), true);
+  const d2 = cols(TRACKS.d2);
+  assert.deepEqual([d2.ug, d2.d2, d2.iug, d2.id2], [0, 1, 0, 1]);
+  assert.equal(pageOf(d2.files, 'teamdetail.html').includes('Undergraduate'), false);
+  assert.equal(pageOf(d2.files, 'playerdetail.html').includes('Undergraduate'), false);
+  const both = cols(TRACKS.both);
+  assert.deepEqual([both.ug, both.d2, both.iug, both.id2], [1, 1, 1, 1]);
+  assert.equal(pageOf(both.files, 'teamdetail.html').includes('Undergraduate, Division II'), true);
+});
+
+test('marks: both .yft files carry exactly the tracked marks', () => {
+  const opts = (roster) => ({ name: 'T', matches: MARK_MATCHES(), roster });
+  const plain4 = serializeYft(opts(parseRoster(ROSTER)));
+  const plain3 = serializeYft3(opts(parseRoster(ROSTER)));
+  assert.equal(serializeYft(opts(markedRoster(TRACKS.neither))), plain4);
+  assert.equal(serializeYft3(opts(markedRoster(TRACKS.neither))), plain3);
+  for (const [key, track] of Object.entries(TRACKS)) {
+    const t = buildYft(opts(markedRoster(track))).objects[0];
+    assert.equal(t.YfData.trackUG, track.trackUG, key);
+    assert.equal(t.YfData.trackDiv2, track.trackDiv2, key);
+    const alpha = t.registrations.flatMap((r) => r.teams).find((x) => x.name === 'Alpha');
+    assert.deepEqual([alpha.YfData.isUG, alpha.YfData.isD2], [track.trackUG, track.trackDiv2], key);
+    const ann = alpha.players.find((p) => p.name === 'Ann');
+    assert.deepEqual([ann.YfData.isUG, ann.YfData.isD2], [track.trackUG, track.trackDiv2], key);
+    const abe = alpha.players.find((p) => p.name === 'Abe');
+    assert.deepEqual([abe.YfData.isUG, abe.YfData.isD2], [track.trackUG, false], key);
+    const y3 = JSON.parse(serializeYft3(opts(markedRoster(track))).split('\n')[4]).find((x) => x.teamName === 'Alpha');
+    assert.deepEqual([y3.teamUGStatus, y3.teamD2Status], [track.trackUG, track.trackDiv2], key);
+    assert.deepEqual(y3.roster.Abe, { year: '', undergrad: track.trackUG, div2: false }, key);
+  }
+});
+
+test('marks: aggregate hands the marks to the rows it shows them on', () => {
+  const agg = aggregate(MARK_MATCHES(), markedRoster(TRACKS.both));
+  const alpha = agg.teams.find((t) => t.name === 'Alpha');
+  assert.deepEqual([alpha.ug, alpha.d2], [true, true]);
+  const abe = agg.players.find((p) => p.name === 'Abe');
+  assert.deepEqual([abe.ug, abe.d2], [true, undefined]);
+  const plain = aggregate(MARK_MATCHES(), markedRoster(TRACKS.neither));
+  assert.deepEqual(plain, aggregate(MARK_MATCHES(), parseRoster(ROSTER)));
+});
+
 /* ---------- stats ---------- */
 
 console.log('stats');

@@ -390,6 +390,67 @@ await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'team re
 await click('#rostersave');
 roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).length === 12 && r; }, 'roster back to 12');
 ok('4 roster: back to the twelve teams', JSON.stringify(parseRoster(roster).map((t) => t.name)) === JSON.stringify(TEAMS));
+// Undergraduate / Division II marks: nothing without a switch, one kind of
+// box per switch, and with both switched back off the roster as it was
+{
+  const plain = JSON.stringify(roster);
+  const count = (sel) => js(`document.querySelectorAll(${q(sel)}).length`);
+  const reopen = async () => {
+    await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+    await click('#editroster');
+    await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor again');
+  };
+  await reopen();
+  ok('4 marks: no UG or DII boxes until a switch is on',
+    await count('[data-tmark]') === 0 && await count('[data-pmark]') === 0
+      && !(await js(`document.querySelector('#trackug').checked || document.querySelector('#trackd2').checked`)));
+  await click('#trackug');
+  await waitJs(`document.querySelectorAll('[data-tmark]').length === 12`, 'UG boxes');
+  ok('4 marks: Track Undergrad adds a UG box per team and player, and no DII box',
+    await count('[data-tmark$=".ug"]') === 12 && await count('[data-tmark$=".d2"]') === 0
+      && await count('[data-pmark$=".ug"]') === await count('[data-pname]') && await count('[data-pmark$=".d2"]') === 0);
+  await click('[data-tmark="0.ug"]');
+  await click('[data-pmark="0.0.ug"]');
+  await click('[data-pmark="1.0.ug"]');
+  await click('#rostersave');
+  roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).track.trackUG && r; }, 'UG roster saved');
+  {
+    const teams = parseRoster(roster);
+    ok('4 marks: the saved roster tracks UG only and holds the three marks',
+      !teams.track.trackDiv2 && teams[0].ug === true && teams[0].d2 === undefined
+        && JSON.stringify(teams[0].marks) === JSON.stringify({ [teams[0].players[0]]: { ug: true, d2: false } })
+        && teams[1].ug === undefined && Object.keys(teams[1].marks).length === 1 && teams[2].marks === undefined
+        && !JSON.stringify(roster).includes('"isD2":true') && modaqValid(roster), JSON.stringify(roster).slice(0, 300));
+  }
+  await reopen();
+  ok('4 marks: the editor reopens with the switch and the boxes as saved',
+    await js(`document.querySelector('#trackug').checked && !document.querySelector('#trackd2').checked
+      && document.querySelector('[data-tmark="0.ug"]').checked && document.querySelector('[data-pmark="0.0.ug"]').checked
+      && !document.querySelector('[data-tmark="1.ug"]').checked && document.querySelector('[data-pmark="1.0.ug"]').checked`));
+  await click('#trackd2');
+  await waitJs(`document.querySelectorAll('[data-tmark$=".d2"]').length === 12`, 'DII boxes');
+  await click('[data-tmark="1.d2"]');
+  await click('[data-pmark="0.0.d2"]');
+  await click('#rostersave');
+  roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).track.trackDiv2 && r; }, 'UG + DII roster saved');
+  {
+    const teams = parseRoster(roster);
+    ok('4 marks: with both switches on the roster holds both kinds of mark',
+      teams.track.trackUG && teams[0].ug === true && teams[1].d2 === true && teams[1].ug === undefined
+        && JSON.stringify(teams[0].marks) === JSON.stringify({ [teams[0].players[0]]: { ug: true, d2: true } })
+        && modaqValid(roster), JSON.stringify(roster).slice(0, 300));
+  }
+  await reopen();
+  await click('#trackug');
+  await waitJs(`document.querySelectorAll('[data-tmark$=".ug"]').length === 0`, 'UG boxes gone');
+  await click('#trackd2');
+  await waitJs(`document.querySelectorAll('[data-tmark]').length === 0`, 'every box gone');
+  await click('#rostersave');
+  roster = await until(async () => { const r = await storedRoster(); return r && !parseRoster(r).track.trackUG && !parseRoster(r).track.trackDiv2 && r; }, 'plain roster saved');
+  ok('4 marks: with both switches off the saved roster is the one from before', JSON.stringify(roster) === plain,
+    JSON.stringify(roster).slice(0, 200));
+  await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+}
 // the hidden debug roster: absent without ?debug, loads a preset with it
 ok('4 roster: no test-roster loader without ?debug', !(await js(`!!document.querySelector('#dbgroster')`)));
 await goto(`${PAGES}/index.html?a=${secret}&debug`);

@@ -132,6 +132,15 @@ table.box th:first-child {
      otherwise stack the digits of "round 10" when a flex row squeezes */
   white-space: nowrap;
 }
+/* an Undergraduate / Division II mark beside a team's or player's name:
+   a small filled tag, a colour of its own for each (neither the links' blue) so the two
+   read apart down a column of names */
+.ntag {
+  display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; line-height: 1.45;
+  letter-spacing: 0.02em; border-radius: 5px; padding: 0 6px; vertical-align: 1px; white-space: nowrap;
+  color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, var(--bg));
+}
+.ntag.d2 { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, var(--bg)); }
 .pill.on { color: var(--ok); border-color: var(--ok); }
 .pill.warn { color: var(--bad); border-color: var(--bad); }
 .pill.link { cursor: pointer; }
@@ -369,7 +378,13 @@ details.qd summary .pill { font-size: 11px; margin-left: 6px; }
 .step:hover { background: var(--hover-bg); }
 /* roster editor */
 .playerline { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
-.playerline input { flex: 1; min-width: 160px; }
+.playerline input:not([type="checkbox"]) { flex: 1; min-width: 160px; }
+/* Roster: the Track switches, and a UG / DII box per team and player */
+.rtrack { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 10px; font-size: 14px; }
+.rmark { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.rmark input, .rtrack input { margin: 0; padding: 0; width: 15px; height: 15px; accent-color: var(--link); }
+.rtrack label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.rmarks { display: inline-flex; gap: 12px; align-items: center; }
 .xbtn {
   border: none; color: var(--muted); background: none; cursor: pointer;
   font-size: 15px; padding: 2px 6px; border-radius: 6px;

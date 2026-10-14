@@ -37,7 +37,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
-import { parseMatch, parseRoster } from '../app/engine/qbj.js';
+import { parseMatch, parseRoster, rosterTracking } from '../app/engine/qbj.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { serializeYft, PHASE_NAME, POOL_NAME } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
@@ -129,6 +129,8 @@ function runScenario(sc, importer, opener, importer3) {
   for (const g of sc.games) fs.writeFileSync(path.join(dir, 'in', 'games', g.filename), JSON.stringify(g.qbj));
   fs.writeFileSync(path.join(dir, 'in', 'config.json'), JSON.stringify({
     name: sc.name, yfVersion: YF_VERSION, ruleSet: sc.ruleSet, rules,
+    // the Track Undergrad / Track Division 2 boxes, ticked as the roster says
+    ...rosterTracking(roster),
     rounds: Math.max(...matches.map((m) => m.round)),
     phaseName: PHASE_NAME, poolName: POOL_NAME,
     // imported round by round, as buildYft orders them

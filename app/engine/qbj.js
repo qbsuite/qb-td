@@ -160,19 +160,43 @@ export function parseRosterLines(text) {
  * registration per team — the shape MODAQ's parseQbjRegistration reads
  * (each team needs >= 1 player), YellowFruit imports, and parseRoster
  * round-trips.
+ *
+ * Undergraduate and Division II marks ride in YellowFruit's own fields: a
+ * team's {ug, d2} and its players' (`marks`, by player name) as
+ * YfData.isUG / isD2, and which of the two the tournament tracks as the
+ * Tournament's YfData.trackUG / trackDiv2. A mark the tournament does not
+ * track is not written, so a roster that tracks neither is the file it
+ * always was.
  */
-export function buildRosterQbj(tournamentName, teams) {
+export function buildRosterQbj(tournamentName, teams, track = rosterTracking(teams)) {
+  const mark = (m) => {
+    const ug = !!(track.trackUG && m && m.ug);
+    const d2 = !!(track.trackDiv2 && m && m.d2);
+    return ug || d2 ? { YfData: { isUG: ug, isD2: d2 } } : {};
+  };
   return {
     version: '2.1.1',
     objects: [{
       type: 'Tournament',
       name: tournamentName || 'Tournament',
+      ...(track.trackUG || track.trackDiv2 ? { YfData: { trackUG: !!track.trackUG, trackDiv2: !!track.trackDiv2 } } : {}),
       registrations: teams.map((t) => ({
         name: t.name,
-        teams: [{ name: t.name, players: t.players.map((p) => ({ name: p })) }],
+        teams: [{ name: t.name, ...mark(t),
+          players: t.players.map((p) => ({ name: p, ...mark((t.marks || {})[p]) })) }],
       })),
     }],
   };
+}
+
+/** Which marks a roster tracks, {trackUG, trackDiv2}: what parseRoster
+    read from its file (`roster.track`), else whatever any team or player
+    on it is marked with — the rule YellowFruit applies to a file that
+    predates the switches. No roster tracks nothing. */
+export function rosterTracking(teams) {
+  if (teams && teams.track) return { trackUG: !!teams.track.trackUG, trackDiv2: !!teams.track.trackDiv2 };
+  const any = (k) => (teams || []).some((tm) => tm[k] || Object.values(tm.marks || {}).some((m) => m[k]));
+  return { trackUG: any('ug'), trackDiv2: any('d2') };
 }
 
 /**
@@ -180,6 +204,14 @@ export function buildRosterQbj(tournamentName, teams) {
  * per team. Accepts: a whole file ({objects: [...]} with a Tournament and/or
  * Registration objects), a bare {registrations: [...]} object, or a bare
  * array of registrations/teams. A Registration's teams each become one entry.
+ *
+ * A marked entry also carries its marks — `ug` / `d2` (true) for the team
+ * and `marks`, {player name: {ug, d2}}, for its marked players — and the
+ * returned array a `track` property, {trackUG, trackDiv2} (see
+ * rosterTracking; not enumerable, so a roster still compares and
+ * serializes as its teams). A mark the roster does not track is dropped
+ * here, so nothing downstream can show it, and an entry with no marks is
+ * {name, players} and nothing else.
  */
 export function parseRoster(json) {
   const regs = [];
@@ -190,7 +222,14 @@ export function parseRoster(json) {
     if (Array.isArray(teams)) {
       for (const t of teams) collect(t);
     } else if (Array.isArray(players) && asName(obj)) {
-      regs.push({ name: asName(obj), players: players.map(asName).filter(Boolean) });
+      const yf = (o) => (o && typeof o === 'object' && pick(o, 'YfData', 'yf_data')) || {};
+      const marks = {};
+      for (const p of players) {
+        const y = yf(p);
+        if (asName(p) && (y.isUG || y.isD2)) marks[asName(p)] = { ug: !!y.isUG, d2: !!y.isD2 };
+      }
+      regs.push({ name: asName(obj), players: players.map(asName).filter(Boolean),
+        ug: !!yf(obj).isUG, d2: !!yf(obj).isD2, marks });
     }
   };
 
@@ -217,5 +256,25 @@ export function parseRoster(json) {
     out.push(r);
   }
   if (!out.length) throw new Error('No teams found in roster file');
+
+  // the switches as the file sets them (a Tournament's YfData), else as
+  // its marks imply
+  const holder = json && Array.isArray(json.objects) && json.objects.find((o) => {
+    const y = o && typeof o === 'object' && pick(o, 'YfData', 'yf_data');
+    return y && (y.trackUG !== undefined || y.trackDiv2 !== undefined);
+  });
+  const y = holder && pick(holder, 'YfData', 'yf_data');
+  const track = y ? { trackUG: !!y.trackUG, trackDiv2: !!y.trackDiv2 } : rosterTracking(out);
+  for (const r of out) {
+    if (!(r.ug && track.trackUG)) delete r.ug;
+    if (!(r.d2 && track.trackDiv2)) delete r.d2;
+    for (const [pn, m] of Object.entries(r.marks)) {
+      m.ug = m.ug && track.trackUG;
+      m.d2 = m.d2 && track.trackDiv2;
+      if (!m.ug && !m.d2) delete r.marks[pn];
+    }
+    if (!Object.keys(r.marks).length) delete r.marks;
+  }
+  Object.defineProperty(out, 'track', { value: track });
   return out;
 }

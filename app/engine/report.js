@@ -3,8 +3,9 @@
 // gets the standard six-page report without round-tripping through
 // YellowFruit. Page set, layout, CSS, link scheme, and stat formulas are
 // ported from YellowFruit 4.0.18 (HTMLReports.ts / StatSummaries.ts),
-// reduced to qb-td's model: one phase, no pools/finals, no SS/JV/UG/D2
-// tracking, no lightning rounds, bouncebacks folded into bonus points.
+// reduced to qb-td's model: one phase, no pools/finals, no small-school,
+// JV or year tracking, no lightning rounds, bouncebacks folded into bonus
+// points. Undergraduate and Division II marks are YF's, column for column.
 //
 // buildReport({name, matches, roster, prefix}) -> [{name, text}] — the six
 // files (standings/individuals/games/teamdetail/playerdetail/rounds .html),
@@ -14,6 +15,7 @@
 // database expects to be handed; the bare names are YF's in-app preview.
 
 import { aggregate } from './stats.js';
+import { rosterTracking } from './qbj.js';
 import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME,
   REGULATION_TOSSUPS } from './yft.js';
 
@@ -303,13 +305,29 @@ function reportModel({ name, matches, roster, prefix, settings }) {
   });
   const playerRanks = rankPlayers(players);
 
+  // UG / D2 marks, from the roster; a team or player it lacks has none.
+  // Each is its own switch, as in YF: a column, and the lines under a
+  // marked team's or player's name, only for a mark the roster tracks.
+  const tracked = rosterTracking(roster);
+  const trackUG = !!(rules.trackUG ?? tracked.trackUG);
+  const trackDiv2 = !!(rules.trackDiv2 ?? tracked.trackDiv2);
+  const byTeamName = new Map((roster || []).map((r) => [r.name, r]));
+  for (const t of teams) {
+    const r = byTeamName.get(t.name) || {};
+    t.ug = trackUG && !!r.ug; t.d2 = trackDiv2 && !!r.d2;
+  }
+  for (const p of players) {
+    const mk = ((byTeamName.get(p.team) || {}).marks || {})[p.name] || {};
+    p.ug = trackUG && !!mk.ug; p.d2 = trackDiv2 && !!mk.d2;
+  }
+
   const rounds = [...new Set(agg.games.map((g) => g.round))].sort((x, y) => x - y);
   const hasPowers = vals.some((v) => v > 10);
   const hasNegs = vals.some((v) => v < 0);
 
   return {
     name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks,
-    games, rounds, perTeam, hasPowers, hasNegs, regTossups,
+    games, rounds, perTeam, hasPowers, hasNegs, regTossups, trackUG, trackDiv2,
   };
 }
 
@@ -330,6 +348,8 @@ function standingsHtml(m) {
   const rows = [trTag([
     th('Rank', false, '3%'),
     tdTag({ bold: true, width: '25%' }, 'Team'),
+    ...(m.trackUG ? [th(abbr('UG', 'Undergrad'), false, '3%')] : []),
+    ...(m.trackDiv2 ? [th(abbr('D2', 'Division 2'), false, '3%')] : []),
     th('W', true, '4%'),
     th('L', true, '3%'),
     ...(m.anyTies ? [th('T', true, '3%')] : []),
@@ -343,6 +363,8 @@ function standingsHtml(m) {
     rows.push(trTag([
       tdTag({}, m.teamRanks[i]),
       textCell(teamLink(m, t.name)),
+      ...(m.trackUG ? [tdTag({}, t.ug ? 'UG' : '')] : []),
+      ...(m.trackDiv2 ? [tdTag({}, t.d2 ? 'D2' : '')] : []),
       numCell(String(t.w)),
       numCell(String(t.l)),
       ...(m.anyTies ? [numCell(String(t.t))] : []),
@@ -366,6 +388,8 @@ function individualsHtml(m) {
   const rows = [trTag([
     tdTag({ bold: true }, 'Rank'),
     th('Player'),
+    ...(m.trackUG ? [th(abbr('UG', 'Undergrad'))] : []),
+    ...(m.trackDiv2 ? [th(abbr('D2', 'Division 2'))] : []),
     th('Team'),
     th(abbr('GP', 'Games played'), true),
     ...valHeaders(m.vals),
@@ -376,6 +400,8 @@ function individualsHtml(m) {
     rows.push(trTag([
       tdTag({}, m.playerRanks[i]),
       textCell(playerLink(m, p.team, p.name)),
+      ...(m.trackUG ? [tdTag({}, p.ug ? 'UG' : '')] : []),
+      ...(m.trackDiv2 ? [tdTag({}, p.d2 ? 'D2' : '')] : []),
       textCell(teamLink(m, p.team)),
       numCell(p.gp.toFixed(1)),
       ...valCells(p.counts, m.vals),
@@ -509,11 +535,25 @@ function teamDetailMatchTable(m, t) {
   return tableTag(rows, { width: '100%' });
 }
 
+// A marked team's or player's heading: YF writes what it is marked as on
+// an italic line under the name, and closes the heading up to it. `x` is a
+// model team or player, its marks already limited to the tracked ones.
+function detailHeading(id, title, x) {
+  const attrs = [x.ug && 'Undergraduate', x.d2 && 'Division II'].filter(Boolean).join(', ');
+  if (!attrs) return [tagWithAttrs('h2', [`id=${id}`], title)];
+  return [
+    tagWithAttrs('h2', [`id=${id}`, 'style="margin-bottom:0"'], title),
+    tagWithAttrs('div', ['style="margin-bottom:15px; font-style: italic"'], attrs),
+  ];
+}
+
 function teamDetailPlayerTable(m, t) {
   const onTeam = m.players.filter((p) => p.team === t.name);
   if (!onTeam.length) return '';
   const rows = [trTag([
     th('Player'),
+    ...(m.trackUG ? [th(abbr('UG', 'Undergrad'))] : []),
+    ...(m.trackDiv2 ? [th(abbr('D2', 'Division 2'))] : []),
     th(abbr('GP', 'Games played'), true),
     ...valHeaders(m.vals),
     th(abbr('TUH', 'Tossups heard'), true, '10%'),
@@ -522,6 +562,8 @@ function teamDetailPlayerTable(m, t) {
   for (const p of onTeam) {
     rows.push(trTag([
       textCell(playerLink(m, p.team, p.name)),
+      ...(m.trackUG ? [textCell(p.ug ? 'UG' : '')] : []),
+      ...(m.trackDiv2 ? [textCell(p.d2 ? 'D2' : '')] : []),
       numCell(p.gp.toFixed(1)),
       ...valCells(p.counts, m.vals),
       numCell(String(p.tuh)),
@@ -537,7 +579,7 @@ function teamDetailHtml(m) {
     return an < bn ? -1 : an > bn ? 1 : 0;
   });
   return byName.map((t) => [
-    tagWithAttrs('h2', [`id=${alphaOnly(t.name)}`], esc(t.name)),
+    ...detailHeading(alphaOnly(t.name), esc(t.name), t),
     teamDetailMatchTable(m, t),
     '<br />',
     teamDetailPlayerTable(m, t),
@@ -591,7 +633,7 @@ function playerDetailHtml(m) {
     return an < bn ? -1 : an > bn ? 1 : 0;
   });
   return sorted.map((p) => [
-    tagWithAttrs('h2', [`id=${alphaOnly(p.team)}-${alphaOnly(p.name)}`], `${esc(p.name)}, ${esc(p.team)}`),
+    ...detailHeading(`${alphaOnly(p.team)}-${alphaOnly(p.name)}`, `${esc(p.name)}, ${esc(p.team)}`, p),
     playerDetailTable(m, p),
   ].join('\n')).join('\n');
 }
@@ -687,11 +729,12 @@ export function reportData(opts) {
   });
   return {
     name: m.name, vals: m.vals, regTossups: m.regTossups, anyTies: m.anyTies,
+    trackUG: m.trackUG, trackDiv2: m.trackDiv2,
     hasPowers: m.hasPowers, hasNegs: m.hasNegs,
     teams: m.teams.map((t, i) => {
       const pct = winPct(t);
       return {
-        name: t.name, anchor: `teamdetail-${alphaOnly(t.name)}`,
+        name: t.name, anchor: `teamdetail-${alphaOnly(t.name)}`, ug: t.ug, d2: t.d2,
         rank: m.teamRanks[i], w: t.w, l: t.l, t: t.t, record: record(t),
         pct: Number.isNaN(pct) ? null : pct, pp: t.regTuh ? pptuh(t) * m.regTossups : null,
         counts: t.counts, regTuh: t.regTuh, tuh: t.tuh,
@@ -704,7 +747,7 @@ export function reportData(opts) {
       };
     }),
     players: m.players.map((p, i) => ({
-      name: p.name, team: p.team, anchor: `playerdetail-${alphaOnly(p.team)}-${alphaOnly(p.name)}`,
+      name: p.name, team: p.team, anchor: `playerdetail-${alphaOnly(p.team)}-${alphaOnly(p.name)}`, ug: p.ug, d2: p.d2,
       rank: m.playerRanks[i], gp: p.gp, counts: p.counts,
       tuh: p.tuh, points: p.points, pp: regPer(p.points, p.tuh),
       games: p.games.map((x) => ({

@@ -28,10 +28,11 @@ const teams: any[] = [];
 for (const reg of tournament.registrations) {
   for (const team of reg.teams) {
     const roster: any = {};
-    for (const p of team.players) roster[p.name.trim()] = { year: '', undergrad: false, div2: false };
+    // AddTeamModal's UG and D2 boxes, ticked as the roster marks them
+    for (const p of team.players) roster[p.name.trim()] = { year: '', undergrad: !!p.YfData?.isUG, div2: !!p.YfData?.isD2 };
     teams.push({
       teamName: team.name.trim(), smallSchool: false, jrVarsity: false,
-      teamUGStatus: false, teamD2Status: false, roster, divisions: {}, rank: null,
+      teamUGStatus: !!team.YfData?.isUG, teamD2Status: !!team.YfData?.isD2, roster, divisions: {}, rank: null,
     });
   }
 }

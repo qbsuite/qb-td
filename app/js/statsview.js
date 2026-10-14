@@ -52,6 +52,11 @@ function gameRow(g, vals) {
   </details>`;
 }
 
+// Undergraduate / Division II marks beside a name; aggregate() sets them
+// only on a row the roster marks
+const markTags = (x) => (x.ug ? '<span class="ntag" title="Undergraduate">UG</span>' : '')
+  + (x.d2 ? '<span class="ntag d2" title="Division II">DII</span>' : '');
+
 export function renderStats(out, agg, errors = [], opts = {}) {
   const site = opts.site ? (row) => `<td class="name muted">${esc(row.site || '')}</td>` : () => '';
   const siteHead = opts.site ? '<th class="name">site</th>' : '';
@@ -70,7 +75,7 @@ export function renderStats(out, agg, errors = [], opts = {}) {
         <th class="num sep">TUH</th><th class="num sep">PPB</th></tr>
       ${agg.teams.map((tm, i) => `<tr>
         <td class="num">${i + 1}</td>
-        <td class="name">${esc(tm.name)}${tm.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
+        <td class="name">${esc(tm.name)}${markTags(tm)}${tm.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
         ${site(tm)}
         <td class="num sep">${tm.w}</td><td class="num">${tm.l}</td>${ties ? `<td class="num">${tm.t}</td>` : ''}
         <td class="num sep">${tm.pp20tuh}</td>
@@ -87,7 +92,7 @@ export function renderStats(out, agg, errors = [], opts = {}) {
         <th class="num sep">PP20TUH</th></tr>
       ${agg.players.map((p, i) => `<tr>
         <td class="num">${i + 1}</td>
-        <td class="name">${esc(p.name)}${p.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
+        <td class="name">${esc(p.name)}${markTags(p)}${p.rostered ? '' : ' <span class="bad" title="not in roster">?</span>'}</td>
         <td class="name">${esc(p.team)}</td>
         ${site(p)}
         <td class="num sep">${p.gp}</td>

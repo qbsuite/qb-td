@@ -1,3 +1,17 @@
+Release Notes for 10/13/2026
+
+[ SETUP ]
+- Added Track Undergrad and Track Division II switches to the roster editor.
+- With a switch on, each team and each player gets a UG or DII box. With both off, the roster is unchanged.
+- An uploaded roster keeps the UG and Division II marks it carries, and its preview counts them.
+
+[ STATS ]
+- Classic layout: UG and D2 columns and lines for marked teams and players, as YellowFruit shows them.
+- New layout and the hub's stats: a UG or DII tag beside a marked team or player.
+
+[ EXPORTS ]
+- The YellowFruit 4 and YellowFruit 3 files and the stat report carry the UG and Division II marks.
+
 Release Notes for 10/12/2026
 
 [ SETUP ]

@@ -29,8 +29,8 @@ export function dedupeMatches(matches) {
 /**
  * @param matches parsed matches; each may carry extra metadata (e.g.
  *   `room`, `fileId`) which is passed through to the per-round game list.
- * @param roster optional [{name, players}] — seeds team/player order and
- *   flags unrostered names.
+ * @param roster optional [{name, players}] — seeds team/player order,
+ *   flags unrostered names, and hands its UG / D2 marks to the rows.
  * @returns {values, teams, players, games, errors}
  */
 export function aggregate(matches, roster = null) {
@@ -64,8 +64,18 @@ export function aggregate(matches, roster = null) {
 
   if (roster) {
     for (const r of roster) {
-      teamRow(r.name).rostered = true;
-      for (const pn of r.players) playerRow(r.name, pn).rostered = true;
+      const tr = teamRow(r.name);
+      tr.rostered = true;
+      // Undergraduate / Division II marks, only on a row that has one
+      if (r.ug) tr.ug = true;
+      if (r.d2) tr.d2 = true;
+      for (const pn of r.players) {
+        const pr = playerRow(r.name, pn);
+        pr.rostered = true;
+        const mk = (r.marks || {})[pn] || {};
+        if (mk.ug) pr.ug = true;
+        if (mk.d2) pr.d2 = true;
+      }
     }
   }
 

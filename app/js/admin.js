@@ -16,7 +16,7 @@
 // until setup is complete.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
-import { parseMatch, parseRoster, matchPayload, buildRosterQbj } from '../engine/qbj.js';
+import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
@@ -269,7 +269,14 @@ const staged = [];      // packets staged from a zip or loose files (packetsui.j
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
 
 let rosterOpen = false;
-let rosterTeams = null; // structured editor working copy [{name, players, was}]; was: the saved name
+// structured editor working copy [{name, players, was, ug, d2, flags}];
+// was: the saved name; ug / d2: the team's marks; flags: {ug, d2} per
+// player, in step with players
+let rosterTeams = null;
+// which marks the roster tracks (YellowFruit's Track Undergrad / Track
+// Division 2). A mark is shown, saved and exported only while its switch
+// is on; with both off the roster is the file it always was.
+let rosterTrack = { trackUG: false, trackDiv2: false };
 let rosterUpload = null; // parsed upload awaiting confirmation
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
@@ -871,8 +878,39 @@ function rosterProblems() {
   return problems;
 }
 function cleanRosterTeams() {
-  return rosterTeams.map((tm) => ({ name: tm.name.trim(),
-    players: tm.players.map((p) => p.trim()).filter(Boolean) }));
+  return rosterTeams.map((tm) => {
+    const out = { name: tm.name.trim(), players: [] };
+    const marks = {};
+    tm.players.forEach((p, pi) => {
+      const pn = p.trim();
+      if (!pn) return;
+      out.players.push(pn);
+      const f = tm.flags[pi] || {};
+      const ug = rosterTrack.trackUG && !!f.ug;
+      const d2 = rosterTrack.trackDiv2 && !!f.d2;
+      if (ug || d2) marks[pn] = { ug, d2 };
+    });
+    if (rosterTrack.trackUG && tm.ug) out.ug = true;
+    if (rosterTrack.trackDiv2 && tm.d2) out.d2 = true;
+    if (Object.keys(marks).length) out.marks = marks;
+    return out;
+  });
+}
+const blankRosterTeam = () => ({ name: '', players: ['', '', '', ''], ug: false, d2: false, flags: [{}, {}, {}, {}] });
+// parseRoster's teams as the editor holds them, and the switches they set
+function editRoster(parsed) {
+  rosterTrack = rosterTracking(parsed);
+  return parsed.map((tm) => ({
+    name: tm.name, players: [...tm.players], was: tm.name, ug: !!tm.ug, d2: !!tm.d2,
+    flags: tm.players.map((p) => ({ ...((tm.marks || {})[p] || {}) })),
+  }));
+}
+// how many teams and players an uploaded roster marks, for its preview
+function markCounts(teams) {
+  const track = rosterTracking(teams);
+  const count = (k) => teams.filter((tm) => tm[k]).length
+    + teams.reduce((n, tm) => n + Object.values(tm.marks || {}).filter((m) => m[k]).length, 0);
+  return [track.trackUG && `${count('ug')} UG`, track.trackDiv2 && `${count('d2')} DII`].filter(Boolean);
 }
 
 // Hidden debug aid: with ?debug in the hub's URL the Roster step offers a
@@ -956,11 +994,13 @@ function renderRosterSec(a, t) {
     if (rosterOpen && rosterTeams === null) {
       if (t.roster_r2_key) {
         try {
-          rosterTeams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key))
-            .map((tm) => ({ name: tm.name, players: [...tm.players], was: tm.name }));
+          rosterTeams = editRoster(parseRoster(await fetchOwnedJson(a, t.roster_r2_key)));
         } catch (e) { /* unparseable upload: start blank */ }
       }
-      if (rosterTeams === null) rosterTeams = [{ name: '', players: ['', '', '', ''] }];
+      if (rosterTeams === null) {
+        rosterTrack = { trackUG: false, trackDiv2: false };
+        rosterTeams = [blankRosterTeam()];
+      }
     }
     renderRosterEditor(a, t);
   };
@@ -996,7 +1036,8 @@ function renderUpPreview(a) {
       <div class="row">
         <b>${esc(u.filename)}</b>
         <span class="pill">${u.teams.length} teams &middot; ${
-          u.teams.reduce((n, tm) => n + tm.players.length, 0)} players</span>
+          u.teams.reduce((n, tm) => n + tm.players.length, 0)} players${
+          markCounts(u.teams).map((x) => ' &middot; ' + x).join('')}</span>
         <span class="spacer" style="flex:1"></span>
         <button id="upconfirm" class="primary">Save as tournament roster</button>
         <button id="upcancel">Cancel</button>
@@ -1015,7 +1056,7 @@ function renderUpPreview(a) {
       // uploaded: MODAQ reads only a versioned tournament with a name, and
       // a file qb-td can parse may be neither. Names are all either keeps.
       await pub(`${a}/roster?name=${encodeURIComponent(u.filename)}`,
-        { method: 'POST', body: JSON.stringify(buildRosterQbj(lastDetail.tournament.name, u.teams)) });
+        { method: 'POST', body: JSON.stringify(buildRosterQbj(lastDetail.tournament.name, u.teams, rosterTracking(u.teams))) });
       rosterUpload = null;
       rosterTeams = null;   // editor reloads from the new roster
       schedFetched = false; // schedule editor re-reads the team list
@@ -1035,7 +1076,18 @@ function renderRosterEditor(a, t) {
   if (!rosterOpen || rosterTeams === null) { box.innerHTML = ''; return; }
   const nPlayers = rosterTeams.reduce((n, tm) => n + tm.players.filter((p) => p.trim()).length, 0);
   const problems = rosterProblems();
+  // a UG and a DII box for a team (data-tmark) or a player (data-pmark),
+  // each only while the roster tracks that mark
+  const markBoxes = (attr, at, m) => {
+    const one = (k, label, on) => `<label class="rmark"><input type="checkbox" ${attr}="${at}.${k}" ${on ? 'checked' : ''}>${label}</label>`;
+    const boxes = (rosterTrack.trackUG ? one('ug', 'UG', m.ug) : '') + (rosterTrack.trackDiv2 ? one('d2', 'DII', m.d2) : '');
+    return boxes ? `<span class="rmarks">${boxes}</span>` : '';
+  };
   box.innerHTML = `
+    <div class="rtrack">
+      <label><input type="checkbox" id="trackug" ${rosterTrack.trackUG ? 'checked' : ''}>Track Undergrad</label>
+      <label><input type="checkbox" id="trackd2" ${rosterTrack.trackDiv2 ? 'checked' : ''}>Track Division II</label>
+    </div>
     ${rosterTeams.map((tm, ti) => `
     <div class="card">
       <div class="row">
@@ -1048,12 +1100,14 @@ function renderRosterEditor(a, t) {
         <span class="pill" title="Roster order is seed order">Seed ${ti + 1}</span>
         <input data-tname="${ti}" value="${esc(tm.name)}" placeholder="Team name" size="24">
         <span class="muted" data-tcount="${ti}">${tm.players.filter((p) => p.trim()).length} players</span>
+        ${markBoxes('data-tmark', ti, tm)}
         <span class="spacer" style="flex:1"></span>
         <button class="small" data-delteam="${ti}" tabindex="-1">Remove team</button>
       </div>
       ${tm.players.map((p, pi) => `
       <div class="playerline">
         <input data-pname="${ti}.${pi}" value="${esc(p)}" placeholder="Player name">
+        ${markBoxes('data-pmark', `${ti}.${pi}`, tm.flags[pi] || {})}
         <button class="xbtn" data-delplayer="${ti}.${pi}" title="Remove player" tabindex="-1">&times;</button>
       </div>`).join('')}
       <div class="row" style="margin-top:4px">
@@ -1083,6 +1137,19 @@ function renderRosterEditor(a, t) {
     $('rostercount').textContent = rosterTeams.length + ' teams · ' + total + ' players';
     $('rosterproblems').textContent = rosterProblems().join(' · ');
   };
+  $('trackug').onchange = () => { rosterTrack.trackUG = $('trackug').checked; rerender(); };
+  $('trackd2').onchange = () => { rosterTrack.trackDiv2 = $('trackd2').checked; rerender(); };
+  box.querySelectorAll('[data-tmark]').forEach((inp) => {
+    const [ti, k] = inp.dataset.tmark.split('.');
+    inp.onchange = () => { rosterTeams[Number(ti)][k] = inp.checked; };
+  });
+  box.querySelectorAll('[data-pmark]').forEach((inp) => {
+    const [ti, pi, k] = inp.dataset.pmark.split('.');
+    inp.onchange = () => {
+      const flags = rosterTeams[Number(ti)].flags;
+      flags[Number(pi)] = { ...flags[Number(pi)], [k]: inp.checked };
+    };
+  });
   box.querySelectorAll('[data-tname]').forEach((inp) => {
     inp.oninput = () => {
       rosterTeams[Number(inp.dataset.tname)].name = inp.value;
@@ -1098,7 +1165,7 @@ function renderRosterEditor(a, t) {
       if (ev.key === 'Enter' || (ev.key === 'Tab' && !ev.shiftKey && last && inp.value.trim())) {
         ev.preventDefault();
         rosterTeams[ti].players[pi] = inp.value;
-        if (last) rosterTeams[ti].players.push('');
+        if (last) { rosterTeams[ti].players.push(''); rosterTeams[ti].flags.push({}); }
         rerender();
         const nxt = box.querySelector(`[data-pname="${ti}.${pi + 1}"]`);
         if (nxt) nxt.focus();
@@ -1112,6 +1179,7 @@ function renderRosterEditor(a, t) {
     b.onclick = () => {
       const [ti, pi] = b.dataset.delplayer.split('.').map(Number);
       rosterTeams[ti].players.splice(pi, 1);
+      rosterTeams[ti].flags.splice(pi, 1);
       rerender();
     };
   });
@@ -1119,6 +1187,7 @@ function renderRosterEditor(a, t) {
     b.onclick = () => {
       const ti = Number(b.dataset.addplayer);
       rosterTeams[ti].players.push('');
+      rosterTeams[ti].flags.push({});
       rerender();
       const inp = box.querySelector(`[data-pname="${ti}.${rosterTeams[ti].players.length - 1}"]`);
       if (inp) inp.focus();
@@ -1145,7 +1214,7 @@ function renderRosterEditor(a, t) {
     };
   });
   $('addteam').onclick = () => {
-    rosterTeams.push({ name: '', players: ['', '', '', ''] });
+    rosterTeams.push(blankRosterTeam());
     rerender();
   };
   const validated = () => {
@@ -1160,7 +1229,7 @@ function renderRosterEditor(a, t) {
   $('rosterdl').onclick = () => {
     const clean = validated();
     if (!clean) return;
-    download('roster.qbj', JSON.stringify(buildRosterQbj(t.name, clean), null, 2),
+    download('roster.qbj', JSON.stringify(buildRosterQbj(t.name, clean, rosterTrack), null, 2),
       'application/json');
   };
   $('rostersave').onclick = async () => {
@@ -1173,8 +1242,8 @@ function renderRosterEditor(a, t) {
     });
     try {
       await pub(`${a}/roster?name=roster.qbj`,
-        { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, clean), null, 2) });
-      rosterTeams = clean.map((tm) => ({ name: tm.name, players: [...tm.players], was: tm.name }));
+        { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, clean, rosterTrack), null, 2) });
+      rosterTeams = null; // the editor reloads from what was saved
       rosterOpen = false;
       schedFetched = false; // schedule editor re-reads the team list
       schedTeams = clean.map((tm) => tm.name); // …and has the new names at once
