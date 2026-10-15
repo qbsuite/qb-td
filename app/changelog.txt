@@ -1,3 +1,20 @@
+Release Notes for 10/15/2026
+
+[ SCHEDULE ]
+- New format picker. Format lists hdwhite's schedule formats for your team count, written like "8/8/7 → 6/6/6/5, crossover · 11 rounds".
+- Picking a format fills in its phases, and all of them stay editable. Changing the structure turns Format to Custom.
+- Custom works for any number of teams. Set any number of pools, for example "2 pools of 7/6", and add more phases.
+- Playoff pools fill by finish, best places first. A Crossover box keeps teams from the same pool from playing again.
+- When only some teams of a place go up, they are compared by winning percentage, then points per 20 tossups heard.
+- Copy this phase plays the same pools again, for example a fifth round robin.
+- Playoffs can also be single or double elimination.
+- Rebracketing ties: break them by points per 20 tossups heard or with a tiebreaker game. A game keeps a round free, if needed.
+- Enable finals sequence if needed: no final if the leader clears by two games, an advantaged final if up by one, else one game.
+- Rooms can be shared by all pools. The shared rooms take games from each pool in turn and get their own lane in the editor.
+- Rooms now come from the Rooms step. The editor no longer has Add room, Rooms or Compact.
+- Add phase in the editor adds a finals phase after the last one. Games played only if needed are marked "If needed".
+- Fill playoff slots from standings now fills pools past D, and places compared across pools.
+
 Release Notes for 10/14/2026
 
 [ SCHEDULE ]

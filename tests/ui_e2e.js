@@ -497,21 +497,25 @@ const rosterTeams = parseRoster(roster);
 /* ---------- 5. schedule ---------- */
 
 await click('[data-step="sched"]');
-await waitJs(`!!document.querySelector('input[name="schedfmt"][value="pools2"]')`, 'schedule formats');
-await click('input[name="schedfmt"][value="pools2"]');
-ok('5 schedule: the creator offers six rooms', (await js(`document.querySelector('#schedrooms').value`)) === '6');
-ok('5 schedule: and the twelve teams just saved', (await text('#schedsec')).includes('12 teams'), (await text('#schedsec')).slice(0, 80));
-// generation options: Reroll only matters (and only works) once an option is random
-ok('5 schedule: with default options there is nothing to reroll', await js(`document.querySelector('#optreroll').disabled`));
-await fill('#optrooms', 'rotate', ['change']);
-await waitJs(`!document.querySelector('#optreroll').disabled`, 'Reroll enabled for rotate');
+await waitJs(`!!document.querySelector('select[data-fmt]')`, 'the format picker');
+ok('5 schedule: the picker takes the six rooms from the Rooms step', (await text('#schedsec')).includes('6 rooms for 12 teams'), (await text('#schedsec')).slice(0, 120));
+ok('5 schedule: and starts on hdwhite\'s 12-team crossover', /^6\/6 → 6\/6, crossover · 8 rounds$/.test(await js(`document.querySelector('[data-fmt]').selectedOptions[0].textContent`)),
+  await js(`document.querySelector('[data-fmt]').selectedOptions[0].textContent`));
+ok('5 schedule: the round count is shown big', /^8 rounds/.test(await text('.pktotal')), await text('.pktotal'));
+// Custom stays Custom; changing the pools is a custom format
+await fill('select[data-fmt]', 'custom', ['change']);
+await waitJs(`document.querySelector('[data-fmt]').value === 'custom'`, 'Custom picked');
+await fill('[data-pcount]', '3', ['change']);
+await waitJs(`document.querySelector('[data-psizes]').value === '4/4/4' && document.querySelector('[data-fmt]').value === 'custom'`, 'three pools, still Custom');
+ok('5 schedule: three pools split 4/4/4 and stay Custom', true);
+// back to the default format, with rooms kept as generated before (the rest of the run depends on them)
+await fill('select[data-fmt]', await js(`document.querySelector('[data-fmt] option').value`), ['change']);
+await waitJs(`document.querySelector('[data-psizes]').value === '6/6'`, 'back to 6/6');
+for (const sel of ['[data-mode="0"]', '[data-mode="1"]']) await fill(sel, 'keep', ['change']);
 const seed1 = await text('.sgseed b');
 await click('#optreroll');
 await waitJs(`document.querySelector('.sgseed b').textContent !== ${q(seed1)}`, 'a new seed');
-ok('5 schedule: Reroll draws a new seed, and the preview line describes the result',
-  /8 rounds · 6 of 6 rooms used · no byes/.test(await text('.sgpreview')), await text('.sgpreview'));
-await fill('#optrooms', 'keep', ['change']); // back to defaults: the rest of the run depends on the default rooms
-await click('input[name="schedfmt"][value="pools2"]');
+ok('5 schedule: Reroll draws a new seed', true);
 await click('#schedgen');
 const schedKey = `t/${tid}/schedule.json`;
 const storedSched = async () => { const r = await call(`${A}/file?key=${encodeURIComponent(schedKey)}`); return r.status === 200 ? r.body : null; };
@@ -573,40 +577,47 @@ ok('5 schedule: Checks flag the half-empty game and the team left without one',
 await click('#scheddiscard');
 await waitJs(`(${slotEl(0, 1, 2, 'b')}).textContent === ${q(cleared)} && /Saved/.test(document.querySelector('.sgbar').textContent)`, 'discarded');
 ok('5 schedule: Discard puts the saved schedule back', /all clear/.test(await text('.sgchecks')));
-// rooms and whole games: add a room, drag a game into it, remove the room, undo all of it
-await click('#schedaddroom');
-await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 7`, 'a seventh room column');
-const moved = [await slotText2(0, 0, 0, 'a'), await slotText2(0, 0, 0, 'b')];
-ok('5 schedule: an empty room accepts a dragged game', await dragOnto(cellEl(0, 0, 0), cellEl(0, 0, 6)));
-await waitJs(`!!(${slotEl(0, 0, 6, 'a')}) && (${slotEl(0, 0, 6, 'a')}).textContent === ${q(moved[0])}`, 'game moved to the new room');
+// whole games: drag one onto another to trade places, then back by clicks
+const before = [await slotText2(0, 0, 0, 'a'), await slotText2(0, 0, 1, 'a')];
+ok('5 schedule: a game card is a valid drop on another game', await dragOnto(cellEl(0, 0, 0), cellEl(0, 0, 1)));
+await waitJs(`(${slotEl(0, 0, 0, 'a')}).textContent === ${q(before[1])} && (${slotEl(0, 0, 1, 'a')}).textContent === ${q(before[0])}`, 'games traded');
 await click('#schedsave');
-sched = await until(async () => { const x = await storedSched(); const g = gameAt(x, 0, 0, 6); return x.rooms.length === 7 && g && g.a.team === moved[0] && !gameAt(x, 0, 0, 0) && x; }, 'moved game saved');
-ok('5 schedule: dragging a game into an empty room moves it, and Save stores it', true);
-await js(`[...document.querySelectorAll('.sgroom')].find((b) => b.textContent === 'Room 7').click(); true`);
-await waitJs(`!!document.querySelector('.sgpanel [data-act="droproom"]')`, 'the room panel');
-await click('.sgpanel [data-act="droproom"]');
-await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 6`, 'room removed');
-ok('5 schedule: removing a room drops its teams to Byes',
-  JSON.stringify(await js(`[...document.querySelectorAll('[data-byes="0.0"] .sgslot')].map((b) => b.textContent)`)) === JSON.stringify(moved));
-await click('#schedundo');
-await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 7
-  && (${slotEl(0, 0, 6, 'a')}).textContent === ${q(moved[0])}`, 'room removal undone');
-ok('5 schedule: Undo brings the room and its game back', /Saved/.test(await text('.sgbar')));
-// the game goes home by the click path this time, then the empty room goes without asking
-await js(`(${cellEl(0, 0, 6)}).querySelector('.sgh').click(); true`);
+sched = await until(async () => { const x = await storedSched(); return gameAt(x, 0, 0, 0).a.team === before[1] && x; }, 'traded games saved');
+ok('5 schedule: dragging a game onto another trades them, and Save stores it', true);
+await js(`(${cellEl(0, 0, 1)}).querySelector('.sgh').click(); true`);
 await waitJs(`!!document.querySelector('.sgpanel [data-act="move"]')`, 'the game panel');
 await click('.sgpanel [data-act="move"]');
-await js(`(${cellEl(0, 0, 0)}).querySelector('.sgadd').click(); true`);
-await waitJs(`!!(${slotEl(0, 0, 0, 'a')}) && (${slotEl(0, 0, 0, 'a')}).textContent === ${q(moved[0])}`, 'game moved back by clicks');
-const dialogsBefore = dialogs.length;
-await js(`[...document.querySelectorAll('.sgroom')].find((b) => b.textContent === 'Room 7').click(); true`);
-await waitJs(`!!document.querySelector('.sgpanel [data-act="droproom"]')`, 'the room panel again');
-await click('.sgpanel [data-act="droproom"]');
-await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 6`, 'empty room removed');
-ok('5 schedule: an empty room goes without a confirm', dialogs.length === dialogsBefore, dialogs.slice(dialogsBefore));
+await js(`(${cellEl(0, 0, 0)}).click(); true`);
+await waitJs(`(${slotEl(0, 0, 0, 'a')}).textContent === ${q(before[0])}`, 'traded back by clicks');
 await click('#schedsave');
-sched = await until(async () => { const x = await storedSched(); return x.rooms.length === 6 && JSON.stringify(x.phases) === generated && x; }, 'back to six rooms');
-ok('5 schedule: moved back by clicks and saved as generated', true);
+sched = await until(async () => { const x = await storedSched(); return JSON.stringify(x.phases) === generated && x; }, 'back to the generated schedule');
+ok('5 schedule: traded back by clicks and saved as generated', true);
+// no Add room or Rooms here (the Rooms step has the rooms); a room still comes out from its header, and Undo puts it back
+ok('5 schedule: no Add room, Rooms or Compact buttons', !(await js(`!!document.querySelector('#schedaddroom, #schedroomsbtn, #scheddense')`)));
+const r6 = [await slotText2(0, 0, 5, 'a'), await slotText2(0, 0, 5, 'b')];
+await js(`[...document.querySelectorAll('.sgroom')].find((b) => b.textContent === 'Room 6').click(); true`);
+await waitJs(`!!document.querySelector('.sgpanel [data-act="droproom"]')`, 'the room panel');
+await click('.sgpanel [data-act="droproom"]');
+await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 5`, 'room removed');
+ok('5 schedule: removing a room (confirmed) drops its teams to Byes',
+  JSON.stringify(await js(`[...document.querySelectorAll('[data-byes="0.0"] .sgslot')].map((b) => b.textContent)`)) === JSON.stringify(r6)
+    && dialogs.some((x) => x.startsWith('Remove Room 6')));
+await click('#schedundo');
+await waitJs(`document.querySelectorAll('.sgphase')[0].querySelectorAll('.sgroom:not(.sgroom-byes)').length === 6 && /Saved/.test(document.querySelector('.sgbar').textContent)`, 'room removal undone');
+ok('5 schedule: Undo brings the room and its games back', true);
+// Add phase: a final between the top two of the Championship, a second game if needed
+await click('#schedaddphase');
+await waitJs(`!!document.querySelector('#schedapgo')`, 'the Add phase form');
+await fill('[data-apab]', 'CH', ['change']);
+await fill('[data-apbb]', 'CH', ['change']);
+await click('#schedapgo');
+await waitJs(`[...document.querySelectorAll('.sgphasehead b')].some((b) => b.textContent === 'Finals')`, 'a Finals phase');
+ok('5 schedule: Add phase adds Finals, 1st against 2nd in the Championship, the second game if needed',
+  /1st in Championship/.test(await text('#sgscroll')) && /2nd in Championship/.test(await text('#sgscroll'))
+    && (await js(`document.querySelectorAll('.sgifneeded').length`)) === 1 && /all clear/.test(await text('.sgchecks')), await text('.sgchecks'));
+await click('#schedundo');
+await waitJs(`![...document.querySelectorAll('.sgphasehead b')].some((b) => b.textContent === 'Finals') && /Saved/.test(document.querySelector('.sgbar').textContent)`, 'finals undone');
+ok('5 schedule: Undo takes the Finals out again', true);
 // rounds: insert then delete an empty one is no change at all
 const nRounds = await js(`document.querySelectorAll('.sgrnd').length`);
 await js(`document.querySelector('[data-insround="0.0"]').click(); true`);
@@ -795,8 +806,8 @@ ok('8 public: once rebuilt, the mark reads Up to date', (await js(`document.quer
   await waitJs(`/Updating/.test((document.querySelector('#pubmark') || {}).textContent || '')`, 'Updating after rename');
   ok('8 rename: and the page marks the public page Updating', true);
   await click('[data-step="sched"]');
-  await waitJs(`!!document.querySelector('[data-roomname="${si}"]')`, 'schedule rooms');
-  ok('8 rename: the schedule step shows the new name', (await js(`document.querySelector('[data-roomname="${si}"]').value`)) === 'Hall 7 East');
+  await waitJs(`!!document.querySelector('.sgroom[data-room="${si}"]')`, 'schedule rooms');
+  ok('8 rename: the schedule step shows the new name', (await js(`document.querySelector('.sgroom[data-room="${si}"]').textContent`)) === 'Hall 7 East');
   await click('[data-step="rooms"]');
   await waitJs(`!!document.querySelector('[data-roomrename="${b.id}"]')`, 'the room row');
   await fill(`[data-roomrename="${b.id}"]`, b.room_name, ['change']);
@@ -1125,7 +1136,8 @@ await waitJs(`/Stats data rebuilt \\(${good.length} games\\)/.test(document.quer
 ok('17 exports: Rebuild public stats posts every game', true);
 await tick();
 {
-  const st = (await call('/pub/' + slug)).body;
+  // the tick returns before its rebuild finishes: wait for the rounds to show
+  const st = await until(async () => { const b = (await call('/pub/' + slug)).body; return b && b.rounds && Object.keys(b.rounds).length && b; }, 'public rounds rebuilt');
   const q2 = Object.entries(st.rounds || {}).map(([n, v]) => n + '@' + v).join(',');
   const shards = (await call(`/pub/${slug}/rounds?n=${q2}`)).body.rounds;
   const n = shards.reduce((k, s) => k + s.entries.length, 0);

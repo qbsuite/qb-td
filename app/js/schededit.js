@@ -12,18 +12,19 @@
 import { esc } from './api.js';
 import { busy } from './busy.js';
 import {
-  formatsFor, allFormats, buildSchedule, validateSchedule, slotText, insertRound, removeRound,
-  addRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, fillPlaceholders,
+  allFormats, poolSizes, validateSchedule, slotText, insertRound, removeRound,
+  addRound, swapCells, removeRoomCol, hasPlaceholders, fillPlaceholders,
   tagBrackets, bracketRooms, phaseLanes, scheduleChecks, renameTeams, removeTeam,
   poolOf, tradePools, tradesLocked,
 } from '../engine/schedule.js';
+import { buildPlan, planPreview, planGroups, rebracketChecks, addFinals } from '../engine/plan.js';
+import HDWHITE from '../engine/hdwhite.js';
 
 /* ---------- view state (per page load) ---------- */
 
 const ui = {
   view: 'grid',          // grid | teams | brackets
   filter: '',            // '' = every bracket, else a bracket key
-  dense: false,
   closed: new Set(),     // collapsed phase indexes
   sel: null,             // {kind: slot|game|empty|room|round, ...}
   mode: null,            // swapSlot | moveGame | trade
@@ -38,8 +39,9 @@ const ui = {
   sideOpen: false,       // full screen: the panel was opened for its checks
   colW: {},              // 'laneKey@phase' -> px: room columns the TD dragged to a width of their own
   byeW: null,            // the Byes column, likewise
-  opts: { seeding: 'snake', roundOrder: 'asis', rooms: 'keep', seed: 1 + Math.floor(Math.random() * 9999) },
-  fmt: null,
+  opts: { seed: 1 + Math.floor(Math.random() * 9999) }, // the picker's seed (rounds are always shuffled)
+  plan: null,            // the picker's plan (plan.js phases); null: from the schedule, or the default
+  addPhase: false,       // the editor's Add phase form is open
   fillCheck: null,       // fillReport() with something to look at before filling
 };
 
@@ -172,7 +174,7 @@ const cellKey = (x) => `${x.p}.${x.r}.${x.room}`;
 const slotShow = (s) => {
   if (!s) return '';
   if (s.team) return s.team;
-  const m = /^([A-D])(\d+)$/.exec(s.label || '');
+  const m = /^([A-Z])(\d+)$/.exec(s.label || '');
   if (!m) return s.label || '';
   const n = Number(m[2]);
   return `Pool ${m[1]} ${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
@@ -184,7 +186,7 @@ const slotShow = (s) => {
  *   dirty(), setDirty(b)
  *   teams                  roster team names, seed order
  *   buckets                the tournament's rooms [{id, room_name}]
- *   roomsN(), setRoomsN(n) the picker's room count
+ *   roomsN(), setRoomsN(n) (unused now: the picker takes the Rooms step's rooms)
  *   save(s), del()         Worker calls
  *   fill()                 -> {A: [names best-first], ...} for placeholders
  *   say(text, bad), refresh() (full hub render)
@@ -208,74 +210,370 @@ export function renderSchedStep(box, env) {
 
 /* ================= format picker ================= */
 
+// The Format menu is hdwhite's formats for the team count (hdwhite.js),
+// the engine formats added on purpose since (triple and quadruple round
+// robins; two places a pool from pools of 5 or more), then Custom. Picking
+// a format fills in its phases (plan.js); every control stays editable,
+// and changing the structure turns Format to Custom. Rounds are always
+// shuffled, so the seed always matters.
+
+const MODES = [['rotate', 'Teams rotate through rooms evenly'], ['keep', 'Teams stay in one room where possible'],
+  ['shuffle', 'Teams get random rooms each round']];
+const TIES = [['pp20', 'Break ties by points per 20 tossups heard'], ['game', 'Break ties with a tiebreaker game']];
+const TYPES = [['brackets', 'Pools'], ['same', 'The same pools again'], ['single', 'Single elimination'], ['double', 'Double elimination']];
+const REPEAT = ['', 'double', 'triple', 'quadruple', 'quintuple', 'sextuple'];
+const ORDN = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
+const phase = (name, o = {}) => ({ name, kind: 'pools', groups: 1, top: 0, per: 1, pools: 1, cross: false, same: false, meets: 1,
+  carry: true, reset: true, byes: false, sizes: null, parallelTop: false, share: false, n: 3, mode: 'rotate', ...o });
+const teamsOf = (t) => Array.from({ length: t }, (_, i) => 'T' + i);
+const sizesOf = (gs) => gs.map((g) => g.members.length).join('/');
+
+// phases for k pools played `cycles` times ("Round robin 1", "Round robin
+// 2", … as the engine names a repeated round robin), then playoffs; a
+// 2-pool split in two is each pool's own top and bottom half
+function phasesFor({ k, cycles = 1, byes = false, sizes = null, parallelTop = false, carry = true, per = null }) {
+  const out = [];
+  const one = k === 1 && !sizes;
+  for (let c = 0; c < cycles; c++) {
+    const name = one ? (cycles > 1 ? 'Round robin ' + (c + 1) : 'Round robin') : cycles > 1 ? 'Prelims ' + (c + 1) : 'Prelims';
+    out.push(phase(name, { groups: k, same: c > 0, byes }));
+  }
+  const halves = per === null ? (k === 2 && sizes && sizes.length === 2 ? -1 : 1) : per;
+  if (sizes) out.push(phase('Playoffs', { sizes, parallelTop, carry: k > 1 && carry, per: halves }));
+  return out;
+}
+
+// The Format menu for t teams: [{key, label, phases, rooms}]
+const formatCache = new Map();
+function formatList(t) {
+  if (formatCache.has(t)) return formatCache.get(t);
+  const raw = [];
+  for (const f of HDWHITE[t] || []) raw.push({ key: 'hd' + f.key, phases: phasesFor({ ...f, carry: !f.repeat }) });
+  // engine formats added on purpose after the first version (git log):
+  // triple and quadruple round robins (649d459), and two places a pool
+  // (c6e1736, for 22 teams: 6/6/6/4) from pools of at least 5
+  for (const f of allFormats(t)) {
+    if (/^rr[34]$/.test(f.key)) { raw.push({ key: f.key, phases: phasesFor({ k: 1, cycles: Number(f.key[2]) }) }); continue; }
+    const m = /^pools(\d)x2$/.exec(f.key);
+    if (!m) continue;
+    const k = Number(m[1]);
+    const rows = planGroups(teamsOf(t), [phase('', { groups: k })], 'snake', () => 0.5)[0].map((g) => g.members.length);
+    if (Math.min(...rows) < 5) continue;
+    const deepest = Math.max(...rows);
+    const at = (place) => rows.filter((x) => x >= place).length;
+    const sizes = [];
+    for (let pl = 1; pl <= deepest; pl += 2) sizes.push(at(pl) + (pl + 1 <= deepest ? at(pl + 1) : 0));
+    raw.push({ key: f.key, phases: phasesFor({ k, sizes }) });
+  }
+  // build each once: its rounds and rooms, and who plays whom (to drop duplicates)
+  const out = [];
+  const seen = new Set();
+  const rooms = Array.from({ length: 64 }, (_, i) => ({ name: 'R' + i, bucket: null }));
+  for (const x of raw) {
+    let s;
+    try { s = buildPlan(teamsOf(t), rooms, x.phases, 'snake', 1); } catch (e) { continue; }
+    const sig = s.phases.map((p) => p.rounds.length + ':' + p.rounds.flatMap((r) => r.games.map((g) => [JSON.stringify(g.a), JSON.stringify(g.b)].sort().join())).sort().join(';')).join('|');
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    const g = planGroups(teamsOf(t), x.phases, 'snake', () => 0.5);
+    const P = x.phases;
+    const preCycles = P.filter((p) => !p.sizes).length;
+    const pre = (P[0].groups === 1 ? String(t) : sizesOf(g[0])) + (P[0].byes ? ' with byes' : '');
+    let label;
+    if (!P[P.length - 1].sizes) label = `${pre} → ${REPEAT[preCycles - 1] ? REPEAT[preCycles - 1] + ' round robin' : 'round robin'}`;
+    else {
+      const po = P[P.length - 1];
+      const notes = [];
+      if (preCycles > 1) notes.push(REPEAT[preCycles - 1] + ' round robin first');
+      // crossover only says something when a pool holds pool-mates
+      const mates = g[g.length - 1].some((b) => new Set(b.members.map((m) => m.from)).size < b.members.length);
+      if (P[0].groups > 1) notes.push(!mates ? 'by place' : po.carry ? 'crossover' : 'repeat matches');
+      if (po.parallelTop) {
+        const top = g[g.length - 1].filter((b) => b.tier === 0).reduce((k, b) => k + b.members.length, 0);
+        notes.splice(notes.indexOf('by place'), notes.includes('by place') ? 1 : 0, `top ${top} in two pools`);
+      }
+      label = `${pre} → ${sizesOf(g[g.length - 1])}${notes.length ? ', ' + notes.join(', ') : ''}`;
+    }
+    out.push({ key: x.key, label: `${label} · ${s.phases.reduce((n, p) => n + p.rounds.length, 0)} rounds`, phases: x.phases,
+      rooms: Math.max(...s.phases.flatMap((p) => p.rounds.map((r) => r.games.length))) });
+  }
+  formatCache.set(t, out);
+  return out;
+}
+// a plan for a Format menu entry (seeding and room settings carry over)
+function planFor(key, t, from) {
+  const f = formatList(t).find((x) => x.key === key);
+  const phases = JSON.parse(JSON.stringify(f.phases));
+  if (from) phases.forEach((p, i) => { const o = from.phases[Math.min(i, from.phases.length - 1)]; Object.assign(p, { share: o.share, n: o.n, mode: o.mode }); });
+  // two parallel top pools only crown a champion with a final
+  return { fmt: key, seeding: from ? from.seeding : 'snake', ties: from ? from.ties : 'pp20', finalTies: from ? from.finalTies : 'pp20',
+    phases, finals: phases.some((p) => p.parallelTop) || !!(from && from.finals) };
+}
+// the default: the first format that fits the rooms; with none (48 teams),
+// Custom with pools of about 8
+function firstPlan(t, n) {
+  const f = formatList(t).find((x) => x.rooms <= n) || formatList(t)[0];
+  if (f) return planFor(f.key, t);
+  const k = t <= 16 ? 1 : Math.ceil(t / 8);
+  return { fmt: 'custom', seeding: 'snake', ties: 'pp20', finalTies: 'pp20', finals: false, phases: [phase(k === 1 ? 'Round robin' : 'Prelims', { groups: k })] };
+}
+// Pool sizes for k pools of whole places after `prev`: the places split as
+// evenly as can be, better places first (6 pools of 8, k = 6 → 12/12/6/6/6/6).
+// A last pool of one team would have no games: it joins the pool above.
+function placeSizes(prev, k) {
+  const deepest = Math.max(...prev.map((g) => g.members.length));
+  const at = (place) => prev.filter((g) => g.members.length >= place).length;
+  let place = 1;
+  const sizes = poolSizes(deepest, Math.max(1, Math.min(deepest, k))).map((n) => {
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += at(place++);
+    return sum;
+  });
+  if (sizes.length > 1 && sizes[sizes.length - 1] === 1) sizes.push(sizes.pop() + sizes.pop());
+  return sizes;
+}
+// a new phase: as many pools as the phase before (at least two), of whole places
+const standardNext = (prev) => ({ sizes: placeSizes(prev, Math.max(2, prev.length)), per: 1 });
+// numbered phase names: "Round robin" → "Round robin 1", "X 2" → "X 3"
+const numbered = (name, i) => (/\s\d+$/.test(name) ? name.replace(/\d+$/, String(i)) : `${name} ${i}`);
+function copyOf(P, p) {
+  const src = P[p];
+  if (!/\s\d+$/.test(src.name)) src.name = numbered(src.name, 1);
+  const k = Number(/(\d+)$/.exec(src.name)[1]);
+  return phase(numbered(src.name, k + 1), { same: true, groups: src.groups, byes: src.byes, share: src.share, n: src.n, mode: src.mode });
+}
+// the plan's phases with its rebracketing ties on each rebracketing
+const withTies = (pl) => pl.phases.map((x, i) => (i > 0 && !x.same ? { ...x, ties: pl.ties || 'pp20' } : x));
+
 function renderCreator(box, env) {
   if (fullBtn()) fullBtn().hidden = true; // nothing to fill the screen with yet
-  const teams = env.teams;
-  const nRooms = env.roomsN();
-  const fmts = formatsFor(teams.length, nRooms);
-  if (!fmts.some((f) => f.key === ui.fmt)) ui.fmt = fmts.length ? fmts[0].key : null;
-  const o = ui.opts;
-  const rooms = roomList(env, nRooms);
-  let preview = '';
-  if (ui.fmt) {
-    try {
-      const s = buildSchedule(ui.fmt, teams, rooms, o);
-      const nr = s.phases.reduce((n, ph) => n + ph.rounds.length, 0);
-      const used = new Set(s.phases.flatMap((ph) => ph.rounds.flatMap((r) => r.games.filter((g) => g.a || g.b).map((g) => g.room))));
-      const byes = s.phases.reduce((n, ph) => n + ph.rounds.reduce((m, r) => m + r.byes.length, 0), 0);
-      preview = `${nr} rounds · ${used.size} of ${nRooms} rooms used · ${byes ? byes + ' byes in all' : 'no byes'}`
-        + (s.brackets.length > 1 ? ' · ' + s.brackets.map((b) => b.name).join(', ') : '');
-    } catch (e) { preview = e.message; }
+  const t = env.teams.length;
+  const n = env.buckets.length;
+  const back = env.sched() ? `<div class="sgnotice">Picking a new format replaces the schedule when you press Generate.
+      <button id="schedback" class="small">Keep the current schedule</button></div>` : '';
+  const wireBack = () => { const b = box.querySelector('#schedback'); if (b) b.onclick = () => { ui.creator = false; env.refresh(); }; };
+  if (t < 2 || !n) {
+    box.innerHTML = back + `<div class="muted">${t < 2 ? 'Please add at least two teams on the Roster step first.' : 'Please add rooms on the Rooms step first.'}</div>`;
+    wireBack();
+    return;
   }
-  const sel = (id, value, options) => `<select id="${id}">${options.map(([v, l]) =>
-    `<option value="${v}" ${v === value ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
-  const random = o.seeding === 'random' || o.roundOrder === 'shuffle' || o.rooms === 'shuffle' || o.rooms === 'rotate';
-  box.innerHTML = `
-    ${env.sched() ? `<div class="sgnotice">Picking a new format replaces the schedule when you press Generate.
-      <button id="schedback" class="small">Keep the current schedule</button></div>` : ''}
-    <div class="row sgcreatorhead">
-      <span class="muted">${teams.length} teams (roster order is seed order)</span>
-      <label class="muted">Rooms <input id="schedrooms" type="number" min="1" max="99" value="${nRooms}" style="width:64px"></label>
-    </div>
-    <div class="sgfmts">
-      ${fmts.map((f) => `
-      <label class="sgfmt"><input type="radio" name="schedfmt" value="${f.key}" ${f.key === ui.fmt ? 'checked' : ''}>
-        <span><b>${esc(f.name)}</b> <span class="muted">&mdash; ${esc(f.desc)}</span></span></label>`).join('')
-      || `<div class="muted">No format fits ${teams.length} teams in ${nRooms} rooms. ${
-        allFormats(teams.length).length ? 'Add rooms: the smallest format needs ' + Math.min(...allFormats(teams.length).map((f) => f.roomsNeeded)) + '.' : ''}</div>`}
-    </div>
-    ${fmts.length ? `
-    <div class="sgopts">
-      <label>Seeding ${sel('optseed', o.seeding, [['snake', 'Snake by roster order'], ['random', 'Random']])}</label>
-      <label>Round order ${sel('optorder', o.roundOrder, [['asis', 'As generated'], ['shuffle', 'Shuffled within each phase']])}</label>
-      <label title="Each pool and playoff bracket keeps its own block of rooms. This picks how teams move within it.">Rooms within each pool ${
-        sel('optrooms', o.rooms, [['keep', 'Teams keep their room where possible'],
-        ['shuffle', 'Shuffle rooms every round'], ['rotate', 'Rotate so teams see rooms evenly']])}</label>
-      <span class="sgseed ${random ? '' : 'muted'}">Seed <b>${o.seed}</b> <button id="optreroll" class="small" ${random ? '' : 'disabled'}>Reroll</button></span>
-    </div>
-    <div class="sgpreview">${esc(preview)}</div>
-    <div class="row"><button id="schedgen" class="primary">Generate</button></div>` : ''}`;
-  const q = (id) => box.querySelector('#' + id);
+  if (!ui.plan || ui.plan.teams !== t) {
+    const o = (env.sched() || {}).options || {};
+    ui.plan = o.plan && o.plan.fmt && (o.plan.fmt === 'custom' || formatList(t).some((f) => f.key === o.plan.fmt))
+      ? JSON.parse(JSON.stringify(o.plan)) : firstPlan(t, n);
+    ui.plan.teams = t;
+  }
+  const plan = ui.plan;
+  const P = plan.phases;
+  const rooms = roomList(env, n);
+  const pv = planPreview(env.teams, rooms, withTies(plan), plan.seeding, 1);
+  const groupsBy = planGroups(env.teams, P, plan.seeding, () => 0.5);
   const again = () => renderCreator(box, env);
-  q('schedrooms').onchange = () => { env.setRoomsN(Math.max(1, Number(q('schedrooms').value) || 1)); again(); };
-  box.querySelectorAll('input[name="schedfmt"]').forEach((r) => { r.onchange = () => { ui.fmt = r.value; again(); }; });
-  if (q('schedback')) q('schedback').onclick = () => { ui.creator = false; env.refresh(); };
-  if (!fmts.length) return;
-  q('optseed').onchange = () => { o.seeding = q('optseed').value; again(); };
-  q('optorder').onchange = () => { o.roundOrder = q('optorder').value; again(); };
-  q('optrooms').onchange = () => { o.rooms = q('optrooms').value; again(); };
-  q('optreroll').onclick = () => { o.seed = 1 + Math.floor(Math.random() * 9999); again(); };
-  q('schedgen').onclick = async () => {
-    const key = (box.querySelector('input[name="schedfmt"]:checked') || {}).value || ui.fmt;
-    if (env.sched() && !confirm('Replace the current schedule with a new ' + (fmts.find((f) => f.key === key) || {}).name + '?')) return;
+
+  const menu = (attr, list, on) => `<select ${attr}>${list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(on) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const nr = (p) => (pv.rounds[p] ? `<span class="pkrounds">${pv.rounds[p]} ${pv.rounds[p] === 1 ? 'round' : 'rounds'}</span>` : '');
+  const lastRooms = (k) => andList(rooms.map((r) => r.name).slice(n - k));
+  // who goes where, with runs of places as ranges: "A1–A4", "Round robin 1st–24th"
+  const who = (groups) => `<span class="pkhelp">${groups.map((g) => {
+    const parts = [];
+    const shown = new Set();
+    for (const m of g.members) {
+      if (shown.has(m)) continue;
+      const run = [m];
+      if (m.place && !String(m.from).startsWith('compared')) {
+        for (const x of g.members.filter((y) => y.from === m.from && y.place).sort((a, b) => a.place - b.place)) {
+          if (x !== m && x.place === run[run.length - 1].place + 1) run.push(x);
+        }
+      }
+      if (run.length >= 3) {
+        run.forEach((x) => shown.add(x));
+        parts.push(/^[A-Z]$/.test(m.from) ? `${m.from}${run[0].place}–${m.from}${run[run.length - 1].place}`
+          : `${(m.slot.label || '').replace(/^\d+\w\w in /, '').replace(/ \d+\w\w$/, '')} ${ORDN(run[0].place)}–${ORDN(run[run.length - 1].place)}`);
+      } else { shown.add(m); parts.push(m.slot.label || m.slot.team); }
+    }
+    return `${esc(g.name)}: ${esc(parts.join(', '))}`;
+  }).join(' · ')}</span>`;
+  const warn = (list) => (list.length ? `<span></span><span class="pkwarn">${list.map((x) => `<span>${esc(x)}</span>`).join('')}</span>` : '');
+  const sizesBox = (attr, sizes) => `<input class="pksizes" value="${sizes.join('/')}" ${attr} aria-label="Pool sizes">`;
+  // "[2] pools of [7/6]": the count splits evenly; the sizes can be edited
+  const poolsRow = (countAttr, sizesAttr, sizes, max) => `<span class="pkl">Pools</span><span class="pkrow">
+    <input type="number" class="pkcount" min="1" max="${max}" value="${sizes.length}" ${countAttr} aria-label="Number of pools">
+    <span class="muted">${sizes.length === 1 ? 'pool of' : 'pools of'}</span> ${sizesBox(sizesAttr, sizes)}</span>`;
+  const roomRows = (p, out, what) => {
+    const ph = P[p];
+    if (groupsBy[p].length > 1 && ph.kind === 'pools') {
+      out.push(`<span class="pkl">Rooms</span>
+      <span><label class="pkcheck"><input type="checkbox" data-share="${p}" ${ph.share ? 'checked' : ''}> Share rooms between ${what}</label>
+        ${ph.share ? `<span class="pkshared"><input type="number" min="1" max="${n}" value="${ph.n}" data-n="${p}"> of ${n} rooms</span>
+          <span class="pkhelp">${esc(lastRooms(Math.min(ph.n, n)))} take games from all ${what}, rotating each round.</span>` : ''}</span>`);
+    }
+    if (ph.kind === 'pools') out.push(`<span class="pkl">Room changes</span><span>${menu(`data-mode="${p}"`, MODES, ph.mode)}</span>`);
+  };
+
+  // the first phase: pool sizes ("6/6"; one number is a single round robin)
+  const first = () => {
+    const groups = groupsBy[0];
+    const out = [poolsRow('data-pcount', 'data-psizes', P[0].sizes || groups.map((g) => g.members.length), Math.floor(t / 2))];
+    if (groups.length > 1) out.push(`<span class="pkl">Seeding</span><span>${menu('data-seed', [['snake', 'Snake by roster order'], ['random', 'Random']], plan.seeding)}</span>`);
+    roomRows(0, out, 'pools');
+    return `<div class="pkgrid">${out.join('')}</div>`;
+  };
+  // a later phase: pools by finish, the same pools again, or elimination
+  const later = (p) => {
+    const ph = P[p];
+    const groups = groupsBy[p];
+    const out = [];
+    const prev = groupsBy[p - 1];
+    const prevName = P[p - 1].name.toLowerCase();
+    const type = ph.same ? 'same' : ph.kind === 'pools' ? 'brackets' : ph.kind;
+    out.push(`<span class="pkl">Type</span><span>${menu(`data-type="${p}"`, TYPES, type)}</span>`);
+    const warnings = [];
+    if (type === 'brackets') {
+      const sizes = ph.sizes || groups.map((g) => g.members.length);
+      const playing = prev.reduce((k, g) => k + g.members.length, 0);
+      const sum = sizes.reduce((a, b) => a + b, 0);
+      out.push(poolsRow(`data-count="${p}"`, `data-sizes="${p}"`, sizes, Math.max(1, Math.floor(playing / 2))));
+      if (sum > playing) warnings.push(`The pools hold ${sum} teams, but only ${playing} play on.`);
+      else if (sum < playing) out.push(`<span></span><span class="pkhelp">The other ${playing - sum} teams are done after ${esc(prevName)}.</span>`);
+      if (groups.some((g) => new Set(g.members.map((m) => m.from)).size < g.members.length)) {
+        out.push(`<span class="pkl">Crossover</span><label class="pkcheck"><input type="checkbox" data-carry="${p}" ${ph.carry ? 'checked' : ''}> Teams from the same pool don’t play again</label>`);
+      }
+      out.push(`<span></span>${who(groups)}`);
+      if (groups.split && groups.split.length) {
+        const pl = andList(groups.split.map((x) => ORDN(x)));
+        out.push(`<span></span><span class="pkhelp pknote">${groups.split.length === 1 ? `Only some ${pl}-place teams` : `Only some teams of ${pl} place`} go up. They are compared by winning percentage, then points per 20 tossups heard.</span>`);
+      }
+    } else if (type === 'single' || type === 'double') {
+      const full = Math.max(...prev.map((g) => g.members.length));
+      out.push(`<span class="pkl">Who plays</span><span class="pkrow">The top <input type="number" class="pkcount" min="1" max="${full}" value="${ph.top || full}" data-top="${p}"> <span class="muted">from each pool</span></span>`);
+      if (type === 'double') out.push(`<span></span><label class="pkcheck"><input type="checkbox" data-reset="${p}" ${ph.reset ? 'checked' : ''}> A second final if the unbeaten team loses</label>`);
+    }
+    for (const c of rebracketChecks(groupsBy, P, p)) if (!c.ok) warnings.push(c.text);
+    out.push(warn(warnings));
+    roomRows(p, out, 'pools');
+    return `<div class="pkgrid">${out.join('')}</div>`;
+  };
+
+  const rebracketing = P.some((x, i) => i > 0 && !x.same && x.kind === 'pools');
+  const canCopy = (p) => P[p].kind === 'pools' && groupsBy[p].some((g) => g.members.length > 1);
+  const headOf = (p) => `<h3 class="pksec"><input class="pkname" data-name="${p}" size="${Math.max(6, P[p].name.length + 1)}" value="${esc(P[p].name)}" aria-label="Phase name"> ${nr(p)}
+    <span class="pktools">${canCopy(p) ? `<button class="linkbtn" data-copy="${p}">Copy this phase</button>` : ''}${p > 0 ? `<button class="linkbtn" data-del="${p}">Remove</button>` : ''}</span></h3>`;
+  const canAdd = P[P.length - 1].kind === 'pools' && groupsBy[P.length - 1].some((g) => g.members.length > 1);
+  // Finals: 1st against 2nd of the top pool (or the two top pools' winners)
+  const finals = (() => {
+    if (P.length < 2 && groupsBy[0].length > 1) return null;
+    return addFinals({ phases: [{ rounds: [{ round: 0 }] }], brackets: [] }, groupsBy, P);
+  })();
+  const finalsBox = finals ? `<h3 class="pksec">Finals</h3><div class="pkgrid">
+      <span></span><label class="pkcheck"><input type="checkbox" data-finals ${plan.finals ? 'checked' : ''}> Enable finals sequence if needed</label>
+      ${plan.finals ? `<span></span><span class="pkhelp">${finals.parallel ? 'One game between the two top pools’ winners.'
+        : 'If leader clears by two games, no final. Advantaged final if leader is up by one game, otherwise one game final.'}</span>
+      <span class="pkl">Ties</span><span>${menu('data-fties', TIES, plan.finalTies || 'pp20')}
+        ${plan.finalTies === 'game' ? '<span class="pkhelp">A round is kept free before the finals for a tiebreaker game, if needed.</span>' : ''}</span>` : ''}
+    </div>` : '';
+  const fin = plan.finals && finals ? (finals.parallel ? 1 : 2) : 0;
+  const total = pv.ok ? pv.rounds.reduce((a, b) => a + b, 0) : 0;
+  const tb = (pv.tiebreak || 0) + (fin && plan.finalTies === 'game' ? 1 : 0);
+  const extra = [tb ? `${tb} for tiebreakers` : '', fin ? (fin === 1 ? 'a final' : '2 for finals') : ''].filter(Boolean);
+  const optOf = (f) => `<option value="${esc(f.key)}" ${f.key === plan.fmt ? 'selected' : ''}${f.rooms > n ? ' disabled' : ''}>${esc(f.label)}${f.rooms > n ? ` (needs ${f.rooms} rooms)` : ''}</option>`;
+
+  box.innerHTML = `${back}
+    <div class="pkpick">
+      <div class="pkgrid">
+        <span class="pkl">Rooms</span><span class="pkrow"><span>${n} rooms for ${t} teams</span><span class="muted">from the Rooms step</span></span>
+        <span class="pkl">Format</span><span><select data-fmt>${formatList(t).map(optOf).join('')}<option value="custom" ${plan.fmt === 'custom' ? 'selected' : ''}>Custom</option></select></span>
+        ${rebracketing ? `<span class="pkl">Rebracketing ties</span><span>${menu('data-ties', TIES, plan.ties || 'pp20')}
+          ${plan.ties === 'game' ? '<span class="pkhelp">A round is kept free before each rebracketing for tiebreaker games, if needed.</span>' : ''}</span>` : ''}
+      </div>
+      ${P.map((_, p) => headOf(p) + (p === 0 ? first() : later(p))).join('')}
+      ${canAdd ? '<div><button class="linkbtn pkadd" data-add>Add another phase</button></div>' : ''}
+      ${finalsBox}
+      <div class="sgpreview pktotalbox">${pv.ok
+        ? `<span class="pktotal"><b>${total} rounds</b>${extra.length ? ` <span>plus up to ${extra.join(' and ')}</span>` : ''}</span><span class="muted">${esc(pv.text.split(' · ').slice(1).join(' · '))}</span>`
+        : `<span class="pkwarn"><span>${esc(pv.text)}</span></span>`}</div>
+      <div class="row pkfoot"><button id="schedgen" class="primary" ${pv.ok ? '' : 'disabled'}>Generate</button>
+        <span class="sgseed">Seed <b>${ui.opts.seed}</b> <button id="optreroll" class="small">Reroll</button></span></div>
+    </div>`;
+  wireBack();
+
+  // each change redraws; a change to the structure turns Format to Custom
+  // (seeding, ties and rooms don't)
+  const each = (attr, ev, fn, shape = true) => box.querySelectorAll(`[${attr}]`).forEach((el) => {
+    el[ev] = () => { fn(el, Number(el.getAttribute(attr))); if (shape) plan.fmt = 'custom'; again(); };
+  });
+  each('data-fmt', 'onchange', (el) => {
+    if (el.value === 'custom') { plan.fmt = 'custom'; return; }
+    ui.plan = { ...planFor(el.value, t, plan), teams: t };
+  }, false);
+  // the prelims changed: later phases go back to the default split
+  const resplit = () => {
+    for (let i = 1; i < P.length; i++) {
+      const x = P[i];
+      if (x.same || x.kind !== 'pools') continue;
+      Object.assign(x, standardNext(planGroups(env.teams, P.slice(0, i), plan.seeding, () => 0.5)[i - 1]));
+    }
+  };
+  each('data-pcount', 'onchange', (el) => {
+    const k = Math.max(1, Math.min(Math.floor(t / 2), Number(el.value) || 1));
+    Object.assign(P[0], { sizes: poolSizes(t, k), groups: k });
+    if (P[0].name === 'Round robin' && k > 1) P[0].name = 'Prelims';
+    if (k === 1 && P.length === 1) P[0].name = 'Round robin';
+    resplit();
+  });
+  each('data-psizes', 'onchange', (el) => {
+    const sizes = el.value.split(/[^\d]+/).map(Number).filter((x) => x > 0);
+    if (!sizes.length) return;
+    Object.assign(P[0], { sizes, groups: sizes.length });
+    resplit();
+  });
+  each('data-count', 'onchange', (el, p) => { P[p].sizes = placeSizes(groupsBy[p - 1], Math.max(1, Number(el.value) || 1)); P[p].per = 1; });
+  each('data-sizes', 'onchange', (el, p) => {
+    const sizes = el.value.split(/[^\d]+/).map(Number).filter((x) => x > 0);
+    P[p].sizes = sizes.length ? sizes : null;
+  });
+  each('data-type', 'onchange', (el, p) => {
+    const v = el.value;
+    Object.assign(P[p], { same: v === 'same', kind: v === 'single' || v === 'double' ? v : 'pools', sizes: null, top: 0 });
+    if (v === 'brackets') Object.assign(P[p], standardNext(groupsBy[p - 1]));
+    // elimination usually takes the top teams: start on the top 2 of each pool
+    if (v === 'single' || v === 'double') { P[p].top = Math.min(2, Math.ceil(t / P[p - 1].groups)); P.splice(p + 1); }
+  });
+  each('data-seed', 'onchange', (el) => { plan.seeding = el.value; }, false);
+  each('data-ties', 'onchange', (el) => { plan.ties = el.value; }, false);
+  each('data-fties', 'onchange', (el) => { plan.finalTies = el.value; }, false);
+  each('data-finals', 'onchange', (el) => { plan.finals = el.checked; }, false);
+  each('data-top', 'onchange', (el, p) => { P[p].top = Math.max(1, Number(el.value) || 1); });
+  each('data-carry', 'onchange', (el, p) => { P[p].carry = el.checked; });
+  each('data-reset', 'onchange', (el, p) => { P[p].reset = el.checked; });
+  each('data-share', 'onchange', (el, p) => { P[p].share = el.checked; P[p].n = Math.min(P[p].n || groupsBy[p].length, n); }, false);
+  each('data-n', 'onchange', (el, p) => { P[p].n = Math.max(1, Math.min(n, Number(el.value) || 1)); }, false);
+  each('data-mode', 'onchange', (el, p) => { P[p].mode = el.value; }, false);
+  each('data-name', 'onchange', (el, p) => { P[p].name = el.value.trim() || P[p].name; }, false);
+  each('data-copy', 'onclick', (el, p) => { P.splice(p + 1, 0, copyOf(P, p)); });
+  each('data-del', 'onclick', (el, p) => { P.splice(p, 1); });
+  each('data-add', 'onclick', () => {
+    const prev = groupsBy[P.length - 1];
+    // after tiered pools a re-cut would give the same pools back: play them again
+    if (new Set(prev.map((g) => g.tier || 0)).size > 1) { P.push(phase('Phase ' + (P.length + 1), { same: true, mode: P[P.length - 1].mode })); return; }
+    P.push(phase(P.length > 1 ? 'Phase ' + (P.length + 1) : 'Playoffs', { mode: P[P.length - 1].mode, carry: P[0].groups > 1, ...standardNext(prev) }));
+  });
+  const reroll = box.querySelector('#optreroll');
+  reroll.onclick = () => { ui.opts.seed = 1 + Math.floor(Math.random() * 9999); again(); };
+  box.querySelector('#schedgen').onclick = async () => {
+    const label = plan.fmt === 'custom' ? 'custom format' : (formatList(t).find((f) => f.key === plan.fmt) || {}).label;
+    if (env.sched() && !confirm(`Replace the current schedule with ${plan.fmt === 'custom' ? 'a custom format' : label}?`)) return;
     let s;
     try {
-      s = buildSchedule(key, teams, roomList(env, nRooms), o);
-      s.format = key;
-      s.options = { ...o };
+      s = buildPlan(env.teams, roomList(env, n), withTies(plan), plan.seeding, ui.opts.seed);
+      if (plan.finals) addFinals(s, planGroups(env.teams, P, plan.seeding, () => 0.5), P, plan.finalTies);
+      tagBrackets(s);
+      s.format = plan.fmt;
+      const saved = JSON.parse(JSON.stringify(plan));
+      delete saved.teams;
+      s.options = { seed: ui.opts.seed, plan: saved };
     } catch (e) { env.say(e.message, true); return; }
     // a generated schedule goes live right away — Save is for edits after
-    const run = busy(q('schedgen'), { label: 'Generating' });
+    const run = busy(box.querySelector('#schedgen'), { label: 'Generating' });
     env.setSched(s);
     ui.creator = false;
     resetEditor();
@@ -299,12 +597,17 @@ function renderCreator(box, env) {
 const andList = (xs) => (xs.length < 3 ? xs.join(' and ') : xs.slice(0, -1).join(', ') + ', and ' + xs.at(-1));
 function fillCheckHtml(r) {
   const pp = (x) => (Math.round(x.pp20tuh * 100) / 100).toFixed(2);
+  // r.game: the schedule breaks rebracketing ties with a tiebreaker game
   const items = [
     ...r.missing.map((m) => `Round ${m.round}, ${esc(m.room)}: there is no game file for ${esc(m.a)} vs ${esc(m.b)}.`),
     ...r.extra.map((m) => `Round ${m.round}: a game file for ${esc(m.a)} vs ${esc(m.b)} was uploaded, but that game is not on the schedule.`),
-    ...r.ties.map((t) => `Pool ${esc(t.pool)}: ${andList(t.teams.map((x) => esc(x.name)))} are tied at ${t.record}. `
-      + 'Points per 20 tossups heard breaks the tie: '
+    ...r.ties.map((t) => `Pool ${esc(t.pool)}: ${andList(t.teams.map((x) => esc(x.name)))} are tied at ${t.record}. ` + (r.game
+      ? 'Please play a tiebreaker game, then place the teams by hand. Filling now orders them by points per 20 tossups heard: '
+      : 'Points per 20 tossups heard breaks the tie: ')
       + t.teams.map((x) => `${esc(x.name)} (${pp(x)}) goes to ${esc(x.bracket || 'no bracket')}`).join(', ') + '.'),
+    ...(r.compared || []).map((c) => `${ORDN(c.place)} places ${andList(c.teams.map((x) => `${esc(x.name)} (Pool ${esc(x.pool)}, ${x.record})`))} `
+      + `have the same winning percentage. ${r.game ? 'Please play a tiebreaker game, then place them by hand. Filling now goes by' : 'They go up by'} points per 20 tossups heard: `
+      + c.teams.map((x) => `${esc(x.name)} ${pp(x)}`).join(', ') + '.'),
   ];
   return `<div class="sgnotice sgfillcheck">
     <div><b>Before filling playoff slots</b>
@@ -418,11 +721,15 @@ function renderEditor(box, env) {
   const sel = ui.sel;
   const isSel = (o) => sel && Object.keys(o).every((k) => sel[k] === o[k]);
   const nRounds = phases.reduce((n, ph) => n + ph.rounds.length, 0);
-  const fmtName = (allFormats(env.teams.length).find((f) => f.key === s.format) || {}).name;
+  // the format's name: the picker's Format menu label, Custom, or (a
+  // schedule from before the picker) the engine format's name
+  const fmtName = s.options && s.options.plan
+    ? (s.format === 'custom' ? 'Custom' : ((formatList(env.teams.length).find((f) => f.key === s.format) || {}).label || '').replace(/ · \d+ rounds$/, ''))
+    : (allFormats(env.teams.length).find((f) => f.key === s.format) || {}).name;
   const unsaved = env.dirty();
 
   /* -- the grid, one section per phase -- */
-  const w = ui.dense ? 104 : 122;
+  const w = 122;
   const gridHtml = phases.map((ph, p) => {
     const only = ui.filter ? [ui.filter] : null;
     const lanes = phaseLanes(s, p, only);
@@ -434,16 +741,16 @@ function renderEditor(box, env) {
     const first = roundNo[p][0];
     const last = roundNo[p][roundNo[p].length - 1];
     // a lane the TD dragged keeps its own width (gridTracks); the rest take w
-    const byeW = ui.dense ? 84 : 96;
+    const byeW = 96;
     const tmpl = `${LEAD}px ${lanes.flatMap((l) => l.rooms.map(() => (ui.colW[l.key + '@' + p] || w) + 'px')).join(' ')} ${ui.byeW || byeW}px`;
     const grip = (id, n) => `<span class="sgresize" data-resize="${esc(id)}" data-n="${n}" title="Drag to change the width. Double-click to reset it."></span>`;
     return `
     <section class="sgphase">
       <button class="sgphasehead" data-phase="${p}"><span class="caret">${open ? '▾' : '▸'}</span>
-        <b>${esc(ph.name)}</b><span class="muted">${ph.rounds.length ? `rounds ${first}–${last}` : 'no rounds'}${
-        (ph.meet || 1) > 1 ? ` · pairs meet ${ph.meet} times` : ''}</span></button>
+        <b>${esc(ph.name)}</b><span class="muted">${ph.rounds.length ? (first === last ? `round ${first}` : `rounds ${first}–${last}`) : 'no rounds'}${
+        (ph.meet || 1) > 1 && ph.kind !== 'final' ? ` · pairs meet ${ph.meet} times` : ''}${ph.kind === 'tiebreak' ? ' · if needed' : ''}</span></button>
       ${open ? `
-      <div class="sggrid${ui.dense ? ' dense' : ''}" style="grid-template-columns:${tmpl}" data-col="${w}" data-auto="${w}" data-bye="${byeW}"
+      <div class="sggrid" style="grid-template-columns:${tmpl}" data-col="${w}" data-auto="${w}" data-bye="${byeW}"
         data-lanes="${esc(lanes.map((l) => l.key + '@' + p + ':' + l.rooms.length).join(','))}">
         <div class="sgcorner"></div>
         ${lanes.map((l) => `<div class="sglane lane-${colorOf.get(l.key + '@' + p) ?? 'x'}" style="grid-column:span ${l.rooms.length}"><i></i>${esc(l.name)}${grip(l.key + '@' + p, l.rooms.length)}</div>`).join('')}
@@ -468,8 +775,14 @@ function renderEditor(box, env) {
                 <button class="sgadd" data-emptycell='${JSON.stringify(cell)}' aria-label="Empty room: add or move a game here">${ui.mode === 'moveGame' ? 'Move here' : ''}</button></div>`;
             }
             const off = g.bracket && lanes.length && !lanes.some((l) => l.key === g.bracket && l.rooms.includes(room));
-            return `<div class="sgcell${csel ? ' on' : ''}${againCells.has(cellKey(cell)) ? ' again' : ''}" draggable="true" data-cell='${JSON.stringify(cell)}'>
+            // in the Shared rooms lane each game wears its bracket's color;
+            // a bracket chip picked above fades the others' games there
+            const sharedLane = lanes.some((l) => l.shared && l.rooms.includes(room));
+            const tint = off && sharedLane && colorOf.has(g.bracket + '@' + p) ? ` mx lane-${colorOf.get(g.bracket + '@' + p)}` : '';
+            const dim = sharedLane && ui.filter && g.bracket !== ui.filter ? ' dim' : '';
+            return `<div class="sgcell${csel ? ' on' : ''}${againCells.has(cellKey(cell)) ? ' again' : ''}${tint}${dim}" draggable="true" data-cell='${JSON.stringify(cell)}'>
               <button class="sgh" data-gh='${JSON.stringify(cell)}' title="Move or swap this whole game (or drag the card)" aria-label="Game options">&#8943;</button>
+              ${g.ifNeeded ? `<span class="sgtag sgifneeded" title="Played ${esc(typeof g.ifNeeded === 'string' ? g.ifNeeded : 'if needed')}">If needed</span>` : ''}
               ${off ? `<span class="sgtag" title="${esc(bracketName(g.bracket))}">${esc(bracketName(g.bracket))}</span>` : ''}
               ${['a', 'b'].map((side) => {
                 const v = g[side];
@@ -477,7 +790,7 @@ function renderEditor(box, env) {
                 const k = refKey(ref);
                 return `<button class="sgslot${!v ? ' none' : v.label ? ' ph' : ''}${bad.get(k) ? ' bad' : ''}${isSel({ kind: 'slot', ...ref }) ? ' on' : ''}"
                   draggable="${v ? 'true' : 'false'}" data-ref='${JSON.stringify(ref)}'>${v ? esc(slotShow(v)) : 'empty'}</button>`;
-              }).join(ui.dense ? '<span class="sgv">–</span>' : '')}
+              }).join('')}
             </div>`;
           }).join('')}
           <div class="sgbyes" data-byes="${p}.${r}">${round.byes.map((v, i) => {
@@ -571,7 +884,6 @@ function renderEditor(box, env) {
           + bs.map((b) => `<button class="chip${ui.filter === b.key ? ' on' : ''}" data-filter="${esc(b.key)}"><i class="lane-${colorOf.get(b.key + '@' + b.phase)}"></i>${esc(b.name)}</button>`).join('');
       }).join('')}
       <span class="spacer" style="flex:1"></span>
-      ${ui.view === 'grid' ? `<button class="small" id="scheddense">${ui.dense ? 'Comfortable' : 'Compact'}</button>` : ''}
     </div>
     <div class="sgbar${unsaved ? ' unsaved' : ''}">
       <b>${unsaved ? (ui.past.length ? ui.past.length + ' unsaved change' + (ui.past.length === 1 ? '' : 's') : 'Unsaved changes') : 'Saved'}</b>
@@ -581,8 +893,7 @@ function renderEditor(box, env) {
         : '<span class="sgclear">Checks all clear</span>'}
       <span class="spacer" style="flex:1"></span>
       <button id="schedaddround" class="small">Add round</button>
-      <button id="schedaddroom" class="small">Add room</button>
-      <button id="schedroomsbtn" class="small">Rooms</button>
+      <button id="schedaddphase" class="small">Add phase</button>
       ${s.pools && hasPlaceholders(s) ? '<button id="schedfill" class="small">Fill playoff slots from standings</button>' : ''}
       <button id="schedundo" class="small" ${ui.past.length ? '' : 'disabled'}>Undo</button>
       <button id="schedredo" class="small" ${ui.future.length ? '' : 'disabled'}>Redo</button>
@@ -591,17 +902,7 @@ function renderEditor(box, env) {
       <button id="scheddel" class="small sgdel">Delete</button>
     </div>
     ${ui.fillCheck ? fillCheckHtml(ui.fillCheck) : ''}
-    <div id="schedroomspanel" class="sgroomspanel" ${ui.roomsOpen ? '' : 'hidden'}>
-      ${s.rooms.map((r, i) => `
-      <div class="row">
-        <input data-roomname="${i}" value="${esc(r.name)}" size="20" aria-label="Room name">
-        <select data-roombucket="${i}" aria-label="Linked room page">
-          <option value="">Not linked</option>
-          ${env.buckets.map((b) => `<option value="${b.id}" ${b.id === r.bucket ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}
-        </select>
-      </div>`).join('')}
-      <div class="muted small">A linked room's reader preselects its scheduled teams.</div>
-    </div>
+    ${ui.addPhase ? addPhaseForm(s) : ''}
     <div class="sgbody">
       <div class="sgscroll" id="sgscroll">${ui.view === 'teams' ? teamHtml : ui.view === 'brackets' ? mapHtml : gridHtml}</div>
       <aside class="sgside${ui.mode === 'trade' ? ' trading' : ''}"${ui.full && !ui.sel && !ui.mode && !ui.sideOpen ? ' hidden' : ''}>
@@ -640,7 +941,6 @@ function renderEditor(box, env) {
   $$('[data-view2]').forEach((b) => { b.onclick = () => { ui.view = b.dataset.view2; again(); }; });
   $$('[data-filter]').forEach((b) => { b.onclick = () => { ui.filter = b.dataset.filter; if (ui.view === 'brackets') ui.view = 'grid'; ui.scrollPos = null; again(); }; });
   $$('[data-phase]').forEach((b) => { b.onclick = () => { const p = Number(b.dataset.phase); if (ui.closed.has(p)) ui.closed.delete(p); else ui.closed.add(p); again(); }; });
-  if (q('scheddense')) q('scheddense').onclick = () => { ui.dense = !ui.dense; again(); };
   // Drag the right edge of a pool's heading (or of Byes) to set the width
   // of its columns; the drag is spread over the lane's rooms. Widths live
   // in ui.colW / ui.byeW until the page is reloaded.
@@ -823,21 +1123,16 @@ function renderEditor(box, env) {
 
   /* -- toolbar -- */
   q('schedaddround').onclick = () => edit('Added a round', (ss) => addRound(ss, ss.phases.length - 1));
-  q('schedaddroom').onclick = () => edit('Added a room', (ss) => addRoomCol(ss, 'Room ' + (ss.rooms.length + 1)));
-  q('schedroomsbtn').onclick = () => { ui.roomsOpen = !ui.roomsOpen; again(); };
-  $$('[data-roomname]').forEach((inp) => {
-    inp.onchange = () => edit('Renamed a room', (ss) => { ss.rooms[Number(inp.dataset.roomname)].name = inp.value.trim() || inp.value; });
-  });
-  $$('[data-roombucket]').forEach((sl) => {
-    sl.onchange = () => edit('Linked a room', (ss) => { ss.rooms[Number(sl.dataset.roombucket)].bucket = sl.value ? Number(sl.value) : null; });
-  });
+  q('schedaddphase').onclick = () => { ui.addPhase = !ui.addPhase; again(); };
+  wireAddPhase(box, s, edit, again);
   if (q('schedfill')) {
     q('schedfill').onclick = async () => {
       env.say('Computing standings…');
       try {
         const report = await env.fill();
         if (!report) { env.say('No game files uploaded yet — nothing to rank', true); return; }
-        if (report.missing.length || report.extra.length || report.ties.length) {
+        report.game = !!(s.options && s.options.plan && s.options.plan.ties === 'game');
+        if (report.missing.length || report.extra.length || report.ties.length || (report.compared || []).length) {
           ui.fillCheck = report;
           env.say('Please look over the notes above the grid before filling.');
           again();
@@ -916,11 +1211,56 @@ function renderEditor(box, env) {
   q('schedregen').onclick = () => {
     if (env.dirty() && !confirm('You have unsaved edits. Pick a new format anyway? (Nothing changes until you press Generate.)')) return;
     ui.creator = true;
-    ui.fmt = s.format || ui.fmt;
-    if (s.options) ui.opts = { ...ui.opts, ...s.options };
-    // pools always keep a block of rooms now: the old names for that
-    ui.opts.rooms = { blocks: 'keep', blockrotate: 'rotate' }[ui.opts.rooms] || ui.opts.rooms;
+    ui.plan = null; // the picker starts from the schedule's plan, or the default
+    if (s.options && s.options.seed) ui.opts.seed = s.options.seed;
     renderCreator(box, env);
+  };
+}
+
+/* ---------- Add phase (a finals phase after the last one) ---------- */
+
+// The form: a name, the first game (a place in a bracket of the last
+// phase against another), and whether a second game follows if the
+// first-place team loses (an advantaged final).
+function addPhaseForm(s) {
+  const last = s.phases.length - 1;
+  const brs = (s.brackets || []).filter((b) => b.phase === last);
+  const size = (key) => new Set(s.phases[last].rounds.flatMap((r) => r.games.filter((g) => g.bracket === key)
+    .flatMap((g) => [slotText(g.a), slotText(g.b)]))).size;
+  const top = brs[0] ? brs[0].key : '';
+  const places = (on) => Array.from({ length: Math.max(2, size(top)) }, (_, i) =>
+    `<option value="${i + 1}" ${i + 1 === on ? 'selected' : ''}>${ORDN(i + 1)}</option>`).join('');
+  const opts = brs.map((b) => `<option value="${esc(b.key)}">${esc(b.name)}</option>`).join('');
+  return `<div class="sgnotice pkaddphase">
+    <div class="pkgrid">
+      <span class="pkl">Name</span><span><input data-apname value="Finals" size="16"></span>
+      <span class="pkl">First game</span><span class="pkrow"><select data-apa>${places(1)}</select> in <select data-apab>${opts}</select>
+        <span class="muted">against</span> <select data-apb>${places(2)}</select> in <select data-apbb>${opts}</select></span>
+      <span></span><label class="pkcheck"><input type="checkbox" data-apif checked> Play a second game if the first-place team loses</label>
+    </div>
+    <div class="row"><button class="small primary" id="schedapgo">Add phase</button><button class="small" id="schedapno">Cancel</button></div>
+  </div>`;
+}
+function wireAddPhase(box, s, edit, again) {
+  const q = (a) => box.querySelector(a);
+  if (!q('#schedapgo')) return;
+  q('#schedapno').onclick = () => { ui.addPhase = false; again(); };
+  q('#schedapgo').onclick = () => {
+    const last = s.phases.length - 1;
+    const nameOf = (k) => ((s.brackets || []).find((b) => b.key === k && b.phase === last) || {}).name || '';
+    const a = { label: `${ORDN(Number(q('[data-apa]').value))} in ${nameOf(q('[data-apab]').value)}` };
+    const b = { label: `${ORDN(Number(q('[data-apb]').value))} in ${nameOf(q('[data-apbb]').value)}` };
+    const name = q('[data-apname]').value.trim() || 'Finals';
+    const twice = q('[data-apif]').checked;
+    ui.addPhase = false;
+    edit(`Added ${name}`, (ss) => {
+      let round = Math.max(...ss.phases.flatMap((ph) => ph.rounds.map((r) => r.round))) + 1;
+      const key = 'FN' + (ss.phases.length + 1);
+      const rounds = [{ round: round++, games: [{ room: 0, a, b, bracket: key }], byes: [] }];
+      if (twice) rounds.push({ round: round++, games: [{ room: 0, a: { ...a }, b: { ...b }, bracket: key, ifNeeded: 'if the first-place team loses the first game' }], byes: [] });
+      ss.phases.push({ name, rounds, meet: twice ? 2 : 1, kind: 'final' });
+      ss.brackets = [...(ss.brackets || []), { key, name, phase: ss.phases.length - 1 }];
+    });
   };
 }
 

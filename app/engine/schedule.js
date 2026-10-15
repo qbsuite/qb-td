@@ -709,8 +709,20 @@ export function bracketRooms(schedule, brackets) {
  * in `only` (a key list) when given.
  */
 export function phaseLanes(schedule, p, only) {
+  // rooms that more than one bracket uses in this phase (rooms shared by
+  // pools) gather in a "Shared rooms" lane; each game there says its bracket
+  const use = new Map();
+  for (const r of schedule.phases[p].rounds) {
+    for (const g of r.games) {
+      if (!g.bracket || !(g.a || g.b)) continue;
+      if (!use.has(g.room)) use.set(g.room, new Set());
+      use.get(g.room).add(g.bracket);
+    }
+  }
+  const shared = [...use].filter(([, set]) => set.size > 1).map(([room]) => room).sort((x, y) => x - y);
   const brs = bracketRooms(schedule).filter((b) => b.phase === p && (!only || only.includes(b.key)));
-  const lanes = brs.filter((b) => b.rooms.length).map((b) => ({ key: b.key, name: b.name, rooms: b.rooms }));
+  const lanes = brs.map((b) => ({ key: b.key, name: b.name, rooms: b.rooms.filter((i) => !shared.includes(i)) })).filter((l) => l.rooms.length);
+  if (shared.length) lanes.push({ key: '', name: 'Shared rooms', rooms: shared, shared: true });
   if (!only) {
     const used = new Set(lanes.flatMap((l) => l.rooms));
     const other = schedule.rooms.map((_, i) => i).filter((i) => !used.has(i));
@@ -745,7 +757,9 @@ export function scheduleChecks(schedule) {
         if (rooms.length > 1) out.push({ sev: 0, kind: 'twice', p, r: ri, key: t, room: rooms.find((x) => x !== 'bye'), text: `Round ${r.round}: ${t} is in two places` });
       }
       const empty = r.games.every((g) => !g.a && !g.b) && !r.byes.length;
-      if (!empty) {
+      // a tiebreaker round, finals and elimination (plan.js `kind`): most
+      // slots wait on results, so a team without a game is how they work
+      if (!empty && !ph.kind) {
         const missing = [...expected].filter((t) => !where.has(t));
         if (missing.length) {
           out.push({ sev: 0, kind: 'missing', p, r: ri, key: missing[0],
@@ -891,7 +905,12 @@ export function removeRoomCol(schedule, roomIndex) {
 
 /* ---------- playoff placeholders ---------- */
 
-const PH_RE = /^([A-D])(\d+)$/;
+const PH_RE = /^([A-Z])(\d+)$/;
+// a place compared across pools ("Better 4th place", "Other 4th place",
+// "Best 2nd place", "3rd-best 2nd place"): plan.js makes these when a
+// pool's edge cuts a place
+const CMP_RE = /^(Better|Other|Best|(\d+)(?:st|nd|rd|th)-best) (\d+)(?:st|nd|rd|th) place$/;
+const cmpIndex = (m) => (m[1] === 'Better' || m[1] === 'Best' ? 0 : m[1] === 'Other' ? 1 : Number(m[2]) - 1);
 
 /** True when any slot in the schedule is still a placeholder. */
 export function hasPlaceholders(schedule) {
@@ -984,16 +1003,45 @@ export function fillReport(schedule, agg) {
       i = j;
     }
   }
-  return { ranks, missing, extra, ties };
+  // A place compared across pools: its teams by winning percentage, then
+  // points per 20 tossups heard (the pools may differ in size). A tie in
+  // winning percentage is listed with how points per 20 broke it, or that
+  // it couldn't.
+  const compared = [];
+  const places = new Set();
+  for (const ph of schedule.phases) for (const r of ph.rounds) {
+    for (const x of [...r.games.flatMap((g) => [g.a, g.b]), ...r.byes]) {
+      const c = x && x.label ? CMP_RE.exec(x.label) : null;
+      if (c) places.add(Number(c[3]));
+    }
+  }
+  const pct = (x) => (x.w + (x.t || 0) / 2) / Math.max(1, x.w + x.l + (x.t || 0));
+  const poolLists = Object.entries(ranks);
+  for (const place of [...places].sort((a, b) => a - b)) {
+    const teams = poolLists.map(([pool, list]) => ({ pool, name: list[place - 1] }))
+      .filter((x) => x.name && row.has(x.name)).map((x) => ({ ...x, ...row.get(x.name) }));
+    teams.sort((x, y) => pct(y) - pct(x) || y.pp20tuh - x.pp20tuh);
+    ranks['#' + place] = teams.map((x) => x.name);
+    for (let i = 0; i < teams.length;) {
+      let j = i + 1;
+      while (j < teams.length && pct(teams[j]) === pct(teams[i])) j++;
+      if (j - i > 1) compared.push({ place, teams: teams.slice(i, j).map((x) => ({ name: x.name, pool: x.pool, pp20tuh: x.pp20tuh,
+        record: x.w + '–' + x.l + (x.t ? '–' + x.t : '') })) });
+      i = j;
+    }
+  }
+  return { ranks, missing, extra, ties, compared };
 }
 
 export function fillPlaceholders(schedule, poolRanks) {
   let filled = 0;
   const resolve = (slot) => {
     if (!slot || !slot.label) return slot;
-    const m = PH_RE.exec(slot.label);
-    if (!m) return slot;
-    const team = (poolRanks[m[1]] || [])[Number(m[2]) - 1];
+    const c = CMP_RE.exec(slot.label);
+    const m = c ? null : PH_RE.exec(slot.label);
+    if (!m && !c) return slot;
+    // a compared place reads its order from poolRanks['#4'] (fillReport)
+    const team = c ? (poolRanks['#' + c[3]] || [])[cmpIndex(c)] : (poolRanks[m[1]] || [])[Number(m[2]) - 1];
     if (!team) return slot;
     filled++;
     // `from` keeps the slot it filled, so pages can say "Stanford (A1)"

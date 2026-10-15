@@ -282,6 +282,38 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 .linkbtn { border: none; background: none; padding: 0; color: var(--link); font: inherit; font-size: 14px; cursor: pointer; }
 .linkbtn:hover { text-decoration: underline; }
 
+/* picker (schededit.js renderCreator): a column of label / setting rows,
+   a section per phase, the round count big above Generate */
+.pkpick { display: grid; gap: 14px; max-width: 720px; margin: 4px 0 6px; font-size: 14px; }
+.pkgrid { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px 16px; align-items: baseline; }
+.pkgrid select { width: auto; max-width: 100%; }
+.pkl { color: var(--muted); }
+.pksec { font-size: 15px; font-weight: 600; margin: 10px 0 0; padding-top: 12px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; }
+.pkname { font: inherit; font-weight: 600; border: 1px solid transparent; border-radius: 6px; padding: 1px 6px; margin-left: -7px; background: none; color: var(--fg); width: auto; }
+.pkname:hover, .pkname:focus { border-color: var(--line); }
+.pkrounds { font-size: 13px; font-weight: 400; color: var(--muted); }
+.pktools { margin-left: auto; display: flex; gap: 14px; }
+.pktools .linkbtn { font-size: 13px; font-weight: 400; }
+.pkadd { font-size: 14px; }
+.pkhelp { display: block; font-size: 13px; color: var(--muted); margin-top: 4px; max-width: 60ch; }
+.pknote { color: var(--fg); }
+.pkwarn { display: grid; gap: 4px; font-size: 13px; color: var(--warn); }
+.pkwarn span::before { content: "! "; font-weight: 700; }
+.pkrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pkrow input.pkcount, .pkshared input { width: 56px; }
+.pkrow input.pksizes { width: 160px; font-variant-numeric: tabular-nums; }
+.pkcheck { display: inline-flex; gap: 8px; align-items: center; }
+.pkshared { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.pktotalbox { margin: 6px 0 0; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.pktotal { font-size: 22px; color: var(--fg); }
+.pktotal b { font-weight: 600; }
+.pktotal span { font-size: 15px; color: var(--muted); }
+.pkfoot { gap: 16px; align-items: center; }
+.pkaddphase { flex-direction: column; align-items: stretch; gap: 10px; }
+@media (max-width: 560px) {
+  .pkgrid { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .pkgrid .pkl { margin-top: 8px; }
+}
 /* picker */
 .sgnotice { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--sel); margin-bottom: 12px; font-size: 14px; }
 .sgfillcheck { align-items: flex-start; justify-content: space-between; margin: 8px 0; }
@@ -396,6 +428,13 @@ i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
 .sgcell:hover .sgh, .sgcell.on .sgh, .sgh:focus { opacity: 1; }
 .sgh:hover { background: var(--pick); color: var(--fg); }
 .sgtag { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the Shared rooms lane: a game wears its bracket's color; a picked chip fades the others */
+.sgcell.mx { box-shadow: inset 3px 0 0 var(--lc); background: color-mix(in srgb, var(--lt) 70%, transparent); padding-left: 9px; }
+.sgcell.mx:hover { background: var(--lt); }
+.sgcell.mx .sgtag { color: var(--lc); font-weight: 600; font-size: 10.5px; }
+.sgcell.mx.on { box-shadow: inset 3px 0 0 var(--lc), inset 0 0 0 2px var(--link); }
+.sgcell.dim { opacity: 0.28; }
+.sgifneeded { color: var(--warn); font-weight: 600; }
 .sgslot { display: block; max-width: 100%; text-align: left; border: none; border-radius: 4px; margin: 0 -3px; padding: 1px 3px;
   background: none; font: inherit; font-size: 13px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .sggrid.dense .sgslot { font-size: 12px; margin: 0; flex: 0 1 auto; }

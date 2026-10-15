@@ -24,6 +24,8 @@ import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzke
 import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
 import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
 import { checkPacket } from '../app/engine/packetcheck.js';
+import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms } from '../app/engine/plan.js';
+import HDWHITE from '../app/engine/hdwhite.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -4007,6 +4009,192 @@ test('brackets: filled playoff slots keep their label and still tag', () => {
   assert.equal(liveLayout(1), 'plain');
   assert.equal(liveLayout(2), 'columns');
   assert.equal(liveLayout(12), 'columns');
+});
+
+/* ---------- plan.js: the format picker's builder ---------- */
+
+const planPhase = (name, o = {}) => ({ name, kind: 'pools', groups: 1, top: 0, per: 1, pools: 1, cross: false, same: false, meets: 1,
+  carry: true, reset: true, byes: false, sizes: null, parallelTop: false, share: false, n: 3, mode: 'rotate', ...o });
+const planTeams = (t) => Array.from({ length: t }, (_, i) => 'T' + (i + 1));
+const planRooms = (n) => Array.from({ length: n }, (_, i) => ({ name: 'Room ' + (i + 1), bucket: null }));
+const pairsByPhase = (s) => s.phases.map((p) => p.rounds.flatMap((r) => r.games.map((g) => [slotText(g.a), slotText(g.b)].sort().join(' v '))).sort());
+const namesOf = (s) => s.phases.map((p) => p.name).join('|') + ' / ' + s.brackets.map((b) => b.key + '=' + b.name + '@' + b.phase).join(' ');
+// today's engine defaults as plans (the picker's mapping)
+function engineAsPlan(f, t) {
+  const rr = /^rr(\d?)$/.exec(f.key);
+  if (rr) {
+    const k = Number(rr[1]) || 1;
+    return Array.from({ length: k }, (_, i) => planPhase(k === 1 ? 'Round robin' : 'Round robin ' + (i + 1), i ? { same: true } : {}));
+  }
+  const m = /^pools(\d)(x2)?$/.exec(f.key);
+  const k = Number(m[1]);
+  return [planPhase('Prelims', { groups: k }), planPhase('Playoffs', { per: k === 2 ? -1 : m[2] ? 2 : 1 })];
+}
+
+test('plan: every engine default format comes out identical (pools, games, rounds, names)', () => {
+  let n = 0;
+  for (let t = 6; t <= 30; t++) {
+    for (const f of allFormats(t)) {
+      const teams = planTeams(t);
+      const rooms = planRooms(f.roomsNeeded);
+      const eng = buildSchedule(f.key, teams, rooms, {});
+      const mine = buildPlan(teams, rooms, engineAsPlan(f, t), 'snake', 1);
+      const label = `${t} ${f.key}`;
+      assert.deepEqual(mine.phases.map((p) => p.rounds.length), eng.phases.map((p) => p.rounds.length), label + ' rounds');
+      assert.deepEqual(pairsByPhase(mine), pairsByPhase(eng), label + ' games');
+      assert.deepEqual(mine.pools || null, eng.pools || null, label + ' pools');
+      assert.equal(namesOf(mine), namesOf(eng), label + ' names');
+      n++;
+    }
+  }
+  assert.equal(n, 105);
+});
+
+// hdwhite's formats as plans (the picker's mapping)
+function hdAsPlan(f) {
+  const out = [];
+  for (let c = 0; c < f.cycles; c++) {
+    const one = f.k === 1 && !f.sizes;
+    out.push(planPhase(one ? (f.cycles > 1 ? 'Round robin ' + (c + 1) : 'Round robin') : 'Prelims', { groups: f.k, same: c > 0, byes: f.byes }));
+  }
+  if (f.sizes) out.push(planPhase('Playoffs', { sizes: f.sizes, parallelTop: f.parallelTop, carry: f.k > 1 && !f.repeat,
+    per: f.k === 2 && f.sizes.length === 2 ? -1 : 1 }));
+  return out;
+}
+
+test('plan: hdwhite formats build with hdwhite round counts (14b and 21a one round shorter)', () => {
+  const shorter = [];
+  let n = 0;
+  for (const [t, list] of Object.entries(HDWHITE)) {
+    for (const f of list) {
+      const s = buildPlan(planTeams(Number(t)), planRooms(f.rooms), hdAsPlan(f), 'snake', 1);
+      const rounds = s.phases.reduce((k, p) => k + p.rounds.length, 0);
+      assert.ok(Math.max(...s.phases.flatMap((p) => p.rounds.map((r) => r.games.length))) <= f.rooms, f.key + ' fits hdwhite\'s rooms');
+      assert.deepEqual(scheduleChecks(s), [], f.key + ' checks');
+      if (rounds !== f.rounds) { assert.equal(rounds, f.rounds - 1, f.key); shorter.push(f.key); }
+      n++;
+    }
+  }
+  assert.equal(n, 61);
+  assert.deepEqual(shorter.sort(), ['14b', '21a']);
+});
+
+test('plan: hdwhite 23c (8/8/7 into 6/6/6/5) is the engine’s pools3x2 — the ACF Fall @ UIUC schedule', () => {
+  const teams = planTeams(23);
+  const f = HDWHITE[23].find((x) => x.key === '23c');
+  const eng = buildSchedule('pools3x2', teams, planRooms(11), {});
+  const mine = buildPlan(teams, planRooms(11), hdAsPlan(f), 'snake', 1);
+  assert.deepEqual(pairsByPhase(mine), pairsByPhase(eng));
+  assert.equal(namesOf(mine), namesOf(eng));
+  assert.deepEqual(mine.phases.map((p) => p.rounds.length), [7, 4]);
+});
+
+const poolSizesOf = (n, k) => Array.from({ length: k }, (_, i) => Math.floor(n / k) + (i < n % k ? 1 : 0));
+test('plan: every hdwhite field size and 48 builds sensibly, any pool count, with playoffs and finals', () => {
+  const sizes = [...Object.keys(HDWHITE).map(Number), 48];
+  let n = 0;
+  for (const t of sizes) {
+    const teams = planTeams(t);
+    for (let k = 1; k <= Math.floor(t / 3); k++) {
+      const prev = planGroups(teams, [planPhase('Prelims', { groups: k })], 'snake', () => 0.5)[0];
+      // the picker's default next phase: as many pools as before (2+), whole places
+      const deepest = Math.max(...prev.map((g) => g.members.length));
+      const at = (place) => prev.filter((g) => g.members.length >= place).length;
+      let place = 1;
+      const sizesOut = poolSizesOf(deepest, Math.min(deepest, Math.max(2, k))).map((m) => { let sum = 0; for (let i = 0; i < m; i++) sum += at(place++); return sum; });
+      if (sizesOut.length > 1 && sizesOut[sizesOut.length - 1] === 1) sizesOut.push(sizesOut.pop() + sizesOut.pop());
+      const P = [planPhase('Prelims', { groups: k }), planPhase('Playoffs', { sizes: sizesOut, carry: k > 1 })];
+      const s = buildPlan(teams, planRooms(Math.floor(t / 2)), P, 'snake', 1);
+      addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P);
+      assert.deepEqual(scheduleChecks(s), [], `${t} teams, ${k} pools`);
+      // every playoff pool has games for every team
+      for (const g of planGroups(teams, P, 'snake', () => 0.5)[1]) assert.ok(g.members.length > 1, `${t}/${k}: ${g.name} has one team`);
+      n++;
+    }
+  }
+  assert.equal(n, 182); // every hdwhite field size and 48, every pool count of 3+ teams
+});
+
+test('plan: crossover pools of equal parts take the fewest rounds, each cross pair once, no byes', () => {
+  for (const [q, m] of [[3, 4], [3, 6], [4, 4], [3, 8], [6, 2], [4, 3], [2, 5], [5, 4]]) {
+    const t = q * m;
+    const s = buildPlan(planTeams(t), planRooms(t), [planPhase('Prelims', { groups: q }), planPhase('Playoffs', { sizes: [t] })], 'snake', 1);
+    const pr = s.phases[1].rounds;
+    const pairs = pr.flatMap((r) => r.games.map((g) => [slotText(g.a), slotText(g.b)].sort().join('-')));
+    assert.equal(pr.length, (q - 1) * m, `${q}x${m} rounds`);
+    assert.equal(new Set(pairs).size, (q * (q - 1) / 2) * m * m, `${q}x${m} pairs`);
+    assert.equal(pr.reduce((c, r) => c + r.byes.length, 0), 0, `${q}x${m} byes`);
+  }
+  // 48 teams, 6 pools of 8, the top two of each pool together: 10 rounds, no byes
+  const P = [planPhase('Prelims', { groups: 6 }), planPhase('Playoffs', { per: 2 })];
+  const s = buildPlan(planTeams(48), planRooms(24), P, 'snake', 1);
+  assert.deepEqual(s.phases.map((p) => p.rounds.length), [7, 10]);
+  assert.equal(s.phases[1].rounds.reduce((c, r) => c + r.byes.length, 0), 0);
+});
+
+test('plan: a split place is compared across pools, and fill places it by winning percentage, then PP20', () => {
+  const teams = planTeams(13);
+  const P = [planPhase('Prelims', { sizes: [7, 6], groups: 2 }), planPhase('Playoffs', { sizes: [7, 6] })];
+  const g = planGroups(teams, P, 'snake', () => 0.5)[1];
+  assert.deepEqual(g[0].members.map((m) => m.slot.label), ['A1', 'B1', 'A2', 'B2', 'A3', 'B3', 'Better 4th place']);
+  assert.deepEqual(g[1].members.map((m) => m.slot.label).slice(0, 2), ['Other 4th place', 'A5']);
+  const s = buildPlan(teams, planRooms(7), P, 'snake', 1);
+  // B4 (4–2) beats A4 (4–3) on winning percentage
+  const row = (name, w, l, pp) => ({ name, w, l, t: 0, pp20tuh: pp });
+  const order = [...s.pools.A, ...s.pools.B];
+  const agg = { teams: order.map((n, i) => row(n, 10 - i, i, 100)), games: [] };
+  const A4 = s.pools.A[3], B4 = s.pools.B[3];
+  agg.teams.find((x) => x.name === A4).w = 4; agg.teams.find((x) => x.name === A4).l = 3;
+  agg.teams.find((x) => x.name === B4).w = 4; agg.teams.find((x) => x.name === B4).l = 2;
+  const rep = fillReport(s, agg);
+  assert.deepEqual(rep.ranks['#4'], [B4, A4]);
+  fillPlaceholders(s, rep.ranks);
+  const all = s.phases[1].rounds.flatMap((r) => r.games.flatMap((x) => [x.a, x.b]));
+  assert.ok(all.some((x) => x.team === B4 && x.from === 'Better 4th place'));
+  assert.ok(all.some((x) => x.team === A4 && x.from === 'Other 4th place'));
+  // the same winning percentage: listed, PP20 decides
+  agg.teams.find((x) => x.name === B4).l = 3;
+  agg.teams.find((x) => x.name === B4).pp20tuh = 150;
+  const rep2 = fillReport(buildPlan(teams, planRooms(7), P, 'snake', 1), agg);
+  assert.equal(rep2.compared.length, 1);
+  assert.deepEqual(rep2.ranks['#4'], [B4, A4]);
+});
+
+test('plan: pools past D fill from standings, and the editor names them', () => {
+  const teams = planTeams(20);
+  const P = [planPhase('Prelims', { groups: 5 }), planPhase('Playoffs', { per: 1 })];
+  const s = buildPlan(teams, planRooms(10), P, 'snake', 1);
+  const ranks = Object.fromEntries(Object.entries(s.pools).map(([k, v]) => [k, v]));
+  fillPlaceholders(s, ranks);
+  assert.ok(s.phases[1].rounds.every((r) => r.games.every((g) => g.a.team && g.b.team)));
+  assert.equal(fillPlaceholders(buildPlan(teams, planRooms(10), P, 'snake', 1), ranks) > 0, true);
+});
+
+test('plan: rooms shared by all pools get their own lane in the editor', () => {
+  const s = buildPlan(planTeams(18), planRooms(9), [planPhase('Prelims', { groups: 3, share: true, n: 3 })], 'snake', 1);
+  tagBrackets(s);
+  const lanes = phaseLanes(s, 0);
+  assert.deepEqual(lanes.map((l) => l.name), ['Pool A', 'Pool B', 'Pool C', 'Shared rooms']);
+  assert.deepEqual(lanes[3].rooms, [6, 7, 8]);
+  // a schedule without shared rooms keeps today's lanes
+  const plain = buildSchedule('pools3x2', planTeams(23), planRooms(11), {});
+  tagBrackets(plain);
+  assert.ok(!phaseLanes(plain, 0).some((l) => l.shared) && !phaseLanes(plain, 1).some((l) => l.shared));
+  void shareRooms;
+});
+
+test('plan: tiebreaker rounds, finals and elimination pass the editor’s checks', () => {
+  const teams = planTeams(12);
+  const P = [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { per: -1, ties: 'game' })];
+  const s = buildPlan(teams, planRooms(6), P, 'snake', 1);
+  addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P, 'game');
+  assert.deepEqual(s.phases.map((p) => p.name + (p.kind ? ':' + p.kind : '')), ['Prelims', 'Tiebreakers:tiebreak', 'Playoffs', 'Tiebreakers:tiebreak', 'Finals:final']);
+  assert.deepEqual(scheduleChecks(s), []);
+  const e = buildPlan(planTeams(16), planRooms(8), [planPhase('Prelims', { groups: 4 }), planPhase('Playoffs', { kind: 'double', top: 2 })], 'snake', 1);
+  assert.equal(e.phases[1].rounds.reduce((k, r) => k + r.games.length, 0), 15);
+  assert.deepEqual(scheduleChecks(e), []);
+  assert.deepEqual(rebracketChecks(planGroups(planTeams(16), [planPhase('Prelims', { groups: 4 }), planPhase('Playoffs', { kind: 'double', top: 2 })], 'snake', () => 0.5),
+    [planPhase('Prelims', { groups: 4 }), planPhase('Playoffs', { kind: 'double', top: 2 })], 1).filter((c) => !c.ok), []);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
