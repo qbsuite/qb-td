@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pools that share rooms</title>
+<!-- Throwaway mock. Each artboard is mixed-rooms-board.html in a frame:
+     the real schedule editor at a real laptop or phone width. -->
+<link rel="stylesheet" href="../app/css/td.css">
+<style>
+body { padding: 28px 32px 80px; }
+.mk-h1 { font-size: 26px; font-weight: 600; }
+.mk-lede { max-width: 82ch; color: var(--muted); margin: 8px 0 0; }
+.mk-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin: 20px 0 4px; max-width: 1400px; }
+.mk-opts h3 { font-size: 16px; font-weight: 600; }
+.mk-opts p { font-size: 14px; margin-top: 6px; }
+.mk-opts .lim { color: var(--muted); }
+.mk-sec { font-size: 20px; font-weight: 600; margin: 40px 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--fg); }
+.mk-sub { font-size: 16px; font-weight: 600; margin: 28px 0 0; }
+.mk-row { display: flex; gap: 24px; overflow-x: auto; padding: 16px 0 10px; align-items: flex-start; }
+.mk-col { flex: none; }
+.mk-cap { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mk-cap span { font-weight: 400; color: var(--muted); }
+iframe { border: 1px solid var(--line); border-radius: 10px; display: block; background: var(--bg); }
+.lap { width: 1440px; height: 1250px; zoom: 0.5; }
+.lapshort { width: 1440px; height: 620px; zoom: 0.5; }
+.phone { width: 390px; height: 1500px; zoom: 0.62; border-radius: 22px; }
+</style>
+</head>
+<body>
+<h1 class="mk-h1">Pools that share rooms</h1>
+<p class="mk-lede">Today the editor gives each room to the pool that plays in it most. When pools share a room, the room sits under one pool&rsquo;s heading, and the other pools&rsquo; games in it carry only a small grey label. The example has 18 teams in three pools. Each pool keeps two rooms of its own, and in each round, each pool sends one game to one of the three shared halls. You can click and drag in all of the artboards.</p>
+
+<h2 class="mk-sec">Format picker</h2>
+<p class="mk-lede">Today the picker gives each pool its own block of rooms. Each proposal adds a way to share rooms and keeps the current choices for how teams move between rooms.</p>
+<div class="mk-opts">
+  <div>
+    <h3>P1. One more choice in the Rooms menu</h3>
+    <p>The menu keeps today&rsquo;s three choices, now worded as &ldquo;Each pool has its own rooms, &hellip;&rdquo;, and adds &ldquo;Pools share all rooms, rotated evenly&rdquo;.</p>
+    <p class="lim">The choices get long, and the menu can only share all rooms or none.</p>
+  </div>
+  <div>
+    <h3>P2. Two menus</h3>
+    <p>&ldquo;Pool rooms&rdquo; picks whether each pool has its own rooms or the pools share all of them. &ldquo;Within those rooms&rdquo; holds today&rsquo;s three choices.</p>
+    <p class="lim">This also shares all rooms or none.</p>
+  </div>
+  <div>
+    <h3>P3. A count of shared rooms</h3>
+    <p>&ldquo;Rooms shared by all pools&rdquo; takes a number. 0 is today&rsquo;s schedule, the room count shares all rooms, and anything in between makes the last rooms shared, like the halls in the example. The preview names the shared rooms.</p>
+    <p class="lim">The shared rooms are always the last ones in the list. A TD who wants different rooms can reorder the rooms or move games afterward.</p>
+  </div>
+</div>
+<div id="picker"></div>
+
+<h2 class="mk-sec">Editor</h2>
+<p class="mk-lede">C is the chosen layout. A and B are kept here for comparison.</p>
+<div class="mk-opts">
+  <div>
+    <h3>A. One &ldquo;Rooms&rdquo; heading, games colored by pool</h3>
+    <p>When any room in a phase hosts more than one pool, that phase drops the pool headings. The rooms run in order under one heading, and each game shows its pool&rsquo;s color and name.</p>
+    <p class="lim">A pool&rsquo;s games are spread across the whole grid, even in the rooms it has to itself.</p>
+  </div>
+  <div>
+    <h3>B. Columns are a pool&rsquo;s games, and each game picks its room</h3>
+    <p>Each pool keeps its heading, and its columns become Game 1, Game 2 and Game 3. The room is a menu on each game, and a new check catches a room with two games in one round.</p>
+    <p class="lim">This is the biggest change, and moving a game to another room means using the menu instead of dragging.</p>
+  </div>
+  <div>
+    <h3>C. Shared rooms get a heading of their own (chosen)</h3>
+    <p>A room that only one pool uses stays under that pool&rsquo;s heading. Rooms that pools share move to a &ldquo;Shared rooms&rdquo; heading at the end, where each game shows its pool&rsquo;s color and name.</p>
+    <p class="lim">If all rooms are shared, this looks the same as A.</p>
+  </div>
+</div>
+<div id="rows"></div>
+
+<script>
+const frames = (vars, cls, theme) => `<div class="mk-row">${vars.map(([v, name, sub]) =>
+  `<div class="mk-col"><div class="mk-cap">${name} <span>${sub}</span></div><iframe class="${cls}" src="mixed-rooms-board.html?v=${v}&theme=${theme}" loading="eager"></iframe></div>`).join('')}</div>`;
+const PICK = [['pbefore', 'Before', 'the picker today'], ['p1', 'P1', 'one more menu choice'], ['p2', 'P2', 'two menus'], ['p3', 'P3', 'a count of shared rooms']];
+const ED = [['before', 'Before', 'the editor today'], ['a', 'A', 'one Rooms heading'], ['b', 'B', 'pool columns, room menus'], ['c', 'C', 'a Shared rooms heading']];
+document.getElementById('picker').innerHTML =
+  '<h3 class="mk-sub">Laptop</h3>' + frames(PICK, 'lapshort', 'lt') + frames(PICK, 'lapshort', 'dk')
+  + '<h3 class="mk-sub">Phone</h3>' + frames(PICK, 'phone', 'lt') + frames(PICK, 'phone', 'dk');
+document.getElementById('rows').innerHTML =
+  '<h3 class="mk-sub">Laptop</h3>' + frames(ED, 'lap', 'lt') + frames(ED, 'lap', 'dk')
+  + '<h3 class="mk-sub">Phone</h3>' + frames(ED, 'phone', 'lt') + frames(ED, 'phone', 'dk');
+</script>
+</body>
+</html>

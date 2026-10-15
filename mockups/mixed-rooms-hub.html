@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>qb-td</title>
+<!-- Throwaway mock: the real hub (app/index.html + admin.js) running the
+     demo, with three modules swapped by the import map:
+       the demo's data      -> 18 teams, 9 rooms, the last three shared by all pools
+       the schedule engine  -> proposal C's lanes (a "Shared rooms" heading)
+       the schedule step    -> proposal P3's "Rooms shared by all pools" in the picker
+     Open it as mixed-rooms-hub.html?a=demo; it goes straight to Setup >
+     Schedule (add &picker=1 for the format picker, &pk=a|b|before for the
+     picker: the proposal, or today's; &custom=1 to open on Custom). -->
+<script type="importmap">
+{ "imports": {
+  "./js/demo.js": "../app/js/demo.js",
+  "../app/demo/fixture.js": "./mixed-rooms-fixture.js",
+  "../app/engine/schedule.js": "./mixed-rooms-engine.js",
+  "../app/js/schededit.js": "./mixed-rooms-schededit.js"
+} }
+</script>
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/hub.css">
+<style>
+/* C: a game in a room that more than one pool uses wears its pool's color */
+.sgcell.mx { box-shadow: inset 3px 0 0 var(--lc); background: color-mix(in srgb, var(--lt) 70%, transparent); padding-left: 9px; }
+.sgcell.mx:hover { background: var(--lt); }
+.sgcell.mx .sgtag { color: var(--lc); font-weight: 600; font-size: 10.5px; }
+.sgcell.mx.on { box-shadow: inset 3px 0 0 var(--lc), inset 0 0 0 2px var(--link); }
+/* a pool chip picked above the grid: the other pools' games fade */
+.sgcell.dim { opacity: 0.28; }
+
+/* mock only: the Teams box in the corner */
+.mkmock { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; gap: 10px; align-items: center; padding: 8px 12px;
+  border: 1px dashed var(--warn); border-radius: 10px; background: var(--bg); font-size: 13px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.mkmock b { color: var(--warn); font-weight: 600; }
+.mkmock input { width: 60px; }
+
+/* the format picker proposal (?pk=a) */
+.mkpick { display: grid; gap: 14px; max-width: 720px; margin: 4px 0 6px; font-size: 14px; }
+.mkgrid { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px 16px; align-items: baseline; }
+.mkgrid select { width: auto; max-width: 100%; }
+.mkl { color: var(--muted); }
+.mksec { font-size: 15px; font-weight: 600; margin: 10px 0 0; padding-top: 12px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; }
+.mkrounds { font-size: 13px; font-weight: 400; color: var(--muted); }
+.mkhelp { display: block; font-size: 13px; color: var(--muted); margin-top: 4px; max-width: 60ch; }
+.mkcheck { display: inline-flex; gap: 8px; align-items: center; }
+.mknote { color: var(--fg); }
+.mkunder { display: flex; margin-top: 8px; }
+.mkname { font: inherit; font-weight: 600; border: 1px solid transparent; border-radius: 6px; padding: 1px 6px; margin-left: -7px; background: none; color: var(--fg); width: auto; }
+.mkname:hover, .mkname:focus { border-color: var(--line); }
+.mkadd { font-size: 14px; }
+.mkdel { margin-left: auto; font-size: 13px; font-weight: 400; }
+.mktools { margin-left: auto; display: flex; gap: 14px; }
+.mktools .linkbtn { font-size: 13px; font-weight: 400; }
+.mkgrid input[type=number] { width: 56px; }
+.mkwarn { display: grid; gap: 4px; font-size: 13px; color: var(--warn); }
+.mkwarn span::before { content: "! "; font-weight: 700; }
+.mkaddphase { flex-direction: column; align-items: stretch; gap: 10px; }
+.mkaddphase .row { display: flex; gap: 8px; }
+.mkrooms input.mkcount { width: 56px; }
+.mkrooms input.mksizes { width: 160px; font-variant-numeric: tabular-nums; }
+.mkchecks { display: grid; gap: 4px; font-size: 13px; }
+.mkchecks span { display: flex; gap: 8px; }
+.mkchecks b { width: 12px; flex: none; }
+.mkchecks .ok { color: var(--fg); }
+.mkchecks .ok b { color: var(--ok); }
+.mkchecks .warn { color: var(--warn); }
+.mkshared { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.mkshared input { width: 56px; }
+.mkrooms { display: flex; gap: 10px; align-items: center; }
+.mkrooms input { width: 64px; }
+.mkfoot { display: flex; gap: 16px; align-items: center; }
+.mkpick .sgpreview { margin: 6px 0 0; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.mktotal { font-size: 22px; color: var(--fg); }
+.mktotal b { font-weight: 600; }
+.mktotal span { font-size: 15px; color: var(--muted); }
+@media (max-width: 560px) {
+  .mkgrid { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .mkgrid .mkl { margin-top: 8px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <header class="sitehead">
+    <h1>qb-td</h1>
+    <a href="#" class="muted">All tournaments</a>
+    <span class="spacer"></span>
+    <a href="#" class="muted">About</a>
+    <a href="#" class="muted">Changelog</a>
+  </header>
+  <div id="msg"></div>
+  <div id="view"></div>
+</div>
+<div id="linkmodal" class="modalback" hidden></div>
+<!-- mock only: change the field size (reloads with ?teams=N) -->
+<form class="mkmock" id="mkmock">
+  <b>Mock only</b>
+  <label>Teams <input type="number" min="4" max="64" id="mkteams"></label>
+  <button>Show</button>
+</form>
+<script type="module" src="../app/js/admin.js"></script>
+<script type="module">
+// go to Setup > Schedule (and, with ?picker=1, open the format picker)
+const until = (fn) => new Promise((ok) => { const t = setInterval(() => { const el = fn(); if (el) { clearInterval(t); ok(el); } }, 50); });
+const go = async () => {
+  const setup = await until(() => document.querySelector('[data-view="setup"]'));
+  if (!setup.classList.contains('on')) setup.click();
+  (await until(() => document.querySelector('[data-step="sched"]'))).click();
+  // the demo always has two room links; this tournament has nine (or one
+  // per two teams for a bigger field, as in mixed-rooms-fixture.js)
+  const nRooms = Math.max(9, Math.floor((Number(new URLSearchParams(location.search).get('teams')) || 18) / 2)) + ' rooms';
+  new MutationObserver(() => {
+    const d = document.querySelector('[data-step="rooms"] .sdetail');
+    if (d && d.textContent !== nRooms) d.textContent = nRooms;
+  }).observe(document.getElementById('view'), { childList: true, subtree: true });
+  if (new URLSearchParams(location.search).get('picker')) (await until(() => document.getElementById('schedregen'))).click();
+};
+go();
+// mock only: the Teams box reloads the page with another field size
+const qs = new URLSearchParams(location.search);
+document.getElementById('mkteams').value = qs.get('teams') || 18;
+document.getElementById('mkmock').onsubmit = (e) => {
+  e.preventDefault();
+  qs.set('teams', document.getElementById('mkteams').value);
+  location.search = qs.toString();
+};
+</script>
+</body>
+</html>

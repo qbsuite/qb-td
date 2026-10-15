@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mixed rooms artboard</title>
+<!-- One artboard of mockups/mixed-rooms.html: the real schedule editor
+     (schededit.js) with the hub's stylesheets and a made-up schedule.
+     ?v=before|a|b|c &theme=lt|dk. The import map swaps in
+     mixed-rooms-engine.js so each proposal can lay out its lanes; the
+     rest of the editor is the app's own code, so clicking and dragging
+     work as they do today. -->
+<script type="importmap">
+{ "imports": { "../app/engine/schedule.js": "./mixed-rooms-engine.js" } }
+</script>
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/hub.css">
+<style>
+html.lt {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7; --link: #1d4ed8;
+  --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c; --pick: #e4e4df; --pick-line: #c9c9c2;
+  --warn: #b4410e; --card: #f1f1ec; --sel: #efefea;
+}
+html.lt .lane-0 { --lc: #2f5fb3; --lt: #eef2fa; }
+html.lt .lane-1 { --lc: #b8741a; --lt: #fbf3e6; }
+html.lt .lane-2 { --lc: #2f7d57; --lt: #eaf5ef; }
+html.lt .lane-3 { --lc: #8b3fa6; --lt: #f5ecf8; }
+html.lt .lane-4 { --lc: #1f7a8c; --lt: #e6f3f5; }
+html.lt .lane-5 { --lc: #b83b5e; --lt: #f9e9ee; }
+html.dk {
+  --bg: #232326; --fg: #e4e4e7; --muted: #a1a1aa; --line: #36363c; --link: #8fb0f5;
+  --hover-bg: #2c2c31; --ok: #6fc58d; --bad: #f08a8a; --pick: #38383f; --pick-line: #4d4d55;
+  --warn: #e7a177; --card: #2b2b2f; --sel: #303036;
+  color-scheme: dark;
+}
+html.dk .lane-0 { --lc: #8fb0f5; --lt: #26314a; }
+html.dk .lane-1 { --lc: #e3ad63; --lt: #3a2f20; }
+html.dk .lane-2 { --lc: #74c69b; --lt: #21352a; }
+html.dk .lane-3 { --lc: #c99ae0; --lt: #33263a; }
+html.dk .lane-4 { --lc: #6cc3d3; --lt: #1f3337; }
+html.dk .lane-5 { --lc: #ec8ea8; --lt: #3a2229; }
+html.dk .lane-x, html.lt .lane-x { --lc: var(--muted); --lt: var(--hover-bg); }
+
+/* ---------- what the proposals add ---------- */
+/* A and C: a game in a room that more than one pool uses wears its pool's color */
+.sgcell.mx { box-shadow: inset 3px 0 0 var(--lc); background: color-mix(in srgb, var(--lt) 70%, transparent); padding-left: 9px; }
+.sgcell.mx:hover { background: var(--lt); }
+.sgcell.mx .sgtag { color: var(--lc); font-weight: 600; font-size: 10.5px; }
+.sgcell.mx.on { box-shadow: inset 3px 0 0 var(--lc), inset 0 0 0 2px var(--link); }
+/* a pool chip picked above: the other pools' games fade */
+.sgcell.dim { opacity: 0.28; }
+/* B: columns are a pool's games, and each game names its room */
+.mkroom { margin-top: 3px; font: inherit; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px;
+  padding: 0 2px; background: var(--bg); max-width: 100%; cursor: pointer; }
+.mkroom:hover { color: var(--fg); border-color: var(--pick-line); }
+.sggrid.dense .mkroom { margin: 0 0 0 auto; }
+</style>
+</head>
+<body class="hubpage">
+<div class="wrap">
+  <section id="setupsec">
+    <div class="schedhead"><h2>Schedule</h2></div>
+    <div id="schedsec"></div>
+  </section>
+</div>
+<script type="module">
+import { renderSchedStep } from '../app/js/schededit.js';
+import { buildSchedule } from '../app/engine/schedule.js';
+
+const qs = new URLSearchParams(location.search);
+const V = qs.get('v') || 'before';
+document.documentElement.className = qs.get('theme') === 'dk' ? 'dk' : 'lt';
+
+// 18 teams in seed order, 3 pools of 6, 9 rooms; playoff pools by finish
+const TEAMS = ['Chicago A', 'Stanford A', 'Berkeley A', 'Michigan A', 'Penn A', 'Columbia A', 'Yale A', 'Harvard A',
+  'Duke A', 'Illinois A', 'Maryland A', 'Rutgers A', 'Ohio State A', 'Cornell A', 'Brown A', 'Virginia A', 'UCLA A', 'Rice A'];
+const ROOMS = ['Room 101', 'Room 102', 'Room 104', 'Room 105', 'Room 110', 'Room 112', 'Hall A', 'Hall B', 'Hall C'];
+const s = buildSchedule('pools3', TEAMS, ROOMS.map((name) => ({ name, bucket: null })), {});
+s.format = 'pools3';
+
+// The prelims as the TD wants them: each pool keeps two rooms of its own
+// (101-102, 104-105, 110-112), and the three halls are shared — each
+// round, each pool sends one game to a hall, and the halls rotate.
+const POOLS = ['A', 'B', 'C'];
+s.phases[0].rounds.forEach((round, r) => {
+  POOLS.forEach((pool, k) => {
+    const games = round.games.filter((g) => g.bracket === pool);
+    const out = r % games.length; // which game goes to the hall this round
+    let own = 0;
+    games.forEach((g, i) => { g.room = i === out ? 6 + ((k + r) % 3) : k * 2 + own++; });
+  });
+  round.games.sort((x, y) => x.room - y.room);
+});
+
+// B: a prelim game's column is its place in its pool (Pool A game 1-3);
+// the room rides on the game and is picked on the card
+if (V === 'b') {
+  for (const round of s.phases[0].rounds) {
+    POOLS.forEach((pool, k) => {
+      round.games.filter((g) => g.bracket === pool).sort((x, y) => x.room - y.room)
+        .forEach((g, i) => { g.where = g.room; g.room = k * 3 + i; });
+    });
+    round.games.sort((x, y) => x.room - y.room);
+  }
+}
+
+// ?v=pbefore|p1|p2|p3: the format picker (no schedule yet), with the
+// room options each picker proposal would have
+const PICKER = /^p/.test(V);
+let sched = PICKER ? null : s;
+let dirty = false;
+const box = document.getElementById('schedsec');
+const env = {
+  sched: () => sched, setSched: (x) => { sched = x; }, dirty: () => dirty, setDirty: (d) => { dirty = d; },
+  teams: TEAMS, buckets: [], played: () => new Set(), roomsN: () => 9, setRoomsN: () => {},
+  save: async () => {}, del: async () => {}, fill: async () => null, say: () => {}, refresh: () => renderSchedStep(box, env),
+};
+
+const opt = (list, on) => list.map((l, i) => `<option ${i === on ? 'selected' : ''}>${l}</option>`).join('');
+const WITHIN = ['Teams keep their room where possible', 'Shuffle rooms each round', 'Rotate so teams see rooms evenly'];
+const PICKS = {
+  // one menu with one more choice
+  p1: `<label>Rooms <select>${opt(['Each pool has its own rooms, and teams keep theirs', 'Each pool has its own rooms, shuffled each round',
+    'Each pool has its own rooms, rotated evenly', 'Pools share all rooms, rotated evenly'], 3)}</select></label>`,
+  // two menus: who shares, then how teams move
+  p2: `<label>Pool rooms <select>${opt(['Each pool has its own rooms', 'Pools share all rooms'], 1)}</select></label>
+    <label>Within those rooms <select>${opt(WITHIN, 2)}</select></label>`,
+  // a count of shared rooms: 0 is today, all 9 is fully mixed
+  p3: `<label>Rooms shared by all pools <input type="number" min="0" max="9" value="3" style="width:56px"> <span>of 9</span></label>
+    <label>Within each pool&rsquo;s rooms <select>${opt(WITHIN, 0)}</select></label>`,
+};
+function patchPicker() {
+  const label = box.querySelector('#optrooms')?.closest('label');
+  if (!label || !PICKS[V]) return;
+  label.outerHTML = PICKS[V];
+  const pre = box.querySelector('.sgpreview');
+  if (pre) pre.textContent += V === 'p3' ? ' · Hall A, Hall B and Hall C shared by all pools' : ' · all rooms shared by all pools';
+}
+
+// after each render: what the proposal adds to the editor's own markup
+function patch() {
+  if (PICKER) { patchPicker(); return; }
+  const cur = env.sched();
+  const lanes = (p) => (cur.brackets || []).filter((b) => b.phase === p);
+  const colorIdx = (p, key) => lanes(p).findIndex((b) => b.key === key);
+  const chip = box.querySelector('.sgchips .chip.on');
+  const filter = chip ? chip.dataset.filter : '';
+  for (const el of box.querySelectorAll('.sgcell[data-cell]')) {
+    const c = JSON.parse(el.dataset.cell);
+    const g = cur.phases[c.p].rounds[c.r].games.find((x) => x.room === c.room);
+    if (!g || !g.bracket) continue;
+    if ((V === 'a' || V === 'c') && el.querySelector('.sgtag')) {
+      el.classList.add('mx', 'lane-' + colorIdx(c.p, g.bracket));
+      if (filter && lanes(c.p).some((b) => b.key === filter) && g.bracket !== filter) el.classList.add('dim');
+    }
+    if (V === 'b' && c.p === 0 && g.where !== undefined) {
+      el.insertAdjacentHTML('beforeend', `<select class="mkroom" aria-label="Room">${ROOMS.map((n, i) =>
+        `<option ${i === g.where ? 'selected' : ''}>${n}</option>`).join('')}</select>`);
+    }
+  }
+  if (V === 'b') {
+    const first = box.querySelector('.sgphase .sggrid');
+    if (first) first.querySelectorAll('.sgroom[data-room]').forEach((b) => {
+      b.textContent = 'Game ' + (Number(b.dataset.room) % 3 + 1);
+      b.title = '';
+    });
+    const checks = [...box.querySelectorAll('.sgchecks .sgcheck')];
+    const last = checks[2];
+    if (last) last.insertAdjacentHTML('afterend', '<div class="sgcheck ok"><span class="ok">✓</span><span>Each room holds one game a round</span></div>');
+  }
+}
+// each render sets box.innerHTML, so this sees each one (the first too)
+new MutationObserver(patch).observe(box, { childList: true });
+renderSchedStep(box, env);
+</script>
+</body>
+</html>
