@@ -19,7 +19,7 @@ const SUB_SHORT = {
   'World History': 'WH', 'Other History': 'OH',
   'Visual Fine Arts': 'VFA', 'Auditory Fine Arts': 'AFA', 'Other Fine Arts': 'OFA',
   Biology: 'Bio', Chemistry: 'Chem', Physics: 'Phys', Math: 'Math', 'Other Science': 'OSci',
-  Economics: 'Econ',
+  Anthropology: 'Anth', Economics: 'Econ', Linguistics: 'Ling', Psychology: 'Psy', Sociology: 'Soc',
 };
 const CAT_SHORT = {
   Literature: 'Lit', History: 'Hist', Science: 'Sci', 'Fine Arts': 'FA', Religion: 'Rel',
@@ -32,14 +32,27 @@ const FAMILY = {
   Religion: 'rmp', Mythology: 'rmp', Philosophy: 'rmp', 'Social Science': 'rmp', Beliefs: 'rmp',
 };
 
+// A subcategory as the tables name it. Packets often give the short form
+// ("European" under History, "Visual" under Fine Arts, "Other" under
+// Science) or add a detail after a colon ("Other Science: Computer").
+const PARENT_WORD = { Literature: 'Literature', History: 'History', 'Fine Arts': 'Fine Arts', Science: 'Science' };
+function fullSub(c, s) {
+  const head = s.split(':')[0].trim();
+  for (const x of [s, head, PARENT_WORD[c] ? head + ' ' + PARENT_WORD[c] : '']) if (x && SUB_SHORT[x]) return x;
+  return head;
+}
+
 /** {label, family, title} for a catmap entry ({c, s}), or null. A label
     the tables don't know is cut to four characters, so it fits. */
 export function catTag(cat) {
   if (!cat || typeof cat.c !== 'string' || !cat.c) return null;
   const c = cat.c;
-  const s = typeof cat.s === 'string' && cat.s !== c ? cat.s : '';
-  const label = SUB_SHORT[s] || CAT_SHORT[c] || (s || c).slice(0, 4);
-  return { label, family: FAMILY[c] || 'oth', title: s ? c + ' · ' + s : c };
+  const s = typeof cat.s === 'string' && cat.s.trim() && cat.s !== c ? cat.s.trim() : '';
+  const sub = s ? fullSub(c, s) : '';
+  // a subcategory named for another category ("Social Science: Political"
+  // filed under Science) takes that category's tag and colour
+  const label = SUB_SHORT[sub] || CAT_SHORT[sub] || CAT_SHORT[c] || (sub || c).slice(0, 4);
+  return { label, family: FAMILY[sub] || FAMILY[c] || 'oth', title: s ? c + ' · ' + s : c };
 }
 
 /** Initials unique within one team: two players with the same initials

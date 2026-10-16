@@ -199,10 +199,146 @@ function toSnake(node) {
 
 const ref = ($ref) => ({ $ref });
 
+/* ---------- stages from the schedule ----------
+   With a saved schedule of more than one stage (pools, then playoff
+   brackets, then finals), the file carries YF's own stages: a Prelim
+   stage with the schedule's pools, a Playoff stage per later stage with
+   one pool per bracket, and Finals / Tiebreaker stages without pools. YF
+   then ranks each pool on its own, the way it does for a schedule built
+   in YF. A bracket carries over its pool-mates' earlier games
+   (hasCarryover) exactly when the schedule leaves some pool-mates' pair
+   unplayed in it; a bracket that replays them all (a 4-team bracket with
+   the pool-mates' game played again) carries nothing, and neither does
+   an elimination bracket. Carried games are
+   marked the way YF marks them (Tournament.carryOverMatches).
+
+   Anything the schedule can't place cleanly — no schedule, one stage,
+   slots not filled yet, a game in a round the schedule doesn't have, a
+   team in two pools of a stage, a game between pools — keeps the single
+   stage and pool below, as before. So a round robin, double or triple
+   included, is unchanged. */
+
+const MINOR = { final: 'Finals', tiebreak: 'Tiebreaker' };
+
+export function yfStages(schedule, matches) {
+  if (!schedule || !Array.isArray(schedule.phases)) return null;
+  const nameOf = (x) => (x && typeof x.team === 'string' ? x.team : null);
+  const brackets = schedule.brackets || [];
+  const stages = [];
+  for (const [p, ph] of schedule.phases.entries()) {
+    const type = MINOR[ph.kind] || (stages.some((x) => x.full) ? 'Playoff' : 'Prelim');
+    const rounds = (ph.rounds || []).map((r) => r.round);
+    let pools = [];
+    if (!MINOR[ph.kind]) {
+      if (type === 'Prelim' && schedule.pools && Object.keys(schedule.pools).length) {
+        pools = Object.entries(schedule.pools).map(([k, teams]) => ({
+          key: k, name: (brackets.find((b) => b.key === k && b.phase === p) || {}).name || 'Pool ' + k, teams: [...teams] }));
+      } else {
+        const by = new Map();
+        for (const r of ph.rounds || []) for (const g of r.games || []) {
+          for (const t of [nameOf(g.a), nameOf(g.b)]) {
+            if (!t) continue;
+            if (!by.has(g.bracket)) by.set(g.bracket, []);
+            if (!by.get(g.bracket).includes(t)) by.get(g.bracket).push(t);
+          }
+        }
+        pools = [...by.entries()].map(([k, teams]) => ({
+          key: k, name: (brackets.find((b) => b.key === k) || {}).name || ph.name, teams }));
+      }
+    }
+    stages.push({ name: ph.name, type, full: !MINOR[ph.kind], elim: ph.kind === 'single' || ph.kind === 'double',
+      meet: ph.meet || 1, rounds, pools, carry: false });
+  }
+  // A stage nobody has played yet is left out (its slots may not be
+  // filled); a pool stage with games needs all its slots filled, or its
+  // brackets aren't known
+  const playedRounds = new Set(matches.map((m) => m.round));
+  for (const [p, ph] of schedule.phases.entries()) {
+    if (!stages[p].rounds.some((n) => playedRounds.has(n))) { stages[p].unplayed = true; continue; }
+    // (finals and tiebreakers have no pools: their slots may stay as written)
+    const open = stages[p].full && (ph.rounds || []).some((r) => (r.games || []).some((g) => (g.a && !nameOf(g.a)) || (g.b && !nameOf(g.b))));
+    if (open) return null;
+  }
+  const full = stages.filter((x) => x.full && !x.unplayed);
+  if (full.length < 2 && !(full.length === 1 && full[0].pools.length > 1)) return null;
+
+  // each game in the stage holding its round, between two teams of one pool
+  const stageOf = new Map(stages.flatMap((x) => x.rounds.map((n) => [n, x])));
+  const placed = new Map(); // match -> stage
+  for (const m of matches) {
+    const st = stageOf.get(m.round);
+    if (!st) return null;
+    if (st.full) {
+      const [a, b] = m.teams.map((t) => t.name);
+      if (!st.pools.some((pl) => pl.teams.includes(a) && pl.teams.includes(b))) return null;
+    }
+    placed.set(m, st);
+  }
+  for (const st of full) {
+    const seen = new Set();
+    for (const pl of st.pools) for (const t of pl.teams) { if (seen.has(t)) return null; seen.add(t); }
+  }
+  // names are ids in the file (Phase_<name>, Pool_<name>): unique
+  if (new Set(stages.map((x) => x.name)).size !== stages.length) return null;
+  const poolNames = full.flatMap((x) => x.pools.map((pl) => pl.name));
+  if (new Set(poolNames).size !== poolNames.length) return null;
+
+  // carryover: a bracket some of whose pool-mates' pairs it doesn't play
+  const key = (x, y) => [x, y].sort().join('\n');
+  for (const [i, st] of full.entries()) {
+    if (!i) continue;
+    const prev = full[i - 1];
+    const playedHere = new Set([...placed].filter(([, s]) => s === st).map(([m]) => key(m.teams[0].name, m.teams[1].name)));
+    const scheduledHere = new Set(schedule.phases.flatMap((ph) => ph.name === st.name ? ph.rounds.flatMap((r) => r.games.map((g) => key(nameOf(g.a), nameOf(g.b)))) : []));
+    for (const pl of st.pools) {
+      const mates = [];
+      for (let x = 0; x < pl.teams.length; x++) for (let y = x + 1; y < pl.teams.length; y++) {
+        if (prev.pools.some((pp) => pp.teams.includes(pl.teams[x]) && pp.teams.includes(pl.teams[y]))) mates.push(key(pl.teams[x], pl.teams[y]));
+      }
+      // an elimination bracket is its own games only: nothing carries
+      pl.carry = !st.elim && mates.some((k) => !scheduledHere.has(k) && !playedHere.has(k));
+    }
+    st.carry = st.pools.some((pl) => pl.carry);
+  }
+  return { stages, placed };
+}
+
+// The stages as YF writes them (Phase/Pool toFileObject): a stage needs at
+// least one round, so stages not played yet are left out. Codes as YF's
+// recomputePhaseCodes gives them: 1, 2, … and "<n>T" for a tiebreaker.
+function yfPhases(plan, roundNumbers, roundOf) {
+  const out = [];
+  let code = 1;
+  for (const st of plan.stages) {
+    const rounds = st.rounds.filter((n) => roundNumbers.includes(n)).sort((a, b) => a - b);
+    if (!rounds.length) continue;
+    const minor = !st.full;
+    out.push({
+      YfData: {
+        phaseType: st.type, code: st.type === 'Tiebreaker' ? `${code}T` : String(code++),
+        wildCardAdvancementRules: [], wildCardRankingMethod: 'RankThenPPB',
+        // finals and tiebreakers keep their round numbers
+        ...(minor ? { forceNumericRounds: true } : {}),
+      },
+      name: st.name,
+      rounds: rounds.map(roundOf),
+      pools: minor ? [] : st.pools.map((pl, i) => ({
+        YfData: { size: pl.teams.length, roundRobins: st.meet, seeds: [], hasCarryover: pl.carry, autoAdvanceRules: [] },
+        name: pl.name,
+        position: i + 1,
+        poolTeams: pl.teams.map((t) => ({ YfData: {}, team: ref(`Team_${t}`) })),
+      })),
+      id: `Phase_${st.name}`,
+    });
+  }
+  return out;
+}
+
 /**
  * Build the .yft file object.
  * @param opts {name, questionSet, startDate, endDate, matches, roster,
- *   settings} — matches from qbj.parseMatch, roster from qbj.parseRoster
+ *   settings, schedule} — schedule, the saved one, gives the file its
+ *   stages (yfStages above) — matches from qbj.parseMatch, roster from qbj.parseRoster
  *   (falls back to teams/players observed in matches). settings is the
  *   tournament's effective MODAQ game format (read_core.js
  *   effectiveFormat) — regulationTossupCount, powers, negValue,
@@ -282,7 +418,34 @@ export function buildYft(opts) {
   const matchIds = new Map(matches.map((m, i) => [m, matchId(m, i)]));
 
   const regulation = settings.regulationTossupCount ?? REGULATION_TOSSUPS;
-  const rounds = roundNumbers.map((n) => ({
+  // the schedule's stages, when it has them cleanly (yfStages)
+  const plan = yfStages(opts.schedule, matches);
+  const carriedTo = new Map(); // match -> [stage names it also counts in]
+  if (plan) {
+    // Tournament.carryOverMatches: for each pair sharing a carryover pool,
+    // the first game they played in an earlier stage where they shared a
+    // pool, looking back while those stages carry over too
+    const full = plan.stages.filter((x) => x.full && !x.unplayed);
+    const inStage = (st) => matches.filter((m) => plan.placed.get(m) === st);
+    const samePool = (st, x, y) => st.pools.some((pl) => pl.teams.includes(x) && pl.teams.includes(y));
+    for (const [i, st] of full.entries()) {
+      if (!i || !st.carry) continue;
+      for (const pl of st.pools.filter((x) => x.carry)) {
+        for (let x = 0; x < pl.teams.length - 1; x++) for (let y = x + 1; y < pl.teams.length; y++) {
+          const [a, b] = [pl.teams[x], pl.teams[y]];
+          for (let j = i - 1; j >= 0; j--) {
+            const past = full[j];
+            if (samePool(past, a, b)) {
+              const m = inStage(past).find((g) => g.teams.some((t) => t.name === a) && g.teams.some((t) => t.name === b));
+              if (m && !(carriedTo.get(m) || []).includes(st.name)) carriedTo.set(m, [...(carriedTo.get(m) || []), st.name]);
+            }
+            if (!past.carry) break;
+          }
+        }
+      }
+    }
+  }
+  const roundOf = (n) => ({
     YfData: { number: n },
     name: String(n), // YF Round.name is number.toString() unless non-numeric
     matches: matches.filter((m) => m.round === n).map((m) => [m, overtimeOf(m, regulation)]).map(([m, ot]) => ({
@@ -309,11 +472,12 @@ export function buildYft(opts) {
           })),
         })),
       })),
-      carryoverPhases: [],
+      carryoverPhases: (carriedTo.get(m) || []).map((name) => ref(`Phase_${name}`)),
       packets: m.packets,
       notes: m.notes,
     })),
-  }));
+  });
+  const rounds = roundNumbers.map(roundOf);
 
   // ScoringRules like YF's toFileObject (yft mode) with standard defaults.
   const anyMod5 = values.some((v) => v % 10 !== 0);
@@ -358,9 +522,10 @@ export function buildYft(opts) {
     endDate: opts.endDate || undefined,
     questionSet: opts.questionSet || undefined,
     registrations,
-    // One stage, one pool with every team in it, as YF's "custom schedule"
-    // starts out. YF compiles standings per pool: no pool, no standings.
-    phases: [{
+    // The schedule's stages when it has them (yfStages); else one stage,
+    // one pool with every team in it, as YF's "custom schedule" starts
+    // out. YF compiles standings per pool: no pool, no standings.
+    phases: plan ? yfPhases(plan, roundNumbers, roundOf) : [{
       YfData: {
         phaseType: 'Prelim', code: '1', wildCardAdvancementRules: [],
         wildCardRankingMethod: 'RankThenPPB',

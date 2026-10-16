@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
-import { buildYft } from '../app/engine/yft.js';
+import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
@@ -4421,6 +4421,75 @@ test('addFinals: one game final if needed, and one game final always played', ()
   assert.equal(one.got.always, true);
 });
 
+/* ---------- YellowFruit stages from the schedule ---------- */
+
+// two pools of three, then a 4-team top bracket (two from each pool) and
+// a 2-team bottom one; `extra` adds games to the playoff rounds
+function stageSched(extra = []) {
+  const g = (bracket, a, b) => ({ room: 0, bracket, a: { team: a }, b: { team: b } });
+  return {
+    pools: { A: ['a1', 'a2', 'a3'], B: ['b1', 'b2', 'b3'] },
+    brackets: [{ key: 'A', name: 'Pool A', phase: 0 }, { key: 'B', name: 'Pool B', phase: 0 },
+      { key: 'T1', name: 'Top', phase: 1 }, { key: 'T2', name: 'Bottom', phase: 1 }],
+    phases: [
+      { name: 'Prelims', meet: 1, rounds: [
+        { round: 1, games: [g('A', 'a1', 'a2'), g('B', 'b1', 'b2')], byes: [] },
+        { round: 2, games: [g('A', 'a1', 'a3'), g('B', 'b1', 'b3')], byes: [] },
+        { round: 3, games: [g('A', 'a2', 'a3'), g('B', 'b2', 'b3')], byes: [] }] },
+      { name: 'Playoffs', meet: 1, rounds: [
+        { round: 4, games: [g('T1', 'a1', 'b1'), g('T1', 'a2', 'b2'), g('T2', 'a3', 'b3'), ...extra.filter((x) => x.round === 4).map((x) => x.g)], byes: [] },
+        { round: 5, games: [g('T1', 'a1', 'b2'), g('T1', 'a2', 'b1'), ...extra.filter((x) => x.round === 5).map((x) => x.g)], byes: [] }] },
+    ],
+  };
+}
+const stageGames = (s) => s.phases.flatMap((p) => p.rounds.flatMap((r) => r.games.map((g) => ({ round: r.round, teams: [{ name: g.a.team }, { name: g.b.team }] }))));
+
+test('yfStages: pools, then brackets carrying their pool-mates\' games', () => {
+  const s = stageSched();
+  const plan = yfStages(s, stageGames(s));
+  assert.deepEqual(plan.stages.map((x) => [x.name, x.type]), [['Prelims', 'Prelim'], ['Playoffs', 'Playoff']]);
+  assert.deepEqual(plan.stages[1].pools.map((p) => [p.name, p.teams.length, p.carry]), [['Top', 4, true], ['Bottom', 2, false]]);
+});
+
+test('yfStages: a bracket that replays its pool-mates carries nothing', () => {
+  const g = (a, b) => ({ room: 1, bracket: 'T1', a: { team: a }, b: { team: b } });
+  const s = stageSched([{ round: 4, g: g('a1', 'a2') }, { round: 5, g: g('b1', 'b2') }]);
+  // a team twice in a round is fine for this check: the rule reads pairs
+  const plan = yfStages(s, stageGames(s));
+  assert.equal(plan.stages[1].pools[0].carry, false);
+});
+
+test('yfStages: an elimination bracket carries nothing', () => {
+  const s = stageSched();
+  s.phases[1].kind = 'single';
+  assert.equal(yfStages(s, stageGames(s)).stages[1].pools[0].carry, false);
+});
+
+test('yfStages: a stage not played yet is left out; the pools still count', () => {
+  const s = stageSched();
+  for (const r of s.phases[1].rounds) for (const g of r.games) { g.a = { label: 'A1' }; g.b = { label: 'B2' }; }
+  const plan = yfStages(s, stageGames(stageSched()).filter((m) => m.round <= 3));
+  assert.ok(plan && plan.stages[1].unplayed && plan.stages[0].pools.length === 2);
+});
+
+test('yfStages: a played final whose slots were never filled in is still a Finals stage', () => {
+  const s = stageSched();
+  s.phases.push({ name: 'Finals', kind: 'final', meet: 2, rounds: [{ round: 6, games: [{ room: 0, bracket: 'FN',
+    a: { label: '1st in Top' }, b: { label: '2nd in Top' } }], byes: [] }] });
+  const plan = yfStages(s, [...stageGames(stageSched()), { round: 6, teams: [{ name: 'a1' }, { name: 'b1' }] }]);
+  assert.ok(plan && plan.stages[2].type === 'Finals' && !plan.stages[2].unplayed);
+});
+
+test('yfStages: one stage, or anything it can\'t place, keeps the single pool', () => {
+  const rr = { phases: [{ name: 'Round robin', meet: 3, rounds: [{ round: 1, games: [{ bracket: 'A', a: { team: 'x' }, b: { team: 'y' } }] }] }] };
+  assert.equal(yfStages(rr, [{ round: 1, teams: [{ name: 'x' }, { name: 'y' }] }]), null);
+  assert.equal(yfStages(null, []), null);
+  const s = stageSched();
+  // a game between pools in the prelims, or in a round the schedule lacks
+  assert.equal(yfStages(s, [...stageGames(s), { round: 2, teams: [{ name: 'a2' }, { name: 'b3' }] }]), null);
+  assert.equal(yfStages(s, [...stageGames(s), { round: 9, teams: [{ name: 'a1' }, { name: 'b1' }] }]), null);
+});
+
 /* ---------- scoresheets ---------- */
 
 // a MODAQ-shaped match with lineups, buzzes and bonus parts
@@ -4512,6 +4581,19 @@ test('catTag: subcategory initials, else the category\'s short form, else cut to
   assert.equal(catTag({ c: 'Geography', s: 'Geography' }).family, 'oth');
   assert.equal(catTag({ c: 'Science', s: 'Astronomy' }).label, 'Sci');
   assert.equal(catTag({ c: 'Linguistics', s: '' }).label, 'Ling');
+  // packets' short forms, as ACF Fall @ UIUC's give them
+  const tag = (c, s) => catTag({ c, s }).label;
+  assert.equal(tag('History', 'European'), 'EH');
+  assert.equal(tag('Literature', 'British'), 'BL');
+  assert.equal(tag('Fine Arts', 'Visual'), 'VFA');
+  assert.equal(tag('Fine Arts', 'Other'), 'OFA');
+  assert.equal(tag('Science', 'Other'), 'OSci');
+  assert.equal(tag('Science', 'Other Science: Computer'), 'OSci');
+  assert.equal(tag('Science', 'Other Science: Math and Computer'), 'OSci');
+  assert.equal(tag('Social Science', 'Anthropology'), 'Anth');
+  assert.equal(tag('Beliefs', ''), 'Bel');
+  assert.equal(catTag({ c: 'Science', s: 'Social Science: Political' }).family, 'rmp');
+  assert.equal(tag('Science', 'Social Science: Political'), 'SS');
   assert.equal(catTag(null), null);
 });
 

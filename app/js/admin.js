@@ -540,6 +540,10 @@ function renderModaqSec(a, t, settings) {
 
 /* ---------- Stats settings: what the public stats page shows ---------- */
 
+// renderStatsSec's state across redraws: a switch waiting on a password,
+// the Change password field, the scoresheet example, and what's typed
+const statsUi = { slug: null, want: null, changing: false, showExample: false, typed: '' };
+
 function renderStatsSec(a, t, settings) {
   const box = $('setupsec');
   // Opening this tab is the decision the checklist wants: the page starts
@@ -553,33 +557,33 @@ function renderStatsSec(a, t, settings) {
   const locked = !!(t.set && t.set.lock_buzz);
   // Scoresheets and buzzpoints are only ever behind the stats password
   // (settings.buzz, which keeps it with buzzpoints off as mode 'off').
-  // Turning either on without one asks for it first (`want`), and the
+  // Turning either on without one asks for it first (`statsUi.want`), and the
   // switch goes on once it is set; the Worker refuses either without one.
-  let want = null;        // 'scoresheets' | 'buzz': waiting on a password
-  let changing = false;   // the Change password field is open
-  let showExample = false; // the (i) beside Scoresheets is open
+  // this section's own state lives outside it (statsUi), so the hub's
+  // own redraws (a refresh, a save) don't close a half-typed password
+  if (statsUi.slug !== t.slug) Object.assign(statsUi, { slug: t.slug, want: null, changing: false, showExample: false, typed: '' });
   const hasKey = () => Boolean(settings.buzz && settings.buzz.hash);
   const buzzOn = () => Boolean(settings.buzz && settings.buzz.mode === 'password');
   const sheetsOn = () => settings.scoresheets === true && hasKey();
   const WHAT = { scoresheets: 'scoresheets', buzz: 'buzzpoints' };
 
   const pwRow = () => {
-    if (hasKey() && !changing) {
+    if (hasKey() && !statsUi.changing) {
       return `<div class="row"><span class="pill on">Password set</span>
           <button id="pwchange">Change password</button></div>
         <p class="muted" style="margin:6px 0 0">Viewers enter this password to see scoresheets and buzzpoints.</p>`;
     }
-    if (changing) {
+    if (statsUi.changing) {
       return `<div class="row"><label class="row">New password
           <input id="statspw" type="password" placeholder="New password" size="18"></label>
           <button id="pwset" class="primary">Save</button><button id="pwcancel">Cancel</button></div>
         <p class="muted" style="margin:6px 0 0">Viewers who unlocked with the old password will need to enter the new one.</p>`;
     }
-    if (want) {
+    if (statsUi.want) {
       return `<div class="row"><label class="row">Password
           <input id="statspw" type="password" placeholder="Choose a password" size="18"></label>
           <button id="pwset" class="primary">Set password</button><button id="pwcancel">Cancel</button></div>
-        <p style="margin:6px 0 0">Please set a password to turn on ${WHAT[want]}. Viewers will enter it to see them.</p>`;
+        <p style="margin:6px 0 0">Please set a password to turn on ${WHAT[statsUi.want]}. Viewers will enter it to see them.</p>`;
     }
     return '<p class="muted" style="margin:0">Scoresheets and buzzpoints need a password. Turning one on will ask for it.</p>';
   };
@@ -616,15 +620,15 @@ function renderStatsSec(a, t, settings) {
             <option value="on" ${sheetsOn() ? 'selected' : ''}>On</option>
           </select>
         </label>
-        <button class="infobtn" id="sheetsinfo" aria-expanded="${showExample}" aria-controls="sheetsex"
+        <button class="infobtn" id="sheetsinfo" aria-expanded="${statsUi.showExample}" aria-controls="sheetsex"
           title="What is a scoresheet?">i</button>
       </div>
       <p class="muted" style="margin:6px 0 0">Shows a scoresheet for each game when all games during a round finish.</p>
-      <div id="sheetsex" class="sheetex" ${showExample ? '' : 'hidden'}>
+      <div id="sheetsex" class="sheetex" ${statsUi.showExample ? '' : 'hidden'}>
         <p>A scoresheet lists the tossups of a game in order. It shows who buzzed and for how many points, which
           bonus parts each team got, the category, and the score after each tossup. A hatched column means that
           player was out of the game. Here is a short example.</p>
-        ${showExample ? exampleSheetHtml() : ''}
+        ${statsUi.showExample ? exampleSheetHtml() : ''}
       </div>
       <div class="row" style="margin-top:12px">
         <label class="row">Buzzpoints
@@ -660,12 +664,12 @@ function renderStatsSec(a, t, settings) {
       try {
         const cred = await buzzCredentials(pw);
         const next = { ...settings,
-          buzz: { ...cred.settings, mode: buzzOn() || want === 'buzz' ? 'password' : 'off' } };
-        if (want === 'scoresheets') next.scoresheets = true;
+          buzz: { ...cred.settings, mode: buzzOn() || statsUi.want === 'buzz' ? 'password' : 'off' } };
+        if (statsUi.want === 'scoresheets') next.scoresheets = true;
         await saveSettings(next, { buzz_token: cred.token });
       } finally { run.end(); }
-      say(want ? `Password set, ${WHAT[want]} on` : 'Password changed');
-      want = null; changing = false;
+      say(statsUi.want ? `Password set, ${WHAT[statsUi.want]} on` : 'Password changed');
+      statsUi.want = null; statsUi.changing = false; statsUi.typed = '';
       showDetail();
     } catch (e) { say(e.message, true); }
   };
@@ -691,7 +695,7 @@ function renderStatsSec(a, t, settings) {
     // On without a password: back to Off, and ask for one
     const toggle = (which, sel, apply) => async () => {
       const on = Boolean(sel.value);
-      if (on && !hasKey()) { want = which; changing = false; draw(); $('statspw').focus(); return; }
+      if (on && !hasKey()) { statsUi.want = which; statsUi.changing = false; draw(); $('statspw').focus(); return; }
       try {
         const next = { ...settings };
         apply(next, on);
@@ -708,10 +712,12 @@ function renderStatsSec(a, t, settings) {
     $('buzzmode').onchange = toggle('buzz', $('buzzmode'), (next, on) => {
       next.buzz = { ...settings.buzz, mode: on ? 'password' : 'off' };
     });
-    $('sheetsinfo').onclick = () => { showExample = !showExample; draw(); };
-    if ($('pwchange')) $('pwchange').onclick = () => { changing = true; want = null; draw(); $('statspw').focus(); };
-    if ($('pwcancel')) $('pwcancel').onclick = () => { changing = false; want = null; draw(); };
+    $('sheetsinfo').onclick = () => { statsUi.showExample = !statsUi.showExample; draw(); };
+    if ($('pwchange')) $('pwchange').onclick = () => { statsUi.changing = true; statsUi.want = null; draw(); $('statspw').focus(); };
+    if ($('pwcancel')) $('pwcancel').onclick = () => { statsUi.changing = false; statsUi.want = null; statsUi.typed = ''; draw(); };
     if ($('pwset')) {
+      $('statspw').value = statsUi.typed;
+      $('statspw').oninput = () => { statsUi.typed = $('statspw').value; };
       $('pwset').onclick = setPassword;
       $('statspw').onkeydown = (e) => { if (e.key === 'Enter') setPassword(); };
     }
@@ -2432,9 +2438,12 @@ async function computeStats(a, t, buckets, files, settings) {
   // under Tournament Setup -> MODAQ Settings. Without them the exports
   // silently assumed 20 tossups, which turned the last two tossups of
   // every game at a longer event into overtime nobody played.
+  // The saved schedule gives the YellowFruit 4 file its stages: pools,
+  // playoff brackets with their carryover, finals (yft.js yfStages). A
+  // round robin, or a schedule not filled in yet, stays one stage.
   const exportOpts = {
     name: t.name, matches: dedupeMatches(matches), roster,
-    settings: effectiveFormat(settings),
+    settings: effectiveFormat(settings), schedule: sched,
   };
   // The two YellowFruits share an extension and nothing else, and neither
   // says so when handed the other's file: YellowFruit 4 refuses a file

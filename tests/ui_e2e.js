@@ -815,13 +815,24 @@ ok('8 public: once rebuilt, the mark reads Up to date', (await js(`document.quer
   await click('[data-step="stats"]');
   await waitJs(`!!document.querySelector('#pub')`, 'public page section');
 }
-await waitJs(`!!document.querySelector('#buzzmode')`, 'buzzpoints controls');
-await fill('#buzzmode', 'password', ['change']);
-await waitJs(`!document.querySelector('#buzzpw').hidden`, 'password field');
-await fill('#buzzpw', 'hunter2', ['input']);
-await click('#buzzset');
+// Password-protected stats: both switches start off, and turning one on
+// with no password asks for one first
+await waitJs(`!!document.querySelector('#buzzmode') && !!document.querySelector('#sheetsmode')`, 'password-protected stats');
+ok('8 public: scoresheets and buzzpoints start off, no password field yet',
+  (await js(`document.querySelector('#buzzmode').value === '' && document.querySelector('#sheetsmode').value === '' && !document.querySelector('#statspw')`)));
+await fill('#buzzmode', 'on', ['change']);
+await waitJs(`!!document.querySelector('#statspw')`, 'password field');
+ok('8 public: buzzpoints on with no password asks for one, and stays off',
+  (await js(`document.querySelector('#buzzmode').value === ''`)) && !settingsOf(await detail()).buzz);
+await fill('#statspw', 'hunter2', ['input']);
+await click('#pwset');
 d = await until(async () => { const x = await detail(); const b = settingsOf(x).buzz; return b && b.mode === 'password' && x; }, 'buzz password saved', 20000);
 ok('8 public: buzzpoints on with a password', !!settingsOf(d).buzz.hash || !!settingsOf(d).buzz.kdf, settingsOf(d).buzz);
+// with the password set, scoresheets switch on without asking again
+await waitJs(`!!document.querySelector('#pwchange')`, 'Password set');
+await fill('#sheetsmode', 'on', ['change']);
+d = await until(async () => { const x = await detail(); return settingsOf(x).scoresheets === true && x; }, 'scoresheets saved', 20000);
+ok('8 public: scoresheets on, behind the same password', settingsOf(d).buzz.mode === 'password' && !!settingsOf(d).buzz.hash);
 
 /* ---------- 9. start ---------- */
 
@@ -1098,6 +1109,7 @@ const menu = async (id) => {
   const y = JSON.parse(f.bytes.toString('utf8'));
   const t = y.objects[0];
   const games = t.phases.flatMap((p) => p.rounds.flatMap((r) => r.matches)).length;
+  console.log('     .yft stages:', t.phases.map((p) => `${p.name} (${p.pools.map((x) => x.name + (x.YfData.hasCarryover ? '*' : '')).join(', ')})`).join(' / '));
   ok('17 exports: YellowFruit 4 .yft parses, 12 teams, every game', f.name === slug + '-yf4.yft'
     && t.registrations.flatMap((r) => r.teams).length === 12 && games === deduped.length,
   { name: f.name, teams: t.registrations.length, games, want: deduped.length });
@@ -1465,9 +1477,13 @@ async function openHubOf(adminSecret) {
   await goto(`${PAGES}/index.html?a=${F.t.admin_secret}`);
   await waitJs(`!!document.querySelector('[data-step="sched"]')`, 'the step list (fill again)');
   await click('[data-step="sched"]');
-  await waitJs(`!!document.querySelector('#schedfill')`, 'Fill playoff slots again');
-  await click('#schedfill');
-  await waitJs(`!!document.querySelector('.sgfillcheck') || /Filled playoff slots/.test(document.querySelector('.sgbar').textContent)`, 'filled or noted');
+  // since 2725d8a the hub fills the slots itself once a pool's games are
+  // all in; the Fill button only stays when something holds it back
+  await waitJs(`!!document.querySelector('#schedfill') || /Filled the playoff slots/.test(document.body.textContent)`, 'filled, or Fill offered');
+  if (await exists('#schedfill')) {
+    await click('#schedfill');
+    await waitJs(`!!document.querySelector('.sgfillcheck') || /Filled playoff slots/.test(document.querySelector('.sgbar').textContent)`, 'filled or noted');
+  }
   const after = await js(`[...document.querySelectorAll('.sgfillcheck li')].map((l) => l.textContent)`);
   ok('12c fill: with every game in, no game is missing', after.every((l) => /^Pool [AB]: .* are tied at /.test(l)), after);
 }

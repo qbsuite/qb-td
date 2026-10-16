@@ -1,11 +1,18 @@
 Release Notes for 10/16/2026
 
+[ EXPORTS ]
+- YellowFruit 4 files carry the schedule's stages: pools, then playoff brackets, then finals, so YellowFruit ranks each bracket.
+- A bracket carries its pool-mates' prelim games unless it plays them again; elimination brackets carry none.
+- A round robin, or a schedule YellowFruit couldn't follow, still exports as one stage, as before.
+
 [ STATS ]
+- Scoresheet categories read packets' short names too ("European", "Visual", "Other Science: Computer").
 - Scoresheets: each game's tossups in order, with who buzzed, bonus parts, categories, substitutions and the running score.
 - Scoresheets sit beside a game's tables on the Scoreboard, in Classic and New, once all games in its round finish.
 - A Scoresheets switch on the stats page unlocks them with the stats password, then shows or hides them.
 
 [ HUB ]
+- The password field stays open, with what was typed, when the hub refreshes.
 - Public page has a Category stats setting, on by default, that shows or hides the Categories tab.
 - Password-protected stats: one password for scoresheets and buzzpoints. Both stay off until a password is set.
 - The (i) next to Scoresheets shows an example scoresheet.
