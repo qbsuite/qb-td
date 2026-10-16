@@ -31,6 +31,7 @@ import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams,
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials } from './buzzkey.js';
+import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
 
@@ -401,6 +402,7 @@ function setupSteps(t, buckets, rounds, settings) {
         : 'Not saved'],
     ['stats', 'Public page', !!settings.statsSeen,
       (t.published ? 'Public' : 'Page off')
+        + (settings.scoresheets && (settings.buzz || {}).hash ? ' · Scoresheets on' : '')
         + ((settings.buzz || {}).mode === 'password' ? ' · Buzzpoints on' : '')],
   ];
 }
@@ -548,9 +550,42 @@ function renderStatsSec(a, t, settings) {
     settings = { ...settings, statsSeen: true };
     pub(a, { method: 'POST', json: { settings } }).then(showDetail, () => {});
   }
-  const buzz = settings.buzz || {};
   const locked = !!(t.set && t.set.lock_buzz);
-  box.innerHTML = `
+  // Scoresheets and buzzpoints are only ever behind the stats password
+  // (settings.buzz, which keeps it with buzzpoints off as mode 'off').
+  // Turning either on without one asks for it first (`want`), and the
+  // switch goes on once it is set; the Worker refuses either without one.
+  let want = null;        // 'scoresheets' | 'buzz': waiting on a password
+  let changing = false;   // the Change password field is open
+  let showExample = false; // the (i) beside Scoresheets is open
+  const hasKey = () => Boolean(settings.buzz && settings.buzz.hash);
+  const buzzOn = () => Boolean(settings.buzz && settings.buzz.mode === 'password');
+  const sheetsOn = () => settings.scoresheets === true && hasKey();
+  const WHAT = { scoresheets: 'scoresheets', buzz: 'buzzpoints' };
+
+  const pwRow = () => {
+    if (hasKey() && !changing) {
+      return `<div class="row"><span class="pill on">Password set</span>
+          <button id="pwchange">Change password</button></div>
+        <p class="muted" style="margin:6px 0 0">Viewers enter this password to see scoresheets and buzzpoints.</p>`;
+    }
+    if (changing) {
+      return `<div class="row"><label class="row">New password
+          <input id="statspw" type="password" placeholder="New password" size="18"></label>
+          <button id="pwset" class="primary">Save</button><button id="pwcancel">Cancel</button></div>
+        <p class="muted" style="margin:6px 0 0">Viewers who unlocked with the old password will need to enter the new one.</p>`;
+    }
+    if (want) {
+      return `<div class="row"><label class="row">Password
+          <input id="statspw" type="password" placeholder="Choose a password" size="18"></label>
+          <button id="pwset" class="primary">Set password</button><button id="pwcancel">Cancel</button></div>
+        <p style="margin:6px 0 0">Please set a password to turn on ${WHAT[want]}. Viewers will enter it to see them.</p>`;
+    }
+    return '<p class="muted" style="margin:0">Scoresheets and buzzpoints need a password. Turning one on will ask for it.</p>';
+  };
+
+  const draw = () => {
+    box.innerHTML = `
     <h2>Public page</h2>
     <div class="row" style="margin-bottom:6px">
       <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Public page</label>
@@ -561,73 +596,128 @@ function renderStatsSec(a, t, settings) {
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
       <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy</button>
     </div>
-    <h2>Buzzpoints</h2>
+    <h2>Category stats</h2>
     <div class="row">
-      <label class="row">Buzzpoints
-        <select id="buzzmode" ${locked ? 'disabled' : ''}>
-          <option value="">Off</option>
-          <option value="password" ${buzz.mode === 'password' ? 'selected' : ''}>On (password)</option>
+      <label class="row">Category stats
+        <select id="catstats">
+          <option value="on">On</option>
+          <option value="off" ${settings.catStats === false ? 'selected' : ''}>Off</option>
         </select>
       </label>
-      ${buzz.hash ? '<span class="pill on">Password set</span>' : ''}
-      <input id="buzzpw" type="password" placeholder="Password" size="16" ${buzz.mode === 'password' ? '' : 'hidden'}>
-      <button id="buzzset" ${buzz.mode === 'password' ? '' : 'hidden'}>Set password</button>
     </div>
-    <p class="muted" style="margin:6px 0 0">Updates buzzpoints (password-locked) when all games during a round finish.</p>
-    ${locked ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
-      <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
-      played elsewhere, so the public page shows none, whatever is set here.</div>` : ''}`;
-  $('pub').onchange = async () => {
-    try {
-      await pub(a, { method: 'POST', json: { published: $('pub').checked } });
-      say($('pub').checked ? 'Public page on' : 'Public page off');
-      showDetail();
-    } catch (e) { say(e.message, true); }
+    <p class="muted" style="margin:6px 0 0">Shows the Categories tab when the packets have categories.</p>
+    <h2>Password-protected stats</h2>
+    <div id="pwrow">${pwRow()}</div>
+    <div class="pwstats">
+      <div class="row">
+        <label class="row">Scoresheets
+          <select id="sheetsmode">
+            <option value="">Off</option>
+            <option value="on" ${sheetsOn() ? 'selected' : ''}>On</option>
+          </select>
+        </label>
+        <button class="infobtn" id="sheetsinfo" aria-expanded="${showExample}" aria-controls="sheetsex"
+          title="What is a scoresheet?">i</button>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Shows a scoresheet for each game when all games during a round finish.</p>
+      <div id="sheetsex" class="sheetex" ${showExample ? '' : 'hidden'}>
+        <p>A scoresheet lists the tossups of a game in order. It shows who buzzed and for how many points, which
+          bonus parts each team got, the category, and the score after each tossup. A hatched column means that
+          player was out of the game. Here is a short example.</p>
+        ${showExample ? exampleSheetHtml() : ''}
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="row">Buzzpoints
+          <select id="buzzmode" ${locked ? 'disabled' : ''}>
+            <option value="">Off</option>
+            <option value="on" ${buzzOn() ? 'selected' : ''}>On</option>
+          </select>
+        </label>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Updates buzzpoints when all games during a round finish.</p>
+      ${locked ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
+        <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
+        played elsewhere, so the public page shows none, whatever is set here.</div>` : ''}
+    </div>`;
+    wireStats();
   };
+
   const saveSettings = async (next, extra) => {
     await pub(a, { method: 'POST', json: { settings: next, ...extra } });
     settings = next;
   };
-  $('buzzmode').onchange = async () => {
-    const mode = $('buzzmode').value;
-    try {
-      const next = { ...settings };
-      if (!mode) delete next.buzz;
-      else {
-        // keep an existing password; otherwise wait for one to be set.
-        // Spread it whole: dropping kdf/iters here would silently demote a
-        // stretched password to the legacy scheme.
-        if (settings.buzz && settings.buzz.hash) {
-          next.buzz = { ...settings.buzz, mode: 'password' };
-        } else {
-          $('buzzpw').hidden = false;
-          $('buzzset').hidden = false;
-          say('Set a password');
-          return;
-        }
-      }
-      await saveSettings(next);
-      say(mode ? 'Buzzpoints on' : 'Buzzpoints off');
-      showDetail();
-    } catch (e) { say(e.message, true); }
-  };
-  $('buzzset').onclick = async () => {
-    const pw = $('buzzpw').value;
+
+  // A new password, keeping each switch as it is, plus the one that asked
+  // for it. PBKDF2 at 600k iterations takes about a second here; the
+  // Worker only ever sees what comes back (buzzkey.js). The derived token
+  // rides along once so the Worker can wrap the content key for the gated
+  // packet route — it is not stored on either side.
+  const setPassword = async () => {
+    const pw = $('statspw').value;
     if (!pw) { say('Enter a password', true); return; }
     try {
-      // PBKDF2 at 600k iterations takes about a second here; the Worker
-      // only ever sees what comes back (buzzkey.js). The derived token
-      // rides along once so the Worker can wrap the content key for the
-      // gated packet route — it is not stored on either side.
-      const run = busy($('buzzset'), { label: 'Setting password', scope: box });
+      const run = busy($('pwset'), { label: 'Setting password', scope: box });
       try {
         const cred = await buzzCredentials(pw);
-        await saveSettings({ ...settings, buzz: cred.settings }, { buzz_token: cred.token });
+        const next = { ...settings,
+          buzz: { ...cred.settings, mode: buzzOn() || want === 'buzz' ? 'password' : 'off' } };
+        if (want === 'scoresheets') next.scoresheets = true;
+        await saveSettings(next, { buzz_token: cred.token });
       } finally { run.end(); }
-      say('Buzzpoints password set');
+      say(want ? `Password set, ${WHAT[want]} on` : 'Password changed');
+      want = null; changing = false;
       showDetail();
     } catch (e) { say(e.message, true); }
   };
+
+  const wireStats = () => {
+    $('pub').onchange = async () => {
+      try {
+        await pub(a, { method: 'POST', json: { published: $('pub').checked } });
+        say($('pub').checked ? 'Public page on' : 'Public page off');
+        showDetail();
+      } catch (e) { say(e.message, true); }
+    };
+    $('catstats').onchange = async () => {
+      const on = $('catstats').value === 'on';
+      try {
+        const next = { ...settings };
+        if (on) delete next.catStats; else next.catStats = false;
+        await saveSettings(next);
+        say(on ? 'Category stats on' : 'Category stats off');
+        showDetail();
+      } catch (e) { say(e.message, true); }
+    };
+    // On without a password: back to Off, and ask for one
+    const toggle = (which, sel, apply) => async () => {
+      const on = Boolean(sel.value);
+      if (on && !hasKey()) { want = which; changing = false; draw(); $('statspw').focus(); return; }
+      try {
+        const next = { ...settings };
+        apply(next, on);
+        await saveSettings(next);
+        say(`${WHAT[which][0].toUpperCase() + WHAT[which].slice(1)} ${on ? 'on' : 'off'}`);
+        showDetail();
+      } catch (e) { say(e.message, true); }
+    };
+    $('sheetsmode').onchange = toggle('scoresheets', $('sheetsmode'), (next, on) => {
+      if (on) next.scoresheets = true; else delete next.scoresheets;
+    });
+    // Spread the password whole: dropping kdf/iters here would silently
+    // demote a stretched password to the legacy scheme.
+    $('buzzmode').onchange = toggle('buzz', $('buzzmode'), (next, on) => {
+      next.buzz = { ...settings.buzz, mode: on ? 'password' : 'off' };
+    });
+    $('sheetsinfo').onclick = () => { showExample = !showExample; draw(); };
+    if ($('pwchange')) $('pwchange').onclick = () => { changing = true; want = null; draw(); $('statspw').focus(); };
+    if ($('pwcancel')) $('pwcancel').onclick = () => { changing = false; want = null; draw(); };
+    if ($('pwset')) {
+      $('pwset').onclick = setPassword;
+      $('statspw').onkeydown = (e) => { if (e.key === 'Enter') setPassword(); };
+    }
+  };
+
+  draw();
 }
 
 /* ---------- Rooms: create N at once, rename inline ---------- */

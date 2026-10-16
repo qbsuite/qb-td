@@ -23,6 +23,8 @@ import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, re
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, UNKNOWN_CAT } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
+import { buildScoresheet } from '../engine/scoresheet.js';
+import { sheetHtml } from './sheetview.js';
 import { effectiveFormat } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
@@ -457,7 +459,7 @@ function buzzStored() {
 
 function buzzAuthHeaders() {
   const s = buzzStored();
-  return state.buzz && s ? { Authorization: 'Buzz ' + s.tok } : {};
+  return (state.buzz || state.scoresheets) && s ? { Authorization: 'Buzz ' + s.tok } : {};
 }
 
 // Text of every tiebreaker the tournament read, for the Replacements view:
@@ -499,10 +501,15 @@ async function tryBuzzKey(pw) {
     tok = await buzzToken(pw, state.buzz_kdf);
   } catch (e) { say('Could not check the password', true); return; }
   sessionStorage.setItem(BUZZ_KEY, JSON.stringify({ tok, v: state.buzz_v }));
+  // A finished round's packet proves the password; without one (no
+  // packets, or scoresheets alone) the Worker's unlock route does.
   const probe = (state.buzz_done || []).filter((n) =>
     (state.packet_rounds || []).includes(n))[0];
-  if (probe !== undefined) {
-    try { await fetchBuzzPacket(probe); }
+  const check = probe !== undefined ? () => fetchBuzzPacket(probe)
+    : !usingStaticData() ? () => pub('/pub/' + slug + '/unlock', { headers: buzzAuthHeaders() })
+      : null;
+  if (check) {
+    try { await check(); }
     catch (e) {
       const m = String(e.message);
       // a rejected key and a hit attempt cap both mean "not unlocked", so
@@ -893,6 +900,11 @@ function pendingNote() {
 // its own page, marked with a bar and a link back to where you were.
 const STATS_LAYOUT_KEY = 'qbtdStatsLayout';
 const STAND_VIEW_KEY = 'qbtdStandView';
+// Scoresheets toggle: a viewer's show/hide, kept once unlocked (on by
+// default); sheetAsk: the password field beside it is open
+const SHEETS_KEY = 'qbtdSheets';
+let sheetAsk = false;
+const sheetsShown = () => readPref(SHEETS_KEY) !== 'off';
 let standView = null;      // New layout, pools: 'table' | 'grid', for every pool at once
 let statsLayout = null;    // 'classic' | 'new'
 let statsSec = 'standings'; // New layout: a NEW_SECS key
@@ -1057,6 +1069,114 @@ const logHead = '<th class="nrkcol">Rd</th><th class="name nstick">Opponent</th>
 const secHead = (id, title, meta, at) => `<div class="nsec" id="${id}" data-at="${esc(at)}"><h3 class="nhead"><span>${title}</span>${
   meta ? `<span class="meta">${meta}</span>` : ''}</h3>`;
 
+// the Scoresheets switch: on/off once unlocked; locked, it is off with a
+// closed padlock, and pressing it opens the password field
+const LOCK_SVG = '<svg class="swlock" viewBox="0 0 12 14" width="11" height="13" aria-hidden="true">'
+  + '<path d="M3 6V4a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+  + '<rect x="1" y="6" width="10" height="7.5" rx="1.5" fill="currentColor"/></svg>';
+const sheetSwitch = (on, locked) => `<button id="sheetchip" class="sw${on ? ' on' : ''}${locked ? ' locked' : ''}" role="switch"
+  aria-checked="${on}" title="${locked ? 'Locked: enter the password to see scoresheets' : on ? 'Hide scoresheets' : 'Show scoresheets'}">${
+  locked ? LOCK_SVG : ''}<span>Scoresheets</span><span class="swtrack"><span class="swknob"></span></span><span class="swstate">${
+  locked ? 'Locked' : on ? 'On' : 'Off'}</span></button>`;
+
+// Scoresheets are behind the stats password, a viewer can switch them
+// off, and a round's appear only once all its games are in (buzz_done,
+// the buzzpoints rule). For one reportData game: null (none), 'wait' (its
+// round is still being played) or the scoresheet.
+function sheetOf(g, regTossups) {
+  if (!state.scoresheets || !buzzStored() || !sheetsShown()) return null;
+  if (!buzzDoneSet().has(g.round)) return 'wait';
+  const e = rawEntries.find((x) => x.id === g.fileId);
+  const cr = catmap && catmap.rounds && catmap.rounds[String(g.round)];
+  return (e && buildScoresheet(e.qbj, cr ? cr.t : null, regTossups)) || null;
+}
+const sheetWait = (g) => `<p class="muted sxwait">The scoresheet will appear when all round ${g.round} games finish.</p>`;
+// the switch and, while locked and asked, the password field beside it
+function sheetToggle() {
+  if (!state.scoresheets) return '';
+  const open = Boolean(buzzStored());
+  return `<span class="sxtoggle">${!open && sheetAsk
+    ? `<input id="sheetpw" type="password" placeholder="Password" size="12" aria-label="Scoresheet password">
+       <button id="sheetgo" class="small primary">View</button>` : ''}${sheetSwitch(open && sheetsShown(), !open)}</span>`;
+}
+// The switch's handlers, for whichever layout drew it. A redraw remounts
+// the Classic report, so its place (page and scroll) is kept first.
+function wireSheetToggle() {
+  const keep = () => { const rb = document.querySelector('.reportbox'); if (rb) pendingPlace = reportPlace(rb); };
+  if ($('sheetchip')) {
+    $('sheetchip').onclick = () => {
+      keep();
+      if (buzzStored()) { savePref(SHEETS_KEY, sheetsShown() ? 'off' : 'on'); render(); return; }
+      sheetAsk = !sheetAsk;
+      render();
+      if ($('sheetpw')) $('sheetpw').focus();
+    };
+  }
+  if ($('sheetgo')) {
+    // a right password redraws (tryBuzzKey), at the place kept here; once
+    // unlocked the field is gone, so sheetAsk can simply reset
+    const go = async () => {
+      keep();
+      await tryBuzzKey($('sheetpw') ? $('sheetpw').value : '');
+      if (buzzStored()) sheetAsk = false;
+    };
+    $('sheetgo').onclick = go;
+    $('sheetpw').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  }
+}
+
+// The Classic report is YellowFruit's, and the files a TD downloads must
+// stay byte-identical to YF's own (engine/report.js), so scoresheets are
+// added to the in-page copy only, on the Scoreboard page laid out as New
+// lays it out: the game's tables stacked on the left (the two team tables
+// one above the other, then bonuses), the scoresheet on the right, which
+// drops below them on a narrow screen. The report is its own document (reportframe.js), so
+// they carry their styles in: the page's own scoresheet rules, with the
+// theme's colours.
+function sheetFrameCss() {
+  const rules = [];
+  for (const sheet of document.styleSheets) {
+    let list;
+    try { list = sheet.cssRules; } catch (e) { continue; }
+    for (const r of list) if (/\.(sx|cf)\b|\.sxsubs|\.sxwait/.test(r.cssText)) rules.push(r.cssText);
+  }
+  const cs = getComputedStyle(document.documentElement);
+  const vars = ['--fg', '--muted', '--line', '--hover-bg', '--c-sci', '--c-lit', '--c-hist', '--c-fa', '--c-rmp', '--c-oth']
+    .map((v) => `${v}:${cs.getPropertyValue(v).trim()}`).join(';');
+  return `<style>:root{${vars};--bg:transparent}
+    .cslay{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-start}
+    .csleft{flex:0 1 auto;min-width:0}
+    .csleft .boxScoreTable{flex-direction:column;gap:12px}
+    .csleft table{width:auto!important;min-width:18em}
+    .cslay>.sxwrap{flex:none;width:min-content;max-width:100%}
+    .sxwrap .tablewrap{overflow-x:auto}${rules.join('\n')}</style>`;
+}
+function withSheets(pages, rd) {
+  const at = pages.findIndex((p) => /games\.html$/.test(p.name));
+  if (at < 0 || !state.scoresheets || !buzzStored() || !sheetsShown()) return pages;
+  let text = pages[at].text;
+  let css = sheetFrameCss();
+  for (const g of rd.games) {
+    const sheet = sheetOf(g, rd.regTossups);
+    if (!sheet) continue;
+    // a game's box score: its team tables (.boxScoreTable), then its
+    // bonus table, the last table before the next game
+    const start = text.indexOf(`id=${g.anchor.replace(/^games-/, '')} `);
+    const from = start < 0 ? -1 : text.indexOf('<div class="boxScoreTable">', start);
+    const bonus = from < 0 ? -1 : text.indexOf('Bonuses', from);
+    const end = bonus < 0 ? -1 : text.indexOf('</table>', bonus) + 8;
+    if (end < 8) continue;
+    if (sheet === 'wait') {
+      text = text.slice(0, end) + css + sheetWait(g) + text.slice(end);
+    } else {
+      text = text.slice(0, from) + css + '<div class="cslay"><div class="csleft">' + text.slice(from, end)
+        + '</div>' + sheetHtml(sheet, rd.regTossups) + '</div>' + text.slice(end);
+    }
+    css = '';
+  }
+  return pages.map((p, i) => (i === at ? { ...p, text } : p));
+}
+
 function newGames(rd, ids, vals) {
   const rounds = [...new Set(rd.games.map((g) => g.round))];
   const box = (g) => {
@@ -1064,8 +1184,8 @@ function newGames(rd, ids, vals) {
     const w = g.teams.find((t) => t.name === g.winner);
     const l = g.teams.find((t) => t.name === g.loser);
     const title = `${esc(w.name)} ${w.points}, ${esc(l.name)} ${l.points}${g.otTossups ? ' (OT)' : ''}`;
-    return `${secHead(ids.game(g.id), title, head, g.anchor)}
-      <div class="nbox">${g.teams.map((t) => `<div class="tablewrap"><table class="nstats">
+    const sheet = sheetOf(g, rd.regTossups);
+    const tables = `<div class="nbox">${g.teams.map((t) => `<div class="tablewrap"><table class="nstats">
         <thead><tr><th class="name nstick">${goLink('teams', ids.team(t.name), esc(t.name))}</th><th class="num">TUH</th>
           ${vals.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th></tr></thead>
         <tbody>${t.players.map((p) => `<tr><td class="name nstick">${goLink('players', ids.player(t.name, p.name), esc(p.name))}</td>
@@ -1078,9 +1198,14 @@ function newGames(rd, ids, vals) {
         <thead><tr><th class="name nstick">Bonuses</th><th class="num">Heard</th><th class="num">Pts</th><th class="num">PPB</th></tr></thead>
         <tbody>${g.teams.map((t) => `<tr><td class="name nstick">${esc(t.name)}</td><td class="num">${t.bonusesHeard}</td>
           <td class="num">${t.bonusPoints}</td><td class="num">${fx(t.ppb, 2)}</td></tr>`).join('')}</tbody>
-      </table></div></div>`;
+      </table></div>`;
+    return `${secHead(ids.game(g.id), title, head, g.anchor)}${
+      sheet && sheet !== 'wait' ? `<div class="slay"><div class="sleft">${tables}</div>${sheetHtml(sheet, rd.regTossups)}</div>`
+        : tables + (sheet === 'wait' ? sheetWait(g) : '')}</div>`;
   };
-  return `<div class="chips njump">${rounds.map((r) => `<a href="#" class="chip" data-go="games|${ids.round(r)}">Round ${r}</a>`).join('')}</div>`
+  // the Scoresheets toggle, at the end of the round links: locked, it
+  // opens a password field beside it; unlocked, it shows or hides them
+  return `<div class="chips njump">${rounds.map((r) => `<a href="#" class="chip" data-go="games|${ids.round(r)}">Round ${r}</a>`).join('')}${sheetToggle()}</div>`
     + rounds.map((r) => `<h3 class="poolhead" id="${ids.round(r)}" data-at="games-Round-${r}">Round ${r}</h3>${
       rd.games.filter((g) => g.round === r).map(box).join('')}`).join('');
 }
@@ -1209,6 +1334,7 @@ function renderNewStats(box) {
     players: () => newPlayers(rd, ids, vals), rounds: () => newRounds(rd, ids) };
   box.innerHTML = (draw[statsSec] || draw.standings)();
   wire(box, 'standview', (v) => { standView = v; savePref(STAND_VIEW_KEY, v); });
+  wireSheetToggle();
   fitTables(box);
   // a followed link: mark where it landed, with the way back (a round's
   // heading gets only the way back)
@@ -1251,6 +1377,10 @@ function renderNewStats(box) {
 }
 
 function renderStatsTab(box) {
+  // a redraw (new games on Refresh, a new password) keeps the Classic
+  // report where the reader was, as a layout switch does
+  const shown = box.querySelector('.reportbox');
+  if (!pendingPlace && shown) pendingPlace = reportPlace(shown);
   if (unmountReport) { unmountReport(); unmountReport = null; }
   if (!matches.length) {
     box.innerHTML = statsErrors.length
@@ -1263,7 +1393,7 @@ function renderStatsTab(box) {
   const sec = (v, label) => `<a href="#" class="view${statsSec === v ? ' on' : ''}" data-statssec="${v}">${label}</a>`;
   box.innerHTML = statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('') + pendingNote()
     + `<div class="views statsbar">
-        ${isNew ? NEW_SECS.map(([k, label]) => sec(k, label)).join('') : ''}
+        ${isNew ? NEW_SECS.map(([k, label]) => sec(k, label)).join('') : sheetToggle()}
         <span class="grow"></span>
         <span class="layoutpick"><span class="muted">Layout</span>${chipsHtml([{ v: 'classic', label: 'Classic' },
           { v: 'new', label: 'New' }], statsLayout, 'layout')}</span>
@@ -1279,12 +1409,13 @@ function renderStatsTab(box) {
   });
   wire(box, 'statssec', (v) => { statsSec = v; newMark = null; newBack = []; });
   if (isNew) { renderNewStats($('newstats')); return; }
-  unmountReport = mountReport(box.querySelector('.reportbox'),
-    buildReport({ name: state.name, matches: dedupeMatches(matches), roster,
-      // same rules the TO's own download uses: the report is scaled and
-      // its overtime split by the tournament's regulation tossup count
-      settings: effectiveFormat(state.format) }),
-    { start: pendingPlace });
+  wireSheetToggle();
+  // same rules the TO's own download uses: the report is scaled and its
+  // overtime split by the tournament's regulation tossup count
+  const opts = { name: state.name, matches: dedupeMatches(matches), roster, settings: effectiveFormat(state.format) };
+  let pages = buildReport(opts);
+  if (state.scoresheets && buzzStored() && sheetsShown()) pages = withSheets(pages, reportData(opts));
+  unmountReport = mountReport(box.querySelector('.reportbox'), pages, { start: pendingPlace });
   pendingPlace = null;
 }
 
@@ -1377,14 +1508,20 @@ async function load() {
     // converges). Frozen data (demo/archive) never uses snapshots.
     snap = !usingStaticData() && state.pub && state.pub.sha ? state.pub : null;
     const storedKey = buzzStored();
-    if (storedKey && storedKey.v !== state.buzz_v) sessionStorage.removeItem(BUZZ_KEY);
+    // a new password moves buzz_v: the old key is dropped, and the page
+    // redraws locked even when nothing else moved
+    const dropped = Boolean(storedKey && storedKey.v !== state.buzz_v);
+    if (dropped) sessionStorage.removeItem(BUZZ_KEY);
     document.title = state.name;
     $('tname').textContent = state.name;
     $('round').textContent = 'Round ' + liveRound();
     $('tab-buzz').hidden = !state.buzz;
-    $('tab-cats').hidden = !state.cats;
+    // the Categories tab: there are categories, and the TD's Category
+    // stats switch is on (cat_tab false; absent from an older Worker)
+    const catTab = Boolean(state.cats) && state.cat_tab !== false;
+    $('tab-cats').hidden = !catTab;
     if (tab === 'buzz' && !state.buzz) setTab('stats', false);
-    if (tab === 'cats' && !state.cats) setTab('stats', false);
+    if (tab === 'cats' && !catTab) setTab('stats', false);
 
     // Stats follow the live per-round stamps: fetchRounds picks the
     // snapshot or the Worker per round, so unlike the single-blob stamps
@@ -1401,7 +1538,11 @@ async function load() {
     const statsMoved = statsStamp !== lastVersion;
     const schedMoved = schedStamp !== lastSched;
     const catsMoved = catsStamp !== lastCats;
-    if (!statsMoved && !schedMoved && !catsMoved) { say(''); return; }
+    if (!statsMoved && !schedMoved && !catsMoved) {
+      say('');
+      if (dropped && tab !== null) { sheetAsk = false; render(); }
+      return;
+    }
     say('Loading');
 
     const jobs = [];
@@ -1436,7 +1577,7 @@ async function load() {
     if (tab === null) {
       const wanted = (location.hash || '').replace('#', '');
       setTab(wanted === 'stats' || wanted === 'schedule'
-        || (wanted === 'buzz' && state.buzz) || (wanted === 'cats' && state.cats)
+        || (wanted === 'buzz' && state.buzz) || (wanted === 'cats' && catTab)
         // an archived tournament opens on how it ended
         ? wanted : schedule && !usingArchive() ? 'schedule' : 'stats', false);
     } else render();

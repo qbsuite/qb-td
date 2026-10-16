@@ -237,6 +237,14 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 }
 #setupsec h2 ~ h2 { margin-top: 36px; }
 #setupsec .setupintro { margin-top: 0; }
+/* Password-protected stats: the switches the password above unlocks */
+#setupsec .pwstats { margin-top: 14px; padding-left: 14px; border-left: 1px solid var(--line); }
+/* the (i) beside Scoresheets, and the example it opens */
+.infobtn { width: 20px; height: 20px; padding: 0; border-radius: 50%; font: italic 600 12px/18px Georgia, 'Times New Roman', serif;
+  color: var(--muted); text-align: center; }
+.infobtn[aria-expanded="true"] { color: var(--fg); border-color: var(--fg); }
+#setupsec .sheetex { margin: 10px 0 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--hover-bg); max-width: 100%; overflow-x: auto; }
+#setupsec .sheetex p { margin: 0 0 10px; font-size: 14px; max-width: 62ch; }
 /* MODAQ settings: the same compact rows, no box around them */
 .hubpage #fmtpanel.card { border: none; padding: 6px 0 0; }
 .hubpage #fmtpanel.card:hover { background: none; }

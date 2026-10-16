@@ -413,6 +413,56 @@ ok('unknown kdf write accepted', r.status === 200);
 r = await call('/pub/' + slug);
 ok('unknown kdf reads as off', r.body.buzz === null, r.body.buzz);
 
+// the stats password, scoresheets and the category switch: neither
+// scoresheets nor buzzpoints switch on without a stored password, and the
+// password stays with buzzpoints off (mode 'off') for scoresheets to use
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', scoresheets: true } } });
+ok('scoresheets refused without a password', r.status === 400 && r.body.error === 'set a password first', r.body);
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: { mode: 'password' } } } });
+ok('buzzpoints refused without a password', r.status === 400, r.body);
+r = await call(A, { method: 'POST', json: { buzz_token: kdfToken,
+  settings: { gameFormat: 'acf', scoresheets: true, buzz: { ...kdfSettings, mode: 'off' } } } });
+ok('scoresheets on behind a password with buzzpoints off', r.status === 200, r.body);
+r = await call('/pub/' + slug);
+ok('pub state: scoresheets on, buzzpoints off',
+  r.body.scoresheets === true && r.body.buzz === null
+  && r.body.buzz_kdf && r.body.buzz_kdf.salt === kdfSettings.salt
+  && JSON.stringify(r.body.buzz_done) === '[1]' && r.body.packet_rounds.length === 0
+  && !JSON.stringify(r.body).includes(kdfSettings.hash), r.body);
+{
+  const bare = await fetch(`${BASE}/pub/${slug}/unlock`);
+  ok('unlock 401 with no password', bare.status === 401);
+  const wrong = await fetch(`${BASE}/pub/${slug}/unlock`, { headers: { Authorization: 'Buzz ' + 'f'.repeat(64) } });
+  ok('unlock 401 with a wrong password', wrong.status === 401);
+  const right = await fetch(`${BASE}/pub/${slug}/unlock`, { headers: { Authorization: 'Buzz ' + kdfToken } });
+  ok('unlock accepts the stats password', right.status === 200);
+  // buzzpoints off: no packet text, whatever the password
+  const pkt = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`, { headers: { Authorization: 'Buzz ' + kdfToken } });
+  ok('qpacket 404 with buzzpoints off', pkt.status === 404);
+}
+// buzzpoints back on with the kept password: no new password needed
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', scoresheets: true,
+  buzz: { ...kdfSettings, mode: 'password' } } } });
+{
+  const pkt = await fetch(`${BASE}/pub/${slug}/qpacket?round=1`, { headers: { Authorization: 'Buzz ' + kdfToken } });
+  ok('buzzpoints back on serve packets on the kept password', r.status === 200 && pkt.status === 200);
+}
+// Category stats off hides the tab; scoresheets keep their category map
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', scoresheets: true, catStats: false,
+  buzz: { ...kdfSettings, mode: 'password' } } } });
+r = await call('/pub/' + slug);
+ok('category stats off: the tab flag only, the map stays as it was',
+  r.body.cat_tab === false && 'cats' in r.body, r.body);
+// both off: nothing for the password to unlock
+r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: { ...kdfSettings, mode: 'off' } } } });
+r = await call('/pub/' + slug);
+ok('scoresheets and buzzpoints off', r.body.scoresheets === false && r.body.buzz === null
+  && r.body.buzz_v === null, r.body);
+{
+  const res = await fetch(`${BASE}/pub/${slug}/unlock`, { headers: { Authorization: 'Buzz ' + kdfToken } });
+  ok('unlock 404 with nothing switched on', res.status === 404);
+}
+
 // attempt cap: only meaningful when the ratelimit binding is present, so
 // the run says which it checked rather than passing silently either way
 r = await call(A, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: kdfSettings } } });

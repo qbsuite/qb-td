@@ -761,6 +761,8 @@ export function reportData(opts) {
       const win = b.points > a.points ? b : a;
       return {
         id: g.id, anchor: `games-${gameAnchor(g)}`, round: g.round, tossupsRead: g.tossupsRead, otTossups: g.overtime.tossups,
+        fileId: g.fileId, // the public page's scoresheet finds the game's qbj by it
+
         winner: win.name, loser: (win === a ? b : a).name,
         teams: g.teams.map((mt) => ({
           name: mt.name, points: mt.points, tossupPoints: mt.tossupPoints, counts: teamCounts(mt),

@@ -21,6 +21,8 @@ import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenize
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, catOfEntry } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
+import { buildScoresheet, teamInitials, catTag } from '../app/engine/scoresheet.js';
+import { sheetHtml, exampleSheetHtml } from '../app/js/sheetview.js';
 import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
 import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
 import { checkPacket } from '../app/engine/packetcheck.js';
@@ -4417,6 +4419,100 @@ test('addFinals: one game final if needed, and one game final always played', ()
   assert.equal(oneif.fin.rounds[0].games[0].ifNeeded, 'unless the leader is two wins clear');
   assert.equal(oneif.got.always, false);
   assert.equal(one.got.always, true);
+});
+
+/* ---------- scoresheets ---------- */
+
+// a MODAQ-shaped match with lineups, buzzes and bonus parts
+function sheetMatch() {
+  const buzz = (team, player, value) => ({ team: { name: team }, player: { name: player },
+    buzz_position: { word_index: 10 }, result: { value } });
+  const bonus = (...pts) => ({ question: { question_number: 1 }, parts: pts.map((x) => ({ controlled_points: x, bounceback_points: 0 })) });
+  return {
+    tossups_read: 4,
+    match_teams: [
+      { team: { name: 'Alpha' }, lineups: [
+          { first_question: 1, players: [{ name: 'Ann Lee' }, { name: 'Bo Kim' }] },
+          { first_question: 3, players: [{ name: 'Ann Lee' }, { name: 'Cy Park' }] }],
+        match_players: [{ player: { name: 'Ann Lee' } }, { player: { name: 'Bo Kim' } }, { player: { name: 'Cy Park' } }] },
+      { team: { name: 'Beta' }, lineups: [{ first_question: 1, players: [{ name: 'Evan Shah' }, { name: 'Emma Stone' }] }],
+        match_players: [{ player: { name: 'Evan Shah' } }, { player: { name: 'Emma Stone' } }] },
+    ],
+    match_questions: [
+      { question_number: 1, tossup_question: { question_number: 1 }, buzzes: [buzz('Alpha', 'Ann Lee', 15)], bonus: bonus(10, 10, 0) },
+      { question_number: 2, tossup_question: { question_number: 2 },
+        buzzes: [buzz('Beta', 'Emma Stone', -5), buzz('Alpha', 'Bo Kim', 10)], bonus: bonus(0, 0, 0) },
+      { question_number: 3, tossup_question: { question_number: 3 }, buzzes: [buzz('Beta', 'Evan Shah', 0)] },
+      { question_number: 4, tossup_question: { question_number: 4 }, buzzes: [buzz('Beta', 'Evan Shah', 10)], bonus: bonus(10, 10, 10) },
+      { question_number: 5, tossup_question: { question_number: 5 }, buzzes: [buzz('Alpha', 'Cy Park', 10)] },
+    ],
+  };
+}
+
+test('buildScoresheet: cells, bonus parts, running score and overtime', () => {
+  const cats = [{ c: 'Literature', s: 'American Literature' }, { c: 'Science', s: 'Other Science' }, null,
+    { c: 'History', s: 'Ancient History' }, { c: 'Social Science', s: 'Social Science' }];
+  const sh = buildScoresheet(sheetMatch(), cats, 4);
+  assert.deepEqual(sh.teams.map((t) => t.players.map((p) => p.initials)), [['AL', 'BK', 'CP'], ['ESh', 'ESt']]);
+  assert.deepEqual(sh.rows[0].cells, [[15, null, null], [null, null]]);
+  assert.deepEqual(sh.rows[0].bonus, [[true, true, false], null]);
+  // a neg and the other team's pick-up share the row; the bonus goes to the 10
+  assert.deepEqual(sh.rows[1].cells, [[null, 10, null], [null, -5]]);
+  assert.deepEqual(sh.rows[1].bonus, [[false, false, false], null]);
+  // a 0 is marked, and earns no bonus
+  assert.deepEqual(sh.rows[2].cells[1], [0, null]);
+  assert.deepEqual(sh.rows[2].bonus, [null, null]);
+  assert.deepEqual(sh.rows.map((r) => r.score), [[35, 0], [45, -5], [45, -5], [45, 35], [55, 35]]);
+  assert.deepEqual(sh.final, [55, 35]);
+  assert.deepEqual(sh.rows.map((r) => r.ot), [false, false, false, false, true]);
+  assert.deepEqual(sh.rows.map((r) => r.cat && r.cat.label), ['AL', 'OSci', null, 'AnH', 'SS']);
+  assert.equal(sh.rows[0].cat.family, 'lit');
+  assert.equal(sh.rows[4].cat.family, 'rmp');
+});
+
+test('buildScoresheet: substitutions from the lineups', () => {
+  const sh = buildScoresheet(sheetMatch(), null, 20);
+  assert.deepEqual(sh.subs, [{ n: 3, team: 0, in: ['Cy Park'], out: ['Bo Kim'] }]);
+  // out of the game: Cy Park before the sub, Bo Kim after it
+  assert.deepEqual(sh.rows.map((r) => r.out[0]), [
+    [false, false, true], [false, false, true], [false, true, false], [false, true, false], [false, true, false]]);
+  assert.deepEqual(sh.rows[2].subs, [0]);
+  assert.ok(sh.rows.every((r) => r.cat === null));
+});
+
+test('buildScoresheet: no tossup data means no scoresheet', () => {
+  assert.equal(buildScoresheet({ tossups_read: 20, match_teams: [{}, {}] }), null);
+});
+
+test('sheetHtml: without categories the column is left out, the rest stays', () => {
+  const none = sheetHtml(buildScoresheet(sheetMatch(), null, 4), 4);
+  assert.ok(!none.includes('class="qc"') && !none.includes('class="cf'));
+  assert.ok(none.includes('<table class="sx">') && none.includes('55–35'));
+  assert.ok(none.includes('TU 3: Alpha CP subbed for BK'));
+  const cats = [{ c: 'Literature', s: 'American Literature' }];
+  assert.ok(sheetHtml(buildScoresheet(sheetMatch(), cats, 4), 4).includes('class="cf lit"'));
+});
+
+test('exampleSheetHtml: the hub\'s example draws', () => {
+  const h = exampleSheetHtml();
+  assert.equal((h.match(/<tr/g) || []).length, 11); // two header rows, 8 tossups, the final score
+  assert.ok(h.includes('subbed for') && h.includes('class="cf hist"') && h.includes('−5'));
+});
+
+test('teamInitials: unique within a team', () => {
+  const m = teamInitials(['Evan Shah', 'Emma Stone', 'Fiona Ruiz', 'Plato']);
+  assert.deepEqual([...m.values()], ['ESh', 'ESt', 'FR', 'Pl']);
+  // the same initials on two teams are fine: each team is its own list
+  assert.equal(teamInitials(['Ann Kim']).get('Ann Kim'), 'AK');
+});
+
+test('catTag: subcategory initials, else the category\'s short form, else cut to four', () => {
+  assert.equal(catTag({ c: 'Fine Arts', s: 'Visual Fine Arts' }).label, 'VFA');
+  assert.equal(catTag({ c: 'Mythology', s: '' }).label, 'Myth');
+  assert.equal(catTag({ c: 'Geography', s: 'Geography' }).family, 'oth');
+  assert.equal(catTag({ c: 'Science', s: 'Astronomy' }).label, 'Sci');
+  assert.equal(catTag({ c: 'Linguistics', s: '' }).label, 'Ling');
+  assert.equal(catTag(null), null);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tossup box score</title>
+<!-- Throwaway mock: a per-tossup grid at the top of a game on the New
+     layout's Scoreboard. One row per team, one column per tossup read: the
+     tossup's points (15, 10, -5) and the bonus parts as checks and crosses.
+     Games are simulated from a fixed seed, so the player tables under the
+     grid add up to the same totals. In the app's own stylesheets. -->
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/pub.css">
+<style>
+.lt {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7; --link: #1d4ed8;
+  --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c; --pick: #e4e4df; --pick-line: #c9c9c2;
+  --c-sci: #d6efda; --c-lit: #d9e6fb; --c-hist: #f8d9d9; --c-fa: #e7dcf8; --c-rmp: #f8e8c2; --c-oth: #e6e6e1;
+  --s15-bg: #0b5ea8; --s15-fg: #ffffff; --s10-bg: #a9d4f2; --s10-fg: #0b2a44; --sn-bg: #c95c00; --sn-fg: #ffffff;
+}
+.dk {
+  --bg: #232326; --fg: #e4e4e7; --muted: #a1a1aa; --line: #36363c; --link: #8fb0f5;
+  --hover-bg: #2c2c31; --ok: #6fc58d; --bad: #f08a8a; --pick: #38383f; --pick-line: #4d4d55;
+    --c-sci: #24412c; --c-lit: #233552; --c-hist: #4d2828; --c-fa: #3b2c52; --c-rmp: #4a3c1d; --c-oth: #38383e;
+    --s15-bg: #5aa7e6; --s15-fg: #0b1b2b; --s10-bg: #234b6e; --s10-fg: #dcefff; --sn-bg: #f0952e; --sn-fg: #1f1200;
+  color-scheme: dark;
+}
+body { padding: 0 32px 80px; background: #f4f4f2; color: #1a1a1a; }
+.mk-h1 { font-size: 26px; font-weight: 600; margin: 24px 0 4px; }
+.mk-intro { max-width: 760px; color: #444; font-size: 14px; }
+.mk-bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  padding: 12px 0; background: #f4f4f2; border-bottom: 1px solid #ddd; font: 14px system-ui, sans-serif; }
+.mk-seg { display: inline-flex; border: 1px solid #bbb; border-radius: 8px; overflow: hidden; }
+.mk-seg button { border: 0; border-right: 1px solid #ddd; background: #fff; color: #1a1a1a; padding: 6px 12px; font: inherit; cursor: pointer; }
+.mk-seg button:last-child { border-right: 0; }
+.mk-seg button.on { background: #1a1a1a; color: #fff; }
+.mk-sec { font-size: 20px; font-weight: 600; margin: 32px 0 6px; padding-bottom: 8px; border-bottom: 1px solid #1a1a1a; }
+.mk-note { font-size: 14px; color: #444; max-width: 760px; margin: 0 0 12px; }
+.mk-row { display: flex; gap: 24px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
+.mk-cap { font-size: 13px; color: #666; margin-bottom: 6px; }
+.board { width: 760px; padding: 18px 20px; border: 1px solid #ddd; border-radius: 10px; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.board.phone { width: 390px; padding: 14px 16px; border-radius: 22px; }
+.board .views { margin-bottom: 8px; }
+
+/* ---- what the proposal adds ---- */
+.bxwrap { margin: 2px 0 14px; }
+.bx { border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 1.1; width: auto; }
+.bx + .bx { margin-top: 8px; }
+.bx th, .bx td { border-bottom: none; padding: 0; text-align: center; vertical-align: middle; }
+.bx th { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; padding: 0 0 3px; }
+.bx td { min-width: 27px; height: 34px; border-left: 1px solid var(--line); }
+.bx tr.ta td { border-bottom: 1px solid var(--line); }
+.bx .tm { text-align: left; font-weight: 600; white-space: nowrap; padding-right: 10px; border-left: none; min-width: 0; }
+.bx .half { border-left: 2px solid var(--muted); }
+.bx .ot { border-left: 2px dashed var(--muted); }
+.bx .tot { font-weight: 700; padding-left: 10px; text-align: right; border-left: 2px solid var(--muted); font-variant-numeric: tabular-nums; }
+.bx .v { display: block; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bx .v.p { color: var(--ok); }
+.bx .v.n { color: var(--bad); }
+.bx .m { display: block; font-size: 11px; letter-spacing: -1px; margin-top: 2px; white-space: nowrap; }
+.bx .y { color: var(--ok); }
+.bx .x { color: var(--muted); }
+.bx tr.cat th { font-size: 10px; font-weight: 600; color: var(--fg); padding: 2px 1px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--fg) 5%, var(--bg)); }
+.bx tr.cat th:first-child, .bx tr.cat th:last-child:empty { background: none; border: none; }
+.bx tr.cat th.half { border-left: 2px solid var(--muted); }
+.bx tr.cat th.ot { border-left: 2px dashed var(--muted); }
+.bx .who { display: block; font-size: 10px; color: var(--muted); margin-bottom: 1px; }
+.bx td[title] { cursor: default; }
+@media (hover: hover) { .bx td[title]:hover { background: var(--hover-bg); } }
+/* C: one line per cell */
+.bx.inl td { min-width: 52px; height: 26px; padding: 0 3px; }
+.bx.inl .tm, .bx.inl .tot { min-width: 0; }
+.bx.inl .v, .bx.inl .m { display: inline; margin: 0; }
+.bx.inl .m { margin-left: 3px; font-size: 11px; }
+.bxkey { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.bxkey b { color: var(--fg); font-weight: 600; }
+.bxlegend { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* transposed */
+.tlay { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; }
+.tlay > .tablewrap { flex: none; max-width: 100%; }
+.trest { flex: 1 1 300px; min-width: 0; }
+.vx { border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 1.1; }
+.vx th { font-size: 12px; font-weight: 600; text-align: left; padding: 0 8px 4px; border-bottom: 1px solid var(--line); }
+.vx td { padding: 3px 8px; white-space: nowrap; height: 24px; }
+.vx tbody tr:nth-child(odd) td { background: color-mix(in srgb, var(--fg) 5%, var(--bg)); }
+.vx tr.half td { border-top: 2px solid var(--muted); }
+.vx tr.ot td { border-top: 2px dashed var(--muted); }
+.vx .qn { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; padding-right: 4px; }
+.vx .qc { font-size: 11px; font-weight: 600; }
+.vx td.qt { min-width: 92px; }
+.vx td.qt + td.qt, .vx th.qt + th.qt { border-left: 1px solid var(--line); }
+.vx .who { display: inline-block; width: 3.2ch; font-size: 11px; color: var(--muted); }
+.vx .v { display: inline-block; width: 2.4ch; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vx .v.p { color: var(--ok); }
+.vx .v.n { color: var(--bad); }
+.vx .v.z, .bx .v.z { color: var(--muted); }
+.vx .m { font-size: 11px; letter-spacing: -1px; margin-left: 5px; }
+.vx .y { color: var(--ok); }
+.vx .x { color: var(--muted); }
+.vx .qs { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.vx th.qs { text-align: right; }
+.vx tfoot td { font-weight: 700; border-top: 1px solid var(--muted); padding-top: 5px; }
+.vx tfoot td.qt { padding-left: calc(8px + 3.2ch); }
+@media (hover: hover) { .vx td[title]:hover { background: var(--hover-bg); } }
+
+.cf { display: inline-block; min-width: 3.4ch; text-align: center; padding: 2px 5px; border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--fg); background: var(--c-oth); }
+.cf.sci { background: var(--c-sci); } .cf.lit { background: var(--c-lit); } .cf.hist { background: var(--c-hist); }
+.cf.fa { background: var(--c-fa); } .cf.rmp { background: var(--c-rmp); }
+.cfleg { display: flex; flex-wrap: wrap; gap: 4px; }
+.cfleg .cf { font-weight: 500; }
+.vx td.qc { padding-top: 2px; padding-bottom: 2px; }
+/* scoresheet, compact */
+.sxwrap { margin: 14px 0 6px; }
+.sx { border-collapse: separate; border-spacing: 0; font-size: 10px; line-height: 1; }
+.sx th { font-size: 9px; font-weight: 600; text-align: center; padding: 0 1px 2px; color: var(--muted); }
+.sx th.tn { font-size: 10px; text-align: left; padding-left: 3px; color: var(--fg); }
+.sx thead tr:last-child th { border-bottom: 1px solid var(--line); }
+.sx td { padding: 1px; height: 16px; white-space: nowrap; text-align: center; }
+.sx tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--fg) 4%, var(--bg)); }
+.sx tr.half td { border-top: 1px solid var(--muted); }
+.sx tr.ot td { border-top: 1px dashed var(--muted); }
+.sx .pl { width: 17px; min-width: 17px; }
+.sx .t0 { border-left: 1px solid var(--muted); }
+.sx td.bon, .sx th.bon { min-width: 20px; padding: 1px 1px; }
+.sx tbody tr:nth-child(n) td.out { background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--fg) 14%, transparent) 3px 4px), var(--bg); }
+.sx td.chg { box-shadow: inset 0 2px 0 var(--fg); }
+.sx .qn { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; padding-right: 3px; }
+.sx .qn .sub { color: var(--fg); margin-left: 1px; }
+.sx .qc { padding: 1px 3px 1px 0; }
+.sx .qc .cf { font-size: 9px; padding: 1px 2px; min-width: 3ch; border-radius: 2px; }
+/* one width for all tags, sized to the longest label (Chem, Myth, OSci) */
+.sx .qc .cf { box-sizing: border-box; width: 5ch; min-width: 0; padding: 1px 0; }
+.vx .qc .cf { box-sizing: border-box; width: 5.2ch; min-width: 0; padding: 2px 0; }
+.b { display: inline-block; min-width: 15px; padding: 2px 1px; border-radius: 2px; font-size: 9.5px; font-weight: 700;
+  text-align: center; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.b.p { background: var(--s15-bg); color: var(--s15-fg); }
+.b.t { background: var(--s10-bg); color: var(--s10-fg); }
+.b.z { background: none; color: var(--fg); box-shadow: inset 0 0 0 1px var(--muted); }
+.b.n { background: var(--sn-bg); color: var(--sn-fg); }
+.sx .m { font-size: 9px; letter-spacing: -1.5px; }
+.sx .y { color: var(--fg); }
+.sx .x { color: var(--muted); opacity: 0.7; }
+.sx .qs { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; padding-left: 4px; border-left: 1px solid var(--muted); }
+.sx th.qs { color: var(--muted); }
+.sx tfoot td { font-weight: 700; border-top: 1px solid var(--muted); padding-top: 3px; font-variant-numeric: tabular-nums; }
+.sx tfoot td.qs { color: var(--fg); }
+/* plain numbers on a thin grid */
+.b { display: inline; min-width: 0; padding: 0; background: none !important; color: var(--fg) !important; box-shadow: none !important; font-size: 10px; font-weight: 600; }
+.sx td { border-bottom: 1px solid var(--line); }
+.sx td.pl, .sx td.bon, .sx th.pl, .sx th.bon { border-right: 1px solid var(--line); }
+.sx tbody tr:nth-child(even) td:not(.out) { background: none; }
+.sx td.bon { border-right: none; }
+.sx th.tn { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sxsubs { line-height: 1.45; }
+/* scoresheet beside the tables */
+.slay { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; }
+.sleft { flex: 0 1 auto; min-width: 0; }
+.sleft .nbox { flex-direction: column; }
+.sleft .nbox > .nfade { flex: none; }
+.sleft .nstats th.nstick, .sleft .nstats td.nstick { white-space: normal; min-width: 10ch; max-width: 13em; }
+.slay > .sxwrap { margin-top: 0; flex: none; width: min-content; max-width: 100%; }
+@media (hover: hover) { .sx td[title]:hover { background: var(--hover-bg); } }
+.sxleg { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.sxleg .cf { font-size: 10px; padding: 1px 4px; margin-right: -6px; }
+.sxkey { font-size: 11px; margin-top: 4px; }
+/* hub settings (td.css subset) */
+.hub h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 22px 0 8px; }
+.hub h2:first-child { margin-top: 0; }
+.hub .row, .sxlock .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hub p.muted { color: var(--muted); font-size: 14px; margin: 6px 0 0; max-width: 62ch; }
+.hub select, .hub input, .sxlock input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.hub button, .sxlock button { font: inherit; color: var(--link); background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+.hub button.primary, .sxlock button.primary { font-weight: 600; }
+.hub .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.hub button.small { padding: 2px 10px; font-size: 13px; }
+.hub .pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--ok) 15%, var(--bg)); color: var(--ok); }
+.hub .new { border-left: 3px solid var(--link); padding-left: 8px; margin-left: -11px; }
+.board.hubb { width: 600px; }
+input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+/* public page: the lock, the wait note, the tab rows */
+.tabsbar { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.statsbar.sub .view { font-size: 14px; }
+.sxlock { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--hover-bg); }
+.sxlock p { margin: 0 0 8px; font-size: 14px; }
+.sxwait { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.muted { color: var(--muted); }
+/* mock-only controls */
+.mk-ctl { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 0 0 12px; font-size: 14px; color: var(--muted);
+  padding: 10px 14px; border: 1px dashed var(--frame); border-radius: 10px; max-width: 760px; }
+.mk-seg { display: inline-flex; border: 1px solid var(--frame); border-radius: 8px; overflow: hidden; margin-left: 6px; }
+.mk-seg button { border: 0; border-right: 1px solid var(--frame); background: var(--bg); color: var(--fg); padding: 5px 12px; font: inherit; cursor: pointer; }
+.mk-seg button:last-child { border-right: 0; }
+.mk-seg button.on { background: var(--fg); color: var(--bg); }
+</style>
+</head>
+<body>
+<h1 class="mk-h1">Tossup box score</h1>
+<p class="mk-intro">A grid at the top of each game on the Scoreboard (New layout). It has one row per team and one
+column per tossup read. A cell shows what that team got on the tossup (15, 10 or −5) and how it did on the bonus.
+Hovering a cell shows who buzzed. The player and bonus tables stay below it.</p>
+<div class="mk-bar">
+  <span>Theme</span>
+  <span class="mk-seg" id="theme"><button data-v="lt" class="on">Light</button><button data-v="dk">Dark</button></span>
+  <span style="color:#666">Applies to the proposals. "Before" shows both.</span>
+</div>
+
+<h2 class="mk-sec">Before</h2>
+<p class="mk-note">The Scoreboard today: a heading, each team's player table, then bonuses.</p>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop, light</div><div class="board lt" data-v="before"></div></div>
+  <div><div class="mk-cap">Laptop, dark</div><div class="board dk" data-v="before"></div></div>
+</div>
+<div class="mk-row" style="margin-top:16px">
+  <div><div class="mk-cap">Phone, light</div><div class="board phone lt" data-v="before"></div></div>
+  <div><div class="mk-cap">Phone, dark</div><div class="board phone dk" data-v="before"></div></div>
+</div>
+
+<h2 class="mk-sec">A. Points over marks (recommended)</h2>
+<p class="mk-note">Each cell has the tossup points on top and the three bonus parts under them. Powers are green and
+negs are red. A heavier line splits the halves, and a dashed line starts overtime. On a phone the grid wraps into
+two blocks of ten.</p>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop</div><div class="board themed" data-v="A"></div></div>
+  <div><div class="mk-cap">Phone</div><div class="board phone themed" data-v="A" data-block="10"></div></div>
+</div>
+
+<h2 class="mk-sec">B. With the player</h2>
+<p class="mk-note">Same as A, with the buzzing player's initials above the points and a key under the grid. This
+works without hovering, so it suits phones, but it is a little taller.</p>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop</div><div class="board themed" data-v="B"></div></div>
+  <div><div class="mk-cap">Phone</div><div class="board phone themed" data-v="B" data-block="10"></div></div>
+</div>
+
+<h2 class="mk-sec">E. Scoresheet</h2>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop</div><div class="board themed" data-v="S"></div></div>
+  <div><div class="mk-cap">Phone</div><div class="board phone themed" data-v="S"></div></div>
+</div>
+
+<h2 class="mk-sec">G. Scoresheets off and on</h2>
+<div class="mk-ctl">
+  <span>Viewer<span class="mk-seg"><button data-mock="unlocked=false">Locked</button><button data-mock="unlocked=true" class="on">Unlocked</button></span></span>
+</div>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop, off</div><div class="board themed" data-v="L" data-sheets="off"></div></div>
+  <div><div class="mk-cap">Laptop, on</div><div class="board themed" data-v="L"></div></div>
+</div>
+
+<h2 class="mk-sec">F. Scoresheet beside</h2>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop</div><div class="board themed" data-v="S2"></div></div>
+  <div><div class="mk-cap">Phone</div><div class="board phone themed" data-v="S2"></div></div>
+</div>
+
+<h2 class="mk-sec">D. Transposed</h2>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop</div><div class="board themed" data-v="T"></div></div>
+  <div><div class="mk-cap">Phone</div><div class="board phone themed" data-v="T"></div></div>
+</div>
+
+<h2 class="mk-sec">C. Scoresheet lines</h2>
+<p class="mk-note">Points and marks sit on one line, like a paper scoresheet. The cells are wider, so the game
+always wraps into blocks: ten per line on a laptop and five on a phone.</p>
+<div class="mk-row">
+  <div><div class="mk-cap">Laptop</div><div class="board themed" data-v="C" data-block="10"></div></div>
+  <div><div class="mk-cap">Phone</div><div class="board phone themed" data-v="C" data-block="5"></div></div>
+</div>
+
+<script>
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function rng(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+// pubview.js shortTeam
+function shortTeam(name) {
+  const words = String(name).trim().split(/\s+/);
+  const tail = words.length > 1 && /^[A-Z0-9]{1,2}$/.test(words[words.length - 1]) ? ' ' + words.pop() : '';
+  const base = words.filter((w, i) => !(/^(of|the|at)$/i.test(w) || (i === 0 && /^(university|college)$/i.test(w) && words.length > 1)));
+  const use = base.length ? base : words;
+  const core = use.length > 1 ? use.map((w) => w[0].toUpperCase()).join('') : use[0].length > 5 ? use[0].slice(0, 3) : use[0];
+  return core + tail;
+}
+// Initials need only be unique on a team: the row says which team. Two
+// teammates with the same initials both take more of the last name
+// (Evan Shah, Emma Stone -> ESh, ESt); a full tie takes a number.
+function teamInitials(names) {
+  const parts = names.map((n) => n.trim().split(/\s+/));
+  const tag = (p, k) => p.slice(0, -1).map((w) => w[0]).join('') + (p.length > 1 ? p[p.length - 1].slice(0, k) : '');
+  const out = new Map();
+  for (let i = 0; i < names.length; i++) {
+    const clash = (k) => parts.some((q, j) => j !== i && tag(q, k) === tag(parts[i], k));
+    let k = 1;
+    while (k < 6 && clash(k)) k++;
+    let t = tag(parts[i], k);
+    if (clash(k)) t += parts.slice(0, i + 1).filter((q) => tag(q, k) === tag(parts[i], k)).length;
+    out.set(names[i], t);
+  }
+  return out;
+}
+const INITIALS = new Map();
+const initials = (team, n) => {
+  if (!INITIALS.has(team)) INITIALS.set(team, teamInitials(TEAMS[team].players));
+  return INITIALS.get(team).get(n);
+};
+// one packet's tossup categories (catmap t[i] = {c, s}); RMPSS shows its
+// own subcategory, since that is what readers call the question
+const CATS = [
+  ['Literature', 'American Literature'], ['Science', 'Biology'], ['History', 'European History'],
+  ['Fine Arts', 'Visual Fine Arts'], ['Religion', ''], ['Science', 'Physics'], ['Literature', 'British Literature'],
+  ['History', 'American History'], ['Mythology', ''], ['Science', 'Chemistry'], ['Literature', 'World Literature'],
+  ['Fine Arts', 'Auditory Fine Arts'], ['History', 'World History'], ['Philosophy', ''], ['Science', 'Math'],
+  ['Social Science', 'Economics'], ['Literature', 'European Literature'], ['History', 'Ancient History'],
+  ['Geography', ''], ['Fine Arts', 'Other Fine Arts'], ['Science', 'Other Science'],
+];
+// a fixed table, one label per subcategory: multiword ones by initials,
+// one-word ones by their usual short form. Ancient History takes AnH so it
+// stays apart from American History (AH).
+const SUB_SHORT = { "American Literature": "AL", "British Literature": "BL", "European Literature": "EL",
+  "World Literature": "WL", "American History": "AH", "Ancient History": "AnH", "European History": "EH",
+  "World History": "WH", "Visual Fine Arts": "VFA", "Auditory Fine Arts": "AFA", "Other Fine Arts": "OFA",
+  Biology: "Bio", Chemistry: "Chem", Physics: "Phys", Math: "Math", "Other Science": "OSci", Economics: "Econ" };
+// the color family a category belongs to; RMPSS parts share one
+const FAMILY = { Science: "sci", Literature: "lit", History: "hist", "Fine Arts": "fa", Religion: "rmp",
+  Mythology: "rmp", Philosophy: "rmp", "Social Science": "rmp", Beliefs: "rmp", RMPSS: "rmp" };
+const family = (c) => FAMILY[c] || "oth";
+const catLabel = (c, sub) => SUB_SHORT[sub] || CAT_SHORT[c] || c;
+const CAT_SHORT = { Literature: 'Lit', History: 'Hist', Science: 'Sci', 'Fine Arts': 'FA', Religion: 'Rel',
+  Mythology: 'Myth', Philosophy: 'Phil', 'Social Science': 'SS', Beliefs: 'Bel', Geography: 'Geo',
+  'Current Events': 'CE', 'Other Academic': 'OA', Trash: 'Pop' };
+
+const TEAMS = {
+  'Illinois A': { players: ['Alice Kim', 'Ben Lee', 'Chris Ortiz', 'Dana Park', 'Ed Novak'], w: [5, 3, 2, 1, 2],
+    subs: [{ at: 10, in: 'Ed Novak', out: 'Ben Lee' }], buzz: 0.6, power: 0.4, bonus: 0.72 },
+  'Michigan': { players: ['Evan Shah', 'Fiona Ruiz', 'Emma Stone', 'Henry Cole', 'Ivy Grant'], w: [4, 3, 2, 2, 2],
+    subs: [{ at: 15, in: 'Ivy Grant', out: 'Henry Cole' }], buzz: 0.4, power: 0.25, bonus: 0.55 },
+  'We Should Have Studied More Fine Arts': { players: ['Ian Moss', 'Jade Wu', 'Kai Brooks'], w: [3, 2, 2], buzz: 0.5, power: 0.3, bonus: 0.6 },
+  'University of Iowa A': { players: ['Lena Ford', 'Marco Diaz', 'Nina Patel', 'Omar Said'], w: [3, 3, 2, 1], buzz: 0.5, power: 0.3, bonus: 0.6 },
+};
+// who is in the game on tossup i (0-based): the starters, then each sub
+// in order (QBJ lineups, first_question)
+function active(t, p, i) {
+  const subs = TEAMS[t].subs || [];
+  let on = !subs.some((x) => x.in === p);
+  for (const x of subs) if (x.at <= i) { if (x.in === p) on = true; if (x.out === p) on = false; }
+  return on;
+}
+let QI = 0;
+function pick(r, t) {
+  const ps = TEAMS[t].players;
+  const w = TEAMS[t].w.map((v, k) => (active(t, ps[k], QI) ? v : 0)); let x = r() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < w.length; i++) { x -= w[i]; if (x < 0 && w[i]) return ps[i]; }
+  return ps.find((q) => active(t, q, QI));
+}
+// q: [{cells: [cellA, cellB]}], cell = {val, player, parts} or null
+function tossup(r, names, ot) {
+  const cells = [null, null];
+  if (r() < 0.07) return { cells };
+  const first = r() < TEAMS[names[0]].buzz ? 0 : 1;
+  const ft = names[first];
+  const get = (i, val) => {
+    const t = names[i];
+    cells[i] = { val, player: pick(r, t), parts: ot ? null : [0, 1, 2].map(() => r() < TEAMS[t].bonus) };
+  };
+  // a wrong buzz after the question ends, or after the other team negs, is a 0
+  const miss = (i) => { cells[i] = { val: 0, player: pick(r, names[i]) }; };
+  if (r() < 0.13) {
+    cells[first] = { val: -5, player: pick(r, ft) };
+    if (r() < 0.7) get(1 - first, 10);
+    else if (r() < 0.5) miss(1 - first);
+  } else if (r() < 0.08) {
+    miss(first);
+    if (r() < 0.5) get(1 - first, 10);
+  } else get(first, r() < TEAMS[ft].power ? 15 : 10);
+  return { cells };
+}
+const ptsOf = (c) => (c ? c.val + (c.parts ? c.parts.filter(Boolean).length * 10 : 0) : 0);
+function game(seed, names, wantTie) {
+  for (let s = seed; ; s++) {
+    const r = rng(s);
+    const qs = Array.from({ length: 20 }, (_, k) => { QI = k; return tossup(r, names, false); });
+    const tot = [0, 1].map((i) => qs.reduce((a, q) => a + ptsOf(q.cells[i]), 0));
+    if (!wantTie || tot[0] === tot[1]) {
+      if (wantTie) qs.push({ ot: true, cells: [null, { val: 10, player: TEAMS[names[1]].players[0], parts: null }] });
+      return finish(names, qs);
+    }
+  }
+}
+function finish(names, qs) {
+  const teams = names.map((name, i) => {
+    const players = TEAMS[name].players.map((p) => {
+      const mine = qs.map((q) => q.cells[i]).filter((c) => c && c.player === p);
+      const counts = { 15: 0, 10: 0, '-5': 0 };
+      mine.forEach((c) => counts[c.val]++);
+      return { name: p, counts, tuh: qs.filter((q, k) => !q.ot && active(name, p, k)).length, points: mine.reduce((a, c) => a + c.val, 0) };
+    });
+    const reg = qs.filter((q) => !q.ot).map((q) => q.cells[i]);
+    const heard = reg.filter((c) => c && c.val > 0).length;
+    const bonusPoints = reg.reduce((a, c) => a + (c && c.parts ? c.parts.filter(Boolean).length * 10 : 0), 0);
+    const tossupPoints = players.reduce((a, p) => a + p.points, 0);
+    const counts = { 15: 0, 10: 0, '-5': 0 };
+    players.forEach((p) => [15, 10, -5].forEach((v) => { counts[v] += p.counts[v]; }));
+    return { name, players, heard, bonusPoints, tossupPoints, counts, points: tossupPoints + bonusPoints };
+  });
+  return { teams, qs, ot: qs.filter((q) => q.ot).length };
+}
+const GAMES = [game(11, ['Illinois A', 'Michigan'], false), game(500, ['We Should Have Studied More Fine Arts', 'University of Iowa A'], true)];
+const VALS = [15, 10, -5];
+
+function cellHtml(c, team, style) {
+  if (!c) return '';
+  const v = `<span class="v${c.val === 15 ? ' p' : c.val < 0 ? ' n' : c.val === 0 ? ' z' : ''}">${c.val < 0 ? '−5' : c.val}</span>`;
+  const m = c.parts ? `<span class="m">${c.parts.map((y) => (y ? '<span class="y">✓</span>' : '<span class="x">✗</span>')).join('')}</span>` : '';
+  const who = style === 'B' ? `<span class="who">${initials(team, c.player)}</span>` : '';
+  return who + v + m;
+}
+const tip = (c) => (!c ? '' : `${c.player} ${c.val < 0 ? '−5' : c.val}${c.parts ? ` · bonus ${c.parts.filter(Boolean).length * 10}` : ''}`);
+
+function grid(g, style, block) {
+  const n = g.qs.length;
+  const size = block || n;
+  const out = [];
+  // overtime rides along with the last block of regulation
+  const reg = n - g.ot;
+  for (let s = 0; s < reg; s += size) {
+    const last = s + size >= reg;
+    const idx = Array.from({ length: last ? n - s : size }, (_, k) => s + k);
+    const cls = (i) => (g.qs[i].ot && !g.qs[i - 1].ot ? 'ot' : i === 10 && s !== 10 ? 'half' : '');
+    const label = (i) => (g.qs[i].ot ? 'OT' : i + 1);
+    out.push(`<table class="bx${style === 'C' ? ' inl' : ''}">
+      <tr><th></th>${idx.map((i) => `<th>${label(i)}</th>`).join('')}${last ? '<th></th>' : ''}</tr>
+      <tr class="cat"><th></th>${idx.map((i) => { const [c, sub] = CATS[i]; return `<th class="${cls(i)}" title="${esc(sub ? c + ' · ' + sub : c)}">${catLabel(c, sub)}</th>`; }).join('')}${last ? '<th></th>' : ''}</tr>
+      ${g.teams.map((t, ti) => `<tr class="${ti ? '' : 'ta'}"><td class="tm">${esc(shortTeam(t.name))}</td>${idx.map((i) => {
+        const c = g.qs[i].cells[ti];
+        return `<td class="${cls(i)}"${c ? ` title="${esc(tip(c))}"` : ''}>${cellHtml(c, g.teams[ti].name, style)}</td>`;
+      }).join('')}${last ? `<td class="tot">${t.points}</td>` : ''}</tr>`).join('')}
+    </table>`);
+  }
+  const key = style === 'B' ? `<div class="bxkey">${g.teams.map((t) => `<b>${esc(shortTeam(t.name))}</b> ${
+    t.players.map((p) => `${initials(t.name, p.name)} ${esc(p.name)}`).join(', ')}`).join('<br>')}</div>` : '';
+  return `<div class="bxwrap">${out.join('')}${key}</div>`;
+}
+
+// transposed: one row per tossup, a column per team, and the score so far
+function vgrid(g) {
+  const run = [0, 0];
+  const rows = g.qs.map((q, i) => {
+    const [c, sub] = CATS[i];
+    q.cells.forEach((x, ti) => { run[ti] += ptsOf(x); });
+    const cls = q.ot && !g.qs[i - 1].ot ? "ot" : i === 10 ? "half" : "";
+    return `<tr class="${cls}"><td class="qn">${q.ot ? "OT" : i + 1}</td>
+      <td class="qc"><span class="cf ${family(c)}" title="${esc(sub ? c + " · " + sub : c)}">${catLabel(c, sub)}</span></td>
+      ${q.cells.map((x, ti) => `<td class="qt"${x ? ` title="${esc(tip(x))}"` : ""}>${x ? `<span class="who">${initials(g.teams[ti].name, x.player)}</span><span class="v${x.val === 15 ? " p" : x.val < 0 ? " n" : x.val === 0 ? " z" : ""}">${x.val < 0 ? "\u22125" : x.val}</span><span class="m">${x.parts ? x.parts.map((y) => (y ? "<span class=\"y\">\u2713</span>" : "<span class=\"x\">\u2717</span>")).join("") : ""}</span>` : ""}</td>`).join("")}
+      <td class="qs">${run[0]}\u2013${run[1]}</td></tr>`;
+  });
+  const legend = [["sci", "Science"], ["lit", "Literature"], ["hist", "History"], ["fa", "Fine Arts"], ["rmp", "RMPSS"], ["oth", "Other"]]
+    .map(([k, n]) => `<span class="cf ${k}">${n}</span>`).join(" ");
+  return `<div class="tablewrap"><table class="vx">
+    <thead><tr><th class="qn"></th><th class="qc"></th>${g.teams.map((t) => `<th class="qt">${esc(shortTeam(t.name))}</th>`).join("")}<th class="qs">Score</th></tr></thead>
+    <tbody>${rows.join("")}</tbody>
+    <tfoot><tr><td></td><td></td>${g.teams.map((t) => `<td class="qt">${t.points}</td>`).join("")}<td></td></tr></tfoot>
+  </table>
+  <div class="bxkey cfleg">${legend}</div>
+  <div class="bxkey">${g.teams.map((t) => `<b>${esc(shortTeam(t.name))}</b> ${t.players.map((p) => `${initials(t.name, p.name)} ${esc(p.name)}`).join(", ")}`).join("<br>")}</div></div>`;
+}
+
+// scoresheet: one row per tossup, a column per player and a bonus column
+// per team. A player out of the game is hatched; a sub's row is marked.
+// MOCK: the viewer's unlock and the TD's Category stats setting (mock controls)
+const MOCK = { unlocked: true, sheets: true };
+function sgrid(g) {
+  const qcOn = true;
+  const run = [0, 0];
+  const subsAt = (i) => g.teams.flatMap((t) => (TEAMS[t.name].subs || []).filter((x) => x.at === i).map((x) => ({ t: t.name, ...x })));
+  const subWords = (x) => `${x.t}: ${x.in} in for ${x.out}`;
+  const marks = (parts) => parts.map((y) => (y ? '<span class="y">✓</span>' : '<span class="x">✗</span>')).join('');
+  const rows = g.qs.map((q, i) => {
+    const [c, sub] = CATS[i];
+    q.cells.forEach((x, ti) => { run[ti] += ptsOf(x); });
+    const subs = q.ot ? [] : subsAt(i);
+    const cls = [q.ot && !g.qs[i - 1].ot ? 'ot' : i === 10 ? 'half' : ''].join(' ');
+    const team = (t, ti) => {
+      const x = q.cells[ti];
+      const ps = TEAMS[t.name].players;
+      return ps.map((p, k) => {
+        const on = q.ot ? active(t.name, p, 19) : active(t.name, p, i);
+        const changed = subs.some((s) => s.t === t.name && (s.in === p || s.out === p));
+        const mine = x && x.player === p;
+        const v = mine ? `<span class="b ${x.val === 15 ? 'p' : x.val === 10 ? 't' : x.val === 0 ? 'z' : 'n'}">${x.val < 0 ? '−5' : x.val}</span>` : '';
+        return `<td class="pl${k ? '' : ' t0'}${on ? '' : ' out'}${changed ? ' chg' : ''}"${mine ? ` title="${esc(tip(x))}"` : ''}>${v}</td>`;
+      }).join('') + `<td class="bon">${x && x.parts ? `<span class="m">${marks(x.parts)}</span>` : ''}</td>`;
+    };
+    return `<tr class="${cls}"><td class="qn">${q.ot ? 'OT' : i + 1}${subs.length ? `<span class="sub" title="${esc(subs.map(subWords).join('; '))}">⇄</span>` : ''}</td>
+      ${qcOn ? `<td class="qc"><span class="cf ${family(c)}" title="${esc(sub ? c + ' · ' + sub : c)}">${catLabel(c, sub)}</span></td>` : ''}
+      ${g.teams.map(team).join('')}<td class="qs">${run[0]}–${run[1]}</td></tr>`;
+  });
+  const head1 = `<tr><th></th>${qcOn ? '<th></th>' : ''}${g.teams.map((t) => `<th class="tn t0" colspan="${TEAMS[t.name].players.length + 1}" title="${esc(t.name)}">${esc(t.name)}</th>`).join('')}<th></th></tr>`;
+  const head2 = `<tr><th></th>${qcOn ? '<th></th>' : ''}${g.teams.map((t) => TEAMS[t.name].players.map((p, k) =>
+    `<th class="pl${k ? '' : ' t0'}" title="${esc(p)}">${initials(t.name, p)}</th>`).join('') + '<th class="bon">Bon</th>').join('')}<th class="qs">Score</th></tr>`;
+  const foot = `<tr><td></td>${qcOn ? '<td></td>' : ''}${g.teams.map((t) => t.players.map((p, k) =>
+    `<td class="pl${k ? '' : ' t0'}"></td>`).join('') + '<td class="bon"></td>').join('')}<td class="qs">${g.teams.map((t) => t.points).join('–')}</td></tr>`;
+  const notes = g.teams.flatMap((t) => (TEAMS[t.name].subs || []).map((x) => ({ at: x.at,
+    text: `TU ${x.at + 1}: ${esc(t.name)} ${initials(t.name, x.in)} subbed for ${initials(t.name, x.out)}` })))
+    .sort((a, b) => a.at - b.at).map((x) => `<div>${x.text}</div>`);
+  const legend = [['p', '15', 'power'], ['t', '10', 'get'], ['z', '0', 'wrong, no penalty'], ['n', '−5', 'neg']]
+    .map(([k, v, n]) => `<span><span class="b ${k}">${v}</span> ${n}</span>`).join('')
+    + [['sci', 'Sci'], ['lit', 'Lit'], ['hist', 'Hist'], ['fa', 'FA'], ['rmp', 'RMPSS'], ['oth', 'Other']]
+      .map(([k, n]) => `<span class="cf ${k}">${n}</span>`).join('');
+  return `<div class="sxwrap"><div class="tablewrap"><table class="sx"><thead>${head1}${head2}</thead><tbody>${rows.join('')}</tbody><tfoot>${foot}</tfoot></table></div>
+    ${notes.length ? `<div class="bxkey sxsubs">${notes.join('')}</div>` : ''}</div>`;
+}
+
+function gameBox(g, style, block) {
+  if (style === 'L') style = SHEETS && MOCK.unlocked && !g.live ? 'S2' : 'before';
+  const [w, l] = [...g.teams].sort((a, b) => b.points - a.points);
+  const title = `${esc(w.name)} ${w.points}, ${esc(l.name)} ${l.points}${g.ot ? ' (OT)' : ''}`;
+  const head = `Round ${g.round || 3} · Tossups read: ${g.qs.length}${g.ot ? ` (${g.ot} in OT)` : ''}`;
+  return `<div class="nsec"><h3 class="nhead"><span>${title}</span><span class="meta">${head}</span></h3>${style === 'S2' ? '<div class="slay"><div class="sleft">' : ''}
+    ${style === 'before' || style === 'T' ? '' : style === 'S' || style === 'S2' ? '' : grid(g, style, block)}
+    ${style === 'T' ? `<div class="tlay">${vgrid(g)}<div class="trest">` : ''}<div class="nbox">${g.teams.map((t) => `<div class="nfade"><div class="tablewrap"><table class="nstats">
+      <thead><tr><th class="name nstick"><a href="#">${esc(t.name)}</a></th><th class="num">TUH</th>
+        ${VALS.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th></tr></thead>
+      <tbody>${t.players.map((p) => `<tr><td class="name nstick"><a href="#">${esc(p.name)}</a></td><td class="num">${p.tuh}</td>
+        ${VALS.map((v) => `<td class="num">${p.counts[v]}</td>`).join('')}<td class="num">${p.points}</td></tr>`).join('')}
+      <tr class="ntot"><td class="name nstick">Total</td><td></td>${VALS.map((v) => `<td class="num">${t.counts[v]}</td>`).join('')}
+        <td class="num">${t.tossupPoints}</td></tr></tbody></table></div></div>`).join('')}</div>
+    <div class="nfade"><div class="tablewrap"><table class="nstats nbonus">
+      <thead><tr><th class="name nstick">Bonuses</th><th class="num">Heard</th><th class="num">Pts</th><th class="num">PPB</th></tr></thead>
+      <tbody>${g.teams.map((t) => `<tr><td class="name nstick">${esc(t.name)}</td><td class="num">${t.heard}</td>
+        <td class="num">${t.bonusPoints}</td><td class="num">${t.heard ? (t.bonusPoints / t.heard).toFixed(2) : '–'}</td></tr>`).join('')}</tbody>
+    </table></div></div>${style === 'T' ? '</div></div>' : ''}${style === 'S' ? sgrid(g) : ''}${style === 'S2' ? `</div>${sgrid(g)}</div>` : ''}${g.live && SHEETS && MOCK.unlocked ? `<p class="muted sxwait">The scoresheet will appear when all round ${g.round} games finish.</p>` : ''}</div>`;
+}
+
+function render(board) {
+  if (!board.dataset.v) return;
+  if (board.dataset.v === 'L') return renderLocked(board);
+  const style = board.dataset.v;
+  const block = Number(board.dataset.block) || 0;
+  const phone = board.classList.contains('phone');
+  const secs = ['Standings', 'Individuals', 'Scoreboard', 'Teams', 'Players', 'Rounds'];
+  board.innerHTML = `<div class="views statsbar">${(phone ? secs.slice(0, 3) : secs).map((s) =>
+    `<a href="#" class="view${s === 'Scoreboard' ? ' on' : ''}">${s}</a>`).join('')}</div>
+    <div class="chips njump">${[1, 2, 3].map((r) => `<a href="#" class="chip">Round ${r}</a>`).join('')}</div>
+    <h3 class="poolhead">Round 3</h3>
+    ${GAMES.map((g) => gameBox(g, style, block || (phone && style !== 'before' ? 10 : 0))).join('')}`;
+}
+// the public page with scoresheets locked behind the buzzpoint password
+// and held back for a round still being played
+const LIVE = { ...game(77, ['Illinois A', 'University of Iowa A'], false), round: 4, live: true };
+let SHEETS = true; // this board's Scoresheets setting
+function renderLocked(board) {
+  SHEETS = board.dataset.sheets !== 'off';
+  const phone = board.classList.contains('phone');
+  const tabs = ['Schedule', 'Stats', 'Categories', 'Buzzpoints'];
+  const secs = ['Standings', 'Individuals', 'Scoreboard', 'Teams', 'Players', 'Rounds'];
+  const lock = !SHEETS || MOCK.unlocked ? '' : `<div class="sxlock"><p>Scoresheets are locked. Please enter the buzzpoint password to see them.</p>
+    <div class="row"><input type="password" placeholder="Password" aria-label="Buzzpoint password"><button class="primary" data-unlock="1">View</button></div></div>`;
+  board.innerHTML = `<div class="views tabsbar">${tabs.map((s) => `<a href="#" class="view${s === 'Stats' ? ' on' : ''}">${s}</a>`).join('')}</div>
+    <div class="views statsbar sub">${(phone ? secs.slice(0, 3) : secs).map((s) =>
+    `<a href="#" class="view${s === 'Scoreboard' ? ' on' : ''}">${s}</a>`).join('')}</div>
+    <div class="chips njump">${[1, 2, 3, 4].map((r) => `<a href="#" class="chip">Round ${r}</a>`).join('')}</div>
+    ${lock}
+    <h3 class="poolhead">Round 4</h3>
+    ${gameBox(LIVE, 'L')}
+    ${SHEETS ? '<p class="muted">1 game still in progress.</p>' : ''}
+    <h3 class="poolhead">Round 3</h3>
+    ${GAMES.map((g) => gameBox(g, 'L')).join('')}`;
+}
+function mockSet(k, v) {
+  MOCK[k] = v;
+  document.querySelectorAll('[data-mock]').forEach((b) => {
+    const [mk, mv] = b.dataset.mock.split('=');
+    b.classList.toggle('on', String(MOCK[mk]) === mv);
+  });
+  document.querySelectorAll('.board[data-v="L"]').forEach(render);
+}
+document.addEventListener('click', (e) => {
+  const m = e.target.closest('[data-mock]');
+  if (m) { const [k, v] = m.dataset.mock.split('='); mockSet(k, v === 'true'); }
+  if (e.target.closest('[data-unlock]')) mockSet('unlocked', true);
+});
+document.querySelectorAll('.board').forEach(render);
+document.querySelectorAll('.board.themed').forEach((b) => b.classList.add('lt'));
+document.querySelectorAll('#theme button').forEach((btn) => btn.onclick = () => {
+  document.querySelectorAll('#theme button').forEach((x) => x.classList.toggle('on', x === btn));
+  document.querySelectorAll('.board.themed').forEach((b) => { b.classList.remove('lt', 'dk'); b.classList.add(btn.dataset.v); });
+});
+document.addEventListener('click', (e) => { if (e.target.closest('a[href="#"]')) e.preventDefault(); });
+</script>
+</body>
+</html>

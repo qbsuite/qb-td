@@ -14,6 +14,8 @@
   --win-fg: #14532d;
   --card: #f1f1ec;      /* the only filled surface: public game groups */
   --sel: #efefea;       /* a selected row or cell */
+  /* scoresheet category tags, pastel by category */
+  --c-sci: #d6efda; --c-lit: #d9e6fb; --c-hist: #f8d9d9; --c-fa: #e7dcf8; --c-rmp: #f8e8c2; --c-oth: #e6e6e1;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -33,6 +35,7 @@
     --win-fg: #cfeeda;
     --card: #2b2b2f;
     --sel: #303036;
+    --c-sci: #24412c; --c-lit: #233552; --c-hist: #4d2828; --c-fa: #3b2c52; --c-rmp: #4a3c1d; --c-oth: #38383e;
   }
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -493,3 +496,44 @@ table.pktable { margin-top: 4px; border-top: 1px solid var(--line); }
 i.lane-0, i.lane-1, i.lane-2, i.lane-3, i.lane-4, i.lane-5, i.lane-6, i.lane-7 {
   display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--lc); flex: none;
 }
+
+/* A game's scoresheet (sheetview.js), on the public Scoreboard and as the
+   hub's example. Dense on purpose: 16px rows and narrow player columns, so
+   a game of two five-player teams fits a phone without scrolling sideways. */
+.sx { width: auto; border-collapse: separate; border-spacing: 0; font-size: 10px; line-height: 1; }
+table.sx th { font-size: 9px; font-weight: 600; text-transform: none; letter-spacing: 0; text-align: center;
+  padding: 0 1px 2px; color: var(--muted); border-bottom: none; }
+.sx th.tn { font-size: 10px; text-align: left; padding-left: 3px; color: var(--fg);
+  max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx thead tr:last-child th { border-bottom: 1px solid var(--line); }
+.sx td { padding: 1px; height: 16px; white-space: nowrap; text-align: center; border-bottom: 1px solid var(--line); }
+.sx td.pl, .sx th.pl, .sx th.bon { border-right: 1px solid var(--line); }
+.sx tr.half td { border-top: 1px solid var(--muted); }
+.sx tr.ot td { border-top: 1px dashed var(--muted); }
+.sx .pl { width: 17px; min-width: 17px; }
+.sx .t0 { border-left: 1px solid var(--muted); }
+.sx td.bon, .sx th.bon { min-width: 20px; padding: 1px; }
+.sx th.bon { font-weight: 500; }
+.sx tbody td.out { background: repeating-linear-gradient(135deg, transparent 0 3px,
+  color-mix(in srgb, var(--fg) 14%, transparent) 3px 4px), var(--bg); }
+.sx td.chg { box-shadow: inset 0 2px 0 var(--fg); }
+.sx td b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.sx .qn { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; padding-right: 3px; }
+.sx .qn .sub { color: var(--fg); margin-left: 1px; }
+.sx .qc { padding: 1px 3px 1px 0; }
+/* one width for all tags, sized to the longest label (Chem, Myth, OSci) */
+.sx .cf { display: inline-block; box-sizing: border-box; width: 5ch; padding: 1px 0; border-radius: 2px;
+  font-size: 9px; font-weight: 600; color: var(--fg); background: var(--c-oth); }
+.sx .cf.sci { background: var(--c-sci); }
+.sx .cf.lit { background: var(--c-lit); }
+.sx .cf.hist { background: var(--c-hist); }
+.sx .cf.fa { background: var(--c-fa); }
+.sx .cf.rmp { background: var(--c-rmp); }
+.sx .m { font-size: 9px; letter-spacing: -1.5px; }
+.sx .x { color: var(--muted); opacity: 0.7; }
+.sx .qs { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; padding-left: 4px;
+  border-left: 1px solid var(--muted); }
+.sx tfoot td { font-weight: 700; border-top: 1px solid var(--muted); border-bottom: none; padding-top: 3px; }
+.sx tfoot td.qs { color: var(--fg); }
+@media (hover: hover) { .sx td[title]:hover { background: var(--hover-bg); } }
+.sxsubs { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45; }

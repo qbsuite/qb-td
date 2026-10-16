@@ -182,3 +182,28 @@ details.qd .qdmeta.track { line-height: 20px; }
 .acard .ameta { font-size: 13px; color: var(--muted); margin-top: 6px; }
 .acard .ameta a { color: var(--muted); text-decoration: underline; }
 
+
+/* Scoreboard scoresheets: the game's tables stacked on the left, the
+   scoresheet (td.css .sx) on the right, which drops below them on a phone. */
+.slay { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; }
+.sleft { flex: 0 1 auto; min-width: 0; }
+.sleft .nbox { flex-direction: column; }
+.sleft .nbox > .nfade { flex: none; }
+.sleft .nstats th.nstick, .sleft .nstats td.nstick { white-space: normal; min-width: 10ch; max-width: 13em; }
+.slay > .sxwrap { flex: none; width: min-content; max-width: 100%; }
+.sxtoggle { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sxtoggle input { font-size: 13px; padding: 3px 8px; }
+/* the Scoresheets switch */
+.sw { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; color: var(--fg);
+  background: none; border: 0; padding: 2px 0; cursor: pointer; }
+.sw:hover { border: 0; }
+.sw .swtrack { position: relative; width: 30px; height: 17px; border-radius: 99px; background: var(--pick-line); transition: background .15s; }
+.sw .swknob { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: left .15s; }
+.sw.on .swtrack { background: var(--ok); }
+.sw.on .swknob { left: 15px; }
+.sw .swstate { font-size: 12px; color: var(--muted); min-width: 3.6em; text-align: left; }
+.sw.locked, .sw .swlock { color: var(--muted); }
+.sw.locked .swtrack { opacity: .6; }
+@media (prefers-reduced-motion: reduce) { .sw .swtrack, .sw .swknob { transition: none; } }
+.sxwait { font-size: 13px; margin: 8px 0 0; }

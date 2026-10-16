@@ -1,5 +1,19 @@
 Release Notes for 10/16/2026
 
+[ STATS ]
+- Scoresheets: each game's tossups in order, with who buzzed, bonus parts, categories, substitutions and the running score.
+- Scoresheets sit beside a game's tables on the Scoreboard, in Classic and New, once all games in its round finish.
+- A Scoresheets switch on the stats page unlocks them with the stats password, then shows or hides them.
+
+[ HUB ]
+- Public page has a Category stats setting, on by default, that shows or hides the Categories tab.
+- Password-protected stats: one password for scoresheets and buzzpoints. Both stay off until a password is set.
+- The (i) next to Scoresheets shows an example scoresheet.
+
+[ PUBLIC PAGE ]
+- A new stats password locks viewers out on their next refresh.
+- Refresh keeps the Classic report on the page you were reading.
+
 [ SCHEDULE ]
 - A smaller bracket plays its games in the first playoff rounds and finishes early, instead of sitting out a round in the middle.
 - Finals has a Final menu: the advantaged final if needed, a one game final if needed, or a one game final that is always played.
