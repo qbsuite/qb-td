@@ -647,7 +647,7 @@ function renderRoomsSec(a, t, buckets, files) {
   box.innerHTML = `
     <h2>Rooms</h2>
     ${buckets.length ? `<div class="tablewrap"><table class="roomtable">
-      <tr><th>Name</th><th>Reader link</th><th class="num">Files</th><th></th></tr>
+      <tr><th>Name</th><th>Reader link <button class="linkbtn" id="copyrooms">Copy all</button></th><th class="num">Files</th><th></th></tr>
       ${buckets.map((b) => {
         // names go into a JS string inside an attribute: escape for both
         const js = (s) => esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
@@ -665,7 +665,7 @@ function renderRoomsSec(a, t, buckets, files) {
       ? `Room links work until ${esc(new Date(t.closes).toLocaleString())}, when the tournament closes.`
       : 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament. '
         + 'Test simulates a room for json testing purposes without needing to start the tournament. '
-        + 'Games that are exported from test rooms are NOT saved.'}</p>`
+        + 'Games that are exported from test rooms are NOT saved. Test rooms can also be used for unofficial scrims.'}</p>`
     : '<div class="muted">No rooms yet</div>'}
     <div class="row" style="margin-top:10px">
       <label>${buckets.length ? 'Add' : 'Create'}
@@ -673,6 +673,10 @@ function renderRoomsSec(a, t, buckets, files) {
         ${buckets.length ? 'more rooms' : 'rooms'}</label>
       <button id="mkrooms" class="primary">${buckets.length ? 'Add rooms' : 'Create rooms'}</button>
     </div>`;
+  // each room's link, one a line ("Room 101: https://…"), to paste in a message
+  if ($('copyrooms')) {
+    $('copyrooms').onclick = () => copy(buckets.map((b) => `${b.room_name}: ${readLink(b.secret)}`).join('\n'), 'all room links');
+  }
   $('mkrooms').onclick = async () => {
     const n = Math.max(1, Math.min(60, Number($('roomn').value) || 0));
     const again = $('mkrooms').textContent.trim();

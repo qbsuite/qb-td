@@ -4,6 +4,11 @@ Release Notes for 10/15/2026
 - Playoff slots fill themselves once a pool's prelim games are all in. Ties for a spot go by points per 20 tossups heard.
 - A Playoffs line under the round lists ties points per 20 decided, and any prelim game the schedule doesn't have, with Fill anyway.
 - Auto-advance with brackets now reads "Brackets will advance to the next round once each room has started the current round."
+- Live now lists brackets left to right, row by row, so a third pool sits under the first.
+
+[ SETUP ]
+- Rooms has Copy all: each room's name and reader link, one a line, to paste in a message.
+- The Rooms note says test rooms can also be used for unofficial scrims.
 
 [ SCHEDULE ]
 - New format picker. Format lists hdwhite's schedule formats for your team count, written like "8/8/7 → 6/6/6/5, crossover · 11 rounds".

@@ -251,6 +251,26 @@ await upload({ round: pr, room: pg.room, a: pg.a.team, b: pg.b.team, tens: [8, 6
 await h1.refresh();
 await until(async () => !(await h1.ev(`!!document.querySelector('.playoffnote')`)), 'note gone');
 ok('the note leaves once the playoffs start', true);
+// Live now: the pools fill the grid left to right, row by row (Pool C under Pool A)
+await h1.ev(`document.querySelector('[data-view="live"]').click(); true`);
+await sleep(800);
+const spots = await h1.ev(`JSON.stringify([...document.querySelectorAll('.bcols > .bgroup[data-bracket]')].slice(0, 3).map((g) => { const r = g.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }))`);
+const [pa, pb, pc] = JSON.parse(spots);
+ok('Live now: brackets read left to right, the third under the first', pa && pb && pc && pa[1] === pb[1] && pb[0] > pa[0] && pc[0] === pa[0] && pc[1] > pa[1], spots);
+await h1.shot('hub-live-cols');
+
+// Rooms: Copy all puts each room's name and reader link on its own line
+await h1.ev(`window.__copied = null; navigator.clipboard.writeText = async (x) => { window.__copied = x; }; true`);
+await h1.ev(`document.querySelector('[data-view="setup"]').click(); true`);
+await until(() => h1.ev(`!!document.querySelector('[data-step="rooms"]')`), 'setup');
+await h1.ev(`document.querySelector('[data-step="rooms"]').click(); true`);
+await until(() => h1.ev(`!!document.getElementById('copyrooms')`), 'Copy all');
+await h1.ev(`document.getElementById('copyrooms').click(); true`);
+const copied = await until(() => h1.ev('window.__copied'), 'copied text');
+const lines = copied.split('\n');
+ok('Copy all: one line a room, "Name: link"', lines.length === rooms.length
+  && lines.every((l, k) => l.startsWith(sched.rooms[k].name + ': ') && l.includes('read.html?b=' + rooms[k].secret)), lines.slice(0, 2));
+
 ok('no page errors', errs.length === 0, errs);
 
 // leave the dev Worker's publish queue as we found it (it serves four a tick)
