@@ -57,6 +57,8 @@ crons = ["* * * * *", "0 * * * *", "0 15 * * MON"]
 [vars]
 # Origin of the GitHub Pages site — used for CORS.
 ALLOWED_ORIGIN = "https://qbsuite.github.io"
+# Where the app's pages live — the links in Discord alerts.
+PAGES_URL = "https://qbsuite.github.io/qb-td/app"
 
 # Snapshot publisher config — leave SNAPSHOT_REPO empty to disable the
 # whole feature (the cron then no-ops and /pub serves everything, exactly

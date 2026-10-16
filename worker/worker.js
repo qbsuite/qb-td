@@ -1731,10 +1731,13 @@ async function setTournamentAlert(env, t, alert, { quiet = false } = {}) {
   }
 }
 
-// The public page for a slug, when this instance has a site to point at.
+// The public page for a slug, when this instance has a site to point at:
+// PAGES_URL (where the app's pages live, e.g. …github.io/qb-td/app), else
+// the CORS origin, for a site served from its root.
 function publicLink(env, slug) {
-  const origin = (env.ALLOWED_ORIGIN || '').split(',')[0].trim();
-  return origin ? origin + '/t.html?t=' + slug : null;
+  const base = (env.PAGES_URL || '').trim().replace(/\/+$/, '')
+    || (env.ALLOWED_ORIGIN || '').split(',')[0].trim();
+  return base ? base + '/t.html?t=' + slug : null;
 }
 
 // `what` distinguishes the three ways a row is born: an open creation, a
