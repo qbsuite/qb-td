@@ -506,6 +506,21 @@ export function buildPlan(teams, rooms, phases, seeding, seed) {
         return { games, byes };
       });
       rounds = shuffle(rounds, rng); // rounds are always shuffled
+      // A group that needs fewer rounds than the phase (a smaller last
+      // bracket) plays its rounds first, in the shuffled order, and has
+      // the rest off: it finishes early instead of sitting out a round in
+      // the middle. Groups that fill the phase are left as they are.
+      groups.forEach((g) => {
+        const busy = rounds.map((round) => round.games.filter((x) => x.bracket === g.key)).filter((x) => x.length);
+        if (busy.length === rounds.length) return;
+        const slots = g.members.map((m) => m.slot);
+        rounds.forEach((round, r) => {
+          const games = busy[r] || [];
+          const playing = new Set(games.flatMap((x) => [x.a, x.b]));
+          round.games = round.games.filter((x) => x.bracket !== g.key).concat(games);
+          round.byes = round.byes.filter((s) => !slots.includes(s)).concat(slots.filter((s) => !playing.has(s)));
+        });
+      });
       // each group gets a block of rooms as big as its busiest round
       const need = groups.map((g) => Math.max(0, ...rounds.map((r) => r.games.filter((x) => x.bracket === g.key).length)));
       const total = need.reduce((a, b) => a + b, 0);

@@ -4365,5 +4365,27 @@ test('prelimRounds: both cycles of a double round robin, never tiebreaker rounds
   assert.equal(prelimRounds(s).length, s.phases[0].rounds.length + s.phases[1].rounds.length);
 });
 
+test('buildPlan: a smaller last bracket plays its rounds first and finishes early', () => {
+  // ACF Fall @ UIUC's shape: pools 8/7/7, then crossover brackets 6/6/6/4.
+  // The 4-team bracket needs 3 rounds of a 4-round phase; its rounds come
+  // first and its last round is off, never an empty round in the middle.
+  const base = { kind: 'pools', top: 0, per: 1, pools: 1, cross: false, same: false, meets: 1, carry: true,
+    reset: true, byes: false, parallelTop: false, share: false, n: 3, mode: 'rotate' };
+  const phases = [{ ...base, name: 'Prelims', groups: 3, sizes: null }, { ...base, name: 'Playoffs', groups: 1, sizes: [6, 6, 6, 4] }];
+  for (const seed of [1, 5070, 77, 4242]) {
+    const s = buildPlan(planTeams(22), planRooms(11), phases, 'random', seed);
+    const po = s.phases.find((p) => p.name === 'Playoffs');
+    const small = s.brackets.filter((b) => b.phase === 1).map((b) => b.key)
+      .find((k) => po.rounds.reduce((n, r) => n + r.games.filter((g) => g.bracket === k).length, 0) === 5);
+    const per = po.rounds.map((r) => r.games.filter((g) => g.bracket === small).length);
+    assert.equal(po.rounds.length, 4);
+    assert.ok(per.slice(0, 3).every((n) => n > 0) && per[3] === 0, `seed ${seed}: ${per}`);
+    // its teams sit out the last round, and nobody else is touched
+    assert.equal(po.rounds[3].byes.length, 4);
+    assert.ok(po.rounds.every((r) => r.games.filter((g) => g.bracket !== small).length === 9));
+    assert.deepEqual(validateSchedule(s), []);
+  }
+});
+
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
 
