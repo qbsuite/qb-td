@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>tournament</title>
+<!-- Throwaway mock: the real public page on the tiebreakers mock's demo
+     (open from tiebreakers-hub.html's Open public page, or t.html?t=demo),
+     with the tiebreaker games added to the schedule tab. -->
+<script type="importmap">
+{ "imports": {
+  "./js/demo.js": "./tiebreakers-demo.js",
+  "../app/demo/fixture.js": "./tiebreakers-fixture.js"
+} }
+</script>
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/pub.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="tname">tournament</h1>
+    <span class="spacer"></span>
+    <span id="round" class="sub"></span>
+    <button id="refresh">Refresh</button>
+  </header>
+  <div class="tabs">
+    <button class="tab" id="tab-schedule" data-tab="schedule">Schedule</button>
+    <button class="tab" id="tab-stats" data-tab="stats">Stats</button>
+    <button class="tab" id="tab-cats" data-tab="cats" hidden>Categories</button>
+    <button class="tab" id="tab-buzz" data-tab="buzz" hidden>Buzzpoints</button>
+  </div>
+  <div id="msg"></div>
+  <div id="out"></div>
+</div>
+<script type="module" src="../app/js/pubview.js"></script>
+<script type="module">
+// MOCK: the schedule tab shows the tiebreaker games after the round they
+// follow (All rounds), and between the rounds in Now
+import fixture from '../app/demo/fixture.js';
+import { tbPublicHtml, tbBlocks } from './tiebreakers-view.js';
+const out = document.getElementById('out');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const name = (x) => (x && (x.team || x.label)) || '—';
+const put = () => {
+  const s = fixture.schedule;
+  if (!s || !(s.tiebreakers || []).length || out.querySelector('.tbpub')) return;
+  const first = out.querySelector('#schedout .rhead');
+  if (first && first.nextElementSibling) {
+    first.nextElementSibling.insertAdjacentHTML('afterend', `<div class="tbpub">${tbPublicHtml(s)}</div>`);
+    return;
+  }
+  const now = out.querySelector('#schedout .nowgrid .nowblock');
+  if (now) {
+    now.insertAdjacentHTML('afterend', `<section class="nowblock tbpub"><div class="nowhead"><h3>Tiebreakers</h3></div>
+      ${tbBlocks(s).map((b) => `<div class="poolname">Tiebreaker ${b.tb}</div><div class="gcard">${b.games.map((g) => `<div class="gg">
+        <div class="groom">${esc(s.rooms[g.room].name)} · Pool ${esc(g.pool)}</div>
+        <div class="gl${g.a.label ? ' ph' : ''}"><span class="t">${esc(name(g.a))}</span></div>
+        <div class="gl${g.b.label ? ' ph' : ''}"><span class="t">${esc(name(g.b))}</span></div></div>`).join('')}</div>`).join('')}</section>`);
+  }
+};
+new MutationObserver(put).observe(out, { childList: true, subtree: true });
+</script>
+</body>
+</html>

@@ -956,11 +956,24 @@ export function poolStandings(pools, rankedNames) {
  *             them to different playoff brackets: [{pool, record,
  *             teams: [{name, pp20tuh, bracket}]}], in finish order
  */
+// The rounds pools are ranked on: each phase before the first with a
+// playoff slot (a double round robin's both cycles), less tiebreaker and
+// finals phases, whose games aren't pool games.
+export function prelimRounds(schedule) {
+  const out = [];
+  for (const ph of schedule.phases) {
+    const open = ph.rounds.some((r) => r.games.some((g) => (g.a && g.a.label) || (g.b && g.b.label) || (g.a && g.a.from) || (g.b && g.b.from)));
+    if (open) break;
+    if (!ph.kind) out.push(...ph.rounds);
+  }
+  return out;
+}
+
 export function fillReport(schedule, agg) {
   const ranks = poolStandings(schedule.pools, agg.teams.map((x) => x.name));
   const pair = (round, x, y) => round + '\n' + [x, y].sort().join('\n');
-  const prelim = schedule.phases[0] ? schedule.phases[0].rounds : [];
-  const prelimRounds = new Set(prelim.map((r) => r.round));
+  const prelim = prelimRounds(schedule);
+  const prelimSet = new Set(prelim.map((r) => r.round));
   const played = new Set(agg.games.map((g) => pair(g.round, g.teams[0].name, g.teams[1].name)));
   const scheduled = new Set();
   const missing = [];
@@ -973,7 +986,7 @@ export function fillReport(schedule, agg) {
       }
     }
   }
-  const extra = agg.games.filter((g) => prelimRounds.has(g.round) && !scheduled.has(pair(g.round, g.teams[0].name, g.teams[1].name)))
+  const extra = agg.games.filter((g) => prelimSet.has(g.round) && !scheduled.has(pair(g.round, g.teams[0].name, g.teams[1].name)))
     .map((g) => ({ round: g.round, a: g.teams[0].name, b: g.teams[1].name }));
   // the bracket each placeholder plays in ("A3" -> "3rd–4th place")
   const tagged = JSON.parse(JSON.stringify(schedule));
@@ -1031,6 +1044,91 @@ export function fillReport(schedule, agg) {
     }
   }
   return { ranks, missing, extra, ties, compared };
+}
+
+/**
+ * Which pools have all their prelim games in, from upload metadata alone
+ * (each good upload's summary names its two teams), so the hub can tell
+ * without fetching a game. files: the hub's file rows. Returns
+ *   ready — pool letters with no prelim game left
+ *   left  — {A: games still to come}
+ *   files — the good prelim uploads of the ready pools' teams
+ *   sig   — changes whenever a prelim upload does
+ */
+export function prelimProgress(schedule, files) {
+  const prelim = prelimRounds(schedule);
+  const rounds = new Set(prelim.map((r) => r.round));
+  const pair = (round, x, y) => round + '\n' + [x, y].sort().join('\n');
+  const teamsOf = (f) => {
+    let s = f.summary;
+    if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { s = null; } }
+    return s && Array.isArray(s.teams) && s.teams.length === 2 ? s.teams.map(String) : null;
+  };
+  const mine = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && rounds.has(f.round));
+  const have = new Set(mine.map((f) => teamsOf(f)).map((x, i) => x && pair(mine[i].round, x[0], x[1])).filter(Boolean));
+  const poolOf = new Map(Object.entries(schedule.pools || {}).flatMap(([p, ms]) => ms.map((m) => [m, p])));
+  const left = Object.fromEntries(Object.keys(schedule.pools || {}).map((p) => [p, 0]));
+  for (const r of prelim) {
+    for (const g of r.games) {
+      if (!g.a || !g.a.team || !g.b || !g.b.team || have.has(pair(r.round, g.a.team, g.b.team))) continue;
+      for (const p of new Set([poolOf.get(g.a.team), poolOf.get(g.b.team)])) if (p) left[p]++;
+    }
+  }
+  const ready = Object.keys(left).filter((p) => !left[p]);
+  const files2 = mine.filter((f) => { const x = teamsOf(f); return x && x.some((n) => ready.includes(poolOf.get(n))); });
+  return { ready, left, files: files2, sig: mine.map((f) => f.id).sort((x, y) => x - y).join(',') };
+}
+
+/**
+ * Fill the playoff slots of pools whose prelims are done (ready, from
+ * prelimProgress), on a copy. agg: aggregate() of those pools' games.
+ * A pool waits for the TD when a prelim-round game of its teams isn't on
+ * the schedule (`odd`), or, when ties wait for the TD, when a tie sends
+ * teams to different brackets (`held`). Ties wait when opts.holdTies says
+ * so, else when the schedule has a Tiebreakers phase. Places compared
+ * across pools fill once all pools are done and nothing waits. force:
+ * pool letters the TD said to fill anyway (ties by points per 20).
+ * Returns {schedule, filled, pools, ties, held, odd}.
+ */
+export function autoFill(schedule, agg, ready, force = [], opts = {}) {
+  const report = fillReport(schedule, agg);
+  const ok = new Set(ready);
+  const poolOf = new Map(Object.entries(schedule.pools || {}).flatMap(([p, ms]) => ms.map((m) => [m, p])));
+  const odd = new Map();
+  for (const g of report.extra) {
+    for (const p of new Set([poolOf.get(g.a), poolOf.get(g.b)])) {
+      if (p && ok.has(p) && !force.includes(p)) odd.set(p, [...(odd.get(p) || []), g]);
+    }
+  }
+  const holdTies = opts.holdTies !== undefined ? opts.holdTies : schedule.phases.some((ph) => ph.kind === 'tiebreak');
+  const held = holdTies ? report.ties.filter((x) => ok.has(x.pool) && !odd.has(x.pool) && !force.includes(x.pool)) : [];
+  const ranks = {};
+  for (const [k, list] of Object.entries(report.ranks)) {
+    if (k[0] !== '#' && ok.has(k) && !odd.has(k)) ranks[k] = list.slice();
+  }
+  for (const x of held) for (const tm of x.teams) ranks[x.pool][ranks[x.pool].indexOf(tm.name)] = undefined;
+  const all = Object.keys(schedule.pools || {}).every((p) => ok.has(p));
+  if (all && !odd.size && !held.length) {
+    for (const [k, list] of Object.entries(report.ranks)) if (k[0] === '#') ranks[k] = list;
+  }
+  const copy = JSON.parse(JSON.stringify(schedule));
+  const open = (s) => {
+    const out = new Set();
+    for (const ph of s.phases) for (const r of ph.rounds) {
+      for (const x of [...r.games.flatMap((g) => [g.a, g.b]), ...r.byes]) {
+        const m = x && x.label ? PH_RE.exec(x.label) : null;
+        if (m) out.add(m[1]);
+      }
+    }
+    return out;
+  };
+  const before = open(copy);
+  const filled = fillPlaceholders(copy, ranks);
+  const after = open(copy);
+  // the pools this fill moved, for the TD's note
+  const pools = [...before].filter((k) => ranks[k] && ranks[k].some(Boolean) && !after.has(k)).sort();
+  const ties = report.ties.filter((x) => ranks[x.pool] && !held.includes(x));
+  return { schedule: copy, filled, pools, ties, held, odd: [...odd.entries()].map(([pool, games]) => ({ pool, games })) };
 }
 
 export function fillPlaceholders(schedule, poolRanks) {

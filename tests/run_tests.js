@@ -12,7 +12,7 @@ import { buildReport } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -4195,6 +4195,174 @@ test('plan: tiebreaker rounds, finals and elimination pass the editor’s checks
   assert.deepEqual(scheduleChecks(e), []);
   assert.deepEqual(rebracketChecks(planGroups(planTeams(16), [planPhase('Prelims', { groups: 4 }), planPhase('Playoffs', { kind: 'double', top: 2 })], 'snake', () => 0.5),
     [planPhase('Prelims', { groups: 4 }), planPhase('Playoffs', { kind: 'double', top: 2 })], 1).filter((c) => !c.ok), []);
+});
+
+
+/* ---------- playoff slots that fill themselves ---------- */
+
+// A tournament day in miniature: each prelim game gets a random result and
+// an upload row (what the hub holds: round + summary teams/score) plus the
+// parsed match aggregate() reads.
+function playDay(s, seed, scoreOf = null) {
+  const rnd = mulberry32(seed);
+  const side = (name, points) => ({ name, points, bonusPoints: 0, players: [] });
+  const out = [];
+  let id = 0;
+  for (const r of prelimRounds(s)) {
+    for (const g of r.games) {
+      if (!g.a || !g.a.team || !g.b || !g.b.team) continue;
+      const [pa, pb] = scoreOf ? scoreOf(g.a.team, g.b.team, rnd) : (() => {
+        const x = 5 * Math.floor(rnd() * 80) + 10, y = 5 * Math.floor(rnd() * 80) + 10;
+        return x === y ? [x + 5, y] : [x, y];
+      })();
+      const m = { round: r.round, tossupsRead: 20, teams: [side(g.a.team, pa), side(g.b.team, pb)] };
+      out.push({ m, f: { id: ++id, kind: 'combined', round: r.round, error: null,
+        summary: JSON.stringify({ teams: [g.a.team, g.b.team], score: [pa, pb] }) } });
+    }
+  }
+  return out;
+}
+// Upload the day's games in a random order; each time a pool finishes,
+// auto-fill the saved schedule from that pool's games, as the hub does.
+function autoDay(s, games, seed) {
+  const rnd = mulberry32(seed + 7);
+  const order = games.slice().sort(() => rnd() - 0.5);
+  let saved = JSON.parse(JSON.stringify(s));
+  let ready = 0, fills = 0;
+  const up = [];
+  for (const g of order) {
+    up.push(g);
+    const prog = prelimProgress(saved, up.map((x) => x.f));
+    if (prog.ready.length === ready) continue;
+    ready = prog.ready.length;
+    const ids = new Set(prog.files.map((f) => f.id));
+    const res = autoFill(saved, aggregate(up.filter((x) => ids.has(x.f.id)).map((x) => x.m)), prog.ready);
+    // pools not done keep their slots open
+    for (const p of Object.keys(saved.pools)) {
+      if (!prog.ready.includes(p)) assert.ok(!res.pools.includes(p));
+    }
+    if (res.filled) { saved = res.schedule; fills++; }
+  }
+  return { saved, fills };
+}
+const manualFill = (s, games) => {
+  const c = JSON.parse(JSON.stringify(s));
+  fillPlaceholders(c, fillReport(s, aggregate(games.map((x) => x.m))).ranks);
+  return c;
+};
+
+test('auto-fill: ACF Fall @ UIUC format (23 teams, 8/8/7 crossover), pools finishing in random order', () => {
+  const s = buildSchedule('pools3x2', Array.from({ length: 23 }, (_, i) => 'Team ' + (i + 1)),
+    Array.from({ length: 11 }, (_, i) => ({ name: 'Room ' + (i + 1), bucket: null })));
+  for (let seed = 1; seed <= 150; seed++) {
+    const games = playDay(s, seed);
+    const { saved, fills } = autoDay(s, games, seed);
+    assert.ok(fills >= 1 && fills <= 3);
+    assert.ok(!hasPlaceholders(saved), 'seed ' + seed);
+    assert.deepEqual(saved, manualFill(s, games), 'seed ' + seed);
+  }
+  // nothing fills before a pool is done, and an upload list with no summaries reads as nothing in
+  const games = playDay(s, 3);
+  const prog = prelimProgress(s, games.slice(0, -1).map((x) => x.f));
+  assert.ok(prog.ready.length < 3);
+  assert.deepEqual(prelimProgress(s, games.map((x) => ({ ...x.f, summary: null }))).ready, []);
+  // a re-upload of the same game and a file that couldn't be read change nothing
+  const dup = [...games, { m: games[0].m, f: { ...games[0].f, id: 999 } }, { m: null, f: { id: 1000, kind: 'qbj', round: 1, error: 'bad', summary: null } }];
+  assert.deepEqual(prelimProgress(s, dup.map((x) => x.f)).ready, ['A', 'B', 'C']);
+  const res = autoFill(s, aggregate(dedupeMatches(dup.filter((x) => x.m).map((x) => x.m))), ['A', 'B', 'C']);
+  assert.deepEqual(res.schedule, manualFill(s, games));
+});
+
+test('auto-fill: hdwhite and engine formats end where the Fill button does, places compared across pools last', () => {
+  let n = 0, compared = 0;
+  const cases = [];
+  for (const [t, list] of Object.entries(HDWHITE)) for (const f of list) {
+    if (f.sizes) cases.push([f.key, buildPlan(planTeams(Number(t)), planRooms(f.rooms), hdAsPlan(f), 'snake', 1)]);
+  }
+  for (let t = 6; t <= 30; t++) for (const f of allFormats(t)) {
+    if (f.key.startsWith('pools')) cases.push([t + ' ' + f.key, buildSchedule(f.key, planTeams(t), planRooms(f.roomsNeeded), {})]);
+  }
+  for (const [key, s] of cases) {
+    if (!s.pools || !hasPlaceholders(s)) continue;
+    const hasCmp = JSON.stringify(s).includes(' place"');
+    for (let seed = 1; seed <= 3; seed++) {
+      const games = playDay(s, seed * 31);
+      const { saved } = autoDay(s, games, seed);
+      assert.deepEqual(saved, manualFill(s, games), key + ' seed ' + seed);
+      // compared places wait for the last pool
+      if (hasCmp) {
+        const firstPool = Object.keys(s.pools)[0];
+        const only = games.filter((x) => s.pools[firstPool].includes(x.m.teams[0].name));
+        const part = autoFill(s, aggregate(only.map((x) => x.m)), [firstPool]);
+        assert.ok(!JSON.stringify(part.schedule).match(/"from":"[^"]* place"/), key + ' compared early');
+        compared++;
+      }
+      n++;
+    }
+  }
+  assert.ok(n > 250, 'ran ' + n);
+  assert.ok(compared > 0);
+});
+
+test('auto-fill: a game off the schedule holds its pool until the TD says fill anyway', () => {
+  const s = buildSchedule('pools3x2', planTeams(23), planRooms(11), {});
+  const games = playDay(s, 5);
+  const A = s.pools.A;
+  // pool A's first two teams also played an unscheduled game in round 2
+  const stray = { round: 2, tossupsRead: 20, teams: [{ name: A[0], points: 300, bonusPoints: 0, players: [] }, { name: A[1], points: 100, bonusPoints: 0, players: [] }] };
+  const all = [...games.map((x) => x.m), stray];
+  const res = autoFill(s, aggregate(all), ['A', 'B', 'C']);
+  assert.deepEqual(res.odd.map((x) => x.pool), ['A']);
+  assert.deepEqual(res.pools, ['B', 'C']);
+  assert.ok(JSON.stringify(res.schedule).includes('"label":"A1"'));
+  const forced = autoFill(s, aggregate(all), ['A', 'B', 'C'], ['A']);
+  assert.deepEqual([forced.odd, forced.pools], [[], ['A', 'B', 'C']]);
+  assert.ok(!hasPlaceholders(forced.schedule));
+});
+
+test('auto-fill: with a Tiebreakers phase, ties for different brackets wait; points per 20 when the TD asks', () => {
+  const teams = planTeams(16);
+  const P = [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { per: -1, ties: 'game' })];
+  const s = buildPlan(teams, planRooms(8), P, 'snake', 1);
+  assert.ok(s.phases.some((p) => p.kind === 'tiebreak'));
+  // tiebreaker rounds aren't prelim rounds
+  assert.ok(!prelimRounds(s).some((r) => s.phases.find((p) => p.kind === 'tiebreak').rounds.includes(r)));
+  // pool A: a rock-paper-scissors three-way tie for places 4–6, across the halves; everyone else by seed
+  const A = s.pools.A;
+  const rank = (x) => A.includes(x) ? A.indexOf(x) : Number(x.slice(1));
+  const cyc = [[A[3], A[4]], [A[4], A[5]], [A[5], A[3]]];
+  const games = playDay(s, 1, (a, b) => {
+    const c = cyc.find(([w, l]) => (w === a && l === b) || (w === b && l === a));
+    const win = c ? c[0] : rank(a) <= rank(b) ? a : b;
+    const bonus = { [A[3]]: 40, [A[4]]: 20, [A[5]]: 0 }[win] || 0;
+    return win === a ? [300 + bonus, 100] : [100, 300 + bonus];
+  });
+  const res = autoFill(s, aggregate(games.map((x) => x.m)), ['A', 'B']);
+  assert.equal(res.held.length, 1);
+  assert.equal(res.held[0].pool, 'A');
+  assert.deepEqual(res.held[0].teams.map((x) => x.name).sort(), [A[3], A[4], A[5]].sort());
+  // pool A's other places and all of pool B fill; A4–A6 wait
+  const txt = JSON.stringify(res.schedule);
+  for (const l of ['A4', 'A5', 'A6']) assert.ok(txt.includes(`"label":"${l}"`), l);
+  assert.ok(!txt.includes('"label":"A1"') && !txt.includes('"label":"A7"') && !txt.includes('"label":"B1"'));
+  const pp = autoFill(res.schedule, aggregate(games.map((x) => x.m)), ['A', 'B'], ['A']);
+  assert.deepEqual(pp.held, []);
+  assert.equal(pp.ties.length, 1);
+  assert.ok(!hasPlaceholders({ ...pp.schedule, phases: pp.schedule.phases.filter((p) => !p.kind) }));
+  // without a Tiebreakers phase the same tie just goes by points per 20
+  const plain = buildPlan(teams, planRooms(8), [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { per: -1 })], 'snake', 1);
+  const r2 = autoFill(plain, aggregate(games.map((x) => x.m)), ['A', 'B']);
+  assert.deepEqual(r2.held, []);
+  assert.ok(!hasPlaceholders(r2.schedule));
+  // the caller can say ties wait (or don't), whatever the schedule has
+  assert.equal(autoFill(plain, aggregate(games.map((x) => x.m)), ['A', 'B'], [], { holdTies: true }).held.length, 1);
+  assert.deepEqual(autoFill(s, aggregate(games.map((x) => x.m)), ['A', 'B'], [], { holdTies: false }).held, []);
+});
+
+test('prelimRounds: both cycles of a double round robin, never tiebreaker rounds', () => {
+  const f = Object.values(HDWHITE).flat().find((x) => x.cycles === 2 && x.sizes);
+  const s = buildPlan(planTeams(f.sizes.reduce((a, b) => a + b, 0)), planRooms(f.rooms), hdAsPlan(f), 'snake', 1);
+  assert.equal(prelimRounds(s).length, s.phases[0].rounds.length + s.phases[1].rounds.length);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

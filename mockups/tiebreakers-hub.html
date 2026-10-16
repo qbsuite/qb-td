@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>qb-td</title>
+<!-- Throwaway mock: the real hub running the demo, open it as
+     tiebreakers-hub.html?a=demo (add &v=built for what's built). The
+     import map swaps the demo's data (two pools of eight, prelims done,
+     Pool A tied three ways) and its backend (saves schedules); the hub is a
+     copy of admin.js whose Playoffs line carries the proposal. -->
+<script type="importmap">
+{ "imports": {
+  "./js/demo.js": "./tiebreakers-demo.js",
+  "../app/demo/fixture.js": "./tiebreakers-fixture.js"
+} }
+</script>
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/hub.css">
+<style>
+/* the proposal: a Tiebreakers section, one panel per tied pool in its pool's color */
+/* the section stands out while a tie is open */
+.tbsec { margin-top: 24px; padding: 0 0 4px; }
+.tbsec.tbopen { padding: 14px 16px 16px; border: 2px solid var(--warn); border-radius: 12px;
+  background: color-mix(in srgb, var(--warn) 9%, var(--bg)); }
+.tbsechead { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.tbsec.tbopen .tbsechead { border-bottom-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.tbsechead h2 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+.tbsec.tbopen .tbsechead h2 { color: var(--warn); }
+.tbalert { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--warn); color: var(--bg); font-size: 14px; font-weight: 700; }
+.tbcount { margin-left: auto; font-weight: 600; color: var(--warn); }
+.tbsechead .muted { margin-left: auto; }
+/* one panel per tied pool, in the pool's color */
+.tbcard { margin-top: 14px; padding: 12px 16px 12px 18px; border: 1px solid var(--line); border-left: 4px solid var(--lc);
+  border-radius: 10px; background: color-mix(in srgb, var(--lt) 40%, var(--bg)); font-size: 14px; }
+.tbhead { display: flex; gap: 12px; align-items: center; }
+.tbhead h3 { margin: 0; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.tbhead h3 i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--lc); }
+.tbstatus { margin-left: auto; color: var(--warn); font-weight: 600; font-size: 13px; }
+.tbstatus.ok { color: var(--ok); }
+.tbwhy { margin: 6px 0 0; }
+.tbstats { width: auto; min-width: 0; margin: 10px 0 4px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tbstats th { font-weight: 500; color: var(--muted); text-align: left; padding: 2px 18px 2px 0; border-bottom: 1px solid var(--line); }
+.tbstats td { padding: 3px 18px 3px 0; }
+.tbstats .num { text-align: right; }
+.tbgames { margin: 10px 0 2px; padding-left: 22px; }
+.tbgames li { margin: 4px 0; }
+.tbpp { display: inline-flex; gap: 5px; align-items: center; margin-left: 14px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.tbpp input { margin: 0; }
+.tbhow { display: flex; gap: 14px; margin-top: 8px; align-items: center; }
+.tbplace { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.tbdone { margin: 8px 0 0; font-weight: 500; }
+.tbedit select { width: auto; max-width: 220px; }
+/* each game's tiebreaker round and room */
+.tbtag { display: inline-block; min-width: 200px; margin-right: 10px; font-size: 12px; color: var(--muted); }
+.tbtag.off { opacity: .6; }
+/* which tiebreaker packets the games read */
+.tbpks { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0 2px; font-size: 13px; }
+.tbpk { padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+.tbpk.on { border-color: var(--warn); color: var(--fg); }
+.tbpk span { color: var(--muted); }
+.tbpk.bad, .tbpk.bad span { color: var(--warn); }
+/* the Packets step: tiebreaker packets indented under the round they follow */
+.tbpkrow td.pkn { padding-left: 28px; }
+.tbpktag { display: inline-block; padding: 1px 8px; border-radius: 6px; background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tbpkfoot td { padding-left: 28px; font-size: 13px; }
+.tbpkfoot .linkbtn { margin-left: 12px; font-size: 13px; }
+/* the Uploads grid: tiebreaker columns, set off from the rounds */
+.ugrid th.tbcol, .ugrid td.tbcol { background: color-mix(in srgb, var(--warn) 8%, transparent); font-size: 12px; }
+.ugrid th.tbcol { color: var(--warn); }
+/* a game's room */
+.tbroom { width: auto; font-size: 12px; padding: 1px 4px; margin-left: 2px; }
+/* a resolved tie, folded to its result */
+.tbcard.folded { padding-top: 10px; padding-bottom: 10px; }
+.tbcard.folded .tbhead { flex-wrap: wrap; }
+.tbcard.folded h3 { font-size: 16px; }
+.tbresult { color: var(--fg); margin-left: 4px; }
+.tbhead .linkbtn { font-size: 13px; }
+.tbhide { margin-left: auto; }
+.tbhide + .tbstatus { margin-left: 12px; }
+/* the editor's read-only Tiebreakers block */
+.tbedphase .sgphasehead { cursor: default; }
+/* mock only: the box in the corner */
+.mkmock { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; max-width: 380px;
+  padding: 10px 14px; border: 1px dashed var(--warn); border-radius: 10px; background: var(--bg); font-size: 13px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.mkmock b { color: var(--warn); font-weight: 600; }
+.mkgames { flex-basis: 100%; display: grid; gap: 6px; }
+.mkgames div { display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <header class="sitehead">
+    <h1>qb-td</h1>
+    <a href="index.html" class="muted">All tournaments</a>
+    <span class="spacer"></span>
+    <a href="about.html" class="muted">About</a>
+    <a href="changelog.html" class="muted">Changelog</a>
+  </header>
+  <div id="msg"></div>
+  <div id="view"></div>
+</div>
+<div id="linkmodal" class="modalback" hidden>
+  <div class="modal">
+    <h2 style="margin-top:0">Save this link</h2>
+    <div class="mono linkbox" id="modallink"></div>
+    <p>This device keeps the tournament in its list here. The link is the
+    only way to open it from another device or after clearing browser
+    data.</p>
+    <p>You have until <b id="modalcloses"></b> to set the tournament up. When you
+    press <b>Start tournament</b> on the day, this link and every room link work for
+    48 hours from then. Export stats and files before they close.</p>
+    <div class="row" style="margin-top:12px">
+      <button id="modalcopy" class="primary">Copy link</button>
+      <button id="modalok">Saved it</button>
+    </div>
+  </div>
+</div>
+<script type="module" src="./tiebreakers-admin.js"></script>
+</body>
+</html>

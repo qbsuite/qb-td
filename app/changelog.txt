@@ -1,5 +1,10 @@
 Release Notes for 10/15/2026
 
+[ LIVE HUB ]
+- Playoff slots fill themselves once a pool's prelim games are all in. Ties for a spot go by points per 20 tossups heard.
+- A Playoffs line under the round lists ties points per 20 decided, and any prelim game the schedule doesn't have, with Fill anyway.
+- Auto-advance with brackets now reads "Brackets will advance to the next round once each room has started the current round."
+
 [ SCHEDULE ]
 - New format picker. Format lists hdwhite's schedule formats for your team count, written like "8/8/7 → 6/6/6/5, crossover · 11 rounds".
 - Picking a format fills in its phases, and all of them stay editable. Changing the structure turns Format to Custom.
@@ -8,7 +13,7 @@ Release Notes for 10/15/2026
 - When only some teams of a place go up, they are compared by winning percentage, then points per 20 tossups heard.
 - Copy this phase plays the same pools again, for example a fifth round robin.
 - Playoffs can also be single or double elimination.
-- Rebracketing ties: break them by points per 20 tossups heard or with a tiebreaker game. A game keeps a round free, if needed.
+- Generate no longer keeps rounds free for tiebreaker games.
 - Enable finals sequence if needed: no final if the leader clears by two games, an advantaged final if up by one, else one game.
 - Rooms can be shared by all pools. The shared rooms take games from each pool in turn and get their own lane in the editor.
 - Rooms now come from the Rooms step. The editor no longer has Add room, Rooms or Compact.

@@ -26,7 +26,8 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames } from '../engine/schedule.js';
+import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
+  hasPlaceholders, prelimProgress, prelimRounds, autoFill } from '../engine/schedule.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials } from './buzzkey.js';
@@ -325,6 +326,7 @@ async function showDetail(quiet = false, held = null) {
   render();
   // the header isn't redrawn when the view stays put: its mark is
   notePub({});
+  autoFillSlots();
   return true;
 }
 
@@ -1578,7 +1580,7 @@ function autoBracketsHtml(bk, settings) {
   return `<div class="railblock">
     <label class="railtoggle"><span><b>Auto-advance</b> <span class="muted">${nStarted}/${rows.length} started</span></span>
       <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''}></label>
-    ${settings.autoAdvance ? '<div class="muted small">Each bracket opens its next round once every room in it has started this one.</div>' : ''}
+    ${settings.autoAdvance ? '<div class="muted small">Brackets will advance to the next round once each room has started the current round.</div>' : ''}
     <div class="blist">${bk.groups.map((g) => `<div class="bline" data-bline="${esc(g.key)}">
       <i class="lane-${g.color}"></i>
       <span>${esc(g.name)} <span class="${g.round < bk.top ? 'warntext' : 'muted'}">rd ${g.round}</span></span>
@@ -1758,6 +1760,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         ? '<span class="warntext">No packet for this round</span>' : ''}
       ${tbTotal ? `<span class="muted">Tiebreakers <span class="fg">${tbUsed}/${tbTotal}</span> used</span>` : ''}
     </div>
+    ${playoffNoteHtml(files)}
     <div class="livegrid">
       <div class="livemain">
         <section>
@@ -1893,6 +1896,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     };
   });
   box.querySelectorAll('[data-closecell]').forEach((b) => { b.onclick = () => { cellOpen = null; render(); }; });
+  box.querySelectorAll('[data-fillpool]').forEach((b) => {
+    b.onclick = () => { autoForce = [...new Set([...autoForce, b.dataset.fillpool])]; autoFillSlots(true); };
+  });
   box.querySelectorAll('[data-addfor]').forEach((b) => {
     b.onclick = () => {
       const [bid, n] = b.dataset.addfor.split(':').map(Number);
@@ -2178,7 +2184,7 @@ async function fetchOwnedJson(a, key) {
 // Every clean game file parsed, plus the roster: shared by Compute stats
 // and the schedule's fill-from-standings.
 // onFile(done, total) after each game file, for the caller's progress.
-async function collectMatches(a, t, buckets, files, onFile = () => {}) {
+async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = null) {
   const qbjFiles = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error);
   const errors = [];
   let roster = null;
@@ -2196,7 +2202,11 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}) {
       // Combined reader uploads contribute only their qbj half downstream
       // (the game half carries the full packet text; the TO's zip gets it
       // as the separate MODAQ game file).
-      const full = await fetchOwnedJson(a, f.r2_key);
+      // auto-fill keeps the games it has read: a pool finishing later
+      // fetches only its own
+      const ck = f.id + '|' + f.size + '|' + f.created;
+      const full = cache && cache.has(ck) ? cache.get(ck) : await fetchOwnedJson(a, f.r2_key);
+      if (cache) cache.set(ck, full);
       const payload = matchPayload(full);
       const m = parseMatch(payload, { filename: f.filename });
       const room = buckets.find((b) => b.id === f.bucket_id);
@@ -2223,6 +2233,81 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}) {
     }
   }
   return { roster, matches, raw, games, errors };
+}
+
+/* ---------- playoff slots fill themselves ----------
+   Once a pool's prelim games are all in — told from the upload list the
+   hub already holds, so watching costs the Worker nothing — the hub reads
+   those games, ranks the pool and saves its playoff slots filled: the same
+   requests the editor's Fill button makes, once, with games already read
+   kept. It fills the saved schedule, not this tab's copy, and leaves it
+   alone while the TD has unsaved schedule edits. Ties for different
+   brackets go by points per 20 tossups heard, unless the schedule has a
+   Tiebreakers phase: then those slots wait for the TD (autoFill). */
+let autoSig = null;           // prelim uploads last looked at
+let autoBusy = false;
+let autoWait = { held: [], odd: [] }; // what waits for the TD, for the Live Hub
+let autoForce = [];           // pools the TD said to fill anyway
+const autoCache = new Map();  // game files already read
+
+async function autoFillSlots(force = false) {
+  if (autoBusy || !lastDetail || !sched || schedDirty || !sched.pools || !hasPlaceholders(sched)) return;
+  if (shownView === 'setup' && setupTab === 'sched') return; // the editor holds this schedule
+  const { tournament: t, buckets, files } = lastDetail;
+  if (!t.started) return;
+  const prog = prelimProgress(sched, files);
+  if (!prog.ready.length || (prog.sig === autoSig && !force)) return;
+  autoBusy = true;
+  const a = '/a/' + adminSecret;
+  try {
+    const { matches, roster } = await collectMatches(a, t, buckets, prog.files, () => {}, autoCache);
+    if (!matches.length) return;
+    const agg = aggregate(matches, roster);
+    const saved = await fetchOwnedJson(a, `t/${t.id}/schedule.json`).catch(() => null);
+    if (!saved || schedDirty) return;
+    autoSig = prog.sig;
+    const res = autoFill(saved, agg, prelimProgress(saved, files).ready, autoForce);
+    autoWait = { held: res.held, odd: res.odd };
+    if (res.filled) {
+      const had = new Set((saved.filled || []).map((x) => x.pool + ' ' + x.record));
+      res.schedule.filled = [...(saved.filled || []), ...res.ties.filter((x) => !had.has(x.pool + ' ' + x.record))
+        .map((x) => ({ pool: x.pool, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, bracket: tm.bracket })) }))];
+      await pub(a + '/schedule', { method: 'POST', json: res.schedule });
+      if (schedDirty) return;
+      sched = res.schedule;
+      say(res.pools.length ? `Filled the playoff slots from ${res.pools.length > 1 ? 'pools' : 'pool'} ${andList(res.pools)}` : 'Filled some playoff slots');
+    } else sched = saved;
+    if (shownView === 'live') render();
+  } catch (e) {
+    autoSig = null; // try again on the next refresh
+  } finally { autoBusy = false; }
+}
+const andList = (xs) => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
+
+// The Live Hub's Playoffs line: ties points per 20 settled, and pools
+// waiting for the TD. Gone once a playoff game is in.
+function playoffNoteHtml(files) {
+  if (!sched) return '';
+  const prelim = new Set(prelimRounds(sched).map((r) => r.round));
+  if (files.some((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && Number.isInteger(f.round) && !prelim.has(f.round))) return '';
+  const lines = [];
+  for (const x of sched.filled || []) {
+    lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} were tied at ${esc(x.record)}, so points per 20 decided their places.`);
+  }
+  for (const x of autoWait.odd) {
+    lines.push(`Pool ${esc(x.pool)} has ${x.games.map((g) => `${esc(g.a)} vs ${esc(g.b)} (round ${g.round})`).join(', ')}, which isn&rsquo;t on the schedule.
+      <button class="linkbtn" data-fillpool="${esc(x.pool)}">Fill anyway</button>`);
+  }
+  for (const x of autoWait.held) {
+    const by = {};
+    x.teams.forEach((tm) => { by[tm.bracket] = (by[tm.bracket] || 0) + 1; });
+    const spots = Object.entries(by).map(([b, n]) => `${n === 1 ? 'one spot' : n + ' spots'} in ${esc(b)}`);
+    lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${andList(spots)}.
+      <button class="linkbtn" data-fillpool="${esc(x.pool)}">Use points per 20</button>`);
+  }
+  if (!lines.length) return '';
+  return `<div class="banner playoffnote"><span style="font-weight:600">Playoffs</span>
+    <div>${lines.map((l) => `<div>${l}</div>`).join('')}</div></div>`;
 }
 
 async function computeStats(a, t, buckets, files, settings) {

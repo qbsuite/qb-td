@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiebreaker games</title>
+<!-- Throwaway interactive mock: playoff slots fill themselves, and a tie
+     for different brackets is settled from the Live Hub's Playoffs line,
+     by points per 20 or by tiebreaker games. In the app's own stylesheets.
+     Scenario 1 is ACF Nationals 2026's New Carrollton pool (Toronto A, UCLA,
+     Minnesota tied at 5–2). Playoffs take places in pairs. -->
+<link rel="stylesheet" href="../app/css/td.css">
+<link rel="stylesheet" href="../app/css/hub.css">
+<link rel="stylesheet" href="../app/css/pub.css">
+<style>
+.lt {
+  --bg: #fafaf8; --fg: #1a1a1a; --muted: #71717a; --line: #e4e4e7; --link: #1d4ed8;
+  --hover-bg: #f4f4f0; --ok: #15803d; --bad: #b91c1c; --pick: #e4e4df; --pick-line: #c9c9c2;
+  --warn: #b4410e; --card: #f1f1ec; --sel: #efefea; --win-bg: #dcefe0; --win-fg: #14532d;
+}
+.dk {
+  --bg: #232326; --fg: #e4e4e7; --muted: #a1a1aa; --line: #36363c; --link: #8fb0f5;
+  --hover-bg: #2c2c31; --ok: #6fc58d; --bad: #f08a8a; --pick: #38383f; --pick-line: #4d4d55;
+  --warn: #e7a177; --card: #2b2b2f; --sel: #303036; --win-bg: #2a4032; --win-fg: #cfeeda;
+  color-scheme: dark;
+}
+.lt .lane-0 { --lc: #2f5fb3; --lt: #eef2fa; } .dk .lane-0 { --lc: #8fb0f5; --lt: #26314a; }
+body { padding: 0 32px 80px; background: #f4f4f2; color: #1a1a1a; }
+.mk-h1 { font-size: 26px; font-weight: 600; margin: 24px 0 0; }
+.mk-bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  padding: 12px 0; background: #f4f4f2; border-bottom: 1px solid #ddd; font: 14px system-ui, sans-serif; }
+.mk-seg { display: inline-flex; border: 1px solid #bbb; border-radius: 8px; overflow: hidden; }
+.mk-seg button { border: 0; border-right: 1px solid #ddd; background: #fff; color: #1a1a1a; padding: 6px 12px; font: inherit; cursor: pointer; }
+.mk-seg button:last-child { border-right: 0; }
+.mk-seg button.on { background: #1a1a1a; color: #fff; }
+.mk-sec { font-size: 20px; font-weight: 600; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1a1a1a; }
+.mk-row { display: flex; gap: 24px; overflow-x: auto; align-items: flex-start; }
+.mk-cap { font-size: 13px; color: #666; margin-bottom: 6px; }
+.board { width: 760px; padding: 18px 20px; border: 1px solid #ddd; border-radius: 10px; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.board.phone { width: 390px; padding: 14px 16px; border-radius: 22px; }
+.mockonly { width: 760px; color: #1a1a1a; padding: 12px 16px; border: 1px dashed #999; border-radius: 10px; background: #fff; font: 14px system-ui, sans-serif; }
+.mockonly .g { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.mockonly .g > span { width: 64px; color: #666; }
+.mockonly button { font: inherit; color: #1a1a1a; padding: 3px 10px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+.mockonly button.won { background: #dcefe0; border-color: #15803d; font-weight: 600; }
+.mockonly button:disabled { color: #aaa; cursor: default; }
+/* what the proposal adds */
+.hubpage .banner.playoffnote { display: flex; gap: 14px; margin-top: 16px; padding: 12px 14px; }
+.tbline + .tbline { margin-top: 10px; }
+.tbhow { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 4px 0 0; }
+.tbgames { margin: 4px 0 0; padding-left: 22px; }
+.tbgames li { margin: 2px 0; }
+.tbgames .x { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px; }
+.tbadd { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 6px 0 0; font-size: 14px; }
+.tbres { font-size: 14px; color: var(--muted); margin: 4px 0 0; }
+.tbbad { color: var(--warn); }
+.tbplace { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 0; font-size: 14px; }
+.tblist { font-size: 13px; margin: 10px 0 0; }
+.tblist ul { margin: 2px 0 0; padding-left: 20px; }
+.tblist a { color: var(--link); }
+.nstats td.eq { color: var(--muted); }
+.sgcell .tbnum { font-size: 10.5px; color: var(--muted); margin-left: 4px; }
+</style>
+</head>
+<body>
+<h1 class="mk-h1">Tiebreaker games</h1>
+<div class="mk-bar" id="bar"></div>
+<div id="rows"></div>
+
+<script>
+/* [name, W, L, PP20, 10s, −5s, PPB], sorted by record, then PP20 */
+const SCEN = {
+  a: { label: '3-way tie (ACF Nationals)', pool: 'F', teams: [
+    ['Virginia Tech', 6, 1, 245.7, 73, 16, 14.66], ['Toronto A', 5, 2, 263.6, 71, 19, 17.32], ['UCLA', 5, 2, 245.0, 70, 9, 15.14],
+    ['Minnesota', 5, 2, 220.0, 67, 10, 13.73], ['Penn State', 3, 4, 167.1, 58, 30, 12.76], ['Georgia Tech B', 2, 5, 160.0, 54, 22, 12.78],
+    ['Purdue', 1, 6, 151.4, 53, 14, 11.32], ['Maryland B', 1, 6, 117.9, 41, 7, 10.98]] },
+  b: { label: '4-way tie, places 2–5', pool: 'G', teams: [
+    ['Chicago', 6, 1, 270.4, 78, 12, 16.10], ['Yale', 4, 3, 251.3, 70, 15, 15.40], ['Rice', 4, 3, 236.8, 66, 11, 15.02],
+    ['Duke', 4, 3, 230.1, 64, 18, 14.61], ['Penn', 4, 3, 212.9, 60, 9, 14.20], ['Brown', 3, 4, 190.0, 55, 20, 13.50],
+    ['Tufts', 2, 5, 158.6, 47, 14, 12.41], ['Emory', 1, 6, 120.7, 38, 10, 11.20]] },
+  c: { label: '4-way tie, places 1–4, and a 2-way tie', pool: 'H', teams: [
+    ['Stanford', 5, 2, 268.6, 77, 13, 16.42], ['Berkeley', 5, 2, 254.3, 72, 17, 15.90], ['Michigan', 5, 2, 240.0, 69, 12, 15.33],
+    ['Columbia', 5, 2, 226.4, 65, 15, 14.70], ['Harvard', 3, 4, 198.6, 57, 19, 13.62], ['Cornell', 2, 5, 165.0, 49, 11, 12.85],
+    ['Ohio State', 2, 5, 150.7, 46, 16, 12.10], ['Illinois', 1, 6, 118.6, 37, 8, 11.04]] },
+};
+const BR = ['1st–2nd place', '3rd–4th place', '5th–6th place', '7th–8th place'];
+const br = (p) => Math.floor((p - 1) / 2);
+const WORD = ['', 'one', 'two', 'three', 'four'];
+const ROOMS = ['Room 112', 'Room 114'];
+const S = { scen: 'a', mode: 'new', theme: 'lt', ties: [] };
+
+const andList = (a) => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+const T = (n) => ({ t: n }), W = (i) => ({ w: i }), L = (i) => ({ l: i });
+const isW = (r) => 'w' in r, gi = (r) => isW(r) ? r.w : r.l;
+
+function findTies(teams) {
+  const out = [];
+  for (let i = 0; i < teams.length;) {
+    let j = i;
+    while (j + 1 < teams.length && teams[j + 1][1] === teams[i][1]) j++;
+    if (j > i && br(i + 1) !== br(j + 1))
+      out.push({ p0: i + 1, rec: `${teams[i][1]}–${teams[i][2]}`, seeds: teams.slice(i, j + 1).map((t) => t[0]),
+        how: null, custom: null, editing: false, win: {}, place: null });
+    i = j + 1;
+  }
+  return out;
+}
+function load() { S.ties = findTies(SCEN[S.scen].teams); }
+
+/* The suggested games: the two lowest seeds (by points per 20) play, the
+   winner plays the next one up, and so on, stopping once the rest share a
+   bracket. Changed games are the TD's own. */
+function gamesOf(t) {
+  if (t.custom) return t.custom;
+  const s = t.seeds, n = s.length, P = (j) => br(t.p0 + j), g = [];
+  for (let i = 0; i < n - 1 && P(0) !== P(n - 1 - i); i++) g.push({ a: T(s[n - 2 - i]), b: i ? W(i - 1) : T(s[n - 1]) });
+  return g;
+}
+function who(t, r, g) {
+  if (r.t) return r.t;
+  const i = gi(r), w = t.win[i];
+  if (!w || !g[i]) return null;
+  const a = who(t, g[i].a, g), b = who(t, g[i].b, g);
+  if (!a || !b) return null;
+  return isW(r) === (w === 'a') ? a : b;
+}
+function allGames() {
+  const out = [];
+  S.ties.forEach((t, ti) => { if (t.how === 'games' && !t.editing) gamesOf(t).forEach((g, i) => out.push({ ti, i, g, n: out.length + 1 })); });
+  return out;
+}
+function numOf(ti, i) { const x = allGames().find((x) => x.ti === ti && x.i === i); return x ? x.n : i + 1; }
+function refText(t, ti, r, g, cap) {
+  const n = who(t, r, g);
+  if (n) return n;
+  const src = g[gi(r)], word = isW(r) ? 'winner' : 'loser';
+  const of = src.a.t && src.b.t ? `${src.a.t} vs ${src.b.t}` : `game ${numOf(ti, gi(r))}`;
+  return `${cap ? word[0].toUpperCase() + word.slice(1) : word} of ${of}`;
+}
+/* order of the tied teams once their games are in; null while waiting */
+function orderOf(t) {
+  const s = t.seeds, n = s.length, g = gamesOf(t), w = (r) => who(t, r, g);
+  const bySeed = (x, y) => s.indexOf(x) - s.indexOf(y);
+  if (t.how === 'pp') return s.slice();
+  if (t.how !== 'games' || t.editing || g.some((_, i) => !t.win[i])) return null;
+  if (!t.custom) {
+    const m = g.length, o = [];
+    for (let i = 0; i < m; i++) o[n - 1 - i] = w(L(i));
+    s.slice(0, n - 1 - m).concat([w(W(m - 1))]).sort(bySeed).forEach((x, k) => { o[k] = x; });
+    return o;
+  }
+  const wins = (x) => g.filter((_, i) => w(W(i)) === x).length;
+  const def = s.slice().sort((x, y) => wins(y) - wins(x) || bySeed(x, y));
+  if (!t.place) return def;
+  return s.slice().sort((x, y) => t.place[x] - t.place[y] || def.indexOf(x) - def.indexOf(y));
+}
+const brOfOrder = (t, o) => Object.fromEntries(o.map((x, k) => [x, br(t.p0 + k)]));
+function spotsText(t) {
+  const c = {};
+  t.seeds.forEach((_, j) => { const b = br(t.p0 + j); c[b] = (c[b] || 0) + 1; });
+  return andList(Object.keys(c).map((b, k) => `${WORD[c[b]]}${k ? '' : c[b] > 1 ? ' spots' : ' spot'} in ${BR[b]}`));
+}
+function placeText(t, o) {
+  const by = {};
+  o.forEach((x, k) => { (by[br(t.p0 + k)] ||= []).push(x); });
+  return Object.keys(by).map((b, k) => `${andList(by[b])}${k ? '' : by[b].length > 1 ? ' go' : ' goes'} to ${BR[b]}`).join(', ') + '.';
+}
+const pool = () => 'Pool ' + SCEN[S.scen].pool;
+// a custom order counts only once each bracket has the right number of teams
+function placeOk(t, o) {
+  const need = {}, have = {}, b = brOfOrder(t, o);
+  t.seeds.forEach((_, j) => { need[br(t.p0 + j)] = (need[br(t.p0 + j)] || 0) + 1; });
+  t.seeds.forEach((x) => { have[b[x]] = (have[b[x]] || 0) + 1; });
+  return Object.keys(need).every((k) => need[k] === (have[k] || 0));
+}
+
+/* 1. the Live Hub's Playoffs line */
+function tieLine(t, ti) {
+  const tied = `${pool()}: ${andList(t.seeds)}`;
+  if (S.mode === 'now' || t.how === 'pp') return `<div class="tbline">${tied} were tied at ${t.rec}, so points per 20 decided their places.</div>`;
+  if (!t.how) return `<div class="tbline">${tied} are tied at ${t.rec} for ${spotsText(t)}.
+    <div class="tbhow"><button class="linkbtn" data-how="${ti}:pp">Use points per 20</button><button class="linkbtn" data-how="${ti}:games">Use tiebreaker games</button></div></div>`;
+  const g = gamesOf(t), o = orderOf(t);
+  if (o && (!t.custom || (t.place && placeOk(t, o)))) return `<div class="tbline">${pool()}: ${placeText(t, o)}</div>`;
+  let h = `<div class="tbline">${tied} are tied at ${t.rec} for ${spotsText(t)}.`;
+  if (g.length) h += `<ol class="tbgames">${g.map((x, i) => `<li>${refText(t, ti, x.a, g, false)} vs ${refText(t, ti, x.b, g, false)}${
+    t.editing ? ` <button class="x" data-del="${ti}:${i}" title="Remove">✕</button>` : ''}</li>`).join('')}</ol>`;
+  if (t.editing) {
+    const opts = t.seeds.map((x) => [`t:${x}`, x]).concat(g.flatMap((_, i) => [[`w:${i}`, `Winner of game ${i + 1}`], [`l:${i}`, `Loser of game ${i + 1}`]]));
+    const sel = (k) => `<select data-c${k}="${ti}">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`;
+    h += `<div class="tbadd">${sel('a')} vs ${sel('b')} <button class="small" data-cadd="${ti}">Add</button> <button class="small" data-done="${ti}"${g.length ? '' : ' disabled'}>Done</button></div>`;
+  } else if (o) {
+    // the TD's own games: they say where each team goes
+    const b = brOfOrder(t, o), used = [...new Set(t.seeds.map((_, j) => br(t.p0 + j)))];
+    h += `<div class="tbplace">${t.seeds.map((x) => `<label>${x} <select data-pl="${ti}" data-team="${x}">${used.map((k) =>
+      `<option value="${k}"${b[x] === k ? ' selected' : ''}>${BR[k]}</option>`).join('')}</select></label>`).join('')}
+      <button class="small" data-place="${ti}">Fill</button></div>`;
+    if (t.place && !placeOk(t, o)) h += `<div class="tbbad">Each bracket needs as many teams as it has spots.</div>`;
+  } else h += `<div class="tbhow"><button class="linkbtn" data-edit="${ti}">Change games</button></div>`;
+  return h + '</div>';
+}
+function hub() {
+  const rows = allGames().filter((x) => !S.ties[x.ti].win[x.i]);
+  const sched = schedule();
+  const roomOf = (x) => { for (const [r, list] of sched.entries()) { const k = list.findIndex((y) => y.ti === x.ti && y.i === x.i); if (k >= 0) return [r, k]; } return [0, 0]; };
+  return `<div class="roundline" style="padding-top:4px"><span class="biground">Round 7<span class="of"> / 11</span></span><span class="muted">Prelims · round 7 of 7</span></div>
+    <div class="banner playoffnote"><span style="font-weight:600">Playoffs</span><div>${S.ties.map(tieLine).join('')}</div></div>
+    ${rows.length && S.mode !== 'now' ? `<section style="margin-top:20px"><div class="sechead"><h2>Tiebreakers</h2><span class="muted">0/${rows.length} in</span></div>
+      ${rows.map((x) => { const t = S.ties[x.ti], g = gamesOf(t), [r, k] = roomOf(x);
+        return `<div class="lrow"><span class="lroom">${ROOMS[k]} · round ${8 + r}</span><span class="lgame">${refText(t, x.ti, x.g.a, g, true)} <span class="muted">v</span> ${refText(t, x.ti, x.g.b, g, true)}</span><span class="lacts"></span><span class="lmark warn">&ndash;</span></div>`;
+      }).join('')}</section>` : ''}`;
+}
+
+/* 2. schedule editor */
+function schedule() {
+  const rnd = new Map(), rounds = [];
+  allGames().forEach((x) => {
+    const deps = [x.g.a, x.g.b].filter((r) => !r.t).map((r) => rnd.get(x.ti + ':' + gi(r)));
+    let r = deps.length ? Math.max(...deps) + 1 : 0;
+    while ((rounds[r] || []).length >= ROOMS.length) r++;
+    (rounds[r] ||= []).push(x);
+    rnd.set(x.ti + ':' + x.i, r);
+  });
+  return rounds;
+}
+function editor() {
+  const rounds = S.mode === 'now' ? [] : schedule(), n = Math.max(rounds.length, 1);
+  let cells = '';
+  for (let r = 0; r < n; r++) {
+    cells += `<div class="sgrnd"><span>${8 + r}</span></div>`;
+    ROOMS.forEach((_, k) => {
+      const x = (rounds[r] || [])[k];
+      if (!x) { cells += `<div class="sgcell empty"><button class="sgadd"></button></div>`; return; }
+      const t = S.ties[x.ti], g = gamesOf(t);
+      const slot = (ref) => `<button class="sgslot${who(t, ref, g) ? '' : ' ph'}">${refText(t, x.ti, ref, g, true)}</button>`;
+      cells += `<div class="sgcell"><span class="sgtag sgifneeded">If needed</span><span class="tbnum">Game ${x.n}</span>${slot(x.g.a)}${slot(x.g.b)}</div>`;
+    });
+    cells += `<div class="sgbyes"></div>`;
+  }
+  return `<section class="sgphase">
+    <button class="sgphasehead"><span class="caret">▾</span><b>Tiebreakers</b><span class="muted">${n > 1 ? `rounds 8–${7 + n}` : 'round 8'} · if needed</span></button>
+    <div class="sggrid" style="grid-template-columns:40px repeat(${ROOMS.length}, 230px) 96px">
+      <div class="sgcorner"></div><div class="sglane lane-0" style="grid-column:span ${ROOMS.length}"><i></i>${pool()}</div><div class="sglane sglane-byes">Byes</div>
+      <div class="sgcorner sgcorner2"></div>${ROOMS.map((r) => `<button class="sgroom">${r}</button>`).join('')}<div class="sgroom sgroom-byes"></div>
+      ${cells}</div></section>`;
+}
+
+/* 3. mock-only results */
+function results() {
+  const all = allGames();
+  if (!all.length) return '<div class="mockonly">Choose tiebreaker games in step 1 first.</div>';
+  return `<div class="mockonly">Pick the winners (mock only).${all.map((x) => {
+    const t = S.ties[x.ti], g = gamesOf(t), a = who(t, x.g.a, g), b = who(t, x.g.b, g), w = t.win[x.i];
+    const btn = (side, n) => `<button data-win="${x.ti}:${x.i}:${side}"${n ? '' : ' disabled'} class="${w === side ? 'won' : ''}">${n || refText(t, x.ti, side === 'a' ? x.g.a : x.g.b, g, true)}</button>`;
+    return `<div class="g"><span>Game ${x.n}</span>${btn('a', a)} vs ${btn('b', b)}</div>`;
+  }).join('')}</div>`;
+}
+
+/* 4. public page: as ACF Nationals shows it */
+function pub() {
+  const tm = SCEN[S.scen].teams;
+  const rank = tm.map((t) => {
+    const f = tm.findIndex((x) => x[1] === t[1]), many = tm.filter((x) => x[1] === t[1]).length > 1;
+    return `${f + 1}${many ? '=' : ''}`;
+  });
+  const played = [];
+  if (S.mode !== 'now') S.ties.forEach((t) => {
+    if (t.how !== 'games' || t.editing) return;
+    const g = gamesOf(t);
+    g.forEach((x, i) => {
+      const w = t.win[i] && who(t, W(i), g), l = t.win[i] && who(t, L(i), g);
+      if (w && l) played.push(`<li>${w} def. ${l} (<a href="#">box</a>)</li>`);
+    });
+  });
+  return `<h3 class="poolhead">${pool()}</h3><div class="tablewrap"><table class="nstats">
+    <thead><tr><th class="nrkcol"></th><th class="name nstick">Team</th><th class="num g0">W</th><th class="num">L</th>
+      <th class="num g0">PP20</th><th class="num g0">10</th><th class="num">−5</th><th class="num">TUH</th><th class="num g0">PPB</th></tr></thead>
+    <tbody>${tm.map((t, i) => `<tr><td class="muted nrkcol${rank[i].includes('=') ? ' eq' : ''}">${rank[i]}</td><td class="name nstick"><a href="#">${t[0]}</a></td>
+      <td class="num g0">${t[1]}</td><td class="num">${t[2]}</td><td class="num g0">${t[3].toFixed(1)}</td><td class="num g0">${t[4]}</td><td class="num">${t[5]}</td>
+      <td class="num">140</td><td class="num g0">${t[6].toFixed(2)}</td></tr>`).join('')}</tbody></table></div>${
+    played.length ? `<div class="tblist">Tiebreakers:<ul>${played.join('')}</ul></div>` : ''}`;
+}
+
+/* page */
+const seg = (key, opts) => `<span class="mk-seg">${opts.map(([v, l]) => `<button data-set="${key}:${v}" class="${S[key] === v ? 'on' : ''}">${l}</button>`).join('')}</span>`;
+const board = (html, cls = '') => `<div class="board ${S.theme} ${cls}">${html}</div>`;
+const sec = (title, body) => `<h2 class="mk-sec">${title}</h2><div class="mk-row">${body}</div>`;
+function render() {
+  document.getElementById('bar').innerHTML =
+    seg('scen', Object.entries(SCEN).map(([k, v]) => [k, v.label]))
+    + seg('mode', [['now', 'Built'], ['new', 'Proposal']])
+    + seg('theme', [['lt', 'Light'], ['dk', 'Dark']]);
+  const now = S.mode === 'now';
+  document.getElementById('rows').innerHTML =
+    sec('1. Live Hub, once the prelims are in', board(hub(), 'hubpage'))
+    + (now ? '' : sec('2. Schedule', board(editor())) + sec('3. Games played', results()))
+    + sec(now ? '2. Public page' : '4. Public page',
+      `<div><div class="mk-cap">Laptop</div>${board(pub())}</div><div><div class="mk-cap">Phone</div>${board(pub(), 'phone')}</div>`);
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const d = b.dataset;
+  const tie = (k) => S.ties[+String(k).split(':')[0]];
+  if (d.set) {
+    const [k, v] = d.set.split(':');
+    S[k] = v;
+    if (k === 'scen') load();
+  } else if (d.how) Object.assign(tie(d.how), { how: d.how.split(':')[1], win: {}, custom: null, editing: false, place: null });
+  else if (d.edit) Object.assign(tie(d.edit), { editing: true, custom: gamesOf(tie(d.edit)).slice(), win: {}, place: null });
+  else if (d.done) tie(d.done).editing = false;
+  else if (d.del) { const t = tie(d.del); t.custom = t.custom.slice(0, +d.del.split(':')[1]); }
+  else if (d.cadd) {
+    const ti = +d.cadd, t = S.ties[ti];
+    const parse = (v) => { const [k, x] = v.split(':'); return k === 't' ? T(x) : k === 'w' ? W(+x) : L(+x); };
+    const a = document.querySelector(`[data-ca="${ti}"]`).value, c = document.querySelector(`[data-cb="${ti}"]`).value;
+    if (a !== c) t.custom = t.custom.concat([{ a: parse(a), b: parse(c) }]);
+  } else if (d.place) { const t = tie(d.place); t.place = { ...brOfOrder(t, orderOf(t)), ...(t.draft || {}) }; t.draft = null; }
+  else if (d.win) {
+    const [ti, i, side] = d.win.split(':'), t = S.ties[+ti];
+    t.win[+i] = side;
+    Object.keys(t.win).forEach((k) => { if (+k > +i) delete t.win[k]; });
+    t.place = null;
+  } else return;
+  render();
+});
+document.addEventListener('change', (e) => {
+  const d = e.target.dataset;
+  if (!d.pl) return;
+  const t = S.ties[+d.pl];
+  // a change here is a draft until Fill
+  t.draft ||= brOfOrder(t, orderOf(t));
+  t.draft[d.team] = +e.target.value;
+});
+load();
+render();
+</script>
+</body>
+</html>

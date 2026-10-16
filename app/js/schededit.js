@@ -219,7 +219,6 @@ export function renderSchedStep(box, env) {
 
 const MODES = [['rotate', 'Teams rotate through rooms evenly'], ['keep', 'Teams stay in one room where possible'],
   ['shuffle', 'Teams get random rooms each round']];
-const TIES = [['pp20', 'Break ties by points per 20 tossups heard'], ['game', 'Break ties with a tiebreaker game']];
 const TYPES = [['brackets', 'Pools'], ['same', 'The same pools again'], ['single', 'Single elimination'], ['double', 'Double elimination']];
 const REPEAT = ['', 'double', 'triple', 'quadruple', 'quintuple', 'sextuple'];
 const ORDN = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
@@ -342,8 +341,9 @@ function copyOf(P, p) {
   const k = Number(/(\d+)$/.exec(src.name)[1]);
   return phase(numbered(src.name, k + 1), { same: true, groups: src.groups, byes: src.byes, share: src.share, n: src.n, mode: src.mode });
 }
-// the plan's phases with its rebracketing ties on each rebracketing
-const withTies = (pl) => pl.phases.map((x, i) => (i > 0 && !x.same ? { ...x, ties: pl.ties || 'pp20' } : x));
+// Ties are settled in the Live Hub once they happen, so no round is kept
+// for them: a plan's old ties setting is ignored
+const withTies = (pl) => pl.phases.map(({ ties: _old, ...x }) => x);
 
 function renderCreator(box, env) {
   if (fullBtn()) fullBtn().hidden = true; // nothing to fill the screen with yet
@@ -454,7 +454,6 @@ function renderCreator(box, env) {
     return `<div class="pkgrid">${out.join('')}</div>`;
   };
 
-  const rebracketing = P.some((x, i) => i > 0 && !x.same && x.kind === 'pools');
   const canCopy = (p) => P[p].kind === 'pools' && groupsBy[p].some((g) => g.members.length > 1);
   const headOf = (p) => `<h3 class="pksec"><input class="pkname" data-name="${p}" size="${Math.max(6, P[p].name.length + 1)}" value="${esc(P[p].name)}" aria-label="Phase name"> ${nr(p)}
     <span class="pktools">${canCopy(p) ? `<button class="linkbtn" data-copy="${p}">Copy this phase</button>` : ''}${p > 0 ? `<button class="linkbtn" data-del="${p}">Remove</button>` : ''}</span></h3>`;
@@ -467,14 +466,11 @@ function renderCreator(box, env) {
   const finalsBox = finals ? `<h3 class="pksec">Finals</h3><div class="pkgrid">
       <span></span><label class="pkcheck"><input type="checkbox" data-finals ${plan.finals ? 'checked' : ''}> Enable finals sequence if needed</label>
       ${plan.finals ? `<span></span><span class="pkhelp">${finals.parallel ? 'One game between the two top pools’ winners.'
-        : 'If leader clears by two games, no final. Advantaged final if leader is up by one game, otherwise one game final.'}</span>
-      <span class="pkl">Ties</span><span>${menu('data-fties', TIES, plan.finalTies || 'pp20')}
-        ${plan.finalTies === 'game' ? '<span class="pkhelp">A round is kept free before the finals for a tiebreaker game, if needed.</span>' : ''}</span>` : ''}
+        : 'If leader clears by two games, no final. Advantaged final if leader is up by one game, otherwise one game final.'}</span>` : ''}
     </div>` : '';
   const fin = plan.finals && finals ? (finals.parallel ? 1 : 2) : 0;
   const total = pv.ok ? pv.rounds.reduce((a, b) => a + b, 0) : 0;
-  const tb = (pv.tiebreak || 0) + (fin && plan.finalTies === 'game' ? 1 : 0);
-  const extra = [tb ? `${tb} for tiebreakers` : '', fin ? (fin === 1 ? 'a final' : '2 for finals') : ''].filter(Boolean);
+  const extra = [fin ? (fin === 1 ? 'a final' : '2 for finals') : ''].filter(Boolean);
   const optOf = (f) => `<option value="${esc(f.key)}" ${f.key === plan.fmt ? 'selected' : ''}${f.rooms > n ? ' disabled' : ''}>${esc(f.label)}${f.rooms > n ? ` (needs ${f.rooms} rooms)` : ''}</option>`;
 
   box.innerHTML = `${back}
@@ -482,8 +478,6 @@ function renderCreator(box, env) {
       <div class="pkgrid">
         <span class="pkl">Rooms</span><span class="pkrow"><span>${n} rooms for ${t} teams</span><span class="muted">from the Rooms step</span></span>
         <span class="pkl">Format</span><span><select data-fmt>${formatList(t).map(optOf).join('')}<option value="custom" ${plan.fmt === 'custom' ? 'selected' : ''}>Custom</option></select></span>
-        ${rebracketing ? `<span class="pkl">Rebracketing ties</span><span>${menu('data-ties', TIES, plan.ties || 'pp20')}
-          ${plan.ties === 'game' ? '<span class="pkhelp">A round is kept free before each rebracketing for tiebreaker games, if needed.</span>' : ''}</span>` : ''}
       </div>
       ${P.map((_, p) => headOf(p) + (p === 0 ? first() : later(p))).join('')}
       ${canAdd ? '<div><button class="linkbtn pkadd" data-add>Add another phase</button></div>' : ''}
@@ -539,8 +533,6 @@ function renderCreator(box, env) {
     if (v === 'single' || v === 'double') { P[p].top = Math.min(2, Math.ceil(t / P[p - 1].groups)); P.splice(p + 1); }
   });
   each('data-seed', 'onchange', (el) => { plan.seeding = el.value; }, false);
-  each('data-ties', 'onchange', (el) => { plan.ties = el.value; }, false);
-  each('data-fties', 'onchange', (el) => { plan.finalTies = el.value; }, false);
   each('data-finals', 'onchange', (el) => { plan.finals = el.checked; }, false);
   each('data-top', 'onchange', (el, p) => { P[p].top = Math.max(1, Number(el.value) || 1); });
   each('data-carry', 'onchange', (el, p) => { P[p].carry = el.checked; });
@@ -565,7 +557,7 @@ function renderCreator(box, env) {
     let s;
     try {
       s = buildPlan(env.teams, roomList(env, n), withTies(plan), plan.seeding, ui.opts.seed);
-      if (plan.finals) addFinals(s, planGroups(env.teams, P, plan.seeding, () => 0.5), P, plan.finalTies);
+      if (plan.finals) addFinals(s, planGroups(env.teams, P, plan.seeding, () => 0.5), P);
       tagBrackets(s);
       s.format = plan.fmt;
       const saved = JSON.parse(JSON.stringify(plan));
