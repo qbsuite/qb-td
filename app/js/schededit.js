@@ -299,6 +299,14 @@ function formatList(t) {
   formatCache.set(t, out);
   return out;
 }
+// The Finals menu: [value, label, help]. finalOne (true) was the first cut
+// of this choice, and reads as 'one'.
+const FINAL_STYLES = [
+  ['adv', 'Advantaged final if needed', 'If leader clears by two games, no final. Advantaged final if leader is up by one game, otherwise one game final.'],
+  ['oneif', 'One game final if needed', 'If leader clears by two games, no final. Otherwise one game final.'],
+  ['one', 'One game final', 'Guarantees final between 1st and 2nd.'],
+];
+const finalStyle = (plan) => (FINAL_STYLES.some(([v]) => v === plan.finalStyle) ? plan.finalStyle : plan.finalOne ? 'one' : 'adv');
 // a plan for a Format menu entry (seeding and room settings carry over)
 function planFor(key, t, from) {
   const f = formatList(t).find((x) => x.key === key);
@@ -306,7 +314,7 @@ function planFor(key, t, from) {
   if (from) phases.forEach((p, i) => { const o = from.phases[Math.min(i, from.phases.length - 1)]; Object.assign(p, { share: o.share, n: o.n, mode: o.mode }); });
   // two parallel top pools only crown a champion with a final
   return { fmt: key, seeding: from ? from.seeding : 'snake', ties: from ? from.ties : 'pp20', finalTies: from ? from.finalTies : 'pp20',
-    phases, finals: phases.some((p) => p.parallelTop) || !!(from && from.finals), finalOne: !!(from && from.finalOne) };
+    phases, finals: phases.some((p) => p.parallelTop) || !!(from && from.finals), finalStyle: from ? finalStyle(from) : 'adv' };
 }
 // the default: the first format that fits the rooms; with none (48 teams),
 // Custom with pools of about 8
@@ -465,14 +473,14 @@ function renderCreator(box, env) {
   })();
   const finalsBox = finals ? `<h3 class="pksec">Finals</h3><div class="pkgrid">
       <span></span><label class="pkcheck"><input type="checkbox" data-finals ${plan.finals ? 'checked' : ''}> Enable finals sequence if needed</label>
-      ${plan.finals && !finals.parallel ? `<span class="pkl">Final</span><span><select data-finalone aria-label="Final">
-        <option value="adv">Advantaged final if needed</option>
-        <option value="one" ${plan.finalOne ? 'selected' : ''}>One game final</option></select></span>` : ''}
+      ${plan.finals && !finals.parallel ? `<span class="pkl">Final</span><span><select data-finalstyle aria-label="Final">
+        ${FINAL_STYLES.map(([v, label]) => `<option value="${v}" ${finalStyle(plan) === v ? 'selected' : ''}>${label}</option>`).join('')}</select></span>` : ''}
       ${plan.finals ? `<span></span><span class="pkhelp">${finals.parallel ? 'One game between the two top pools’ winners.'
-        : plan.finalOne ? 'One game between 1st and 2nd, always played, whatever the records.'
-          : 'If leader clears by two games, no final. Advantaged final if leader is up by one game, otherwise one game final.'}</span>` : ''}
+        : FINAL_STYLES.find(([v]) => v === finalStyle(plan))[2]}</span>` : ''}
     </div>` : '';
-  const fin = plan.finals && finals ? (finals.parallel || plan.finalOne ? 1 : 2) : 0;
+  const fin = plan.finals && finals ? (finals.parallel || finalStyle(plan) !== 'adv' ? 1 : 2) : 0;
+  // a final that is always played is "plus a final"; one that may not be, "plus up to"
+  const always = plan.finals && finals && (finals.parallel || finalStyle(plan) === 'one');
   const total = pv.ok ? pv.rounds.reduce((a, b) => a + b, 0) : 0;
   const extra = [fin ? (fin === 1 ? 'a final' : '2 for finals') : ''].filter(Boolean);
   const optOf = (f) => `<option value="${esc(f.key)}" ${f.key === plan.fmt ? 'selected' : ''}${f.rooms > n ? ' disabled' : ''}>${esc(f.label)}${f.rooms > n ? ` (needs ${f.rooms} rooms)` : ''}</option>`;
@@ -487,7 +495,7 @@ function renderCreator(box, env) {
       ${canAdd ? '<div><button class="linkbtn pkadd" data-add>Add another phase</button></div>' : ''}
       ${finalsBox}
       <div class="sgpreview pktotalbox">${pv.ok
-        ? `<span class="pktotal"><b>${total} rounds</b>${extra.length ? ` <span>plus ${fin === 1 ? '' : 'up to '}${extra.join(' and ')}</span>` : ''}</span><span class="muted">${esc(pv.text.split(' · ').slice(1).join(' · '))}</span>`
+        ? `<span class="pktotal"><b>${total} rounds</b>${extra.length ? ` <span>plus ${always ? '' : 'up to '}${extra.join(' and ')}</span>` : ''}</span><span class="muted">${esc(pv.text.split(' · ').slice(1).join(' · '))}</span>`
         : `<span class="pkwarn"><span>${esc(pv.text)}</span></span>`}</div>
       <div class="row pkfoot"><button id="schedgen" class="primary" ${pv.ok ? '' : 'disabled'}>Generate</button>
         <span class="sgseed">Seed <b>${ui.opts.seed}</b> <button id="optreroll" class="small">Reroll</button></span></div>
@@ -538,7 +546,7 @@ function renderCreator(box, env) {
   });
   each('data-seed', 'onchange', (el) => { plan.seeding = el.value; }, false);
   each('data-finals', 'onchange', (el) => { plan.finals = el.checked; }, false);
-  each('data-finalone', 'onchange', (el) => { plan.finalOne = el.value === 'one'; }, false);
+  each('data-finalstyle', 'onchange', (el) => { plan.finalStyle = el.value; delete plan.finalOne; }, false);
   each('data-top', 'onchange', (el, p) => { P[p].top = Math.max(1, Number(el.value) || 1); });
   each('data-carry', 'onchange', (el, p) => { P[p].carry = el.checked; });
   each('data-reset', 'onchange', (el, p) => { P[p].reset = el.checked; });
@@ -562,7 +570,7 @@ function renderCreator(box, env) {
     let s;
     try {
       s = buildPlan(env.teams, roomList(env, n), withTies(plan), plan.seeding, ui.opts.seed);
-      if (plan.finals) addFinals(s, planGroups(env.teams, P, plan.seeding, () => 0.5), P, undefined, plan.finalOne ? 'one' : 'advantaged');
+      if (plan.finals) addFinals(s, planGroups(env.teams, P, plan.seeding, () => 0.5), P, undefined, { adv: 'advantaged', oneif: 'oneif', one: 'one' }[finalStyle(plan)]);
       tagBrackets(s);
       s.format = plan.fmt;
       const saved = JSON.parse(JSON.stringify(plan));

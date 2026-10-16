@@ -650,9 +650,10 @@ export function rebracketChecks(groupsBy, phases, p) {
  * marked ifNeeded with when it's played (the usual rule: no final when
  * the leader is two wins clear; an advantaged final, where the leader
  * needs one win and the challenger two, when one win clear; one game
- * when tied). style 'one' is a one-game final instead, always played,
- * whatever the records. Returns what the finals are, or null when
- * there's no top pool to take them from.
+ * when tied). style 'oneif' keeps that rule without the second game: no
+ * final when the leader is two wins clear, else one game. style 'one' is
+ * one game, always played, whatever the records. Returns what the finals
+ * are, or null when there's no top pool to take them from.
  */
 export function addFinals(s, groupsBy, phases, ties = 'pp20', style = 'advantaged') {
   const last = groupsBy[groupsBy.length - 1];
@@ -661,7 +662,8 @@ export function addFinals(s, groupsBy, phases, ties = 'pp20', style = 'advantage
   const top = last.filter((g) => (g.tier || 0) === 0 && g.members.length > 1);
   if (!top.length) return null;
   const parallel = top.length > 1;
-  const once = parallel || style === 'one';
+  const once = parallel || style === 'one' || style === 'oneif';
+  const always = parallel || style === 'one';
   const name = (g) => g.name;
   const a = parallel ? { label: `1st in ${name(top[0])}` } : { label: `1st in ${name(top[0])}` };
   const b = parallel ? { label: `1st in ${name(top[1])}` } : { label: `2nd in ${name(top[0])}` };
@@ -669,11 +671,11 @@ export function addFinals(s, groupsBy, phases, ties = 'pp20', style = 'advantage
   // a tie for a place in the final settled by a game: a free round first
   if (ties === 'game') s.phases.push({ name: 'Tiebreakers', rounds: [{ round: round++, games: [], byes: [] }], meet: 1, kind: 'tiebreak' });
   const key = 'FN';
-  const rounds = [{ round: round++, games: [{ room: 0, a, b, bracket: key, ifNeeded: once ? undefined : 'unless the leader is two wins clear' }], byes: [] }];
+  const rounds = [{ round: round++, games: [{ room: 0, a, b, bracket: key, ifNeeded: always ? undefined : 'unless the leader is two wins clear' }], byes: [] }];
   if (!once) rounds.push({ round: round++, games: [{ room: 0, a: { ...a }, b: { ...b }, bracket: key, ifNeeded: 'if the leader loses the first game of an advantaged final' }], byes: [] });
   s.phases.push({ name: 'Finals', rounds, meet: once ? 1 : 2, kind: 'final' });
   s.brackets.push({ key, name: 'Finals', phase: s.phases.length - 1 });
-  return { parallel, one: once, a: a.label, b: b.label };
+  return { parallel, one: once, always, a: a.label, b: b.label };
 }
 
 /**

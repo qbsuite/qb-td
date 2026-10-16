@@ -4387,7 +4387,7 @@ test('buildPlan: a smaller last bracket plays its rounds first and finishes earl
   }
 });
 
-test('addFinals: a one-game final is one game, always played', () => {
+test('addFinals: one game final if needed, and one game final always played', () => {
   const base = { kind: 'pools', top: 0, per: 1, pools: 1, cross: false, same: false, meets: 1, carry: true,
     reset: true, byes: false, parallelTop: false, share: false, n: 3, mode: 'rotate' };
   const P = [{ ...base, name: 'Prelims', groups: 3, sizes: null }, { ...base, name: 'Playoffs', groups: 1, sizes: [6, 6, 6, 4] }];
@@ -4410,6 +4410,13 @@ test('addFinals: a one-game final is one game, always played', () => {
   assert.equal(one.fin.rounds[0].games[0].a.label, '1st in 1st–2nd place');
   assert.equal(one.fin.rounds[0].games[0].b.label, '2nd in 1st–2nd place');
   assert.deepEqual(validateSchedule(one.s), []);
+  // if needed: the advantaged rule's first game, without the second
+  const oneif = build('oneif');
+  assert.equal(oneif.fin.rounds.length, 1);
+  assert.equal(oneif.fin.meet, 1);
+  assert.equal(oneif.fin.rounds[0].games[0].ifNeeded, 'unless the leader is two wins clear');
+  assert.equal(oneif.got.always, false);
+  assert.equal(one.got.always, true);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
