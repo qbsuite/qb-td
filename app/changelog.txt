@@ -2,6 +2,7 @@ Release Notes for 10/16/2026
 
 [ SCHEDULE ]
 - A smaller bracket plays its games in the first playoff rounds and finishes early, instead of sitting out a round in the middle.
+- Finals can be a one game final, always played, instead of the advantaged final.
 
 [ MISC ]
 - Discord alerts link to the public page at its full address, with /qb-td/app.

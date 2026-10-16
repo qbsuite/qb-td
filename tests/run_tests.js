@@ -4387,5 +4387,30 @@ test('buildPlan: a smaller last bracket plays its rounds first and finishes earl
   }
 });
 
+test('addFinals: a one-game final is one game, always played', () => {
+  const base = { kind: 'pools', top: 0, per: 1, pools: 1, cross: false, same: false, meets: 1, carry: true,
+    reset: true, byes: false, parallelTop: false, share: false, n: 3, mode: 'rotate' };
+  const P = [{ ...base, name: 'Prelims', groups: 3, sizes: null }, { ...base, name: 'Playoffs', groups: 1, sizes: [6, 6, 6, 4] }];
+  const teams = planTeams(22);
+  const build = (style) => {
+    const s = buildPlan(teams, planRooms(11), P, 'random', 5070);
+    const got = addFinals(s, planGroups(teams, P, 'random', () => 0.5), P, undefined, style);
+    return { s, got, fin: s.phases[s.phases.length - 1] };
+  };
+  const adv = build();
+  assert.equal(adv.fin.rounds.length, 2);
+  assert.ok(adv.fin.rounds.every((r) => r.games[0].ifNeeded));
+  const one = build('one');
+  assert.equal(one.got.one, true);
+  assert.equal(one.fin.kind, 'final');
+  assert.equal(one.fin.meet, 1);
+  assert.equal(one.fin.rounds.length, 1);
+  assert.equal(one.fin.rounds[0].games.length, 1);
+  assert.equal(one.fin.rounds[0].games[0].ifNeeded, undefined);
+  assert.equal(one.fin.rounds[0].games[0].a.label, '1st in 1st–2nd place');
+  assert.equal(one.fin.rounds[0].games[0].b.label, '2nd in 1st–2nd place');
+  assert.deepEqual(validateSchedule(one.s), []);
+});
+
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
 

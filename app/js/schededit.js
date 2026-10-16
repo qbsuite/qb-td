@@ -306,7 +306,7 @@ function planFor(key, t, from) {
   if (from) phases.forEach((p, i) => { const o = from.phases[Math.min(i, from.phases.length - 1)]; Object.assign(p, { share: o.share, n: o.n, mode: o.mode }); });
   // two parallel top pools only crown a champion with a final
   return { fmt: key, seeding: from ? from.seeding : 'snake', ties: from ? from.ties : 'pp20', finalTies: from ? from.finalTies : 'pp20',
-    phases, finals: phases.some((p) => p.parallelTop) || !!(from && from.finals) };
+    phases, finals: phases.some((p) => p.parallelTop) || !!(from && from.finals), finalOne: !!(from && from.finalOne) };
 }
 // the default: the first format that fits the rooms; with none (48 teams),
 // Custom with pools of about 8
@@ -465,10 +465,14 @@ function renderCreator(box, env) {
   })();
   const finalsBox = finals ? `<h3 class="pksec">Finals</h3><div class="pkgrid">
       <span></span><label class="pkcheck"><input type="checkbox" data-finals ${plan.finals ? 'checked' : ''}> Enable finals sequence if needed</label>
+      ${plan.finals && !finals.parallel ? `<span class="pkl">Final</span><span><select data-finalone aria-label="Final">
+        <option value="adv">Advantaged final if needed</option>
+        <option value="one" ${plan.finalOne ? 'selected' : ''}>One game final</option></select></span>` : ''}
       ${plan.finals ? `<span></span><span class="pkhelp">${finals.parallel ? 'One game between the two top pools’ winners.'
-        : 'If leader clears by two games, no final. Advantaged final if leader is up by one game, otherwise one game final.'}</span>` : ''}
+        : plan.finalOne ? 'One game between 1st and 2nd, always played, whatever the records.'
+          : 'If leader clears by two games, no final. Advantaged final if leader is up by one game, otherwise one game final.'}</span>` : ''}
     </div>` : '';
-  const fin = plan.finals && finals ? (finals.parallel ? 1 : 2) : 0;
+  const fin = plan.finals && finals ? (finals.parallel || plan.finalOne ? 1 : 2) : 0;
   const total = pv.ok ? pv.rounds.reduce((a, b) => a + b, 0) : 0;
   const extra = [fin ? (fin === 1 ? 'a final' : '2 for finals') : ''].filter(Boolean);
   const optOf = (f) => `<option value="${esc(f.key)}" ${f.key === plan.fmt ? 'selected' : ''}${f.rooms > n ? ' disabled' : ''}>${esc(f.label)}${f.rooms > n ? ` (needs ${f.rooms} rooms)` : ''}</option>`;
@@ -483,7 +487,7 @@ function renderCreator(box, env) {
       ${canAdd ? '<div><button class="linkbtn pkadd" data-add>Add another phase</button></div>' : ''}
       ${finalsBox}
       <div class="sgpreview pktotalbox">${pv.ok
-        ? `<span class="pktotal"><b>${total} rounds</b>${extra.length ? ` <span>plus up to ${extra.join(' and ')}</span>` : ''}</span><span class="muted">${esc(pv.text.split(' · ').slice(1).join(' · '))}</span>`
+        ? `<span class="pktotal"><b>${total} rounds</b>${extra.length ? ` <span>plus ${fin === 1 ? '' : 'up to '}${extra.join(' and ')}</span>` : ''}</span><span class="muted">${esc(pv.text.split(' · ').slice(1).join(' · '))}</span>`
         : `<span class="pkwarn"><span>${esc(pv.text)}</span></span>`}</div>
       <div class="row pkfoot"><button id="schedgen" class="primary" ${pv.ok ? '' : 'disabled'}>Generate</button>
         <span class="sgseed">Seed <b>${ui.opts.seed}</b> <button id="optreroll" class="small">Reroll</button></span></div>
@@ -534,6 +538,7 @@ function renderCreator(box, env) {
   });
   each('data-seed', 'onchange', (el) => { plan.seeding = el.value; }, false);
   each('data-finals', 'onchange', (el) => { plan.finals = el.checked; }, false);
+  each('data-finalone', 'onchange', (el) => { plan.finalOne = el.value === 'one'; }, false);
   each('data-top', 'onchange', (el, p) => { P[p].top = Math.max(1, Number(el.value) || 1); });
   each('data-carry', 'onchange', (el, p) => { P[p].carry = el.checked; });
   each('data-reset', 'onchange', (el, p) => { P[p].reset = el.checked; });
@@ -557,7 +562,7 @@ function renderCreator(box, env) {
     let s;
     try {
       s = buildPlan(env.teams, roomList(env, n), withTies(plan), plan.seeding, ui.opts.seed);
-      if (plan.finals) addFinals(s, planGroups(env.teams, P, plan.seeding, () => 0.5), P);
+      if (plan.finals) addFinals(s, planGroups(env.teams, P, plan.seeding, () => 0.5), P, undefined, plan.finalOne ? 'one' : 'advantaged');
       tagBrackets(s);
       s.format = plan.fmt;
       const saved = JSON.parse(JSON.stringify(plan));
