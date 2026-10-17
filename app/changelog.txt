@@ -7,6 +7,8 @@ Release Notes for 10/17/2026
 - The uploads key under the grid is shorter.
 
 [ READER ]
+- Uploading a game shows "Uploading the game. Please wait." until it lands, and extra clicks don't send it again.
+- An upload that stalls gives up after 45 seconds and asks the moderator to check the connection and upload again.
 - An upload says how far the game got: the furthest question reached. Games begun before this update say nothing, as before.
 
 [ BUZZPOINTS ]

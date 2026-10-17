@@ -227,6 +227,7 @@ function mountMODAQ(id, meta, isNew) {
     localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
   };
 
+  let uploading = null;
   const props = {
     persistState: true,
     storeName: gameKey(store, id),
@@ -235,42 +236,65 @@ function mountMODAQ(id, meta, isNew) {
     customExport: {
       label: 'Upload to qb-td',
       type: 'QBJ',
-      onExport: async (match) => {
+      onExport: (match, ctx) => {
         if (testKey) {
           // MODAQ words its own result dialog ("Export succeeded"), which a
           // test must not show: say it here and leave MODAQ waiting
           alert(testKey === 'bye' ? 'This is the Bye Room, so nothing was uploaded.' : 'This is a test game, so nothing was uploaded.');
           return new Promise(() => {});
         }
-        try {
-          const name = matchFilenames(meta.round, meta.a, meta.b).combined;
-          // games with appended tiebreakers report which ones were read,
-          // so the TD's usage log stays exact (worker logTbUses); logged
-          // protests go up structured, swing included, for the hub's
-          // Protests drawer (the qbj's notes carry them as text only)
-          // (null if the store won't parse: the Worker falls back to the
-          // qbj's notes)
-          const storeText = localStorage.getItem(gameKey(store, id));
-          const protests = gameProtests(storeText, meta, props.gameFormat || null);
-          // questions added mid-packet shift MODAQ's numbering; number them
-          // as if appended so stats keyed on packet numbers line up
-          const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
-          const app = tbBridge.appState;
-          const progress = app && typeof meta.reached === 'number'
-            ? gameProgress(Math.max(meta.reached, app.uiState.cycleIndex + 1), app.game.gameFormat.regulationTossupCount) : null;
-          const body = combinedUpload(qbj, meta.round, storeText,
-            meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests, progress);
-          const out = await pub(
-            `/b/${secret}/upload?round=${meta.round}&name=${encodeURIComponent(name)}`,
-            { method: 'POST', body });
-          if (out && out.error) return { isError: true, status: name + ': ' + out.error };
-          return { isError: false, status: 'uploaded ' + name };
-        } catch (e) {
-          return { isError: true, status: String((e && e.message) || e) };
-        }
+        // a click while an upload is running joins it instead of sending
+        // another; clicks show "Uploading" until it lands (MODAQ's timed
+        // export, if a TD turns it on, stays quiet)
+        if (uploading) return uploading;
+        const shown = !(ctx && ctx.source === 'Timer') && uploadingNote();
+        uploading = uploadGame(match).finally(() => {
+          uploading = null;
+          if (shown) shown.remove();
+        });
+        return uploading;
       },
     },
   };
+  async function uploadGame(match) {
+    try {
+      const name = matchFilenames(meta.round, meta.a, meta.b).combined;
+      // games with appended tiebreakers report which ones were read,
+      // so the TD's usage log stays exact (worker logTbUses); logged
+      // protests go up structured, swing included, for the hub's
+      // Protests drawer (the qbj's notes carry them as text only)
+      // (null if the store won't parse: the Worker falls back to the
+      // qbj's notes)
+      const storeText = localStorage.getItem(gameKey(store, id));
+      const protests = gameProtests(storeText, meta, props.gameFormat || null);
+      // questions added mid-packet shift MODAQ's numbering; number them
+      // as if appended so stats keyed on packet numbers line up
+      const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
+      const app = tbBridge.appState;
+      const progress = app && typeof meta.reached === 'number'
+        ? gameProgress(Math.max(meta.reached, app.uiState.cycleIndex + 1), app.game.gameFormat.regulationTossupCount) : null;
+      const body = combinedUpload(qbj, meta.round, storeText,
+        meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests, progress);
+      // a stalled connection gives up rather than leave "Uploading" up
+      const stop = new AbortController();
+      const timer = setTimeout(() => stop.abort(), UPLOAD_WAIT_MS);
+      let out;
+      try {
+        out = await pub(
+          `/b/${secret}/upload?round=${meta.round}&name=${encodeURIComponent(name)}`,
+          { method: 'POST', body, signal: stop.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (out && out.error) return { isError: true, status: name + ': ' + out.error };
+      return { isError: false, status: 'uploaded ' + name };
+    } catch (e) {
+      if (e && e.name === 'AbortError') {
+        return { isError: true, status: 'the upload took too long. Please check the connection and upload again' };
+      }
+      return { isError: true, status: String((e && e.message) || e) };
+    }
+  }
   if (isNew) {
     // Resume mounts restore everything from the persisted store instead;
     // these props would clobber it.
@@ -716,3 +740,17 @@ async function boot() {
 }
 
 boot();
+
+// how long an upload may take before the reader gives up on it
+const UPLOAD_WAIT_MS = 45000;
+
+// "Uploading the game…" over the reader while an upload runs; it takes
+// the clicks, so a moderator can't send the game again meanwhile
+function uploadingNote() {
+  const el = document.createElement('div');
+  el.className = 'uploading';
+  el.setAttribute('role', 'status');
+  el.innerHTML = '<div class="uploadingcard"><span class="spin" aria-hidden="true"></span>Uploading the game. Please wait.</div>';
+  document.body.appendChild(el);
+  return el;
+}

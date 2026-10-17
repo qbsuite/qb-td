@@ -21,6 +21,16 @@ body:not(.reading) #game, body:not(.reading) #newgame { display: none; }
 /* a bar across the top of the room and of the game, so the link is never mistaken for a room's */
 .teststrip { background: var(--warn); color: var(--bg); padding: 10px 24px; font-size: 15px; text-align: center; }
 .testtag[hidden], .teststrip[hidden] { display: none; }
+/* over the reader while a game uploads (read_main uploadingNote) */
+.uploading {
+  position: fixed; inset: 0; z-index: 2000000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .25); cursor: progress;
+}
+.uploadingcard {
+  display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-radius: 12px;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line); font-size: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .2);
+}
 
 /* ---------- reader: before the game ---------- */
 .rstart {
