@@ -369,10 +369,12 @@ function applySchedDefault() {
       byePicked = { a: $('teama').value, b: $('teamb').value };
     }
     const list = on.length < 2 ? on.join('') : on.slice(0, -1).join(', ') + ' and ' + on[on.length - 1];
-    $('byelist').textContent = !on.length ? `No team is on a bye in round ${selectedRound}.`
+    // a schedule with no byes at all says nothing about them
+    const anyByes = (sched.phases || []).some((ph) => (ph.rounds || []).some((r) => (r.byes || []).length));
+    $('byelist').textContent = !on.length ? (anyByes ? `No team is on a bye in round ${selectedRound}.` : '')
       : on.length === 1 ? `${list} is on a bye in round ${selectedRound}.`
       : on.length > 2 ? `On a bye in round ${selectedRound}: ${list}.` : '';
-    $('byelist').hidden = on.length === 2;
+    $('byelist').hidden = on.length === 2 || !$('byelist').textContent;
   }
   if (schedGame) {
     $('teama').value = schedGame.a;
@@ -609,7 +611,7 @@ async function boot() {
     // a bye room: the TD's room for reading to teams on a bye
     if (testKey === 'bye') {
       $('testtag').textContent = 'Bye Room';
-      $('teststrip').innerHTML = '<b>This is the Bye Room.</b> It is for reading to teams on a bye. Games read here are NOT saved.';
+      $('teststrip').innerHTML = '<b>This is the Bye Room.</b> Games read here are NOT saved.';
       $('start').textContent = 'Start bye-round game';
     }
   }

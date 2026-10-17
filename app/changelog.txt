@@ -28,7 +28,7 @@ Release Notes for 10/16/2026
 - Brackets can be renamed in the schedule editor.
 
 [ SETUP ]
-- A schedule with byes gets a Bye Room, shown below the rooms. Its one link can be shared by several readers.
+- Tournaments get a Bye Room, shown below the rooms, to read packets to teams on a bye or anyone else. Several readers can share its link.
 
 [ READER ]
 - The Bye Room reads any round already played or the round being played, and saves nothing.

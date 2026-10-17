@@ -319,7 +319,7 @@ async function showDetail(quiet = false, held = null) {
   saveLink({ secret: adminSecret, slug: t.slug, name: t.name,
     closes: t.closes, created: t.created });
   await ensureSched(a, t);
-  // a schedule with byes always has a bye room: made here, once
+  // a tournament with rooms always has a bye room: made here, once
   if (await ensureByeRoom(a, t, detail.buckets)) return showDetail(quiet, held);
   // the bye room is kept apart: no room list, schedule or live view has it
   const byeId = byeIdOf(t);
@@ -753,11 +753,11 @@ function byeIdOf(t) {
 }
 const byeLink = (secret) => readLink(secret) + '&test=bye';
 
-// A schedule with byes gets the bye room without being asked. Made once.
+// A tournament with rooms gets the bye room without being asked (it reads
+// packets for teams on a bye, or for anyone else). Made once.
 const byeMade = new Set();
 async function ensureByeRoom(a, t, buckets) {
-  if (byeMade.has(t.slug) || byeIdOf(t) !== null || !sched || !Array.isArray(sched.phases)) return false;
-  if (!sched.phases.some((ph) => (ph.rounds || []).some((r) => (r.byes || []).length))) return false;
+  if (byeMade.has(t.slug) || byeIdOf(t) !== null || !buckets.length) return false;
   byeMade.add(t.slug);
   try {
     const taken = new Set(buckets.map((b) => b.room_name));
