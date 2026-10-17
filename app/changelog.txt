@@ -4,6 +4,7 @@ Release Notes for 10/17/2026
 - The uploads grid keeps its checkmark when a room uploads a game more than once, with a small count beside it.
 - A game uploaded before its last regulation question shows a pie of how far it got, and "on question 3 of 20" in Live now.
 - Orange marks need a look: a missing game, a file that can't be read, uploads that disagree, or a game in progress.
+- The uploads key under the grid is shorter.
 
 [ READER ]
 - An upload says how far the game got: the furthest question reached. Games begun before this update say nothing, as before.

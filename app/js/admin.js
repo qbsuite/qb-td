@@ -2144,7 +2144,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
               + rows.map((b) => `<tr><td class="uroom" title="${esc(b.room_name)}">${esc(b.room_name)}</td>${roundCols.map((n) => gridCell(b, n)).join('')}</tr>${
               cellOpen && cellOpen.bid === b.id ? cellPanel() : ''}`).join('')).join('')}
           </table></div>
-          <div class="muted legend">&#10003; in &middot; <span class="uin">&#10003;<sup class="ucount">3</sup></span> 3 uploads, the newest counts &middot;
+          <div class="muted legend">&#10003; in &middot;
             <span class="upie" style="--p:40%"></span> in progress &middot; &#9675; started &middot; &ndash; missing &middot; ! can&rsquo;t read &middot;
             <span class="warntext">orange</span>: needs a look</div>`
           : ''}
