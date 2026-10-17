@@ -9,4 +9,6 @@ export const tbBridge = {
   addedIds: null, // () => pool question ids already appended to the current game
   onAdd: null,    // ({tu, bo}, base) => record newly appended ids in the game meta
   replace: null,  // 'tossup' | 'bonus' while the dialog is in replace mode
+  getTb: null,    // () => the game meta's tb (read_core tbState), or null
+  setTb: null,    // (tb) => save it in the game meta
 };

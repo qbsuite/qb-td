@@ -205,6 +205,13 @@ function mountMODAQ(id, meta, isNew) {
     meta.tb = tbRecordAdd(meta.tb, base, at || base, sel);
     localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
   };
+  // Replace tossup / Replace bonus record their own changes (read_core
+  // replaceQuestion), held bonuses included
+  tbBridge.getTb = () => meta.tb || null;
+  tbBridge.setTb = (tb) => {
+    meta.tb = tb;
+    localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
+  };
 
   const props = {
     persistState: true,

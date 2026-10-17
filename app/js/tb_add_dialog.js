@@ -16,7 +16,7 @@
 
 import * as React from 'react';
 import { observer } from 'mobx-react-lite';
-import { runInAction } from 'mobx';
+import { runInAction, reaction } from 'mobx';
 import { Checkbox, ChoiceGroup, DialogFooter, PrimaryButton, DefaultButton } from '@fluentui/react';
 import * as AddQuestionsDialogController from 'modaq/src/components/dialogs/AddQuestionsDialogController';
 import * as PacketLoaderController from 'modaq/src/components/PacketLoaderController';
@@ -26,7 +26,8 @@ import { ModalVisibilityStatus } from 'modaq/src/state/ModalVisibilityStatus';
 import { ModalDialog } from 'modaq/src/components/dialogs/ModalDialog';
 import { PacketState } from 'modaq/src/state/PacketState';
 import { tbBridge } from './tb_bridge.js';
-import { tbSelection, readerInsertPoint, addCounts, replaceCheck, afterThrowOut } from './read_core.js';
+import { tbSelection, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion,
+  syncReserved, keepsThrownOut, heldBonusText } from './read_core.js';
 
 const h = React.createElement;
 const strip = (s) => String(s || '').replace(/<[^>]*>/g, '');
@@ -102,37 +103,20 @@ export function openReplace(appState, kind) {
   appState.uiState.dialogState.showAddQuestionsDialog();
 }
 
-// Throw out the question being read, then put `question` (a MODAQ Tossup
-// or Bonus) in its place, recording it for the upload's numbering. Checked
-// before anything changes, so it never needs undoing. Returns an error
-// message, or '' once done.
-function replaceNow(appState, kind, question, id) {
-  const game = appState.game;
-  const ci = appState.uiState.cycleIndex;
-  const cycle = game.cycles[ci];
-  const check = replaceCheck({ cycles: game.cycles, cycleIndex: ci, curB: game.getBonusIndex(ci), kind });
-  if (check.error) return REPLACE_ERRORS[check.error];
-  if (kind === 'tossup') {
-    const t = game.getTossupIndex(ci);
-    cycle.addThrownOutTossup(t);
-    clearThrownOutNegs(appState, cycle, t);
-    appState.uiState.setSelectedWordIndex(-1);
-  } else {
-    cycle.addThrownOutBonus(game.getBonusIndex(ci));
-  }
-  const point = insertPoint(appState, { tossups: kind === 'tossup' ? 1 : 0, bonuses: kind === 'bonus' ? 1 : 0 });
-  if (point.error) return WHERE_ERRORS[point.error]; // replaceCheck rules this out
-  const base = { t: game.packet.tossups.length, b: game.packet.bonuses.length };
-  const ids = kind === 'tossup' ? { tu: [id], bo: [] } : { tu: [], bo: [id] };
-  if (tbBridge.onAdd) tbBridge.onAdd(ids, base, point);
-  insertAt(appState, point, kind === 'tossup' ? [question] : [], kind === 'bonus' ? [question] : []);
-  return '';
+// MODAQ's PacketState from lists of its questions
+function makePacket(tossups, bonuses, name) {
+  const p = new PacketState();
+  p.setTossups(tossups);
+  p.setBonuses(bonuses);
+  p.setName(name);
+  return p;
 }
 
 const REPLACE_ERRORS = {
   none: 'There is no question here to replace.',
-  nobonus: 'There is no bonus being read here. A bonus can be replaced once a team has answered the tossup correctly.',
-  later: 'Later questions in this game already have results, so only the question being read now can be replaced.',
+  nobonus: 'There is no bonus on this question. A bonus can be replaced once a team has answered the tossup correctly.',
+  paired: 'This game format reads a bonus with each tossup, so only the latest question can be replaced.',
+  needbonus: 'Please pick a bonus as well, to read if the replacement tossup is answered.',
 };
 
 const WHERE_ERRORS = {
@@ -146,67 +130,93 @@ const preview = (text, n = 90) => {
   return t.length > n ? t.slice(0, n - 1) + '\u2026' : t;
 };
 
+// One question to pick, as radio options: the pool's ('p:' + id) and a
+// loaded packet file's ('f:' + index), of one kind
+function pickOptions(isTu, pool, file, added) {
+  const qs = pool ? (isTu ? pool.tossups : pool.bonuses) : [];
+  const usesFor = (id) => ((pool && pool.uses) || []).filter((u) => u && u.q === id);
+  const fileQs = file ? (isTu ? file.tossups : file.bonuses) : [];
+  return [
+    ...qs.map((q) => {
+      const heard = usesFor(q.id).map((u) => (u.teams || []).join(' & ') + ' (Round ' + u.round + ')').join('; ');
+      return {
+        key: 'p:' + q.id,
+        disabled: added.has(q.id),
+        text: q.id + ' — ' + (isTu ? strip(q.answer) : (q.answers || []).map(strip).join(' / '))
+          + (added.has(q.id) ? ' (already in this game)' : '') + (heard ? ' · Heard by ' + heard : ''),
+      };
+    }),
+    ...fileQs.map((q, i) => ({
+      key: 'f:' + i,
+      text: (i + 1) + '. ' + (isTu ? preview(q.question) + ' — ' + preview(q.answer, 40)
+        : preview(q.leadin) + ' — ' + (q.parts || []).map((x) => preview(x.answer, 24)).join(' / ')),
+    })),
+  ];
+}
+
+// the MODAQ question and pool id ('' for a file's) a pick names
+function picked(appState, isTu, key, pool, file) {
+  if (key.startsWith('p:')) {
+    const id = key.slice(2);
+    const q = (isTu ? pool.tossups : pool.bonuses).find((x) => x.id === id);
+    if (!q) return null;
+    const { id: _i, from: _f, ...plain } = q;
+    const conv = PacketLoaderController.loadPacket(appState,
+      isTu ? { tossups: [plain] } : { tossups: [], bonuses: [plain] }, appState.game.packet.name);
+    return conv ? { question: isTu ? conv.tossups[0] : conv.bonuses[0], id } : null;
+  }
+  if (key.startsWith('f:') && file) {
+    const q = (isTu ? file.tossups : file.bonuses)[Number(key.slice(2))];
+    return q ? { question: q, id: '' } : null;
+  }
+  return null;
+}
+
 function ReplaceDialog({ appState, kind, onClose }) {
   const [pick, setPick] = React.useState('');
+  const [bonusPick, setBonusPick] = React.useState('');
   const [file, setFile] = React.useState(null); // a loaded packet file's PacketState
   const [error, setError] = React.useState('');
   const pool = tbBridge.pool;
   const added = new Set(tbBridge.addedIds ? tbBridge.addedIds() : []);
   const game = appState.game;
   const ci = appState.uiState.cycleIndex;
-  const check = replaceCheck({ cycles: game.cycles, cycleIndex: ci, curB: game.getBonusIndex(ci), kind });
+  const tb = tbBridge.getTb ? tbBridge.getTb() : null;
+  const check = replaceCheck({ cycles: game.cycles, cycleIndex: ci, kind, tb, paired: !!game.gameFormat.pairTossupsBonuses });
   const isTu = kind === 'tossup';
-  const now = isTu ? game.getTossupIndex(ci) + 1 : game.getBonusIndex(ci) + 1;
-
-  // pool questions ('p:' + id) and the loaded file's ('f:' + index)
-  const poolQs = pool ? (isTu ? pool.tossups : pool.bonuses) : [];
-  const usesFor = (id) => ((pool && pool.uses) || []).filter((u) => u && u.q === id);
-  const fileQs = file ? (isTu ? file.tossups : file.bonuses) : [];
-  const options = [
-    ...poolQs.map((q) => {
-      const heard = usesFor(q.id).map((u) => (u.teams || []).join(' & ') + ' (Round ' + u.round + ')').join('; ');
-      return {
-        key: 'p:' + q.id,
-        disabled: added.has(q.id),
-        text: q.id + ' \u2014 ' + (isTu ? strip(q.answer) : (q.answers || []).map(strip).join(' / '))
-          + (added.has(q.id) ? ' (already in this game)' : '') + (heard ? ' \u00b7 Heard by ' + heard : ''),
-      };
-    }),
-    ...fileQs.map((q, i) => ({
-      key: 'f:' + i,
-      text: (i + 1) + '. ' + (isTu ? preview(q.question) + ' \u2014 ' + preview(q.answer, 40)
-        : preview(q.leadin) + ' \u2014 ' + (q.parts || []).map((p) => preview(p.answer, 24)).join(' / ')),
-    })),
-  ];
+  const cycle = game.cycles[ci];
+  const now = isTu ? game.getTossupIndex(ci) + 1 : ((cycle && cycle.bonusAnswer) ? cycle.bonusAnswer.bonusIndex + 1 : 0);
 
   const replace = () => {
-    let question;
-    let id = '';
-    if (pick.startsWith('p:')) {
-      id = pick.slice(2);
-      const q = poolQs.find((x) => x.id === id);
-      const { id: _i, from: _f, ...plain } = q;
-      const conv = PacketLoaderController.loadPacket(appState,
-        isTu ? { tossups: [plain] } : { tossups: [], bonuses: [plain] }, game.packet.name);
-      if (!conv) { setError('That question could not be read.'); return; }
-      question = isTu ? conv.tossups[0] : conv.bonuses[0];
-    } else if (pick.startsWith('f:')) {
-      question = fileQs[Number(pick.slice(2))];
-    }
-    if (!question) return;
-    const msg = replaceNow(appState, kind, question, id);
-    if (msg) { setError(msg); return; }
+    const main = picked(appState, isTu, pick, pool, file);
+    if (!main) { setError('That question could not be read.'); return; }
+    const extra = check.needBonus ? picked(appState, false, bonusPick, pool, file) : null;
+    if (check.needBonus && !extra) { setError(REPLACE_ERRORS.needbonus); return; }
+    const out = replaceQuestion({
+      game, cycleIndex: ci, kind, question: main.question, id: main.id,
+      bonus: extra && extra.question, bonusId: extra ? extra.id : '',
+      tb, act: runInAction, makePacket,
+    });
+    if (out.error) { setError(REPLACE_ERRORS[out.error] || out.error); return; }
+    if (tbBridge.setTb) tbBridge.setTb(out.tb);
+    if (isTu) appState.uiState.setSelectedWordIndex(-1);
     onClose();
   };
 
   const body = [];
+  const options = pickOptions(isTu, pool, file, added);
   if (check.error) {
     body.push(h('div', { key: 'err' }, REPLACE_ERRORS[check.error]));
   } else {
+    const q = ci + 1;
     body.push(h('div', { key: 'what', style: { marginBottom: 10 } },
-      isTu ? `Tossup ${now} will be thrown out, and the tossup you pick will be read in its place.`
-        : `Bonus ${now} will be thrown out, and the bonus you pick will be read in its place.`));
-    if (poolQs.length) {
+      isTu ? `Tossup ${now} on question ${q} will be thrown out, and the tossup you pick will be read in its place.`
+        : `Bonus ${now} on question ${q} will be thrown out, and the bonus you pick will be read in its place.`));
+    if (check.retro) {
+      body.push(h('div', { key: 'retro', style: { marginBottom: 10, fontSize: 13 } },
+        `Later questions already have results, and they keep them. Please enter the replacement's result on question ${q}.`));
+    }
+    if (pool && (isTu ? pool.tossups : pool.bonuses).length) {
       body.push(h('div', { key: 'hint', style: { marginBottom: 4, fontWeight: 600 } },
         'From the tournament director. Please check with the TD which one to read.'));
     }
@@ -219,18 +229,55 @@ function ReplaceDialog({ appState, kind, onClose }) {
       body.push(h('div', { key: 'nopool', style: { marginBottom: 4 } },
         `There are no ${isTu ? 'tossups' : 'bonuses'} from the tournament director. Please load a packet file and pick one from it.`));
     }
+    if (check.needBonus) {
+      const bonusOptions = pickOptions(false, pool, file, added);
+      body.push(h('div', { key: 'bhint', style: { margin: '14px 0 4px', fontWeight: 600 } },
+        'The bonus to read if the replacement is answered:'));
+      body.push(bonusOptions.length
+        ? h(ChoiceGroup, { key: 'bpick', selectedKey: bonusPick || null, options: bonusOptions,
+          onChange: (e, o) => { setBonusPick(o.key); setError(''); } })
+        : h('div', { key: 'nobpool' }, 'There are no bonuses from the tournament director. Please load a packet file and pick one from it.'));
+    }
     body.push(
       h('div', { key: 'or', style: { margin: '14px 0 4px', fontWeight: 600 } },
-        file ? 'Or load a different packet file:' : 'Or pick one from a packet file:'),
-      h(PacketLoader, { key: 'loader', appState, onLoad: (packet) => { setFile(packet); setPick(''); } }));
+        file ? 'Or load a different packet file:' : 'Or pick from a packet file:'),
+      h(PacketLoader, { key: 'loader', appState, onLoad: (packet) => { setFile(packet); setPick(''); setBonusPick(''); } }));
     if (error) body.push(h('div', { key: 'fail', style: { color: '#a4262c', marginTop: 8 } }, error));
   }
   return [
     h('div', { key: 'body' }, body),
     h(DialogFooter, { key: 'foot' },
-      check.error ? null : h(PrimaryButton, { text: isTu ? 'Replace tossup' : 'Replace bonus', disabled: !pick, onClick: replace }),
+      check.error ? null : h(PrimaryButton, {
+        text: isTu ? 'Replace tossup' : 'Replace bonus',
+        disabled: !pick || (check.needBonus && !bonusPick),
+        onClick: replace,
+      }),
       h(DefaultButton, { text: 'Cancel', onClick: onClose })),
   ];
+}
+
+// A bonus held for a replacement tossup on an earlier question is read if
+// the replacement is answered and otherwise stays thrown out: kept right on
+// each result, and once the game opens (read_core syncReserved). MODAQ's
+// GameBar calls this (build_read.mjs), since it is always on screen and
+// MODAQ unmounts its dialogs, this one included, while none is open.
+export function useHeldBonuses(appState) {
+  React.useEffect(() => reaction(
+    () => appState.game.cycles.map((c) => (c.correctBuzz ? 1 : 0)).join(''),
+    () => {
+      const tb = tbBridge.getTb ? tbBridge.getTb() : null;
+      if (tb && tb.reserve) syncReserved({ game: appState.game, tb, act: runInAction });
+    },
+    { fireImmediately: true }), [appState]);
+}
+
+/** For MODAQ's event log (ThrowOutQuestionCycleItem, patched by
+    build_read.mjs): whether a throw-out offers its undo, and its text. */
+export function keepsThrownOutHere(isTossup, index) {
+  return keepsThrownOut(tbBridge.getTb ? tbBridge.getTb() : null, isTossup, index);
+}
+export function thrownOutText(isTossup, index, text) {
+  return (!isTossup && heldBonusText(tbBridge.getTb ? tbBridge.getTb() : null, index)) || text;
 }
 
 export const AddQuestionsDialog = observer(function AddQuestionsDialog() {

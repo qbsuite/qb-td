@@ -138,7 +138,9 @@ export function tbSelection(pool, ids) {
     the base packet, which is the same thing with the positions implied. */
 export function tbState(tb) {
   if (!tb) return null;
-  if (tb.tuAt || tb.boAt) return { t: tb.t, b: tb.b, tuAt: { ...tb.tuAt }, boAt: { ...tb.boAt } };
+  if (tb.tuAt || tb.boAt) {
+    return { t: tb.t, b: tb.b, tuAt: { ...tb.tuAt }, boAt: { ...tb.boAt }, ...(tb.reserve ? { reserve: { ...tb.reserve } } : {}) };
+  }
   const at = (base, ids) => Object.fromEntries((ids || []).map((id, i) => [base + i, id]));
   return { t: tb.t, b: tb.b, tuAt: at(tb.t, tb.tu), boAt: at(tb.b, tb.bo) };
 }
@@ -147,7 +149,7 @@ export function tbState(tb) {
     before this add; at = the game indices they were inserted at (base.t /
     base.b for an append); sel = {tu, bo} pool ids, '' for packet-file
     questions. Added questions already at or past an insert point move
-    down with it. */
+    down with it, as do bonuses held for a replacement (reserve). */
 export function tbRecordAdd(tb, base, at, sel) {
   const st = tbState(tb) || { t: base.t, b: base.b, tuAt: {}, boAt: {} };
   const place = (map, from, ids) => {
@@ -159,10 +161,14 @@ export function tbRecordAdd(tb, base, at, sel) {
     ids.forEach((id, j) => { out[from + j] = id || ''; });
     return out;
   };
+  const nb = (sel.bo || []).length;
+  const reserve = st.reserve && Object.fromEntries(Object.entries(st.reserve)
+    .map(([ci, k]) => [ci, k >= at.b ? k + nb : k]));
   return {
     t: st.t, b: st.b,
     tuAt: place(st.tuAt, at.t, sel.tu || []),
     boAt: place(st.boAt, at.b, sel.bo || []),
+    ...(reserve && Object.keys(reserve).length ? { reserve } : {}),
   };
 }
 
@@ -279,23 +285,187 @@ export function readerInsertPoint({ cycles, cycleIndex, curT, curB, bonusCount, 
   return { t, b };
 }
 
-/** Whether Replace tossup / Replace bonus (the Actions menu, tb_add_dialog
-    replace mode) can act on the cycle being read: {} or {error}. Replacing
-    throws the question out first, which moves MODAQ on to the next one,
-    and then puts the pick in at that place (readerInsertPoint), so it is
-    read next. A bonus needs a correct buzz on this cycle's tossup ('nobonus').
-    Results on later cycles ('later') would point at the wrong questions once
-    a question goes in before them, as would replacing on a past cycle. */
-export function replaceCheck({ cycles, cycleIndex, curB, kind }) {
+/* ---------- Replace tossup / Replace bonus ----------
+   The Actions menu items (tb_add_dialog replace mode) throw out a question
+   and put one picked question in its place, on the question being read or
+   on any earlier one. MODAQ doesn't store which tossup or bonus a question
+   (cycle) read: it counts them. A cycle reads tossup (cycle + tossups
+   thrown out so far) and bonus (correct buzzes before it + bonuses thrown
+   out so far). So a question put in mid-packet moves the packet down by
+   one under every later cycle, and the question numbers those cycles
+   store (buzzes, throw-outs, protests, bonus answers) move with it.
+
+   A bonus is read only when its tossup is answered, so the count of
+   bonuses depends on results. A tossup replaced on an earlier question,
+   with later questions already played, could go either way, so the TD
+   picks a bonus for it then, held in reserve (tb.reserve: cycle -> game
+   bonus index): read if the replacement is answered, and otherwise kept
+   thrown out, so later questions keep their bonuses (syncReserved). A
+   bonus already read with a thrown-out tossup is thrown out with it. */
+
+const hasResults = (x) => !!(x && (x.correctBuzz || (x.wrongBuzzes || []).length
+  || (x.thrownOutTossups || []).length || (x.thrownOutBonuses || []).length
+  || (x.tossupProtests || []).length || (x.bonusProtests || []).length
+  || (x.bonusAnswer && (x.bonusAnswer.parts || []).some((p) => p && p.points))));
+
+/** Whether a question can be replaced: {error} ('none' | 'nobonus' |
+    'paired'), or {retro, needBonus}. retro: later questions have results;
+    needBonus: a tossup replaced then needs a bonus held for it, unless the
+    question holds one no one has heard yet. A bonus is replaced once its
+    tossup was answered. Formats that pair a bonus with each tossup count
+    bonuses another way, so only the latest question is replaced there. */
+export function replaceCheck({ cycles, cycleIndex, kind, tb, paired }) {
   const c = (cycles || [])[cycleIndex];
   if (!c) return { error: 'none' };
-  if (kind === 'bonus' && (!c.correctBuzz || curB < 0)) return { error: 'nobonus' };
-  const hasResults = (x) => !!(x && (x.correctBuzz || (x.wrongBuzzes || []).length
-    || (x.thrownOutTossups || []).length || (x.thrownOutBonuses || []).length
-    || (x.tossupProtests || []).length || (x.bonusProtests || []).length
-    || (x.bonusAnswer && (x.bonusAnswer.parts || []).some((p) => p && p.points))));
-  for (let i = cycleIndex + 1; i < cycles.length; i++) if (hasResults(cycles[i])) return { error: 'later' };
-  return {};
+  if (kind === 'bonus' && !(c.correctBuzz && c.bonusAnswer)) return { error: 'nobonus' };
+  const retro = cycles.slice(cycleIndex + 1).some(hasResults);
+  if (retro && paired) return { error: 'paired' };
+  const held = ((tbState(tb) || {}).reserve || {})[cycleIndex];
+  return { retro, needBonus: kind === 'tossup' && retro && !(held !== undefined && !c.correctBuzz) };
+}
+
+// the game bonus index cycle ci reads, by MODAQ's count (getBonusIndex
+// without its end-of-packet -1)
+function bonusSlot(cycles, ci) {
+  let n = 0;
+  for (let i = 0; i <= ci; i++) {
+    if (i < ci && cycles[i].correctBuzz) n++;
+    n += (cycles[i].thrownOutBonuses || []).length;
+  }
+  return n;
+}
+
+// Later cycles' stored question numbers, moved down past a question put
+// in at game index `from` (tossups or bonuses).
+function shiftLater(cycles, ci, kind, from) {
+  const up = (i) => (i >= from ? i + 1 : i);
+  for (let j = ci + 1; j < cycles.length; j++) {
+    const c = cycles[j];
+    if (kind === 'tu') {
+      if (c.correctBuzz) c.correctBuzz = { ...c.correctBuzz, tossupIndex: up(c.correctBuzz.tossupIndex) };
+      if (c.wrongBuzzes) c.wrongBuzzes = c.wrongBuzzes.map((b) => ({ ...b, tossupIndex: up(b.tossupIndex) }));
+      if (c.thrownOutTossups) c.thrownOutTossups = c.thrownOutTossups.map((x) => ({ ...x, questionIndex: up(x.questionIndex) }));
+      if (c.tossupProtests) c.tossupProtests = c.tossupProtests.map((x) => ({ ...x, questionIndex: up(x.questionIndex) }));
+    } else {
+      if (c.bonusAnswer) c.bonusAnswer = { ...c.bonusAnswer, bonusIndex: up(c.bonusAnswer.bonusIndex) };
+      if (c.thrownOutBonuses) c.thrownOutBonuses = c.thrownOutBonuses.map((x) => ({ ...x, questionIndex: up(x.questionIndex) }));
+      if (c.bonusProtests) c.bonusProtests = c.bonusProtests.map((x) => ({ ...x, questionIndex: up(x.questionIndex) }));
+    }
+  }
+}
+
+const throwBonus = (c, k) => {
+  if (!(c.thrownOutBonuses || []).some((x) => x.questionIndex === k)) {
+    c.thrownOutBonuses = [...(c.thrownOutBonuses || []), { questionIndex: k }];
+  }
+};
+
+/** Replace the tossup or bonus of cycle `cycleIndex` with `question` (a
+    MODAQ Tossup / Bonus; `id` its pool id, '' for a packet file's), and for
+    a tossup replaced on an earlier question, hold `bonus` (`bonusId`) for
+    it. game: MODAQ's GameState; act(fn) runs fn as one MobX action;
+    makePacket(tossups, bonuses, name) builds a PacketState. Checked first,
+    and nothing changes on an error. Returns {error} or {tb}: the game
+    meta's new tb, to save. */
+export function replaceQuestion({ game, cycleIndex: ci, kind, question, id = '', bonus = null, bonusId = '', tb, act, makePacket }) {
+  const cycles = game.cycles;
+  const check = replaceCheck({ cycles, cycleIndex: ci, kind, tb, paired: !!game.gameFormat.pairTossupsBonuses });
+  if (check.error) return check;
+  if (check.needBonus && !bonus) return { error: 'needbonus' };
+  const c = cycles[ci];
+  const packet = game.packet;
+  let st = tbState(tb) || { t: packet.tossups.length, b: packet.bonuses.length, tuAt: {}, boAt: {} };
+  const reserve = { ...(st.reserve || {}) };
+  act(() => {
+    let tuAt = null;
+    let boAt = null;
+    let held = false;
+    // the bonus read with this question, now thrown out (and no longer held)
+    const voidBonus = (k) => {
+      throwBonus(c, k);
+      if (c.bonusProtests) c.bonusProtests = c.bonusProtests.filter((x) => x.questionIndex !== k);
+      if (reserve[ci] === k) delete reserve[ci];
+    };
+    if (kind === 'tossup') {
+      const t = game.getTossupIndex(ci);
+      const heard = c.correctBuzz && c.bonusAnswer ? c.bonusAnswer.bonusIndex : null;
+      c.addThrownOutTossup(t); // MODAQ drops its correct buzz and bonus answer
+      const next = afterThrowOut(c, t);
+      c.wrongBuzzes = next.wrongBuzzes;
+      c.tossupProtests = next.tossupProtests;
+      if (next.changed) c.updateNeg(game.gameFormat);
+      if (heard !== null && heard >= 0) voidBonus(heard);
+      tuAt = t + 1;
+      if (check.needBonus) { boAt = bonusSlot(cycles, ci); held = true; }
+    } else {
+      const k = c.bonusAnswer.bonusIndex;
+      const team = c.bonusAnswer.receivingTeamName;
+      const parts = (c.bonusAnswer.parts || []).map(() => ({ teamName: '', points: 0 }));
+      voidBonus(k);
+      boAt = k + 1;
+      c.bonusAnswer = { bonusIndex: k + 1, correctParts: [], receivingTeamName: team, parts };
+    }
+    if (tuAt !== null) shiftLater(cycles, ci, 'tu', tuAt);
+    if (boAt !== null) shiftLater(cycles, ci, 'bo', boAt);
+    const base = { t: packet.tossups.length, b: packet.bonuses.length };
+    const tuNew = tuAt !== null ? [question] : [];
+    const boNew = boAt !== null ? [kind === 'bonus' ? question : bonus] : [];
+    st = tbRecordAdd({ ...st, reserve }, base, { t: tuAt ?? base.t, b: boAt ?? base.b },
+      { tu: tuNew.map(() => id), bo: boNew.map(() => (kind === 'bonus' ? id : bonusId)) });
+    if (held) st.reserve = { ...(st.reserve || {}), [ci]: boAt };
+    const ins = (list, i, more) => (i === null ? list : [...list.slice(0, i), ...more, ...list.slice(i)]);
+    game.loadPacket(makePacket(ins(packet.tossups, tuAt, tuNew), ins(packet.bonuses, boAt, boNew), packet.name));
+    c.updateIfNeeded();
+  });
+  syncReserved({ game, tb: st, act });
+  return { tb: st };
+}
+
+/** Keep each held bonus right for its question's result: read (not thrown
+    out, and the bonus answer's) when the replacement was answered, else
+    thrown out so later questions keep theirs. Run after any change to
+    the game (tb_add_dialog runs it on every result). */
+export function syncReserved({ game, tb, act }) {
+  const reserve = ((tbState(tb) || {}).reserve) || {};
+  const todo = Object.entries(reserve).filter(([ci, k]) => {
+    const c = game.cycles[ci];
+    if (!c) return false;
+    const thrown = (c.thrownOutBonuses || []).some((x) => x.questionIndex === k);
+    return c.correctBuzz ? thrown || (c.bonusAnswer && c.bonusAnswer.bonusIndex !== k) : !thrown;
+  });
+  if (!todo.length) return false;
+  act(() => {
+    for (const [ci, k] of todo) {
+      const c = game.cycles[ci];
+      if (c.correctBuzz) {
+        const rest = (c.thrownOutBonuses || []).filter((x) => x.questionIndex !== k);
+        c.thrownOutBonuses = rest.length ? rest : undefined;
+        if (c.bonusAnswer) c.bonusAnswer = { ...c.bonusAnswer, bonusIndex: k };
+      } else {
+        throwBonus(c, k);
+      }
+      c.updateIfNeeded();
+    }
+  });
+  return true;
+}
+
+/** Whether a throw-out belongs to a replacement, so MODAQ's event log
+    offers no undo for it: undoing it would leave the replacement in the
+    packet and move later questions onto the wrong tossups and bonuses. */
+export function keepsThrownOut(tb, isTossup, index) {
+  const st = tbState(tb);
+  if (!st) return false;
+  if (isTossup) return st.tuAt[index + 1] !== undefined;
+  return st.boAt[index + 1] !== undefined || Object.values(st.reserve || {}).includes(index);
+}
+
+/** The event log's line for a bonus held for a replacement that wasn't
+    answered: it was never read, so it isn't "thrown out". */
+export function heldBonusText(tb, index) {
+  const st = tbState(tb);
+  return st && Object.values(st.reserve || {}).includes(index)
+    ? `Bonus #${index + 1} held for the replacement tossup` : null;
 }
 
 /** A cycle's negs and tossup protests once tossup `t` is thrown out:

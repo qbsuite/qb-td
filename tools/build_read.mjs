@@ -40,13 +40,22 @@ const REPLACE_ITEMS = `                {
                     disabled: appState.game.cycles.length === 0,
                 },
 `;
+// ...and the GameBar, always on screen, keeps bonuses held for
+// replacements right (tb_add_dialog useHeldBonuses).
+const GAMEBAR_STATE = /(const appState = StateContext_1\.useAppState\(\);)(\r?\n)/;
 const replaceMenuPlugin = {
   name: 'qbtd-replace-menu',
   setup(build) {
     build.onLoad({ filter: /[/\\]modaq[/\\]src[/\\]components[/\\]GameBar\.js$/ }, async (args) => {
       const text = await readFile(args.path, 'utf8');
-      if (!MENU_END.test(text)) throw new Error('build_read: MODAQ GameBar.js menu changed; update the Replace items patch');
-      return { contents: text.replace(MENU_END, (m) => REPLACE_ITEMS + m), loader: 'js' };
+      if (!MENU_END.test(text) || (text.match(new RegExp(GAMEBAR_STATE, 'g')) || []).length !== 1) {
+        throw new Error('build_read: MODAQ GameBar.js changed; update the Replace items patch');
+      }
+      return {
+        contents: text.replace(MENU_END, (m) => REPLACE_ITEMS + m)
+          .replace(GAMEBAR_STATE, (m, line, nl) => `${line}${nl}    require("./dialogs/AddQuestionsDialog").useHeldBonuses(appState);${nl}`),
+        loader: 'js',
+      };
     });
   },
 };
@@ -70,6 +79,31 @@ const throwOutPlugin = {
   },
 };
 
+// MODAQ's event log: a throw-out that belongs to a replacement offers no
+// undo (undoing it would move later questions onto the wrong tossups and
+// bonuses), and a bonus held for a replacement nobody answered says so
+// (tb_add_dialog keepsThrownOutHere / thrownOutText).
+const EVENT_TEXT = /const text = `Threw out \$\{questionType\} #\$\{props\.thrownOutEvent\.questionIndex \+ 1\}`;/;
+const EVENT_UNDO = /if \(props\.isLastThrownOutQuestion\) \{/;
+const throwOutEventPlugin = {
+  name: 'qbtd-throw-out-event',
+  setup(build) {
+    build.onLoad({ filter: /[/\\]modaq[/\\]src[/\\]components[/\\]cycleItems[/\\]ThrowOutQuestionCycleItem\.js$/ }, async (args) => {
+      const text = await readFile(args.path, 'utf8');
+      if (!EVENT_TEXT.test(text) || !EVENT_UNDO.test(text)) {
+        throw new Error('build_read: MODAQ ThrowOutQuestionCycleItem.js changed; update the event log patch');
+      }
+      const ours = 'require("../dialogs/AddQuestionsDialog")';
+      return {
+        contents: text
+          .replace(EVENT_TEXT, (m) => `const text = ${ours}.thrownOutText(props.isTossup, props.thrownOutEvent.questionIndex, ${m.slice('const text = '.length, -1)});`)
+          .replace(EVENT_UNDO, `if (props.isLastThrownOutQuestion && !${ours}.keepsThrownOutHere(props.isTossup, props.thrownOutEvent.questionIndex)) {`),
+        loader: 'js',
+      };
+    });
+  },
+};
+
 await esbuild.build({
   entryPoints: [path.join(root, 'app', 'js', 'read_main.js')],
   bundle: true,
@@ -78,5 +112,5 @@ await esbuild.build({
   outfile: path.join(root, 'app', 'js', 'read.bundle.js'),
   define: { 'process.env.NODE_ENV': '"production"' },
   logLevel: 'warning',
-  plugins: [tbDialogPlugin, replaceMenuPlugin, throwOutPlugin],
+  plugins: [tbDialogPlugin, replaceMenuPlugin, throwOutPlugin, throwOutEventPlugin],
 });

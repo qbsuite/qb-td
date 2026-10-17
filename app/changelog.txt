@@ -1,5 +1,10 @@
 Release Notes for 10/17/2026
 
+[ READER ]
+- Replace tossup and Replace bonus work on earlier questions too. Later questions keep their results.
+- A tossup replaced on an earlier question holds a bonus, read only if the replacement is answered.
+- A question can be replaced again, and a tossup and then its bonus. A replacement's throw-outs can't be undone by mistake.
+
 [ STATS ]
 - Once playoffs or finals are played, Classic stats and the HTML report go stage by stage, as YellowFruit does.
 - Standings show each stage's pools, where teams advanced to, and every team's whole day; games show their stage and carryover.
