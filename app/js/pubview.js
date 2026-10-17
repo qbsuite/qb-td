@@ -18,6 +18,7 @@ import { dedupeMatches } from '../engine/stats.js';
 import { buildReport, reportData } from '../engine/report.js';
 import { mountReport, reportPlace } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
+import { scheduleFinished } from '../engine/finals.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes } from '../engine/buzz.js';
 import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
@@ -420,6 +421,16 @@ function scheduleTeams() {
 // and frozen copies carry only current_round.
 function liveRound() {
   return Number.isInteger(state.live_round) ? state.live_round : state.current_round;
+}
+// The tournament is over: every scheduled game is in (finals.js
+// scheduleFinished). Then nothing is live: no Now view, no Live now.
+let finishedFor = null;
+function finished() {
+  if (!schedule || !matches.length) return false;
+  if (!finishedFor || finishedFor.schedule !== schedule || finishedFor.matches !== matches) {
+    finishedFor = { schedule, matches, value: scheduleFinished(schedule, dedupeMatches(matches)) };
+  }
+  return finishedFor.value;
 }
 
 function renderSchedule(box) {
@@ -966,7 +977,30 @@ const markTags = (x) => (x.ug ? '<span class="ntag" title="Undergraduate">UG</sp
   + (x.d2 ? '<span class="ntag d2" title="Division II">DII</span>' : '');
 const markWords = (x) => [x.ug && 'Undergraduate', x.d2 && 'Division II'].filter(Boolean).join(', ');
 
-function newStandings(rd, ids, vals, pp) {
+// The New layout's stage pick: a stage's name, or 'combined'; null until
+// the viewer picks (pickStage then opens the stage being played)
+let statStage = null;
+// the stages offered, latest first, each with its own rounds (Combined
+// needs the final places, so no stages without them)
+function statStages(all) {
+  if (!all.stageStandings || !all.combined) return [];
+  const out = [];
+  for (const sec of all.stageStandings) if (!out.some((x) => x.name === sec.stage)) out.push({ name: sec.stage, own: sec.own });
+  return out;
+}
+// the viewer's pick while it's offered; else Combined once the tournament
+// is over, or the stage of the round being played, or the latest. A grid
+// is one stage's games: never Combined
+function pickStage(stages, grid) {
+  if (!stages.length) return null;
+  const offered = (v) => (v === 'combined' ? !grid : stages.some((x) => x.name === v));
+  if (statStage && offered(statStage)) return statStage;
+  if (finished() && !grid) return 'combined';
+  const cur = liveRound();
+  return (stages.find((x) => x.own && x.own.includes(cur)) || stages[0]).name;
+}
+
+function newStandings(rd, ids, vals, pp, { chips = '', stage = null } = {}) {
   const table = (teams, ranked) => `<div class="tablewrap"><table class="nstats">
     <thead><tr><th class="nrkcol"></th><th class="name nstick">Team</th><th class="num g0">W</th><th class="num">L</th>${rd.anyTies ? '<th class="num">T</th>' : ''}
       <th class="num g0" title="Points scored in regulation per ${rd.regTossups} regulation tossups heard">${pp}</th>
@@ -983,7 +1017,12 @@ function newStandings(rd, ids, vals, pp) {
   // by stage and pool, as the Classic report heads them: the latest stage
   // first, a table per pool counting its stage's games (and the games
   // carried into it), ranked as YF ranks them
-  if (rd.stageStandings) return stagedStandings(rd, ids, table);
+  if (stage === 'combined') {
+    const views = rd.stageStandings.some((sec) => sec.pools.length > 1)
+      ? `<span class="poolsep"></span>${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], 'table', 'standview')}` : '';
+    return `<div class="poolbar">${chips}${views}</div>${table(rd.combined, true)}`;
+  }
+  if (rd.stageStandings) return stagedStandings(rd, ids, table, { chips, stage });
   // a schedule the stages can't be read from: per prelim pool, as before;
   // teams in none go last
   const pools = (schedule && schedule.pools) || {};
@@ -1016,13 +1055,14 @@ function shortTeam(name) {
 
 // The standings by stage: a heading per stage when there are several, a
 // table (or grid) per pool. One switch, Table or Grid, for every pool.
-function stagedStandings(rd, ids, table) {
-  const secs = rd.stageStandings;
+function stagedStandings(rd, ids, table, { chips = '', stage = null } = {}) {
+  const secs = stage ? rd.stageStandings.filter((sec) => sec.stage === stage) : rd.stageStandings;
   const anyPools = secs.some((sec) => sec.pools.length > 1);
   if (!standView) standView = readPref(STAND_VIEW_KEY) === 'grid' ? 'grid' : 'table';
   const grid = standView === 'grid' && anyPools;
   const row = new Map(rd.teams.map((t) => [t.name, t]));
-  return (anyPools ? `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}</div>` : '')
+  const views = anyPools ? chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview') : '';
+  return (chips || views ? `<div class="poolbar">${chips}${chips && views ? '<span class="poolsep"></span>' : ''}${views}</div>` : '')
     + secs.map((sec) => `${secs.length > 1 ? `<h2 class="stagehead">${esc(sec.name)}</h2>` : ''}${grid
       ? poolGrids(rd, ids, sec.pools.map((pl) => [pl.name, pl.teams.map((t) => row.get(t.name)).filter(Boolean), pl.rounds]))
       : sec.pools.map((pl) => `${sec.pools.length > 1 ? `<h3 class="poolhead">${esc(pl.name)}</h3>` : ''}${table(pl.teams, true)}`).join('')}`).join('');
@@ -1382,16 +1422,30 @@ window.addEventListener('resize', () => {
 
 function renderNewStats(box) {
   // the schedule too, so standings go by stage and pool as Classic's do
-  const rd = reportData({ name: state.name, matches: dedupeMatches(matches), roster,
-    settings: effectiveFormat(state.format), schedule });
+  const settings = effectiveFormat(state.format);
+  const all = reportData({ name: state.name, matches: dedupeMatches(matches), roster, settings, schedule });
+  // Prelims / Playoffs / Combined: a stage's pages count its own games
+  // (its standings, as Classic's, also those carried into it); Combined is
+  // the whole day, its standings every team in its final place
+  const stages = statStages(all);
+  if (!standView) standView = readPref(STAND_VIEW_KEY) === 'grid' ? 'grid' : 'table';
+  const stage = pickStage(stages, statsSec === 'standings' && standView === 'grid');
+  const own = stage && stage !== 'combined' ? stages.find((x) => x.name === stage).own : null;
+  const rd = own ? reportData({ name: state.name, matches: dedupeMatches(matches).filter((m) => own.includes(m.round)),
+    roster, settings, schedule }) : all;
   const ids = newIds(rd);
   const vals = rd.vals.filter((v) => v !== 0);
   const pp = `PP${rd.regTossups}TUH`;
-  const draw = { standings: () => newStandings(rd, ids, vals, pp), individuals: () => newIndividuals(rd, ids, vals, pp),
-    games: () => newGames(rd, ids, vals), teams: () => newTeams(rd, ids, vals, pp),
-    players: () => newPlayers(rd, ids, vals), rounds: () => newRounds(rd, ids) };
+  const grid = statsSec === 'standings' && standView === 'grid';
+  const chips = stages.length ? chipsHtml([...stages.map((x) => ({ v: x.name, label: x.name })),
+    { v: 'combined', label: 'Combined', off: grid }], stage, 'statstage') : '';
+  const top = (html) => (chips ? `<div class="poolbar">${chips}</div>` : '') + html;
+  const draw = { standings: () => newStandings(stage ? all : rd, ids, vals, pp, { chips, stage }), individuals: () => top(newIndividuals(rd, ids, vals, pp)),
+    games: () => top(newGames(rd, ids, vals)), teams: () => top(newTeams(rd, ids, vals, pp)),
+    players: () => top(newPlayers(rd, ids, vals)), rounds: () => top(newRounds(rd, ids)) };
   box.innerHTML = (draw[statsSec] || draw.standings)();
   wire(box, 'standview', (v) => { standView = v; savePref(STAND_VIEW_KEY, v); });
+  wire(box, 'statstage', (v) => { statStage = v; });
   wireSheetToggle();
   fitTables(box);
   // a followed link: mark where it landed, with the way back (a round's

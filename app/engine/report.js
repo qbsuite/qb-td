@@ -455,7 +455,7 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
   const hasNegs = vals.some((v) => v < 0);
 
   return {
-    name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks, phaseName, pools, stages,
+    name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks, phaseName, pools, stages, schedule,
     games, rounds, perTeam, hasPowers, hasNegs, regTossups, trackUG, trackDiv2,
   };
 }
@@ -590,6 +590,62 @@ function stageSections(m) {
     out.push({ kind: 'stage', name: both ? `${st.name} Only` : st.name, st, tables: forStage(st, st.carriedIn) });
   }
   return out;
+}
+
+// Every team in its final place, for the New layout's Combined standings:
+// the latest stage's brackets in the schedule's order, each team at its
+// place in its bracket; then the teams an earlier stage ended, by their
+// place in their pool, then winning percentage, then points per tossup;
+// and the last final played sets 1st and 2nd. [{name, rank}], rank as
+// rankTeams writes it ("3", "4=").
+function finalPlacings(m) {
+  const brackets = (m.schedule && m.schedule.brackets) || [];
+  const at = (name) => { const i = brackets.findIndex((b) => b.name === name); return i < 0 ? Infinity : i; };
+  // latest first; a stage shown as Total and Only places by its Total. One
+  // stage of pools (the prelims so far): no later stage, so its pools mix
+  const all = m.stages ? stageSections(m) : [];
+  const secs = m.stages ? all.filter((x) => x.kind === 'total' || !all.some((y) => y.kind === 'total' && y.st === x.st))
+    : [{ none: true }, { tables: m.pools.map((pl) => ({ pl, teams: pl.teams, ranks: pl.ranks })) }];
+  const out = []; // {name, tie}: teams with one tie key share a place
+  const seen = new Set();
+  secs.forEach((sec, si) => {
+    if (sec.none) return;
+    const tables = sec.tables.slice().sort((a, b) => at(a.pl.name) - at(b.pl.name));
+    if (si === 0) {
+      for (const { pl, teams, ranks } of tables) {
+        teams.forEach((t, i) => {
+          if (seen.has(t.name)) return;
+          seen.add(t.name);
+          out.push({ name: t.name, tie: String(ranks[i]).endsWith('=') ? pl.name + '|' + ranks[i] : null });
+        });
+      }
+      return;
+    }
+    const rest = [];
+    for (const { teams } of tables) teams.forEach((t, i) => { if (!seen.has(t.name)) rest.push({ t, place: i }); });
+    const num = (x) => (Number.isNaN(x) ? -1 : x);
+    rest.sort((a, b) => a.place - b.place || num(winPct(b.t)) - num(winPct(a.t)) || num(pptuh(b.t)) - num(pptuh(a.t)));
+    for (const x of rest) { seen.add(x.t.name); out.push({ name: x.t.name, tie: null }); }
+  });
+  // the finals: the winner of the last final played first, the other second
+  const finals = (m.stages ? m.stages.list : []).filter((st) => st.type === 'Finals').flatMap((st) => st.rounds.flatMap((r) => r.games));
+  const last = finals.slice().sort((a, b) => a.round - b.round).pop();
+  if (last) {
+    const [a, b] = last.teams;
+    const res = resultOf(a, b);
+    if (res === 'W' || res === 'L') {
+      const [win, lose] = res === 'W' ? [a.name, b.name] : [b.name, a.name];
+      const others = out.filter((x) => x.name !== win && x.name !== lose);
+      out.splice(0, out.length, { name: win, tie: null }, { name: lose, tie: null }, ...others);
+    }
+  }
+  // places: shared by a run of one tie key, written "4="
+  return out.map((x, i) => {
+    let first = i;
+    while (x.tie && first > 0 && out[first - 1].tie === x.tie) first--;
+    const shared = x.tie && ((i > 0 && out[i - 1].tie === x.tie) || (i + 1 < out.length && out[i + 1].tie === x.tie));
+    return { name: x.name, rank: String(first + 1) + (shared ? '=' : '') };
+  });
 }
 
 // YF's standings for a tournament in stages: finals results, then each
@@ -1063,16 +1119,20 @@ export function reportData(opts) {
       const S = m.stages;
       const base = [...roundsOf(sec.st), ...(sec.kind === 'total' ? roundsOf(S.list.find((x) => x.type === 'Prelim')) : [])];
       const earlier = S.list.slice(0, S.list.indexOf(sec.st)).filter((x) => x.full).flatMap(roundsOf);
-      return { name: sec.name, pools: sec.tables.map(({ pl, teams, ranks }) => ({
+      return { name: sec.name, stage: sec.st.name, own: roundsOf(sec.st), pools: sec.tables.map(({ pl, teams, ranks }) => ({
         name: pl.name, rounds: [...new Set([...base, ...(pl.carry ? earlier : [])])].sort((a, b) => a - b),
         teams: teams.map((t, i) => standRow(t, ranks[i])) })) };
     })
-    : m.pools ? [{ name: m.phaseName, pools: m.pools.map((pl) => ({ name: pl.name, rounds: null,
+    : m.pools ? [{ name: m.phaseName, stage: m.phaseName, own: null, pools: m.pools.map((pl) => ({ name: pl.name, rounds: null,
       teams: pl.teams.map((t, i) => standRow(t, pl.ranks[i])) })) }]
       : null;
+  // Combined: each team's whole day, in its final place
+  const byName = new Map(m.teams.map((t) => [t.name, t]));
+  const combined = m.stages || m.pools
+    ? finalPlacings(m).filter((x) => byName.has(x.name)).map((x) => standRow(byName.get(x.name), x.rank)) : null;
   return {
     name: m.name, vals: m.vals, regTossups: m.regTossups, anyTies: m.anyTies,
-    trackUG: m.trackUG, trackDiv2: m.trackDiv2, stageStandings,
+    trackUG: m.trackUG, trackDiv2: m.trackDiv2, stageStandings, combined,
     hasPowers: m.hasPowers, hasNegs: m.hasNegs,
     teams: m.teams.map((t, i) => {
       const pct = winPct(t);

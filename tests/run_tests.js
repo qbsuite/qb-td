@@ -2145,6 +2145,36 @@ test('stats pick: any stages, or the finished rounds, export cleanly — both Ye
   assert.ok(STAGED.filter((x) => x.pick).length >= 7);
 });
 
+test('Combined standings: the final decides 1st and 2nd, then the playoff brackets in order, each team at its place', () => {
+  const data = (key) => {
+    const sc = STAGED.find((x) => x.key === key);
+    const matches = dedupeMatches(sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));
+    return { sc, matches, rd: reportData({ name: sc.name, matches, roster: parseRoster(sc.roster), schedule: sc.schedule }) };
+  };
+  // mid-playoffs, no final: the top bracket's table, then the bottom one's
+  let { rd } = data('playoffs');
+  const play = rd.stageStandings.find((x) => x.stage === 'Playoffs').pools;
+  assert.deepEqual(rd.combined.map((t) => t.name), [...play[0].teams, ...play[1].teams].map((t) => t.name));
+  assert.equal(rd.combined.length, 12);
+  assert.ok(rd.combined.slice(6).every((t) => Number.parseInt(t.rank, 10) >= 7), 'the second bracket starts at 7th');
+  // with the final played: its winner 1st, the other finalist 2nd, the rest in order
+  const f = data('finals');
+  const last = f.matches.filter((m) => m.round === 9)[0];
+  const win = last.teams[0].points > last.teams[1].points ? last.teams[0].name : last.teams[1].name;
+  const lose = last.teams.find((t) => t.name !== win).name;
+  assert.deepEqual(f.rd.combined.slice(0, 2).map((t) => [t.rank, t.name]), [['1', win], ['2', lose]]);
+  const top = f.rd.stageStandings.find((x) => x.stage === 'Playoffs').pools[0].teams.map((t) => t.name).filter((n) => n !== win && n !== lose);
+  assert.deepEqual(f.rd.combined.slice(2, 6).map((t) => t.name), top);
+  // whole-day records: every game each team played
+  const games = (n) => f.matches.filter((m) => m.teams.some((t) => t.name === n)).length;
+  for (const t of f.rd.combined) assert.equal(t.w + t.l + t.t, games(t.name), t.name);
+  // prelims only: one stage, its pools mixed by place
+  ({ rd } = data('pools'));
+  assert.equal(rd.combined.length, 12);
+  const firsts = rd.stageStandings[0].pools.map((p) => p.teams[0].name);
+  assert.deepEqual(rd.combined.slice(0, 2).map((t) => t.name).sort(), firsts.sort(), 'the pool winners first');
+});
+
 test('New layout standings match Classic\'s, stage by stage and pool by pool, in each staged scenario', () => {
   // Classic's standings page as [{stage, pools: [{name, teams}]}]; Finals
   // (result lines) and Cumulative (every team together) are Classic's own
