@@ -1,5 +1,10 @@
 Release Notes for 10/17/2026
 
+[ READER ]
+- Actions has Replace tossup and Replace bonus. The question being read is thrown out, and the one you pick is read in its place.
+- The replacement comes from the TD's questions or from one question of a packet file.
+- Throwing out a tossup also removes its negs, so a neg on the replacement counts.
+
 [ EXPORTS ]
 - The HTML report can be downloaded as six separate files as well as a zip.
 

@@ -279,6 +279,38 @@ export function readerInsertPoint({ cycles, cycleIndex, curT, curB, bonusCount, 
   return { t, b };
 }
 
+/** Whether Replace tossup / Replace bonus (the Actions menu, tb_add_dialog
+    replace mode) can act on the cycle being read: {} or {error}. Replacing
+    throws the question out first, which moves MODAQ on to the next one,
+    and then puts the pick in at that place (readerInsertPoint), so it is
+    read next. A bonus needs a correct buzz on this cycle's tossup ('nobonus').
+    Results on later cycles ('later') would point at the wrong questions once
+    a question goes in before them, as would replacing on a past cycle. */
+export function replaceCheck({ cycles, cycleIndex, curB, kind }) {
+  const c = (cycles || [])[cycleIndex];
+  if (!c) return { error: 'none' };
+  if (kind === 'bonus' && (!c.correctBuzz || curB < 0)) return { error: 'nobonus' };
+  const hasResults = (x) => !!(x && (x.correctBuzz || (x.wrongBuzzes || []).length
+    || (x.thrownOutTossups || []).length || (x.thrownOutBonuses || []).length
+    || (x.tossupProtests || []).length || (x.bonusProtests || []).length
+    || (x.bonusAnswer && (x.bonusAnswer.parts || []).some((p) => p && p.points))));
+  for (let i = cycleIndex + 1; i < cycles.length; i++) if (hasResults(cycles[i])) return { error: 'later' };
+  return {};
+}
+
+/** A cycle's negs and tossup protests once tossup `t` is thrown out:
+    those on it go (tb_add_dialog clearThrownOutNegs). undefined for none
+    left, as MODAQ keeps them. */
+export function afterThrowOut(cycle, t) {
+  const negs = (cycle.wrongBuzzes || []).filter((b) => b.tossupIndex !== t);
+  const protests = (cycle.tossupProtests || []).filter((p) => p.questionIndex !== t);
+  return {
+    wrongBuzzes: negs.length ? negs : undefined,
+    tossupProtests: protests.length ? protests : undefined,
+    changed: negs.length !== (cycle.wrongBuzzes || []).length,
+  };
+}
+
 /** What the Add questions dialog would add, for readerInsertPoint: the
     picked pool questions, or a loaded file's when nothing is picked.
     With neither yet, "Here" is judged as for a tossup. Bonuses alone

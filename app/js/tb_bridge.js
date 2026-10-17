@@ -8,4 +8,5 @@ export const tbBridge = {
   pool: null,     // normalized tiebreaker pool ({tossups, bonuses, uses}), or null
   addedIds: null, // () => pool question ids already appended to the current game
   onAdd: null,    // ({tu, bo}, base) => record newly appended ids in the game meta
+  replace: null,  // 'tossup' | 'bonus' while the dialog is in replace mode
 };

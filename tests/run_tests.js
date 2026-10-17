@@ -37,7 +37,7 @@ import { eachLimit } from '../app/js/limit.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -2976,6 +2976,193 @@ test('addCounts: a replacement bonus can go Here after a thrown-out bonus', () =
   assert.deepEqual(addCounts(false, { tossups: [], bonuses: [] }, { tossups: [], bonuses: [{}] }), { tossups: 0, bonuses: 1 });
   // nothing yet: judged as a tossup
   assert.deepEqual(addCounts(false, { tossups: [], bonuses: [] }, null), { tossups: 1, bonuses: 0 });
+});
+
+/* ---------- Replace tossup / Replace bonus, on MODAQ's own game state ----------
+   The steps tb_add_dialog's replaceNow takes: check, throw out, find the
+   reader's place, record the add, insert. */
+const modaqRequire = createRequire(import.meta.url);
+const { GameState: MGame } = modaqRequire('modaq/src/state/GameState.js');
+const { PacketState: MPacket, Tossup: MTossup, Bonus: MBonus } = modaqRequire('modaq/src/state/PacketState.js');
+const { Player: MPlayer } = modaqRequire('modaq/src/state/TeamState.js');
+const { ACFGameFormat } = modaqRequire('modaq/src/state/GameFormats.js');
+const { toQBJ } = modaqRequire('modaq/src/qbj/QBJ.js');
+function replaceGame() {
+  const tu = (i, tag = 'P') => new MTossup(`${tag}${i} words to buzz on`, `${tag}${i} answer`);
+  const bo = (i, tag = 'P') => new MBonus(`${tag}B${i}`, [1, 2, 3].map((k) => ({ question: 'part ' + k, answer: 'a', value: 10 })));
+  const packet = new MPacket();
+  packet.setTossups(Array.from({ length: 20 }, (_, i) => tu(i + 1)));
+  packet.setBonuses(Array.from({ length: 20 }, (_, i) => bo(i + 1)));
+  packet.setName('Packet');
+  const game = new MGame();
+  game.setGameFormat(ACFGameFormat);
+  game.loadPacket(packet);
+  const A = new MPlayer('Ann', 'Alpha', true);
+  const B = new MPlayer('Bob', 'Beta', true);
+  game.addNewPlayers([A, B]);
+  const g = { game, A, B, tb: null, tu, bo };
+  g.correct = (ci, who) => {
+    game.cycles[ci].addCorrectBuzz({ player: who, position: 2, points: 10 }, game.getTossupIndex(ci), game.gameFormat, game.getBonusIndex(ci), 3);
+    game.cycles[ci].setBonusPartAnswer(0, who.teamName, 10);
+  };
+  g.neg = (ci, who, position = 1) => game.cycles[ci].addWrongBuzz({ player: who, position, points: -5, isLastWord: false }, game.getTossupIndex(ci), game.gameFormat);
+  // MODAQ's throw-out plus clearThrownOutNegs, as the patched reader does
+  g.throwOut = (ci) => {
+    const c = game.cycles[ci];
+    const t = game.getTossupIndex(ci);
+    c.addThrownOutTossup(t);
+    const next = afterThrowOut(c, t);
+    c.wrongBuzzes = next.wrongBuzzes;
+    c.tossupProtests = next.tossupProtests;
+    if (next.changed) c.updateNeg(game.gameFormat);
+  };
+  g.scores = () => Object.fromEntries(g.upload().teams.map((t) => [t.name, t.points]));
+  g.replace = (ci, kind, question, id) => {
+    const check = replaceCheck({ cycles: game.cycles, cycleIndex: ci, curB: game.getBonusIndex(ci), kind });
+    if (check.error) return check.error;
+    if (kind === 'tossup') g.throwOut(ci);
+    else game.cycles[ci].addThrownOutBonus(game.getBonusIndex(ci));
+    const point = readerInsertPoint({ cycles: game.cycles, cycleIndex: ci, curT: game.getTossupIndex(ci), curB: game.getBonusIndex(ci),
+      bonusCount: game.packet.bonuses.length, tossups: kind === 'tossup', bonuses: kind === 'bonus' });
+    if (point.error) return 'insert ' + point.error;
+    const base = { t: game.packet.tossups.length, b: game.packet.bonuses.length };
+    g.tb = tbRecordAdd(g.tb, base, point, kind === 'tossup' ? { tu: [id], bo: [] } : { tu: [], bo: [id] });
+    const ins = (l, i, m) => [...l.slice(0, i), ...m, ...l.slice(i)];
+    const p = new MPacket();
+    p.setTossups(ins(game.packet.tossups, point.t, kind === 'tossup' ? [question] : []));
+    p.setBonuses(ins(game.packet.bonuses, point.b, kind === 'bonus' ? [question] : []));
+    p.setName('Packet');
+    game.loadPacket(p);
+    return '';
+  };
+  g.upload = () => parseMatch(withRound(tbRemapMatch(toQBJ(game, 'Packet', 1), g.tb), 1));
+  g.qbj = () => tbRemapMatch(toQBJ(game, 'Packet', 1), g.tb);
+  return g;
+}
+
+test('Replace tossup: after a neg, the pick is read next in its place and the rest of the packet follows', () => {
+  const g = replaceGame();
+  for (let ci = 0; ci < 3; ci++) g.correct(ci, g.A);
+  g.neg(3, g.A);
+  assert.equal(g.replace(3, 'tossup', g.tu(1, 'TB'), 'TU1'), '');
+  assert.equal(g.game.getTossup(3).question.slice(0, 3), 'TB1', 'the replacement is the tossup being read');
+  g.correct(3, g.B);
+  for (let ci = 4; ci < 20; ci++) g.correct(ci, g.B);
+  assert.equal(g.game.getTossup(4).question.slice(0, 2), 'P5', 'packet tossup 5 comes next; tossup 4 is not read again');
+  assert.equal(g.game.getBonus(3).leadin, 'PB4', 'the bonus after the replacement is the next packet bonus');
+  const m = g.upload();
+  assert.equal(m.tossupsRead, 20);
+  const qs = g.qbj().match_questions;
+  assert.equal(qs[3].replacement_tossup_question.question_number, 21, 'numbered after the packet');
+  assert.equal(qs[3].tossup_question.qbtd_tiebreaker, 'TU1');
+  assert.deepEqual(qs.slice(4).map((q) => q.tossup_question.question_number), Array.from({ length: 16 }, (_, i) => i + 5));
+  assert.deepEqual(qs.map((q) => q.bonus && q.bonus.question.question_number), Array.from({ length: 20 }, (_, i) => i + 1));
+  assert.deepEqual(tbUsedIds(g.qbj(), g.tb), ['TU1']);
+});
+
+test('Replace bonus: the pick is read in place of the thrown-out bonus, then the packet resumes', () => {
+  const g = replaceGame();
+  for (let ci = 0; ci < 5; ci++) g.correct(ci, g.A);
+  g.game.cycles[5].addCorrectBuzz({ player: g.B, position: 2, points: 10 }, g.game.getTossupIndex(5), g.game.gameFormat, g.game.getBonusIndex(5), 3);
+  assert.equal(g.replace(5, 'bonus', g.bo(1, 'TB'), 'B1'), '');
+  assert.equal(g.game.getBonus(5).leadin, 'TBB1');
+  g.game.cycles[5].setBonusPartAnswer(0, 'Beta', 10);
+  for (let ci = 6; ci < 20; ci++) g.correct(ci, g.A);
+  assert.equal(g.game.getBonus(6).leadin, 'PB7', 'bonus 6 was thrown out, so bonus 7 is next');
+  const qs = g.qbj().match_questions;
+  assert.equal(qs[5].bonus.question.question_number, 21);
+  assert.equal(qs[5].bonus.question.qbtd_tiebreaker, 'B1');
+  assert.equal(qs[5].bonus.parts[0].controlled_points, 10);
+  assert.deepEqual(qs.map((q) => q.tossup_question.question_number), Array.from({ length: 20 }, (_, i) => i + 1));
+  assert.deepEqual(tbUsedIds(g.qbj(), g.tb), ['B1']);
+});
+
+test('Replace: a tossup and then its bonus on one question, and a packet-file pick (no pool id)', () => {
+  const g = replaceGame();
+  g.correct(0, g.A);
+  assert.equal(g.replace(1, 'tossup', g.tu(9, 'F'), ''), '');
+  g.correct(1, g.B);
+  assert.equal(g.replace(1, 'bonus', g.bo(9, 'F'), ''), '');
+  assert.equal(g.game.getTossup(1).question.slice(0, 2), 'F9');
+  assert.equal(g.game.getBonus(1).leadin, 'FB9');
+  for (let ci = 2; ci < 20; ci++) g.correct(ci, g.A);
+  const qs = g.qbj().match_questions;
+  assert.equal(qs[1].tossup_question.question_number, 21);
+  assert.equal(qs[1].bonus.question.question_number, 21);
+  assert.ok(!qs[1].tossup_question.qbtd_tiebreaker && !qs[1].bonus.question.qbtd_tiebreaker);
+  assert.equal(qs[2].tossup_question.question_number, 3);
+  assert.equal(qs[2].bonus.question.question_number, 3);
+  assert.equal(g.upload().tossupsRead, 20);
+});
+
+test('Replace and throw out: scores and earlier bonuses stand; a thrown-out tossup takes its negs with it', () => {
+  // the same nine questions played twice: once straight, once with
+  // tossup 6 negged by Alpha and replaced, then Beta negs the replacement
+  // and Alpha gets it
+  const play = (replace) => {
+    const g = replaceGame();
+    for (let ci = 0; ci < 5; ci++) {
+      g.correct(ci, ci % 2 ? g.B : g.A);
+      g.game.cycles[ci].setBonusPartAnswer(1, (ci % 2 ? g.B : g.A).teamName, 10);
+    }
+    if (replace) {
+      g.neg(5, g.A, 14);
+      assert.equal(g.replace(5, 'tossup', g.tu(1, 'TB'), 'TU1'), '');
+    }
+    g.neg(5, g.B, 1); // before Alpha's correct buzz (word 2)
+    g.correct(5, g.A);
+    for (let ci = 6; ci < 9; ci++) g.correct(ci, g.B);
+    return g;
+  };
+  const plain = play(false);
+  const replaced = play(true);
+  // by hand: Alpha questions 1, 3, 5 at 10 + 20 and question 6 at 10 + 10 = 110;
+  // Beta questions 2, 4 at 10 + 20 and 7-9 at 10 + 10, less the neg on 6 = 115
+  assert.deepEqual(plain.scores(), { Alpha: 110, Beta: 115 });
+  assert.deepEqual(replaced.scores(), { Alpha: 110, Beta: 115 }, 'the thrown-out neg is gone; the replacement neg counts');
+  const qs = (g) => g.qbj().match_questions;
+  for (let i = 0; i < 5; i++) {
+    assert.deepEqual(qs(replaced)[i].bonus.parts.map((p) => p.controlled_points), [10, 10, 0], 'question ' + (i + 1) + ' keeps its bonus');
+    assert.deepEqual(qs(replaced)[i].buzzes, qs(plain)[i].buzzes);
+  }
+  assert.deepEqual(qs(replaced)[5].buzzes.map((b) => b.team.name + ' ' + b.result.value), ['Beta -5', 'Alpha 10']);
+  // a neg left on a thrown-out tossup would have taken the replacement neg's points
+  const kept = replaceGame();
+  kept.neg(0, kept.A, 14);
+  kept.game.cycles[0].addThrownOutTossup(0);
+  kept.neg(0, kept.B, 9);
+  assert.equal(kept.game.cycles[0].wrongBuzzes[1].marker.points, 0, 'MODAQ alone: only the first neg in a slot counts');
+  // and MODAQ's own Throw out, as patched, clears it the same way
+  const thrown = replaceGame();
+  thrown.neg(0, thrown.A, 14);
+  thrown.throwOut(0);
+  assert.equal(thrown.game.cycles[0].wrongBuzzes, undefined);
+  thrown.neg(0, thrown.B, 9);
+  assert.equal(thrown.game.cycles[0].wrongBuzzes[0].marker.points, -5);
+});
+
+test('reader bundle: MODAQ Throw out tossup clears the thrown-out negs', () => {
+  const bundle = readFileSync(new URL('../app/js/read.bundle.js', import.meta.url), 'utf8');
+  assert.ok(/addThrownOutTossup\(\w-1\),[^;]{0,40}\.clearThrownOutNegs\(/.test(bundle), 'run npm run build:read');
+});
+
+test('Replace: refused with nothing changed when later questions have results or no bonus is being read', () => {
+  const g = replaceGame();
+  for (let ci = 0; ci < 6; ci++) g.correct(ci, g.A);
+  const before = JSON.stringify(g.qbj());
+  assert.equal(g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1'), 'later', 'a past question');
+  g.neg(6, g.B);
+  assert.equal(g.replace(6, 'bonus', g.bo(1, 'TB'), 'B1'), 'nobonus', 'no correct buzz yet');
+  assert.equal(JSON.stringify(g.qbj().match_questions.slice(0, 6)), JSON.stringify(JSON.parse(before).match_questions.slice(0, 6)));
+  assert.equal(g.game.packet.tossups.length, 20);
+  assert.equal(g.game.packet.bonuses.length, 20);
+  // the current tossup, buzzes and all, can still be replaced
+  assert.equal(g.replace(6, 'tossup', g.tu(1, 'TB'), 'TU1'), '');
+});
+
+test('reader bundle: the Actions menu carries Replace tossup and Replace bonus', () => {
+  const bundle = readFileSync(new URL('../app/js/read.bundle.js', import.meta.url), 'utf8');
+  assert.ok(bundle.includes('Replace tossup...') && bundle.includes('Replace bonus...'), 'run npm run build:read');
 });
 
 test('combinedUpload carries tb.used when given, omits it otherwise', () => {
