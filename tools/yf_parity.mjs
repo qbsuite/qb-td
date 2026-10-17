@@ -103,7 +103,45 @@ function firstDifference(a, b) {
   return `at byte ${i}\n      yellowfruit: …${a.slice(Math.max(0, i - 80), i + 120)}\n      qb-td:       …${b.slice(Math.max(0, i - 80), i + 120)}`;
 }
 
+// A staged tournament (a scenario with a schedule): YellowFruit opens
+// qb-td's .yft as is (its importer builds one stage only), must hold the
+// same file, and renders its own report of it, which qb-td's report must
+// equal page for page.
+function runStaged(sc, opener) {
+  const dir = path.join(outRoot, sc.key);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const problems = [];
+  const matches = dedupeMatches(sc.games.map((g) => {
+    const m = parseMatch(g.qbj, { filename: g.filename });
+    m.filename = g.filename;
+    return m;
+  }));
+  const roster = parseRoster(sc.roster);
+  const rules = sc.rules || {};
+  const opts = { name: sc.name, matches, roster, settings: rules, schedule: sc.schedule };
+  const ours = serializeYft(opts);
+  const phases = JSON.parse(ours).objects[0].phases.map((ph) => `${ph.name} (${ph.pools.length} pools)`);
+  console.log('    stages: ' + phases.join(', '));
+  if (phases.length < 2 && !JSON.parse(ours).objects[0].phases[0].pools[1]) problems.push('qb-td wrote no stages for this schedule');
+  fs.writeFileSync(path.join(dir, 'qbtd.yft'), ours);
+  execFileSync('node', [opener, path.join(dir, 'qbtd.yft'), path.join(dir, 'qbtd_reopened.yft'), YF_VERSION], { stdio: 'inherit', env: { ...process.env, YF_REPORT_PREFIX: REPORT_PREFIX } });
+  const reopened = fs.readFileSync(path.join(dir, 'qbtd_reopened.yft'), 'utf8');
+  const flagged = JSON.parse(reopened).objects[0].phases.flatMap((ph) => ph.rounds).flatMap((r) => r.matches || [])
+    .flatMap((m) => [...(m.YfData.otherValidation || []), ...m.match_teams.flatMap((mt) => mt.YfData.validation || [])]
+      .filter((v) => v.status === YF_ERROR).map((v) => `${m.id}: ${v.message}`));
+  for (const f of flagged) problems.push(`YellowFruit finds an error in qb-td's file — ${f}`);
+  for (const page of buildReport({ ...opts, prefix: REPORT_PREFIX })) {
+    const pg = page.name.slice(REPORT_PREFIX.length + 1, -'.html'.length);
+    fs.writeFileSync(path.join(dir, `qbtd_report_${page.name}`), page.text);
+    const yfPage = fs.readFileSync(path.join(dir, `qbtd_reopened_${pg}.html`), 'utf8');
+    if (yfPage !== page.text) problems.push(`stat report: ${page.name} differs from YellowFruit's ${firstDifference(yfPage, page.text)}`);
+  }
+  return { games: matches.length, problems, raw: true };
+}
+
 function runScenario(sc, importer, opener, importer3) {
+  if (sc.schedule) return runStaged(sc, opener);
   const dir = path.join(outRoot, sc.key);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(path.join(dir, 'in', 'games'), { recursive: true });

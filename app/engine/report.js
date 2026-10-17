@@ -16,7 +16,7 @@
 
 import { aggregate } from './stats.js';
 import { rosterTracking } from './qbj.js';
-import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME,
+import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME, yfStages,
   REGULATION_TOSSUPS } from './yft.js';
 
 // Stat display scaling. YellowFruit scales its rate stats by the
@@ -242,7 +242,7 @@ function htmlPage(m, title, data, withVersion) {
 
 // One derived bundle every page reads: YF-ordered team rows, player rows
 // with fractional games played, per-round game lists.
-function reportModel({ name, matches, roster, prefix, settings }) {
+function reportModel({ name, matches, roster, prefix, settings, schedule }) {
   const rules = settings || {};
   const regTossups = rules.regulationTossupCount ?? REGULATION_TOSSUPS;
   const agg = aggregate(matches, roster);
@@ -275,6 +275,19 @@ function reportModel({ name, matches, roster, prefix, settings }) {
 
   const teams = sortTeamsYf(agg.teams);
   const teamRanks = rankTeams(teams);
+  // The stages the .yft gives YF (yft.js yfStages), from the schedule. With
+  // one stage played, its name heads the pages and each of its pools is
+  // ranked apart, in the pool's own team order for ties, as YF does.
+  const plan = schedule ? yfStages(schedule, matches) : null;
+  const playedRounds = new Set(agg.games.map((g) => g.round));
+  const playedStages = plan ? plan.stages.filter((st) => st.rounds.some((n) => playedRounds.has(n))) : [];
+  const stage = playedStages.length === 1 ? playedStages[0] : null;
+  const phaseName = stage ? stage.name : PHASE_NAME;
+  const byName = new Map(agg.teams.map((t) => [t.name, t]));
+  const pools = stage && stage.pools.length > 1 ? stage.pools.map((pl) => {
+    const sorted = sortTeamsYf(pl.teams.map((n) => byName.get(n)).filter(Boolean));
+    return { name: pl.name, teams: sorted, ranks: rankTeams(sorted) };
+  }) : null;
 
   // Fractional GP (sum of tuh share per game) + per-match rows, per player.
   const perPlayer = new Map(); // team\nname -> {gp, games: [{g, mt, mp}]}
@@ -295,13 +308,24 @@ function reportModel({ name, matches, roster, prefix, settings }) {
     }
   }
 
+  // YF's order (StatSummaries sortPlayersByPptuh): points per tossup
+  // heard, then more tossups heard first (fewer, for a player below zero),
+  // then the order players first appear in the file's games
+  const seenAt = new Map();
+  for (const g of games) for (const mt of g.teams) for (const mp of mt.players) {
+    const key = mt.name + '\n' + mp.name;
+    if (!seenAt.has(key)) seenAt.set(key, seenAt.size);
+  }
   const players = agg.players
     .filter((p) => p.tuh > 0)
     .map((p) => ({ ...p, ...perPlayer.get(p.team + '\n' + p.name) }));
   players.sort((x, y) => {
-    const xv = x.tuh ? x.points / x.tuh : -9999999;
-    const yv = y.tuh ? y.points / y.tuh : -9999999;
-    return yv - xv || x.name.localeCompare(y.name);
+    const xv = x.tuh ? x.points / x.tuh : -999999;
+    const yv = y.tuh ? y.points / y.tuh : -999999;
+    if (xv !== yv) return yv - xv;
+    if (xv > 0 && x.tuh !== y.tuh) return y.tuh - x.tuh;
+    if (xv <= 0 && x.tuh !== y.tuh) return x.tuh - y.tuh;
+    return (seenAt.get(x.team + '\n' + x.name) ?? 1e9) - (seenAt.get(y.team + '\n' + y.name) ?? 1e9);
   });
   const playerRanks = rankPlayers(players);
 
@@ -326,7 +350,7 @@ function reportModel({ name, matches, roster, prefix, settings }) {
   const hasNegs = vals.some((v) => v < 0);
 
   return {
-    name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks,
+    name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks, phaseName, pools,
     games, rounds, perTeam, hasPowers, hasNegs, regTossups, trackUG, trackDiv2,
   };
 }
@@ -345,6 +369,7 @@ const resultLetter = (mine, theirs) =>
 /* ---------- standings ---------- */
 
 function standingsHtml(m) {
+  const table = (teams, ranks) => {
   const rows = [trTag([
     th('Rank', false, '3%'),
     tdTag({ bold: true, width: '25%' }, 'Team'),
@@ -359,9 +384,9 @@ function standingsHtml(m) {
     th(abbr('TUH', 'Tossups heard in regulation'), true, '6%'),
     th(abbr('PPB', 'Points per bonus'), true, '7%'),
   ])];
-  m.teams.forEach((t, i) => {
+  teams.forEach((t, i) => {
     rows.push(trTag([
-      tdTag({}, m.teamRanks[i]),
+      tdTag({}, ranks[i]),
       textCell(teamLink(m, t.name)),
       ...(m.trackUG ? [tdTag({}, t.ug ? 'UG' : '')] : []),
       ...(m.trackDiv2 ? [tdTag({}, t.d2 ? 'D2' : '')] : []),
@@ -375,11 +400,16 @@ function standingsHtml(m) {
       numCell(fmtPpb(t.bonusPoints, t.bonusesHeard)),
     ]));
   });
+  return tableTag(rows, { cssClass: 'fwBelow1000px' });
+  };
   const meta = genericTag('span', esc(m.name));
-  const header = headerWithDivider(m, PHASE_NAME, 'standings.html', { noTopLink: true });
-  // the blank lines are YF's: slots it leaves empty for a one-stage,
-  // one-pool tournament (no final ranks, pool heading or tiebreakers)
-  return `${meta}\n\n${header}\n\n${tableTag(rows, { cssClass: 'fwBelow1000px' })}\n<br/>`;
+  const header = headerWithDivider(m, m.phaseName, 'standings.html', { noTopLink: true });
+  // the blank lines are YF's: slots it leaves empty here (final ranks, a
+  // pool's heading when there is one pool, its tiebreakers)
+  const tables = m.pools
+    ? m.pools.map((pl) => `${genericTag('h3', esc(pl.name))}\n${table(pl.teams, pl.ranks)}\n`)
+    : [`\n${table(m.teams, m.teamRanks)}\n`];
+  return `${meta}\n\n${header}\n${tables.join('\n')}<br/>`;
 }
 
 /* ---------- individuals ---------- */
@@ -409,7 +439,7 @@ function individualsHtml(m) {
       numCell(((p.points / p.tuh) * m.regTossups).toFixed(2)),
     ]));
   });
-  const header = headerWithDivider(m, 'All Games', 'individuals.html', { noTopLink: true });
+  const header = headerWithDivider(m, m.phaseName, 'individuals.html', { noTopLink: true });
   return `${header}\n${tableTag(rows, { cssClass: 'fwBelow1000px' })}`;
 }
 
@@ -482,12 +512,12 @@ function boxScore(m, g) {
 function scoreboardHtml(m) {
   // the table of contents names the stage, then its rounds indented under it
   const toc = tagWithAttrs('div', [cls('floatingTOC')], genericTag('ul', [
-    PHASE_NAME, ...m.rounds.map((r) => `${NBSP}${NBSP}${roundLink(m, r, `Round ${r}`)}`),
+    m.phaseName, ...m.rounds.map((r) => `${NBSP}${NBSP}${roundLink(m, r, `Round ${r}`)}`),
   ].map((item) => genericTag('li', item)).join('\n')));
   const sections = m.rounds.map((r) => genericTag('div', [
     ...(r !== 1 ? ['<br /><br />'] : []),
     tagWithAttrs('div', [`id=Round-${r}`]),
-    headerWithDivider(m, `Round ${r} - ${PHASE_NAME}`, 'games.html', { noTopLink: r === 1, sticky: true }),
+    headerWithDivider(m, `Round ${r} - ${m.phaseName}`, 'games.html', { noTopLink: r === 1, sticky: true }),
     ...m.games.filter((g) => g.round === r).map((g) => boxScore(m, g)),
   ].join('\n')));
   return `${toc}\n${sections.join('\n')}`;

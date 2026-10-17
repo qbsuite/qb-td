@@ -2084,6 +2084,30 @@ test('packetCategories: bonuses keep their e/m/h difficulty marks', () => {
 
 console.log('html stat report');
 
+const STAGED = (await import('../tools/yf_parity/scenarios.mjs')).SCENARIOS;
+test('html stat report: a prelim stage with pools ranks each pool apart, under the stage name', () => {
+  const sc = STAGED.find((x) => x.key === 'pools');
+  const matches = dedupeMatches(sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));
+  const roster = parseRoster(sc.roster);
+  const page = (pages, p) => pages.find((f) => f.name === p + '.html').text;
+  const staged = buildReport({ name: sc.name, matches, roster, schedule: sc.schedule });
+  const st = page(staged, 'standings');
+  assert.ok(st.includes('<h3>\nPool A\n</h3>') && st.includes('<h3>\nPool B\n</h3>'), 'a heading per pool');
+  assert.ok(st.includes('Prelims') && !st.includes('All Games'));
+  const tables = st.split('<h3>').slice(1);
+  for (const [i, t] of tables.entries()) {
+    const names = sc.schedule.pools[i ? 'B' : 'A'];
+    assert.ok(names.every((n) => t.includes(`>${n}<`) || t.includes(`\n${n}\n`)), 'pool ' + i + ' holds its own teams');
+    assert.ok(/<td\s*>\s*1=?\s*<\/td>/.test(t), 'ranks start at 1 in each pool');
+  }
+  assert.ok(page(staged, 'individuals').includes('Prelims'));
+  assert.ok(page(staged, 'games').includes('Round 1 - Prelims'));
+  // without the schedule, one table as before
+  const plain = page(buildReport({ name: sc.name, matches, roster }), 'standings');
+  assert.ok(plain.includes('All Games') && !plain.includes('<h3>'));
+});
+
+
 // M1 (Alpha 125, Beta 55) + M2 (Gamma 145, Alpha 55) through the report.
 // Alpha: 1-1, 180 pts / 40 TUH -> 90.0 PP20TUH, bonuses 90 pts on 9 heard.
 // Gamma: 1-0, 145 / 20 -> 145.0. Beta: 0-1, 55 / 20 -> 55.0.

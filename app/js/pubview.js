@@ -1425,8 +1425,9 @@ function renderStatsTab(box) {
   if (isNew) { renderNewStats($('newstats')); return; }
   wireSheetToggle();
   // same rules the TO's own download uses: the report is scaled and its
-  // overtime split by the tournament's regulation tossup count
-  const opts = { name: state.name, matches: dedupeMatches(matches), roster, settings: effectiveFormat(state.format) };
+  // overtime split by the tournament's regulation tossup count, and the
+  // schedule's stages and pools head its standings
+  const opts = { name: state.name, matches: dedupeMatches(matches), roster, settings: effectiveFormat(state.format), schedule };
   let pages = buildReport(opts);
   if (state.scoresheets && buzzStored() && sheetsShown()) pages = withSheets(pages, reportData(opts));
   unmountReport = mountReport(box.querySelector('.reportbox'), pages, { start: pendingPlace });

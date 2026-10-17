@@ -1,5 +1,12 @@
 Release Notes for 10/17/2026
 
+[ STATS ]
+- Classic stats and the HTML report show the prelims under the stage's name, with a table for each pool, as YellowFruit does.
+- Players tied on points per tossup heard are listed in YellowFruit's order.
+
+[ HUB ]
+- "Edit in reader" is now "Edit in MODAQ".
+
 [ READER ]
 - Actions has Replace tossup and Replace bonus. The question being read is thrown out, and the one you pick is read in its place.
 - The replacement comes from the TD's questions or from one question of a packet file.

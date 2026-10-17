@@ -164,6 +164,76 @@ const longRounds = [
     { tossupsRead: 24 }),
 ];
 
+// Staged tournaments, as qb-td schedules them: 12 teams in two prelim pools
+// of six (a round robin, five rounds), then playoff brackets by place
+// (top three of each pool, bottom three) that carry their prelim games
+// and play the other pool's three over three rounds, then a one-game
+// final. Results come from a seeded draw; `upTo` stops the day after a
+// round, so a scenario can hold the prelims only, or stop mid-playoffs.
+// The check (yf_parity.mjs) is YellowFruit's own report of qb-td's
+// staged file against qb-td's report.
+function stagedScenario(key, name, upTo, { marks = false } = {}) {
+  let seed = 7;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const SCHOOLS = ['Ames', 'Bloom', 'Cedar', 'Dover', 'Elm', 'Fargo', 'Gale', 'Hale', 'Iona', 'Jett', 'Kent', 'Lyle'];
+  const teams = SCHOOLS.map((n, i) => ({ name: n + (i % 3 === 0 ? ' A' : ''), players: [0, 1, 2].map((k) => n + ' Player ' + (k + 1)) }));
+  const pools = { A: teams.filter((_, i) => i % 2 === 0).map((t) => t.name), B: teams.filter((_, i) => i % 2 === 1).map((t) => t.name) };
+  const rr = (names) => {
+    const list = [...names];
+    const rounds = [];
+    for (let r = 0; r < list.length - 1; r++) {
+      const pairs = [];
+      for (let i = 0; i < list.length / 2; i++) pairs.push([list[i], list[list.length - 1 - i]]);
+      rounds.push(pairs);
+      list.splice(1, 0, list.pop());
+    }
+    return rounds;
+  };
+  const byName = new Map(teams.map((t) => [t.name, t]));
+  const games = [];
+  // a game's result: the stronger side (earlier in the list) more often wins;
+  // a few draws make tied records
+  const play = (round, x, y) => {
+    const side = (t, strong) => {
+      const gets = Math.max(0, Math.round((strong ? 8 : 5) + rnd() * 5 - 2)); // at most 11 + 8 of 20
+      const negs = Math.round(rnd() * 2);
+      const counts = [0, 1, 2].map(() => ({}));
+      for (let k = 0; k < gets; k++) { const pl = counts[Math.floor(rnd() * 3)]; pl[10] = (pl[10] || 0) + 1; }
+      for (let k = 0; k < negs; k++) { const pl = counts[Math.floor(rnd() * 3)]; pl['-5'] = (pl['-5'] || 0) + 1; }
+      return { name: t.name, bonus: gets * 10 + Math.round(rnd() * gets) * 10,
+        players: t.players.map((pn, k) => P(pn, counts[k])) };
+    };
+    const xi = teams.indexOf(byName.get(x));
+    const yi = teams.indexOf(byName.get(y));
+    const strongX = rnd() < (xi < yi ? 0.65 : 0.35);
+    games.push(game(round, side(byName.get(x), strongX), side(byName.get(y), !strongX)));
+  };
+  const prelim = { A: rr(pools.A), B: rr(pools.B) };
+  const phases = [{ name: 'Prelims', rounds: [] }, { name: 'Playoffs', rounds: [] }, { name: 'Finals', kind: 'final', rounds: [] }];
+  for (let r = 0; r < 5; r++) {
+    const pairs = [...prelim.A[r].map((p) => [...p, 'A']), ...prelim.B[r].map((p) => [...p, 'B'])];
+    phases[0].rounds.push({ round: r + 1, games: pairs.map(([x, y, k], i) => ({ room: i, a: { team: x }, b: { team: y }, bracket: k })) });
+    if (r + 1 <= upTo) for (const [x, y] of pairs) play(r + 1, x, y);
+  }
+  // playoff brackets by place, drawn from the prelim pools' order as written
+  const top = [...pools.A.slice(0, 3), ...pools.B.slice(0, 3)];
+  const bottom = [...pools.A.slice(3), ...pools.B.slice(3)];
+  for (let r = 0; r < 3; r++) {
+    const cross = (b) => [0, 1, 2].map((i) => [b[i], b[3 + ((i + r) % 3)]]);
+    const pairs = [...cross(top).map((p) => [...p, 'P1']), ...cross(bottom).map((p) => [...p, 'P2'])];
+    phases[1].rounds.push({ round: 6 + r, games: pairs.map(([x, y, k], i) => ({ room: i, a: { team: x }, b: { team: y }, bracket: k })) });
+    if (6 + r <= upTo) for (const [x, y] of pairs) play(6 + r, x, y);
+  }
+  phases[2].rounds.push({ round: 9, games: [{ room: 0, a: { team: top[0] }, b: { team: top[3] } }] });
+  if (upTo >= 9) play(9, top[0], top[3]);
+  const schedule = { v: 1, rooms: [], phases, pools,
+    brackets: [{ key: 'P1', name: '1st–6th place', phase: 1 }, { key: 'P2', name: '7th–12th place', phase: 1 }] };
+  const rosterTeams = teams.map((t, i) => ({ name: t.name, players: t.players,
+    ...(marks ? { marks: Object.fromEntries(t.players.map((p) => [p, { ug: i % 4 === 1, d2: i % 4 === 2 }])) } : {}) }));
+  return { key, name, ruleSet: 'Acf', schedule,
+    roster: buildRosterQbj(name, rosterTeams, marks ? { trackUG: true, trackDiv2: true } : undefined), games };
+}
+
 export const SCENARIOS = [
   markedScenario('marks', 'Marked Open', MARKED, { trackUG: true, trackDiv2: true }),
   markedScenario('marks-ug', 'Undergrad Open', MARKED, { trackUG: true, trackDiv2: false }),
@@ -199,4 +269,5 @@ export const SCENARIOS = [
     roster: buildRosterQbj('Long Rounds Invitational', LONG_ROSTER),
     games: longRounds,
   },
+  stagedScenario('pools', 'Pools Open', 5, { marks: true }),
 ];

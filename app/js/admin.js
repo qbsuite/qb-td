@@ -1988,7 +1988,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
           ${f.error ? ` &middot; <span class="warntext">${esc(f.error)}</span>` : ''} ${protestMarker(f)}</div>
         <div class="pacts">${fileLinks(f)}
           ${f.kind === 'combined' && !f.error && s
-            ? `<button class="linkbtn" data-editfile="${f.id}" title="Reopen this game in the reader to correct it">Edit in reader</button>` : ''}
+            ? `<button class="linkbtn" data-editfile="${f.id}" title="Reopen this game in MODAQ to correct it">Edit in MODAQ</button>` : ''}
           <span class="spacer" style="flex:1"></span>
           <button class="linkbtn muted" data-delfile="${f.id}">Delete</button></div>
       </div>`;
