@@ -1,6 +1,8 @@
 Release Notes for 10/17/2026
 
 [ STATS ]
+- Once playoffs or finals are played, Classic stats and the HTML report go stage by stage, as YellowFruit does.
+- Standings show each stage's pools, where teams advanced to, and every team's whole day; games show their stage and carryover.
 - Classic stats and the HTML report show the prelims under the stage's name, with a table for each pool, as YellowFruit does.
 - Players tied on points per tossup heard are listed in YellowFruit's order.
 

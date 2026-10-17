@@ -9,7 +9,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
   rosterNameMap, renameMatch, carryFormerNames } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
-import { buildReport } from '../app/engine/report.js';
+import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
@@ -2105,6 +2105,25 @@ test('html stat report: a prelim stage with pools ranks each pool apart, under t
   // without the schedule, one table as before
   const plain = page(buildReport({ name: sc.name, matches, roster }), 'standings');
   assert.ok(plain.includes('All Games') && !plain.includes('<h3>'));
+});
+
+test('html stat report: stages played in turn report as YellowFruit does — finals, playoffs, prelims, cumulative', () => {
+  const sc = STAGED.find((x) => x.key === 'finals');
+  const matches = dedupeMatches(sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));
+  const roster = parseRoster(sc.roster);
+  const pages = buildReport({ name: sc.name, matches, roster, schedule: sc.schedule });
+  const page = (p) => pages.find((f) => f.name === p + '.html').text;
+  const heads = [...page('standings').matchAll(/<h2>\n([^\n]*)&nbsp;\n<\/h2>/g)].map((x) => x[1]);
+  assert.deepEqual(heads, ['Finals', 'Playoffs', 'Prelims', 'Cumulative']);
+  assert.ok(/def\. .* \(<a HREF=games\.html#/.test(page('standings')), 'the final as a result line');
+  assert.ok(page('standings').includes('Advanced To') && page('standings').includes('1st–6th place'));
+  const ind = [...page('individuals').matchAll(/<h2>\n([^\n]*)&nbsp;\n<\/h2>/g)].map((x) => x[1]);
+  assert.deepEqual(ind, ['Prelims', 'All Games']);
+  assert.ok(page('games').includes('Round 6 - Playoffs') && page('games').includes('Carries over to: Playoffs'));
+  assert.ok(page('teamdetail').includes('Stage') && page('teamdetail').includes('Carried To'));
+  assert.ok(page('playerdetail').includes('Stage') && page('rounds').includes('Stage'));
+  // the New layout's numbers are untouched by it
+  assert.equal(reportData({ name: sc.name, matches, roster, schedule: sc.schedule }).teams.length, 12);
 });
 
 

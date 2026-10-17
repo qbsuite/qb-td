@@ -172,12 +172,17 @@ const longRounds = [
 // round, so a scenario can hold the prelims only, or stop mid-playoffs.
 // The check (yf_parity.mjs) is YellowFruit's own report of qb-td's
 // staged file against qb-td's report.
-function stagedScenario(key, name, upTo, { marks = false } = {}) {
+// onePool: one prelim pool of all twelve (eleven rounds), then the
+// brackets play only teams they haven't met... which is none, so each
+// bracket plays its own three-team round robin again. tiebreak: a
+// Tiebreakers stage after the prelims, one game between two pool A teams.
+function stagedScenario(key, name, upTo, { marks = false, onePool = false, tiebreak = false } = {}) {
   let seed = 7;
   const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
   const SCHOOLS = ['Ames', 'Bloom', 'Cedar', 'Dover', 'Elm', 'Fargo', 'Gale', 'Hale', 'Iona', 'Jett', 'Kent', 'Lyle'];
   const teams = SCHOOLS.map((n, i) => ({ name: n + (i % 3 === 0 ? ' A' : ''), players: [0, 1, 2].map((k) => n + ' Player ' + (k + 1)) }));
-  const pools = { A: teams.filter((_, i) => i % 2 === 0).map((t) => t.name), B: teams.filter((_, i) => i % 2 === 1).map((t) => t.name) };
+  const pools = onePool ? { A: teams.map((t) => t.name) }
+    : { A: teams.filter((_, i) => i % 2 === 0).map((t) => t.name), B: teams.filter((_, i) => i % 2 === 1).map((t) => t.name) };
   const rr = (names) => {
     const list = [...names];
     const rounds = [];
@@ -208,26 +213,37 @@ function stagedScenario(key, name, upTo, { marks = false } = {}) {
     const strongX = rnd() < (xi < yi ? 0.65 : 0.35);
     games.push(game(round, side(byName.get(x), strongX), side(byName.get(y), !strongX)));
   };
-  const prelim = { A: rr(pools.A), B: rr(pools.B) };
-  const phases = [{ name: 'Prelims', rounds: [] }, { name: 'Playoffs', rounds: [] }, { name: 'Finals', kind: 'final', rounds: [] }];
-  for (let r = 0; r < 5; r++) {
-    const pairs = [...prelim.A[r].map((p) => [...p, 'A']), ...prelim.B[r].map((p) => [...p, 'B'])];
+  const prelim = Object.fromEntries(Object.entries(pools).map(([k, names]) => [k, rr(names)]));
+  const phases = [{ name: 'Prelims', rounds: [] }, ...(tiebreak ? [{ name: 'Tiebreakers', kind: 'tiebreak', rounds: [] }] : []),
+    { name: 'Playoffs', rounds: [] }, { name: 'Finals', kind: 'final', rounds: [] }];
+  const prelimRounds = prelim.A.length;
+  for (let r = 0; r < prelimRounds; r++) {
+    const pairs = Object.keys(prelim).flatMap((k) => prelim[k][r].map((p) => [...p, k]));
     phases[0].rounds.push({ round: r + 1, games: pairs.map(([x, y, k], i) => ({ room: i, a: { team: x }, b: { team: y }, bracket: k })) });
     if (r + 1 <= upTo) for (const [x, y] of pairs) play(r + 1, x, y);
   }
+  let next = prelimRounds + 1;
+  if (tiebreak) {
+    phases[1].rounds.push({ round: next, games: [{ room: 0, a: { team: pools.A[2] }, b: { team: pools.A[3] } }] });
+    if (next <= upTo) play(next, pools.A[2], pools.A[3]);
+    next++;
+  }
+  const playoffs = phases[tiebreak ? 2 : 1];
+  const finals = phases[phases.length - 1];
   // playoff brackets by place, drawn from the prelim pools' order as written
-  const top = [...pools.A.slice(0, 3), ...pools.B.slice(0, 3)];
-  const bottom = [...pools.A.slice(3), ...pools.B.slice(3)];
+  const top = onePool ? pools.A.slice(0, 6) : [...pools.A.slice(0, 3), ...pools.B.slice(0, 3)];
+  const bottom = onePool ? pools.A.slice(6) : [...pools.A.slice(3), ...pools.B.slice(3)];
   for (let r = 0; r < 3; r++) {
     const cross = (b) => [0, 1, 2].map((i) => [b[i], b[3 + ((i + r) % 3)]]);
     const pairs = [...cross(top).map((p) => [...p, 'P1']), ...cross(bottom).map((p) => [...p, 'P2'])];
-    phases[1].rounds.push({ round: 6 + r, games: pairs.map(([x, y, k], i) => ({ room: i, a: { team: x }, b: { team: y }, bracket: k })) });
-    if (6 + r <= upTo) for (const [x, y] of pairs) play(6 + r, x, y);
+    playoffs.rounds.push({ round: next + r, games: pairs.map(([x, y, k], i) => ({ room: i, a: { team: x }, b: { team: y }, bracket: k })) });
+    if (next + r <= upTo) for (const [x, y] of pairs) play(next + r, x, y);
   }
-  phases[2].rounds.push({ round: 9, games: [{ room: 0, a: { team: top[0] }, b: { team: top[3] } }] });
-  if (upTo >= 9) play(9, top[0], top[3]);
+  const last = next + 3;
+  finals.rounds.push({ round: last, games: [{ room: 0, a: { team: top[0] }, b: { team: top[3] } }] });
+  if (upTo >= last) play(last, top[0], top[3]);
   const schedule = { v: 1, rooms: [], phases, pools,
-    brackets: [{ key: 'P1', name: '1st–6th place', phase: 1 }, { key: 'P2', name: '7th–12th place', phase: 1 }] };
+    brackets: [{ key: 'P1', name: '1st–6th place', phase: phases.indexOf(playoffs) }, { key: 'P2', name: '7th–12th place', phase: phases.indexOf(playoffs) }] };
   const rosterTeams = teams.map((t, i) => ({ name: t.name, players: t.players,
     ...(marks ? { marks: Object.fromEntries(t.players.map((p) => [p, { ug: i % 4 === 1, d2: i % 4 === 2 }])) } : {}) }));
   return { key, name, ruleSet: 'Acf', schedule,
@@ -270,4 +286,8 @@ export const SCENARIOS = [
     games: longRounds,
   },
   stagedScenario('pools', 'Pools Open', 5, { marks: true }),
+  stagedScenario('playoffs', 'Playoffs Open', 7),
+  stagedScenario('finals', 'Finals Open', 9),
+  stagedScenario('tiebreak', 'Tiebreak Open', 10, { tiebreak: true }),
+  stagedScenario('onepool', 'One Pool Open', 15, { onePool: true }),
 ];
