@@ -1,5 +1,8 @@
 Release Notes for 10/17/2026
 
+[ LIVE HUB ]
+- A room still playing a round after the tournament moves on shows as started (○) in the uploads grid, not as missing.
+
 [ SETUP ]
 - Typing over a team's or player's saved name in the roster editor renames them, and says so with an Undo.
 - A renamed team's or player's games already played count under the new name.

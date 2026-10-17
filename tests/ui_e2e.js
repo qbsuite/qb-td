@@ -1035,6 +1035,23 @@ ok('13 uploads: moving it through its picker reaches the Worker', true);
 await waitJs(`document.querySelector('[data-cell="${b3.id}:2"]').textContent.trim() === '✓'
   && document.querySelector('[data-cell="${b4.id}:2"]').textContent.trim() === '✓'`, 'grid updated');
 ok('13 uploads: the grid follows (✓ in both rooms)', true);
+// the tournament moves on to round 3 while room 2 is still playing round 2:
+// its round 2 cell stays Started, and a room that never started is Missing
+{
+  const b1 = roomBucket(1);
+  const b2 = roomBucket(2);
+  await call(A, { method: 'POST', json: { current_round: 3 } });
+  await openHub();
+  await waitJs(`document.querySelector('.biground').textContent.includes('Round 3')`, 'hub on round 3');
+  const title = (bid) => js(`document.querySelector('[data-cell="${bid}:2"]').title`);
+  ok('13 uploads: a past round a room started but has not turned in reads Started, not Missing',
+    (await cellText(b1.id, 2)) === '○' && (await title(b1.id)).endsWith('Started, not uploaded'), [await cellText(b1.id, 2), await title(b1.id)]);
+  ok('13 uploads: a past round a room never started reads Missing',
+    (await cellText(b2.id, 2)) === '–' && (await title(b2.id)).endsWith(': Missing'), [await cellText(b2.id, 2), await title(b2.id)]);
+  await call(A, { method: 'POST', json: { current_round: 2 } });
+  await openHub();
+  await waitJs(`document.querySelector('.biground').textContent.includes('Round 2')`, 'hub back on round 2');
+}
 
 // Add a game: room 6, round 2, the match file and its MODAQ game file
 await click('#addtoggle');

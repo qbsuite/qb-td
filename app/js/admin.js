@@ -1910,6 +1910,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     // with brackets a room is on its own round (its bracket's)
     const now = bk ? bk.roomOf(b.id).rr : t.current_round;
     const startedNow = bk ? bk.roomOf(b.id).started : started.has(b.id);
+    // a room still playing a round the tournament has moved past started
+    // it, so it is in progress rather than missing
+    const startedThen = (lastDetail.starts || []).some((x) => x.bucket_id === b.id && x.round === n);
     let mark = '', cls = '', title = '';
     if (errs.length) { mark = '!'; cls = 'warn'; title = errs.length + ' file' + (errs.length === 1 ? '' : 's') + ' could not be read'; }
     else if (goods.length > 1) { mark = String(goods.length); cls = games.size > 1 ? 'warn' : ''; title = goods.length + ' uploads'; }
@@ -1920,7 +1923,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       mark = startedNow ? '&#9675;' : '&ndash;';
       cls = startedNow ? 'muted' : 'warn';
       title = startedNow ? 'Started, not uploaded' : 'Not started';
-    } else { mark = '&ndash;'; cls = 'warn'; title = 'Missing'; }
+    } else if (startedThen) { mark = '&#9675;'; cls = 'muted'; title = 'Started, not uploaded'; }
+    else { mark = '&ndash;'; cls = 'warn'; title = 'Missing'; }
     if (bk) {
       const br = bk.bracketAt(b, n);
       title = `Round ${n}${br ? ' \u00b7 ' + br.name : ''}${title ? ': ' + title : ''}`;
