@@ -261,6 +261,10 @@ export function yfStages(schedule, matches) {
   }
   const full = stages.filter((x) => x.full && !x.unplayed);
   if (full.length < 2 && !(full.length === 1 && full[0].pools.length > 1)) return null;
+  // YF's first stage is its Prelim stage, the one it ranks players in: when
+  // the games start later (the hub's stats pick of the playoffs alone),
+  // the first stage with games takes that place
+  full.forEach((x, i) => { x.type = i ? 'Playoff' : 'Prelim'; });
 
   // each game in the stage holding its round, between two teams of one pool
   const stageOf = new Map(stages.flatMap((x) => x.rounds.map((n) => [n, x])));

@@ -203,6 +203,9 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 .pcompact .given, .hubpage .given { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--fg); }
 .pcompact select { height: 34px; margin-top: 4px; }
 .statbtns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.statpick { display: grid; gap: 4px; margin: 6px 0 10px; }
+.statstages { display: grid; gap: 4px; padding-left: 22px; }
+.statstages label:has(input:disabled) { opacity: .5; }
 .statbtns > button, .dlwrap > button { height: 40px; width: 100%; }
 .dlwrap { position: relative; }
 .dlpanel {

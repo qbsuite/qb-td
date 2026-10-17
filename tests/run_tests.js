@@ -13,7 +13,7 @@ import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, finishedThrough, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -29,7 +29,7 @@ import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoic
 import { checkPacket } from '../app/engine/packetcheck.js';
 import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk } from '../app/engine/plan.js';
 import HDWHITE from '../app/engine/hdwhite.js';
-import { finalsSources, finalsProgress, finalsFill } from '../app/engine/finals.js';
+import { finalsSources, finalsProgress, finalsFill, scheduleFinished } from '../app/engine/finals.js';
 import { eachLimit } from '../app/js/limit.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
@@ -2127,6 +2127,22 @@ test('forfeits: a win and a loss, no stats, shown as YellowFruit shows them', ()
   assert.ok(mt && mt.match_teams.find((x) => x.forfeit_loss).team.$ref === `Team_${lose}`);
   const y3 = JSON.parse(serializeYft3({ matches: dedupeMatches([...played, ff]), roster }).split('\n')[5]).find((x) => x.forfeit);
   assert.deepEqual([y3.team1, y3.team2, y3.round, y3.players1], [win, lose, 6, null]);
+});
+
+test('stats pick: any stages, or the finished rounds, export cleanly — both YellowFruit files and the report', () => {
+  for (const sc of STAGED.filter((x) => x.pick)) {
+    const matches = dedupeMatches(sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));
+    const opts = { name: sc.name, matches, roster: parseRoster(sc.roster), schedule: sc.schedule };
+    const yf = JSON.parse(serializeYft(opts)).objects[0];
+    const inFile = yf.phases.flatMap((ph) => ph.rounds.flatMap((r) => r.matches || [])).length;
+    assert.equal(inFile, matches.length, sc.key + ': every picked game in the YellowFruit 4 file');
+    const poolStages = yf.phases.filter((ph) => ['Prelim', 'Playoff'].includes(ph.YfData.phaseType));
+    assert.equal(poolStages[0].YfData.phaseType, 'Prelim', sc.key + ': the first pool stage is YellowFruit\'s Prelim stage');
+    const yf3 = serializeYft3(opts);
+    assert.ok(yf3.length > 0, sc.key + ': YellowFruit 3 file');
+    assert.equal(buildReport(opts).length, 6, sc.key + ': six report pages');
+  }
+  assert.ok(STAGED.filter((x) => x.pick).length >= 7);
 });
 
 test('New layout standings match Classic\'s, stage by stage and pool by pool, in each staged scenario', () => {
@@ -5429,6 +5445,76 @@ function finalsDay(seed, opts = {}) {
   return { s, games, files };
 }
 const finalTeams = (s) => s.phases.find((ph) => ph.kind === 'final').rounds.map((r) => r.games.map((g) => [g.a.team || g.a.label, g.b.team || g.b.label]));
+
+// four teams, a round robin, then an advantaged final if needed; `beats`
+// lists who wins each round robin game
+function rrFinal(beats) {
+  const teams = planTeams(4);
+  const P = [planPhase('Round robin', { groups: 1 })];
+  const s = buildPlan(teams, planRooms(2), P, 'snake', 1);
+  tagBrackets(s);
+  addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P, undefined, 'advantaged');
+  const game = (round, w, l) => ({ round, tossupsRead: 20, teams: [{ name: w, points: 300, bonusPoints: 100, players: [] }, { name: l, points: 100, bonusPoints: 50, players: [] }] });
+  const games = s.phases[0].rounds.flatMap((r) => r.games.map((g) => {
+    const [a, b] = [g.a.team, g.b.team];
+    return game(r.round, beats(a, b) ? a : b, beats(a, b) ? b : a);
+  }));
+  const files = games.map((m, i) => ({ id: i + 1, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
+  const filled = finalsFill(s, games, finalsProgress(s, files).ready).schedule;
+  const fin = filled.phases.find((ph) => ph.kind === 'final');
+  return { s, filled, games, game, fin };
+}
+
+test('finished: a round robin is finished when its last game is in; finished rounds stop at the first one missing a game', () => {
+  const teams = planTeams(4);
+  const s = buildPlan(teams, planRooms(2), [planPhase('Round robin', { groups: 1 })], 'snake', 1);
+  const game = (r, g) => ({ round: r.round, tossupsRead: 20, teams: [{ name: g.a.team, points: 200, bonusPoints: 0, players: [] }, { name: g.b.team, points: 100, bonusPoints: 0, players: [] }] });
+  const games = s.phases[0].rounds.flatMap((r) => r.games.map((g) => game(r, g)));
+  assert.equal(scheduleFinished(s, games), true);
+  assert.equal(scheduleFinished(s, games.slice(0, -1)), false);
+  assert.equal(scheduleFinished(s, []), false);
+  assert.equal(finishedThrough(s, games), 3);
+  const r2 = s.phases[0].rounds[1];
+  const missing = games.filter((m) => !(m.round === r2.round && m.teams[0].name === r2.games[0].a.team));
+  assert.equal(finishedThrough(s, missing), 1, 'round 2 is missing a game, so only round 1 counts');
+  assert.equal(finishedThrough(s, games.filter((m) => m.round === 1)), 1);
+  assert.equal(finishedThrough(s, []), 0);
+});
+
+test('finished: pools waiting on playoff teams, or a final waiting on its bracket, are not finished', () => {
+  const { s, games } = finalsDay(5);
+  // prelims and playoffs in, the final's teams not filled in yet
+  assert.equal(scheduleFinished(s, games), false);
+  const prelimsOnly = JSON.parse(JSON.stringify(s));
+  // before the playoffs are filled: still placeholders
+  const raw = buildPlan(planTeams(22), planRooms(11), [planPhase('Prelims', { groups: 3 }), planPhase('Playoffs', { sizes: [6, 6, 6, 4], carry: true })], 'snake', 1);
+  const pre = games.filter((m) => prelimRounds(raw).some((r) => r.round === m.round));
+  assert.equal(scheduleFinished(raw, pre), false);
+  assert.ok(prelimsOnly);
+});
+
+test('finished: an advantaged final — skipped when the leader is two wins clear, a second game only when the leader loses the first', () => {
+  const rank = (x) => Number(x.slice(1));
+  // T1 wins everything, T2 beats T3 and T4: 3–0 and 2–1, one win apart: the final is played
+  let x = rrFinal((a, b) => rank(a) < rank(b));
+  const [g1] = x.fin.rounds[0].games;
+  assert.deepEqual([g1.a.team, g1.b.team], ['T1', 'T2']);
+  assert.equal(scheduleFinished(x.filled, x.games), false, 'the first final is still to play');
+  assert.equal(scheduleFinished(x.filled, [...x.games, x.game(x.fin.rounds[0].round, 'T1', 'T2')]), true, 'the leader won it: no second game');
+  const lost = [...x.games, x.game(x.fin.rounds[0].round, 'T2', 'T1')];
+  assert.equal(scheduleFinished(x.filled, lost), false, 'the leader lost it: the second game decides');
+  assert.equal(scheduleFinished(x.filled, [...lost, x.game(x.fin.rounds[1].round, 'T1', 'T2')]), true);
+  // T1 3–0; T2, T3 and T4 all 1–2: the leader is two wins clear, no final
+  const cycle = { T2: 'T4', T4: 'T3', T3: 'T2' }; // each of the others beats one and loses to one
+  x = rrFinal((a, b) => (a === 'T1' || b === 'T1' ? a === 'T1' : cycle[a] === b));
+  assert.equal(scheduleFinished(x.filled, x.games), true, 'no final needed');
+  // finished rounds stop at the round robin: the final nobody played doesn't stretch them
+  assert.equal(finishedThrough(x.filled, x.games), 3);
+  x = rrFinal((a, b) => rank(a) < rank(b));
+  const fr = x.fin.rounds[0].round;
+  assert.equal(finishedThrough(x.filled, x.games), 3, 'the final still to play');
+  assert.equal(finishedThrough(x.filled, [...x.games, x.game(fr, 'T1', 'T2')]), fr, 'the final played: it counts');
+});
 
 test('finals: the source is the top bracket, its carryover the same as the YellowFruit file\'s', () => {
   const { s, games } = finalsDay(5);

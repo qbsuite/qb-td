@@ -11,6 +11,7 @@
 // for the TD when the schedule has a Tiebreakers phase.
 
 import { aggregate, dedupeMatches } from './stats.js';
+import { playedMap, teamOf, gameKey } from './schedule.js';
 
 const FIN_RE = /^(\d+)(?:st|nd|rd|th) in (.+)$/;
 const MINOR = new Set(['tiebreak', 'final']);
@@ -203,4 +204,94 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
 /** True when the schedule has a finals slot still to fill. */
 export function hasFinalsSlots(schedule) {
   return finalsSources(schedule).length > 0;
+}
+
+/**
+ * True when the tournament is over: every scheduled game between known
+ * teams is in, no playoff slot waits for a team, and each "if needed"
+ * game was played or turned out not to be needed — a final the leader
+ * is two wins clear of, a second final the leader won the first of, a
+ * double elimination reset the unbeaten team won. Tiebreakers never
+ * hold it open.
+ */
+export function scheduleFinished(schedule, matches) {
+  if (!schedule || !Array.isArray(schedule.phases) || !schedule.phases.length) return false;
+  const played = playedMap(matches);
+  if (!played.size) return false;
+  const all = schedule.phases.flatMap((ph) => ph.rounds.map((r) => ({ r, ph })));
+  // net wins in the bracket a finals slot reads ("1st in Championship"),
+  // over its games and the ones carried into it, as finalsFill ranks it
+  // (finalsSources reads the slots' labels: a filled slot keeps its label as `from`)
+  const asLabels = JSON.parse(JSON.stringify(schedule));
+  for (const ph of asLabels.phases) for (const r of ph.rounds) for (const g of r.games) {
+    for (const k of ['a', 'b']) if (g[k] && g[k].from && FIN_RE.test(g[k].from)) g[k] = { label: g[k].from };
+  }
+  const sources = new Map(finalsSources(asLabels).map((src) => [src.name, src]));
+  const netWins = (slot) => {
+    const m = slot && slot.from ? FIN_RE.exec(slot.from) : null;
+    const src = m ? sources.get(m[2]) : null;
+    if (!src) return null;
+    const me = teamOf(slot);
+    const inBracket = new Set(src.games.map((g) => g.round));
+    const prev = new Set(src.prevRounds);
+    const carried = new Set(src.carried.map((x) => key2(x.a, x.b)));
+    let net = 0;
+    for (const { r } of all) {
+      const counts = inBracket.has(r.round) || prev.has(r.round);
+      if (!counts) continue;
+      for (const g of r.games) {
+        const [a, b] = [teamOf(g.a), teamOf(g.b)];
+        if (a !== me && b !== me) continue;
+        if (!inBracket.has(r.round) && !carried.has(key2(a, b))) continue;
+        const res = played.get(gameKey(r.round, g));
+        if (res && res.win) net += res.win === me ? 1 : -1;
+      }
+    }
+    return net;
+  };
+  // an elimination phase's games by number ("Winner of game 7")
+  const gameNo = (ph, n) => {
+    for (const r of ph.rounds) for (const g of r.games) if (g.game === n) return { g, round: r.round };
+    return null;
+  };
+  const needed = (g, round, ph) => {
+    const a = teamOf(g.a);
+    const b = teamOf(g.b);
+    const why = typeof g.ifNeeded === 'string' ? g.ifNeeded : '';
+    if (/two wins clear/.test(why)) {
+      // the leader against the second: played unless one is two wins clear
+      if (!a || !b) return true;
+      const na = netWins(g.a);
+      const nb = netWins(g.b);
+      // two wins clear: four apart in net wins (a win and a loss each)
+      return na === null || nb === null || Math.abs(na - nb) < 4;
+    }
+    if (/loses the first game/.test(why)) {
+      // an advantaged final's second game: only if the leader lost the first
+      const first = all.find((x) => x.r.round < round && x.r.games.some((y) => y.ifNeeded && teamOf(y.a) === a && teamOf(y.b) === b));
+      if (!first) return false;
+      const res = played.get(gameKey(first.r.round, first.r.games.find((y) => teamOf(y.a) === a && teamOf(y.b) === b)));
+      // not played: the first game decides whether there is a second
+      return !!res && res.win !== a;
+    }
+    // a double elimination reset: only if the final's second team won it
+    const m = /^Winner of game (\d+)$/.exec((g.a && (g.a.label || g.a.from)) || '');
+    const src = m ? gameNo(ph, Number(m[1])) : null;
+    if (src) {
+      const res = played.get(gameKey(src.round, src.g));
+      return !res || res.win === teamOf(src.g.b);
+    }
+    return false;
+  };
+  for (const { r, ph } of all) {
+    if (ph.kind === 'tiebreak') continue;
+    for (const g of r.games) {
+      if (!g.a && !g.b) continue;
+      const done = teamOf(g.a) && teamOf(g.b) && played.has(gameKey(r.round, g));
+      if (done) continue;
+      if (g.ifNeeded) { if (needed(g, r.round, ph)) return false; continue; }
+      return false;
+    }
+  }
+  return true;
 }

@@ -122,8 +122,9 @@ function runStaged(sc, opener) {
   const opts = { name: sc.name, matches, roster, settings: rules, schedule: sc.schedule };
   const ours = serializeYft(opts);
   const phases = JSON.parse(ours).objects[0].phases.map((ph) => `${ph.name} (${ph.pools.length} pools)`);
-  console.log('    stages: ' + phases.join(', '));
-  if (phases.length < 2 && !JSON.parse(ours).objects[0].phases[0].pools[1]) problems.push('qb-td wrote no stages for this schedule');
+  console.log(`    ${matches.length} games, rounds ${[...new Set(matches.map((m) => m.round))].sort((x, y) => x - y).join(',')}; stages: ` + phases.join(', '));
+  // a stats pick may hold one stage of one pool (the finals alone): that's fine
+  if (!sc.pick && phases.length < 2 && !JSON.parse(ours).objects[0].phases[0].pools[1]) problems.push('qb-td wrote no stages for this schedule');
   fs.writeFileSync(path.join(dir, 'qbtd.yft'), ours);
   execFileSync('node', [opener, path.join(dir, 'qbtd.yft'), path.join(dir, 'qbtd_reopened.yft'), YF_VERSION], { stdio: 'inherit', env: { ...process.env, YF_REPORT_PREFIX: REPORT_PREFIX } });
   const reopened = fs.readFileSync(path.join(dir, 'qbtd_reopened.yft'), 'utf8');

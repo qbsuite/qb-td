@@ -4,6 +4,7 @@
 
 import fixture from '../../app/demo/fixture.js';
 import { buildRosterQbj, forfeitQbj } from '../../app/engine/qbj.js';
+import { finishedThrough } from '../../app/engine/schedule.js';
 
 // A game file shaped like MODAQ's QBJ export (what the reader uploads):
 // inline team and player objects, answer values inline, only the players
@@ -256,6 +257,22 @@ function stagedScenario(key, name, upTo, { marks = false, onePool = false, tiebr
     roster: buildRosterQbj(name, rosterTeams, marks ? { trackUG: true, trackDiv2: true } : undefined), games };
 }
 
+// The hub's stats pick (admin.js statRounds): the same day and schedule,
+// only some rounds' games — a stage or several, or the finished rounds.
+// `rounds` is a list, or 'finished' for every round up to the first one
+// still missing a game.
+const roundOf = (g) => Number(/^Round_(\d+)_/.exec(g.filename)[1]);
+function pickScenario(base, key, name, rounds, drop = null) {
+  const games = base.games.filter((g) => !drop || !drop(g));
+  let keep = rounds;
+  if (rounds === 'finished') {
+    const asMatches = games.map((g) => ({ round: roundOf(g), teams: g.qbj.match_teams.map((mt) => ({ name: mt.team.name, points: 0 })) }));
+    const through = finishedThrough(base.schedule, asMatches);
+    keep = Array.from({ length: through }, (_, i) => i + 1);
+  }
+  return { ...base, key, name, pick: true, games: games.filter((g) => keep.includes(roundOf(g))) };
+}
+
 // A forfeit as the hub records it (qbj.js forfeitQbj): `loser` forfeits
 function forfeitGame(round, winner, loser) {
   return { filename: `Round_${round}_${winner}_${loser}_Forfeit.qbj`.replace(/[^\w.]+/g, '_'), qbj: forfeitQbj(round, winner, loser) };
@@ -309,4 +326,21 @@ export const SCENARIOS = [
   stagedScenario('tiebreak', 'Tiebreak Open', 10, { tiebreak: true }),
   stagedScenario('onepool', 'One Pool Open', 15, { onePool: true }),
   stagedScenario('forfeit-staged', 'Forfeit Open', 9, { forfeit: true }),
+  // the hub's stats pick over a whole day: prelims 1–5, playoffs 6–8, final 9
+  ...(() => {
+    const day = stagedScenario('pick-day', 'Pick Open', 9);
+    const tb = stagedScenario('pick-tb', 'Pick Tiebreak Open', 10, { tiebreak: true });
+    const mid = stagedScenario('pick-mid', 'Pick Mid Open', 7);
+    const r7 = mid.games.find((g) => roundOf(g) === 7);
+    return [
+      pickScenario(day, 'pick-prelims', 'Pick Prelims Open', [1, 2, 3, 4, 5]),
+      pickScenario(day, 'pick-playoffs', 'Pick Playoffs Open', [6, 7, 8]),
+      pickScenario(day, 'pick-finals', 'Pick Finals Open', [9]),
+      pickScenario(day, 'pick-prelims-finals', 'Pick Prelims Finals Open', [1, 2, 3, 4, 5, 9]),
+      pickScenario(day, 'pick-playoffs-finals', 'Pick Playoffs Finals Open', [6, 7, 8, 9]),
+      pickScenario(tb, 'pick-tb-playoffs', 'Pick Tiebreak Playoffs Open', [6, 7, 8, 9]),
+      // round 7 short a game: the finished rounds are 1–6
+      pickScenario(mid, 'pick-finished', 'Pick Finished Open', 'finished', (g) => g === r7),
+    ];
+  })(),
 ];

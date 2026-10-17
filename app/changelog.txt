@@ -1,6 +1,7 @@
 Release Notes for 10/17/2026
 
 [ LIVE HUB ]
+- Stats can use some stages only, or the finished rounds only. Compute and every download follow the choice.
 - The uploads grid keeps its checkmark when a room uploads a game more than once, with a small count beside it.
 - A game uploaded before its last regulation question shows a pie of how far it got, and "on question 3 of 20" in Live now.
 - Orange marks need a look: a missing game, a file that can't be read, uploads that disagree, or a game in progress.
@@ -59,6 +60,7 @@ Release Notes for 10/17/2026
 - Throwing out a tossup also removes its negs, so a neg on the replacement counts.
 
 [ EXPORTS ]
+- A YellowFruit file of later stages only (the playoffs, say) ranks its players in YellowFruit, as qb-td's report does.
 - The HTML report can be downloaded as six separate files as well as a zip.
 
 [ LIVE HUB ]

@@ -1454,3 +1454,58 @@ export function roundIntake(schedule, roundNumber, buckets, files) {
   if (inRooms.size >= expected) missing = [];
   return { got: inRooms.size, expected, missing };
 }
+
+/* ---------- finished ---------- */
+
+// The games played, by round and team pair: {round|a|b (sorted) -> winner}
+// (a tie has no winner). `matches` are parsed games (qbj.js parseMatch);
+// a later upload of the same game replaces an earlier one.
+export function playedMap(matches) {
+  const out = new Map();
+  for (const m of matches || []) {
+    const [a, b] = m.teams || [];
+    if (!a || !b) continue;
+    let win = null;
+    if (m.forfeit) win = a.forfeitLoss ? (b.forfeitLoss ? null : b.name) : a.name;
+    else if (a.points !== b.points) win = a.points > b.points ? a.name : b.name;
+    out.set(m.round + '|' + [a.name, b.name].sort().join('|'), { win });
+  }
+  return out;
+}
+export const teamOf = (s) => (s && typeof s.team === 'string' ? s.team : null);
+export const gameKey = (round, g) => round + '|' + [teamOf(g.a), teamOf(g.b)].sort().join('|');
+
+/**
+ * Whether a round's games are all in: each game between two known teams
+ * has a result, and no game still waits for a team (a placeholder).
+ * "If needed" games and tiebreakers never hold a round open.
+ */
+function roundIn(round, phase, played) {
+  return round.games.every((g) => {
+    if (g.ifNeeded || phase.kind === 'tiebreak') return true;
+    if (!g.a && !g.b) return true;
+    if (!teamOf(g.a) || !teamOf(g.b)) return false;
+    return played.has(gameKey(round.round, g));
+  });
+}
+
+/**
+ * The last round of an unbroken run of finished rounds from the first:
+ * the stats a TD can compile without a half-played round. 0 when the
+ * first round isn't finished; rounds with no games are skipped over.
+ */
+export function finishedThrough(schedule, matches) {
+  if (!schedule || !Array.isArray(schedule.phases)) return 0;
+  const played = playedMap(matches);
+  const rounds = schedule.phases.flatMap((ph) => ph.rounds.map((r) => ({ r, ph })))
+    .filter(({ r }) => r.games.length).sort((x, y) => x.r.round - y.r.round);
+  let last = 0;
+  for (const { r, ph } of rounds) {
+    if (!roundIn(r, ph, played)) break;
+    last = r.round;
+  }
+  // a final or tiebreaker nobody played (not needed, or not yet) doesn't
+  // stretch the run: it ends at the last round with a game in
+  const playedRounds = [...played.keys()].map((k) => Number(k.split('|')[0])).filter((n) => n <= last);
+  return playedRounds.length ? Math.max(...playedRounds) : 0;
+}

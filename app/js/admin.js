@@ -28,7 +28,7 @@ import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
-  hasPlaceholders, prelimProgress, prelimRounds, autoFill } from '../engine/schedule.js';
+  hasPlaceholders, prelimProgress, prelimRounds, autoFill, finishedThrough } from '../engine/schedule.js';
 import { finalsProgress, finalsFill } from '../engine/finals.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
@@ -2194,6 +2194,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         </div>
         <div class="railblock">
           <div class="railhead"><b>Stats</b></div>
+          <div id="statrange">${statRangeHtml(t, files)}</div>
           <div class="statbtns">
             <button id="calc">Compute</button>
             <div class="dlwrap">
@@ -2354,6 +2355,91 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   });
   $('addgame').onclick = () => addGame(a, buckets);
   $('calc').onclick = () => computeStats(a, t, buckets, files, settings);
+  wireStatRange(t, files);
+}
+
+/* ---------- which games the stats use ----------
+   One or the other: By stage (tick the stages to include), or Finished
+   rounds only — every round up to the first one still missing a game (a
+   round counts once all its games are in). Compute and every download
+   follow; the public page and Rebuild public stats always use every game.
+   The choice lasts the session, per tournament. */
+
+let statPick = null; // {tid, off: [phase index], finished}
+const pickFor = (t) => {
+  if (!statPick || statPick.tid !== t.id) statPick = { tid: t.id, off: [], finished: false };
+  return statPick;
+};
+// the schedule's stages that have games: [{i, name, lo, hi}]
+function statStages() {
+  if (!sched || !Array.isArray(sched.phases)) return [];
+  return sched.phases.map((ph, i) => {
+    const rounds = ph.rounds.filter((r) => r.games.length).map((r) => r.round);
+    return rounds.length ? { i, name: ph.name, lo: Math.min(...rounds), hi: Math.max(...rounds) } : null;
+  }).filter(Boolean);
+}
+// uploads as just enough of a game for finishedThrough: the round and the two teams
+function filesAsGames(files) {
+  return files.map((f) => {
+    let x = f.summary;
+    if (typeof x === 'string') { try { x = JSON.parse(x); } catch (e) { x = null; } }
+    return (f.kind === 'qbj' || f.kind === 'combined') && !f.error && x && Array.isArray(x.teams) && x.teams.length === 2
+      ? { round: f.round, teams: x.teams.map((name) => ({ name: String(name), points: 0 })) } : null;
+  }).filter(Boolean);
+}
+// the rounds the stats use, from the pick: a Set, or null for every round
+function statRounds(t, games) {
+  const st = statStages();
+  if (!st.length) return null;
+  const pick = pickFor(t);
+  const out = new Set();
+  if (pick.finished) {
+    const through = finishedThrough(sched, games);
+    for (const x of st) for (const r of sched.phases[x.i].rounds) if (r.round <= through) out.add(r.round);
+    return out;
+  }
+  if (!pick.off.length) return null;
+  for (const x of st) {
+    if (pick.off.includes(x.i)) continue;
+    for (const r of sched.phases[x.i].rounds) out.add(r.round);
+  }
+  return out;
+}
+const roundSpan = (n) => (n.length === 1 ? 'round ' + n[0] : `rounds ${n[0]}–${n[n.length - 1]}`);
+function statRangeHtml(t, files) {
+  const st = statStages();
+  if (!st.length) return '';
+  const pick = pickFor(t);
+  const through = finishedThrough(sched, filesAsGames(files));
+  const span = (lo, hi) => (lo === hi ? `Round ${lo}` : `Rounds ${lo}–${hi}`);
+  return `<div class="statpick" role="radiogroup" aria-label="Games in the stats">
+    <label class="pkcheck small"><input type="radio" name="statmode" value="stages" ${pick.finished ? '' : 'checked'}> By stage</label>
+    <div class="statstages">${st.map((x) => `<label class="pkcheck small"><input type="checkbox" data-statph="${x.i}"
+      ${pick.off.includes(x.i) ? '' : 'checked'} ${pick.finished ? 'disabled' : ''}>
+      ${esc(x.name)} <span class="muted">(${span(x.lo, x.hi).toLowerCase()})</span></label>`).join('')}</div>
+    <label class="pkcheck small"><input type="radio" name="statmode" value="finished" ${pick.finished ? 'checked' : ''}>
+      Finished rounds only <span class="muted">(${through ? span(1, through) : 'none yet'})</span></label>
+  </div>`;
+}
+function wireStatRange(t, files) {
+  const box = $('statrange');
+  if (!box) return;
+  const redo = () => {
+    box.innerHTML = statRangeHtml(t, files);
+    wireStatRange(t, files);
+    if (lastStats && lastStats.t.id === t.id) showStats(lastStats);
+  };
+  box.querySelectorAll('[data-statph]').forEach((el) => {
+    el.onchange = () => {
+      const pick = pickFor(t);
+      const i = Number(el.dataset.statph);
+      pick.off = el.checked ? pick.off.filter((x) => x !== i) : [...pick.off, i];
+      redo();
+    };
+  });
+  box.querySelectorAll('input[name="statmode"]').forEach((el) => {
+    el.onchange = () => { pickFor(t).finished = el.value === 'finished'; redo(); };
+  });
 }
 
 /* ---------- editing a game a room already turned in ----------
@@ -2792,11 +2878,34 @@ async function computeStats(a, t, buckets, files, settings) {
   try {
     got = await collectMatches(a, t, buckets, files, (done) => run.step(done));
   } finally { run.end(); }
-  const { roster, matches, raw, games, errors } = got;
+  lastStats = { a, t, buckets, files, settings, got };
+  showStats(lastStats);
+}
 
-  if (!matches.length) {
+let lastStats = null; // the games Compute fetched, so a new pick needs no refetch
+function showStats({ a, t, files, settings, got }) {
+  const out = $('statsout');
+  if (!out) return;
+  // the stages and rounds picked (statRounds); null keeps every game
+  const keepRounds = statRounds(t, got.matches);
+  const inPick = (x) => !keepRounds || keepRounds.has(x.round);
+  const { roster, errors } = got;
+  const matches = got.matches.filter(inPick);
+  const raw = got.raw.filter(inPick);
+  const games = got.games.filter(inPick);
+  const allRaw = got.raw;
+  out.innerHTML = '';
+
+  if (!got.matches.length) {
     out.innerHTML = `<div class="bad">No readable game files</div>
       ${errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')}`;
+    return;
+  }
+  if (!matches.length) {
+    // nothing to download until the pick holds a game
+    out.innerHTML = '<div class="muted">No games are in the stages and rounds picked.</div>';
+    $('dlmenu').disabled = true;
+    $('statsnote').textContent = 'No games in these stats';
     return;
   }
 
@@ -2825,7 +2934,13 @@ async function computeStats(a, t, buckets, files, settings) {
   for (const id of ['dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild']) $(id).disabled = false;
   const closeMenu = () => { $('dlpanel').hidden = true; $('dlmenu').setAttribute('aria-expanded', 'false'); };
   // games, not files: a re-exported game counts once, as it does in the stats
-  $('statsnote').textContent = `${exportOpts.matches.length} ${exportOpts.matches.length === 1 ? 'game' : 'games'} in these stats`;
+  const n = exportOpts.matches.length;
+  const nGames = `${n} ${n === 1 ? 'game' : 'games'}`;
+  const kept = keepRounds ? [...keepRounds].sort((x, y) => x - y) : null;
+  const stages = statStages().filter((x) => !pickFor(t).off.includes(x.i)).map((x) => x.name);
+  $('statsnote').textContent = !kept ? `${nGames} in these stats`
+    : pickFor(t).finished || stages.length === statStages().length ? `${nGames} in ${kept.length ? roundSpan(kept) : 'no rounds'}`
+      : `${nGames} in ${andList(stages)}`;
   const yft = (name, text) => {
     try { download(name, text, 'application/json'); closeMenu(); }
     catch (e) { say(e.message, true); }
@@ -2879,7 +2994,7 @@ async function computeStats(a, t, buckets, files, settings) {
     for (const r of raw) add(r.round, r.filename, r.text);
     for (const g of games) add(g.round, g.filename, g.text);
     // game files that went up separately from their .qbj (Add a game)
-    for (const f of files.filter((x) => x.kind === 'game')) {
+    for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
       try { add(f.round, f.filename, JSON.stringify(await fetchOwnedJson(a, f.r2_key))); }
       catch (e) { /* bundle still useful without it */ }
     }
@@ -2891,10 +3006,11 @@ async function computeStats(a, t, buckets, files, settings) {
   };
   $('rebuild').disabled = false;
   $('rebuild').onclick = async () => {
-    const batches = Math.ceil(raw.length / REBUILD_BATCH);
+    // the public stats always hold every game, whatever the pick
+    const batches = Math.ceil(allRaw.length / REBUILD_BATCH);
     const run = busy($('rebuild'), { label: 'Rebuilding', total: batches, scope: $('rebuild').closest('.row') });
     try {
-      const entries = raw.map((r) => ({
+      const entries = allRaw.map((r) => ({
         id: r.id, round: r.round, room: r.room, filename: r.filename,
         qbj: JSON.parse(r.text),
       }));
