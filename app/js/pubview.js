@@ -982,13 +982,14 @@ const markWords = (x) => [x.ug && 'Undergraduate', x.d2 && 'Division II'].filter
 // The New layout's stage pick: a stage's name, or 'combined'; null until
 // the viewer picks (pickStage then opens the stage being played)
 let statStage = null;
-// the stages offered, latest first, each with its own rounds (Combined
+// the stages offered in the order they're played (Prelims, then
+// Playoffs; Combined after them), each with its own rounds (Combined
 // needs the final places, so no stages without them)
 function statStages(all) {
   if (!all.stageStandings || !all.combined) return [];
   const out = [];
   for (const sec of all.stageStandings) if (!out.some((x) => x.name === sec.stage)) out.push({ name: sec.stage, own: sec.own });
-  return out;
+  return out.reverse(); // stageStandings run latest first
 }
 // the viewer's pick while it's offered; else Combined once the tournament
 // is over, or the stage of the round being played, or the latest. A grid
@@ -999,7 +1000,7 @@ function pickStage(stages, grid) {
   if (statStage && offered(statStage)) return statStage;
   if (finished() && !grid) return 'combined';
   const cur = liveRound();
-  return (stages.find((x) => x.own && x.own.includes(cur)) || stages[0]).name;
+  return (stages.find((x) => x.own && x.own.includes(cur)) || stages[stages.length - 1]).name;
 }
 
 function newStandings(rd, ids, vals, pp, { chips = '', stage = null } = {}) {
