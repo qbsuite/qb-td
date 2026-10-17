@@ -10,6 +10,7 @@ Release Notes for 10/16/2026
 - Scoresheets: each game's tossups in order, with who buzzed, bonus parts, categories, substitutions and the running score.
 - Scoresheets sit beside a game's tables on the Scoreboard, in Classic and New, once all games in its round finish.
 - A Scoresheets switch on the stats page unlocks them with the stats password, then shows or hides them.
+- Compute stats counts a game uploaded twice as one game in its total.
 
 [ HUB ]
 - The password field stays open, with what was typed, when the hub refreshes.
@@ -26,6 +27,8 @@ Release Notes for 10/16/2026
 - Finals has a Final menu: the advantaged final if needed, a one game final if needed, or a one game final that is always played.
 - Brackets are named for the places they decide (1st–6th place, 7th–12th place) instead of 1st–2nd, 3rd–4th and so on.
 - Brackets can be renamed in the schedule editor.
+- Finals slots fill themselves once the bracket they come from finishes: by record, then points per 20, carried-over games counted.
+- A tie for a Finals place is noted on the Live Hub; with a Tiebreakers phase it waits for the TD, as playoff ties do.
 
 [ SETUP ]
 - Tournaments get a Bye Room, shown below the rooms, to read packets to teams on a bye or anyone else. Several readers can share its link.
@@ -33,6 +36,10 @@ Release Notes for 10/16/2026
 [ READER ]
 - The Bye Room reads any round already played or the round being played, and saves nothing.
 - The Bye Room fills in the round's teams on a bye, and lists them when there are more than two.
+
+[ PERFORMANCE ]
+- The hub loads faster: the roster, schedule and tiebreakers are fetched together.
+- Compute stats, exports and playoff filling read six game files at a time, about four times faster on a full day.
 
 [ MISC ]
 - Discord alerts link to the public page at its full address, with /qb-td/app.

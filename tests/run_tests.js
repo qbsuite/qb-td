@@ -28,6 +28,8 @@ import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoic
 import { checkPacket } from '../app/engine/packetcheck.js';
 import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms } from '../app/engine/plan.js';
 import HDWHITE from '../app/engine/hdwhite.js';
+import { finalsSources, finalsProgress, finalsFill } from '../app/engine/finals.js';
+import { eachLimit } from '../app/js/limit.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -4595,6 +4597,165 @@ test('catTag: subcategory initials, else the category\'s short form, else cut to
   assert.equal(catTag({ c: 'Science', s: 'Social Science: Political' }).family, 'rmp');
   assert.equal(tag('Science', 'Social Science: Political'), 'SS');
   assert.equal(catTag(null), null);
+});
+
+
+/* ---------- finals fill themselves (finals.js) ---------- */
+
+// UIUC's shape: pools of 8/7/7, brackets of 6/6/6/4 carrying pool-mates'
+// games, then an advantaged final between 1st and 2nd of the top bracket
+function finalsDay(seed, opts = {}) {
+  const teams = planTeams(22);
+  const P = [planPhase('Prelims', { groups: 3 }), planPhase('Playoffs', { sizes: [6, 6, 6, 4], carry: true })];
+  const s = buildPlan(teams, planRooms(11), P, 'snake', 1);
+  if (opts.tiebreak) s.phases.push({ name: 'Tiebreakers', rounds: [{ round: 12, games: [], byes: [] }], meet: 1, kind: 'tiebreak' });
+  addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P);
+  const rnd = mulberry32(seed);
+  const game = (round, a, b, tens) => {
+    const t = tens || [4 + Math.floor(rnd() * 8), 4 + Math.floor(rnd() * 8)];
+    if (t[0] === t[1]) t[0]++;
+    return { round, tossupsRead: 20, teams: [{ name: a, points: t[0] * 20, bonusPoints: t[0] * 10, players: [] },
+      { name: b, points: t[1] * 20, bonusPoints: t[1] * 10, players: [] }] };
+  };
+  const games = prelimRounds(s).flatMap((r) => r.games.map((g) => game(r.round, g.a.team, g.b.team)));
+  fillPlaceholders(s, fillReport(s, aggregate(games)).ranks);
+  for (const r of s.phases[1].rounds) for (const g of r.games) games.push(game(r.round, g.a.team, g.b.team, opts.tens && opts.tens(g)));
+  let id = 0;
+  const files = games.map((m) => ({ id: ++id, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
+  return { s, games, files };
+}
+const finalTeams = (s) => s.phases.find((ph) => ph.kind === 'final').rounds.map((r) => r.games.map((g) => [g.a.team || g.a.label, g.b.team || g.b.label]));
+
+test('finals: the source is the top bracket, its carryover the same as the YellowFruit file\'s', () => {
+  const { s, games } = finalsDay(5);
+  const src = finalsSources(s);
+  assert.equal(src.length, 1);
+  assert.deepEqual([src[0].name, src[0].places, src[0].teams.length, src[0].games.length], ['1st–6th place', [1, 2], 6, 12]);
+  // A1/A2, B1/B2, C1/C2 were pool-mates and don't meet again: those three games carry
+  assert.equal(src[0].carry, true);
+  assert.equal(src[0].carried.length, 3);
+  const yf = yfStages(s, games);
+  assert.equal(yf.stages[1].pools.find((p) => p.name === '1st–6th place').carry, src[0].carry);
+});
+
+test('finals: nothing fills while a game of the top bracket is missing', () => {
+  const { s, games, files } = finalsDay(5);
+  const src = finalsSources(s)[0];
+  const g = src.games[3];
+  const drop = files.findIndex((f) => f.round === g.round && JSON.parse(f.summary).teams.sort().join() === [g.a, g.b].sort().join());
+  const fewer = files.filter((_, i) => i !== drop);
+  assert.deepEqual(finalsProgress(s, fewer).ready, []);
+  // a game of another bracket missing doesn't hold the finals
+  const other = files.findIndex((f) => f.round === 11 && !src.teams.includes(JSON.parse(f.summary).teams[0]));
+  assert.deepEqual(finalsProgress(s, files.filter((_, i) => i !== other)).ready, ['1st–6th place']);
+  // and the games read are only that bracket's and its carried prelim games
+  const prog = finalsProgress(s, files);
+  assert.equal(prog.files.length, 15);
+  assert.equal(finalsFill(s, [], prog.ready).filled, 0, 'no games read: nothing fills');
+});
+
+test('finals: filled from the bracket\'s standings, net wins then points per 20, carryover counted', () => {
+  for (const seed of [5, 9, 13, 21, 34]) {
+    const { s, games, files } = finalsDay(seed);
+    const src = finalsSources(s)[0];
+    const prog = finalsProgress(s, files);
+    const res = finalsFill(s, games, prog.ready);
+    const carried = new Set(src.carried.map((c) => [c.a, c.b].sort().join('\n')));
+    const mine = games.filter((m) => m.teams.every((t) => src.teams.includes(t.name))
+      && (m.round >= 8 || carried.has(m.teams.map((t) => t.name).sort().join('\n'))));
+    assert.equal(mine.length, 15, `seed ${seed}: 12 bracket games and 3 carried`);
+    const order = aggregate(mine).teams.map((t) => t.name);
+    assert.equal(res.filled, 4, `seed ${seed}`);
+    assert.deepEqual(finalTeams(res.schedule), [[[order[0], order[1]]], [[order[0], order[1]]]], `seed ${seed}`);
+    assert.deepEqual(res.brackets, ['1st–6th place']);
+    assert.equal(hasPlaceholders(res.schedule), false);
+    // the slots keep where they came from, as playoff slots do
+    assert.equal(res.schedule.phases[2].rounds[0].games[0].a.from, '1st in 1st–6th place');
+    // the original is untouched
+    assert.equal(s.phases[2].rounds[0].games[0].a.label, '1st in 1st–6th place');
+  }
+});
+
+test('finals: a tie for a finals place is settled by points per 20 and noted; with a Tiebreakers phase it waits', () => {
+  // a seed whose top bracket has a tie reaching a finals place
+  let found = null;
+  for (let seed = 1; seed < 200 && !found; seed++) {
+    const d = finalsDay(seed);
+    const res = finalsFill(d.s, d.games, finalsProgress(d.s, d.files).ready);
+    if (res.ties.length) found = { seed, res };
+  }
+  assert.ok(found, 'a seed with a tie');
+  const x = found.res.ties[0];
+  assert.ok(x.teams.length > 1 && x.teams.some((tm) => tm.place <= 2));
+  assert.ok(x.teams.every((tm, i) => !i || tm.pp20tuh <= x.teams[i - 1].pp20tuh), 'points per 20, best first');
+  const d = finalsDay(found.seed, { tiebreak: true });
+  const prog = finalsProgress(d.s, d.files);
+  const held = finalsFill(d.s, d.games, prog.ready);
+  assert.equal(held.filled, 0);
+  assert.equal(held.held.length, 1);
+  assert.equal(held.held[0].record, x.record);
+  // the TD says use points per 20
+  const forced = finalsFill(d.s, d.games, prog.ready, ['1st–6th place']);
+  assert.equal(forced.filled, 4);
+  assert.equal(forced.ties.length, 1);
+});
+
+test('finals: a top bracket game uploaded under the wrong team name waits', () => {
+  const { s, games, files } = finalsDay(5);
+  const src = finalsSources(s)[0];
+  const g = src.games[0];
+  const bad = games.map((m) => (m.round === g.round && m.teams.map((t) => t.name).sort().join() === [g.a, g.b].sort().join()
+    ? { ...m, teams: [{ ...m.teams[0], name: m.teams[0].name + ' (typo)' }, m.teams[1]] } : m));
+  assert.equal(finalsFill(s, bad, finalsProgress(s, files).ready).filled, 0);
+});
+
+test('finals: a round robin\'s final, and pools whose winners meet, fill too', () => {
+  const ph = planPhase;
+  for (const [teams, phases, rooms, labels] of [
+    [planTeams(8), [ph('Round robin')], 4, ['1st in Round robin', '2nd in Round robin']],
+    [planTeams(10), [ph('Prelims', { groups: 2 })], 5, ['1st in Pool A', '1st in Pool B']],
+  ]) {
+    const s = buildPlan(teams, planRooms(rooms), phases, 'snake', 1);
+    addFinals(s, planGroups(teams, phases, 'snake', () => 0.5), phases);
+    const fin = s.phases[s.phases.length - 1].rounds[0].games[0];
+    assert.deepEqual([fin.a.label, fin.b.label], labels);
+    // the lower-numbered team wins every game
+    const games = s.phases[0].rounds.flatMap((r) => r.games.map((g) => {
+      const n = (x) => Number(x.slice(1));
+      const [w, l] = n(g.a.team) < n(g.b.team) ? [g.a.team, g.b.team] : [g.b.team, g.a.team];
+      return { round: r.round, tossupsRead: 20, teams: [{ name: w, points: 300, bonusPoints: 100, players: [] }, { name: l, points: 100, bonusPoints: 30, players: [] }] };
+    }));
+    let id = 0;
+    const files = games.map((m) => ({ id: ++id, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
+    const res = finalsFill(s, games, finalsProgress(s, files).ready);
+    const got = res.schedule.phases[res.schedule.phases.length - 1].rounds[0].games[0];
+    const want = s.pools ? Object.values(s.pools).map((m) => m.slice().sort((x, y) => Number(x.slice(1)) - Number(y.slice(1)))[0]) : ['T1', 'T2'];
+    assert.deepEqual([got.a.team, got.b.team], want, labels.join(' / '));
+  }
+});
+
+await testA('eachLimit: any count of items, in order, never more than n at once, failures kept apart', async () => {
+  for (const count of [0, 1, 2, 5, 6, 7, 11, 12, 13, 113]) {
+    for (const n of [1, 6, 50]) {
+      let running = 0, most = 0;
+      const calls = new Array(count).fill(0);
+      const progress = [];
+      const out = await eachLimit(Array.from({ length: count }, (_, i) => i), n, async (x, i) => {
+        calls[i]++;
+        running++; most = Math.max(most, running);
+        await new Promise((r) => setTimeout(r, (x * 7) % 5));
+        running--;
+        if (x % 5 === 3) throw new Error('bad ' + x);
+        return x * 10;
+      }, (done, total) => progress.push([done, total]));
+      assert.equal(out.length, count, `${count}/${n}`);
+      assert.ok(calls.every((c) => c === 1), `${count}/${n}: each item once`);
+      assert.ok(most <= n, `${count}/${n}: at most ${n} at once (${most})`);
+      out.forEach((o, i) => (i % 5 === 3 ? assert.equal(o.error.message, 'bad ' + i) : assert.equal(o.value, i * 10)));
+      assert.deepEqual(progress.map((p) => p[0]), Array.from({ length: count }, (_, i) => i + 1), `${count}/${n}: progress counts up`);
+      assert.ok(progress.every((p) => p[1] === count));
+    }
+  }
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

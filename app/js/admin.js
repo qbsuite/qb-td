@@ -28,11 +28,13 @@ import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimProgress, prelimRounds, autoFill } from '../engine/schedule.js';
+import { finalsProgress, finalsFill } from '../engine/finals.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
+import { eachLimit } from './limit.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
 
 const $ = (id) => document.getElementById(id);
@@ -71,6 +73,8 @@ window.qtd = { copy }; // for inline onclick handlers
 const LINKS_KEY = 'qbtdAdminLinks';
 // Games per rebuild request; must not exceed the Worker's MAX_REBUILD.
 const REBUILD_BATCH = 200;
+// Game files read at once by Compute stats and the playoff fill
+const FETCH_AT_ONCE = 6;
 
 function savedLinks() {
   try {
@@ -318,6 +322,10 @@ async function showDetail(quiet = false, held = null) {
   const t = detail.tournament;
   saveLink({ secret: adminSecret, slug: t.slug, name: t.name,
     closes: t.closes, created: t.created });
+  // the route, not the blob: on a set's mirror the pool is the set's
+  // backup questions (read live) followed by this tournament's own.
+  // Asked for now, alongside the roster and schedule, not after them.
+  const tbReq = pub(a + '/tiebreakers').catch(() => null);
   await ensureSched(a, t);
   // a tournament with rooms always has a bye room: made here, once
   if (await ensureByeRoom(a, t, detail.buckets)) return showDetail(quiet, held);
@@ -325,10 +333,7 @@ async function showDetail(quiet = false, held = null) {
   const byeId = byeIdOf(t);
   detail.byeRoom = detail.buckets.find((b) => b.id === byeId) || null;
   detail.buckets = detail.buckets.filter((b) => b.id !== byeId);
-  // the route, not the blob: on a set's mirror the pool is the set's
-  // backup questions (read live) followed by this tournament's own
-  try { tbPool = await pub(a + '/tiebreakers'); }
-  catch (e) { tbPool = null; }
+  tbPool = await tbReq;
   lastDetail = detail;
   render();
   // the header isn't redrawn when the view stays put: its mark is
@@ -1461,10 +1466,12 @@ async function ensureSched(a, t) {
   // A schedule generated (or edited) while these fetches were out is newer
   // than what they bring back: keep it rather than wipe it.
   const before = sched;
-  try { schedTeams = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)).map((x) => x.name); }
-  catch (e) { schedTeams = []; }
-  let got = null;
-  try { got = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); } catch (e) { got = null; }
+  // both at once: each is a round trip to the Worker
+  const [names, got] = await Promise.all([
+    fetchOwnedJson(a, t.roster_r2_key).then((r) => parseRoster(r).map((x) => x.name), () => []),
+    fetchOwnedJson(a, `t/${t.id}/schedule.json`).catch(() => null),
+  ]);
+  schedTeams = names;
   if (sched === before) sched = got;
 }
 
@@ -2338,18 +2345,24 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
   const matches = [];
   const raw = [];   // qbj halves: the zip download + the served stats bundle
   const games = []; // game halves of combined uploads, for the zip only
-  let fetched = 0;
-  for (const f of qbjFiles) {
-    onFile(fetched++, qbjFiles.length);
+  // Each file is its own round trip to the Worker (a quarter second or
+  // more), so they're read FETCH_AT_ONCE at a time rather than one after
+  // another, then parsed in upload order so the output doesn't change.
+  // auto-fill keeps the games it has read: a pool finishing later
+  // fetches only its own
+  const got = await eachLimit(qbjFiles, FETCH_AT_ONCE, async (f) => {
+    const ck = f.id + '|' + f.size + '|' + f.created;
+    const full = cache && cache.has(ck) ? cache.get(ck) : await fetchOwnedJson(a, f.r2_key);
+    if (cache) cache.set(ck, full);
+    return full;
+  }, onFile);
+  for (const [i, f] of qbjFiles.entries()) {
     try {
       // Combined reader uploads contribute only their qbj half downstream
       // (the game half carries the full packet text; the TO's zip gets it
       // as the separate MODAQ game file).
-      // auto-fill keeps the games it has read: a pool finishing later
-      // fetches only its own
-      const ck = f.id + '|' + f.size + '|' + f.created;
-      const full = cache && cache.has(ck) ? cache.get(ck) : await fetchOwnedJson(a, f.r2_key);
-      if (cache) cache.set(ck, full);
+      if (got[i].error) throw got[i].error;
+      const full = got[i].value;
       const payload = matchPayload(full);
       const m = parseMatch(payload, { filename: f.filename });
       const room = buckets.find((b) => b.id === f.bucket_id);
@@ -2386,39 +2399,68 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
    kept. It fills the saved schedule, not this tab's copy, and leaves it
    alone while the TD has unsaved schedule edits. Ties for different
    brackets go by points per 20 tossups heard, unless the schedule has a
-   Tiebreakers phase: then those slots wait for the TD (autoFill). */
-let autoSig = null;           // prelim uploads last looked at
+   Tiebreakers phase: then those slots wait for the TD (autoFill).
+   The Finals ("1st in 1st–6th place") fill the same way once that
+   bracket's games are all in, ranked on its own games plus the ones its
+   pool-mates carry over (finals.js). */
+let autoSig = null;           // uploads last looked at
 let autoBusy = false;
-let autoWait = { held: [], odd: [] }; // what waits for the TD, for the Live Hub
-let autoForce = [];           // pools the TD said to fill anyway
+let autoWait = { held: [], odd: [], finals: [] }; // what waits for the TD, for the Live Hub
+let autoForce = [];           // pools (and 'F:' + a finals bracket) the TD said to fill anyway
 const autoCache = new Map();  // game files already read
 
 async function autoFillSlots(force = false) {
-  if (autoBusy || !lastDetail || !sched || schedDirty || !sched.pools || !hasPlaceholders(sched)) return;
+  if (autoBusy || !lastDetail || !sched || schedDirty || !hasPlaceholders(sched)) return;
   if (shownView === 'setup' && setupTab === 'sched') return; // the editor holds this schedule
   const { tournament: t, buckets, files } = lastDetail;
   if (!t.started) return;
-  const prog = prelimProgress(sched, files);
-  if (!prog.ready.length || (prog.sig === autoSig && !force)) return;
+  const prog = sched.pools ? prelimProgress(sched, files) : { ready: [], files: [], sig: '' };
+  const fin = finalsProgress(sched, files);
+  const sig = prog.sig + '#' + fin.sig;
+  if ((!prog.ready.length && !fin.ready.length) || (sig === autoSig && !force)) return;
   autoBusy = true;
   const a = '/a/' + adminSecret;
   try {
-    const { matches, roster } = await collectMatches(a, t, buckets, prog.files, () => {}, autoCache);
+    const ids = new Set();
+    const need = [...prog.files, ...fin.files].filter((f) => !ids.has(f.id) && ids.add(f.id));
+    const { matches, roster } = await collectMatches(a, t, buckets, need, () => {}, autoCache);
     if (!matches.length) return;
-    const agg = aggregate(matches, roster);
     const saved = await fetchOwnedJson(a, `t/${t.id}/schedule.json`).catch(() => null);
     if (!saved || schedDirty) return;
-    autoSig = prog.sig;
-    const res = autoFill(saved, agg, prelimProgress(saved, files).ready, autoForce);
-    autoWait = { held: res.held, odd: res.odd };
-    if (res.filled) {
-      const had = new Set((saved.filled || []).map((x) => x.pool + ' ' + x.record));
-      res.schedule.filled = [...(saved.filled || []), ...res.ties.filter((x) => !had.has(x.pool + ' ' + x.record))
-        .map((x) => ({ pool: x.pool, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, bracket: tm.bracket })) }))];
-      await pub(a + '/schedule', { method: 'POST', json: res.schedule });
+    autoSig = sig;
+    let next = saved;
+    const said = [];
+    if (saved.pools && prog.ready.length) {
+      // pools rank on their prelim games only
+      const poolIds = new Set(prog.files.map((f) => f.id));
+      const agg = aggregate(matches.filter((m) => poolIds.has(m.fileId)), roster);
+      const res = autoFill(next, agg, prelimProgress(next, files).ready, autoForce.filter((x) => !x.startsWith('F:')));
+      autoWait = { ...autoWait, held: res.held, odd: res.odd };
+      if (res.filled) {
+        const had = new Set((next.filled || []).map((x) => x.pool + ' ' + x.record));
+        res.schedule.filled = [...(next.filled || []), ...res.ties.filter((x) => !had.has(x.pool + ' ' + x.record))
+          .map((x) => ({ pool: x.pool, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, bracket: tm.bracket })) }))];
+        next = res.schedule;
+        said.push(res.pools.length ? `the playoff slots from ${res.pools.length > 1 ? 'pools' : 'pool'} ${andList(res.pools)}` : 'some playoff slots');
+      }
+    }
+    const fp = finalsProgress(next, files);
+    if (fp.ready.length) {
+      const res = finalsFill(next, matches, fp.ready, autoForce.filter((x) => x.startsWith('F:')).map((x) => x.slice(2)));
+      autoWait = { ...autoWait, finals: res.held };
+      if (res.filled) {
+        const had = new Set((next.filled || []).map((x) => (x.pool || x.bracket) + ' ' + x.record));
+        res.schedule.filled = [...(next.filled || []), ...res.ties.filter((x) => !had.has(x.bracket + ' ' + x.record))
+          .map((x) => ({ bracket: x.bracket, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, place: tm.place })) }))];
+        next = res.schedule;
+        said.push(`the Finals from ${andList(res.brackets)}`);
+      }
+    }
+    if (next !== saved) {
+      await pub(a + '/schedule', { method: 'POST', json: next });
       if (schedDirty) return;
-      sched = res.schedule;
-      say(res.pools.length ? `Filled the playoff slots from ${res.pools.length > 1 ? 'pools' : 'pool'} ${andList(res.pools)}` : 'Filled some playoff slots');
+      sched = next;
+      say('Filled ' + andList(said));
     } else sched = saved;
     if (shownView === 'live') render();
   } catch (e) {
@@ -2426,31 +2468,50 @@ async function autoFillSlots(force = false) {
   } finally { autoBusy = false; }
 }
 const andList = (xs) => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
+const ordinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
 
 // The Live Hub's Playoffs line: ties points per 20 settled, and pools
-// waiting for the TD. Gone once a playoff game is in.
+// waiting for the TD. Gone once a playoff game is in. The Finals line the
+// same, gone once a finals game is in.
 function playoffNoteHtml(files) {
   if (!sched) return '';
+  const played = (rounds) => files.some((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && rounds.has(f.round));
   const prelim = new Set(prelimRounds(sched).map((r) => r.round));
-  if (files.some((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && Number.isInteger(f.round) && !prelim.has(f.round))) return '';
-  const lines = [];
-  for (const x of sched.filled || []) {
-    lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} were tied at ${esc(x.record)}, so points per 20 decided their places.`);
+  const all = new Set(sched.phases.flatMap((ph) => ph.rounds.map((r) => r.round)));
+  const out = [];
+  if (![...all].some((n) => !prelim.has(n) && played(new Set([n])))) {
+    const lines = [];
+    for (const x of (sched.filled || []).filter((y) => y.pool)) {
+      lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} were tied at ${esc(x.record)}, so points per 20 decided their places.`);
+    }
+    for (const x of autoWait.odd) {
+      lines.push(`Pool ${esc(x.pool)} has ${x.games.map((g) => `${esc(g.a)} vs ${esc(g.b)} (round ${g.round})`).join(', ')}, which isn&rsquo;t on the schedule.
+        <button class="linkbtn" data-fillpool="${esc(x.pool)}">Fill anyway</button>`);
+    }
+    for (const x of autoWait.held) {
+      const by = {};
+      x.teams.forEach((tm) => { by[tm.bracket] = (by[tm.bracket] || 0) + 1; });
+      const spots = Object.entries(by).map(([b, n]) => `${n === 1 ? 'one spot' : n + ' spots'} in ${esc(b)}`);
+      lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${andList(spots)}.
+        <button class="linkbtn" data-fillpool="${esc(x.pool)}">Use points per 20</button>`);
+    }
+    if (lines.length) out.push(['Playoffs', lines]);
   }
-  for (const x of autoWait.odd) {
-    lines.push(`Pool ${esc(x.pool)} has ${x.games.map((g) => `${esc(g.a)} vs ${esc(g.b)} (round ${g.round})`).join(', ')}, which isn&rsquo;t on the schedule.
-      <button class="linkbtn" data-fillpool="${esc(x.pool)}">Fill anyway</button>`);
+  const finalRounds = new Set(sched.phases.filter((ph) => ph.kind === 'final').flatMap((ph) => ph.rounds.map((r) => r.round)));
+  if (finalRounds.size && !played(finalRounds)) {
+    const lines = [];
+    const places = (teams) => andList(teams.map((tm) => ordinal(tm.place)));
+    for (const x of (sched.filled || []).filter((y) => y.bracket)) {
+      lines.push(`${esc(x.bracket)}: ${esc(andList(x.teams.map((tm) => tm.name)))} were tied at ${esc(x.record)}, so points per 20 decided their places.`);
+    }
+    for (const x of autoWait.finals) {
+      lines.push(`${esc(x.bracket)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${places(x.teams)} place.
+        <button class="linkbtn" data-fillpool="${esc('F:' + x.bracket)}">Use points per 20</button>`);
+    }
+    if (lines.length) out.push(['Finals', lines]);
   }
-  for (const x of autoWait.held) {
-    const by = {};
-    x.teams.forEach((tm) => { by[tm.bracket] = (by[tm.bracket] || 0) + 1; });
-    const spots = Object.entries(by).map(([b, n]) => `${n === 1 ? 'one spot' : n + ' spots'} in ${esc(b)}`);
-    lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${andList(spots)}.
-      <button class="linkbtn" data-fillpool="${esc(x.pool)}">Use points per 20</button>`);
-  }
-  if (!lines.length) return '';
-  return `<div class="banner playoffnote"><span style="font-weight:600">Playoffs</span>
-    <div>${lines.map((l) => `<div>${l}</div>`).join('')}</div></div>`;
+  return out.map(([head, lines]) => `<div class="banner playoffnote"><span style="font-weight:600">${head}</span>
+    <div>${lines.map((l) => `<div>${l}</div>`).join('')}</div></div>`).join('');
 }
 
 async function computeStats(a, t, buckets, files, settings) {
@@ -2496,7 +2557,8 @@ async function computeStats(a, t, buckets, files, settings) {
   $('dlmenu').disabled = false;
   for (const id of ['dlyft4', 'dlyft3', 'dlreport', 'dlzip', 'rebuild']) $(id).disabled = false;
   const closeMenu = () => { $('dlpanel').hidden = true; $('dlmenu').setAttribute('aria-expanded', 'false'); };
-  $('statsnote').textContent = `${matches.length} games in these stats`;
+  // games, not files: a re-exported game counts once, as it does in the stats
+  $('statsnote').textContent = `${exportOpts.matches.length} ${exportOpts.matches.length === 1 ? 'game' : 'games'} in these stats`;
   const yft = (name, text) => {
     try { download(name, text, 'application/json'); closeMenu(); }
     catch (e) { say(e.message, true); }

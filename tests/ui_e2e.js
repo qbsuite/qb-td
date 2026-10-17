@@ -284,7 +284,13 @@ await waitJs(`document.querySelector('#view').textContent.includes('Your tournam
 ok('1 create: the tournament is on this device\'s list',
   await js(`[...document.querySelectorAll('#view a')].some((a) => a.textContent === ${q(NAME)} && a.href.includes('a=${secret}'))`));
 const A = '/a/' + secret;
-const detail = async () => (await call(A)).body;
+// the Bye Room the hub makes is kept apart, as the hub keeps it (admin.js showDetail)
+const detail = async () => {
+  const x = (await call(A)).body;
+  const bye = JSON.parse((x.tournament && x.tournament.settings) || '{}').byeRoom;
+  if (Array.isArray(x.buckets)) x.buckets = x.buckets.filter((b) => b.id !== bye);
+  return x;
+};
 let d = await detail();
 ok('1 create: the Worker has it', d.tournament && d.tournament.slug === slug, d.tournament);
 const tid = d.tournament.id;
