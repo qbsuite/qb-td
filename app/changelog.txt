@@ -1,6 +1,7 @@
 Release Notes for 10/17/2026
 
 [ LIVE HUB ]
+- A game uploaded under a team's old name, after a rename, is listed under its new name in Live now and the uploads.
 - Record a forfeit: pick the room, round and the team that forfeited. It counts as a win and a loss, with no stats, as YellowFruit counts one.
 
 [ READER ]

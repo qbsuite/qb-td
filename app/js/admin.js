@@ -36,7 +36,7 @@ import { buzzCredentials } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
 import { eachLimit } from './limit.js';
-import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary } from './protests.js';
+import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -274,6 +274,24 @@ let setupTab = 'rooms'; // active Tournament Setup sub-tab
 
 const staged = [];      // packets staged from a zip or loose files (packetsui.js)
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
+// The roster's renames (qbj.js rosterNameMap), so a game uploaded under a
+// team's old name is listed under its new one, as the stats count it.
+// Loaded once, and again after the hub saves a roster (key: null).
+const hubNames = { key: null, map: null };
+async function ensureHubNames(a, t) {
+  const key = t.roster_r2_key || '';
+  if (hubNames.key === key) return;
+  hubNames.key = key;
+  hubNames.map = null;
+  if (!key) return;
+  try { hubNames.map = rosterNameMap(parseRoster(await fetchOwnedJson(a, key))); } catch (e) { /* listed as uploaded */ }
+}
+// a file's summary (protests.js), its teams under their current names
+function fileSummary(f) {
+  const s = uploadedSummary(f);
+  if (!s || !hubNames.map) return s;
+  return { ...s, teams: s.teams.map((n) => hubNames.map.teams.get(n) || n) };
+}
 
 let rosterOpen = false;
 // structured editor working copy [{name, players, was, flags, orig}]; was:
@@ -340,6 +358,7 @@ async function showDetail(quiet = false, held = null) {
   detail.byeRoom = detail.buckets.find((b) => b.id === byeId) || null;
   detail.buckets = detail.buckets.filter((b) => b.id !== byeId);
   tbPool = await tbReq;
+  await ensureHubNames(a, t);
   lastDetail = detail;
   render();
   // the header isn't redrawn when the view stays put: its mark is
@@ -1295,6 +1314,7 @@ function renderUpPreview(a) {
       // a file qb-td can parse may be neither. Names are all either keeps.
       await pub(`${a}/roster?name=${encodeURIComponent(u.filename)}`,
         { method: 'POST', body: JSON.stringify(buildRosterQbj(lastDetail.tournament.name, teams, rosterTracking(teams))) });
+      hubNames.key = null; // the hub's listings follow the new names
       rosterUpload = null;
       rosterTeams = null;   // editor reloads from the new roster
       schedFetched = false; // schedule editor re-reads the team list
@@ -1518,6 +1538,7 @@ function renderRosterEditor(a, t) {
     try {
       await pub(`${a}/roster?name=roster.qbj`,
         { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, saving, rosterTrack), null, 2) });
+      hubNames.key = null; // the hub's listings follow the new names
       rosterTeams = null; // the editor reloads from what was saved
       rosterOpen = false;
       schedFetched = false; // schedule editor re-reads the team list
