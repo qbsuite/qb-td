@@ -58,6 +58,7 @@ a.rnd:hover { text-decoration: none; background: var(--hover-bg); }
 .matchrow .grow { flex: 1; min-width: 0; }
 .matchlinks { display: flex; gap: 14px; }
 #schedfrom { font-size: 13px; color: var(--muted); }
+#byelist { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
 .matchup { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; margin-top: 4px; line-height: 1.2; }
 .matchup .vs { font-size: 18px; font-weight: 400; color: var(--muted); }
 .linkbtn { font: inherit; font-size: 13px; color: var(--link); background: none; border: none; padding: 0; cursor: pointer; }

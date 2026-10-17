@@ -116,6 +116,37 @@ ok('detail after Start: closes 48h from Start',
   r.body.tournament.started === startedAt && r.body.tournament.closes === startedAt + 48 * 3600 * 1000,
   r.body.tournament);
 
+// The bye room (settings.byeRoom): the one room kept for reading to teams
+// on a bye. Its link reads the room after Start like a Test link, with no
+// admin secret in it; it reads the round being played and no later one,
+// and nothing it does is kept.
+{
+  const made = (await call(A + '/buckets', { method: 'POST', json: { room_name: 'Bye 1' } })).body;
+  const before = JSON.parse((await call(A)).body.tournament.settings || '{}');
+  r = await call(A, { method: 'POST', json: { settings: { ...before, byeRoom: made.id } } });
+  ok('bye room: marked', r.status === 200, r.body);
+  r = await call('/b/' + made.secret + '?test=bye');
+  ok('bye room: reads after Start, in test mode', r.status === 200 && r.body.test === true, r.body);
+  r = await call('/b/' + made.secret);
+  ok('bye room: its plain link is the same test read', r.status === 200 && r.body.test === true, r.body);
+  let res = await fetch(`${BASE}/b/${made.secret}/packet?round=1&test=bye`);
+  ok('bye room: reads the round being played', res.status === 200, res.status);
+  res = await fetch(`${BASE}/b/${made.secret}/packet?round=2&test=bye`);
+  ok('bye room: no later round', res.status === 403 || res.status === 404, res.status);
+  r = await call(`/b/${made.secret}/upload?round=1&name=bye.qbj`, { method: 'POST', body: MATCH });
+  ok('bye room: no upload', r.status === 403 && /bye room/.test(r.body.error), r.body);
+  r = await call(`/b/${made.secret}/start?round=1`, { method: 'POST' });
+  ok('bye room: no round start', r.status === 403, r.body);
+  r = await call(A);
+  ok('bye room: leaves no trace', !r.body.files.some((f) => f.bucket_id === made.id)
+    && !(r.body.starts || []).some((x) => x.bucket_id === made.id), r.body.starts);
+  // a playing room again: its link is a room's link again
+  r = await call(A, { method: 'POST', json: { settings: before } });
+  r = await call('/b/' + made.secret);
+  ok('bye room: switched off, a playing room', r.status === 200 && r.body.test === undefined, r.body);
+  await call(`${A}/buckets/${made.id}`, { method: 'DELETE' });
+}
+
 // moderator flow
 r = await call('/b/' + secret);
 ok('bucket state', r.status === 200 && r.body.room === 'Room 1' && r.body.current_round === 1, r.body);

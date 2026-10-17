@@ -319,6 +319,12 @@ async function showDetail(quiet = false, held = null) {
   saveLink({ secret: adminSecret, slug: t.slug, name: t.name,
     closes: t.closes, created: t.created });
   await ensureSched(a, t);
+  // a schedule with byes always has a bye room: made here, once
+  if (await ensureByeRoom(a, t, detail.buckets)) return showDetail(quiet, held);
+  // the bye room is kept apart: no room list, schedule or live view has it
+  const byeId = byeIdOf(t);
+  detail.byeRoom = detail.buckets.find((b) => b.id === byeId) || null;
+  detail.buckets = detail.buckets.filter((b) => b.id !== byeId);
   // the route, not the blob: on a set's mirror the pool is the set's
   // backup questions (read live) followed by this tournament's own
   try { tbPool = await pub(a + '/tiebreakers'); }
@@ -737,9 +743,38 @@ function nextRoomNumber(buckets) {
   return Math.max(n, buckets.length) + 1;
 }
 
+// The bye room (settings.byeRoom, a bucket id): one room, apart from the
+// playing rooms, to read to teams on a bye. Its link reads the reader's
+// test mode before and after Start, with no admin secret in it, and the
+// Worker keeps nothing it does.
+function byeIdOf(t) {
+  try { const s = JSON.parse(t.settings || '{}') || {}; return Number.isInteger(s.byeRoom) ? s.byeRoom : null; }
+  catch (e) { return null; }
+}
+const byeLink = (secret) => readLink(secret) + '&test=bye';
+
+// A schedule with byes gets the bye room without being asked. Made once.
+const byeMade = new Set();
+async function ensureByeRoom(a, t, buckets) {
+  if (byeMade.has(t.slug) || byeIdOf(t) !== null || !sched || !Array.isArray(sched.phases)) return false;
+  if (!sched.phases.some((ph) => (ph.rounds || []).some((r) => (r.byes || []).length))) return false;
+  byeMade.add(t.slug);
+  try {
+    const taken = new Set(buckets.map((b) => b.room_name));
+    let name = 'Bye Room';
+    for (let i = 2; taken.has(name); i++) name = 'Bye Room ' + i;
+    const room = await pub(a + '/buckets', { method: 'POST', json: { room_name: name } });
+    const settings = JSON.parse(t.settings || '{}') || {};
+    settings.byeRoom = room.id;
+    await pub(a, { method: 'POST', json: { settings } });
+    return true;
+  } catch (e) { return false; }
+}
+
 function renderRoomsSec(a, t, buckets, files) {
   const box = $('setupsec');
   const next = nextRoomNumber(buckets);
+  const bye = lastDetail && lastDetail.byeRoom;
   box.innerHTML = `
     <h2>Rooms</h2>
     ${buckets.length ? `<div class="tablewrap"><table class="roomtable">
@@ -747,10 +782,11 @@ function renderRoomsSec(a, t, buckets, files) {
       ${buckets.map((b) => {
         // names go into a JS string inside an attribute: escape for both
         const js = (s) => esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+        const link = readLink(b.secret);
         return `<tr>
           <td><input class="inlinename" data-roomrename="${b.id}" value="${esc(b.room_name)}" aria-label="Room name"></td>
-          <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(readLink(b.secret))}', '${js(b.room_name)} reader link')">Copy</button>
-            <a class="muted" href="${esc(readLink(b.secret))}" target="_blank">Open</a>${t.started ? ''
+          <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(link)}', '${js(b.room_name)} reader link')">Copy</button>
+            <a class="muted" href="${esc(link)}" target="_blank">Open</a>${t.started ? ''
               : `<a href="${esc(readLink(b.secret) + '&test=' + adminSecret)}" target="_blank">Test</a>`}</td>
           <td class="num muted">${files.filter((f) => f.bucket_id === b.id).length}</td>
           <td class="num"><button class="linkbtn muted" data-delbucket="${b.id}">Remove</button></td>
@@ -768,7 +804,14 @@ function renderRoomsSec(a, t, buckets, files) {
         <input id="roomn" type="number" min="1" max="60" value="${buckets.length ? 2 : 8}" style="width:64px">
         ${buckets.length ? 'more rooms' : 'rooms'}</label>
       <button id="mkrooms" class="primary">${buckets.length ? 'Add rooms' : 'Create rooms'}</button>
-    </div>`;
+    </div>
+    ${bye ? `<div class="byesec">
+      <div class="row byelink"><strong>Bye Room</strong>
+        <button class="linkbtn" id="copybye">Copy</button>
+        <a class="muted" href="${esc(byeLink(bye.secret))}" target="_blank">Open</a></div>
+      <p class="muted">Bye Room can be used by several readers at once and does not export or save results.</p>
+    </div>` : ''}`;
+  if ($('copybye')) $('copybye').onclick = () => copy(byeLink(bye.secret), 'Bye Room link');
   // each room's link, one a line ("Room 101: https://…"), to paste in a message
   if ($('copyrooms')) {
     $('copyrooms').onclick = () => copy(buckets.map((b) => `${b.room_name}: ${readLink(b.secret)}`).join('\n'), 'all room links');

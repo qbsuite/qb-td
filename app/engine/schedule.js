@@ -457,9 +457,12 @@ function buildBase(key, teams, rooms) {
       const perTier = tiers.map((t) => tierRounds(t, k));
       const nRounds = Math.max(...perTier.map((r) => r.length));
       const slot = (m) => ph(m.pool, m.pos);
+      // named for the overall places a bracket decides: the teams in the
+      // brackets above it come first
       const name = (t) => {
-        const lo = Math.min(...t.map((m) => m.pos)) + 1;
-        const hi = Math.max(...t.map((m) => m.pos)) + 1;
+        const before = tiers.slice(0, tiers.indexOf(t)).reduce((n, x) => n + x.length, 0);
+        const lo = before + 1;
+        const hi = before + t.length;
         return lo === hi ? ORD(lo) + ' place' : ORD(lo) + '\u2013' + ORD(hi) + ' place';
       };
       const rounds = [];
@@ -658,7 +661,14 @@ export function tagBrackets(schedule) {
           const top = (x) => x.n <= Math.ceil(size(x.pool) / 2);
           g.bracket = top(pa) && top(pb) ? add('CH', 'Championship', p) : add('CO', 'Consolation', p);
         } else if (pa.n === pb.n) {
-          g.bracket = add('F' + pa.n, ORD(pa.n) + ' place', p);
+          // the nth of each pool play for the places after the teams placed
+          // above them (pools of uneven size: only those big enough count)
+          const at = (n) => Object.values(pools).filter((ms) => ms.length >= n).length || 2;
+          let before = 0;
+          for (let n = 1; n < pa.n; n++) before += at(n);
+          const lo = before + 1;
+          const hi = before + at(pa.n);
+          g.bracket = add('F' + pa.n, lo === hi ? `${ORD(lo)} place` : `${ORD(lo)}\u2013${ORD(hi)} place`, p);
         }
         continue;
       }

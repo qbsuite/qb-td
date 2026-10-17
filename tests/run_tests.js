@@ -1286,7 +1286,7 @@ test('buildSchedule pools3x2: 22 teams into playoff brackets of 6/6/6/4, pool-ma
   // prelims are pools3's, game for game
   assert.deepEqual(s.phases[0], buildSchedule('pools3', teams, rooms(11)).phases[0]);
   assert.deepEqual(s.brackets.filter((b) => b.phase === 1).map((b) => b.name),
-    ['1st\u20132nd place', '3rd\u20134th place', '5th\u20136th place', '7th\u20138th place']);
+    ['1st\u20136th place', '7th\u201312th place', '13th\u201318th place', '19th\u201322nd place']);
 
   const po = s.phases[1];
   assert.deepEqual(po.rounds.map((r) => r.round), [8, 9, 10, 11]);
@@ -2490,7 +2490,7 @@ test('buildSchedule tags every game with a bracket, and lists the brackets with 
   assert.deepEqual(names(buildSchedule('pools2', T12, R6)),
     ['Pool A@0:0,1,2', 'Pool B@0:3,4,5', 'Championship@1:0,1,2', 'Consolation@1:3,4,5']);
   assert.deepEqual(buildSchedule('pools3', T12, R6).brackets.map((b) => b.name),
-    ['Pool A', 'Pool B', 'Pool C', '1st place', '2nd place', '3rd place', '4th place']);
+    ['Pool A', 'Pool B', 'Pool C', '1st\u20133rd place', '4th\u20136th place', '7th\u20139th place', '10th\u201312th place']);
   assert.deepEqual(buildSchedule('rr2', T12.slice(0, 6), R6).brackets.map((b) => b.name), ['Round robin 1', 'Round robin 2']);
   for (const f of allFormats(12)) {
     const s = buildSchedule(f.key, T12, R6);
@@ -2730,7 +2730,7 @@ test('fillReport: missing prelim files, uploads off the schedule, and ties that 
     const hit = pairs.find(([w, l]) => names.includes(w) && names.includes(l));
     return hit ? game(g.round, hit[0], hit[1], 300, 200) : g;
   });
-  // A[2] beats A[0]: A[0], A[1], A[2] all 6-1 for places 1-3, across 1st–2nd and 3rd–4th place
+  // A[2] beats A[0]: A[0], A[1], A[2] all 6-1 for places 1-3, across 1st–6th and 7th–12th place
   const agg = aggregate(upset([[A[2], A[0]]]));
   const tied = fillReport(s, agg);
   assert.equal(tied.ties.length, 1);
@@ -2738,12 +2738,12 @@ test('fillReport: missing prelim files, uploads off the schedule, and ties that 
   assert.equal(t.pool, 'A');
   assert.equal(t.record, '6\u20131');
   assert.deepEqual(t.teams.map((x) => x.name).sort(), [A[0], A[1], A[2]].sort());
-  assert.deepEqual(t.teams.map((x) => x.bracket), ['1st\u20132nd place', '1st\u20132nd place', '3rd\u20134th place']);
+  assert.deepEqual(t.teams.map((x) => x.bracket), ['1st\u20136th place', '1st\u20136th place', '7th\u201312th place']);
   // in the order the fill uses: points per 20 tossups heard
   for (let i = 1; i < t.teams.length; i++) assert.ok(t.teams[i - 1].pp20tuh >= t.teams[i].pp20tuh);
   assert.deepEqual(tied.ranks.A.slice(0, 3), t.teams.map((x) => x.name));
   // ties that stay inside one bracket are not notes: A[2] beats A[0] and A[3] beats A[1]
-  // gives A[0], A[2] at 6-1 (both 1st–2nd place) and A[1], A[3] at 5-2 (both 3rd–4th place)
+  // gives A[0], A[2] at 6-1 (both 1st–6th place) and A[1], A[3] at 5-2 (both 7th–12th place)
   assert.deepEqual(fillReport(s, aggregate(upset([[A[2], A[0]], [A[3], A[1]]]))).ties, []);
 });
 
@@ -4409,8 +4409,8 @@ test('addFinals: one game final if needed, and one game final always played', ()
   assert.equal(one.fin.rounds.length, 1);
   assert.equal(one.fin.rounds[0].games.length, 1);
   assert.equal(one.fin.rounds[0].games[0].ifNeeded, undefined);
-  assert.equal(one.fin.rounds[0].games[0].a.label, '1st in 1st–2nd place');
-  assert.equal(one.fin.rounds[0].games[0].b.label, '2nd in 1st–2nd place');
+  assert.equal(one.fin.rounds[0].games[0].a.label, '1st in 1st–6th place');
+  assert.equal(one.fin.rounds[0].games[0].b.label, '2nd in 1st–6th place');
   assert.deepEqual(validateSchedule(one.s), []);
   // if needed: the advantaged rule's first game, without the second
   const oneif = build('oneif');

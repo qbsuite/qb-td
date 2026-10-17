@@ -2893,6 +2893,8 @@ async function bucketSchedule(env, secret, url) {
   const norm = (x) => String(x || '').trim().toLowerCase();
   let room = rooms.findIndex((r) => r && r.bucket === b.id);
   if (room === -1) room = rooms.findIndex((r) => r && norm(r.name) === norm(b.room_name));
+  // a bye room is no room of the schedule, whatever it is called
+  if (isByeRoom(b)) room = -1;
   // brackets: every game tagged, and the bracket list with the schedule
   // editor's colours; `multi` says whether the room page should show them
   const model = bracketModel(schedule);
@@ -3151,12 +3153,28 @@ function bucketGate(env, b, test) {
   if (!b.started && !test) return err(env, 403, NOT_STARTED);
   return null;
 }
+// The bye room (settings.byeRoom: a bucket id): the one room the hub keeps
+// to read to teams on a bye, apart from the playing rooms. It is read like
+// a Test link, before Start and after it, with no admin secret in its link:
+// it reads the packets up to the round being played (never a later one),
+// and nothing it does is kept
+// — no uploads, round starts or protests. It is no room of the schedule:
+// it never counts toward a round's games or its rooms started.
+function byeRoomIds(settingsText) {
+  try { const s = JSON.parse(settingsText || '{}') || {}; return Number.isInteger(s.byeRoom) ? [s.byeRoom] : []; }
+  catch (e) { return []; }
+}
+function isByeRoom(b) { return byeRoomIds(b.settings).includes(b.id); }
+const byeRefusal = (env) => err(env, 403, 'This is a bye room, so nothing from it is saved');
+
 // The TD's Test link (admin.js renderRoomsSec): a room link that also
 // carries the tournament's own admin secret (?test=) reads the room
 // before Start, so the TD can try a game with the real packets. Reads
 // only — uploads, round starts and protests keep the gate — and only
 // until Start: from then on the link is the plain room link.
 async function testAccess(env, b, url) {
+  // a bye room is always read this way, before Start and after it
+  if (b && isByeRoom(b)) return 'bye';
   const key = url.searchParams.get('test');
   if (!key || !b || b.started) return false;
   const t = await getAdminTournament(env, key);
@@ -3168,7 +3186,7 @@ async function testAccess(env, b, url) {
 // and no schedule is read, exactly as before.
 async function roomPlace(env, b) {
   const plain = { round: b.current_round, bracket: null, model: null, state: null, room: null };
-  if (b.bracket_rounds === null || b.bracket_rounds === undefined) return plain;
+  if (b.bracket_rounds === null || b.bracket_rounds === undefined || isByeRoom(b)) return plain;
   const obj = await env.DATA.get(`t/${b.tournament_id}/schedule.json`);
   const sched = obj ? await obj.json().catch(() => null) : null;
   const model = bracketModel(sched);
@@ -3191,7 +3209,7 @@ async function bucketState(env, secret, url) {
     env.DB.prepare(
       'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     // a test reads any round's packet, not only those reached so far
-    ).bind(b.tournament_id, test ? 1e9 : place.round).all(),
+    ).bind(b.tournament_id, test === true ? 1e9 : place.round).all(),
     env.DB.prepare(
       'SELECT id, round, kind, filename, size, error, created FROM files WHERE bucket_id = ?1 ORDER BY created DESC LIMIT ?2'
     ).bind(b.id, BUCKET_LIST_LIMIT).all(),
@@ -3229,6 +3247,7 @@ async function bucketUpload(request, url, env, secret) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
+  if (isByeRoom(b)) return byeRefusal(env);
 
   const { results } = await env.DB.prepare(
     'SELECT COUNT(*) AS n FROM files WHERE bucket_id = ?1'
@@ -3300,7 +3319,7 @@ async function bucketPacket(env, secret, url) {
   const place = await roomPlace(env, b);
   let round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) round = place.round;
-  if (round > place.round && !test) return err(env, 403, 'not the live round yet');
+  if (round > place.round && test !== true) return err(env, 403, 'not the live round yet');
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
   ).bind(b.tournament_id, round).all();
@@ -3329,6 +3348,7 @@ async function bucketStartRound(env, secret, url) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
+  if (isByeRoom(b)) return byeRefusal(env);
   const place = await roomPlace(env, b);
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1 || round > place.round) return err(env, 400, 'bad round');
@@ -3346,6 +3366,7 @@ async function bucketLiveProtests(request, url, env, secret) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
+  if (isByeRoom(b)) return byeRefusal(env);
   const game = String(url.searchParams.get('g') || '');
   if (!/^[a-z0-9]{1,24}$/.test(game)) return err(env, 400, 'bad game');
   const round = Number(url.searchParams.get('round'));
@@ -3453,7 +3474,9 @@ async function maybeAdvance(env, tid, onlyBracket = null) {
   ]);
   if (!next.results.length) return false;
   const sched = schedObj ? await schedObj.json().catch(() => null) : null;
-  const { ids, unmatched } = roomsPlaying(sched, n, buckets.results);
+  // bye rooms play no round: never waited on
+  const bye = byeRoomIds(tr[0].settings);
+  const { ids, unmatched } = roomsPlaying(sched, n, buckets.results.filter((x) => !bye.includes(x.id)));
   if (unmatched || !ids.length) return false;
   const started = new Set(starts.results.map((x) => x.bucket_id));
   if (!ids.every((id) => started.has(id))) return false;
@@ -3710,9 +3733,11 @@ async function roundDone(env, t, round) {
     env.DB.prepare(
       "SELECT DISTINCT bucket_id FROM files WHERE tournament_id = ?1 AND round = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL"
     ).bind(t.id, round).all(),
-    env.DB.prepare('SELECT COUNT(*) AS n FROM buckets WHERE tournament_id = ?1').bind(t.id).all(),
+    env.DB.prepare('SELECT id FROM buckets WHERE tournament_id = ?1').bind(t.id).all(),
   ]);
-  let expected = buckets.results[0].n;
+  // bye rooms play no game: they don't count
+  const bye = byeRoomIds(t.settings);
+  let expected = buckets.results.filter((x) => !bye.includes(x.id)).length;
   const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
   if (obj) {
     const n = scheduledGames(await obj.json().catch(() => null), round);
@@ -3877,7 +3902,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
   if (key) {
     buzzV = await buzzStamp(key);
     const sched = schedObj ? await schedObj.json().catch(() => null) : null;
-    buzzDone = doneRounds(rows, buckets.results.length, sched,
+    buzzDone = doneRounds(rows, buckets.results.filter((x) => !byeRoomIds(t.settings).includes(x.id)).length, sched,
       packetRounds.results.map((r) => r.number));
   }
   return {

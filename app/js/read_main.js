@@ -56,6 +56,8 @@ let sched = null;      // tournament schedule (when the TO made one)
 let schedRoom = null;  // this bucket's room index in it
 let schedBrackets = null; // [{key, name, phase, color}] when brackets keep their own rounds, else null
 let schedGame = null;  // {a, b}: what the schedule has this room playing in the selected round
+let byeGame = false;   // a bye room's schedGame: the round's two teams on a bye
+let byePicked = null;  // {a, b}: the bye teams a bye room last put in the pickers
 let locked = false;    // the scheduled matchup is showing, pickers hidden
 const starterSel = new Map(); // team name -> Set of the player names starting
 const orderSel = new Map();   // team name -> its player names in seating order
@@ -77,7 +79,9 @@ function say(text, bad = false) {
 }
 
 function roomLink() {
-  return tq(location.pathname + '?b=' + encodeURIComponent(secret));
+  // a page pointed at another backend (?server=, local testing) stays there
+  const server = new URLSearchParams(location.search).get('server');
+  return tq(location.pathname + '?b=' + encodeURIComponent(secret)) + (server ? '&server=' + encodeURIComponent(server) : '');
 }
 function gameLink(id) {
   return roomLink() + '&g=' + encodeURIComponent(id);
@@ -132,7 +136,7 @@ async function fetchTeams() {
 // bracket: {name, color} on a schedule whose brackets keep their own
 // rounds (the room's round is its bracket's)
 function setHeader(t, room, round, game, bracket) {
-  document.title = (testKey ? 'TEST - ' : '') + t + ' - ' + room;
+  document.title = (testKey === 'bye' ? 'BYE - ' : testKey ? 'TEST - ' : '') + t + ' - ' + room;
   $('tname').textContent = t;
   $('room').textContent = room + ' · Round ' + round;
   if (bracket) {
@@ -214,7 +218,7 @@ function mountMODAQ(id, meta, isNew) {
         if (testKey) {
           // MODAQ words its own result dialog ("Export succeeded"), which a
           // test must not show: say it here and leave MODAQ waiting
-          alert('This is a test game, so nothing was uploaded.');
+          alert(testKey === 'bye' ? 'This is the Bye Room, so nothing was uploaded.' : 'This is a test game, so nothing was uploaded.');
           return new Promise(() => {});
         }
         try {
@@ -332,12 +336,43 @@ function bracketAt(n) {
 // click (Change teams) and a warning at Start. It locks in again whenever
 // the round changes. Rooms the schedule has nothing for keep the pickers,
 // and a moderator's pick there is never clobbered.
+// A bye room: the teams the schedule has on a bye in the selected round.
+// Two of them are the matchup, as a room's scheduled game is; any other
+// number fills the pickers, for the reader to settle.
+function byeTeamsAt(round) {
+  for (const ph of (sched && sched.phases) || []) {
+    for (const r of ph.rounds || []) {
+      if (r.round === round) return (r.byes || []).map((x) => x && x.team).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 function applySchedDefault() {
   schedGame = null;
+  byeGame = false;
+  const known = (n) => teams && teams.some((t) => t.name === n);
   if (sched && schedRoom !== null && teams && !$('teamrow').hidden) {
     const g = gameForRoom(sched, schedRoom, selectedRound);
-    const known = (n) => teams.some((t) => t.name === n);
     if (g && known(g.a) && known(g.b)) schedGame = { a: g.a, b: g.b };
+  } else if (sched && testKey === 'bye' && teams && !$('teamrow').hidden) {
+    const on = byeTeamsAt(selectedRound).filter(known);
+    // the last round's bye teams don't stay picked in a round without them
+    // (a reader's own pick does)
+    if (byePicked && $('teama').value === byePicked.a && $('teamb').value === byePicked.b) {
+      $('teama').value = ''; $('teamb').value = '';
+    }
+    byePicked = null;
+    if (on.length === 2) { schedGame = { a: on[0], b: on[1] }; byeGame = true; byePicked = { ...schedGame }; }
+    else if (on.length) {
+      $('teama').value = on[0]; if (on[1]) $('teamb').value = on[1];
+      byePicked = { a: $('teama').value, b: $('teamb').value };
+    }
+    const list = on.length < 2 ? on.join('') : on.slice(0, -1).join(', ') + ' and ' + on[on.length - 1];
+    $('byelist').textContent = !on.length ? `No team is on a bye in round ${selectedRound}.`
+      : on.length === 1 ? `${list} is on a bye in round ${selectedRound}.`
+      : on.length > 2 ? `On a bye in round ${selectedRound}: ${list}.` : '';
+    $('byelist').hidden = on.length === 2;
   }
   if (schedGame) {
     $('teama').value = schedGame.a;
@@ -354,7 +389,7 @@ function renderTeamPick() {
   $('useschedteams').hidden = locked || !schedGame;
   if (schedGame) {
     const br = bracketAt(selectedRound);
-    $('schedfrom').innerHTML = br
+    $('schedfrom').innerHTML = byeGame ? esc(`On a bye in round ${selectedRound}`) : br
       ? `From the schedule \u00b7 <i class="lane-${Number(br.color) || 0}"></i>${esc(br.name)} \u00b7 Round ${selectedRound} in ${esc(state.room)}`
       : esc(`From the schedule \u00b7 Round ${selectedRound} in ${state.room}`);
     $('mteama').textContent = schedGame.a;
@@ -571,6 +606,12 @@ async function boot() {
     $('testtag').hidden = false;
     $('teststrip').hidden = false;
     $('start').textContent = 'Start test game';
+    // a bye room: the TD's room for reading to teams on a bye
+    if (testKey === 'bye') {
+      $('testtag').textContent = 'Bye Room';
+      $('teststrip').innerHTML = '<b>This is the Bye Room.</b> It is for reading to teams on a bye. Games read here are NOT saved.';
+      $('start').textContent = 'Start bye-round game';
+    }
   }
 
   // Game link: resume that exact game from this device. No fetches — the
@@ -637,6 +678,10 @@ async function boot() {
     schedRoom = sr.room;
     schedBrackets = sr.multi && Array.isArray(sr.brackets) ? sr.brackets : null;
     renderSchedPanel();
+    applySchedDefault();
+  } else if (sr && sr.schedule && testKey === 'bye') {
+    // a bye room: the schedule only for its teams on a bye
+    sched = sr.schedule;
     applySchedDefault();
   }
   // warm the cache for the common case (start on the default round)

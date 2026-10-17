@@ -266,15 +266,20 @@ export function planGroups(teams, phases, seeding, rng) {
     const tiers = halves ? 2 : Math.ceil(rows.length / per);
     const sizeOf = new Map(out[p - 1].map((g) => [g.key, ph.top ? Math.min(ph.top, g.members.length) : g.members.length]));
     const groups = [];
+    let placed = 0; // teams in the tiers above: a tier decides the places after them
     for (let i = 0; i < tiers; i++) {
       const upper = (x) => x.place <= Math.ceil(sizeOf.get(x.from) / 2);
       const tierRows = halves ? rows.map((r) => r.filter((x) => (i === 0) === upper(x))).filter((r) => r.length)
         : rows.slice(i * per, (i + 1) * per);
-      // names and keys as the engine gives them (1st place F1, 1st–2nd
-      // place T1, Championship CH); later phases add their number
-      const last = Math.min((i + 1) * per, rows.length);
-      const tierName = tiers === 1 ? ph.name : per === 1 && !halves ? ORD(i + 1) + ' place' : halves ? ['Championship', 'Consolation'][i]
-        : i * per + 1 === last ? `${ORD(last)} place` : `${ORD(i * per + 1)}–${ORD(last)} place`;
+      // A tier is named for the overall places it decides: the top two of
+      // three pools play for 1st–6th, the next two for 7th–12th. Keys stay
+      // as the engine has always given them (F1, T1, CH); later phases
+      // add their number.
+      const count = tierRows.flat().length;
+      const [lo, hi] = [placed + 1, placed + count];
+      placed += count;
+      const tierName = tiers === 1 ? ph.name : halves ? ['Championship', 'Consolation'][i]
+        : lo === hi ? `${ORD(lo)} place` : `${ORD(lo)}–${ORD(hi)} place`;
       const tierKey = (tiers === 1 ? 'ph' + (p + 1) : per === 1 && !halves ? 'F' + (i + 1) : halves ? ['CH', 'CO'][i] : 'T' + (i + 1))
         + (p > 1 && tiers > 1 ? '~' + (p + 1) : '');
       if (ph.cross) {
@@ -393,7 +398,9 @@ function bySizes(rows, ph, p) {
     const a = placeOf(tr.from);
     const b = placeOf(tr.to - 1);
     const halves = rows.length > 1 && tiers.length === 2 && ph.per === -1;
-    const name = tiers.length === 1 ? ph.name : halves ? ['Championship', 'Consolation'][ti] : a === b ? `${ORD(a)} place` : `${ORD(a)}–${ORD(b)} place`;
+    // named for the overall places the tier decides (see above)
+    const name = tiers.length === 1 ? ph.name : halves ? ['Championship', 'Consolation'][ti]
+      : tr.from + 1 === tr.to ? `${ORD(tr.to)} place` : `${ORD(tr.from + 1)}–${ORD(tr.to)} place`;
     const key = (tiers.length === 1 ? 'ph' + (p + 1) : halves ? ['CH', 'CO'][ti] : a === b && tr.sizes.length === 1 ? 'F' + a : 'T' + (ti + 1)) + (p > 1 && tiers.length > 1 ? '~' + (p + 1) : '');
     if (tr.sizes.length === 1) { groups.push({ key, name, members, tier: ti, listed: true }); return; }
     // a tier of parallel brackets: by place, keeping pool-mates apart

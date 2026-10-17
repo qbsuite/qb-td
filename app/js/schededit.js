@@ -29,6 +29,7 @@ const ui = {
   sel: null,             // {kind: slot|game|empty|room|round, ...}
   mode: null,            // swapSlot | moveGame | trade
   tradePick: null,       // Brackets view: the team picked to trade pools
+  renaming: null,        // Brackets view: 'key@phase' of the bracket being renamed
   past: [], future: [],  // JSON snapshots for Undo / Redo
   note: '',
   baseline: { obj: null, json: '' }, // the schedule as saved
@@ -838,6 +839,11 @@ function renderEditor(box, env) {
     </div>`;
 
   /* -- brackets -- */
+  // under each card: Rename, or the name being typed
+  const renameHtml = (b) => (ui.renaming === b.key + '@' + b.phase
+    ? `<div class="row sgrename"><input data-brname="${esc(b.key)}@${b.phase}" value="${esc(b.name)}" aria-label="Bracket name" size="18">
+        <button class="small primary" data-brsave="${esc(b.key)}@${b.phase}">Save</button><button class="small" data-brcancel="1">Cancel</button></div>`
+    : `<button class="linkbtn small sgrenamebtn" data-brename="${esc(b.key)}@${b.phase}">Rename</button>`);
   const mapHtml = `
     <div class="sgmap">
       <div class="sgmapcol"><div class="sgmapcard static"><b>${env.teams.length} teams</b><span class="muted">${
@@ -857,10 +863,10 @@ function renderEditor(box, env) {
                   : `<button class="sgmaprow${picked ? ' on' : ''}" data-tradepick="${esc(t)}">${esc(t)}${picked ? '<span class="muted small">picked</span>' : can ? '<span class="small sgtradehint">Trade</span>' : ''}</button>`;
               }).join('')}</div>
               <span class="muted small">${b.rooms.map((i2) => esc((s.rooms[i2] || {}).name || '')).join(' · ') || 'no rooms yet'}</span>
-            </div>` : `
+            </div>${renameHtml(b)}` : `
             <button class="sgmapcard" data-filter="${esc(b.key)}"><span><i class="lane-${i % COLORS}"></i><b>${esc(b.name)}</b></span>
               <span class="muted">${esc(s.pools && s.pools[b.key] ? s.pools[b.key].join(', ') : b.key === 'CH' ? 'Top half of each pool' : b.key === 'CO' ? 'Bottom half of each pool' : /^F\d+$/.test(b.key) ? 'Each pool’s ' + b.name.replace(' place', '') : '')}</span>
-              <span class="muted small">${b.rooms.map((i2) => esc((s.rooms[i2] || {}).name || '')).join(' · ') || 'no rooms yet'}</span></button>`).join('')}
+              <span class="muted small">${b.rooms.map((i2) => esc((s.rooms[i2] || {}).name || '')).join(' · ') || 'no rooms yet'}</span></button>${renameHtml(b)}`).join('')}
         </div>`).join('')}
     </div>`;
 
@@ -944,6 +950,34 @@ function renderEditor(box, env) {
   scroll.onscroll = () => { ui.scrollPos = [scroll.scrollLeft, scroll.scrollTop]; };
 
   $$('[data-view2]').forEach((b) => { b.onclick = () => { ui.view = b.dataset.view2; again(); }; });
+  // Renaming a bracket: its name in the schedule, and in any slot that
+  // names it ("1st in 1st–6th place"), as one undoable edit
+  $$('[data-brename]').forEach((b) => { b.onclick = () => { ui.renaming = b.dataset.brename; again(); const f = box.querySelector('[data-brname]'); if (f) { f.focus(); f.select(); } }; });
+  $$('[data-brcancel]').forEach((b) => { b.onclick = () => { ui.renaming = null; again(); }; });
+  const renameBracket = (id) => {
+    const [key, ph] = id.split('@');
+    const field = box.querySelector(`[data-brname="${CSS.escape(id)}"]`);
+    const name = field ? field.value.trim() : '';
+    const cur = (s.brackets || []).find((x) => x.key === key && String(x.phase) === ph);
+    if (!cur) return;
+    if (!name) { env.say('Please give the bracket a name.', true); return; }
+    if (name !== cur.name && (s.brackets || []).some((x) => x.name === name)) { env.say(`Another bracket is already called ${name}.`, true); return; }
+    ui.renaming = null;
+    if (name === cur.name) { again(); return; }
+    const old = cur.name;
+    edit(`Renamed ${old} to ${name}`, (ss) => {
+      for (const x of ss.brackets || []) if (x.key === key && String(x.phase) === ph) x.name = name;
+      for (const p2 of ss.phases) for (const r of p2.rounds) {
+        for (const g of r.games) for (const side of ['a', 'b']) {
+          const x = g[side];
+          if (x && typeof x.label === 'string' && x.label.endsWith(' in ' + old)) x.label = x.label.slice(0, -old.length) + name;
+        }
+        for (const x of r.byes || []) if (x && typeof x.label === 'string' && x.label.endsWith(' in ' + old)) x.label = x.label.slice(0, -old.length) + name;
+      }
+    });
+  };
+  $$('[data-brsave]').forEach((b) => { b.onclick = () => renameBracket(b.dataset.brsave); });
+  $$('[data-brname]').forEach((f) => { f.onkeydown = (e) => { if (e.key === 'Enter') renameBracket(f.dataset.brname); if (e.key === 'Escape') { ui.renaming = null; again(); } }; });
   $$('[data-filter]').forEach((b) => { b.onclick = () => { ui.filter = b.dataset.filter; if (ui.view === 'brackets') ui.view = 'grid'; ui.scrollPos = null; again(); }; });
   $$('[data-phase]').forEach((b) => { b.onclick = () => { const p = Number(b.dataset.phase); if (ui.closed.has(p)) ui.closed.delete(p); else ui.closed.add(p); again(); }; });
   // Drag the right edge of a pool's heading (or of Byes) to set the width
