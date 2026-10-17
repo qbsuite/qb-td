@@ -3,7 +3,7 @@
 // rule set they would pick in YellowFruit's new-tournament screen.
 
 import fixture from '../../app/demo/fixture.js';
-import { buildRosterQbj } from '../../app/engine/qbj.js';
+import { buildRosterQbj, forfeitQbj } from '../../app/engine/qbj.js';
 
 // A game file shaped like MODAQ's QBJ export (what the reader uploads):
 // inline team and player objects, answer values inline, only the players
@@ -176,7 +176,8 @@ const longRounds = [
 // brackets play only teams they haven't met... which is none, so each
 // bracket plays its own three-team round robin again. tiebreak: a
 // Tiebreakers stage after the prelims, one game between two pool A teams.
-function stagedScenario(key, name, upTo, { marks = false, onePool = false, tiebreak = false } = {}) {
+// forfeit: the first playoff game the top bracket plays is a forfeit
+function stagedScenario(key, name, upTo, { marks = false, onePool = false, tiebreak = false, forfeit = false } = {}) {
   let seed = 7;
   const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
   const SCHOOLS = ['Ames', 'Bloom', 'Cedar', 'Dover', 'Elm', 'Fargo', 'Gale', 'Hale', 'Iona', 'Jett', 'Kent', 'Lyle'];
@@ -237,7 +238,12 @@ function stagedScenario(key, name, upTo, { marks = false, onePool = false, tiebr
     const cross = (b) => [0, 1, 2].map((i) => [b[i], b[3 + ((i + r) % 3)]]);
     const pairs = [...cross(top).map((p) => [...p, 'P1']), ...cross(bottom).map((p) => [...p, 'P2'])];
     playoffs.rounds.push({ round: next + r, games: pairs.map(([x, y, k], i) => ({ room: i, a: { team: x }, b: { team: y }, bracket: k })) });
-    if (next + r <= upTo) for (const [x, y] of pairs) play(next + r, x, y);
+    if (next + r <= upTo) {
+      for (const [k, [x, y]] of pairs.entries()) {
+        if (forfeit && r === 0 && k === 0) games.push(forfeitGame(next + r, x, y));
+        else play(next + r, x, y);
+      }
+    }
   }
   const last = next + 3;
   finals.rounds.push({ round: last, games: [{ room: 0, a: { team: top[0] }, b: { team: top[3] } }] });
@@ -248,6 +254,11 @@ function stagedScenario(key, name, upTo, { marks = false, onePool = false, tiebr
     ...(marks ? { marks: Object.fromEntries(t.players.map((p) => [p, { ug: i % 4 === 1, d2: i % 4 === 2 }])) } : {}) }));
   return { key, name, ruleSet: 'Acf', schedule,
     roster: buildRosterQbj(name, rosterTeams, marks ? { trackUG: true, trackDiv2: true } : undefined), games };
+}
+
+// A forfeit as the hub records it (qbj.js forfeitQbj): `loser` forfeits
+function forfeitGame(round, winner, loser) {
+  return { filename: `Round_${round}_${winner}_${loser}_Forfeit.qbj`.replace(/[^\w.]+/g, '_'), qbj: forfeitQbj(round, winner, loser) };
 }
 
 export const SCENARIOS = [
@@ -266,6 +277,13 @@ export const SCENARIOS = [
     key: 'college', name: 'Parity Open', ruleSet: 'mAcfPowers',
     roster: buildRosterQbj('Parity Open', ROSTER),
     games: college,
+  },
+  {
+    // a forfeit, recorded by the hub, in a round of its own and one shared
+    // with a played game
+    key: 'forfeit', name: 'Forfeit Parity Open', ruleSet: 'mAcfPowers',
+    roster: buildRosterQbj('Forfeit Parity Open', ROSTER),
+    games: [...college, forfeitGame(4, 'Penn A', 'Université Laval'), forfeitGame(5, "St. John's (MD)", 'Penn B')],
   },
   {
     // `rules` is the tournament's MODAQ game format (read_core.js
@@ -290,4 +308,5 @@ export const SCENARIOS = [
   stagedScenario('finals', 'Finals Open', 9),
   stagedScenario('tiebreak', 'Tiebreak Open', 10, { tiebreak: true }),
   stagedScenario('onepool', 'One Pool Open', 15, { onePool: true }),
+  stagedScenario('forfeit-staged', 'Forfeit Open', 9, { forfeit: true }),
 ];

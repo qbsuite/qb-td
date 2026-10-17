@@ -215,7 +215,13 @@ function runScenario(sc, importer, opener, importer3) {
     else if (f.invalid) problems.push(`YellowFruit 3 marks ${f.file} invalid: ${f.messages.join(' | ')}`);
     else if (f.messages.length) console.log(`    note: YF 3 warns on ${f.file}: ${f.messages.join(' | ')}`);
   }
-  const theirs3 = fs.readFileSync(path.join(dir, 'yf3.yft'), 'utf8');
+  // YF 3's qbj importer files a forfeit under round 0; qb-td keeps its round
+  const forfeitRounds = new Map(matches.filter((m) => m.forfeit).map((m) => [m.teams.map((t) => t.name).sort().join('\n'), m.round]));
+  const theirs3 = fs.readFileSync(path.join(dir, 'yf3.yft'), 'utf8').split('\n').map((line, i) => {
+    if (i !== 5 || !forfeitRounds.size) return line;
+    return JSON.stringify(JSON.parse(line).map((g) => (g.forfeit && g.round === 0
+      ? { ...g, round: forfeitRounds.get([g.team1, g.team2].sort().join('\n')) ?? 0 } : g)));
+  }).join('\n');
   if (theirs3 !== ours3) problems.push(`YF 3 .yft differs from YellowFruit ${YF3_TAG}'s ${firstDifference(theirs3, ours3)}`);
 
   // qb-td's own report against the one YF saves

@@ -77,8 +77,13 @@ export function parseMatch(json, opts = {}) {
     throw new Error('No round number (missing _round and none in the filename)');
   }
 
-  const tossupsRead = Number(pick(obj, 'tossups_read', 'tossupsRead'));
-  if (!Number.isFinite(tossupsRead) || tossupsRead < 1) {
+  // A forfeit (a team's forfeit_loss, as YellowFruit and the tournament
+  // schema write it) is a result with no game: its stats are left out
+  // wherever YF leaves them out, and it needs no tossups read.
+  const forfeits = rawTeams.map((mt) => !!pick(mt, 'forfeit_loss', 'forfeitLoss'));
+  const forfeit = forfeits.some(Boolean);
+  const tossupsRead = forfeit ? 0 : Number(pick(obj, 'tossups_read', 'tossupsRead'));
+  if (!Number.isFinite(tossupsRead) || (tossupsRead < 1 && !forfeit)) {
     throw new Error('Missing or invalid tossups_read');
   }
 
@@ -111,6 +116,9 @@ export function parseMatch(json, opts = {}) {
       : tossupPoints + bonusPoints + bounceback;
     return { name, points, tossupPoints, bonusPoints: points - tossupPoints, players };
   });
+  if (forfeit) {
+    teams.forEach((t, i) => Object.assign(t, { points: 0, tossupPoints: 0, bonusPoints: 0, players: [], forfeitLoss: forfeits[i] }));
+  }
 
   if (teams[0].name === teams[1].name) throw new Error('Both match_teams have the same name');
 
@@ -128,11 +136,31 @@ export function parseMatch(json, opts = {}) {
   return {
     round,
     tossupsRead,
-    tossupBuzzes,
+    tossupBuzzes: forfeit ? undefined : tossupBuzzes,
     packets: pick(obj, 'packets') || undefined,
     notes: pick(obj, 'notes') || undefined,
     teams,
+    ...(forfeit ? { forfeit: true } : {}),
   };
+}
+
+/** A match team's result against its opponent, as YellowFruit decides it:
+    'W', 'L' or 'T', or '' when both teams forfeited. A forfeit decides the
+    game; otherwise the score does. */
+export function resultOf(mt, opp) {
+  if (mt.forfeitLoss || opp.forfeitLoss) return mt.forfeitLoss && opp.forfeitLoss ? '' : mt.forfeitLoss ? 'L' : 'W';
+  return mt.points > opp.points ? 'W' : mt.points < opp.points ? 'L' : 'T';
+}
+
+/** The game file for a forfeit the TD records: `loser` forfeits to
+    `winner` in `round`. No tossups or players; the forfeiting team's
+    forfeit_loss is the result. */
+export function forfeitQbj(round, winner, loser) {
+  const side = (name, lost) => ({
+    team: { name, players: [] }, bonus_points: 0, match_players: [], lineups: [],
+    ...(lost ? { forfeit_loss: true } : {}),
+  });
+  return { _round: round, tossups_read: 0, match_teams: [side(winner, false), side(loser, true)], match_questions: [] };
 }
 
 /**

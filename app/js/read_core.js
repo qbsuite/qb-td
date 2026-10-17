@@ -421,6 +421,21 @@ export function replaceQuestion({ game, cycleIndex: ci, kind, question, id = '',
   return { tb: st };
 }
 
+/** The bonus held for a tossup replaced on an earlier question, when the TD
+    picks none: blank parts, valued as the packet's bonuses are, for the
+    moderator to score whichever bonus the TD gives (or to swap with Replace
+    bonus). A packet bonus as MODAQ's loader takes it. */
+export function placeholderBonus(packetBonuses) {
+  const like = (packetBonuses || []).find((b) => b && Array.isArray(b.parts) && b.parts.length);
+  const values = like ? like.parts.map((p) => Number(p.value) || 10) : [10, 10, 10];
+  return {
+    leadin: 'Bonus for the replacement tossup. Please read the bonus the TD gives, and enter its parts here.',
+    parts: values.map((_, i) => `Part ${i + 1}`),
+    answers: values.map(() => 'From the bonus the TD gives'),
+    values,
+  };
+}
+
 /** Keep each held bonus right for its question's result: read (not thrown
     out, and the bonus answer's) when the replacement was answered, else
     thrown out so later questions keep theirs. Run after any change to

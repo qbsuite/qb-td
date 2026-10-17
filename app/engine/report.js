@@ -15,7 +15,7 @@
 // database expects to be handed; the bare names are YF's in-app preview.
 
 import { aggregate } from './stats.js';
-import { rosterTracking } from './qbj.js';
+import { rosterTracking, resultOf } from './qbj.js';
 import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME, yfStages, buildYft,
   REGULATION_TOSSUPS } from './yft.js';
 
@@ -325,7 +325,9 @@ function tally(games, names) {
     for (const [mt, opp] of [[g.teams[0], g.teams[1]], [g.teams[1], g.teams[0]]]) {
       const t = out.get(mt.name);
       if (!t) continue;
-      if (mt.points > opp.points) t.w++; else if (mt.points < opp.points) t.l++; else t.t++;
+      const res = resultOf(mt, opp);
+      if (res === 'W') t.w++; else if (res === 'L') t.l++; else if (res === 'T') t.t++;
+      if (g.forfeit) continue; // a forfeit is its result only
       for (const [v, n] of Object.entries(teamCounts(mt))) t.counts[v] = (t.counts[v] || 0) + n;
       t.regTuh += g.tossupsRead - g.overtime.tossups;
       t.regPoints += mt.regPoints;
@@ -464,10 +466,9 @@ const valFootCells = (counts, vals) => vals.map((v) => th(String(counts[v] || 0)
 
 const record = (t) => (t.t ? `${t.w}-${t.l}-${t.t}` : `${t.w}-${t.l}`);
 const paren = (n) => (n < 0 ? `(${n})` : String(n));
-const scoreOnly = (g, mine, theirs) =>
-  `${paren(mine.points)} - ${paren(theirs.points)}${g.overtime.tossups ? ' (OT)' : ''}`;
-const resultLetter = (mine, theirs) =>
-  (mine.points > theirs.points ? 'W' : mine.points < theirs.points ? 'L' : 'T');
+const scoreOnly = (g, mine, theirs) => (g.forfeit ? 'Forfeit'
+  : `${paren(mine.points)} - ${paren(theirs.points)}${g.overtime.tossups ? ' (OT)' : ''}`);
+const resultLetter = (mine, theirs) => resultOf(mine, theirs);
 
 /* ---------- standings ---------- */
 
@@ -723,6 +724,10 @@ function boxScoreBonusTable(g) {
 
 function scoreString(g) {
   const [a, b] = g.teams;
+  if (g.forfeit) {
+    const lost = a.forfeitLoss ? a : b;
+    return `${esc((lost === a ? b : a).name)} defeats ${esc(lost.name)} by forfeit`;
+  }
   const win = b.points > a.points ? b : a;
   const lose = win === a ? b : a;
   return `${esc(win.name)} ${win.points}, ${esc(lose.name)} ${lose.points}${g.overtime.tossups ? ' (OT)' : ''}`;
@@ -730,6 +735,9 @@ function scoreString(g) {
 
 function boxScore(m, g) {
   const tossups = `Tossups read: ${g.tossupsRead}${g.overtime.tossups ? ` (${g.overtime.tossups} in OT)` : ''}`;
+  if (g.forfeit) {
+    return [tagWithAttrs('div', [`id=${gameAnchor(g)}`, cls('boxScoreAnchor')]), tagWithAttrs('h3', [cls('boxScoreTitle')], scoreString(g))].join('\n');
+  }
   return [
     tagWithAttrs('div', [`id=${gameAnchor(g)}`, cls('boxScoreAnchor')]),
     tagWithAttrs('h3', [cls('boxScoreTitle')], scoreString(g)),
@@ -797,11 +805,11 @@ function teamDetailMatchTable(m, t) {
       textCell(teamLink(m, opp.name)),
       textCell(resultLetter(mt, opp)),
       textCell(gameLink(m, g, scoreOnly(g, mt, opp))),
-      ...valCells(teamCounts(mt), m.vals),
-      numCell(String(g.tossupsRead)),
-      numCell(String(heard)),
-      numCell(String(mt.bonusPoints)),
-      numCell(heard ? (mt.bonusPoints / heard).toFixed(2) : MDASH),
+      ...(g.forfeit ? m.vals.map(() => numCell('')) : valCells(teamCounts(mt), m.vals)),
+      numCell(g.forfeit ? '' : String(g.tossupsRead)),
+      numCell(g.forfeit ? '' : String(heard)),
+      numCell(g.forfeit ? '' : String(mt.bonusPoints)),
+      numCell(g.forfeit ? '' : heard ? (mt.bonusPoints / heard).toFixed(2) : MDASH),
     ]));
   }
   rows.push(trFoot([
@@ -978,15 +986,17 @@ function roundReportHtml(m) {
   const asNum = (text) => numCell(text);
   const asFoot = (text) => th(text, true);
 
+  const played = m.games.filter((g) => !g.forfeit); // YF counts no forfeit as a game
   for (const r of m.rounds) {
-    const games = m.games.filter((g) => g.round === r);
+    const games = played.filter((g) => g.round === r);
+    if (!games.length) continue;
     rows.push(trTag([
       textCell(roundLink(m, r, String(r))),
       ...(S ? [stageCell([S.stageOf.get(games[0])].filter(Boolean))] : []),
       ...statCells(roundTotals(games), asNum),
     ]));
   }
-  rows.push(trFoot([th('Total'), ...(S ? [th('')] : []), ...statCells(roundTotals(m.games), asFoot)]));
+  rows.push(trFoot([th('Total'), ...(S ? [th('')] : []), ...statCells(roundTotals(played), asFoot)]));
   return tableTag(rows);
 }
 
@@ -1051,14 +1061,16 @@ export function reportData(opts) {
     })),
     games: m.games.map((g) => {
       const [a, b] = g.teams;
-      const win = b.points > a.points ? b : a;
+      const win = resultOf(b, a) === 'W' ? b : a;
       return {
         id: g.id, anchor: `games-${gameAnchor(g)}`, round: g.round, tossupsRead: g.tossupsRead, otTossups: g.overtime.tossups,
+        ...(g.forfeit ? { forfeit: true } : {}),
         fileId: g.fileId, // the public page's scoresheet finds the game's qbj by it
 
         winner: win.name, loser: (win === a ? b : a).name,
         teams: g.teams.map((mt) => ({
           name: mt.name, points: mt.points, tossupPoints: mt.tossupPoints, counts: teamCounts(mt),
+          ...(mt.forfeitLoss ? { forfeitLoss: true } : {}),
           bonusesHeard: teamBonusesHeard(mt), bonusPoints: mt.bonusPoints,
           ppb: ratio(mt.bonusPoints, teamBonusesHeard(mt)),
           players: mt.players.filter((p) => p.tossupsHeard).map((p) => ({

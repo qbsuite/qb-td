@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames } from '../app/engine/qbj.js';
+  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
@@ -37,7 +37,7 @@ import { eachLimit } from '../app/js/limit.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -2085,6 +2085,50 @@ test('packetCategories: bonuses keep their e/m/h difficulty marks', () => {
 console.log('html stat report');
 
 const STAGED = (await import('../tools/yf_parity/scenarios.mjs')).SCENARIOS;
+test('forfeits: a win and a loss, no stats, shown as YellowFruit shows them', () => {
+  const sc = STAGED.find((x) => x.key === 'pools');
+  const roster = parseRoster(sc.roster);
+  const played = sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename }));
+  const [win, lose] = [roster[0].name, roster[2].name];
+  const ff = parseMatch(forfeitQbj(6, win, lose));
+  assert.equal(ff.forfeit, true);
+  assert.equal(ff.round, 6);
+  assert.equal(ff.tossupsRead, 0);
+  assert.deepEqual(ff.teams.map((t) => [t.name, !!t.forfeitLoss, t.points, t.players.length]), [[win, false, 0, 0], [lose, true, 0, 0]]);
+  assert.equal(resultOf(ff.teams[0], ff.teams[1]), 'W');
+  assert.equal(resultOf(ff.teams[1], ff.teams[0]), 'L');
+  assert.equal(resultOf({ forfeitLoss: true }, { forfeitLoss: true }), '', 'a double forfeit is no result');
+  // the record moves; nothing else does
+  const before = aggregate(played, roster);
+  const after = aggregate([...played, ff], roster);
+  const t = (agg, n) => agg.teams.find((x) => x.name === n);
+  assert.equal(t(after, win).w, t(before, win).w + 1);
+  assert.equal(t(after, lose).l, t(before, lose).l + 1);
+  for (const n of [win, lose]) {
+    for (const k of ['gp', 'points', 'tuh', 'bonusPoints', 'bonusesHeard', 't']) assert.equal(t(after, n)[k], t(before, n)[k], n + ' ' + k);
+    assert.deepEqual(t(after, n).counts, t(before, n).counts);
+  }
+  assert.deepEqual(after.players, before.players);
+  // the report: the box score is its result, team detail says Forfeit with
+  // blank stats, the round report leaves it out
+  const pages = buildReport({ name: 'F', matches: dedupeMatches([...played, ff]), roster });
+  const page = (p) => pages.find((f) => f.name === p + '.html').text;
+  assert.ok(page('games').includes(`${win} defeats ${lose} by forfeit`));
+  assert.ok(!page('rounds').includes('>6</a>') && !page('rounds').includes('#Round-6'), 'no round of forfeits in the round report');
+  assert.ok(/Forfeit<\/a>/.test(page('teamdetail')));
+  // the New layout's data: the winner, and the forfeit marked
+  const g = reportData({ name: 'F', matches: dedupeMatches([...played, ff]), roster }).games.find((x) => x.round === 6);
+  assert.equal(g.forfeit, true);
+  assert.equal(g.winner, win);
+  assert.equal(g.loser, lose);
+  // both YellowFruit files carry it
+  const y = JSON.parse(serializeYft({ name: 'F', matches: dedupeMatches([...played, ff]), roster }));
+  const mt = y.objects[0].phases.flatMap((ph) => ph.rounds).flatMap((r) => r.matches).find((m) => m.match_teams.some((x) => x.forfeit_loss));
+  assert.ok(mt && mt.match_teams.find((x) => x.forfeit_loss).team.$ref === `Team_${lose}`);
+  const y3 = JSON.parse(serializeYft3({ matches: dedupeMatches([...played, ff]), roster }).split('\n')[5]).find((x) => x.forfeit);
+  assert.deepEqual([y3.team1, y3.team2, y3.round, y3.players1], [win, lose, 6, null]);
+});
+
 test('html stat report: a prelim stage with pools ranks each pool apart, under the stage name', () => {
   const sc = STAGED.find((x) => x.key === 'pools');
   const matches = dedupeMatches(sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));
@@ -3245,6 +3289,28 @@ test('Replace tossup on an earlier question: an answered replacement reads the h
   assert.equal(g.view()[2], 'TB1/-');
   assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
   assert.deepEqual(g.scores(), { Alpha: 55, Beta: 65 });
+});
+
+test('Replace tossup on an earlier question: with no bonus picked, a blank one is held and scored if answered', () => {
+  const g = playedGame();
+  const view = g.view();
+  const nums = qnums(g);
+  const ph = placeholderBonus(g.game.packet.bonuses);
+  assert.deepEqual(ph.values, [10, 10, 10], 'valued as the packet bonuses');
+  const held = new MBonus(ph.leadin, ph.parts.map((q, i) => ({ question: q, answer: ph.answers[i], value: ph.values[i] })));
+  assert.equal(g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1', held, ''), '');
+  assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
+  g.correct(2, g.B);
+  g.sync();
+  assert.ok(g.view()[2].startsWith('TB1/Bonus for the replacement tossup'));
+  g.game.cycles[2].setBonusPartAnswer(2, 'Beta', 10);
+  assert.deepEqual(g.scores(), { Alpha: 55, Beta: 95 }, 'Beta: 10, and two parts of the bonus the TD gave');
+  assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
+  assert.deepEqual(tbUsedIds(g.qbj(), g.tb), ['TU1'], 'a packet-file question, not a pool one');
+  // the TD's real bonus can still go in its place
+  assert.equal(g.replace(2, 'bonus', g.bo(1, 'TB'), 'B1'), '');
+  assert.equal(g.view()[2], 'TB1/TBB1');
+  assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
 });
 
 test('Replace tossup on an earlier question that only had a neg; the neg goes with it', () => {

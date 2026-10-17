@@ -1711,6 +1711,56 @@ async function openHubOf(adminSecret) {
   ok('24c rename: with the team\'s whole record', row.split('\t').map((x) => x.trim()).includes(String(before.w)), { row, w: before.w, l: before.l });
 }
 
+/* ---------- 24d. recording a forfeit ----------
+   The TD records one from the hub: it goes up the room's own route, the
+   hub lists it as a forfeit, the stats count a win and a loss, and the
+   public page shows the result. */
+{
+  const room = roomBucket(2); // turned nothing in for round 2
+  await openHub();
+  await click('#fftoggle');
+  await waitJs(`!!document.querySelector('#ffpanel')`, 'the forfeit panel');
+  await fill('#ffroom', String(room.id), ['change']);
+  await waitJs(`document.querySelector('#ffroom') && document.querySelector('#ffroom').value === '${room.id}' && document.querySelector('#fflose').value`, 'the room picked');
+  const lose = await js(`document.querySelector('#fflose').value`);
+  const win = await js(`document.querySelector('#ffwin').value`);
+  ok('24d forfeit: the panel fills in the two teams scheduled there', !!lose && !!win && lose !== win, [lose, win]);
+  const wl = async (team) => js(`(() => {
+    const t = [...document.querySelectorAll('#statsout table')].find((x) => [...x.rows[0].cells].some((c) => c.textContent.trim() === 'W'));
+    const head = [...t.rows[0].cells].map((c) => c.textContent.trim());
+    const row = [...t.rows].find((r) => [...r.cells].some((c) => c.classList.contains('name') && c.firstChild && c.firstChild.textContent.trim() === ${q(team)}));
+    return row ? [Number(row.cells[head.indexOf('W')].textContent), Number(row.cells[head.indexOf('L')].textContent)] : null;
+  })()`);
+  await click('#calc');
+  await waitJs(`document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats before', 30000);
+  const before = [await wl(win), await wl(lose)];
+  await click('#ffsave');
+  const ffFile = await until(async () => {
+    const x = await detail();
+    return x.files.find((f) => f.bucket_id === room.id && f.round === 2 && /_Forfeit\.qbj$/.test(f.filename) && !f.error);
+  }, 'the forfeit at the Worker', 15000);
+  ok('24d forfeit: recorded through the room, as a game the Worker reads', !!ffFile);
+  await waitJs(`(document.querySelector('[data-cell="${room.id}:2"]') || {}).textContent.trim() === '✓'`, 'the grid shows it in');
+  // recording opens that cell's files
+  if (!(await exists('.cellpanel .pfile'))) await click(`[data-cell="${room.id}:2"]`);
+  await waitJs(`!!document.querySelector('.cellpanel .pfile')`, 'the cell panel');
+  ok('24d forfeit: the hub lists it as a forfeit', (await text('.cellpanel')).includes(`${win} defeats ${lose} by forfeit`), await text('.cellpanel'));
+  await click('#calc');
+  await waitJs(`document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats after', 30000);
+  const after = [await wl(win), await wl(lose)];
+  ok('24d forfeit: a win for one, a loss for the other, in the hub stats',
+    before[0] && after[0][0] === before[0][0] + 1 && after[0][1] === before[0][1] && after[1][1] === before[1][1] + 1 && after[1][0] === before[1][0],
+    { before, after });
+  await tick();
+  await goto(`${PAGES}/t.html?t=${slug}`);
+  await js(`localStorage.qbtdStatsLayout = 'new'; true`);
+  await goto(`${PAGES}/t.html?t=${slug}&ff=1#stats`);
+  await waitJs(`!!document.querySelector('[data-statssec="games"]')`, 'the public stats', 20000);
+  await click('[data-statssec="games"]');
+  await waitJs(`document.body.innerText.includes('by forfeit')`, 'the public scoreboard', 15000);
+  ok('24d forfeit: the public scoreboard shows the result', (await js('document.body.innerText')).includes(`${win} defeats ${lose} by forfeit`));
+}
+
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);

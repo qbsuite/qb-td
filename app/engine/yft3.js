@@ -97,12 +97,24 @@ export function buildYft3(opts) {
   // validateGame adds it
   const games = matches.map((m) => {
     const [a, b] = m.teams;
+    // a forfeit as YF 3 holds one: no player lines, `invalid` set up front;
+    // team1 the winner. (Its qbj importer files one under round 0; the
+    // round it was in is kept here.)
+    if (m.forfeit) {
+      const [win, lose] = a.forfeitLoss ? [b, a] : [a, b];
+      return {
+        bbPts1: 0, bbPts2: 0, forfeit: true, invalid: false, lightningPts1: 0, lightningPts2: 0, notes: m.notes ?? '',
+        otNeg1: 0, otNeg2: 0, otPwr1: 0, otPwr2: 0, otTen1: 0, otTen2: 0, ottu: 0, phases: [],
+        players1: null, players2: null, round: m.round, score1: 0, score2: 0, team1: win.name, team2: lose.name,
+        tiebreaker: false, tuhtot: 0, validationMsg: '',
+      };
+    }
     const ot = overtimeOf(m, regulation);
     const otCount = (t, test) => values.reduce((n, v) => n + (test(v) ? ot.count(t.name, v) : 0), 0);
     return {
       bbPts1: 0,
       bbPts2: 0,
-      forfeit: false,
+      forfeit: !!m.forfeit,
       lightningPts1: 0,
       lightningPts2: 0,
       notes: m.notes ?? '',

@@ -5,6 +5,8 @@
 // compute: team W/L/T, points for/against, tossups heard, per-value buzz
 // counts, bonuses heard (= positive buzzes), PPB, PP20TUH.
 
+import { resultOf } from './qbj.js';
+
 function round2(x) {
   return Math.round(x * 100) / 100;
 }
@@ -84,6 +86,15 @@ export function aggregate(matches, roster = null) {
     const [a, b] = m.teams;
     const rows = [teamRow(a.name), teamRow(b.name)];
     const opp = [b, a];
+    // a forfeit: its result, and no stats (YF's PoolTeamStats)
+    if (m.forfeit) {
+      m.teams.forEach((mt, i) => {
+        const res = resultOf(mt, opp[i]);
+        if (res === 'W') rows[i].w += 1; else if (res === 'L') rows[i].l += 1;
+      });
+      games.push({ round: m.round, tossupsRead: 0, teams: m.teams, forfeit: true, room: m.room, fileId: m.fileId });
+      continue;
+    }
     m.teams.forEach((mt, i) => {
       const row = rows[i];
       row.gp += 1;

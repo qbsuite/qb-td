@@ -13,7 +13,7 @@
 // so behind a moderator's upload).
 
 import { pub, esc, usingStaticData, usingArchive, LIVE } from './api.js';
-import { parseMatch, parseRoster, rosterNameMap, renameMatch } from '../engine/qbj.js';
+import { parseMatch, parseRoster, rosterNameMap, renameMatch, resultOf } from '../engine/qbj.js';
 import { dedupeMatches } from '../engine/stats.js';
 import { buildReport, reportData } from '../engine/report.js';
 import { mountReport, reportPlace } from './reportframe.js';
@@ -288,8 +288,10 @@ function gameCell(g, round, results) {
   if (!m) return lineHtml(g.a, a, null) + lineHtml(g.b, b, null);
   const ma = m.teams.find((t) => t.name === a);
   const mb = m.teams.find((t) => t.name === b);
-  return lineHtml(g.a, a, ma.points, ma.points > mb.points, ma.points < mb.points)
-    + lineHtml(g.b, b, mb.points, mb.points > ma.points, mb.points < ma.points);
+  // a forfeit: W for the winner, FF for the team that forfeited
+  const shown = (x, y) => (m.forfeit ? (resultOf(x, y) === 'W' ? 'W' : 'FF') : x.points);
+  return lineHtml(g.a, a, shown(ma, mb), resultOf(ma, mb) === 'W', resultOf(ma, mb) === 'L')
+    + lineHtml(g.b, b, shown(mb, ma), resultOf(mb, ma) === 'W', resultOf(mb, ma) === 'L');
 }
 
 function renderScheduleGrid(box) {
@@ -367,9 +369,9 @@ function renderTeamView(box, team) {
           const mine = m.teams.find((t) => t.name === team);
           const theirs = m.teams.find((t) => t.name === opp);
           if (mine && theirs) {
-            result = mine.points > theirs.points
-              ? `<span class="wtag">W ${mine.points}–${theirs.points}</span>`
-              : `<span class="muted">L ${mine.points}–${theirs.points}</span>`;
+            const won = resultOf(mine, theirs) === 'W';
+            const score = m.forfeit ? '(forfeit)' : `${mine.points}–${theirs.points}`;
+            result = won ? `<span class="wtag">W ${score}</span>` : `<span class="muted">L ${score}</span>`;
           }
         }
         rows.push(`<tr${round.round === liveRound() ? ' class="nowrow"' : ''}><td class="roundcell">${round.round}</td>
@@ -1034,11 +1036,17 @@ function poolGrid(rd, ids, teams) {
       const r = due.get(key(tm.name, o.name));
       return r ? `<td class="todo" title="Round ${r}">R${r}</td>` : '<td class="todo"></td>';
     }
-    const mine = g.teams.find((x) => x.name === tm.name).points;
-    const theirs = g.teams.find((x) => x.name === o.name).points;
-    const tip = `${tm.name} ${mine}, ${o.name} ${theirs}`;
-    return `<td class="${mine > theirs ? 'won' : mine < theirs ? 'lost' : ''}" title="${esc(tip)}">${
-      goLink('games', ids.game(g.id), `${mine}<span class="opp">${theirs}</span>`)}</td>`;
+    const me = g.teams.find((x) => x.name === tm.name);
+    const them = g.teams.find((x) => x.name === o.name);
+    const res = resultOf(me, them);
+    const cls = res === 'W' ? 'won' : res === 'L' ? 'lost' : '';
+    if (g.forfeit) {
+      const tip = res === 'W' ? `${tm.name} wins by forfeit` : `${tm.name} forfeits to ${o.name}`;
+      return `<td class="${cls}" title="${esc(tip)}">${goLink('games', ids.game(g.id), res === 'W' ? 'W' : 'FF')}</td>`;
+    }
+    const tip = `${tm.name} ${me.points}, ${o.name} ${them.points}`;
+    return `<td class="${cls}" title="${esc(tip)}">${
+      goLink('games', ids.game(g.id), `${me.points}<span class="opp">${them.points}</span>`)}</td>`;
   };
   const rec = (tm) => {
     let w = 0;
@@ -1046,9 +1054,8 @@ function poolGrid(rd, ids, teams) {
     for (const o of teams) {
       const g = o === tm ? null : played.get(key(tm.name, o.name));
       if (!g) continue;
-      const mine = g.teams.find((x) => x.name === tm.name).points;
-      const theirs = g.teams.find((x) => x.name === o.name).points;
-      if (mine > theirs) w++; else if (mine < theirs) l++;
+      const res = resultOf(g.teams.find((x) => x.name === tm.name), g.teams.find((x) => x.name === o.name));
+      if (res === 'W') w++; else if (res === 'L') l++;
     }
     return `${w}\u2013${l}`;
   };
@@ -1194,6 +1201,8 @@ function withSheets(pages, rd) {
 function newGames(rd, ids, vals) {
   const rounds = [...new Set(rd.games.map((g) => g.round))];
   const box = (g) => {
+    // a forfeit is its result: no box score, no scoresheet
+    if (g.forfeit) return `${secHead(ids.game(g.id), `${esc(g.winner)} defeats ${esc(g.loser)} by forfeit`, `Round ${g.round}`, g.anchor)}</div>`;
     const head = `Round ${g.round} · Tossups read: ${g.tossupsRead}${g.otTossups ? ` (${g.otTossups} in OT)` : ''}`;
     const w = g.teams.find((t) => t.name === g.winner);
     const l = g.teams.find((t) => t.name === g.loser);

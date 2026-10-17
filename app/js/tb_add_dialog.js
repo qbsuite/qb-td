@@ -27,7 +27,7 @@ import { ModalDialog } from 'modaq/src/components/dialogs/ModalDialog';
 import { PacketState } from 'modaq/src/state/PacketState';
 import { tbBridge } from './tb_bridge.js';
 import { tbSelection, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion,
-  syncReserved, keepsThrownOut, heldBonusText } from './read_core.js';
+  syncReserved, keepsThrownOut, heldBonusText, placeholderBonus } from './read_core.js';
 
 const h = React.createElement;
 const strip = (s) => String(s || '').replace(/<[^>]*>/g, '');
@@ -116,7 +116,7 @@ const REPLACE_ERRORS = {
   none: 'There is no question here to replace.',
   nobonus: 'There is no bonus on this question. A bonus can be replaced once a team has answered the tossup correctly.',
   paired: 'This game format reads a bonus with each tossup, so only the latest question can be replaced.',
-  needbonus: 'Please pick a bonus as well, to read if the replacement tossup is answered.',
+  needbonus: 'The bonus for the replacement could not be set up.',
 };
 
 const WHERE_ERRORS = {
@@ -174,7 +174,6 @@ function picked(appState, isTu, key, pool, file) {
 
 function ReplaceDialog({ appState, kind, onClose }) {
   const [pick, setPick] = React.useState('');
-  const [bonusPick, setBonusPick] = React.useState('');
   const [file, setFile] = React.useState(null); // a loaded packet file's PacketState
   const [error, setError] = React.useState('');
   const pool = tbBridge.pool;
@@ -190,11 +189,15 @@ function ReplaceDialog({ appState, kind, onClose }) {
   const replace = () => {
     const main = picked(appState, isTu, pick, pool, file);
     if (!main) { setError('That question could not be read.'); return; }
-    const extra = check.needBonus ? picked(appState, false, bonusPick, pool, file) : null;
-    if (check.needBonus && !extra) { setError(REPLACE_ERRORS.needbonus); return; }
+    // an earlier question's replacement holds a blank bonus, for whatever
+    // bonus the TD gives if it is answered
+    const held = check.needBonus
+      ? PacketLoaderController.loadPacket(appState, { tossups: [], bonuses: [placeholderBonus(game.packet.bonuses)] }, game.packet.name)
+      : null;
+    if (check.needBonus && !held) { setError('That question could not be read.'); return; }
     const out = replaceQuestion({
       game, cycleIndex: ci, kind, question: main.question, id: main.id,
-      bonus: extra && extra.question, bonusId: extra ? extra.id : '',
+      bonus: held && held.bonuses[0], bonusId: '',
       tb, act: runInAction, makePacket,
     });
     if (out.error) { setError(REPLACE_ERRORS[out.error] || out.error); return; }
@@ -214,7 +217,8 @@ function ReplaceDialog({ appState, kind, onClose }) {
         : `Bonus ${now} on question ${q} will be thrown out, and the bonus you pick will be read in its place.`));
     if (check.retro) {
       body.push(h('div', { key: 'retro', style: { marginBottom: 10, fontSize: 13 } },
-        `Later questions already have results, and they keep them. Please enter the replacement's result on question ${q}.`));
+        `Later questions already have results, and they keep them. Please enter the replacement's result on question ${q}.`
+          + (check.needBonus ? ' If it is answered, a blank bonus comes up: please read the bonus the TD gives and enter its parts there.' : '')));
     }
     if (pool && (isTu ? pool.tossups : pool.bonuses).length) {
       body.push(h('div', { key: 'hint', style: { marginBottom: 4, fontWeight: 600 } },
@@ -229,19 +233,10 @@ function ReplaceDialog({ appState, kind, onClose }) {
       body.push(h('div', { key: 'nopool', style: { marginBottom: 4 } },
         `There are no ${isTu ? 'tossups' : 'bonuses'} from the tournament director. Please load a packet file and pick one from it.`));
     }
-    if (check.needBonus) {
-      const bonusOptions = pickOptions(false, pool, file, added);
-      body.push(h('div', { key: 'bhint', style: { margin: '14px 0 4px', fontWeight: 600 } },
-        'The bonus to read if the replacement is answered:'));
-      body.push(bonusOptions.length
-        ? h(ChoiceGroup, { key: 'bpick', selectedKey: bonusPick || null, options: bonusOptions,
-          onChange: (e, o) => { setBonusPick(o.key); setError(''); } })
-        : h('div', { key: 'nobpool' }, 'There are no bonuses from the tournament director. Please load a packet file and pick one from it.'));
-    }
     body.push(
       h('div', { key: 'or', style: { margin: '14px 0 4px', fontWeight: 600 } },
         file ? 'Or load a different packet file:' : 'Or pick from a packet file:'),
-      h(PacketLoader, { key: 'loader', appState, onLoad: (packet) => { setFile(packet); setPick(''); setBonusPick(''); } }));
+      h(PacketLoader, { key: 'loader', appState, onLoad: (packet) => { setFile(packet); setPick(''); } }));
     if (error) body.push(h('div', { key: 'fail', style: { color: '#a4262c', marginTop: 8 } }, error));
   }
   return [
@@ -249,7 +244,7 @@ function ReplaceDialog({ appState, kind, onClose }) {
     h(DialogFooter, { key: 'foot' },
       check.error ? null : h(PrimaryButton, {
         text: isTu ? 'Replace tossup' : 'Replace bonus',
-        disabled: !pick || (check.needBonus && !bonusPick),
+        disabled: !pick,
         onClick: replace,
       }),
       h(DefaultButton, { text: 'Cancel', onClick: onClose })),

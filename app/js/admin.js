@@ -17,7 +17,7 @@
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
 import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames } from '../engine/qbj.js';
+  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
@@ -293,6 +293,7 @@ let rosterUpload = null; // parsed upload awaiting confirmation
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
 let addOpen = null;      // Add a game panel: {bid, round} to prefill, or null when closed
+let ffOpen = null;       // Record a forfeit panel: {bid, round, win, lose}, or null when closed
 let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
 // clock time of a ruling (protests drawer)
 function clockTime(ms) {
@@ -1656,6 +1657,17 @@ function schedRoomIndex(b) {
   return i !== -1 ? i : sched.rooms.findIndex((r) => norm(r.name) === norm(b.room_name));
 }
 
+// A forfeit the hub recorded (recordForfeit) is named so: its summary
+// carries no result, only the teams, winner first.
+const isForfeitFile = (f) => !!f && /_Forfeit\.qbj$/i.test(f.filename || '');
+function gameLine(sum, file, plain = false) {
+  if (isForfeitFile(file)) return `<span class="win">${esc(sum.teams[0])}</span> defeats ${esc(sum.teams[1])} by forfeit`;
+  if (plain) return `${esc(sum.teams[0])} <b>${sum.score[0]}</b> &ndash; <b>${sum.score[1]}</b> ${esc(sum.teams[1])}`;
+  return `<span class="${sum.score[0] > sum.score[1] ? 'win' : ''}">${esc(sum.teams[0])} ${sum.score[0]}</span>
+         <span class="muted">&ndash;</span>
+         <span class="${sum.score[1] > sum.score[0] ? 'win' : ''}">${sum.score[1]} ${esc(sum.teams[1])}</span>`;
+}
+
 /** The two teams the schedule puts in this room this round, or null. */
 function scheduledGame(b, round) {
   const i = schedRoomIndex(b);
@@ -1776,9 +1788,7 @@ function phaseLine(bk) {
 function liveBracketsHtml(bk, fileLinks) {
   const row = (r) => {
     const game = r.sum
-      ? `<span class="${r.sum.score[0] > r.sum.score[1] ? 'win' : ''}">${esc(r.sum.teams[0])} ${r.sum.score[0]}</span>
-         <span class="muted">&ndash;</span>
-         <span class="${r.sum.score[1] > r.sum.score[0] ? 'win' : ''}">${r.sum.score[1]} ${esc(r.sum.teams[1])}</span>`
+      ? gameLine(r.sum, r.file)
       : r.game ? `${esc(slotLabel(r.game.a))} <span class="muted">v</span> ${esc(slotLabel(r.game.b))}`
       : '<span class="muted">No game this round</span>';
     const acts = r.file
@@ -1976,7 +1986,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         ? `<div class="warntext">Scheduled in ${esc(home.room_name)}. <button class="linkbtn" data-moveto="${f.id}:${home.id}">Move it there</button></div>` : '';
       return `<div class="pfile ${superseded ? 'old' : ''}">
         <div class="pline">
-          <span>${s ? `${esc(s.teams[0])} <b>${s.score[0]}</b> &ndash; <b>${s.score[1]}</b> ${esc(s.teams[1])}` : esc(f.filename)}
+          <span>${s ? gameLine(s, f, true) : esc(f.filename)}
             ${superseded ? '<span class="muted" style="font-size:13px"> &middot; superseded</span>' : ''}</span>
           <select data-movefile="${f.id}" aria-label="Room this game came from">
             ${buckets.some((x) => x.id === f.bucket_id) ? '' : `<option selected>#${f.bucket_id}</option>`}
@@ -2037,9 +2047,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
           <div class="lrow ${r.bye ? 'bye' : ''}">
             <span class="lroom">${esc(r.b.room_name)}</span>
             <span class="lgame">${r.sum
-              ? `<span class="${r.sum.score[0] > r.sum.score[1] ? 'win' : ''}">${esc(r.sum.teams[0])} ${r.sum.score[0]}</span>
-                 <span class="muted">&ndash;</span>
-                 <span class="${r.sum.score[1] > r.sum.score[0] ? 'win' : ''}">${r.sum.score[1]} ${esc(r.sum.teams[1])}</span>`
+              ? gameLine(r.sum, r.file)
               : r.bye ? '<span class="muted">No game this round</span>'
               : r.planned ? `${esc(r.planned[0])} <span class="muted">v</span> ${esc(r.planned[1])}`
               : '<span class="muted">No game yet</span>'}
@@ -2057,7 +2065,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
 
         <section>
           <div class="sechead"><h2>Uploads</h2>
-            <button class="linkbtn" id="addtoggle" aria-expanded="${addOpen ? 'true' : 'false'}">Add a game</button></div>
+            <span><button class="linkbtn" id="fftoggle" aria-expanded="${ffOpen ? 'true' : 'false'}">Record a forfeit</button>
+            <button class="linkbtn" id="addtoggle" aria-expanded="${addOpen ? 'true' : 'false'}" style="margin-left:14px">Add a game</button></span></div>
+          ${ffPanelHtml(t, buckets)}
           <div id="addpanel" class="addpanel" ${addOpen ? '' : 'hidden'}>
             <div class="row">
               <label>Room <select id="addroom">${buckets.map((b) =>
@@ -2186,6 +2196,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     };
   });
   $('addtoggle').onclick = () => { addOpen = addOpen ? null : { bid: null, round: t.current_round }; render(); };
+  wireForfeit(a, t, buckets, render);
   $('addcancel').onclick = () => { addOpen = null; render(); };
   $('addfile').onchange = () => { $('addlist').innerHTML = addListHtml([...$('addfile').files]); };
   // Download menu: closed by picking an item, Escape, or a click elsewhere
@@ -2350,6 +2361,89 @@ async function editGame(a, buckets, files, fileId) {
     // A new tab: the dashboard keeps its place, and the TD can flip back.
     window.open(readLink(room.secret) + '&g=' + encodeURIComponent(gid), '_blank');
   } catch (e) { say(e.message, true); }
+}
+
+/* ---------- forfeits ----------
+   The TD records a forfeit as a game: a file whose forfeiting team carries
+   forfeit_loss (qbj.js forfeitQbj), sent up the room's own upload route
+   like Add a game, so it counts everywhere a game does. The stats count
+   it as YellowFruit does: a win and a loss, nothing else. */
+
+// the teams to pick from: the schedule's, else the roster's
+function forfeitTeams() {
+  const names = new Set();
+  if (sched) for (const r of flatRounds(sched)) for (const g of r.games) for (const x of [g.a, g.b]) if (x && x.team) names.add(x.team);
+  for (const n of schedTeams || []) names.add(n);
+  return [...names].sort((x, y) => x.localeCompare(y));
+}
+
+function ffPanelHtml(t, buckets) {
+  if (!ffOpen) return '';
+  const teams = forfeitTeams();
+  const opts = (sel) => `<option value="">Choose a team</option>${teams.map((n) =>
+    `<option ${n === sel ? 'selected' : ''}>${esc(n)}</option>`).join('')}`;
+  return `<div id="ffpanel" class="addpanel">
+    <div class="row">
+      <label>Room <select id="ffroom">${buckets.map((b) =>
+        `<option value="${b.id}" ${ffOpen.bid === b.id ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}</select></label>
+      <label>Round <input id="ffround" type="number" min="1" max="999" value="${ffOpen.round || t.current_round}" style="width:64px"></label>
+    </div>
+    <div class="row">
+      <label>Forfeited by <select id="fflose">${opts(ffOpen.lose)}</select></label>
+      <label>Winner <select id="ffwin">${opts(ffOpen.win)}</select></label>
+    </div>
+    <div class="muted" style="font-size:13px">A forfeit counts as a win and a loss, with no stats, as YellowFruit counts one.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="ffsave" class="primary">Record forfeit</button>
+      <button id="ffcancel" class="linkbtn muted">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function wireForfeit(a, t, buckets, render) {
+  // the scheduled pair for a room and round, the first team as forfeiting
+  const prefill = (bid, round) => {
+    const b = buckets.find((x) => x.id === bid);
+    const pair = b && sched ? scheduledGame(b, round) : null;
+    ffOpen = { bid, round, lose: pair ? pair[0] : '', win: pair ? pair[1] : '' };
+  };
+  $('fftoggle').onclick = () => {
+    if (ffOpen) ffOpen = null;
+    else prefill(buckets.length ? buckets[0].id : null, t.current_round);
+    render();
+  };
+  if (!ffOpen) return;
+  const reprefill = () => { prefill(Number($('ffroom').value), Number($('ffround').value)); render(); };
+  $('ffroom').onchange = reprefill;
+  $('ffround').onchange = reprefill;
+  $('fflose').onchange = () => { ffOpen.lose = $('fflose').value; };
+  $('ffwin').onchange = () => { ffOpen.win = $('ffwin').value; };
+  $('ffcancel').onclick = () => { ffOpen = null; render(); };
+  $('ffsave').onclick = () => recordForfeit(buckets);
+}
+
+async function recordForfeit(buckets) {
+  const room = buckets.find((b) => b.id === Number($('ffroom').value));
+  const round = Number($('ffround').value);
+  const lose = $('fflose').value;
+  const win = $('ffwin').value;
+  if (!room) { say('Pick a room', true); return; }
+  if (!Number.isInteger(round) || round < 1) { say('Pick a round', true); return; }
+  if (!lose || !win) { say('Pick both teams', true); return; }
+  if (lose === win) { say('Pick two different teams', true); return; }
+  if (notStarted()) { say(START_FIRST, true); return; }
+  const name = `Round_${round}_${win}_${lose}_Forfeit.qbj`.replace(/[^\w.]+/g, '_');
+  const run = busy($('ffsave'), { label: 'Recording', scope: $('ffpanel') });
+  try {
+    const out = await pub(`/b/${room.secret}/upload?round=${round}&name=${encodeURIComponent(name)}`,
+      { method: 'POST', body: JSON.stringify(forfeitQbj(round, win, lose)) });
+    run.end();
+    if (out && out.error) { say(out.error, true); return; }
+    say(`${lose} forfeits to ${win} in round ${round} (${room.room_name})`);
+    ffOpen = null;
+    cellOpen = { bid: room.id, round };
+    showDetail();
+  } catch (e) { run.end(); say(e.message, true); }
 }
 
 /** Put a game into a room the TD picks, through that room's own upload

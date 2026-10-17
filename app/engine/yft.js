@@ -461,7 +461,7 @@ export function buildYft(opts) {
         },
         team: ref(`Team_${t.name}`),
         points: t.points,
-        forfeitLoss: false,
+        forfeitLoss: !!t.forfeitLoss,
         correctTossupsWithoutBonuses: values.reduce((n, v) => n + (v > 0 ? ot.count(t.name, v) : 0), 0),
         matchPlayers: t.players.map((p) => ({
           player: ref(playerIds.get(t.name + '\n' + p.name)),
