@@ -1,3 +1,9 @@
+Release Notes for 10/17/2026
+
+[ STATS ]
+- New layout: the pools' grids line up with one another, whatever the length of the team names.
+- New layout: UG and DII tags line up at the right of the name column.
+
 Release Notes for 10/16/2026
 
 [ EXPORTS ]

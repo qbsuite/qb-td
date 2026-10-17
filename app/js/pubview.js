@@ -968,11 +968,12 @@ function newStandings(rd, ids, vals, pp) {
   const grid = standView === 'grid';
   return `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}
       ${grid ? '<span class="muted pgridnote">Each row is that team&rsquo;s games, with its own score above its opponent&rsquo;s. A green square is a win, and R6 means the game is in round 6.</span>' : ''}</div>`
-    + keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name)), true])
-      .concat([['Other teams', rd.teams.filter((t) => !inPool.has(t.name)), false]])
+    + (grid ? poolGrids(rd, ids, keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name))])
+      .filter(([, teams]) => teams.length)) : '')
+    + (grid ? [] : keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name))]))
+      .concat([['Other teams', rd.teams.filter((t) => !inPool.has(t.name))]])
       .filter(([, teams]) => teams.length)
-      .map(([name, teams, isPool]) => `<h3 class="poolhead">${esc(name)}</h3>${
-        grid && isPool ? poolGrid(rd, ids, teams) : table(teams, false)}`).join('');
+      .map(([name, teams]) => `<h3 class="poolhead">${esc(name)}</h3>${table(teams, false)}`).join('');
 }
 
 // "Illinois A" -> "Ill A", "Notre Dame B" -> "ND B", "University of Iowa A"
@@ -985,6 +986,16 @@ function shortTeam(name) {
   const core = use.length > 1 ? use.map((w) => w[0].toUpperCase()).join('')
     : use[0].length > 5 ? use[0].slice(0, 3) : use[0];
   return core + tail;
+}
+
+// Every pool's grid, in one table so the squares line up from pool to
+// pool whatever the length of each pool's team names.
+function poolGrids(rd, ids, pools) {
+  const span = 2 + Math.max(...pools.map(([, teams]) => teams.length));
+  return `<div class="tablewrap pgridwrap"><table class="pgrid">${pools.map(([name, teams]) => `<tbody>
+    <tr><td class="pghead" colspan="${span}"><h3 class="poolhead">${esc(name)}</h3></td></tr>
+    ${poolGrid(rd, ids, teams)}</tbody>`).join('')}
+  </table></div>`;
 }
 
 // One pool as a square grid, teams in standings order down the side and
@@ -1036,11 +1047,9 @@ function poolGrid(rd, ids, teams) {
     }
     return `${w}\u2013${l}`;
   };
-  return `<div class="tablewrap pgridwrap"><table class="pgrid">
-    <tr><th></th>${teams.map((t) => `<th class="colh" title="${esc(t.name)}">${esc(shortTeam(t.name))}</th>`).join('')}<th class="colh">W\u2013L</th></tr>
+  return `<tr><th></th>${teams.map((t) => `<th class="colh" title="${esc(t.name)}">${esc(shortTeam(t.name))}</th>`).join('')}<th class="colh">W\u2013L</th></tr>
     ${teams.map((tm) => `<tr><th class="rowh">${goLink('teams', ids.team(tm.name), esc(tm.name))}</th>${
-      teams.map((o) => cell(tm, o)).join('')}<td class="rec">${rec(tm)}</td></tr>`).join('')}
-  </table></div>`;
+      teams.map((o) => cell(tm, o)).join('')}<td class="rec">${rec(tm)}</td></tr>`).join('')}`;
 }
 
 function newIndividuals(rd, ids, vals, pp) {

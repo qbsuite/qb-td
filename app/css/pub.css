@@ -65,6 +65,8 @@ tr.nowrow td { background: var(--sel); }
 .pgrid td.todo { background: none; box-shadow: inset 0 0 0 1px var(--line); font-size: 11px; }
 .pgrid td .opp { display: block; font-weight: 400; opacity: 0.8; }
 .pgrid td.rec { width: 48px; background: none; color: var(--fg); font-weight: 600; }
+.pgrid td.pghead { width: auto; height: auto; background: none; border-radius: 0; text-align: left; color: var(--fg); }
+.pgrid tbody:first-child .poolhead { margin-top: 4px; }
 @media (max-width: 560px) {
   .pgrid td { width: 46px; height: 40px; }
   .pgrid th.rowh { font-size: 12px; white-space: normal; max-width: 9em; }
@@ -105,6 +107,9 @@ tr.nowrow td { background: var(--sel); }
 .nstats .nrk { display: none; }
 /* a long team name wraps rather than push the numbers out of view */
 .nstats td.teamcol, .nstats td.nstick { white-space: normal; min-width: 12ch; max-width: 20em; }
+/* a UG or DII tag sits at the name cell's right edge, so the tags line up
+   down the column (nobody is both, so one place holds either) */
+.nstats td.name .ntag { float: right; margin: 1px 0 0 10px; }
 .nfade { position: relative; min-width: 0; }
 .nfade + .nfade { margin-top: 12px; }
 .tablewrap.nfit { overflow: visible; }
