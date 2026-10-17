@@ -42,6 +42,12 @@ function boxScore(t, vals) {
 }
 
 function gameRow(g, vals) {
+  const room = g.room ? ` <span class="muted">· ${esc(g.room)}</span>` : '';
+  // a forfeit is its result: no score, no box score
+  if (g.forfeit) {
+    const [win, lose] = g.teams[0].forfeitLoss ? [g.teams[1], g.teams[0]] : g.teams;
+    return `<div class="game plain">${esc(win.name)} defeats ${esc(lose.name)} by forfeit${room}</div>`;
+  }
   const summary = `${esc(g.teams[0].name)} ${g.teams[0].points},
     ${esc(g.teams[1].name)} ${g.teams[1].points}
     ${g.room ? `<span class="muted">· ${esc(g.room)}</span>` : ''}`;

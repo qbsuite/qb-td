@@ -11,6 +11,7 @@ Release Notes for 10/17/2026
 - A replacement can be undone: delete its "Replaced tossup" or "Replaced bonus" event. The question comes back as it was. Latest first.
 
 [ STATS ]
+- The hub's Compute stats lists a forfeit as "X defeats Y by forfeit" instead of a 0–0 game.
 - Forfeits show as "X defeats Y by forfeit" on the scoreboard, as W and FF on the schedule and pool grid, and in both YellowFruit files.
 
 [ READER ]

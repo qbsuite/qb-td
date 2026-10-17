@@ -1751,6 +1751,8 @@ async function openHubOf(adminSecret) {
   ok('24d forfeit: a win for one, a loss for the other, in the hub stats',
     before[0] && after[0][0] === before[0][0] + 1 && after[0][1] === before[0][1] && after[1][1] === before[1][1] + 1 && after[1][0] === before[1][0],
     { before, after });
+  ok('24d forfeit: the hub stats list the game as a forfeit',
+    (await text('#statsout')).includes(`${win} defeats ${lose} by forfeit`));
   await tick();
   await goto(`${PAGES}/t.html?t=${slug}`);
   await js(`localStorage.qbtdStatsLayout = 'new'; true`);
