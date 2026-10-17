@@ -226,8 +226,8 @@ function ReplaceDialog({ appState, kind, onClose }) {
     }
     if (check.needBonus) {
       body.push(h('div', { key: 'warn', style: { marginBottom: 10, fontSize: 13, color: '#8a5300' } },
-        'Nobody answered this tossup, so it may make more sense to leave this question as it is and read a new tossup '
-          + 'at the end of the game instead (Add questions, At the end of the packet).'));
+        'Tossup went dead. It may make more sense to throw it out or leave the question as is and add a new question '
+          + 'at the end of the game instead. Are you sure you want to replace?'));
     }
     if (pool && (isTu ? pool.tossups : pool.bonuses).length) {
       body.push(h('div', { key: 'hint', style: { marginBottom: 4, fontWeight: 600 } },

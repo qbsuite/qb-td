@@ -6,7 +6,7 @@ Release Notes for 10/17/2026
 [ READER ]
 - A replaced tossup keeps its question's bonus: if the replacement is answered, the same bonus is read again. Later questions are unchanged.
 - Replacing a tossup on an earlier question nobody answered holds a blank bonus, for whichever bonus the TD gives.
-- That case also suggests reading a new tossup at the end of the game instead.
+- That case asks first: a dead tossup may be better thrown out, or left, with a new question added at the end of the game.
 - A replacement can be undone: delete its "Replaced tossup" or "Replaced bonus" event. The question comes back as it was. Latest first.
 
 [ STATS ]
