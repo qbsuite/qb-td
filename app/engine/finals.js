@@ -267,7 +267,11 @@ export function scheduleFinished(schedule, matches) {
       return na === null || nb === null || Math.abs(na - nb) < 4;
     }
     if (/loses the first game/.test(why)) {
-      // an advantaged final's second game: only if the leader lost the first
+      // an advantaged final's second game: only if there was a leader (one
+      // win clear going in; teams level play one game) and it lost the first
+      const na = netWins(g.a);
+      const nb = netWins(g.b);
+      if (na !== null && nb !== null && na - nb !== 2) return false;
       const first = all.find((x) => x.r.round < round && x.r.games.some((y) => y.ifNeeded && teamOf(y.a) === a && teamOf(y.b) === b));
       if (!first) return false;
       const res = played.get(gameKey(first.r.round, first.r.games.find((y) => teamOf(y.a) === a && teamOf(y.b) === b)));

@@ -5534,6 +5534,14 @@ test('finished: an advantaged final — skipped when the leader is two wins clea
   const lost = [...x.games, x.game(x.fin.rounds[0].round, 'T2', 'T1')];
   assert.equal(scheduleFinished(x.filled, lost), false, 'the leader lost it: the second game decides');
   assert.equal(scheduleFinished(x.filled, [...lost, x.game(x.fin.rounds[1].round, 'T1', 'T2')]), true);
+  // level going in (T1 and T2 both 2–1): one game, whoever wins it — no second game
+  const level = { 'T1,T2': true, 'T2,T3': true, 'T3,T1': true, 'T1,T4': true, 'T2,T4': true, 'T3,T4': true };
+  x = rrFinal((a, b) => level[[a, b].join()] ?? !level[[b, a].join()]);
+  const lf = x.fin.rounds[0].games[0];
+  const [p1, p2] = [lf.a.team, lf.b.team];
+  assert.equal(scheduleFinished(x.filled, x.games), false, 'the one-game final still to play');
+  assert.equal(scheduleFinished(x.filled, [...x.games, x.game(x.fin.rounds[0].round, p2, p1)]), true, 'the second-listed team won it: still finished');
+  assert.equal(scheduleFinished(x.filled, [...x.games, x.game(x.fin.rounds[0].round, p1, p2)]), true);
   // T1 3–0; T2, T3 and T4 all 1–2: the leader is two wins clear, no final
   const cycle = { T2: 'T4', T4: 'T3', T3: 'T2' }; // each of the others beats one and loses to one
   x = rrFinal((a, b) => (a === 'T1' || b === 'T1' ? a === 'T1' : cycle[a] === b));
@@ -5544,6 +5552,38 @@ test('finished: an advantaged final — skipped when the leader is two wins clea
   const fr = x.fin.rounds[0].round;
   assert.equal(finishedThrough(x.filled, x.games), 3, 'the final still to play');
   assert.equal(finishedThrough(x.filled, [...x.games, x.game(fr, 'T1', 'T2')]), fr, 'the final played: it counts');
+});
+
+test('finished: a one-game final uploaded under the "if needed" round still counts everywhere; moved to its own round, the tournament is finished', () => {
+  // T1 and T2 level going in: a one-game final, played but filed as the second final's round
+  const level = { 'T1,T2': true, 'T2,T3': true, 'T3,T1': true, 'T1,T4': true, 'T2,T4': true, 'T3,T4': true };
+  const x = rrFinal((a, b) => level[[a, b].join()] ?? !level[[b, a].join()]);
+  const [r12, r13] = x.fin.rounds.map((r) => r.round);
+  const { a, b } = x.fin.rounds[0].games[0];
+  const asR13 = [...x.games, x.game(r13, b.team, a.team)]; // the second-listed team won it
+  const asR12 = [...x.games, x.game(r12, b.team, a.team)];
+  // filed as round 13: nothing is lost
+  assert.equal(finishedThrough(x.filled, asR13), r13, 'finished rounds reach it');
+  assert.equal(scheduleFinished(x.filled, asR13), false, 'its own round looks unplayed, so not finished yet');
+  // moved to round 12: finished, and still counted the same way
+  assert.equal(scheduleFinished(x.filled, asR12), true);
+  // a tournament shaped like ACF Fall @ UIUC (pools, playoff brackets, an
+  // advantaged final): the final filed under the second final's round is
+  // in the Finals stage, the report, Combined and the YellowFruit file
+  const day = finalsDay(5);
+  const filled = finalsFill(day.s, day.games, finalsProgress(day.s, day.files).ready).schedule;
+  const fin = filled.phases.find((ph) => ph.kind === 'final');
+  const g = fin.rounds[0].games[0];
+  const late = fin.rounds[fin.rounds.length - 1].round;
+  const won = { round: late, tossupsRead: 20, teams: [{ name: g.b.team, points: 400, bonusPoints: 200, players: [] }, { name: g.a.team, points: 200, bonusPoints: 100, players: [] }] };
+  const all = dedupeMatches([...day.games, won]);
+  const y = yfStages(filled, all);
+  assert.equal([...y.placed].filter(([m, st]) => m === won && st.type === 'Finals').length, 1, 'in the Finals stage');
+  const rd2 = reportData({ name: 'F', matches: all, schedule: filled });
+  assert.equal(rd2.games.length, all.length, 'every game in the report');
+  assert.equal(rd2.combined[0].name, g.b.team, 'Combined: its winner 1st');
+  assert.equal(JSON.parse(serializeYft({ name: 'F', matches: all, schedule: filled })).objects[0].phases
+    .flatMap((ph) => ph.rounds.flatMap((r) => r.matches || [])).length, all.length, 'every game in the YellowFruit file');
 });
 
 test('finals: the source is the top bracket, its carryover the same as the YellowFruit file\'s', () => {
