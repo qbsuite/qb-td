@@ -11,6 +11,9 @@ Release Notes for 10/17/2026
 - An upload that stalls gives up after 45 seconds and asks the moderator to check the connection and upload again.
 - An upload says how far the game got: the furthest question reached. Games begun before this update say nothing, as before.
 
+[ PUBLIC PAGE ]
+- The schedule's filter chips cover the playoff brackets too ("1st–6th place", "Finals"), not just the prelim pools.
+
 [ BUZZPOINTS ]
 - A round's buzzpoints and scoresheets wait while a game in it was uploaded unfinished.
 

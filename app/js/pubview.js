@@ -223,8 +223,9 @@ async function fetchMatches(errors, rosterP) {
 /* ---------- schedule tab ---------- */
 
 // Two views: Now (the round being read and the one after it, grouped by
-// pool, a card per group) and All rounds (the grid). Pool chips filter
-// either when the schedule has more than one pool. The view is a
+// group, a card per group) and All rounds (the grid). Chips for the
+// groups (pools, then the playoff brackets) filter either when the
+// rounds shown have more than one. The view is a
 // per-viewer convenience, so it lives in localStorage and nothing breaks
 // when that's unavailable.
 const SCHED_VIEW_KEY = 'qbtdSchedView';
@@ -255,10 +256,16 @@ function findRound(n) {
   return null;
 }
 
-// The pool a game belongs to: both teams seeded into the same pool (the
-// generator records membership in schedule.pools). Crossover and playoff
-// games belong to none.
+// The group a game belongs to: its bracket as the schedule names it
+// ("Pool A", "1st–6th place", "Championship"), so playoffs filter as the
+// prelims do. A schedule from before brackets were recorded falls back
+// to its pools: both teams seeded into the same one (schedule.pools).
+function bracketName(g) {
+  const b = g.bracket && (schedule.brackets || []).find((x) => x.key === g.bracket);
+  return b ? b.name : '';
+}
 function poolOf(g) {
+  if ((schedule.brackets || []).length) return bracketName(g);
   const pools = schedule.pools || {};
   const a = g.a && g.a.team;
   const b = g.b && g.b.team;
@@ -268,8 +275,16 @@ function poolOf(g) {
   }
   return '';
 }
+// groups in the schedule's own order (pools, then each playoff bracket)
+function groupOrder(x, y) {
+  const at = (k) => {
+    const i = (schedule.brackets || []).findIndex((b) => b.name === k);
+    return i < 0 ? Infinity : i;
+  };
+  return (x === '') - (y === '') || at(x) - at(y) || x.localeCompare(y);
+}
 function poolsIn(rounds) {
-  return [...new Set(rounds.flatMap((r) => r.games.map(poolOf)).filter(Boolean))].sort();
+  return [...new Set(rounds.flatMap((r) => r.games.map(poolOf)).filter(Boolean))].sort(groupOrder);
 }
 const keepGame = (g) => !poolSel || poolOf(g) === poolSel;
 const roomName = (g) => (schedule.rooms[g.room] ? schedule.rooms[g.room].name : '');
@@ -341,7 +356,7 @@ function renderNow(box) {
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(g);
     }
-    const order = [...groups.keys()].sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
+    const order = [...groups.keys()].sort(groupOrder);
     return `<section class="nowblock">
       <div class="nowhead"><h3>Round ${b.n}</h3><span class="nowtag ${b.cls}">${b.tag}</span></div>
       ${order.map((k) => `${named ? `<div class="poolname">${esc(k || 'Other games')}</div>` : ''}
