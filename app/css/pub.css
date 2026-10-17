@@ -52,7 +52,6 @@ tr.nowrow td { background: var(--sel); }
 /* New layout, pools: the Table | Grid switch and the grid (pubview.js poolGrid) */
 .poolbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 0 0 10px; }
 .poolbar .chip { font-size: 13px; }
-.poolbar .pgridnote { font-size: 12px; }
 .pgridwrap { margin-bottom: 4px; }
 .pgrid { border-collapse: separate; border-spacing: 2px; width: auto; font-size: 12px; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .pgrid th, .pgrid td { border: none; padding: 0; text-align: center; }

@@ -17,6 +17,7 @@ Release Notes for 10/17/2026
 [ PUBLIC PAGE ]
 - The schedule's filter chips cover the playoff brackets too ("1st–6th place", "Finals"), not just the prelim pools.
 - Standings in the New layout go by stage, as Classic's do: each playoff bracket gets its own table and grid, then the prelim pools.
+- The grid view of the standings no longer has a line explaining the grid.
 
 [ BUZZPOINTS ]
 - A round's buzzpoints and scoresheets wait while a game in it was uploaded unfinished.

@@ -993,8 +993,7 @@ function newStandings(rd, ids, vals, pp) {
   // one switch for every pool: all tables, or all grids of who has played whom
   if (!standView) standView = readPref(STAND_VIEW_KEY) === 'grid' ? 'grid' : 'table';
   const grid = standView === 'grid';
-  return `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}
-      ${grid ? '<span class="muted pgridnote">Each row is that team&rsquo;s games, with its own score above its opponent&rsquo;s. A green square is a win, and R6 means the game is in round 6.</span>' : ''}</div>`
+  return `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}</div>`
     + (grid ? poolGrids(rd, ids, keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name))])
       .filter(([, teams]) => teams.length)) : '')
     + (grid ? [] : keys.map((k) => ['Pool ' + k, rd.teams.filter((t) => pools[k].includes(t.name))]))
@@ -1023,8 +1022,7 @@ function stagedStandings(rd, ids, table) {
   if (!standView) standView = readPref(STAND_VIEW_KEY) === 'grid' ? 'grid' : 'table';
   const grid = standView === 'grid' && anyPools;
   const row = new Map(rd.teams.map((t) => [t.name, t]));
-  return (anyPools ? `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}
-      ${grid ? '<span class="muted pgridnote">Each row is that team&rsquo;s games, with its own score above its opponent&rsquo;s. A green square is a win, and R6 means the game is in round 6.</span>' : ''}</div>` : '')
+  return (anyPools ? `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}</div>` : '')
     + secs.map((sec) => `${secs.length > 1 ? `<h2 class="stagehead">${esc(sec.name)}</h2>` : ''}${grid
       ? poolGrids(rd, ids, sec.pools.map((pl) => [pl.name, pl.teams.map((t) => row.get(t.name)).filter(Boolean), pl.rounds]))
       : sec.pools.map((pl) => `${sec.pools.length > 1 ? `<h3 class="poolhead">${esc(pl.name)}</h3>` : ''}${table(pl.teams, true)}`).join('')}`).join('');
