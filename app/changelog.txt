@@ -1,5 +1,8 @@
 Release Notes for 10/17/2026
 
+[ EXPORTS ]
+- The HTML report can be downloaded as six separate files as well as a zip.
+
 [ LIVE HUB ]
 - A room still playing a round after the tournament moves on shows as started (○) in the uploads grid, not as missing.
 

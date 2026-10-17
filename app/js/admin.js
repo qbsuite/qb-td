@@ -2140,6 +2140,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
                 <button id="dlyft4" role="menuitem" disabled>YellowFruit 4 (.yft)<span class="muted">4.0.18+</span></button>
                 <button id="dlyft3" role="menuitem" disabled>YellowFruit 3 (.yft)<span class="muted">3.0.2</span></button>
                 <button id="dlreport" role="menuitem" class="sep" disabled>HTML report<span class="muted">.zip</span></button>
+                <button id="dlreportfiles" role="menuitem" disabled>HTML report<span class="muted">6 separate files</span></button>
                 <button id="dlzip" role="menuitem" disabled>QBJ bundle<span class="muted">split per game</span></button>
                 <button id="rebuild" role="menuitem" class="sep" disabled>Rebuild public stats</button>
               </div>
@@ -2673,7 +2674,7 @@ async function computeStats(a, t, buckets, files, settings) {
   // an error. So the menu names the version, and what it needs, on each
   // item. The files are still named apart, so both can sit in one folder.
   $('dlmenu').disabled = false;
-  for (const id of ['dlyft4', 'dlyft3', 'dlreport', 'dlzip', 'rebuild']) $(id).disabled = false;
+  for (const id of ['dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild']) $(id).disabled = false;
   const closeMenu = () => { $('dlpanel').hidden = true; $('dlmenu').setAttribute('aria-expanded', 'false'); };
   // games, not files: a re-exported game counts once, as it does in the stats
   $('statsnote').textContent = `${exportOpts.matches.length} ${exportOpts.matches.length === 1 ? 'game' : 'games'} in these stats`;
@@ -2694,6 +2695,20 @@ async function computeStats(a, t, buckets, files, settings) {
       download(t.slug + '-report.zip',
         makeZip(pages.map((f) => ({ name: f.name, data: f.text }))), 'application/zip');
       closeMenu();
+    } catch (e) { say(e.message, true); }
+  };
+  // the same pages as six files, for a TD who would rather not unzip; the
+  // browser may ask once to allow several downloads. Saved into one
+  // folder, their links to each other work as in the zip.
+  $('dlreportfiles').disabled = false;
+  $('dlreportfiles').onclick = async () => {
+    try {
+      const pages = buildReport({ ...exportOpts, prefix: t.slug });
+      closeMenu();
+      for (const f of pages) {
+        download(f.name, f.text, 'text/html');
+        await new Promise((res) => setTimeout(res, 300)); // one at a time, or the browser drops some
+      }
     } catch (e) { say(e.message, true); }
   };
   $('dlzip').disabled = false;

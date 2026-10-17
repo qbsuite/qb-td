@@ -1114,12 +1114,12 @@ const good = d.files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') &
 const parsed = played.map((p) => parseMatch(JSON.parse(JSON.stringify(p.qbj)), { filename: p.filename }));
 const deduped = dedupeMatches(parsed);
 const expectAgg = aggregate(deduped, rosterTeams);
-ok('17 stats: every download is off before Compute', await js(`['dlmenu', 'dlyft4', 'dlyft3', 'dlreport', 'dlzip', 'rebuild'].every((id) => document.getElementById(id).disabled)`));
+ok('17 stats: every download is off before Compute', await js(`['dlmenu', 'dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild'].every((id) => document.getElementById(id).disabled)`));
 await click('#calc');
 await waitJs(`!document.querySelector('#statsec').hidden && document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats computed', 30000);
 ok('17 stats: Compute renders the stats', (await text('#statsnote')) === `${good.length} games in these stats`, await text('#statsnote'));
 ok('17 stats: Compute shows no errors', !(await exists('#statsout .bad')), await js(`[...document.querySelectorAll('#statsout .bad')].map((x) => x.textContent).join(' | ')`));
-ok('17 stats: every download is on after', await js(`['dlmenu', 'dlyft4', 'dlyft3', 'dlreport', 'dlzip', 'rebuild'].every((id) => !document.getElementById(id).disabled)`));
+ok('17 stats: every download is on after', await js(`['dlmenu', 'dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild'].every((id) => !document.getElementById(id).disabled)`));
 const menu = async (id) => {
   await click('#dlmenu');
   await waitJs(`!document.querySelector('#dlpanel').hidden`, 'the menu');
@@ -1149,6 +1149,22 @@ const menu = async (id) => {
   const names = (await readZip(new Uint8Array(f.bytes))).map((e) => e.name);
   ok('17 exports: the HTML report zip has the six named pages', f.name === slug + '-report.zip'
     && ['standings', 'individuals', 'games', 'teamdetail', 'playerdetail', 'rounds'].every((p) => names.includes(`${slug}_${p}.html`)), names);
+}
+{
+  // the same six pages as separate files, each the zip's own
+  const zipped = await readZip(new Uint8Array((await menu('dlreport')).bytes));
+  const before = new Set(downloads.keys());
+  await click('#dlmenu');
+  await waitJs(`!document.querySelector('#dlpanel').hidden`, 'the menu');
+  await click('#dlreportfiles');
+  const got = await until(() => {
+    const fresh = [...downloads.keys()].filter((g) => !before.has(g));
+    return fresh.length === 6 && fresh.every((g) => downloads.get(g).done) && fresh;
+  }, 'six report files', 20000);
+  const files = got.map((g) => ({ name: downloads.get(g).name, text: readFileSync(path.join(dl, g), 'utf8') }));
+  ok('17 exports: the HTML report as six separate files, the same pages as the zip',
+    files.every((f) => zipped.some((z) => z.name === f.name && new TextDecoder().decode(z.data) === f.text))
+      && new Set(files.map((f) => f.name)).size === 6, files.map((f) => f.name));
 }
 {
   const f = await menu('dlzip');
