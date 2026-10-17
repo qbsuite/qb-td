@@ -45,6 +45,9 @@ tr.nowrow td { background: var(--sel); }
 .layoutpick { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
 .layoutpick .chips { flex-wrap: nowrap; }
 .poolhead { font-size: 17px; font-weight: 600; margin: 18px 0 4px; }
+.stagehead { font-size: 20px; font-weight: 600; margin: 32px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.stagehead:first-of-type { margin-top: 8px; }
+.stagehead + .poolhead, .stagehead + .tablewrap, .stagehead + .nfade { margin-top: 10px; }
 .poolhead:first-child { margin-top: 4px; }
 /* New layout, pools: the Table | Grid switch and the grid (pubview.js poolGrid) */
 .poolbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 0 0 10px; }

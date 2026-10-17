@@ -980,7 +980,12 @@ function newStandings(rd, ids, vals, pp) {
       ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${tm.counts[v] || 0}</td>`).join('')}
       <td class="num">${tm.regTuh}</td><td class="num g0">${fx(tm.ppb, 2)}</td></tr>`).join('')}</tbody>
   </table></div>`;
-  // per pool when the schedule seeded pools; teams in none go last
+  // by stage and pool, as the Classic report heads them: the latest stage
+  // first, a table per pool counting its stage's games (and the games
+  // carried into it), ranked as YF ranks them
+  if (rd.stageStandings) return stagedStandings(rd, ids, table);
+  // a schedule the stages can't be read from: per prelim pool, as before;
+  // teams in none go last
   const pools = (schedule && schedule.pools) || {};
   const keys = Object.keys(pools).sort();
   if (keys.length < 2) return table(rd.teams, true);
@@ -1010,24 +1015,40 @@ function shortTeam(name) {
   return core + tail;
 }
 
+// The standings by stage: a heading per stage when there are several, a
+// table (or grid) per pool. One switch, Table or Grid, for every pool.
+function stagedStandings(rd, ids, table) {
+  const secs = rd.stageStandings;
+  const anyPools = secs.some((sec) => sec.pools.length > 1);
+  if (!standView) standView = readPref(STAND_VIEW_KEY) === 'grid' ? 'grid' : 'table';
+  const grid = standView === 'grid' && anyPools;
+  const row = new Map(rd.teams.map((t) => [t.name, t]));
+  return (anyPools ? `<div class="poolbar">${chipsHtml([{ v: 'table', label: 'Table' }, { v: 'grid', label: 'Grid' }], standView, 'standview')}
+      ${grid ? '<span class="muted pgridnote">Each row is that team&rsquo;s games, with its own score above its opponent&rsquo;s. A green square is a win, and R6 means the game is in round 6.</span>' : ''}</div>` : '')
+    + secs.map((sec) => `${secs.length > 1 ? `<h2 class="stagehead">${esc(sec.name)}</h2>` : ''}${grid
+      ? poolGrids(rd, ids, sec.pools.map((pl) => [pl.name, pl.teams.map((t) => row.get(t.name)).filter(Boolean), pl.rounds]))
+      : sec.pools.map((pl) => `${sec.pools.length > 1 ? `<h3 class="poolhead">${esc(pl.name)}</h3>` : ''}${table(pl.teams, true)}`).join('')}`).join('');
+}
+
 // Every pool's grid, in one table so the squares line up from pool to
 // pool whatever the length of each pool's team names.
 function poolGrids(rd, ids, pools) {
   const span = 2 + Math.max(...pools.map(([, teams]) => teams.length));
-  return `<div class="tablewrap pgridwrap"><table class="pgrid">${pools.map(([name, teams]) => `<tbody>
+  return `<div class="tablewrap pgridwrap"><table class="pgrid">${pools.map(([name, teams, rounds]) => `<tbody>
     <tr><td class="pghead" colspan="${span}"><h3 class="poolhead">${esc(name)}</h3></td></tr>
-    ${poolGrid(rd, ids, teams)}</tbody>`).join('')}
+    ${poolGrid(rd, ids, teams, rounds)}</tbody>`).join('')}
   </table></div>`;
 }
 
 // One pool as a square grid, teams in standings order down the side and
 // across the top. A square is the row team's game against the column
-// team in the pool phase: both scores once played (a link to the game),
-// else the round it is scheduled for. The record at the end counts the
-// grid's own games.
-function poolGrid(rd, ids, teams) {
-  const first = schedule.phases[0];
-  const poolRounds = new Set(first.rounds.map((r) => r.round));
+// team in the pool's rounds (`rounds`; the first phase's when not given):
+// both scores once played (a link to the game), else the round it is
+// scheduled for. The record at the end counts the grid's own games.
+function poolGrid(rd, ids, teams, rounds = null) {
+  const allRounds = schedule.phases.flatMap((ph) => ph.rounds);
+  const poolRounds = new Set(rounds || schedule.phases[0].rounds.map((r) => r.round));
+  const shownRounds = allRounds.filter((r) => poolRounds.has(r.round));
   const names = new Set(teams.map((t) => t.name));
   const key = (x, y) => (x < y ? x + '\n' + y : y + '\n' + x);
   const played = new Map(); // pair -> the game (the first, should a pair meet twice)
@@ -1037,7 +1058,7 @@ function poolGrid(rd, ids, teams) {
     if (!played.has(key(a.name, b.name))) played.set(key(a.name, b.name), g);
   }
   const due = new Map(); // pair -> round
-  for (const r of first.rounds) {
+  for (const r of shownRounds) {
     for (const g of r.games) {
       const a = g.a && g.a.team;
       const b = g.b && g.b.team;
@@ -1362,8 +1383,9 @@ window.addEventListener('resize', () => {
 });
 
 function renderNewStats(box) {
+  // the schedule too, so standings go by stage and pool as Classic's do
   const rd = reportData({ name: state.name, matches: dedupeMatches(matches), roster,
-    settings: effectiveFormat(state.format) });
+    settings: effectiveFormat(state.format), schedule });
   const ids = newIds(rd);
   const vals = rd.vals.filter((v) => v !== 0);
   const pp = `PP${rd.regTossups}TUH`;

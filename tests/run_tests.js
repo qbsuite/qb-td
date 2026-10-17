@@ -2129,6 +2129,39 @@ test('forfeits: a win and a loss, no stats, shown as YellowFruit shows them', ()
   assert.deepEqual([y3.team1, y3.team2, y3.round, y3.players1], [win, lose, 6, null]);
 });
 
+test('New layout standings match Classic\'s, stage by stage and pool by pool, in each staged scenario', () => {
+  // Classic's standings page as [{stage, pools: [{name, teams}]}]; Finals
+  // (result lines) and Cumulative (every team together) are Classic's own
+  const classic = (html) => html.split(/<h2>\n/).slice(1).map((sec) => {
+    const stage = sec.slice(0, sec.indexOf('&nbsp;'));
+    const parts = sec.split(/<h3>\n/);
+    const tableNames = (t) => [...t.split('</table>')[0].matchAll(/teamdetail\.html#[^>]*>([^<]+)<\/a>/g)].map((x) => x[1]);
+    const pools = parts.length > 1 ? parts.slice(1).map((x) => ({ name: x.slice(0, x.indexOf('\n')), teams: tableNames(x) }))
+      : [{ name: null, teams: tableNames(parts[0]) }];
+    return { stage, pools };
+  }).filter((x) => !['Finals', 'Cumulative'].includes(x.stage) && x.pools.some((p) => p.teams.length));
+  let n = 0;
+  for (const sc of STAGED) {
+    if (!sc.schedule) continue;
+    const matches = dedupeMatches(sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));
+    const roster = parseRoster(sc.roster);
+    const opts = { name: sc.name, matches, roster, schedule: sc.schedule };
+    const rd = reportData(opts);
+    const html = buildReport(opts).find((f) => f.name === 'standings.html').text;
+    const want = classic(html);
+    if (!rd.stageStandings) {
+      assert.ok(want.length <= 1 && want.every((x) => x.pools.length === 1), sc.key + ': no stages or pools, one table');
+      continue;
+    }
+    const got = rd.stageStandings.map((sec) => ({ stage: sec.name, pools: sec.pools.map((pl) => ({ name: rd.stageStandings.length === 1 && sec.pools.length === 1 ? null : pl.name, teams: pl.teams.map((t) => t.name) })) }));
+    // one stage played: Classic names it in its single heading
+    const fix = (x) => x.map((sec) => ({ ...sec, pools: sec.pools.map((p) => (sec.pools.length === 1 ? { ...p, name: null } : p)) }));
+    assert.deepEqual(fix(got), fix(want), sc.key);
+    n++;
+  }
+  assert.ok(n >= 4, 'scenarios with stages: ' + n);
+});
+
 test('html stat report: a prelim stage with pools ranks each pool apart, under the stage name', () => {
   const sc = STAGED.find((x) => x.key === 'pools');
   const matches = dedupeMatches(sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));

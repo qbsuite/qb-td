@@ -565,6 +565,33 @@ function resultList(m, games) {
   }).join('\n'));
 }
 
+// The pool stages' standings, from the latest: a table per pool, each
+// over the stage's games and the games carried into it. A prelim pool
+// carried whole into the one playoff stage gives that stage twice, its
+// Total (with the prelims) and then its games Only, as YF does.
+// [{kind: 'total' | 'stage', name, st, tables: [{pl, teams, ranks}]}]
+function stageSections(m) {
+  const S = m.stages;
+  const gamesOf = (st) => st.rounds.flatMap((rd) => rd.games);
+  const forStage = (st, extra) => {
+    const games = [...gamesOf(st), ...extra];
+    return st.pools.map((pl) => {
+      const stats = tally(games, pl.teams);
+      const teams = sortTeamsYf(pl.teams.map((n) => stats.get(n)));
+      return { pl, teams, ranks: rankTeams(teams) };
+    });
+  };
+  const out = [];
+  for (let i = S.full.length - 1; i >= 0; i--) {
+    const st = S.full[i];
+    if (!st.pools.some((pl) => pl.teams.length)) continue;
+    const both = i === S.full.length - 1 && S.allCarry;
+    if (both) out.push({ kind: 'total', name: `${st.name}: Total`, st, tables: forStage(st, gamesOf(S.list.find((x) => x.type === 'Prelim'))) });
+    out.push({ kind: 'stage', name: both ? `${st.name} Only` : st.name, st, tables: forStage(st, st.carriedIn) });
+  }
+  return out;
+}
+
 // YF's standings for a tournament in stages: finals results, then each
 // pool stage from the latest, a table per pool, then every team together.
 function stagedStandingsHtml(m) {
@@ -575,19 +602,13 @@ function stagedStandingsHtml(m) {
     const gs = gamesOf(st);
     return gs.length ? `${headerWithDivider(m, st.name, 'standings.html')}\n${genericTag('div', '', resultList(m, gs))}` : '';
   }).reverse().join('\n'));
-  const forStage = (st, extra) => {
+  const forStage = (st, tables) => {
     const at = S.list.indexOf(st);
     const next = S.list.slice(at + 1).find((x) => x.type === 'Playoff');
     const tb = S.list[at + 1] && S.list[at + 1].type === 'Tiebreaker' ? S.list[at + 1] : null;
     const assigned = !!next && next.pools.some((pl) => pl.teams.length);
-    const games = [...gamesOf(st), ...extra];
-    const tables = st.pools.map((pl) => {
-      const stats = tally(games, pl.teams);
-      return { pl, teams: sortTeamsYf(pl.teams.map((n) => stats.get(n))) };
-    });
     const anyTies = tables.some((x) => x.teams.some((t) => t.t > 0));
-    return tables.map(({ pl, teams }) => {
-      const ranks = rankTeams(teams);
+    return tables.map(({ pl, teams, ranks }) => {
       const rows = [standingsHeaderRow(m, { anyTies, advance: assigned }),
         ...teams.map((t, i) => trTag(standingsCells(m, t, ranks[i], {
           anyTies, advance: assigned ? ((next.pools.find((x) => x.teams.includes(t.name)) || {}).name || '') : undefined,
@@ -601,17 +622,10 @@ function stagedStandingsHtml(m) {
   };
   let printed = 0;
   let combined = false;
-  for (let i = S.full.length - 1; i >= 0; i--) {
-    const st = S.full[i];
-    if (!st.pools.some((pl) => pl.teams.length)) continue;
-    const both = i === S.full.length - 1 && S.allCarry;
-    if (both) {
-      const prelimGames = gamesOf(S.list.find((x) => x.type === 'Prelim'));
-      sections.push(`${headerWithDivider(m, `${st.name}: Total`, 'standings.html', { noTopLink: printed === 1 })}\n${forStage(st, prelimGames)}`);
-      combined = true;
-    }
-    printed++;
-    sections.push(`${headerWithDivider(m, both ? `${st.name} Only` : st.name, 'standings.html', { noTopLink: printed === 1 })}\n${forStage(st, st.carriedIn)}`);
+  for (const sec of stageSections(m)) {
+    if (sec.kind === 'total') combined = true;
+    else printed++;
+    sections.push(`${headerWithDivider(m, sec.name, 'standings.html', { noTopLink: printed === 1 })}\n${forStage(sec.st, sec.tables)}`);
   }
   if (S.list.length > 1 && !combined) {
     const all = tally(m.games, S.teamOrder);
@@ -1030,9 +1044,35 @@ export function reportData(opts) {
     gameId: g.id, round: g.round, opp: opp.name, result: resultLetter(mt, opp),
     score: scoreOnly(g, mt, opp),
   });
+  // standings rows for a stage's pool (tally() figures, or a team row)
+  const marksOf = new Map(m.teams.map((t) => [t.name, t]));
+  const standRow = (t, rank) => ({
+    name: t.name, ug: (marksOf.get(t.name) || {}).ug, d2: (marksOf.get(t.name) || {}).d2,
+    rank, w: t.w, l: t.l, t: t.t, pp: t.regTuh ? pptuh(t) * m.regTossups : null,
+    counts: t.counts, regTuh: t.regTuh, ppb: ratio(t.bonusPoints, t.bonusesHeard),
+  });
+  // With a schedule: the standings by stage and pool, as the Classic
+  // report heads them (latest stage first, carried-over games counted),
+  // or the pools of the one stage played; null without stages or pools
+  // Each pool also says which rounds its games come from (`rounds`): the
+  // stage's own, the prelims' for a Total, and the earlier stages' when
+  // the pool carries its pool-mates' games over.
+  const roundsOf = (st) => st.rounds.map((r) => r.number);
+  const stageStandings = m.stages
+    ? stageSections(m).map((sec) => {
+      const S = m.stages;
+      const base = [...roundsOf(sec.st), ...(sec.kind === 'total' ? roundsOf(S.list.find((x) => x.type === 'Prelim')) : [])];
+      const earlier = S.list.slice(0, S.list.indexOf(sec.st)).filter((x) => x.full).flatMap(roundsOf);
+      return { name: sec.name, pools: sec.tables.map(({ pl, teams, ranks }) => ({
+        name: pl.name, rounds: [...new Set([...base, ...(pl.carry ? earlier : [])])].sort((a, b) => a - b),
+        teams: teams.map((t, i) => standRow(t, ranks[i])) })) };
+    })
+    : m.pools ? [{ name: m.phaseName, pools: m.pools.map((pl) => ({ name: pl.name, rounds: null,
+      teams: pl.teams.map((t, i) => standRow(t, pl.ranks[i])) })) }]
+      : null;
   return {
     name: m.name, vals: m.vals, regTossups: m.regTossups, anyTies: m.anyTies,
-    trackUG: m.trackUG, trackDiv2: m.trackDiv2,
+    trackUG: m.trackUG, trackDiv2: m.trackDiv2, stageStandings,
     hasPowers: m.hasPowers, hasNegs: m.hasNegs,
     teams: m.teams.map((t, i) => {
       const pct = winPct(t);
