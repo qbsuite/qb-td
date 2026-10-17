@@ -212,13 +212,16 @@ function ReplaceDialog({ appState, kind, onClose }) {
     body.push(h('div', { key: 'err' }, REPLACE_ERRORS[check.error]));
   } else {
     const q = ci + 1;
+    // a replaced tossup keeps its question's bonus (read_core replaceQuestion)
+    const own = isTu && cycle && cycle.correctBuzz && cycle.bonusAnswer ? cycle.bonusAnswer.bonusIndex + 1 : 0;
     body.push(h('div', { key: 'what', style: { marginBottom: 10 } },
       isTu ? `Tossup ${now} on question ${q} will be thrown out, and the tossup you pick will be read in its place.`
+          + (own ? ` If it is answered, bonus ${own} is read again.` : '')
         : `Bonus ${now} on question ${q} will be thrown out, and the bonus you pick will be read in its place.`));
     if (check.retro) {
       body.push(h('div', { key: 'retro', style: { marginBottom: 10, fontSize: 13 } },
         `Later questions already have results, and they keep them. Please enter the replacement's result on question ${q}.`
-          + (check.needBonus ? ' If it is answered, a blank bonus comes up: please read the bonus the TD gives and enter its parts there.' : '')));
+          + (check.needBonus ? ' This question had no bonus, so if the replacement is answered, a blank one comes up: please read the bonus the TD gives and enter its parts there.' : '')));
     }
     if (pool && (isTu ? pool.tossups : pool.bonuses).length) {
       body.push(h('div', { key: 'hint', style: { marginBottom: 4, fontWeight: 600 } },

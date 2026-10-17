@@ -4,7 +4,8 @@ Release Notes for 10/17/2026
 - Record a forfeit: pick the room, round and the team that forfeited. It counts as a win and a loss, with no stats, as YellowFruit counts one.
 
 [ READER ]
-- Replacing a tossup on an earlier question no longer asks for a bonus. If the replacement is answered, a blank bonus comes up for the TD's.
+- A replaced tossup keeps its question's bonus: if the replacement is answered, the same bonus is read again. Later questions are unchanged.
+- Replacing a tossup on an earlier question nobody answered holds a blank bonus, for whichever bonus the TD gives.
 
 [ STATS ]
 - Forfeits show as "X defeats Y by forfeit" on the scoreboard, as W and FF on the schedule and pool grid, and in both YellowFruit files.

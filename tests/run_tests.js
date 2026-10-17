@@ -3270,20 +3270,25 @@ test('Replace tossup on an earlier question: a dead replacement leaves later que
   assert.equal(g.sync(), false, 'nothing to fix while it stays dead');
 });
 
-test('Replace tossup on an earlier question: an answered replacement reads the held bonus, later questions untouched', () => {
+test('Replace tossup on an earlier question: it keeps its bonus, read again if the replacement is answered', () => {
   const g = playedGame();
   const view = g.view();
   const nums = qnums(g);
-  g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1', g.bo(1, 'TB'), 'B1');
+  assert.equal(replaceCheck({ cycles: g.game.cycles, cycleIndex: 2, kind: 'tossup', tb: g.tb }).needBonus, false, 'no bonus to pick');
+  g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1');
+  assert.equal(g.view()[2], 'TB1/-');
+  assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
+  assert.deepEqual(g.scores(), { Alpha: 55, Beta: 65 }, "Alpha's 10 and part on question 3 go");
+  assert.equal(heldBonusText(g.tb, 2), 'Bonus #3 held for the replacement tossup');
   g.correct(2, g.B);
   assert.equal(g.sync(), true);
-  assert.equal(g.view()[2], 'TB1/TBB1', 'Beta answers the replacement and hears the held bonus');
+  assert.equal(g.view()[2], 'TB1/PB3', 'Beta answers the replacement and hears the same bonus 3');
   assert.ok(sameExcept(g.view(), view, [2]), JSON.stringify(g.view()));
   assert.deepEqual(g.scores(), { Alpha: 55, Beta: 85 });
   assert.ok(sameExcept(qnums(g), nums, [2]), JSON.stringify(qnums(g)));
-  assert.deepEqual(qnums(g)[2], [21, 21]);
-  assert.deepEqual(tbUsedIds(g.qbj(), g.tb), ['TU1', 'B1']);
-  // the answer is taken back: the held bonus is held again
+  assert.deepEqual(qnums(g)[2], [21, 3]);
+  assert.deepEqual(tbUsedIds(g.qbj(), g.tb), ['TU1']);
+  // the answer is taken back: bonus 3 is held again, later questions as they were
   g.game.cycles[2].removeCorrectBuzz();
   g.sync();
   assert.equal(g.view()[2], 'TB1/-');
@@ -3291,26 +3296,27 @@ test('Replace tossup on an earlier question: an answered replacement reads the h
   assert.deepEqual(g.scores(), { Alpha: 55, Beta: 65 });
 });
 
-test('Replace tossup on an earlier question: with no bonus picked, a blank one is held and scored if answered', () => {
+test('Replace tossup on an earlier question nobody answered: a blank bonus is held and scored if answered', () => {
   const g = playedGame();
   const view = g.view();
   const nums = qnums(g);
+  assert.equal(replaceCheck({ cycles: g.game.cycles, cycleIndex: 4, kind: 'tossup', tb: g.tb }).needBonus, true, 'question 5 had no bonus');
+  assert.equal(g.replace(4, 'tossup', g.tu(1, 'TB'), 'TU1'), 'needbonus', 'the procedure wants the bonus to hold');
   const ph = placeholderBonus(g.game.packet.bonuses);
   assert.deepEqual(ph.values, [10, 10, 10], 'valued as the packet bonuses');
   const held = new MBonus(ph.leadin, ph.parts.map((q, i) => ({ question: q, answer: ph.answers[i], value: ph.values[i] })));
-  assert.equal(g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1', held, ''), '');
-  assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
-  g.correct(2, g.B);
+  assert.equal(g.replace(4, 'tossup', g.tu(1, 'TB'), 'TU1', held, ''), '');
+  assert.ok(sameExcept(g.view(), view, [4]) && sameExcept(qnums(g), nums, [4]));
+  g.correct(4, g.B);
   g.sync();
-  assert.ok(g.view()[2].startsWith('TB1/Bonus for the replacement tossup'));
-  g.game.cycles[2].setBonusPartAnswer(2, 'Beta', 10);
-  assert.deepEqual(g.scores(), { Alpha: 55, Beta: 95 }, 'Beta: 10, and two parts of the bonus the TD gave');
-  assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
-  assert.deepEqual(tbUsedIds(g.qbj(), g.tb), ['TU1'], 'a packet-file question, not a pool one');
+  assert.ok(g.view()[4].startsWith('TB1/Bonus for the replacement tossup'));
+  g.game.cycles[4].setBonusPartAnswer(2, 'Beta', 10);
+  assert.deepEqual(g.scores(), { Alpha: 80, Beta: 95 }, "Alpha's neg goes; Beta: 10 and two parts");
+  assert.ok(sameExcept(g.view(), view, [4]) && sameExcept(qnums(g), nums, [4]));
   // the TD's real bonus can still go in its place
-  assert.equal(g.replace(2, 'bonus', g.bo(1, 'TB'), 'B1'), '');
-  assert.equal(g.view()[2], 'TB1/TBB1');
-  assert.ok(sameExcept(g.view(), view, [2]) && sameExcept(qnums(g), nums, [2]));
+  assert.equal(g.replace(4, 'bonus', g.bo(1, 'TB'), 'B1'), '');
+  assert.equal(g.view()[4], 'TB1/TBB1');
+  assert.ok(sameExcept(g.view(), view, [4]) && sameExcept(qnums(g), nums, [4]));
 });
 
 test('Replace tossup on an earlier question that only had a neg; the neg goes with it', () => {
@@ -3345,16 +3351,17 @@ test('Replace twice in one slot, and a tossup then its bonus, on an earlier ques
   const g = playedGame();
   const view = g.view();
   const nums = qnums(g);
-  // the replacement is answered, then found to be bad too: its bonus was heard, so a new one is held
-  g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1', g.bo(1, 'TB'), 'B1');
+  // replaced, answered, then found to be bad too: the question keeps bonus 3 throughout
+  g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1');
   g.correct(2, g.B);
   g.sync();
-  assert.equal(replaceCheck({ cycles: g.game.cycles, cycleIndex: 2, kind: 'tossup', tb: g.tb }).needBonus, true);
-  assert.equal(g.replace(2, 'tossup', g.tu(2, 'TB'), 'TU2', g.bo(2, 'TB'), 'B2'), '');
+  assert.equal(g.view()[2], 'TB1/PB3');
+  assert.equal(replaceCheck({ cycles: g.game.cycles, cycleIndex: 2, kind: 'tossup', tb: g.tb }).needBonus, false);
+  assert.equal(g.replace(2, 'tossup', g.tu(2, 'TB'), 'TU2'), '');
   assert.equal(g.view()[2], 'TB2/-');
   g.correct(2, g.A);
   g.sync();
-  assert.equal(g.view()[2], 'TB2/TBB2');
+  assert.equal(g.view()[2], 'TB2/PB3');
   // and its bonus is replaced as well
   assert.equal(g.replace(2, 'bonus', g.bo(3, 'TB'), 'B3'), '');
   assert.equal(g.view()[2], 'TB2/TBB3');
@@ -3362,7 +3369,7 @@ test('Replace twice in one slot, and a tossup then its bonus, on an earlier ques
   assert.ok(sameExcept(g.view(), view, [2]), JSON.stringify(g.view()));
   assert.ok(sameExcept(qnums(g), nums, [2]), JSON.stringify(qnums(g)));
   assert.deepEqual(g.scores(), { Alpha: 75, Beta: 65 }, 'Alpha: 10 and a part on question 3 again');
-  // a dead replacement replaced again keeps the bonus nobody heard
+  // a dead replacement replaced again keeps the bonus held for it
   const h = playedGame();
   h.replace(4, 'tossup', h.tu(1, 'TB'), 'TU1', h.bo(1, 'TB'), 'B1');
   assert.equal(replaceCheck({ cycles: h.game.cycles, cycleIndex: 4, kind: 'tossup', tb: h.tb }).needBonus, false);
@@ -3371,27 +3378,27 @@ test('Replace twice in one slot, and a tossup then its bonus, on an earlier ques
   h.sync();
   assert.equal(h.view()[4], 'TB2/TBB1');
   assert.deepEqual(tbUsedIds(h.qbj(), h.tb), ['TU2', 'B1']);
-  // on the current question: twice, then its bonus twice
+  // on the current question: twice (it keeps bonus 8), then its bonus twice
   g.correct(8, g.A);
   g.replace(8, 'tossup', g.tu(4, 'TB'), 'TU4');
   g.replace(8, 'tossup', g.tu(5, 'TB'), 'TU5');
   g.correct(8, g.B);
+  assert.equal(g.view()[8], 'TB5/PB8');
   g.replace(8, 'bonus', g.bo(4, 'TB'), 'B4');
   g.replace(8, 'bonus', g.bo(5, 'TB'), 'B5');
   assert.equal(g.view()[8], 'TB5/TBB5');
   for (let ci = 9; ci < 20; ci++) g.correct(ci, g.A);
-  // packet bonus 8 (heard after the original tossup) and 9 (after TU5,
-  // then replaced) were read on question 9, so question 10 reads 10
-  assert.equal(g.view()[9], 'P10/PB10');
+  // packet bonus 8 was replaced on question 9, so question 10 reads 9
+  assert.equal(g.view()[9], 'P10/PB9');
   assert.equal(g.upload().tossupsRead, 20);
 });
 
 test('Replace: refused, with nothing changed, without a held bonus, a bonus being read, or in a paired format', () => {
   const g = replaceGame();
-  for (let ci = 0; ci < 6; ci++) g.correct(ci, g.A);
+  for (let ci = 0; ci < 6; ci++) if (ci !== 2) g.correct(ci, g.A);
   g.neg(6, g.B);
   const before = JSON.stringify(g.qbj());
-  assert.equal(g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1'), 'needbonus', 'an earlier question needs a bonus held for it');
+  assert.equal(g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1'), 'needbonus', 'an earlier unanswered question needs a bonus held for it');
   assert.equal(g.replace(6, 'bonus', g.bo(1, 'TB'), 'B1'), 'nobonus', 'no correct buzz yet');
   assert.equal(JSON.stringify(g.qbj()), before);
   assert.equal(g.game.packet.tossups.length, 20);

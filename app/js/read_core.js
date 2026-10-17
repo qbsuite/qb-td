@@ -296,12 +296,13 @@ export function readerInsertPoint({ cycles, cycleIndex, curT, curB, bonusCount, 
    store (buzzes, throw-outs, protests, bonus answers) move with it.
 
    A bonus is read only when its tossup is answered, so the count of
-   bonuses depends on results. A tossup replaced on an earlier question,
-   with later questions already played, could go either way, so the TD
-   picks a bonus for it then, held in reserve (tb.reserve: cycle -> game
-   bonus index): read if the replacement is answered, and otherwise kept
-   thrown out, so later questions keep their bonuses (syncReserved). A
-   bonus already read with a thrown-out tossup is thrown out with it. */
+   bonuses depends on results. A replaced tossup keeps its question's
+   bonus: read again if the replacement is answered. On an earlier
+   question, with later ones played, that bonus is held for it
+   (tb.reserve: cycle -> game bonus index) and kept thrown out while the
+   replacement isn't answered, so later questions keep theirs
+   (syncReserved). An earlier tossup nobody answered had no bonus; its
+   replacement is held a blank one (placeholderBonus). */
 
 const hasResults = (x) => !!(x && (x.correctBuzz || (x.wrongBuzzes || []).length
   || (x.thrownOutTossups || []).length || (x.thrownOutBonuses || []).length
@@ -310,10 +311,11 @@ const hasResults = (x) => !!(x && (x.correctBuzz || (x.wrongBuzzes || []).length
 
 /** Whether a question can be replaced: {error} ('none' | 'nobonus' |
     'paired'), or {retro, needBonus}. retro: later questions have results;
-    needBonus: a tossup replaced then needs a bonus held for it, unless the
-    question holds one no one has heard yet. A bonus is replaced once its
-    tossup was answered. Formats that pair a bonus with each tossup count
-    bonuses another way, so only the latest question is replaced there. */
+    needBonus: a tossup replaced then needs a bonus held for it, as the
+    question has none of its own (its tossup went unanswered) and none is
+    held for it yet. A bonus is replaced once its tossup was answered.
+    Formats that pair a bonus with each tossup count bonuses another way,
+    so only the latest question is replaced there. */
 export function replaceCheck({ cycles, cycleIndex, kind, tb, paired }) {
   const c = (cycles || [])[cycleIndex];
   if (!c) return { error: 'none' };
@@ -321,7 +323,7 @@ export function replaceCheck({ cycles, cycleIndex, kind, tb, paired }) {
   const retro = cycles.slice(cycleIndex + 1).some(hasResults);
   if (retro && paired) return { error: 'paired' };
   const held = ((tbState(tb) || {}).reserve || {})[cycleIndex];
-  return { retro, needBonus: kind === 'tossup' && retro && !(held !== undefined && !c.correctBuzz) };
+  return { retro, needBonus: kind === 'tossup' && retro && held === undefined && !(c.correctBuzz && c.bonusAnswer) };
 }
 
 // the game bonus index cycle ci reads, by MODAQ's count (getBonusIndex
@@ -388,13 +390,15 @@ export function replaceQuestion({ game, cycleIndex: ci, kind, question, id = '',
     };
     if (kind === 'tossup') {
       const t = game.getTossupIndex(ci);
-      const heard = c.correctBuzz && c.bonusAnswer ? c.bonusAnswer.bonusIndex : null;
-      c.addThrownOutTossup(t); // MODAQ drops its correct buzz and bonus answer
+      const own = c.correctBuzz && c.bonusAnswer ? c.bonusAnswer.bonusIndex : null;
+      c.addThrownOutTossup(t); // MODAQ drops its correct buzz, bonus answer and bonus protests
       const next = afterThrowOut(c, t);
       c.wrongBuzzes = next.wrongBuzzes;
       c.tossupProtests = next.tossupProtests;
       if (next.changed) c.updateNeg(game.gameFormat);
-      if (heard !== null && heard >= 0) voidBonus(heard);
+      // the question keeps its bonus. On the latest question MODAQ's count
+      // gives it the same one again; on an earlier one it is held
+      if (own !== null && own >= 0 && check.retro) reserve[ci] = own;
       tuAt = t + 1;
       if (check.needBonus) { boAt = bonusSlot(cycles, ci); held = true; }
     } else {
