@@ -27,7 +27,7 @@ import { sheetHtml, exampleSheetHtml } from '../app/js/sheetview.js';
 import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
 import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
 import { checkPacket } from '../app/engine/packetcheck.js';
-import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms } from '../app/engine/plan.js';
+import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk } from '../app/engine/plan.js';
 import HDWHITE from '../app/engine/hdwhite.js';
 import { finalsSources, finalsProgress, finalsFill } from '../app/engine/finals.js';
 import { eachLimit } from '../app/js/limit.js';
@@ -4750,6 +4750,46 @@ function hdAsPlan(f) {
   return out;
 }
 
+test('plan: pools by hand: the TD\'s pools are the prelim pools; playoffs still follow the places', () => {
+  const teams = planTeams(12);
+  const rooms = planRooms(6);
+  const hand = [[teams[0], teams[1], teams[4], teams[5], teams[8]], [teams[2], teams[3], teams[6], teams[7], teams[9], teams[10], teams[11]]];
+  const phases = [
+    { name: 'Prelims', kind: 'pools', groups: 2, sizes: [5, 7], hand, mode: 'rotate' },
+    { name: 'Playoffs', kind: 'pools', sizes: [6, 6], per: 1, carry: true, mode: 'rotate' },
+  ];
+  const s = buildPlan(teams, rooms, phases, 'hand', 1);
+  assert.deepEqual(s.pools, { A: hand[0], B: hand[1] });
+  for (const r of s.phases[0].rounds) for (const g of r.games) {
+    const k = hand.findIndex((h) => h.includes(g.a.team));
+    assert.ok(hand[k].includes(g.b.team), 'a prelim game stays in its pool');
+  }
+  const pairs = new Set(s.phases[0].rounds.flatMap((r) => r.games.map((g) => [g.a.team, g.b.team].sort().join('|'))));
+  assert.equal(pairs.size, 10 + 21, 'a full round robin in each pool');
+  assert.ok(s.phases[1].rounds.flat().every((r) => r.games.every((g) => g.a.label && g.b.label)), 'playoffs are places');
+  // the same plan seeded by snake ignores the hand
+  assert.deepEqual(buildPlan(teams, rooms, phases.map((p) => ({ ...p, sizes: p.sizes && [6, 6] })), 'snake', 1).pools.A,
+    [teams[0], teams[3], teams[4], teams[7], teams[8], teams[11]]);
+});
+
+test('plan: pools by hand that don\'t fit the roster fall back to the snake', () => {
+  const teams = planTeams(8);
+  const snake = planGroups(teams, [{ name: 'P', kind: 'pools', groups: 2 }], 'snake', () => 0.5)[0].map((g) => g.members.map((m) => m.id));
+  const bad = [
+    [[teams[0], teams[1], teams[2], teams[3]], [teams[4], teams[5], teams[6]]],            // a team missing
+    [[teams[0], teams[1], teams[2], teams[3]], [teams[3], teams[4], teams[5], teams[6], teams[7]]], // a team twice
+    [[teams[0]], teams.slice(1)],                                                           // a pool of one
+    [teams.slice()],                                                                        // one pool
+    [[...teams.slice(0, 4), 'Nobody'], teams.slice(4)],                                     // a team not on the roster
+  ];
+  for (const hand of bad) {
+    assert.equal(handOk(hand, teams), false, JSON.stringify(hand));
+    const got = planGroups(teams, [{ name: 'P', kind: 'pools', groups: 2, hand }], 'hand', () => 0.5)[0].map((g) => g.members.map((m) => m.id));
+    assert.deepEqual(got, snake);
+  }
+  assert.equal(handOk([teams.slice(0, 3), teams.slice(3)], teams), true);
+});
+
 test('plan: hdwhite formats build with hdwhite round counts (14b and 21a one round shorter)', () => {
   const shorter = [];
   let n = 0;
@@ -4959,6 +4999,53 @@ test('auto-fill: ACF Fall @ UIUC format (23 teams, 8/8/7 crossover), pools finis
   assert.deepEqual(prelimProgress(s, dup.map((x) => x.f)).ready, ['A', 'B', 'C']);
   const res = autoFill(s, aggregate(dedupeMatches(dup.filter((x) => x.m).map((x) => x.m))), ['A', 'B', 'C']);
   assert.deepEqual(res.schedule, manualFill(s, games));
+});
+
+test('auto-fill: pools by hand (23c, non-snake pools reseeded inside, and uneven 7/5) play through to filled playoffs and YellowFruit stages', () => {
+  const teams = planTeams(23);
+  const f = HDWHITE[23].find((x) => x.key === '23c');
+  // a split nothing like the snake, each pool in its own seed order
+  const rnd = mulberry32(42);
+  const mixed = teams.slice().sort(() => rnd() - 0.5);
+  const hand = [mixed.slice(0, 8), mixed.slice(8, 16), mixed.slice(16)];
+  const phases = hdAsPlan(f);
+  Object.assign(phases[0], { hand, sizes: [8, 8, 7] });
+  const s = buildPlan(teams, planRooms(11), phases, 'hand', 1);
+  tagBrackets(s);
+  assert.deepEqual(s.pools, { A: hand[0], B: hand[1], C: hand[2] });
+  assert.deepEqual(s.phases.map((p) => p.rounds.length), [7, 4]);
+  for (let seed = 1; seed <= 40; seed++) {
+    const games = playDay(s, seed);
+    const { saved } = autoDay(s, games, seed);
+    assert.ok(!hasPlaceholders(saved), 'seed ' + seed);
+    assert.deepEqual(saved, manualFill(s, games), 'seed ' + seed);
+    // each pool's winner is the one its own games say
+    const agg = aggregate(games.map((x) => x.m));
+    const ranks = poolStandings(s.pools, agg.teams.map((t) => t.name));
+    const firsts = saved.phases[1].rounds.flatMap((r) => r.games).flatMap((g) => [g.a, g.b]).filter((x) => /^[ABC]1$/.test(x.from));
+    for (const x of firsts) assert.equal(x.team, ranks[x.from[0]][0], 'seed ' + seed + ' ' + x.from);
+    // YellowFruit: the prelim stage's pools are the hand-picked ones
+    const played = saved.phases.flatMap((ph) => ph.rounds.flatMap((r) => r.games.map((g) => ({ round: r.round, teams: [{ name: g.a.team }, { name: g.b.team }] }))));
+    const st = yfStages(saved, played);
+    assert.ok(st, 'seed ' + seed + ': yfStages');
+    assert.deepEqual(st.stages[0].pools.map((pl) => pl.teams.slice().sort()), hand.map((h) => h.slice().sort()));
+  }
+  // uneven pools by hand: 7/5 into crossover playoffs
+  const t12 = planTeams(12);
+  const h2 = [[t12[11], t12[0], t12[5], t12[6], t12[2], t12[9], t12[4]], [t12[1], t12[3], t12[7], t12[8], t12[10]]];
+  const s2 = buildPlan(t12, planRooms(6), [
+    planPhase('Prelims', { groups: 2, sizes: [7, 5], hand: h2 }),
+    planPhase('Playoffs', { sizes: [6, 6], carry: true }),
+  ], 'hand', 1);
+  tagBrackets(s2);
+  assert.deepEqual(s2.pools, { A: h2[0], B: h2[1] });
+  for (let seed = 1; seed <= 20; seed++) {
+    const games = playDay(s2, seed);
+    assert.equal(games.length, 21 + 10, 'every prelim pair once');
+    const { saved } = autoDay(s2, games, seed);
+    assert.ok(!hasPlaceholders(saved), 'seed ' + seed);
+    assert.deepEqual(saved, manualFill(s2, games), 'seed ' + seed);
+  }
 });
 
 test('auto-fill: hdwhite and engine formats end where the Fill button does, places compared across pools last', () => {

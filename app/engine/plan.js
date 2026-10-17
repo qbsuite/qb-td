@@ -8,6 +8,7 @@
 //
 // Phases:
 //   first     kind 'pools': `groups` pools (or `sizes`), snake or random seeding
+//             or seeding 'hand': `hand`, the TD's own pools ([[team, ...], ...])
 //   later     `same`: the groups of the phase before, played again
 //             `sizes`: pools by finish, best places first ("6/6/6/5"); a
 //             place cut by a pool's edge is compared across pools
@@ -228,12 +229,26 @@ function rebracket(rows, m) {
   return pools;
 }
 
+/** True when `hand` puts each team in exactly one of two or more pools,
+    each pool with at least two teams (the TD's own pools, seeding 'hand'). */
+export function handOk(hand, teams) {
+  if (!Array.isArray(hand) || hand.length < 2 || hand.some((g) => !Array.isArray(g) || g.length < 2)) return false;
+  const all = hand.flat();
+  return all.length === teams.length && new Set(all).size === all.length && all.every((t) => teams.includes(t));
+}
+
 /** The groups of each phase: [{key, name, members: [{id, slot, from, place}], tier}].
     An elimination phase has one group: its seeds in order. */
 export function planGroups(teams, phases, seeding, rng) {
   const out = [];
   const order = seeding === 'random' ? shuffle(teams, rng) : teams.slice();
   phases.forEach((ph, p) => {
+    if (p === 0 && seeding === 'hand' && handOk(ph.hand, teams)) {
+      out.push(ph.hand.map((list, k) => ({
+        key: LETTERS[k], name: 'Pool ' + LETTERS[k], members: list.map((t) => ({ id: t, slot: { team: t } })),
+      })));
+      return;
+    }
     if (p === 0) {
       // pool sizes as given ("6/6"), or `groups` pools as even as can be
       const given = ph.sizes && ph.sizes.reduce((a, b) => a + b, 0) === teams.length ? ph.sizes : null;

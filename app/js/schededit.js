@@ -17,7 +17,7 @@ import {
   tagBrackets, bracketRooms, phaseLanes, scheduleChecks, renameTeams, removeTeam,
   poolOf, tradePools, tradesLocked,
 } from '../engine/schedule.js';
-import { buildPlan, planPreview, planGroups, rebracketChecks, addFinals } from '../engine/plan.js';
+import { buildPlan, planPreview, planGroups, rebracketChecks, addFinals, handOk } from '../engine/plan.js';
 import HDWHITE from '../engine/hdwhite.js';
 
 /* ---------- view state (per page load) ---------- */
@@ -354,6 +354,53 @@ function copyOf(P, p) {
 // for them: a plan's old ties setting is ignored
 const withTies = (pl) => pl.phases.map(({ ties: _old, ...x }) => x);
 
+// The TD's own pools after the roster changed: a team that left frees its
+// place, a new team takes a freed place (a renamed team keeps its pool),
+// or else the smallest pool (last in it). The order in a pool is the TD's
+// seeding there, kept as it is. A split that no longer fits the pool
+// sizes (a new format) starts again from the snake.
+function fixHand(ph, teams, snakeHand) {
+  if (!Array.isArray(ph.hand)) { ph.hand = snakeHand(ph); return; }
+  const hand = ph.hand.map((g) => (Array.isArray(g) ? g.slice() : []));
+  const freed = [];
+  hand.forEach((g, k) => g.forEach((x) => { if (!teams.includes(x)) freed.push(k); }));
+  const placed = new Set();
+  hand.forEach((g, k) => { hand[k] = g.filter((x) => teams.includes(x) && !placed.has(x) && placed.add(x)); });
+  for (const x of teams.filter((y) => !placed.has(y))) {
+    const k = freed.length ? freed.shift() : hand.reduce((best, g, i) => (g.length < hand[best].length ? i : best), 0);
+    hand[k].push(x);
+  }
+  const changed = JSON.stringify(hand) !== JSON.stringify(ph.hand);
+  ph.hand = hand;
+  if (changed) Object.assign(ph, { sizes: hand.map((g) => g.length), groups: hand.length });
+  const want = snakeHand(ph).map((g) => g.length).join('/');
+  if (!handOk(ph.hand, teams) || ph.hand.map((g) => g.length).join('/') !== want) {
+    ph.hand = snakeHand(ph);
+    Object.assign(ph, { sizes: ph.hand.map((g) => g.length), groups: ph.hand.length });
+  }
+}
+// By hand: a card per pool, its teams in their seed order there. A team
+// drags to a new seed in its pool or into another pool; a letter for each
+// pool moves it too (a small menu instead past three pools, so the names
+// keep their room), which also works where dragging doesn't (phones).
+function handCards(hand, seedOf) {
+  const L = (k) => String.fromCharCode(65 + k);
+  const many = hand.length > 3;
+  const full = 'A pool needs at least two teams.';
+  const pickPool = (team, g, k) => (many
+    ? `<select class="pkhandsel" data-handsel="${esc(team)}" aria-label="${esc(team)}'s pool" ${g.length <= 2 ? `disabled title="${full}"` : ''}>${
+      hand.map((_, j) => `<option value="${j}" ${j === k ? 'selected' : ''}>${L(j)}</option>`).join('')}</select>`
+    : `<span class="pkhandseg" role="group" aria-label="${esc(team)}'s pool">${hand.map((_, j) => (j === k
+      ? `<button class="on" aria-pressed="true" title="In Pool ${L(j)}">${L(j)}</button>`
+      : `<button data-hand="${esc(team)}" data-to="${j}" aria-pressed="false" ${g.length <= 2 ? `disabled title="${full}"` : `title="Move to Pool ${L(j)}"`}>${L(j)}</button>`)).join('')}</span>`);
+  return `<div class="pkhand${many ? ' many' : ''}">${hand.map((g, k) => `<div class="pkhandcard" data-handcard="${k}" data-size="${g.length}">
+    <div class="pkhandhead">Pool ${L(k)} <span class="muted">${g.length} teams</span></div>
+    ${g.map((team, i) => `<div class="pkhandrow" draggable="true" data-handrow="${esc(team)}" data-pool="${k}" data-at="${i}">
+      <span class="pkhandgrip" aria-hidden="true">&#8942;&#8942;</span><span class="pkhandseed" title="Roster seed ${seedOf(team) + 1}">${i + 1}</span><span class="pkhandname" title="${esc(team)}">${esc(team)}</span>
+      ${pickPool(team, g, k)}</div>`).join('')}
+  </div>`).join('')}</div>`;
+}
+
 function renderCreator(box, env) {
   if (fullBtn()) fullBtn().hidden = true; // nothing to fill the screen with yet
   const t = env.teams.length;
@@ -374,6 +421,11 @@ function renderCreator(box, env) {
   }
   const plan = ui.plan;
   const P = plan.phases;
+  // By hand: the TD's own pools, sorted by seed, starting from the snake
+  const seedOf = (team) => env.teams.indexOf(team);
+  const snakeHand = (ph) => planGroups(env.teams, [{ ...ph, hand: undefined }], 'snake', () => 0.5)[0]
+    .map((g) => g.members.map((m) => m.id));
+  if (plan.seeding === 'hand') fixHand(P[0], env.teams, snakeHand);
   const rooms = roomList(env, n);
   const pv = planPreview(env.teams, rooms, withTies(plan), plan.seeding, 1);
   const groupsBy = planGroups(env.teams, P, plan.seeding, () => 0.5);
@@ -423,7 +475,9 @@ function renderCreator(box, env) {
   const first = () => {
     const groups = groupsBy[0];
     const out = [poolsRow('data-pcount', 'data-psizes', P[0].sizes || groups.map((g) => g.members.length), Math.floor(t / 2))];
-    if (groups.length > 1) out.push(`<span class="pkl">Seeding</span><span>${menu('data-seed', [['snake', 'Snake by roster order'], ['random', 'Random']], plan.seeding)}</span>`);
+    if (groups.length > 1) out.push(`<span class="pkl">Seeding</span><span>${menu('data-seed', [['snake', 'Snake by roster order'], ['random', 'Random'], ['hand', 'By hand']], plan.seeding)}</span>`);
+    if (groups.length > 1 && plan.seeding === 'hand') out.push(`<span class="pkl">Teams</span><span>${handCards(P[0].hand, seedOf)}
+      <span class="pkhelp">Teams start where the snake put them. ${P[0].hand.length > 3 ? 'Pick a pool from a team’s menu' : 'Pick a letter'} or drag the team to move it to another pool. Drag a team up or down to set its seed within its pool.</span></span>`);
     roomRows(0, out, 'pools');
     return `<div class="pkgrid">${out.join('')}</div>`;
   };
@@ -506,12 +560,23 @@ function renderCreator(box, env) {
   // each change redraws; a change to the structure turns Format to Custom
   // (seeding, ties and rooms don't)
   const each = (attr, ev, fn, shape = true) => box.querySelectorAll(`[${attr}]`).forEach((el) => {
-    el[ev] = () => { fn(el, Number(el.getAttribute(attr))); if (shape) plan.fmt = 'custom'; again(); };
+    el[ev] = () => {
+      if (fn(el, Number(el.getAttribute(attr))) !== false && shape) { plan.fmt = 'custom'; ui.handBase = null; }
+      again();
+    };
   });
   each('data-fmt', 'onchange', (el) => {
     if (el.value === 'custom') { plan.fmt = 'custom'; return; }
     ui.plan = { ...planFor(el.value, t, plan), teams: t };
+    ui.handBase = null;
+    // the TD's pools stay when the new format's pools are the same sizes
+    if (plan.seeding === 'hand' && P[0].hand) ui.plan.phases[0].hand = P[0].hand;
   }, false);
+  // new pool sizes put a hand-picked split back to the snake: ask first
+  const handReset = () => plan.seeding !== 'hand' || !P[0].hand
+    || JSON.stringify(P[0].hand) === JSON.stringify(snakeHand(P[0]))
+    || confirm('Changing the pools puts the teams back where the snake puts them. Do you want to continue?');
+  const handAfter = () => { if (plan.seeding === 'hand') P[0].hand = snakeHand(P[0]); };
   // the prelims changed: later phases go back to the default split
   const resplit = () => {
     for (let i = 1; i < P.length; i++) {
@@ -522,7 +587,9 @@ function renderCreator(box, env) {
   };
   each('data-pcount', 'onchange', (el) => {
     const k = Math.max(1, Math.min(Math.floor(t / 2), Number(el.value) || 1));
+    if (!handReset()) return false;
     Object.assign(P[0], { sizes: poolSizes(t, k), groups: k });
+    handAfter();
     if (P[0].name === 'Round robin' && k > 1) P[0].name = 'Prelims';
     if (k === 1 && P.length === 1) P[0].name = 'Round robin';
     resplit();
@@ -530,7 +597,9 @@ function renderCreator(box, env) {
   each('data-psizes', 'onchange', (el) => {
     const sizes = el.value.split(/[^\d]+/).map(Number).filter((x) => x > 0);
     if (!sizes.length) return;
+    if (!handReset()) return false;
     Object.assign(P[0], { sizes, groups: sizes.length });
+    handAfter();
     resplit();
   });
   each('data-count', 'onchange', (el, p) => { P[p].sizes = placeSizes(groupsBy[p - 1], Math.max(1, Number(el.value) || 1)); P[p].per = 1; });
@@ -545,7 +614,91 @@ function renderCreator(box, env) {
     // elimination usually takes the top teams: start on the top 2 of each pool
     if (v === 'single' || v === 'double') { P[p].top = Math.min(2, Math.ceil(t / P[p - 1].groups)); P.splice(p + 1); }
   });
-  each('data-seed', 'onchange', (el) => { plan.seeding = el.value; }, false);
+  each('data-seed', 'onchange', (el) => {
+    plan.seeding = el.value;
+    if (el.value === 'hand') P[0].hand = snakeHand(P[0]); else delete P[0].hand;
+  }, false);
+  // a letter (or the menu) moves a team to the end of that pool; the pool
+  // sizes follow
+  const moveTeam = (team, to, at = Infinity) => {
+    const from = P[0].hand.findIndex((g) => g.includes(team));
+    if (from < 0 || from === to || P[0].hand[from].length <= 2) return;
+    // uneven pools are Custom; the format and its later phases come back
+    // when the pools are its sizes again (a swap is two moves)
+    const sizesOf0 = (ph) => ph.hand.map((g) => g.length).join('/');
+    if (plan.fmt !== 'custom') ui.handBase = { fmt: plan.fmt, phases: JSON.parse(JSON.stringify(P)) };
+    P[0].hand[from] = P[0].hand[from].filter((x) => x !== team);
+    P[0].hand[to].splice(at, 0, team);
+    const sizes = P[0].hand.map((g) => g.length);
+    const base = ui.handBase;
+    if (base && sizes.join('/') === sizesOf0(base.phases[0])) {
+      const hand = P[0].hand;
+      P.splice(0, P.length, ...JSON.parse(JSON.stringify(base.phases)));
+      P[0].hand = hand;
+      plan.fmt = base.fmt;
+      ui.handBase = null;
+    } else {
+      plan.fmt = 'custom';
+      Object.assign(P[0], { sizes, groups: sizes.length });
+      resplit();
+    }
+    again();
+  };
+  box.querySelectorAll('[data-hand]').forEach((el) => { el.onclick = () => moveTeam(el.dataset.hand, Number(el.dataset.to)); });
+  box.querySelectorAll('[data-handsel]').forEach((el) => { el.onchange = () => moveTeam(el.dataset.handsel, Number(el.value)); });
+  // dragging: onto a team, before or after it (whichever half the pointer
+  // is in); onto a card's empty space, last. In its own pool that reseeds
+  // the team; in another it moves there, unless its pool would drop below two
+  const handBox = box.querySelector('.pkhand');
+  if (handBox) {
+    let dragged = null; // {team, pool}
+    const clearMarks = () => handBox.querySelectorAll('.drop-before, .drop-after, .drop-end')
+      .forEach((x) => x.classList.remove('drop-before', 'drop-after', 'drop-end'));
+    const dropAt = (ev) => {
+      const card = ev.target.closest && ev.target.closest('[data-handcard]');
+      if (!dragged || !card) return null;
+      const to = Number(card.dataset.handcard);
+      if (to !== dragged.pool && Number(handBox.querySelector(`[data-handcard="${dragged.pool}"]`).dataset.size) <= 2) return null;
+      const row = ev.target.closest('[data-handrow]');
+      if (!row) return { to, at: Infinity, el: card, cls: 'drop-end' };
+      const r = row.getBoundingClientRect();
+      const after = ev.clientY > r.top + r.height / 2;
+      return { to, at: Number(row.dataset.at) + (after ? 1 : 0), el: row, cls: after ? 'drop-after' : 'drop-before' };
+    };
+    handBox.addEventListener('dragstart', (ev) => {
+      const row = ev.target.closest && ev.target.closest('[data-handrow]');
+      if (!row) return;
+      dragged = { team: row.dataset.handrow, pool: Number(row.dataset.pool) };
+      row.classList.add('dragging');
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', dragged.team);
+    });
+    handBox.addEventListener('dragover', (ev) => {
+      const d = dropAt(ev);
+      clearMarks();
+      if (!d) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      d.el.classList.add(d.cls);
+    });
+    handBox.addEventListener('dragend', () => { clearMarks(); dragged = null; handBox.querySelectorAll('.dragging').forEach((x) => x.classList.remove('dragging')); });
+    handBox.addEventListener('drop', (ev) => {
+      const d = dropAt(ev);
+      const drag = dragged;
+      clearMarks();
+      dragged = null;
+      if (!d) return;
+      ev.preventDefault();
+      if (d.to !== drag.pool) { moveTeam(drag.team, d.to, d.at); return; }
+      const g = P[0].hand[d.to];
+      const i = g.indexOf(drag.team);
+      const at = Math.min(d.at, g.length) - (i < d.at ? 1 : 0);
+      if (at === i) { again(); return; }
+      g.splice(i, 1);
+      g.splice(at, 0, drag.team);
+      again();
+    });
+  }
   each('data-finals', 'onchange', (el) => { plan.finals = el.checked; }, false);
   each('data-finalstyle', 'onchange', (el) => { plan.finalStyle = el.value; delete plan.finalOne; }, false);
   each('data-top', 'onchange', (el, p) => { P[p].top = Math.max(1, Number(el.value) || 1); });
