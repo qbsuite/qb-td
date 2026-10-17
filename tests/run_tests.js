@@ -36,8 +36,8 @@ import { eachLimit } from '../app/js/limit.js';
 // roster builder's output must satisfy it, since read.html feeds the
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
-import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from '../app/js/read_core.js';
+import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -3498,6 +3498,21 @@ test('reader bundle: the event log keeps a replacement\'s throw-outs and names a
 test('reader bundle: the Actions menu carries Replace tossup and Replace bonus', () => {
   const bundle = readFileSync(new URL('../app/js/read.bundle.js', import.meta.url), 'utf8');
   assert.ok(bundle.includes('Replace tossup...') && bundle.includes('Replace bonus...'), 'run npm run build:read');
+});
+
+test('upload progress: the furthest question reached rides with a reader upload, and the hub reads it', () => {
+  assert.deepEqual(gameProgress(3, 20), { at: 3, of: 20 });
+  assert.equal(gameProgress(undefined, 20), null, 'a game begun before tracking reports nothing');
+  assert.equal(gameProgress(5, undefined), null);
+  const withP = JSON.parse(combinedUpload({ tossups_read: 20, match_teams: [] }, 3, '{}', null, null, { at: 7, of: 20 }));
+  assert.deepEqual(withP.progress, { at: 7, of: 20 });
+  const without = JSON.parse(combinedUpload({ tossups_read: 20, match_teams: [] }, 3, '{}'));
+  assert.equal(without.progress, undefined, 'and an upload without it is as before');
+  // the hub's reading of a file's summary
+  const sum = (o) => fileSummary({ summary: JSON.stringify({ teams: ['A', 'B'], score: [100, 50], protests: [], ...o }) });
+  assert.deepEqual(sum({ progress: { at: 7, of: 20 } }).progress, { at: 7, of: 20 });
+  assert.equal(sum({}).progress, null, 'old uploads: finished, as before');
+  assert.equal(sum({ progress: { at: 'x', of: 20 } }).progress, null);
 });
 
 test('combinedUpload carries tb.used when given, omits it otherwise', () => {

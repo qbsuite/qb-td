@@ -1,6 +1,20 @@
 Release Notes for 10/17/2026
 
 [ LIVE HUB ]
+- The uploads grid keeps its checkmark when a room uploads a game more than once, with a small count beside it.
+- A game uploaded before its last regulation question shows a pie of how far it got, and "on question 3 of 20" in Live now.
+- Orange marks need a look: a missing game, a file that can't be read, uploads that disagree, or a game in progress.
+
+[ READER ]
+- An upload says how far the game got: the furthest question reached. Games begun before this update say nothing, as before.
+
+[ BUZZPOINTS ]
+- A round's buzzpoints and scoresheets wait while a game in it was uploaded unfinished.
+
+[ PERFORMANCE ]
+- The public page's file host redeploys only when the tournament directory changes.
+
+[ LIVE HUB ]
 - A game uploaded under a team's old name, after a rename, is listed under its new name in Live now and the uploads.
 - Record a forfeit: pick the room, round and the team that forfeited. It counts as a win and a loss, with no stats, as YellowFruit counts one.
 

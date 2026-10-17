@@ -64,7 +64,7 @@ function fakeDb(state) {
         state.mirrorStateReads = (state.mirrorStateReads || []).concat(args[0]);
         return { results: (state.rounds || []).filter((r) => r.tournament_id === args[0]) };
       }
-      if (/SELECT round, bucket_id FROM files/.test(sql)) {
+      if (/SELECT round, bucket_id(, .* AS unfinished)? FROM files/.test(sql)) {
         return {
           results: state.files.filter((f) => f.tournament_id === args[0])
             .map((f) => ({ round: f.round, bucket_id: f.bucket_id ?? 1 })),
@@ -77,7 +77,8 @@ function fakeDb(state) {
         return { results: state.files.filter((f) => f.tournament_id === args[0]) };
       }
       // pubStateBody's queries — still reachable through the /pub route
-      if (/SELECT id, bucket_id, round, filename FROM files/.test(sql)) {
+      // (with or without the unfinished-game flag worker.js adds: none here)
+      if (/SELECT id, bucket_id, round, filename(, .* AS unfinished)? FROM files/.test(sql)) {
         return {
           results: state.files.filter((f) => f.tournament_id === args[0]).map((f) => ({
             id: f.id, bucket_id: f.bucket_id ?? null, round: f.round ?? 1,

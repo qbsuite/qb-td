@@ -404,8 +404,19 @@ function cleanProtests(list) {
   return out;
 }
 
+// A reader upload's progress: the furthest question the moderator reached
+// and the format's regulation count ({at, of}), or null. A game short of
+// its last regulation question is unfinished: listed and counted in the
+// stats, but no room's round is done on it (doneRounds, UNFINISHED_SQL).
+function cleanProgress(p) {
+  if (!p || typeof p !== 'object') return null;
+  const at = Number(p.at);
+  const of = Number(p.of);
+  return Number.isInteger(at) && Number.isInteger(of) && at >= 1 && of >= 1 && at <= 999 && of <= 999 ? { at, of } : null;
+}
+
 // files.summary for a valid match upload: JSON text or null.
-function matchSummary(match, reported) {
+function matchSummary(match, reported, progress = null) {
   if (!match) return null;
   const teams = (match.match_teams || match.matchTeams || []).map((mt) => {
     const t = mt && mt.team;
@@ -413,8 +424,10 @@ function matchSummary(match, reported) {
   });
   const score = (match.match_teams || match.matchTeams || []).map(teamScore);
   const protests = cleanProtests(reported) || protestsFromNotes(match.notes);
-  const json = JSON.stringify({ teams, score, protests });
-  return json.length > 64 * 1024 ? JSON.stringify({ teams, score, protests: [] }) : json;
+  const prog = cleanProgress(progress);
+  const extra = prog ? { progress: prog } : {};
+  const json = JSON.stringify({ teams, score, protests, ...extra });
+  return json.length > 64 * 1024 ? JSON.stringify({ teams, score, protests: [], ...extra }) : json;
 }
 
 // Whole-map write (POST /a/:secret with `rulings`): {key: {r, note, at}},
@@ -551,7 +564,7 @@ async function materialize(env, t) {
   // bucket_id and filename ride along for the public state, which the
   // same tick builds from these rows (putPubState) instead of re-querying
   const { results: rows } = await env.DB.prepare(
-    "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
+    `SELECT id, bucket_id, round, filename, ${UNFINISHED_SQL} AS unfinished FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id`
   ).bind(tid).all();
 
   const byRound = new Map();
@@ -1259,6 +1272,9 @@ async function tickUnlisted(env) {
 async function dirSweep(env) {
   const { changed, text } = await dirBuild(env);
   if (!liveEnabled(env)) return;
+  // Nothing has ever been listed: no file in R2, so a deploy would ship
+  // none and never record one, and every sweep would deploy again.
+  if (!changed && text === DIR_EMPTY && !(await env.DATA.head(DIR_KEY))) return;
   const shipped = await env.DATA.get(DIR_LIVE_KEY);
   if (changed || !shipped || (await shipped.text()) !== (await liveHash(text, 'json'))) {
     await tickLive(env, [], true);
@@ -3273,7 +3289,10 @@ async function bucketUpload(request, url, env, secret) {
     const parsed = extractMatch(new TextDecoder().decode(buf));
     error = parsed.error;
     qbjObj = parsed.qbj || null;
-    if (!error) summary = matchSummary(parsed.match, isCombined && parsed.root ? parsed.root.protests : null);
+    if (!error) {
+      summary = matchSummary(parsed.match, isCombined && parsed.root ? parsed.root.protests : null,
+        isCombined && parsed.root ? parsed.root.progress : null);
+    }
     if (!error && isCombined && parsed.root && parsed.root.tb
       && Array.isArray(parsed.root.tb.used) && parsed.teams.every(Boolean)) {
       tbReport = {
@@ -3696,6 +3715,11 @@ async function buzzAllowed(request, b) {
   return sameDigest(got, b.hash);
 }
 
+// 1 for a game file whose reader reported it short of its last regulation
+// question (matchSummary progress), else 0. Read beside the game rows that
+// decide which rounds are done; no extra rows.
+const UNFINISHED_SQL = "CASE WHEN json_valid(summary) THEN COALESCE(json_extract(summary, '$.progress.at') < json_extract(summary, '$.progress.of'), 0) ELSE 0 END";
+
 // Scheduled games with both slots filled for a round; null when the
 // schedule doesn't cover it.
 function scheduledGames(sched, round) {
@@ -3714,6 +3738,7 @@ function scheduledGames(sched, round) {
 function doneRounds(rows, roomCount, sched, candidates = []) {
   const inByRound = new Map();
   for (const f of rows) {
+    if (f.unfinished) continue; // still being played
     if (!inByRound.has(f.round)) inByRound.set(f.round, new Set());
     inByRound.get(f.round).add(f.bucket_id);
   }
@@ -3725,13 +3750,13 @@ function doneRounds(rows, roomCount, sched, candidates = []) {
 }
 
 // A round is done when every scheduled game (every bucket room, without
-// a schedule) has a clean game file. Buzzpoints stay hidden for a round
+// a schedule) has a clean game file its reader didn't report unfinished. Buzzpoints stay hidden for a round
 // until nobody is still playing it — a lagging room's teams must not
 // read the round's answers mid-game.
 async function roundDone(env, t, round) {
   const [files, buckets] = await Promise.all([
     env.DB.prepare(
-      "SELECT DISTINCT bucket_id FROM files WHERE tournament_id = ?1 AND round = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL"
+      `SELECT DISTINCT bucket_id FROM files WHERE tournament_id = ?1 AND round = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL AND NOT ${UNFINISHED_SQL}`
     ).bind(t.id, round).all(),
     env.DB.prepare('SELECT id FROM buckets WHERE tournament_id = ?1').bind(t.id).all(),
   ]);
@@ -3869,7 +3894,7 @@ async function pubQTiebreakers(request, url, env, slug) {
 async function pubStateBody(env, t, pub, loaded = null) {
   const [files, buckets, schedObj, packetRounds, catsHead, manifest, started] = await Promise.all([
     loaded && loaded.rows ? { results: loaded.rows } : env.DB.prepare(
-      "SELECT id, bucket_id, round, filename FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id"
+      `SELECT id, bucket_id, round, filename, ${UNFINISHED_SQL} AS unfinished FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id`
     ).bind(t.id).all(),
     env.DB.prepare(
       'SELECT id, room_name FROM buckets WHERE tournament_id = ?1'
@@ -5061,7 +5086,7 @@ async function mirrorState(env, tid, packetOf) {
     readManifest(env, tid),
     env.DB.prepare('SELECT number, packet_r2_key FROM rounds WHERE tournament_id = ?1').bind(tid).all(),
     env.DB.prepare(
-      "SELECT round, bucket_id FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL"
+      `SELECT round, bucket_id, ${UNFINISHED_SQL} AS unfinished FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL`
     ).bind(tid).all(),
     env.DB.prepare('SELECT COUNT(*) AS n FROM buckets WHERE tournament_id = ?1').bind(tid).all(),
     env.DATA.get(`t/${tid}/schedule.json`),

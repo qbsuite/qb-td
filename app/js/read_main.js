@@ -27,6 +27,7 @@ import {
   staleGameKeys, roundRows, normalizeTbPool, tbUsedIds, tbPanelRows,
   tbRecordAdd, tbAddedIds, tbRemapMatch, tbNumbering,
 } from './read_core.js';
+import { gameProgress } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
 import { protestReport } from './protests.js';
 import { Tossup } from 'modaq/src/state/PacketState.js';
@@ -207,6 +208,19 @@ function mountMODAQ(id, meta, isNew) {
   };
   // Replace tossup / Replace bonus record their own changes (read_core
   // replaceQuestion), held bonuses included
+  // the furthest question reached (read_core gameProgress), kept with the
+  // game. Only a game begun on this reader tracks it (meta.reached set at
+  // the start): one already under way can't know how far it had got, so it
+  // reports nothing and counts as finished, as every game did before.
+  if (isNew && meta.reached === undefined) {
+    meta.reached = 1;
+    localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
+  }
+  tbBridge.noteReached = (n) => {
+    if (typeof meta.reached !== 'number' || !Number.isInteger(n) || meta.reached >= n) return;
+    meta.reached = n;
+    localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
+  };
   tbBridge.getTb = () => meta.tb || null;
   tbBridge.setTb = (tb) => {
     meta.tb = tb;
@@ -241,8 +255,11 @@ function mountMODAQ(id, meta, isNew) {
           // questions added mid-packet shift MODAQ's numbering; number them
           // as if appended so stats keyed on packet numbers line up
           const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
+          const app = tbBridge.appState;
+          const progress = app && typeof meta.reached === 'number'
+            ? gameProgress(Math.max(meta.reached, app.uiState.cycleIndex + 1), app.game.gameFormat.regulationTossupCount) : null;
           const body = combinedUpload(qbj, meta.round, storeText,
-            meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests);
+            meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests, progress);
           const out = await pub(
             `/b/${secret}/upload?round=${meta.round}&name=${encodeURIComponent(name)}`,
             { method: 'POST', body });

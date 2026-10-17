@@ -218,10 +218,15 @@ export function fileSummary(f) {
   let s = f && f.summary;
   if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return null; } }
   if (!s || !Array.isArray(s.teams) || s.teams.length !== 2 || !Array.isArray(s.score)) return null;
+  const p = s.progress;
+  const progress = p && Number.isInteger(p.at) && Number.isInteger(p.of) && p.at >= 1 && p.of >= 1 ? { at: p.at, of: p.of } : null;
   return {
     teams: s.teams.map(String),
     score: [Number(s.score[0]) || 0, Number(s.score[1]) || 0],
-    protests: Array.isArray(s.protests) ? s.protests.filter((p) => p && typeof p === 'object') : [],
+    protests: Array.isArray(s.protests) ? s.protests.filter((x) => x && typeof x === 'object') : [],
+    // how far the game had got at upload (worker.js cleanProgress), from a
+    // reader that reports it; null means finished, as before
+    progress,
   };
 }
 

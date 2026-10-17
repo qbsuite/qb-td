@@ -577,5 +577,32 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
     { d1: w.DB.counts.queries, r2get: w.DATA.counts.get, r2put: w.DATA.counts.put, api: w.cf.calls.length });
 }
 
+// 16. The hourly sweep on an instance where nothing has ever been listed:
+// no directory file, so nothing to deploy — before, every sweep deployed
+// (and stored a qb-td-live version) because none recorded what it shipped.
+{
+  clock = realNow();
+  const w = world();
+  w.add();
+  await w.tick();
+  const sweep = async () => {
+    const waits = [];
+    await worker.scheduled({ cron: '0 * * * *' }, w.env, { waitUntil: (p) => waits.push(p) });
+    await Promise.all(waits);
+  };
+  w.cf.calls.length = 0;
+  for (let h = 0; h < 3; h++) { clock += 60 * MIN; await sweep(); }
+  ok('sweep: empty directory, no deploys', !w.cf.calls.some((c) => c.startsWith('PUT')), w.cf.calls);
+  // once something is listed, the sweep ships it once and then rests
+  w.DB.raw.prepare('UPDATE tournaments SET dir_entry = ? WHERE id = 1')
+    .run(JSON.stringify({ n: 'Tournament 1', s: 'tour-1', d: clock, c: clock + 48 * 60 * MIN }));
+  await sweep();
+  const puts = () => w.cf.calls.filter((c) => c.startsWith('PUT')).length;
+  ok('sweep: a listed tournament is deployed', puts() === 1 && !!w.cf.deployed['/directory.json'], w.cf.calls);
+  clock += 60 * MIN;
+  await sweep();
+  ok('sweep: then no redeploy while unchanged', puts() === 1, w.cf.calls);
+}
+
 Date.now = realNow;
 console.log(passed + ' tests passed');

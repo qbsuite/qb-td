@@ -80,7 +80,7 @@ export function matchFilenames(round, nameA, nameB) {
     packet carried appended tiebreakers (meta.tb) also report which pool
     questions were read — always, even when the list is empty, so a
     re-export that no longer reaches the tiebreakers clears its old log. */
-export function combinedUpload(match, round, storeText, tbUsed = null, protests = null) {
+export function combinedUpload(match, round, storeText, tbUsed = null, protests = null, progress = null) {
   let game = null;
   try { game = JSON.parse(storeText); } catch (e) { /* upload the qbj anyway */ }
   return JSON.stringify({
@@ -90,7 +90,22 @@ export function combinedUpload(match, round, storeText, tbUsed = null, protests 
     // the game's protests, structured (protests.js protestReport); the
     // Worker falls back to the qbj's notes when absent
     ...(Array.isArray(protests) && protests.length ? { protests } : {}),
+    // how far the game got (gameProgress): MODAQ's tossups_read is always
+    // the full regulation count, so the hub can't tell an early upload
+    // from the file itself
+    ...(progress ? { progress } : {}),
   });
+}
+
+/** How far a game got, for its upload: {at, of}, the furthest question
+    the moderator reached (dead tossups at the end count, as it is where
+    they were, not who buzzed) and the regulation count the TD set. At or
+    past the last regulation question, the game is finished. null when
+    either is unknown. */
+export function gameProgress(reached, regulation) {
+  const at = Number(reached);
+  const of = Number(regulation);
+  return Number.isInteger(at) && at >= 1 && Number.isInteger(of) && of >= 1 ? { at: Math.min(at, 999), of: Math.min(of, 999) } : null;
 }
 
 /* ---------- tiebreakers ----------

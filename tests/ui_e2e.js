@@ -1018,7 +1018,8 @@ await expectLive('round 2, one in, one started, four not started', 2);
 await openHub();
 const b3 = roomBucket(3), b4 = roomBucket(4), b5 = roomBucket(5);
 const cellText = (bid, n) => js(`(document.querySelector('[data-cell="${bid}:${n}"]') || document.querySelector('.ugrid')).textContent.trim()`);
-ok('13 uploads: the room with two games shows 2', (await cellText(b4.id, 2)) === '2', await cellText(b4.id, 2));
+ok('13 uploads: the room with two games shows its check with a 2 beside it', (await cellText(b4.id, 2)) === '✓2'
+  && await js(`!!document.querySelector('[data-cell="${b4.id}:2"] sup.ucount')`), await cellText(b4.id, 2));
 ok('13 uploads: the two games are different, so the 2 is a warning',
   await js(`document.querySelector('[data-cell="${b4.id}:2"]').classList.contains('warn')`));
 ok('13 uploads: the room whose game went elsewhere shows –', (await cellText(b3.id, 2)) === '–', await cellText(b3.id, 2));

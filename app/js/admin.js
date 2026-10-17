@@ -1681,6 +1681,21 @@ function schedRoomIndex(b) {
 // A forfeit the hub recorded (recordForfeit) is named so: its summary
 // carries no result, only the teams, winner first.
 const isForfeitFile = (f) => !!f && /_Forfeit\.qbj$/i.test(f.filename || '');
+// An upload short of its last regulation question (protests.js
+// fileSummary progress): {at, of}, else null (finished, or a reader that
+// doesn't say)
+const unfinishedOf = (sum) => (sum && sum.progress && sum.progress.at < sum.progress.of ? sum.progress : null);
+// its mark: a pie filled to the share of questions reached
+const pieMark = (p) => `<span class="upie" style="--p:${Math.round((100 * p.at) / p.of)}%"></span>`;
+const unfinishedTitle = (p) => `In progress: on question ${p.at} of ${p.of} at the last upload`;
+const inProgress = (rows) => {
+  const n = rows.filter((r) => r.state === 'partial').length;
+  return n ? ` &middot; ${n} in progress` : '';
+};
+const unfinishedNote = (sum) => {
+  const p = unfinishedOf(sum);
+  return p ? ` <span class="muted">&middot; on question ${p.at} of ${p.of}</span>` : '';
+};
 function gameLine(sum, file, plain = false) {
   if (isForfeitFile(file)) return `<span class="win">${esc(sum.teams[0])}</span> defeats ${esc(sum.teams[1])} by forfeit`;
   if (plain) return `${esc(sum.teams[0])} <b>${sum.score[0]}</b> &ndash; <b>${sum.score[1]}</b> ${esc(sum.teams[1])}`;
@@ -1769,13 +1784,14 @@ function liveBrackets(t, buckets, files) {
       : behind ? `Round ${rr - 1} game still not in. Started round ${rr} anyway.` : '';
     return { b, idx, rr, key: game ? key : null, game, file, sum: file ? fileSummary(file) : null, note,
       started: startedAt(b.id, rr),
-      state: file ? 'in' : startedAt(b.id, rr) ? 'started' : 'idle' };
+      state: file ? (unfinishedOf(file && fileSummary(file)) ? 'partial' : 'in') : startedAt(b.id, rr) ? 'started' : 'idle' };
   });
   const groups = ph.keys.map((key) => {
     const info = bracketInfo(bm, key);
     const rows = rooms.filter((r) => r.key === key);
     return { key, name: info ? info.name : key, color: info ? info.color : 0, round: st.rounds[key], rows,
-      nIn: rows.filter((r) => r.state === 'in').length, nStarted: rows.filter((r) => r.started).length };
+      nIn: rows.filter((r) => r.state === 'in').length, nPartial: rows.filter((r) => r.state === 'partial').length,
+      nStarted: rows.filter((r) => r.started).length };
   });
   const idle = rooms.filter((r) => !r.key);
   const all = advanceAll(bm, st, t.current_round);
@@ -1809,25 +1825,27 @@ function phaseLine(bk) {
 function liveBracketsHtml(bk, fileLinks) {
   const row = (r) => {
     const game = r.sum
-      ? gameLine(r.sum, r.file)
+      ? gameLine(r.sum, r.file) + unfinishedNote(r.sum)
       : r.game ? `${esc(slotLabel(r.game.a))} <span class="muted">v</span> ${esc(slotLabel(r.game.b))}`
       : '<span class="muted">No game this round</span>';
     const acts = r.file
       ? fileLinks(r.file) + (r.file.kind === 'combined' && r.sum ? ` <button class="linkbtn" data-editfile="${r.file.id}">Edit</button>` : '')
       : r.game ? `<button class="linkbtn" data-addfor="${r.b.id}:${r.rr}">Upload</button>` : '';
-    const title = r.note || (r.state === 'in' ? 'Game in' : r.state === 'started' ? 'Started, not uploaded' : 'Not started');
-    const mark = !r.game ? '' : r.note ? '!' : r.state === 'in' ? '&#10003;' : r.state === 'started' ? '&#9675;' : '&ndash;';
+    const part = r.state === 'partial' ? unfinishedOf(r.sum) : null;
+    const title = r.note || (part ? unfinishedTitle(part) : r.state === 'in' ? 'Game in' : r.state === 'started' ? 'Started, not uploaded' : 'Not started');
+    const mark = !r.game ? '' : r.note ? '!' : part ? pieMark(part) : r.state === 'in' ? '&#10003;' : r.state === 'started' ? '&#9675;' : '&ndash;';
     return `<div class="brow ${r.game ? '' : 'bye'}" data-room="${r.b.id}">
       <span class="bgame"><span class="bteams">${game}</span>
         <span class="broom">${esc(r.b.room_name)}<span class="lacts">${acts}</span></span>
         ${r.note ? `<span class="bnote">${esc(r.note)}</span>` : ''}</span>
-      <span class="lmark ${r.note || r.state === 'idle' ? 'warn' : r.state === 'started' ? 'muted' : ''}" title="${esc(title)}">${mark}</span>
+      <span class="lmark ${r.note || r.state === 'idle' || r.state === 'partial' ? 'warn' : r.state === 'started' ? 'muted' : ''}" title="${esc(title)}">${mark}</span>
     </div>`;
   };
   const head = (g) => `<div class="bhead"><i class="lane-${g.color}"></i><b>${esc(g.name)}</b>
       ${g.round < bk.top ? `<span class="warntext">&middot; still on round ${g.round}</span>` : ''}
       <span class="spacer"></span>
-      <span class="${g.nIn < g.rows.length ? 'warntext' : 'muted'}">${g.nIn}/${g.rows.length} in</span></div>`;
+      <span class="${g.nIn < g.rows.length ? 'warntext' : 'muted'}">${g.nIn}/${g.rows.length} in${
+        g.nPartial ? ` &middot; ${g.nPartial} in progress` : ''}</span></div>`;
   const idle = bk.idle.length ? `<div class="bgroup"><div class="bhead"><i class="lane-x"></i><b>No game this round</b></div>
       ${bk.idle.map(row).join('')}</div>` : '';
   if (bk.layout === 'plain') return `<div class="bplain">${bk.groups.flatMap((g) => g.rows).map(row).join('')}${idle}</div>`;
@@ -1922,7 +1940,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     const planned = scheduledGame(b, t.current_round);
     const ps = g ? pfiles.get(g.id) : null;
     return { b, bye: r.bye && !g, file: g, sum, planned, openProt: ps && !ps.superseded ? ps.open : 0,
-      state: g ? 'in' : started.has(r.id) ? 'started' : 'idle' };
+      state: g ? (unfinishedOf(sum) ? 'partial' : 'in') : started.has(r.id) ? 'started' : 'idle' };
   });
   const playing = liveRooms.filter((r) => !r.bye);
   const nStarted = playing.filter((r) => started.has(r.id)).length;
@@ -1945,9 +1963,18 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     // it, so it is in progress rather than missing
     const startedThen = (lastDetail.starts || []).some((x) => x.bucket_id === b.id && x.round === n);
     let mark = '', cls = '', title = '';
+    // the newest readable upload counts: ✓, or a pie while it is
+    // unfinished; several uploads ride on it as a small count
+    const newest = goods.length ? [...goods].sort((x, y) => y.id - x.id)[0] : null;
+    const part = newest ? unfinishedOf(fileSummary(newest)) : null;
     if (errs.length) { mark = '!'; cls = 'warn'; title = errs.length + ' file' + (errs.length === 1 ? '' : 's') + ' could not be read'; }
-    else if (goods.length > 1) { mark = String(goods.length); cls = games.size > 1 ? 'warn' : ''; title = goods.length + ' uploads'; }
-    else if (goods.length === 1) { mark = '&#10003;'; title = 'Game in'; }
+    else if (goods.length) {
+      mark = `<span class="uin">${part ? pieMark(part) : '&#10003;'}${goods.length > 1 ? `<sup class="ucount">${goods.length}</sup>` : ''}</span>`;
+      cls = games.size > 1 || part ? 'warn' : '';
+      title = [part ? unfinishedTitle(part) : 'Game in',
+        goods.length > 1 ? `${goods.length} uploads; the newest counts` : '',
+        games.size > 1 ? 'they disagree on the teams' : ''].filter(Boolean).join('. ');
+    }
     else if (fs.length) { mark = '&middot;'; cls = 'muted'; title = 'Game file only'; }
     else if (n > now || bye) { mark = ''; cls = 'muted'; title = bye ? 'No game this round' : ''; }
     else if (n === now) {
@@ -2062,13 +2089,15 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       <div class="livemain">
         <section>
           <div class="sechead"><h2>Live now</h2>
-            ${bk ? `<span class="muted">${bk.rooms.filter((r) => r.key && r.state === 'in').length}/${bk.rooms.filter((r) => r.key).length} in</span>`
-              : intake.expected ? `<span class="muted">${intake.got}/${intake.expected} in</span>` : ''}</div>
+            ${bk ? `<span class="muted">${bk.rooms.filter((r) => r.key && r.state === 'in').length}/${bk.rooms.filter((r) => r.key).length} in${
+                inProgress(bk.rooms.filter((r) => r.key))}</span>`
+              : intake.expected ? `<span class="muted">${Math.max(0, intake.got - liveRows.filter((r) => r.state === 'partial').length)}/${intake.expected} in${
+                inProgress(liveRows)}</span>` : ''}</div>
           ${bk ? liveBracketsHtml(bk, fileLinks) : liveRows.length ? liveRows.map((r) => `
           <div class="lrow ${r.bye ? 'bye' : ''}">
             <span class="lroom">${esc(r.b.room_name)}</span>
             <span class="lgame">${r.sum
-              ? gameLine(r.sum, r.file)
+              ? gameLine(r.sum, r.file) + unfinishedNote(r.sum)
               : r.bye ? '<span class="muted">No game this round</span>'
               : r.planned ? `${esc(r.planned[0])} <span class="muted">v</span> ${esc(r.planned[1])}`
               : '<span class="muted">No game yet</span>'}
@@ -2078,9 +2107,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
               ? fileLinks(r.file) + (r.file.kind === 'combined' && r.sum
                 ? ` <button class="linkbtn" data-editfile="${r.file.id}">Edit</button>` : '')
               : r.bye ? '' : `<button class="linkbtn" data-addfor="${r.b.id}:${t.current_round}">Upload</button>`}</span>
-            <span class="lmark ${r.state === 'idle' ? 'warn' : r.state === 'started' ? 'muted' : ''}"
-              title="${r.state === 'in' ? 'Game in' : r.state === 'started' ? 'Started, not uploaded' : 'Not started'}">${
-              r.bye ? '' : r.state === 'in' ? '&#10003;' : r.state === 'started' ? '&#9675;' : '&ndash;'}</span>
+            <span class="lmark ${r.state === 'idle' || r.state === 'partial' ? 'warn' : r.state === 'started' ? 'muted' : ''}"
+              title="${r.state === 'partial' ? unfinishedTitle(unfinishedOf(r.sum)) : r.state === 'in' ? 'Game in' : r.state === 'started' ? 'Started, not uploaded' : 'Not started'}">${
+              r.bye ? '' : r.state === 'partial' ? pieMark(unfinishedOf(r.sum)) : r.state === 'in' ? '&#10003;' : r.state === 'started' ? '&#9675;' : '&ndash;'}</span>
           </div>`).join('') : '<div class="muted" style="padding:10px 0">No rooms yet. Add them under Setup.</div>'}
         </section>
 
@@ -2115,7 +2144,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
               + rows.map((b) => `<tr><td class="uroom" title="${esc(b.room_name)}">${esc(b.room_name)}</td>${roundCols.map((n) => gridCell(b, n)).join('')}</tr>${
               cellOpen && cellOpen.bid === b.id ? cellPanel() : ''}`).join('')).join('')}
           </table></div>
-          <div class="muted legend">&#10003; in &middot; &#9675; started &middot; &ndash; missing &middot; 2 two uploads &middot; ! can&rsquo;t read</div>`
+          <div class="muted legend">&#10003; in &middot; <span class="uin">&#10003;<sup class="ucount">3</sup></span> 3 uploads, the newest counts &middot;
+            <span class="upie" style="--p:40%"></span> in progress &middot; &#9675; started &middot; &ndash; missing &middot; ! can&rsquo;t read &middot;
+            <span class="warntext">orange</span>: needs a look</div>`
           : ''}
         </section>
 
@@ -2377,6 +2408,8 @@ async function editGame(a, buckets, files, fileId) {
     localStorage.setItem(gameKey(room.secret, gid), storeText);
     localStorage.setItem(metaKey(room.secret, gid), JSON.stringify({
       a: aName, b: bName, round: f.round, t: '', room: room.room_name, started: Date.now(),
+      // how far it had got, so the corrected upload says so too
+      ...(sum.progress ? { reached: sum.progress.at } : {}),
     }));
     say('');
     // A new tab: the dashboard keeps its place, and the TD can flip back.

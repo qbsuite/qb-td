@@ -267,6 +267,12 @@ function ReplaceDialog({ appState, kind, onClose }) {
 // MODAQ unmounts its dialogs, this one included, while none is open.
 export function useHeldBonuses(appState) {
   tbBridge.appState = appState; // for the event log's Undo (undoHandler)
+  // the furthest question the moderator reaches, for the upload's progress
+  // (read_core gameProgress)
+  React.useEffect(() => reaction(
+    () => appState.uiState.cycleIndex,
+    (ci) => { if (tbBridge.noteReached) tbBridge.noteReached(ci + 1); },
+    { fireImmediately: true }), [appState]);
   React.useEffect(() => reaction(
     () => appState.game.cycles.map((c) => (c.correctBuzz ? 1 : 0)).join(''),
     () => {
