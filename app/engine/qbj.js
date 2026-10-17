@@ -17,6 +17,12 @@ function asName(x) {
   return '';
 }
 
+// a roster team's or player's earlier names (buildRosterQbj's _formerNames)
+function formerOf(x) {
+  const f = x && typeof x === 'object' ? x._formerNames : null;
+  return Array.isArray(f) ? f.map((n) => String(n).trim()).filter(Boolean) : [];
+}
+
 /** Round number from the qbj's `_round` or a MODAQ-style filename
     (`Round_3_A_B.qbj`). Returns null if neither yields one. */
 export function roundFromFilename(filename) {
@@ -168,6 +174,10 @@ export function parseRosterLines(text) {
  * follow from its players' (teamMarks), whatever `ug` / `d2` the entry
  * carries. A mark the tournament does not track is not written, so a
  * roster that tracks neither is the file it always was.
+ *
+ * A renamed team or player keeps its earlier names (`formerNames` on a
+ * team, `formerPlayers` {player: [names]}) as `_formerNames`, so games
+ * played before the rename still count under the new name (rosterNameMap).
  */
 export function buildRosterQbj(tournamentName, teams, track = rosterTracking(teams)) {
   const mark = (m) => {
@@ -176,6 +186,7 @@ export function buildRosterQbj(tournamentName, teams, track = rosterTracking(tea
     return ug || d2 ? { YfData: { isUG: ug, isD2: d2 } } : {};
   };
   const teamMark = (t) => mark(teamMarks(t.players, t.marks, track));
+  const former = (names) => (names && names.length ? { _formerNames: [...names] } : {});
   return {
     version: '2.1.1',
     objects: [{
@@ -184,8 +195,9 @@ export function buildRosterQbj(tournamentName, teams, track = rosterTracking(tea
       ...(track.trackUG || track.trackDiv2 ? { YfData: { trackUG: !!track.trackUG, trackDiv2: !!track.trackDiv2 } } : {}),
       registrations: teams.map((t) => ({
         name: t.name,
-        teams: [{ name: t.name, ...teamMark(t),
-          players: t.players.map((p) => ({ name: p, ...mark((t.marks || {})[p]) })) }],
+        teams: [{ name: t.name, ...teamMark(t), ...former(t.formerNames),
+          players: t.players.map((p) => ({ name: p, ...mark((t.marks || {})[p]),
+            ...former((t.formerPlayers || {})[p]) })) }],
       })),
     }],
   };
@@ -249,12 +261,17 @@ export function parseRoster(json) {
     } else if (Array.isArray(players) && asName(obj)) {
       const yf = (o) => (o && typeof o === 'object' && pick(o, 'YfData', 'yf_data')) || {};
       const marks = {};
+      const formerPlayers = {};
       for (const p of players) {
         const y = yf(p);
         if (asName(p) && (y.isUG || y.isD2)) marks[asName(p)] = { ug: !!y.isUG, d2: !!y.isD2 };
+        if (asName(p) && formerOf(p).length) formerPlayers[asName(p)] = formerOf(p);
       }
-      regs.push({ name: asName(obj), players: players.map(asName).filter(Boolean),
-        ug: !!yf(obj).isUG, d2: !!yf(obj).isD2, marks });
+      const reg = { name: asName(obj), players: players.map(asName).filter(Boolean),
+        ug: !!yf(obj).isUG, d2: !!yf(obj).isD2, marks };
+      if (formerOf(obj).length) reg.formerNames = formerOf(obj);
+      if (Object.keys(formerPlayers).length) reg.formerPlayers = formerPlayers;
+      regs.push(reg);
     }
   };
 
@@ -306,4 +323,114 @@ export function parseRoster(json) {
   }
   Object.defineProperty(out, 'track', { value: track });
   return out;
+}
+
+/**
+ * The renames a roster records: {teams: Map(old -> new), players:
+ * Map(team + '\n' + old -> new)}, players keyed by their team's current
+ * name. A former name that is again someone's current name stays with
+ * them. null when the roster records none.
+ */
+export function rosterNameMap(roster) {
+  if (!roster) return null;
+  const current = new Set(roster.map((t) => t.name));
+  const teams = new Map();
+  const players = new Map();
+  for (const t of roster) {
+    for (const old of t.formerNames || []) if (!current.has(old) && !teams.has(old)) teams.set(old, t.name);
+    const now = new Set(t.players);
+    for (const [p, olds] of Object.entries(t.formerPlayers || {})) {
+      for (const old of olds) if (!now.has(old)) players.set(t.name + '\n' + old, p);
+    }
+  }
+  return teams.size || players.size ? { teams, players } : null;
+}
+
+/**
+ * A copy of a match qbj with renamed teams and players under their new
+ * names (rosterNameMap), everywhere the file names them: its teams,
+ * lineups, players and buzzes. Read before parseMatch, so the stats, the
+ * matching of a game uploaded twice, the schedule, scoresheets and the
+ * exports all see one name. Returned as is when there is nothing to rename.
+ */
+export function renameMatch(json, map) {
+  if (!map) return json;
+  const out = structuredClone(json);
+  let obj = matchPayload(out);
+  if (obj && Array.isArray(obj.objects)) {
+    obj = obj.objects.find((o) => o && (o.type === 'Match' || pick(o, 'match_teams', 'matchTeams')));
+  }
+  if (!obj || typeof obj !== 'object') return out;
+  // a name held either as a string or as an object's `name`
+  const swap = (holder, key, to) => {
+    if (typeof holder[key] === 'string') holder[key] = to;
+    else if (holder[key] && typeof holder[key] === 'object') holder[key].name = to;
+  };
+  const player = (team, holder, key) => {
+    const now = map.players.get(team + '\n' + asName(holder[key]));
+    if (now) swap(holder, key, now);
+  };
+  // the team at holder[key], renamed with its players; its name now
+  const team = (holder, key) => {
+    const name = asName(holder[key]);
+    const now = map.teams.get(name) || name;
+    if (now !== name) swap(holder, key, now);
+    const ps = holder[key] && typeof holder[key] === 'object' ? pick(holder[key], 'players') : null;
+    if (Array.isArray(ps)) ps.forEach((_, i) => player(now, ps, i));
+    return now;
+  };
+  for (const mt of pick(obj, 'match_teams', 'matchTeams') || []) {
+    if (!mt || typeof mt !== 'object') continue;
+    const now = team(mt, 'team');
+    for (const lu of pick(mt, 'lineups') || []) {
+      const ps = lu && pick(lu, 'players');
+      if (Array.isArray(ps)) ps.forEach((_, i) => player(now, ps, i));
+    }
+    for (const mp of pick(mt, 'match_players', 'matchPlayers') || []) if (mp && typeof mp === 'object') player(now, mp, 'player');
+  }
+  for (const q of pick(obj, 'match_questions', 'matchQuestions') || []) {
+    for (const b of (q && pick(q, 'buzzes')) || []) {
+      if (!b || typeof b !== 'object') continue;
+      player(team(b, 'team'), b, 'player');
+    }
+  }
+  return out;
+}
+
+/**
+ * A roster about to be saved, with the former names it inherits: those the
+ * saved roster `saved` held, plus the names just changed. teamRenames is
+ * {old: new}; playerRenames is {team (its new name): {old: new}}. A team
+ * or player that is new, or that took a name another just gave up, starts
+ * with none.
+ */
+export function carryFormerNames(saved, next, teamRenames = {}, playerRenames = {}) {
+  const byName = new Map((saved || []).map((t) => [t.name, t]));
+  const invert = (m) => Object.fromEntries(Object.entries(m || {}).map(([o, n]) => [n, o]));
+  // the name it had in `saved`, or null for one new to the roster
+  const source = (name, renames, back) => (back[name] !== undefined ? back[name]
+    : Object.prototype.hasOwnProperty.call(renames || {}, name) ? null : name);
+  const list = (earlier, old, now) => [...new Set([...earlier, ...(old !== null && old !== now ? [old] : [])])]
+    .filter((n) => n !== now);
+  const teamBack = invert(teamRenames);
+  return next.map((t) => {
+    const out = { ...t };
+    delete out.formerNames;
+    delete out.formerPlayers;
+    const oldName = source(t.name, teamRenames, teamBack);
+    const was = oldName === null ? null : byName.get(oldName);
+    const formerNames = list((was && was.formerNames) || [], was ? oldName : null, t.name);
+    if (formerNames.length) out.formerNames = formerNames;
+    const pr = playerRenames[t.name] || {};
+    const pBack = invert(pr);
+    const formerPlayers = {};
+    for (const p of t.players) {
+      const op = source(p, pr, pBack);
+      const known = was && op !== null && was.players.includes(op);
+      const f = list((known && (was.formerPlayers || {})[op]) || [], known ? op : null, p);
+      if (f.length) formerPlayers[p] = f;
+    }
+    if (Object.keys(formerPlayers).length) out.formerPlayers = formerPlayers;
+    return out;
+  });
 }

@@ -381,6 +381,10 @@ details.qd summary .pill { font-size: 11px; margin-left: 6px; }
 .step:hover { background: var(--hover-bg); }
 /* roster editor */
 .playerline { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+/* roster editor: a rename's note under the team or player, with its Undo */
+.rnote { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: 13px; margin: 0 0 4px; }
+.rnote:empty { display: none; }
+.rhelp { font-size: 13px; margin: 0 0 10px; }
 .playerline input:not([type="checkbox"]) { flex: 1; min-width: 160px; }
 /* Roster: the Track switches, and a UG / DII box per team and player */
 .rtrack { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 10px; font-size: 14px; }

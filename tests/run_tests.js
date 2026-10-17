@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks } from '../app/engine/qbj.js';
+import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
+  rosterNameMap, renameMatch, carryFormerNames } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport } from '../app/engine/report.js';
@@ -3418,6 +3419,152 @@ test('rosterRenames: renamed teams found by their players, then by seed', () => 
   assert.deepEqual(rosterRenames(old, [...old, T('D', 'd1')]), {});
   // a replacement team in a dropped team's seed takes its place
   assert.deepEqual(rosterRenames(old, [old[0], T('New', 'n1', 'n2'), old[2]]), { B: 'New' });
+});
+
+/* ---------- roster renames: games played under an earlier name ---------- */
+
+const renameArchive = (await import('../app/archive/2026terrapinopenatusc.js')).default;
+const renameGames = renameArchive['/pub/2026terrapinopenatusc/bundle'].entries;
+const renameRoster = parseRoster(renameArchive['/pub/2026terrapinopenatusc/roster']);
+// a renamed team (UCSD Unc -> UC San Diego) with one renamed player
+// (Jake Anderson -> Jacob Anderson), as the editor saves it
+function renamedRoster() {
+  const next = renameRoster.map((t) => (t.name !== 'UCSD Unc' ? t
+    : { ...t, name: 'UC San Diego', players: t.players.map((p) => (p === 'Jake Anderson' ? 'Jacob Anderson' : p)) }));
+  return parseRoster(buildRosterQbj('T', carryFormerNames(renameRoster, next,
+    { 'UCSD Unc': 'UC San Diego' }, { 'UC San Diego': { 'Jake Anderson': 'Jacob Anderson' } })));
+}
+
+test('roster renames: former names round-trip through the roster file, and MODAQ still reads it', () => {
+  const r = renamedRoster();
+  const t = r.find((x) => x.name === 'UC San Diego');
+  assert.deepEqual(t.formerNames, ['UCSD Unc']);
+  assert.deepEqual(t.formerPlayers, { 'Jacob Anderson': ['Jake Anderson'] });
+  assert.equal(r.filter((x) => x.formerNames || x.formerPlayers).length, 1, 'only the renamed team carries any');
+  const reg = parseRegistration(JSON.stringify(buildRosterQbj('T', r)));
+  assert.equal(reg.success, true, reg.message);
+  assert.ok(reg.value.some((p) => p.teamName === 'UC San Diego' && p.name === 'Jacob Anderson'));
+  // a roster with no renames is the file it always was
+  assert.ok(!JSON.stringify(buildRosterQbj('T', renameRoster)).includes('_formerNames'));
+});
+
+test('roster renames: a second rename keeps both earlier names; a team taking a freed name starts fresh', () => {
+  const once = renamedRoster();
+  const twice = parseRoster(buildRosterQbj('T', carryFormerNames(once,
+    once.map((t) => (t.name === 'UC San Diego' ? { ...t, name: 'UCSD' } : t)), { 'UC San Diego': 'UCSD' })));
+  assert.deepEqual(twice.find((x) => x.name === 'UCSD').formerNames, ['UCSD Unc', 'UC San Diego']);
+  assert.deepEqual(twice.find((x) => x.name === 'UCSD').formerPlayers, { 'Jacob Anderson': ['Jake Anderson'] });
+  // renamed back: the current name is not also a former one
+  const back = carryFormerNames(once, once.map((t) => (t.name === 'UC San Diego' ? { ...t, name: 'UCSD Unc' } : t)),
+    { 'UC San Diego': 'UCSD Unc' });
+  assert.deepEqual(back.find((x) => x.name === 'UCSD Unc').formerNames, ['UC San Diego']);
+  // a new team named UCSD Unc after the rename: no history, and the old
+  // name's games stay with it rather than moving to UC San Diego
+  const taken = carryFormerNames(renameRoster, [...renamedRoster(), { name: 'UCSD Unc', players: ['Someone'] }],
+    { 'UCSD Unc': 'UC San Diego' });
+  assert.equal(taken.find((x) => x.name === 'UCSD Unc').formerNames, undefined);
+  const takenMap = rosterNameMap(taken);
+  assert.ok(!takenMap || !takenMap.teams.has('UCSD Unc'));
+  assert.equal(rosterNameMap(renameRoster), null, 'nothing renamed: nothing to map');
+});
+
+test('roster renames: games played under the old names count under the new ones', () => {
+  const roster = renamedRoster();
+  const names = rosterNameMap(roster);
+  const before = aggregate(renameGames.map((e) => parseMatch(e.qbj, { filename: e.filename })), roster);
+  assert.ok(before.teams.some((t) => t.name === 'UCSD Unc' && !t.rostered), 'without renaming: a split row');
+  const parsed = renameGames.map((e) => parseMatch(renameMatch(e.qbj, names), { filename: e.filename }));
+  const agg = aggregate(parsed, roster);
+  assert.ok(!agg.teams.some((t) => t.name === 'UCSD Unc'));
+  assert.ok(agg.teams.every((t) => t.rostered), agg.teams.filter((t) => !t.rostered).map((t) => t.name).join());
+  const ucsd = agg.teams.find((t) => t.name === 'UC San Diego');
+  const old = aggregate(renameGames.map((e) => parseMatch(e.qbj, { filename: e.filename })), renameRoster)
+    .teams.find((t) => t.name === 'UCSD Unc');
+  assert.equal(ucsd.gp, old.gp);
+  assert.equal(ucsd.w, old.w);
+  assert.equal(ucsd.points, old.points);
+  assert.ok(agg.players.some((p) => p.name === 'Jacob Anderson' && p.team === 'UC San Diego' && p.gp > 0));
+  assert.ok(!agg.players.some((p) => p.name === 'Jake Anderson'));
+  // the file itself is renamed throughout (scoresheets and buzzpoints
+  // read it), and the original is untouched
+  const e = renameGames.find((x) => JSON.stringify(x.qbj).includes('UCSD Unc'));
+  const text = JSON.stringify(renameMatch(e.qbj, names));
+  assert.ok(!text.includes('UCSD Unc') && !text.includes('Jake Anderson'), 'no old name left in the file');
+  assert.ok(JSON.stringify(e.qbj).includes('UCSD Unc'), 'original kept');
+  assert.equal(renameMatch(e.qbj, null), e.qbj, 'no renames: the same object');
+});
+
+test('roster renames: the exports and the HTML report carry only the new names', () => {
+  const roster = renamedRoster();
+  const names = rosterNameMap(roster);
+  const matches = renameGames.map((e, i) => Object.assign(parseMatch(renameMatch(e.qbj, names), { filename: e.filename }),
+    { fileId: e.id, room: e.room, filename: e.filename }));
+  const opts = { name: 'T', matches: dedupeMatches(matches), roster };
+  for (const [what, text] of [['yft4', serializeYft(opts)], ['yft3', serializeYft3(opts)],
+    ['report', buildReport(opts).map((f) => f.text).join('')]]) {
+    assert.ok(text.includes('UC San Diego') && text.includes('Jacob Anderson'), what + ': new names');
+    assert.ok(!text.includes('UCSD Unc') && !text.includes('Jake Anderson'), what + ': no old names');
+  }
+});
+
+test('roster renames: an uploaded roster that renames a team records it, and keeps earlier names', () => {
+  const once = renamedRoster(); // UCSD Unc -> UC San Diego, saved
+  // a file with UC San Diego now called UCSD, matched by its players
+  const upload = once.map((t) => (t.name === 'UC San Diego' ? { name: 'UCSD', players: t.players } : { name: t.name, players: t.players }));
+  const renames = rosterRenames(once, upload);
+  assert.deepEqual(renames, { 'UC San Diego': 'UCSD' });
+  const saved = parseRoster(buildRosterQbj('T', carryFormerNames(once, upload, renames)));
+  const t = saved.find((x) => x.name === 'UCSD');
+  assert.deepEqual(t.formerNames, ['UCSD Unc', 'UC San Diego']);
+  assert.deepEqual(t.formerPlayers, { 'Jacob Anderson': ['Jake Anderson'] }, 'player renames carry over by name');
+  const agg = aggregate(renameGames.map((e) => parseMatch(renameMatch(e.qbj, rosterNameMap(saved)), { filename: e.filename })), saved);
+  assert.ok(agg.teams.every((x) => x.rostered) && agg.teams.some((x) => x.name === 'UCSD' && x.gp > 0));
+});
+
+test('roster renames: UG / DII marks follow the renamed player and team', () => {
+  const T = { trackUG: true, trackDiv2: false };
+  const before = [{ name: 'Old U', players: ['Ann', 'Bo'], marks: { Ann: { ug: true }, Bo: { ug: true } } }];
+  const next = [{ name: 'New U', players: ['Annie', 'Bo'], marks: { Annie: { ug: true }, Bo: { ug: true } } }];
+  const saved = parseRoster(buildRosterQbj('T', carryFormerNames(before, next, { 'Old U': 'New U' }, { 'New U': { Ann: 'Annie' } }), T));
+  assert.equal(saved[0].ug, true);
+  assert.deepEqual(saved[0].marks, { Annie: { ug: true, d2: false }, Bo: { ug: true, d2: false } });
+  const game = { match_teams: [
+    { team: { name: 'Old U', players: [{ name: 'Ann' }] }, match_players: [{ player: { name: 'Ann' }, tossups_heard: 20, answer_counts: [{ answer: { value: 10 }, number: 1 }] }], bonus_points: 0 },
+    { team: { name: 'Other', players: [{ name: 'Zed' }] }, match_players: [{ player: { name: 'Zed' }, tossups_heard: 20, answer_counts: [] }], bonus_points: 0 }],
+  tossups_read: 20, _round: 1 };
+  const agg = aggregate([parseMatch(renameMatch(game, rosterNameMap(saved)))], [...saved, { name: 'Other', players: ['Zed'] }]);
+  const annie = agg.players.find((p) => p.name === 'Annie');
+  assert.ok(annie && annie.ug && annie.team === 'New U');
+});
+
+test('roster renames: names held as plain strings, camelCase keys, and a whole-file wrapper', () => {
+  const map = rosterNameMap([{ name: 'New', players: ['Pat'], formerNames: ['Old'], formerPlayers: { Pat: ['Patrick'] } }]);
+  const qbj = { objects: [{ type: 'Match', matchTeams: [{ team: 'Old', matchPlayers: [{ player: 'Patrick' }], lineups: [{ players: ['Patrick'] }] },
+    { team: 'Other', matchPlayers: [] }], matchQuestions: [{ buzzes: [{ team: 'Old', player: 'Patrick' }] }] }] };
+  const out = renameMatch(qbj, map);
+  const m = out.objects[0];
+  assert.equal(m.matchTeams[0].team, 'New');
+  assert.equal(m.matchTeams[0].matchPlayers[0].player, 'Pat');
+  assert.equal(m.matchTeams[0].lineups[0].players[0], 'Pat');
+  assert.deepEqual(m.matchQuestions[0].buzzes[0], { team: 'New', player: 'Pat' });
+  assert.equal(m.matchTeams[1].team, 'Other');
+  assert.equal(qbj.objects[0].matchTeams[0].team, 'Old', 'original untouched');
+  // a player only matches on their own team
+  const other = renameMatch({ match_teams: [{ team: { name: 'Other' }, match_players: [{ player: { name: 'Patrick' } }] }] }, map);
+  assert.equal(other.match_teams[0].match_players[0].player.name, 'Patrick');
+});
+
+test('roster renames: a correction uploaded under the new name replaces the original game', () => {
+  const names = rosterNameMap(renamedRoster());
+  const e = renameGames.find((x) => JSON.stringify(x.qbj).includes('UCSD Unc'));
+  const original = parseMatch(renameMatch(e.qbj, names), { filename: e.filename });
+  original.fileId = 1;
+  // the correction, as a reader would upload it after the rename
+  const fixed = parseMatch(JSON.parse(JSON.stringify(e.qbj).replaceAll('UCSD Unc', 'UC San Diego')
+    .replaceAll('Jake Anderson', 'Jacob Anderson')), { filename: e.filename });
+  fixed.fileId = 2;
+  assert.equal(dedupeMatches([original, fixed]).length, 1);
+  assert.equal(dedupeMatches([original, fixed])[0].fileId, 2);
 });
 
 test('tradePools: two teams trade every prelim game and their pools, nothing else', () => {

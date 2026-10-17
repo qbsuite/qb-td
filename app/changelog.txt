@@ -1,6 +1,14 @@
 Release Notes for 10/17/2026
 
+[ SETUP ]
+- Typing over a team's or player's saved name in the roster editor renames them, and says so with an Undo.
+- A renamed team's or player's games already played count under the new name.
+- "Add as a new player instead" keeps the player who was there and adds the typed name as someone new.
+- The roster keeps earlier names, shown as "Formerly". A name another team gave up can't be reused.
+- Renames from an uploaded roster file are kept the same way.
+
 [ STATS ]
+- Stats, exports, the stat report and the public page show renamed teams and players under their new names.
 - New layout: the pools' grids line up with one another, whatever the length of the team names.
 - New layout: UG and DII tags line up at the right of the name column.
 

@@ -13,7 +13,7 @@
 // so behind a moderator's upload).
 
 import { pub, esc, usingStaticData, usingArchive, LIVE } from './api.js';
-import { parseMatch, parseRoster } from '../engine/qbj.js';
+import { parseMatch, parseRoster, rosterNameMap, renameMatch } from '../engine/qbj.js';
 import { dedupeMatches } from '../engine/stats.js';
 import { buildReport, reportData } from '../engine/report.js';
 import { mountReport, reportPlace } from './reportframe.js';
@@ -97,7 +97,9 @@ async function fetchStamped(present, snapHas, name, route) {
     try { return await fetchSnap(name); } catch (e) { /* fall back */ }
   }
   if (!present) return null;
-  try { return await asJson(await pub('/pub/' + slug + route)); } catch (e) { return null; }
+  // only fetched when its stamp moved, so a copy the browser holds (served
+  // max-age=60) may be the old one: a renamed team would show its old name
+  try { return await asJson(await pub('/pub/' + slug + route, { cache: 'no-cache' })); } catch (e) { return null; }
 }
 
 async function fetchRoster() {
@@ -192,8 +194,10 @@ async function fetchWholeBundle(errors) {
   return entries;
 }
 
-async function fetchMatches(errors) {
+// rosterP: the roster's fetch, whose former names rename the games
+async function fetchMatches(errors, rosterP) {
   const entries = state.rounds ? await fetchRounds(errors) : await fetchWholeBundle(errors);
+  const names = rosterNameMap(await rosterP);
   loadedIds = new Set(entries.map((e) => e.id));
   // A shard keeps the room a game had when it was built; the state's file
   // list is read live, so a TD's room reassignment (or rename) shows here
@@ -204,11 +208,12 @@ async function fetchMatches(errors) {
   for (const entry of entries) {
     if (liveRoom.get(entry.id)) entry.room = liveRoom.get(entry.id);
     try {
-      const m = parseMatch(entry.qbj, { filename: entry.filename });
+      const qbj = renameMatch(entry.qbj, names);
+      const m = parseMatch(qbj, { filename: entry.filename });
       m.room = entry.room;
       m.fileId = entry.id;
       out.push(m);
-      raw.push({ id: entry.id, round: m.round, room: entry.room, qbj: entry.qbj });
+      raw.push({ id: entry.id, round: m.round, room: entry.room, qbj });
     } catch (e) { errors.push(entry.filename + ': ' + e.message); }
   }
   rawEntries = dedupeEntries(raw);
@@ -1536,7 +1541,9 @@ async function load() {
     // snapshot or the Worker per round, so unlike the single-blob stamps
     // below there is nothing to gain from trailing the snapshot here.
     // (Frozen data has no `rounds` and keeps the old whole-bundle stamp.)
-    const statsStamp = state.rounds ? JSON.stringify(state.rounds) : state.version;
+    // …and the roster's, so a rename reaches the games already shown
+    const statsStamp = (state.rounds ? JSON.stringify(state.rounds) : state.version)
+      + '|' + ((snap && snap.roster_at) || '');
     const schedStamp = snap ? snap.schedule : state.schedule;
     const catsStamp = snap ? snap.cats : state.cats;
     // Stamps alone decide what to refetch, for the first load and for the
@@ -1558,7 +1565,8 @@ async function load() {
     if (statsMoved) {
       const errors = [];
       jobs.push((async () => {
-        const [r, m] = await Promise.all([fetchRoster(), fetchMatches(errors)]);
+        const rosterP = fetchRoster();
+        const [r, m] = await Promise.all([rosterP, fetchMatches(errors, rosterP)]);
         roster = r;
         matches = m;
         statsErrors = errors;

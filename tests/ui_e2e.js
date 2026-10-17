@@ -1600,6 +1600,84 @@ async function openHubOf(adminSecret) {
   await new Promise((r) => server.close(r));
 }
 
+/* ---------- 24c. renaming a team and a player after games are in ----------
+   Typing over a saved name renames it: the editor says so, the roster
+   keeps the old name, and the games already played count under the new
+   one in the hub's stats, the exports and the public page. */
+{
+  const oldTeam = played[0].qbj.match_teams[0].team.name;
+  const oldPlayer = player(oldTeam, 0);
+  const newTeam = oldTeam + ' Cardinal';
+  const newPlayer = 'Renamed Player One';
+  const before = expectAgg.teams.find((x) => x.name === oldTeam);
+  await goto(`${PAGES}/index.html?a=${secret}`);
+  await waitJs(`!!document.querySelector('[data-view="setup"]')`, 'the hub');
+  await click('[data-view="setup"]');
+  await waitJs(`!!document.querySelector('[data-step="roster"]')`, 'the step list');
+  await click('[data-step="roster"]');
+  await waitJs(`!!document.querySelector('#editroster')`, 'the roster step');
+  await click('#editroster');
+  await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor');
+  ok('24c rename: the editor says how renaming works', /To correct a name, type over it/.test(await text('#rosteredit')));
+  const ti = await js(`[...document.querySelectorAll('[data-tname]')].findIndex((e) => e.value === ${q(oldTeam)})`);
+  const pi = await js(`[...document.querySelectorAll('[data-pname^="${ti}."]')].findIndex((e) => e.value === ${q(oldPlayer)})`);
+  await fill(`[data-tname="${ti}"]`, newTeam);
+  await fill(`[data-pname="${ti}.${pi}"]`, newPlayer);
+  ok('24c rename: the team and the player each say what they were renamed from',
+    (await text(`[data-tnote="${ti}"]`)).includes('Renamed from ' + oldTeam)
+      && (await text(`[data-pnote="${ti}.${pi}"]`)).includes('Renamed from ' + oldPlayer)
+      && await exists(`[data-pnew="${ti}.${pi}"]`) && await exists(`[data-tundo="${ti}"]`));
+  // Undo puts the old name back; type it again
+  await click(`[data-tundo="${ti}"]`);
+  ok('24c rename: Undo puts the old team name back', await js(`document.querySelector('[data-tname="${ti}"]').value`) === oldTeam);
+  await fill(`[data-tname="${ti}"]`, newTeam);
+  // another team can't take the old name while its games are this one's
+  const other = ti === 0 ? 1 : 0;
+  const otherName = await js(`document.querySelector('[data-tname="${other}"]').value`);
+  await fill(`[data-tname="${other}"]`, oldTeam);
+  ok('24c rename: a freed name is refused for another team', (await text('#rosterproblems')).includes(`${oldTeam} was the name of ${newTeam}`), await text('#rosterproblems'));
+  await fill(`[data-tname="${other}"]`, otherName);
+  await click('#rostersave');
+  const saved = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).some((x) => x.name === newTeam) && r; }, 'the renamed roster', 10000);
+  const t = parseRoster(saved).find((x) => x.name === newTeam);
+  ok('24c rename: the roster keeps the old names', JSON.stringify(t.formerNames) === JSON.stringify([oldTeam])
+    && JSON.stringify(t.formerPlayers) === JSON.stringify({ [newPlayer]: [oldPlayer] }), t);
+  ok('24c rename: MODAQ still reads the roster', modaqValid(saved));
+  await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+  await click('#editroster');
+  await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor again');
+  ok('24c rename: reopened, the editor shows the former names',
+    (await text(`[data-tnote="${ti}"]`)).includes('Formerly ' + oldTeam) && (await text(`[data-pnote="${ti}.${pi}"]`)).includes('Formerly ' + oldPlayer));
+
+  // the hub's stats: one row under the new name, with every game it played
+  await openHub();
+  await click('#calc');
+  await waitJs(`!document.querySelector('#statsec').hidden && document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats again', 30000);
+  const cells = await js(`[...document.querySelectorAll('#statsout td')].map((c) => c.textContent.replace(/\s*\?$/, '').trim())`);
+  ok('24c rename: the hub stats show the new names only', cells.includes(newTeam) && cells.includes(newPlayer)
+    && !cells.includes(oldTeam) && !cells.includes(oldPlayer), cells.filter((c) => c.includes(oldTeam)));
+  ok('24c rename: and no name is flagged as not in the roster', !(await exists('#statsout .bad')));
+  const y = JSON.parse((await menu('dlyft4')).bytes.toString('utf8')).objects[0];
+  const yNames = y.registrations.flatMap((r) => r.teams.map((x) => x.name));
+  const yText = JSON.stringify(y);
+  ok('24c rename: the YellowFruit export has the new names and games, not the old',
+    yNames.includes(newTeam) && !yNames.includes(oldTeam) && yText.includes(newPlayer) && !yText.includes(`"${oldPlayer}"`), yNames);
+  const report = (await readZip(new Uint8Array((await menu('dlreport')).bytes)))
+    .map((e) => new TextDecoder().decode(e.data)).join('');
+  ok('24c rename: the HTML report too', report.includes(newTeam) && !report.includes(`>${oldTeam}<`) && !report.includes(oldPlayer));
+
+  // the public page, after the Worker publishes the roster
+  await tick();
+  await goto(`${PAGES}/t.html?t=${slug}`);
+  await js(`localStorage.qbtdStatsLayout = 'new'; true`);
+  await goto(`${PAGES}/t.html?t=${slug}&stats=new#stats`); // a new URL, so a real load
+  await waitJs(`document.querySelectorAll('.nstats td').length > 0`, 'the public stats', 20000);
+  const pub = await js(`document.querySelector('#statbody, main, body').innerText`);
+  const row = await js(`(() => { const a = [...document.querySelectorAll('.nstats a')].find((x) => x.textContent === ${q(newTeam)}); return a ? a.closest('tr').innerText : ''; })()`);
+  ok('24c rename: the public stats show the new names only', pub.includes(newTeam) && !pub.split(/\n|\t/).map((x) => x.trim()).includes(oldTeam), row);
+  ok('24c rename: with the team\'s whole record', row.split('\t').map((x) => x.trim()).includes(String(before.w)), { row, w: before.w, l: before.l });
+}
+
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);

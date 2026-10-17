@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseMatch, parseRoster } from '../app/engine/qbj.js';
+import { parseMatch, parseRoster, rosterNameMap, renameMatch } from '../app/engine/qbj.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { buildReport } from '../app/engine/report.js';
 
@@ -160,13 +160,15 @@ async function capture(api, slug) {
   return { state, bundle, roster, data };
 }
 
-/** Parse the bundle the way pubview.js does, so page and report agree. */
-function parseBundle(bundle) {
+/** Parse the bundle the way pubview.js does, so page and report agree:
+    renamed teams and players under the roster's current names. */
+function parseBundle(bundle, roster) {
   const matches = [];
   const errors = [];
+  const names = rosterNameMap(roster);
   for (const entry of bundle.entries) {
     try {
-      const m = parseMatch(entry.qbj, { filename: entry.filename });
+      const m = parseMatch(renameMatch(entry.qbj, names), { filename: entry.filename });
       m.room = entry.room;
       m.fileId = entry.id;
       matches.push(m);
@@ -235,11 +237,11 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
 
   console.log(`reading ${slug} from ${opts.api} ...`);
   const { state, roster, bundle, data } = await capture(opts.api, slug);
-  const { matches, errors } = parseBundle(bundle);
+  const parsedRoster = roster ? parseRoster(roster) : null;
+  const { matches, errors } = parseBundle(bundle, parsedRoster);
   for (const e of errors) console.warn('  skipped unparseable file: ' + e);
   if (!matches.length) throw new Error('no parseable games; nothing to archive');
 
-  const parsedRoster = roster ? parseRoster(roster) : null;
   const games = dedupeMatches(matches);
   const teams = new Set(games.flatMap((m) => m.teams.map((t) => t.name)));
 

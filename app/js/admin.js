@@ -16,7 +16,8 @@
 // until setup is complete.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
-import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks } from '../engine/qbj.js';
+import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks,
+  rosterNameMap, renameMatch, carryFormerNames } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
@@ -275,10 +276,14 @@ const staged = [];      // packets staged from a zip or loose files (packetsui.j
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
 
 let rosterOpen = false;
-// structured editor working copy [{name, players, was, flags}]; was: the
-// saved name; flags: {ug, d2} per player, in step with players. A team's
-// own marks are never entered: they follow from its players' (teamMarks).
+// structured editor working copy [{name, players, was, flags, orig}]; was:
+// the saved name; flags: {ug, d2} per player and orig: each player's saved
+// name ('' for one added here), both in step with players. A team's own
+// marks are never entered: they follow from its players' (teamMarks).
 let rosterTeams = null;
+// the saved roster the editor opened (parseRoster), whose former names a
+// save carries forward; null when it started blank
+let rosterSaved = null;
 // which marks the roster tracks (YellowFruit's Track Undergrad / Track
 // Division 2). A mark is shown, saved and exported only while its switch
 // is on; with both off the roster is the file it always was.
@@ -1016,16 +1021,58 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
 function rosterProblems() {
   const problems = [];
   const seen = new Set();
+  // a name another team had: its games would move to whoever takes it
+  const earlier = new Map();
+  (rosterTeams || []).forEach((tm) => {
+    for (const n of [...formerTeamNames(tm), ...(tm.was && tm.was !== tm.name.trim() ? [tm.was] : [])]) earlier.set(n, tm);
+  });
   (rosterTeams || []).forEach((tm, i) => {
     const name = tm.name.trim();
     if (!name) problems.push('Team ' + (i + 1) + ' has no name');
     else if (seen.has(name)) problems.push('Duplicate team: ' + name);
     seen.add(name);
+    const other = earlier.get(name);
+    if (name && other && other !== tm) {
+      problems.push(`${name} was the name of ${other.name.trim() || 'another team'}. Please choose another name, so its games stay with it`);
+    }
     if (!tm.players.some((p) => p.trim())) {
       problems.push((name || 'Team ' + (i + 1)) + ' has no players');
     }
+    const pseen = new Set();
+    const pEarlier = new Map();
+    tm.players.forEach((p, pi) => {
+      const o = tm.orig[pi];
+      for (const n of [...formerPlayerNames(tm, pi), ...(o && o !== p.trim() ? [o] : [])]) pEarlier.set(n, pi);
+    });
+    tm.players.forEach((p, pi) => {
+      const pn = p.trim();
+      if (!pn) return;
+      if (pseen.has(pn)) problems.push(`Duplicate player on ${name || 'Team ' + (i + 1)}: ${pn}`);
+      pseen.add(pn);
+      const at = pEarlier.get(pn);
+      if (at !== undefined && at !== pi) {
+        problems.push(`${pn} was the name of ${tm.players[at].trim() || 'another player'} on ${name || 'Team ' + (i + 1)}. Please choose another name, so their games stay with them`);
+      }
+    });
   });
   return problems;
+}
+// the names a team or a player had before the saved roster's
+const formerTeamNames = (tm) => tm.formerNames || [];
+const formerPlayerNames = (tm, pi) => (tm.orig[pi] && (tm.formerPlayers || {})[tm.orig[pi]]) || [];
+// What the editor renamed, against the saved roster: {old: new} for
+// teams, and {team: {old: new}} for players (by the team's new name).
+function editorRenames(clean) {
+  const teams = {};
+  const players = {};
+  rosterTeams.forEach((tm, i) => {
+    if (tm.was && tm.was !== clean[i].name) teams[tm.was] = clean[i].name;
+    tm.players.forEach((p, pi) => {
+      const o = tm.orig[pi];
+      if (o && p.trim() && p.trim() !== o) (players[clean[i].name] ||= {})[o] = p.trim();
+    });
+  });
+  return { teams, players };
 }
 function cleanRosterTeams() {
   return rosterTeams.map((tm) => {
@@ -1044,7 +1091,7 @@ function cleanRosterTeams() {
     return out;
   });
 }
-const blankRosterTeam = () => ({ name: '', players: ['', '', '', ''], flags: [{}, {}, {}, {}] });
+const blankRosterTeam = () => ({ name: '', players: ['', '', '', ''], flags: [{}, {}, {}, {}], orig: ['', '', '', ''] });
 // what a team in the editor would be marked as saved, as tags
 function teamTagsHtml(tm) {
   const names = [];
@@ -1054,12 +1101,36 @@ function teamTagsHtml(tm) {
   return (m.ug ? '<span class="ntag" title="Every player is UG or DII, and not all are DII">UG</span>' : '')
     + (m.d2 ? '<span class="ntag d2" title="Every player is DII">DII</span>' : '');
 }
+// Under a team or player: a rename since the roster was saved (with Undo,
+// and for a player the choice of a new player instead), or the names it
+// had before, whose games count under its name.
+function teamNote(tm, ti) {
+  const now = tm.name.trim();
+  if (tm.was && now && now !== tm.was) {
+    return `<span>Renamed from <b>${esc(tm.was)}</b>. Its games already played will count under the new name.</span>
+      <button class="linkbtn" data-tundo="${ti}">Undo</button>`;
+  }
+  const f = formerTeamNames(tm).filter((n) => n !== now);
+  return f.length ? `<span class="muted">Formerly ${f.map(esc).join(', ')}</span>` : '';
+}
+function playerNote(tm, ti, pi) {
+  const now = tm.players[pi].trim();
+  const o = tm.orig[pi];
+  if (o && now && now !== o) {
+    return `<span>Renamed from <b>${esc(o)}</b>. Their games already played will count under the new name.</span>
+      <button class="linkbtn" data-pundo="${ti}.${pi}">Undo</button>
+      <button class="linkbtn" data-pnew="${ti}.${pi}">Add ${esc(now)} as a new player instead</button>`;
+  }
+  const f = formerPlayerNames(tm, pi).filter((n) => n !== now);
+  return f.length ? `<span class="muted">Formerly ${f.map(esc).join(', ')}</span>` : '';
+}
 // parseRoster's teams as the editor holds them, and the switches they set
 function editRoster(parsed) {
   rosterTrack = rosterTracking(parsed);
   return parsed.map((tm) => ({
     name: tm.name, players: [...tm.players], was: tm.name,
     flags: tm.players.map((p) => ({ ...((tm.marks || {})[p] || {}) })),
+    orig: [...tm.players], formerNames: tm.formerNames, formerPlayers: tm.formerPlayers,
   }));
 }
 // how many teams and players an uploaded roster marks, for its preview
@@ -1151,11 +1222,13 @@ function renderRosterSec(a, t) {
     if (rosterOpen && rosterTeams === null) {
       if (t.roster_r2_key) {
         try {
-          rosterTeams = editRoster(parseRoster(await fetchOwnedJson(a, t.roster_r2_key)));
+          rosterSaved = parseRoster(await fetchOwnedJson(a, t.roster_r2_key));
+          rosterTeams = editRoster(rosterSaved);
         } catch (e) { /* unparseable upload: start blank */ }
       }
       if (rosterTeams === null) {
         rosterTrack = { trackUG: false, trackDiv2: false };
+        rosterSaved = null;
         rosterTeams = [blankRosterTeam()];
       }
     }
@@ -1209,11 +1282,18 @@ function renderUpPreview(a) {
     try {
       const t = lastDetail.tournament;
       const renames = u.renames || await upRenames(a);
+      // the saved roster's former names carry over, and a renamed team
+      // adds its old name, so games already played follow it
+      let saved = null;
+      if (t.roster_r2_key) {
+        try { saved = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)); } catch (e) { /* none to carry */ }
+      }
+      const teams = carryFormerNames(saved, u.teams, renames);
       // Save the roster rebuilt from its parsed teams, not the file as
       // uploaded: MODAQ reads only a versioned tournament with a name, and
       // a file qb-td can parse may be neither. Names are all either keeps.
       await pub(`${a}/roster?name=${encodeURIComponent(u.filename)}`,
-        { method: 'POST', body: JSON.stringify(buildRosterQbj(lastDetail.tournament.name, u.teams, rosterTracking(u.teams))) });
+        { method: 'POST', body: JSON.stringify(buildRosterQbj(lastDetail.tournament.name, teams, rosterTracking(teams))) });
       rosterUpload = null;
       rosterTeams = null;   // editor reloads from the new roster
       schedFetched = false; // schedule editor re-reads the team list
@@ -1251,6 +1331,8 @@ function renderRosterEditor(a, t) {
       <label><input type="checkbox" id="trackd2" ${rosterTrack.trackDiv2 ? 'checked' : ''}>Track Division II</label>
       <span class="muted">${teamRule}</span>
     </div>
+    ${rosterSaved ? `<p class="muted rhelp">To correct a name, type over it. That renames the team or player, and
+      their games already played move to the new name. To add someone else, please use + Player.</p>` : ''}
     ${rosterTeams.map((tm, ti) => `
     <div class="card">
       <div class="row">
@@ -1267,12 +1349,14 @@ function renderRosterEditor(a, t) {
         <span class="spacer" style="flex:1"></span>
         <button class="small" data-delteam="${ti}" tabindex="-1">Remove team</button>
       </div>
+      <div class="rnote" data-tnote="${ti}">${teamNote(tm, ti)}</div>
       ${tm.players.map((p, pi) => `
       <div class="playerline">
         <input data-pname="${ti}.${pi}" value="${esc(p)}" placeholder="Player name">
         ${markBoxes(`${ti}.${pi}`, tm.flags[pi] || {})}
         <button class="xbtn" data-delplayer="${ti}.${pi}" title="Remove player" tabindex="-1">&times;</button>
-      </div>`).join('')}
+      </div>
+      <div class="rnote" data-pnote="${ti}.${pi}">${playerNote(tm, ti, pi)}</div>`).join('')}
       <div class="row" style="margin-top:4px">
         <button class="small" data-addplayer="${ti}" tabindex="-1">+ Player</button>
       </div>
@@ -1297,6 +1381,12 @@ function renderRosterEditor(a, t) {
       if (el) el.textContent = tm.players.filter((p) => p.trim()).length + ' players';
       const tags = box.querySelector(`[data-ttags="${ti}"]`);
       if (tags) tags.innerHTML = teamTagsHtml(tm);
+      const tn = box.querySelector(`[data-tnote="${ti}"]`);
+      if (tn) tn.innerHTML = teamNote(tm, ti);
+      tm.players.forEach((_, pi) => {
+        const pn = box.querySelector(`[data-pnote="${ti}.${pi}"]`);
+        if (pn) pn.innerHTML = playerNote(tm, ti, pi);
+      });
     });
     const total = rosterTeams.reduce((n, tm) => n + tm.players.filter((p) => p.trim()).length, 0);
     $('rostercount').textContent = rosterTeams.length + ' teams · ' + total + ' players';
@@ -1327,7 +1417,7 @@ function renderRosterEditor(a, t) {
       if (ev.key === 'Enter' || (ev.key === 'Tab' && !ev.shiftKey && last && inp.value.trim())) {
         ev.preventDefault();
         rosterTeams[ti].players[pi] = inp.value;
-        if (last) { rosterTeams[ti].players.push(''); rosterTeams[ti].flags.push({}); }
+        if (last) { rosterTeams[ti].players.push(''); rosterTeams[ti].flags.push({}); rosterTeams[ti].orig.push(''); }
         rerender();
         const nxt = box.querySelector(`[data-pname="${ti}.${pi + 1}"]`);
         if (nxt) nxt.focus();
@@ -1342,6 +1432,7 @@ function renderRosterEditor(a, t) {
       const [ti, pi] = b.dataset.delplayer.split('.').map(Number);
       rosterTeams[ti].players.splice(pi, 1);
       rosterTeams[ti].flags.splice(pi, 1);
+      rosterTeams[ti].orig.splice(pi, 1);
       rerender();
     };
   });
@@ -1350,6 +1441,7 @@ function renderRosterEditor(a, t) {
       const ti = Number(b.dataset.addplayer);
       rosterTeams[ti].players.push('');
       rosterTeams[ti].flags.push({});
+      rosterTeams[ti].orig.push('');
       rerender();
       const inp = box.querySelector(`[data-pname="${ti}.${rosterTeams[ti].players.length - 1}"]`);
       if (inp) inp.focus();
@@ -1379,6 +1471,26 @@ function renderRosterEditor(a, t) {
     rosterTeams.push(blankRosterTeam());
     rerender();
   };
+  box.onclick = (ev) => {
+    const b = ev.target.closest('[data-tundo], [data-pundo], [data-pnew]');
+    if (!b) return;
+    if (b.dataset.tundo !== undefined) {
+      const tm = rosterTeams[Number(b.dataset.tundo)];
+      tm.name = tm.was;
+    } else {
+      const [ti, pi] = (b.dataset.pundo || b.dataset.pnew).split('.').map(Number);
+      const tm = rosterTeams[ti];
+      // a new player: the typed name gets its own line, and the saved
+      // player keeps theirs
+      if (b.dataset.pnew !== undefined) {
+        tm.players.splice(pi + 1, 0, tm.players[pi].trim());
+        tm.flags.splice(pi + 1, 0, {});
+        tm.orig.splice(pi + 1, 0, '');
+      }
+      tm.players[pi] = tm.orig[pi];
+    }
+    rerender();
+  };
   const validated = () => {
     const problemsNow = rosterProblems();
     if (problemsNow.length || !rosterTeams.length) {
@@ -1398,13 +1510,13 @@ function renderRosterEditor(a, t) {
     const clean = validated();
     if (!clean) return;
     const run = busy($('rostersave'), { label: 'Saving' });
-    const renames = {};
-    rosterTeams.forEach((tm, i) => {
-      if (tm.was && tm.was !== clean[i].name) renames[tm.was] = clean[i].name;
-    });
+    const { teams: renames, players: playerRenames } = editorRenames(clean);
+    // the earlier names go with the roster, so games played under them
+    // count under the new ones
+    const saving = carryFormerNames(rosterSaved, clean, renames, playerRenames);
     try {
       await pub(`${a}/roster?name=roster.qbj`,
-        { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, clean, rosterTrack), null, 2) });
+        { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, saving, rosterTrack), null, 2) });
       rosterTeams = null; // the editor reloads from what was saved
       rosterOpen = false;
       schedFetched = false; // schedule editor re-reads the team list
@@ -2342,6 +2454,7 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
     try { roster = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)); }
     catch (e) { errors.push('Roster: ' + e.message); }
   }
+  const names = rosterNameMap(roster);
   const matches = [];
   const raw = [];   // qbj halves: the zip download + the served stats bundle
   const games = []; // game halves of combined uploads, for the zip only
@@ -2363,7 +2476,8 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
       // as the separate MODAQ game file).
       if (got[i].error) throw got[i].error;
       const full = got[i].value;
-      const payload = matchPayload(full);
+      // under the roster's current names, should a team or player be renamed
+      const payload = renameMatch(matchPayload(full), names);
       const m = parseMatch(payload, { filename: f.filename });
       const room = buckets.find((b) => b.id === f.bucket_id);
       m.room = room ? room.room_name : '';
