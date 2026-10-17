@@ -79,10 +79,11 @@ const throwOutPlugin = {
   },
 };
 
-// MODAQ's event log: a throw-out that belongs to a replacement offers no
-// undo (undoing it would move later questions onto the wrong tossups and
-// bonuses), and a bonus held for a replacement nobody answered says so
-// (tb_add_dialog keepsThrownOutHere / thrownOutText).
+// MODAQ's event log: the latest replacement's throw-out undoes the
+// replacement (tb_add_dialog undoHandler); an earlier one's, or a held
+// bonus's, offers no undo (MODAQ's own would move later questions onto the
+// wrong tossups and bonuses); a bonus held for a replacement nobody
+// answered says so (keepsThrownOutHere / thrownOutText).
 const EVENT_TEXT = /const text = `Threw out \$\{questionType\} #\$\{props\.thrownOutEvent\.questionIndex \+ 1\}`;/;
 const EVENT_UNDO = /if \(props\.isLastThrownOutQuestion\) \{/;
 const throwOutEventPlugin = {
@@ -97,7 +98,9 @@ const throwOutEventPlugin = {
       return {
         contents: text
           .replace(EVENT_TEXT, (m) => `const text = ${ours}.thrownOutText(props.isTossup, props.thrownOutEvent.questionIndex, ${m.slice('const text = '.length, -1)});`)
-          .replace(EVENT_UNDO, `if (props.isLastThrownOutQuestion && !${ours}.keepsThrownOutHere(props.isTossup, props.thrownOutEvent.questionIndex)) {`),
+          .replace(EVENT_UNDO, `const qbtdUndo = ${ours}.undoHandler(props.cycle, props.isTossup, props.thrownOutEvent.questionIndex);
+    if (qbtdUndo) deleteHandler = qbtdUndo;
+    else if (props.isLastThrownOutQuestion && !${ours}.keepsThrownOutHere(props.isTossup, props.thrownOutEvent.questionIndex)) {`),
         loader: 'js',
       };
     });

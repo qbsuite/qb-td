@@ -139,7 +139,8 @@ export function tbSelection(pool, ids) {
 export function tbState(tb) {
   if (!tb) return null;
   if (tb.tuAt || tb.boAt) {
-    return { t: tb.t, b: tb.b, tuAt: { ...tb.tuAt }, boAt: { ...tb.boAt }, ...(tb.reserve ? { reserve: { ...tb.reserve } } : {}) };
+    return { t: tb.t, b: tb.b, tuAt: { ...tb.tuAt }, boAt: { ...tb.boAt }, ...(tb.reserve ? { reserve: { ...tb.reserve } } : {}),
+      ...(tb.undo ? { undo: [...tb.undo] } : {}) };
   }
   const at = (base, ids) => Object.fromEntries((ids || []).map((id, i) => [base + i, id]));
   return { t: tb.t, b: tb.b, tuAt: at(tb.t, tb.tu), boAt: at(tb.b, tb.bo) };
@@ -339,8 +340,8 @@ function bonusSlot(cycles, ci) {
 
 // Later cycles' stored question numbers, moved down past a question put
 // in at game index `from` (tossups or bonuses).
-function shiftLater(cycles, ci, kind, from) {
-  const up = (i) => (i >= from ? i + 1 : i);
+function shiftLater(cycles, ci, kind, from, by = 1) {
+  const up = (i) => (i >= from ? i + by : i);
   for (let j = ci + 1; j < cycles.length; j++) {
     const c = cycles[j];
     if (kind === 'tu') {
@@ -355,6 +356,14 @@ function shiftLater(cycles, ci, kind, from) {
     }
   }
 }
+
+// The question record and packet size a replacement left, so Undo can
+// tell nothing else (Add questions) has changed them since
+const sigOf = (st, nT, nB) => JSON.stringify([st.tuAt, st.boAt, st.reserve || {}, nT, nB]);
+
+// What Replace changes on its own question, saved so Undo can put it back
+const UNDO_FIELDS = ['correctBuzz', 'wrongBuzzes', 'bonusAnswer', 'thrownOutTossups', 'thrownOutBonuses', 'tossupProtests', 'bonusProtests'];
+const snapCycle = (c) => Object.fromEntries(UNDO_FIELDS.map((f) => [f, c[f] === undefined ? undefined : JSON.parse(JSON.stringify(c[f]))]));
 
 const throwBonus = (c, k) => {
   if (!(c.thrownOutBonuses || []).some((x) => x.questionIndex === k)) {
@@ -378,6 +387,9 @@ export function replaceQuestion({ game, cycleIndex: ci, kind, question, id = '',
   const packet = game.packet;
   let st = tbState(tb) || { t: packet.tossups.length, b: packet.bonuses.length, tuAt: {}, boAt: {} };
   const reserve = { ...(st.reserve || {}) };
+  // for Undo: the question as it was, the record before, the cycle count
+  const { undo: undone = [], ...tbBefore } = tbState(tb) || {};
+  const undo = { ci, kind, before: snapCycle(c), tb: tb ? tbBefore : null, cycles: cycles.length };
   act(() => {
     let tuAt = null;
     let boAt = null;
@@ -390,6 +402,7 @@ export function replaceQuestion({ game, cycleIndex: ci, kind, question, id = '',
     };
     if (kind === 'tossup') {
       const t = game.getTossupIndex(ci);
+      undo.thrown = t;
       const own = c.correctBuzz && c.bonusAnswer ? c.bonusAnswer.bonusIndex : null;
       c.addThrownOutTossup(t); // MODAQ drops its correct buzz, bonus answer and bonus protests
       const next = afterThrowOut(c, t);
@@ -403,6 +416,7 @@ export function replaceQuestion({ game, cycleIndex: ci, kind, question, id = '',
       if (check.needBonus) { boAt = bonusSlot(cycles, ci); held = true; }
     } else {
       const k = c.bonusAnswer.bonusIndex;
+      undo.thrown = k;
       const team = c.bonusAnswer.receivingTeamName;
       const parts = (c.bonusAnswer.parts || []).map(() => ({ teamName: '', points: 0 }));
       voidBonus(k);
@@ -417,6 +431,10 @@ export function replaceQuestion({ game, cycleIndex: ci, kind, question, id = '',
     st = tbRecordAdd({ ...st, reserve }, base, { t: tuAt ?? base.t, b: boAt ?? base.b },
       { tu: tuNew.map(() => id), bo: boNew.map(() => (kind === 'bonus' ? id : bonusId)) });
     if (held) st.reserve = { ...(st.reserve || {}), [ci]: boAt };
+    undo.tuAt = tuAt;
+    undo.boAt = boAt;
+    undo.sig = sigOf(st, packet.tossups.length + tuNew.length, packet.bonuses.length + boNew.length);
+    st.undo = [...undone, undo];
     const ins = (list, i, more) => (i === null ? list : [...list.slice(0, i), ...more, ...list.slice(i)]);
     game.loadPacket(makePacket(ins(packet.tossups, tuAt, tuNew), ins(packet.bonuses, boAt, boNew), packet.name));
     c.updateIfNeeded();
@@ -467,6 +485,45 @@ export function syncReserved({ game, tb, act }) {
     }
   });
   return true;
+}
+
+/** The replacement Undo would take back (the latest), or null:
+    {ci, kind, thrown} — its question and the tossup or bonus it threw out. */
+export function undoTop(tb) {
+  const list = (tbState(tb) || {}).undo || [];
+  const u = list[list.length - 1];
+  return u ? { ci: u.ci, kind: u.kind, thrown: u.thrown } : null;
+}
+
+/** Take back the latest replacement: its question as it was before (its
+    result back, and anything entered on the replacement gone), the
+    question it put in taken out of the packet, and later questions' stored
+    numbers moved back with it. Replacements come off latest first. Same
+    arguments as replaceQuestion; returns {error} or {tb}. */
+export function undoReplace({ game, tb, act, makePacket }) {
+  const st = tbState(tb);
+  const list = (st && st.undo) || [];
+  const u = list[list.length - 1];
+  if (!u) return { error: 'noundo' };
+  const cycles = game.cycles;
+  const c = cycles[u.ci];
+  if (!c) return { error: 'noundo' };
+  if (u.sig !== sigOf(st, game.packet.tossups.length, game.packet.bonuses.length)) return { error: 'changed' };
+  act(() => {
+    for (const f of UNDO_FIELDS) c[f] = u.before[f] === undefined ? undefined : JSON.parse(JSON.stringify(u.before[f]));
+    const packet = game.packet;
+    const cut = (list2, i) => (i === null || i === undefined ? list2 : [...list2.slice(0, i), ...list2.slice(i + 1)]);
+    if (u.tuAt !== null && u.tuAt !== undefined) shiftLater(cycles, u.ci, 'tu', u.tuAt + 1, -1);
+    if (u.boAt !== null && u.boAt !== undefined) shiftLater(cycles, u.ci, 'bo', u.boAt + 1, -1);
+    game.loadPacket(makePacket(cut(packet.tossups, u.tuAt), cut(packet.bonuses, u.boAt), packet.name));
+    // a cycle the replacement added at the end, unplayed, goes with it
+    if (cycles.length > u.cycles && !cycles.slice(u.cycles).some(hasResults)) game.setCycles(cycles.slice(0, u.cycles));
+    c.updateIfNeeded();
+  });
+  const rest = list.slice(0, -1);
+  const out = u.tb ? { ...u.tb, ...(rest.length ? { undo: rest } : {}) } : (rest.length ? { undo: rest } : null);
+  syncReserved({ game, tb: out, act });
+  return { tb: out };
 }
 
 /** Whether a throw-out belongs to a replacement, so MODAQ's event log

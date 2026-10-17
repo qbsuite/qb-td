@@ -37,7 +37,7 @@ import { eachLimit } from '../app/js/limit.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -3119,6 +3119,15 @@ function replaceGame() {
   };
   // what syncReserved does on every result in the reader
   g.sync = () => syncReserved({ game, tb: g.tb, act: (fn) => fn() });
+  g.undo = () => {
+    const out = undoReplace({ game, tb: g.tb, act: (fn) => fn(), makePacket });
+    if (out.error) return out.error;
+    g.tb = out.tb;
+    return '';
+  };
+  // the whole game as it stands: what it uploads, the packet, the questions
+  g.state = () => JSON.stringify([toQBJ(game, 'Packet', 1), game.packet.tossups.map((t) => t.question),
+    game.packet.bonuses.map((x) => x.leadin), game.cycles.length, g.view()]);
   // each question as MODAQ shows it: tossup and bonus text
   g.view = () => game.cycles.slice(0, 20).map((c, ci) => (game.getTossup(ci) || {}).question?.split(' ')[0]
     + '/' + (c.correctBuzz && game.getBonus(ci) ? game.getBonus(ci).leadin : '-'));
@@ -3393,6 +3402,73 @@ test('Replace twice in one slot, and a tossup then its bonus, on an earlier ques
   assert.equal(g.upload().tossupsRead, 20);
 });
 
+test('Undo replace: each kind comes back exactly as it was, results and all, latest first', () => {
+  // an earlier tossup that had been answered, then its replacement answered too
+  let g = playedGame();
+  let before = g.state();
+  const tbBefore = JSON.stringify(g.tb);
+  g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1');
+  assert.deepEqual(undoTop(g.tb), { ci: 2, kind: 'tossup', thrown: 2 });
+  g.correct(2, g.B);
+  g.sync();
+  g.game.cycles[2].setBonusPartAnswer(2, 'Beta', 10);
+  assert.notEqual(g.state(), before);
+  assert.equal(g.undo(), '');
+  assert.equal(g.state(), before, 'Alpha\'s tossup and bonus part are back; the replacement is gone');
+  assert.equal(JSON.stringify(g.tb), tbBefore);
+  assert.deepEqual(g.scores(), { Alpha: 75, Beta: 65 });
+  assert.equal(g.undo(), 'noundo', 'nothing left to take back');
+  // an earlier bonus
+  g = playedGame();
+  before = g.state();
+  g.replace(1, 'bonus', g.bo(1, 'TB'), 'B1');
+  g.game.cycles[1].setBonusPartAnswer(2, 'Beta', 10);
+  assert.equal(g.undo(), '');
+  assert.equal(g.state(), before);
+  // the current question, which adds a question to the packet and a cycle at the end
+  g = playedGame();
+  g.neg(8, g.A, 3);
+  before = g.state();
+  g.replace(8, 'tossup', g.tu(1, 'TB'), 'TU1');
+  assert.equal(g.game.packet.tossups.length, 21);
+  assert.equal(g.undo(), '');
+  assert.equal(g.state(), before, "the neg is back, and the packet and cycles are as they were");
+  // an earlier unanswered tossup, with its blank bonus held
+  g = playedGame();
+  before = g.state();
+  const ph = placeholderBonus(g.game.packet.bonuses);
+  g.replace(4, 'tossup', g.tu(1, 'TB'), 'TU1', new MBonus(ph.leadin, ph.parts.map((q, i) => ({ question: q, answer: ph.answers[i], value: ph.values[i] }))), '');
+  g.correct(4, g.B);
+  g.sync();
+  assert.equal(g.undo(), '');
+  assert.equal(g.state(), before);
+  // two replacements come off latest first, and a slot can be replaced again after
+  g = playedGame();
+  before = g.state();
+  g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1');
+  const mid = g.state();
+  g.replace(5, 'bonus', g.bo(1, 'TB'), 'B1');
+  assert.deepEqual(undoTop(g.tb), { ci: 5, kind: 'bonus', thrown: 4 });
+  assert.equal(g.undo(), '');
+  assert.equal(g.state(), mid);
+  assert.equal(g.undo(), '');
+  assert.equal(g.state(), before);
+  assert.equal(g.replace(2, 'tossup', g.tu(2, 'TB'), 'TU2'), '');
+  assert.equal(g.view()[2], 'TB2/-');
+  // questions added another way since: the replacement can no longer be taken back
+  g = playedGame();
+  g.replace(2, 'tossup', g.tu(1, 'TB'), 'TU1');
+  const p = new MPacket();
+  p.setTossups([...g.game.packet.tossups, g.tu(9, 'X')]);
+  p.setBonuses(g.game.packet.bonuses);
+  p.setName('Packet');
+  g.game.loadPacket(p);
+  g.tb = { ...g.tb, tuAt: { ...g.tb.tuAt, 21: '' } };
+  const now = g.state();
+  assert.equal(g.undo(), 'changed');
+  assert.equal(g.state(), now, 'and nothing moved');
+});
+
 test('Replace: refused, with nothing changed, without a held bonus, a bonus being read, or in a paired format', () => {
   const g = replaceGame();
   for (let ci = 0; ci < 6; ci++) if (ci !== 2) g.correct(ci, g.A);
@@ -3416,6 +3492,7 @@ test('reader bundle: the event log keeps a replacement\'s throw-outs and names a
   const bundle = readFileSync(new URL('../app/js/read.bundle.js', import.meta.url), 'utf8');
   assert.ok(/isLastThrownOutQuestion&&!\([^)]*\),[^)]*\)\)\.keepsThrownOutHere\(/.test(bundle), 'run npm run build:read');
   assert.ok(/\.thrownOutText\(\w\.isTossup,/.test(bundle), 'run npm run build:read');
+  assert.ok(/\.undoHandler\(\w\.cycle,\w\.isTossup,\w\.thrownOutEvent\.questionIndex\)/.test(bundle), 'the latest replacement undoes from the event log');
 });
 
 test('reader bundle: the Actions menu carries Replace tossup and Replace bonus', () => {

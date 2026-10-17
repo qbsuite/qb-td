@@ -11,4 +11,5 @@ export const tbBridge = {
   replace: null,  // 'tossup' | 'bonus' while the dialog is in replace mode
   getTb: null,    // () => the game meta's tb (read_core tbState), or null
   setTb: null,    // (tb) => save it in the game meta
+  appState: null, // MODAQ's app state, once its GameBar renders (tb_add_dialog useHeldBonuses)
 };

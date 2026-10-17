@@ -27,7 +27,7 @@ import { ModalDialog } from 'modaq/src/components/dialogs/ModalDialog';
 import { PacketState } from 'modaq/src/state/PacketState';
 import { tbBridge } from './tb_bridge.js';
 import { tbSelection, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion,
-  syncReserved, keepsThrownOut, heldBonusText, placeholderBonus } from './read_core.js';
+  syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from './read_core.js';
 
 const h = React.createElement;
 const strip = (s) => String(s || '').replace(/<[^>]*>/g, '');
@@ -215,13 +215,19 @@ function ReplaceDialog({ appState, kind, onClose }) {
     // a replaced tossup keeps its question's bonus (read_core replaceQuestion)
     const own = isTu && cycle && cycle.correctBuzz && cycle.bonusAnswer ? cycle.bonusAnswer.bonusIndex + 1 : 0;
     body.push(h('div', { key: 'what', style: { marginBottom: 10 } },
-      isTu ? `Tossup ${now} on question ${q} will be thrown out, and the tossup you pick will be read in its place.`
+      (isTu ? `Tossup ${now} on question ${q} will be thrown out, and the tossup you pick will be read in its place.`
           + (own ? ` If it is answered, bonus ${own} is read again.` : '')
-        : `Bonus ${now} on question ${q} will be thrown out, and the bonus you pick will be read in its place.`));
+        : `Bonus ${now} on question ${q} will be thrown out, and the bonus you pick will be read in its place.`)
+        + ' To undo it, click the X next to its event in the Event Log.'));
     if (check.retro) {
       body.push(h('div', { key: 'retro', style: { marginBottom: 10, fontSize: 13 } },
         `Later questions already have results, and they keep them. Please enter the replacement's result on question ${q}.`
           + (check.needBonus ? ' This question had no bonus, so if the replacement is answered, a blank one comes up: please read the bonus the TD gives and enter its parts there.' : '')));
+    }
+    if (check.needBonus) {
+      body.push(h('div', { key: 'warn', style: { marginBottom: 10, fontSize: 13, color: '#8a5300' } },
+        'Nobody answered this tossup, so it may make more sense to leave this question as it is and read a new tossup '
+          + 'at the end of the game instead (Add questions, At the end of the packet).'));
     }
     if (pool && (isTu ? pool.tossups : pool.bonuses).length) {
       body.push(h('div', { key: 'hint', style: { marginBottom: 4, fontWeight: 600 } },
@@ -260,6 +266,7 @@ function ReplaceDialog({ appState, kind, onClose }) {
 // GameBar calls this (build_read.mjs), since it is always on screen and
 // MODAQ unmounts its dialogs, this one included, while none is open.
 export function useHeldBonuses(appState) {
+  tbBridge.appState = appState; // for the event log's Undo (undoHandler)
   React.useEffect(() => reaction(
     () => appState.game.cycles.map((c) => (c.correctBuzz ? 1 : 0)).join(''),
     () => {
@@ -270,12 +277,42 @@ export function useHeldBonuses(appState) {
 }
 
 /** For MODAQ's event log (ThrowOutQuestionCycleItem, patched by
+    build_read.mjs): the latest replacement's event deletes as an undo of
+    the replacement (read_core undoReplace), once MODAQ's own "Are you
+    sure" is answered. null for any other throw-out. */
+export function undoHandler(cycle, isTossup, index) {
+  const appState = tbBridge.appState;
+  const tb = tbBridge.getTb ? tbBridge.getTb() : null;
+  const top = undoTop(tb);
+  if (!appState || !top || appState.game.cycles[top.ci] !== cycle
+    || (top.kind === 'tossup') !== !!isTossup || top.thrown !== index) return null;
+  return () => {
+    const out = undoReplace({ game: appState.game, tb: tbBridge.getTb(), act: runInAction, makePacket });
+    if (!out.error) {
+      if (tbBridge.setTb) tbBridge.setTb(out.tb);
+      return;
+    }
+    // after MODAQ closes its own dialog
+    setTimeout(() => appState.uiState.dialogState.showOKMessageDialog({
+      title: 'Undo Replacement',
+      message: out.error === 'changed'
+        ? 'Questions were added to this game after the replacement, so it can no longer be undone.'
+        : 'There is no replacement to undo.',
+    }), 0);
+  };
+}
+
+/** For MODAQ's event log (ThrowOutQuestionCycleItem, patched by
     build_read.mjs): whether a throw-out offers its undo, and its text. */
 export function keepsThrownOutHere(isTossup, index) {
   return keepsThrownOut(tbBridge.getTb ? tbBridge.getTb() : null, isTossup, index);
 }
 export function thrownOutText(isTossup, index, text) {
-  return (!isTossup && heldBonusText(tbBridge.getTb ? tbBridge.getTb() : null, index)) || text;
+  const tb = tbBridge.getTb ? tbBridge.getTb() : null;
+  if (!isTossup && heldBonusText(tb, index)) return heldBonusText(tb, index);
+  // a replacement's throw-out: deleting the event undoes the replacement
+  if (keepsThrownOut(tb, isTossup, index)) return `Replaced ${isTossup ? 'tossup' : 'bonus'} #${index + 1}`;
+  return text;
 }
 
 export const AddQuestionsDialog = observer(function AddQuestionsDialog() {
