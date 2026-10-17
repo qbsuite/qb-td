@@ -20,6 +20,7 @@ Release Notes for 10/17/2026
 - Standings in the New layout go by stage, as Classic's do: each playoff bracket gets its own table and grid, then the prelim pools.
 - The grid view of the standings no longer has a line explaining the grid.
 - The New layout's stats can show one stage at a time: Playoffs, Prelims, or Combined, the whole day with every team in its final place.
+- Once every game is in, the schedule says Finished, drops Now and Live now, and opens on All rounds.
 
 [ BUZZPOINTS ]
 - A round's buzzpoints and scoresheets wait while a game in it was uploaded unfinished.

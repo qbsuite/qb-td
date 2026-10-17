@@ -312,7 +312,7 @@ function gameCell(g, round, results) {
 
 function renderScheduleGrid(box) {
   const results = resultMap();
-  const cur = liveRound();
+  const cur = nowRound();
   box.innerHTML = schedule.phases.map((phase) => {
     if (!phase.rounds.some((r) => r.games.some(keepGame))) return '';
     // byes aren't in any pool: shown only when the whole schedule is
@@ -390,7 +390,7 @@ function renderTeamView(box, team) {
             result = won ? `<span class="wtag">W ${score}</span>` : `<span class="muted">L ${score}</span>`;
           }
         }
-        rows.push(`<tr${round.round === liveRound() ? ' class="nowrow"' : ''}><td class="roundcell">${round.round}</td>
+        rows.push(`<tr${round.round === nowRound() ? ' class="nowrow"' : ''}><td class="roundcell">${round.round}</td>
           <td class="name${oppSlot && oppSlot.label ? ' ph' : ''}">${esc(opp) || '—'}</td>
           <td class="muted">${esc(room)}</td><td class="num">${result}</td></tr>`);
       } else if (round.byes.some((s) => slotText(s) === team)) {
@@ -432,6 +432,8 @@ function finished() {
   }
   return finishedFor.value;
 }
+// the round shown as being played, or none once the tournament is over
+const nowRound = () => (finished() ? null : liveRound());
 
 function renderSchedule(box) {
   if (!schedule) {
@@ -439,8 +441,8 @@ function renderSchedule(box) {
     return;
   }
   const cur = liveRound();
-  // an archived tournament is over: no Now view, no "Live now"
-  const hasNow = !usingArchive() && Boolean(findRound(cur));
+  // an archived or finished tournament is over: no Now view, no "Live now"
+  const hasNow = !usingArchive() && !finished() && Boolean(findRound(cur));
   if (!schedView) {
     const kept = readPref(SCHED_VIEW_KEY);
     schedView = kept === 'all' || (kept === 'now' && hasNow) ? kept : hasNow ? 'now' : 'all';
@@ -1540,6 +1542,7 @@ function render() {
   const box = $('out');
   // a tab picked before the first load lands: load() renders it then
   if (!state) return;
+  $('round').textContent = finished() ? 'Finished' : 'Round ' + liveRound();
   if (tab === 'schedule') renderSchedule(box);
   else if (tab === 'buzz') renderBuzz(box);
   else if (tab === 'cats') renderCats(box);
