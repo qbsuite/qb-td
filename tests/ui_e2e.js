@@ -741,13 +741,13 @@ d = await until(async () => { const x = await detail(); return x.rounds.length =
 ok('6 packets: Assign by filename puts every packet on its round',
   d.rounds.every((r) => r.packet_name === `Round ${r.number}.json`), d.rounds.map((r) => r.number + ':' + r.packet_name));
 await waitJs(`[...document.querySelectorAll('.pktable tr[data-round]')].every((tr) =>
-  tr.classList.contains('has') && tr.querySelector('.pkfile a').textContent === 'Round ' + tr.dataset.round + '.json')`, 'rows show their packets');
+  tr.classList.contains('has') && tr.querySelector('.pkfile .pkitem').lastChild.textContent === 'Round ' + tr.dataset.round + '.json')`, 'rows show their packets');
 ok('6 packets: every row names its packet', true);
 packets[1] = packetFor(1, ' (revised)');
 const revised = writeFx('Round 1 revised.json', packets[1]);
 await clickPick('[data-pickround="1"]', [revised]);
 d = await until(async () => { const x = await detail(); return x.rounds.find((r) => r.number === 1).packet_name === 'Round 1 revised.json' && x; }, 'replacement uploaded');
-await waitJs(`document.querySelector('.pktable tr[data-round="1"] .pkfile a').textContent === 'Round 1 revised.json'`, 'row 1 renamed');
+await waitJs(`document.querySelector('.pktable tr[data-round="1"] .pkfile .pkitem').lastChild.textContent === 'Round 1 revised.json'`, 'row 1 renamed');
 ok('6 packets: Replace puts a new file on one round', true);
 await setFiles('#tbfile', [tbPath]);
 await waitJs(`[...document.querySelectorAll('#setupsec table tr')].filter((tr) => tr.textContent.includes('Unused')).length === 3`, 'tiebreaker questions listed');
