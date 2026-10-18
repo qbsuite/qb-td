@@ -27,7 +27,7 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { modaqExport, modaqFilenames } from '../engine/modaqfile.js';
+import { modaqExport, modaqFilenames, renameModaqTexts } from '../engine/modaqfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimProgress, prelimRounds, autoFill, finishedThrough } from '../engine/schedule.js';
@@ -2050,10 +2050,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     const base = f.filename.replace(/\.qbtd\.json$/i, '');
     const s = fileSummary(f);
     const names = s ? modaqFilenames(f.round, s.teams) : { qbj: base + '.qbj', game: base + '_Game.json' };
+    // a game file comes down under the roster's current names (worker.js
+    // storedFileResponse)
+    const own = (f.kind === 'qbj' || f.kind === 'game') && !f.error ? `part=${f.kind}&` : '';
     return f.kind === 'combined' && !f.error
       ? link(`part=qbj&dl=${encodeURIComponent(names.qbj)}`, 'qbj') + ' '
         + link(`part=game&dl=${encodeURIComponent(names.game)}`, 'game')
-      : link(`dl=${encodeURIComponent(f.filename)}`, 'Download');
+      : link(`${own}dl=${encodeURIComponent(f.filename)}`, 'Download');
   };
   const protestMarker = (f) => {
     const ps = pfiles.get(f.id);
@@ -3047,13 +3050,14 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, opts = {}
         text: JSON.stringify(payload),
       });
       if (f.kind === 'combined' && full.game && typeof full.game === 'object') {
-        // MODAQ's own two files for this game (engine/modaqfile.js)
-        const exp = modaqExport(full, m.round);
-        // the names MODAQ wrote: its own QBJ's teams, before any roster rename
+        // MODAQ's own two files for this game (engine/modaqfile.js), under
+        // the roster's current names
+        const exp = modaqExport(full, m.round, names);
+        // named by its own QBJ's teams, in MODAQ's order
         let named = m.teams.map((tm) => tm.name);
         try { named = JSON.parse(exp.qbj).match_teams.map((mt) => mt.team.name); } catch (e) { /* keep the parsed names */ }
-        const names = modaqFilenames(m.round, named);
-        modaqFiles.push({ round: m.round, qbjName: names.qbj, qbj: exp.qbj, gameName: names.game, game: exp.game });
+        const fileNames = modaqFilenames(m.round, named);
+        modaqFiles.push({ round: m.round, qbjName: fileNames.qbj, qbj: exp.qbj, gameName: fileNames.game, game: exp.game });
         games.push({
           round: m.round,
           filename: f.filename.replace(/\.qbtd\.json$/i, '_Game.json'),
@@ -3064,7 +3068,7 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, opts = {}
       errors.push(f.filename + ': ' + e.message);
     }
   }
-  return { roster, matches, raw, games, errors, modaqFiles };
+  return { roster, names, matches, raw, games, errors, modaqFiles };
 }
 
 /* ---------- playoff slots fill themselves ----------
@@ -3318,7 +3322,8 @@ function showStats({ a, t, files, settings, got }) {
       entries.push({ name, data });
     };
     // a reader upload: MODAQ's own .qbj and _Game.json, as its Backup to
-    // JSON dialog writes them (engine/modaqfile.js)
+    // JSON dialog writes them (engine/modaqfile.js), under the roster's
+    // current names
     for (const x of modaqFiles) {
       if (x.qbj) add(x.round, x.qbjName, x.qbj);
       if (x.game) add(x.round, x.gameName, x.game);
@@ -3328,7 +3333,10 @@ function showStats({ a, t, files, settings, got }) {
     for (const r of raw.filter((x) => !x.reader)) add(r.round, r.filename, indent(r.text));
     // game files that went up separately from their .qbj (Add a game)
     for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
-      try { add(f.round, f.filename, JSON.stringify(await fetchOwnedJson(a, f.r2_key), null, 2)); }
+      try {
+        const text = JSON.stringify(await fetchOwnedJson(a, f.r2_key), null, 2);
+        add(f.round, f.filename, renameModaqTexts({ qbj: null, game: text }, got.names).game);
+      }
       catch (e) { /* bundle still useful without it */ }
     }
     if (t.roster_r2_key) {

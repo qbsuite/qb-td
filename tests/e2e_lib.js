@@ -4,7 +4,7 @@
 
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -45,6 +45,16 @@ export function r2get(key) {
   const buf = readFileSync(tmp);
   rmSync(tmp);
   return buf;
+}
+
+// Writes an object straight into that local R2, past the Worker's routes
+// (and so past anything a route would also flag).
+export function r2put(key, body) {
+  const tmp = path.join(tmpdir(), 'qbtd-e2e-' + Math.random().toString(36).slice(2));
+  writeFileSync(tmp, body);
+  execSync(`npx wrangler r2 object put qb-td-data/${key} --local --file "${tmp}"${PERSIST}`,
+    { cwd: WORKER_DIR, stdio: 'ignore' });
+  rmSync(tmp);
 }
 
 export async function call(path, opts = {}) {

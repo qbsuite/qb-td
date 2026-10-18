@@ -39,7 +39,8 @@
 // stay up — the publish flag, not the admin link, gates /pub.
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
-import { modaqExport, qbjTextWithRound } from '../app/engine/modaqfile.js';
+import { modaqExport, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
+import { parseRoster, rosterNameMap } from '../app/engine/qbj.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
@@ -2813,7 +2814,19 @@ async function adminDownload(url, env, t) {
   const obj = await env.DATA.get(key);
   if (!obj) return err(env, 404, 'no such file');
   const dl = url.searchParams.get('dl') || key.split('/').pop();
-  return storedFileResponse(env, obj, await blobKey(t, key), dl, url.searchParams.get('part'));
+  const part = url.searchParams.get('part');
+  return storedFileResponse(env, obj, await blobKey(t, key), dl, part,
+    part && t.roster_r2_key ? await rosterNames(env, t.roster_r2_key, await blobKey(t, t.roster_r2_key)) : null);
+}
+
+// The roster's renames (qbj.js rosterNameMap) for a game download, so a
+// game played under a team's or player's old name comes down under the
+// new one, as the stats count it. null without a roster or a rename.
+async function rosterNames(env, rosterKey, rawKey) {
+  if (!rosterKey) return null;
+  const obj = await env.DATA.get(rosterKey);
+  if (!obj) return null;
+  try { return rosterNameMap(parseRoster(JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey))))); } catch (e) { return null; }
 }
 
 // GET /a/:secret/games?ids=1,2,… — up to MAX_GAMES_BATCH games' public
@@ -2844,21 +2857,28 @@ async function adminGames(url, env, t) {
 
 // A stored blob as a download, decrypted with `rawKey`. part=qbj|game
 // splits a combined reader upload (.qbtd.json = {qbj, game}) into the
-// file consumers actually use. Only ever behind a credential that holds
-// the tournament's key — the TO's link, or the link of the set it
-// mirrors: the game half carries the packet text.
-async function storedFileResponse(env, obj, rawKey, dl, part) {
+// file consumers actually use; on a bare .qbj or game file it is that
+// file. Either comes down under the roster's renames (`names`). Only ever
+// behind a credential that holds the tournament's key — the TO's link,
+// or the link of the set it mirrors: the game half carries the packet text.
+async function storedFileResponse(env, obj, rawKey, dl, part, names = null) {
   if (part !== 'qbj' && part !== 'game') return blobResponseDec(env, obj, rawKey, dl);
-  let parsed;
-  try {
-    parsed = JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey)));
-  } catch (e) { return err(env, 400, 'not a combined file'); }
-  const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
-  if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
-  // MODAQ's own file for this half (engine/modaqfile.js), under the round
-  // the upload is filed in
-  const round = Number(typeof parsed.qbj === 'object' && parsed.qbj ? parsed.qbj._round : NaN);
-  const text = modaqExport(parsed, Number.isInteger(round) ? round : undefined)[part];
+  const raw = new TextDecoder().decode(await readBlob(obj, rawKey));
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch (e) { /* not JSON: a bare file goes down as it is */ }
+  let text;
+  if (!parsed || typeof parsed !== 'object') text = raw;
+  else if (!parsed.qbj && !parsed.game) {
+    // a .qbj or game file added by hand: itself, renamed
+    text = renameModaqTexts(part === 'qbj' ? { qbj: raw, game: null } : { qbj: null, game: raw }, names)[part];
+  } else {
+    const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
+    if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
+    // MODAQ's own file for this half (engine/modaqfile.js), under the round
+    // the upload is filed in
+    const round = Number(typeof parsed.qbj === 'object' && parsed.qbj ? parsed.qbj._round : NaN);
+    text = modaqExport(parsed, Number.isInteger(round) ? round : undefined, names)[part];
+  }
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Content-Disposition', attachmentHeader(dl));
@@ -5363,7 +5383,10 @@ async function setMirrorFile(env, s, url) {
   ).bind(fileId, tid).all() : { results: [] };
   const obj = results.length ? await env.DATA.get(results[0].r2_key) : null;
   if (!obj) return err(env, 404, 'no such file');
-  return storedFileResponse(env, obj, rawKey, results[0].filename, url.searchParams.get('part'));
+  const part = url.searchParams.get('part');
+  const { results: tr } = part ? await env.DB.prepare('SELECT roster_r2_key FROM tournaments WHERE id = ?1').bind(tid).all() : { results: [] };
+  return storedFileResponse(env, obj, rawKey, results[0].filename, part,
+    tr.length ? await rosterNames(env, tr[0].roster_r2_key, rawKey) : null);
 }
 
 /* ----- the set's state blob and the routes that read the games ----- */

@@ -8,7 +8,7 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-import { WORKER_DIR, PERSIST, BASE, storedCred, d1row, d1exec, r2get, call, maxAge, tick, ok, summary } from './e2e_lib.js';
+import { WORKER_DIR, PERSIST, BASE, storedCred, d1row, d1exec, r2get, r2put, call, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
@@ -828,6 +828,23 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     gres.status === 200 && JSON.parse(gtext).cycles.length === 0 && gtext.includes('SECRETQUESTIONTEXT'));
   ok('part=game named _Game.json',
     (gres.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta_Game.json'));
+
+  // a roster rename (Ann is Annie now): the game comes down under the new name
+  const rosterWith = (ann) => JSON.stringify({ objects: [{ type: 'Tournament', registrations: [
+    { name: 'Alpha', teams: [{ name: 'Alpha', players: [ann] }] },
+    { name: 'Beta', teams: [{ name: 'Beta', players: [{ name: 'Bob' }] }] },
+  ] }] });
+  // written straight to the stored roster: the upload route would also
+  // flag a public rebuild, which later checks time themselves against
+  const rosterKey = d1row(`SELECT roster_r2_key FROM tournaments WHERE slug = '${slug}'`).roster_r2_key;
+  const rosterWas = r2get(rosterKey);
+  r2put(rosterKey, rosterWith({ name: 'Annie', _formerNames: ['Ann'] }));
+  const renamed = JSON.parse(await (await fetch(fileUrl('&part=qbj&dl=Round_3_Alpha_Beta.qbj'))).text());
+  ok('admin part=qbj: under the roster\'s new name',
+    renamed.match_teams[0].match_players[0].player.name === 'Annie' && !JSON.stringify(renamed).includes('"Ann"'), renamed.match_teams[0]);
+  ok('admin part=qbj: the same game otherwise', renamed.tossups_read === 20 && renamed.match_teams[0].bonus_points === 30);
+  r2put(rosterKey, rosterWas);
+  ok('admin part=qbj: no rename, MODAQ\'s text again', (await (await fetch(fileUrl('&part=qbj&dl=x.qbj'))).text()) === qtext);
 
   // the hub ranks on games' public copies, many to a request (adminGames)
   const batch = await call(`${A}/games?ids=${cid},${broken.body.id},999999`);

@@ -31,7 +31,7 @@ import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk }
 import HDWHITE from '../app/engine/hdwhite.js';
 import { finalsSources, finalsProgress, finalsFill, scheduleFinished } from '../app/engine/finals.js';
 import { eachLimit } from '../app/js/limit.js';
-import { modaqExport, modaqFilenames, qbjTextWithRound } from '../app/engine/modaqfile.js';
+import { modaqExport, modaqFilenames, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
@@ -5799,6 +5799,73 @@ test('modaqfile: a reader upload hands back MODAQ\'s own export texts unchanged;
   assert.equal(out.game, gameText, 'the game alone, as MODAQ writes it');
   // MODAQ's file names: team names joined by "_", spaces kept
   assert.deepEqual(modaqFilenames(3, ['A B', 'C']), { qbj: 'Round_3_A B_C.qbj', game: 'Round_3_A B_C_Game.json' });
+});
+
+test('modaqfile: a roster rename reaches MODAQ\'s own QBJ and game file, everywhere they name the team or player', () => {
+  // Chicago C's Andy Lui is Andy Liu now; Old U is New U, and its Ann is Annie
+  const names = rosterNameMap([
+    { name: 'Chicago C', players: ['Andy Liu', 'Bo'], formerPlayers: { 'Andy Liu': ['Andy Lui'] } },
+    { name: 'New U', players: ['Annie'], formerNames: ['Old U'], formerPlayers: { Annie: ['Ann'] } }]);
+  const p = (name, teamName) => ({ name, teamName, isStarter: true });
+  const qbj = { tossups_read: 2, match_teams: [
+    { team: { name: 'Chicago C', players: [{ name: 'Andy Lui' }, { name: 'Bo' }] }, bonus_points: 10,
+      match_players: [{ player: { name: 'Andy Lui' }, tossups_heard: 2, answer_counts: [{ number: 1, answer: { value: 10 } }] }],
+      lineups: [{ first_question: 1, players: [{ name: 'Andy Lui' }, { name: 'Bo' }] }] },
+    { team: { name: 'Old U', players: [{ name: 'Ann' }] }, bonus_points: 0,
+      match_players: [{ player: { name: 'Ann' }, tossups_heard: 2, answer_counts: [{ number: 1, answer: { value: -5 } }] }],
+      lineups: [{ first_question: 1, players: [{ name: 'Ann' }] }] }],
+  match_questions: [{ question_number: 1, buzzes: [
+    { buzz_position: { word_index: 3 }, player: { name: 'Ann' }, team: { name: 'Old U', players: [{ name: 'Ann' }] }, result: { value: -5 } },
+    { buzz_position: { word_index: 9 }, player: { name: 'Andy Lui' }, team: { name: 'Chicago C', players: [{ name: 'Andy Lui' }, { name: 'Bo' }] }, result: { value: 10 } }] }],
+  _round: 1, packets: 'Packet A' };
+  const game = { players: [p('Andy Lui', 'Chicago C'), p('Bo', 'Chicago C'), p('Ann', 'Old U')],
+    cycles: [{
+      wrongBuzzes: [{ marker: { player: p('Ann', 'Old U'), position: 3, points: -5, isLastWord: false }, tossupIndex: 0 }],
+      correctBuzz: { marker: { player: p('Andy Lui', 'Chicago C'), position: 9, points: 10 }, tossupIndex: 0 },
+      bonusAnswer: { bonusIndex: 0, receivingTeamName: 'Chicago C', parts: [{ teamName: 'Chicago C', points: 10 }] },
+      playerLeaves: [{ outPlayer: p('Bo', 'Chicago C') }], playerJoins: [{ inPlayer: p('Andy Lui', 'Chicago C') }],
+      tossupProtests: [{ teamName: 'Old U', questionIndex: 0, position: 3, reason: '' }] }],
+    packet: { tossups: [{ question: 'Old U and Andy Lui', answer: 'x' }], bonuses: [] }, gameFormat: { pointsForPowers: [] } };
+  const root = { qbj, game: { game, uiState: {} }, modaq: { qbj: JSON.stringify(qbj, null, 2), game: JSON.stringify(game, null, 2) } };
+  const out = modaqExport(root, 1, names);
+  const q = JSON.parse(out.qbj);
+  const g = JSON.parse(out.game);
+  // no old name left outside the packet text
+  const noOld = (x) => !/Andy Lui|"Ann"|Old U/.test(JSON.stringify(x));
+  assert.ok(noOld(q), out.qbj);
+  assert.ok(noOld({ ...g, packet: null }), out.game);
+  assert.deepEqual(q.match_teams.map((mt) => mt.team.name), ['Chicago C', 'New U']);
+  assert.equal(q.match_questions[0].buzzes[1].player.name, 'Andy Liu');
+  assert.deepEqual(g.players.map((x) => x.name + '/' + x.teamName), ['Andy Liu/Chicago C', 'Bo/Chicago C', 'Annie/New U']);
+  assert.equal(g.cycles[0].wrongBuzzes[0].marker.player.name, 'Annie');
+  assert.equal(g.cycles[0].wrongBuzzes[0].marker.player.teamName, 'New U');
+  assert.equal(g.cycles[0].correctBuzz.marker.player.name, 'Andy Liu');
+  assert.equal(g.cycles[0].playerJoins[0].inPlayer.name, 'Andy Liu');
+  assert.equal(g.cycles[0].tossupProtests[0].teamName, 'New U');
+  assert.equal(g.packet.tossups[0].question, 'Old U and Andy Lui', 'the packet text is the packet\'s');
+  // the scores, buzz words and packet name are MODAQ's
+  const m = parseMatch(q);
+  assert.deepEqual(m.teams.map((t) => t.points), [20, -5]);
+  assert.equal(q.match_questions[0].buzzes[1].buzz_position.word_index, 9);
+  assert.equal(q.packets, 'Packet A');
+  // still MODAQ's layout (2-space JSON), and the stats see the same game
+  assert.equal(out.qbj, JSON.stringify(q, null, 2));
+  assert.equal(JSON.stringify(q), JSON.stringify(renameMatch(qbj, names)));
+  // nothing to rename: MODAQ's very text
+  const keep = rosterNameMap([{ name: 'Elsewhere', players: ['Z'], formerNames: ['Gone'] }]);
+  assert.equal(modaqExport(root, 1, keep).qbj, root.modaq.qbj);
+  assert.equal(modaqExport(root, 1, keep).game, root.modaq.game);
+  assert.equal(modaqExport(root, 1).qbj, root.modaq.qbj, 'no roster map: as before');
+  // an older upload rebuilt from the reader's own halves is renamed too
+  const older = modaqExport({ qbj, game: { game, uiState: {} } }, 1, names);
+  assert.ok(noOld(JSON.parse(older.qbj)) && noOld({ ...JSON.parse(older.game), packet: null }));
+  // a .qbj or game file added by hand, as text
+  const bare = renameModaqTexts({ qbj: JSON.stringify(qbj), game: JSON.stringify(game) }, names);
+  assert.ok(noOld(JSON.parse(bare.qbj)) && noOld({ ...JSON.parse(bare.game), packet: null }));
+  assert.deepEqual(renameModaqTexts({ qbj: 'not json', game: null }, names), { qbj: 'not json', game: null });
+  // a player only matches on their own team
+  const other = renameModaqTexts({ qbj: null, game: JSON.stringify({ players: [p('Andy Lui', 'Elsewhere')], cycles: [] }) }, names);
+  assert.equal(JSON.parse(other.game).players[0].name, 'Andy Lui');
 });
 
 /* ---------- Fix buzzes: a moderator's flipped names, put right ----------
