@@ -50,6 +50,14 @@ function answerLineHtml(answer) {
   return `<div class="q muted">ANSWER: ${sanitizeHtml(String(answer).replace(/^\s*ANSWER:\s*/i, ''))}</div>`;
 }
 
+// A question's metadata line as the packet writes it under the answer
+// (author and category): <Editors, Social Science>
+function metadataHtml(q) {
+  const m = q && typeof q.metadata === 'string' ? q.metadata.trim() : '';
+  if (!m) return '';
+  return `<div class="q muted qmeta">${esc(/^<.*>$/.test(m) ? m : '<' + m + '>')}</div>`;
+}
+
 /** A tossup's text with each buzz marked on its word, then the full
     answerline. `tu` = the packet's tossup, or null for no text. */
 export function tossupTextHtml(tu, buzzes) {
@@ -67,7 +75,7 @@ export function tossupTextHtml(tu, buzzes) {
     const cls = buzzWordClass(hits.map((h) => h.b));
     return `<span class="bw ${cls}">${w}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
   }).join(' ') + '</div>'
-    + answerLineHtml(tu.answer);
+    + answerLineHtml(tu.answer) + metadataHtml(tu);
 }
 
 /** The numbered buzz list under a tossup's text. */
@@ -152,6 +160,16 @@ export function bonusMetaHtml(results) {
   return `${avg.toFixed(1)} avg &middot; ${conv.map((c) => c + '/' + heard).join(' ')}`;
 }
 
+// A bonus part's marker as the packet writes it: its value, then its
+// difficulty when the packet gives one — [10h], [10e], [10m], or [10]
+function partMarker(bz, p) {
+  const values = bz && Array.isArray(bz.values) ? bz.values : [];
+  const diff = bz && Array.isArray(bz.difficultyModifiers) ? bz.difficultyModifiers : [];
+  const v = Number.isFinite(Number(values[p])) && values[p] !== null && values[p] !== '' ? Number(values[p]) : null;
+  if (v === null && !diff[p]) return '';
+  return `[${v === null ? 10 : v}${diff[p] ? String(diff[p]) : ''}]`;
+}
+
 /** A bonus's parts — each part's text, then its answerline the way a
     tossup's sits under its text — with their conversion, then each room's
     line. `bz` = the packet's bonus, or null for no text. */
@@ -164,13 +182,17 @@ export function bonusBodyHtml(bz, results) {
   const rows = [];
   for (let p = 0; p < nParts; p++) {
     const c = results.filter((r) => r.parts[p] > 0).length;
+    const marker = partMarker(bz, p);
+    // the part's text after its marker, then its answerline with how many
+    // rooms got it at the right
     rows.push(`
-      <div class="q">${heard ? `<span class="${c ? 'ok' : 'bad'}">${c}/${heard}</span> ` : ''}${
+      <div class="q">${marker ? `<span class="bdiff">${esc(marker)}</span> ` : ''}${
         partsText[p] ? sanitizeHtml(partsText[p]) : ''}</div>
-      ${answers[p] ? answerLineHtml(answers[p]) : ''}`);
+      <div class="bpans">${answers[p] ? answerLineHtml(answers[p]) : '<div></div>'}${
+        heard ? `<span class="bpconv ${c ? 'ok' : 'bad'}">${c}/${heard}</span>` : ''}</div>`);
   }
   return `${bz && bz.leadin ? `<div class="q">${sanitizeHtml(bz.leadin)}</div>` : ''}
-    ${rows.join('')}
+    ${rows.join('')}${metadataHtml(bz)}
     <div class="buzzlist">
       ${results.map((r) => `<div>
         <span class="${r.total > 20 ? 'pow-t' : r.total > 0 ? 'ok' : 'muted'}">${r.total}</span>

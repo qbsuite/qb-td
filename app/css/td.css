@@ -355,6 +355,12 @@ details.qd .qdbody { padding: 6px 10px 4px; border-bottom: 1px solid var(--line)
 /* a bonus sits indented under the tossup it was read with */
 details.qd.bonus summary, details.qd.bonus .qdbody { padding-left: 34px; }
 .buzzlist { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+/* a bonus part: its packet marker ([10h]) before the text; its answerline with how
+   many rooms got it at the right (buzzview.js bonusBodyHtml) */
+.bdiff { font-variant-numeric: tabular-nums; }
+.bpans { display: flex; align-items: baseline; gap: 12px; }
+.bpans > :first-child { flex: 1; min-width: 0; }
+.bpconv { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; }
 /* set page: one question's plays, grouped by the wording they heard */
 .revnote { font-size: 13px; color: var(--muted); margin: 4px 0 8px; max-width: 640px; }
 .revblock { border-left: 2px solid var(--line); padding-left: 10px; margin: 10px 0 4px; }
