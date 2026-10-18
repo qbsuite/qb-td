@@ -2556,11 +2556,15 @@ async function editGame(a, buckets, files, fileId) {
   if (notStarted()) { say(START_FIRST, true); return; }
   try {
     say('Loading the game…');
-    // The MODAQ half of the stored upload, decrypted by the Worker under
-    // the admin link's key — the same download the "game" link offers.
-    const res = await fetch(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&part=game`);
+    // The whole stored upload, decrypted by the Worker under the admin
+    // link's key. Its game half is the reader's saved state ({game,
+    // uiState}), which the reader resumes from; the "game" download is
+    // MODAQ's bare game file (engine/modaqfile.js), which it can't.
+    const res = await fetch(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}`);
     if (!res.ok) throw new Error('could not load the game file (' + res.status + ')');
-    const storeText = await res.text();
+    let saved = null;
+    try { saved = (await res.json()).game; } catch (e) { /* reported below */ }
+    const storeText = saved && typeof saved === 'object' ? JSON.stringify(saved) : '';
     if (!storeIntact(storeText)) throw new Error('this upload has no MODAQ game in it');
 
     // A fresh game id under the room's own secret, so the reader resumes

@@ -705,8 +705,7 @@ async function renderBuzzReplacements(box, read) {
   const got = await fetchBuzzTiebreakers();
   if (tab !== 'buzz' || buzzMode !== 'replacements') return; // user moved on mid-fetch
   if (got.closed === false) {
-    box.innerHTML = '<div class="muted">Replacement questions can come up again in later rounds, '
-      + 'so their buzzpoints appear here once the tournament closes.</div>';
+    box.innerHTML = '<div class="muted">Replacement questions are not available yet.</div>';
     return;
   }
   box.innerHTML = replacementsHtml(read, got.text);

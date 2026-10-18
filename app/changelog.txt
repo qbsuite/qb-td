@@ -2,6 +2,7 @@ Release Notes for 10/18/2026
 
 [ HUB ]
 - Packet names stay as uploaded: a "+" or a long name is no longer changed, and downloads keep the exact name.
+- Fixed "Edit in MODAQ" not opening the game after today's download change.
 
 [ PUBLIC PAGE ]
 - Scoresheets and buzzpoints can go without a password once the question set is clear: "Disable password" under Public page, with a warning.
@@ -12,6 +13,7 @@ Release Notes for 10/18/2026
 [ BUZZPOINTS ]
 - Bonus parts show their marker as the packet writes it ([10h], [10e], [10m]), with how many rooms got each part at the right of its answer.
 - Each question shows its packet metadata line (author and category) under the answer.
+- Shorter message on Replacements before the tournament closes.
 
 [ EXPORTS ]
 - A game's qbj and MODAQ game file download exactly as MODAQ's own Backup to JSON writes them, under MODAQ's file names. The QBJ bundle holds the same files.
