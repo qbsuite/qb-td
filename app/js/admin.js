@@ -1992,6 +1992,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const playing = liveRooms.filter((r) => !r.bye);
   const nStarted = playing.filter((r) => started.has(r.id)).length;
   const nextHasPacket = rounds.some((r) => r.number === t.current_round + 1);
+  // no Advance button past the schedule's last round (Set round still works)
+  const pastSched = (n) => schedRoundCount() > 0 && n > schedRoundCount();
 
   // ---- the uploads grid: rooms down, rounds across ----
   const lastRound = Math.max(totalRounds, ...uploadRounds);
@@ -2222,7 +2224,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
 
       <aside class="liverail">
         <div class="railblock">
-          ${bk ? `<button id="advall" class="primary advance">Advance all to round ${bk.advTo}</button>
+          ${pastSched(bk ? bk.advTo : t.current_round + 1)
+          ? `<div class="muted small">Round ${schedRoundCount()} is the last round in the schedule.</div>`
+          : bk ? `<button id="advall" class="primary advance">Advance all to round ${bk.advTo}</button>
           ${advNote(bk) ? `<div class="muted small">${advNote(bk)}</div>` : ''}
           ${rounds.some((r) => r.number === bk.advTo) || !rounds.length ? '' : `<div class="warntext small">No packet for round ${bk.advTo} yet</div>`}`
           : `<button id="advround" class="primary advance">Advance to round ${t.current_round + 1}</button>

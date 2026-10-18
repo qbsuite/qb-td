@@ -8,6 +8,7 @@ Release Notes for 10/18/2026
 - Packet rows use symbols: preview, download, replace.
 
 [ LIVE HUB ]
+- On the schedule's last round, the Advance button is gone, and a note says it is the last round. Set round still works.
 - Added "Fix buzzes" on an upload: swap two teammates' buzzes, or change who got a single buzz. The fix saves as a new upload.
 
 [ PUBLIC PAGE ]

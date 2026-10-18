@@ -1547,6 +1547,14 @@ async function openHubOf(adminSecret) {
   await waitJs(`!document.querySelector('#schedpanel').hidden`, 'the round robin reader');
   ok('12b round robin: the reader header has no bracket', (await text('#room')).replace(/\s+/g, ' ').trim() === `${R.rooms[0].room_name} · Round 2`
     && !(await exists('#schedrows tr.bhrow')), await text('#room'));
+  await openHubOf(R.t.admin_secret);
+  // on the schedule's last round there is no round to advance to
+  await fill('#curround', String(R.last), ['input']);
+  await click('#setround');
+  await until(async () => (await R.detail()).tournament.current_round === R.last, 'set to the last round');
+  await waitJs(`!document.querySelector('#advround') && !document.querySelector('#advall')`, 'no Advance on the last round');
+  ok('12b round robin: on the last round, no Advance and a note says so',
+    (await text('.liverail')).includes(`Round ${R.last} is the last round in the schedule.`) && await exists('#setround'), await text('.liverail'));
 }
 
 /* ---------- 24b. the public state from qb-td-live ----------
