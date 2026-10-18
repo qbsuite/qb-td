@@ -2722,6 +2722,66 @@ async function uploadPacket(request, url, env, t) {
   return json(env, { round, filename: name });
 }
 
+// POST /a/:secret/packets/move {from, to}: a round's packet to another
+// round, swapped with the packet there or moved when it has none, its
+// categories with it. Games stay in their rounds. A set's mirror keeps its
+// rounds, since the set re-points them by number (mirrorsOpenFor).
+async function movePacket(request, env, t) {
+  let body;
+  try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  const from = Number(body && body.from);
+  const to = Number(body && body.to);
+  if (![from, to].every((n) => Number.isInteger(n) && n >= 1 && n <= 999) || from === to) return err(env, 400, 'bad rounds');
+  if (t.set_id) return err(env, 400, 'a question set\'s rounds cannot be moved');
+  const { results } = await env.DB.prepare(
+    'SELECT number, packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number IN (?2, ?3)'
+  ).bind(t.id, from, to).all();
+  const a = results.find((r) => r.number === from);
+  const b = results.find((r) => r.number === to);
+  if (!a) return err(env, 404, 'no packet in round ' + from);
+  const point = (n, r) => env.DB.prepare(
+    'UPDATE rounds SET packet_r2_key = ?3, packet_name = ?4 WHERE tournament_id = ?1 AND number = ?2'
+  ).bind(t.id, n, r.packet_r2_key, r.packet_name);
+  await env.DB.batch(b ? [point(from, b), point(to, a)] : [
+    env.DB.prepare('INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4)')
+      .bind(t.id, to, a.packet_r2_key, a.packet_name),
+    env.DB.prepare('DELETE FROM rounds WHERE tournament_id = ?1 AND number = ?2').bind(t.id, from),
+  ]);
+  await swapCatmap(env, t.id, from, to);
+  await markPub(env, t.id);
+  // as an upload does: rooms may be waiting on this round's packet
+  if (to === t.current_round + 1
+    || (t.bracket_rounds !== null && t.bracket_rounds !== undefined && to > t.current_round)) {
+    await maybeAdvance(env, t.id);
+  }
+  return json(env, { from, to, swapped: Boolean(b) });
+}
+
+// Swap two rounds' entries in the category map (a missing one swaps as
+// missing), under the same etag retry as updateCatmap.
+async function swapCatmap(env, tid, x, y) {
+  const key = `t/${tid}/catmap.json`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await env.DATA.get(key);
+    if (!cur) return;
+    const map = await cur.json().catch(() => null);
+    if (!map || !map.rounds || typeof map.rounds !== 'object') return;
+    const ex = map.rounds[String(x)];
+    const ey = map.rounds[String(y)];
+    if (ex === undefined && ey === undefined) return;
+    if (ey === undefined) delete map.rounds[String(x)]; else map.rounds[String(x)] = ey;
+    if (ex === undefined) delete map.rounds[String(y)]; else map.rounds[String(y)] = ex;
+    try {
+      const put = await env.DATA.put(key, JSON.stringify(map), {
+        httpMetadata: { contentType: 'application/json' },
+        customMetadata: cur.customMetadata || {},
+        onlyIf: { etagMatches: cur.etag },
+      });
+      if (put) return;
+    } catch (e) { /* precondition failed -> retry */ }
+  }
+}
+
 async function uploadRoster(request, url, env, t) {
   const id = t.id;
   const filename = cleanFilename(url.searchParams.get('name') || 'roster.qbj');
@@ -5661,6 +5721,7 @@ export default {
         return bumpRev(env, t.id, one ? await removeTiebreaker(env, TB_KEY(t.id), t.ckey, one) : await deleteTiebreakers(env, TB_KEY(t.id)));
       }
       if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
+      if (sub === '/packets/move' && method === 'POST') return movePacket(request, env, t);
       if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
       if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
       if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);

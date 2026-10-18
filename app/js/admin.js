@@ -1024,6 +1024,9 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
     countNote: fromSched ? (slots > fromSched ? `the schedule has ${fromSched}` : 'from the schedule') : '',
     uploadPacket: (s, round) => pub(`${a}/packet?round=${round}&name=${encodeURIComponent(s.name)}`,
       { method: 'POST', body: stagedBlob(s) }),
+    // a set's mirror keeps its rounds: the set re-points them by number
+    movePacket: t.set ? null : (from, to) => pub(`${a}/packets/move`, { method: 'POST', json: { from, to } }),
+    roundGames: (k) => ((lastDetail && lastDetail.files) || []).filter((f) => f.round === k && !f.error).length,
     uploadTb: async (name, data) => {
       try {
         const out = await pub(`${a}/tiebreakers?name=${encodeURIComponent(name)}`,

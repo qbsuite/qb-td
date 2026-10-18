@@ -176,7 +176,7 @@ export function bonusMetaHtml(results) {
 
 // A bonus part's marker as the packet writes it: its value, then its
 // difficulty when the packet gives one — [10h], [10e], [10m], or [10]
-function partMarker(bz, p) {
+export function partMarker(bz, p) {
   const values = bz && Array.isArray(bz.values) ? bz.values : [];
   const diff = bz && Array.isArray(bz.difficultyModifiers) ? bz.difficultyModifiers : [];
   const v = Number.isFinite(Number(values[p])) && values[p] !== null && values[p] !== '' ? Number(values[p]) : null;

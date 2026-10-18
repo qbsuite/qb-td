@@ -483,6 +483,36 @@ table.pktable { margin-top: 4px; border-top: 1px solid var(--line); }
 .pktable tr.slot.dragover td { background: var(--sel); }
 .pktable tr.up .dot { background: none; box-shadow: none; border: 2px solid var(--fg); border-right-color: transparent;
   width: 6px; height: 6px; animation: spin .7s linear infinite; }
+/* a row's symbol buttons, and a placed packet's drag handle */
+.icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 28px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px; background: none; color: var(--muted); vertical-align: middle; cursor: pointer; }
+.icon:hover { color: var(--fg); border-color: var(--line); background: var(--hover-bg); }
+.icon:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.pktable .pkact { white-space: nowrap; }
+.pkitem[draggable="true"] { cursor: grab; }
+.pkitem .grip { color: var(--muted); margin: 0 8px 0 -4px; letter-spacing: -3px; font-size: 13px; }
+.pkitem[draggable="true"]:hover .grip { color: var(--fg); }
+.pkundo { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; padding: 4px 0; }
+/* packet preview: the packet as pages, tossup then its bonus */
+.pkview { position: fixed; inset: 0; z-index: 50; background: rgba(20, 20, 22, .55); display: flex; flex-direction: column; }
+.pkviewbar { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.pkviewname { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pkviewbar .icon { color: var(--fg); }
+.pkviewscroll { flex: 1; overflow: auto; padding: 24px 16px 48px; }
+/* paper stays white in both themes, as a PDF viewer shows it */
+.pkpage { background: #fff; color: #1a1a1a; max-width: 760px; margin: 0 auto; padding: 48px 56px; box-shadow: 0 2px 16px rgba(0, 0, 0, .3);
+  font: 15px/1.55 Georgia, "Times New Roman", serif; }
+.pkpage .muted { color: #71717a; }
+.pkpage .bad { color: #b91c1c; }
+.pktitle { font-size: 19px; font-weight: 700; text-align: center; margin-bottom: 2px; }
+.pkcounts { text-align: center; color: #71717a; font-size: 13px; margin-bottom: 26px; }
+.pkpair { padding: 14px 0 16px; border-top: 1px solid #e4e4e7; }
+.pkq { margin-top: 6px; }
+.pkno { font-weight: 700; margin-right: 4px; }
+.pkbonus { margin-top: 18px; }
+.pkpart { margin-top: 10px; }
+.pka { margin-top: 4px; }
+.pkm { color: #71717a; font-size: 13px; margin-top: 4px; }
 
 /* Bracket colors (a schedule bracket's order in its phase, mod 8):
    the schedule editor, Live Hub and the room pages share them. */

@@ -10,11 +10,26 @@
 import { esc } from './api.js';
 import { guessRound } from '../engine/qbj.js';
 import { readZip } from '../engine/zip.js';
-import { readPacket } from './buzzview.js';
+import { readPacket, partMarker } from './buzzview.js';
+import { sanitizeHtml } from '../engine/buzz.js';
 import { parseDocxQuestions } from '../engine/docxq.js';
 import { busy } from './busy.js';
 
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many || one + 's');
+
+// the row buttons' symbols, drawn in the text colour
+const svg = (d) => `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  preview: svg('<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>'),
+  download: svg('<path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11"/>'),
+  upload: svg('<path d="M8 10V2M4.5 5.5 8 2l3.5 3.5M2.5 13.5h11"/>'),
+  close: svg('<path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>'),
+  undo: svg('<path d="M5.5 3 2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/>'),
+};
+const GRIP = '<span class="grip" aria-hidden="true">\u2807\u2807</span>';
+
+// the last move, for its Undo: {from, to, swapped}
+let lastMove = null;
 
 function stripTags(s) { return String(s || '').replace(/<[^>]*>/g, ''); }
 
@@ -88,15 +103,22 @@ export function renderPacketsUi(box, o) {
       <button id="zipauto" class="small">Assign by filename</button>
       <button id="zipclear" class="small">Clear</button>
     </div>` : ''}
+    ${lastMove ? `<div class="pkundo"><span>${lastMove.swapped
+      ? `Swapped ${nounPl} ${lastMove.from} and ${lastMove.to}.`
+      : `Moved ${noun} ${lastMove.from}&rsquo;s packet to ${noun} ${lastMove.to}.`}</span>
+      <button class="icon" id="pkundo" title="Undo" aria-label="Undo">${ICON.undo}</button></div>` : ''}
     <table class="pktable">
       ${slots.map((k) => {
         const r = rounds.find((x) => x.number === k);
+        // a placed packet drags to another round when the caller can move one
+        const drag = r && o.movePacket;
         return `<tr class="slot${r ? ' has' : ''}${r && r.warn ? ' warn' : ''}" data-round="${k}">
           <td class="pkn">${noun} ${k}</td>
           <td class="pkfile">${r
-            ? `<span class="dot"></span><a href="${esc(r.href)}" download title="Download">${esc(r.name)}</a>`
-            : `<span class="dot"></span><span class="muted">No packet yet${staged.length ? ' &middot; drop one here' : ''}</span>`}</td>
-          <td class="pkact"><button class="small" data-pickround="${k}">${r ? 'Replace' : 'Upload'}</button></td>
+            ? `<span class="pkitem"${drag ? ` draggable="true" data-move="${k}" title="Drag to another ${noun.toLowerCase()}"` : ''}>${
+              drag ? GRIP : ''}<span class="dot"></span>${esc(r.name)}</span>`
+            : `<span class="dot"></span><span class="muted">No packet yet${staged.length || o.movePacket ? ' &middot; drop one here' : ''}</span>`}</td>
+          <td class="pkact">${r ? `<button class="icon" data-preview="${k}" title="Preview" aria-label="Preview ${esc(r.name)}">${ICON.preview}</button><a class="icon" href="${esc(r.href)}" download title="Download" aria-label="Download ${esc(r.name)}">${ICON.download}</a>` : ''}<button class="icon" data-pickround="${k}" title="${r ? 'Replace' : 'Upload'}" aria-label="${r ? 'Replace' : 'Upload'} ${noun} ${k}">${ICON.upload}</button></td>
         </tr>`;
       }).join('')}
     </table>
@@ -169,8 +191,13 @@ export function renderPacketsUi(box, o) {
   // chips — a file dragged in from the desktop carries no text at all,
   // and Number('') is 0 — must not resolve to the first staged packet.
   const droppedChip = (e) => {
-    const raw = e.dataTransfer.getData('text/plain');
-    return /^\d+$/.test(raw) ? staged[Number(raw)] || null : null;
+    const m = /^chip:(\d+)$/.exec(e.dataTransfer.getData('text/plain'));
+    return m ? staged[Number(m[1])] || null : null;
+  };
+  // a placed packet's round, or null
+  const droppedRound = (e) => {
+    const m = /^round:(\d+)$/.exec(e.dataTransfer.getData('text/plain'));
+    return m ? Number(m[1]) : null;
   };
   // The Worker splits JSON only, so a .docx goes through YAPP here first,
   // the same parser the reader uses for docx packets
@@ -293,7 +320,7 @@ export function renderPacketsUi(box, o) {
     };
     $('zipclear').onclick = () => { staged.splice(0, staged.length); o.rerender(); };
     box.querySelectorAll('[data-chip]').forEach((c) => {
-      c.ondragstart = (e) => e.dataTransfer.setData('text/plain', c.dataset.chip);
+      c.ondragstart = (e) => e.dataTransfer.setData('text/plain', 'chip:' + c.dataset.chip);
     });
   }
   box.querySelectorAll('.slot').forEach((slot) => {
@@ -302,11 +329,14 @@ export function renderPacketsUi(box, o) {
     slot.ondrop = async (e) => {
       e.preventDefault();
       slot.classList.remove('dragover');
+      const from = droppedRound(e);
+      if (from !== null) { movePacket(from, Number(slot.dataset.round)); return; }
       const s = droppedChip(e);
       if (!s) return;
       slot.classList.add('up');
       try {
         await o.uploadPacket(s, Number(slot.dataset.round));
+        lastMove = null;
         unstage(s);
         o.refresh();
       } catch (err) { slot.classList.remove('up'); o.say(err.message, true); }
@@ -325,6 +355,43 @@ export function renderPacketsUi(box, o) {
       o.refresh();
     }
   };
+  // a placed packet onto another round: swapped with the packet there, or
+  // moved when it has none. Rounds with games in ask first, since their
+  // buzzpoints and categories follow the packet.
+  const movePacket = async (from, to, undo = false) => {
+    if (!o.movePacket || from === to) return;
+    const there = rounds.find((x) => x.number === to);
+    const games = (o.roundGames ? o.roundGames(from) + o.roundGames(to) : 0);
+    if (!undo && games && !confirm(`${there ? `Swap the packets of ${nounPl} ${from} and ${to}?` : `Move ${noun} ${from}'s packet to ${noun} ${to}?`} `
+      + `${plural(games, 'game')} already uploaded will use the packet now in ${games === 1 ? 'its' : 'their'} ${noun.toLowerCase()}.`)) return;
+    const rows = [from, to].map((k) => box.querySelector(`.slot[data-round="${k}"]`)).filter(Boolean);
+    rows.forEach((x) => x.classList.add('up'));
+    try {
+      await o.movePacket(from, to);
+      lastMove = undo ? null : { from, to, swapped: Boolean(there) };
+      o.refresh();
+    } catch (err) { rows.forEach((x) => x.classList.remove('up')); o.say(err.message, true); }
+  };
+  box.querySelectorAll('[data-move]').forEach((el) => {
+    el.ondragstart = (e) => {
+      lastMove = null;
+      e.dataTransfer.setData('text/plain', 'round:' + el.dataset.move);
+      e.dataTransfer.effectAllowed = 'move';
+    };
+  });
+  if ($('pkundo')) {
+    $('pkundo').onclick = () => {
+      const m = lastMove;
+      // a swap undoes itself; a move goes back the way it came
+      if (m) movePacket(m.to, m.from, true);
+    };
+  }
+  box.querySelectorAll('[data-preview]').forEach((b) => {
+    b.onclick = () => {
+      const r = rounds.find((x) => x.number === Number(b.dataset.preview));
+      if (r) openPreview(r, noun, o.say);
+    };
+  });
   const setSlots = async (n) => {
     if (n < minSlots || n > 999) return;
     try {
@@ -350,4 +417,63 @@ export function renderPacketsUi(box, o) {
       o.refresh();
     } catch (e) { if (slot) slot.classList.remove('up'); o.say(e.message, true); }
   };
+}
+
+/* ---------- packet preview ----------
+   The packet as a document: each tossup followed by its bonus, page by
+   page, read through the same parser the reader uses (a .docx goes
+   through YAPP). */
+async function openPreview(r, noun, say) {
+  const view = document.createElement('div');
+  view.className = 'pkview';
+  view.setAttribute('role', 'dialog');
+  view.setAttribute('aria-label', r.name);
+  view.innerHTML = `<div class="pkviewbar">
+      <span class="pkviewname">${esc(noun)} ${r.number} &middot; ${esc(r.name)}</span>
+      <a class="icon" href="${esc(r.href)}" download title="Download" aria-label="Download">${ICON.download}</a>
+      <button class="icon" data-close title="Close" aria-label="Close">${ICON.close}</button>
+    </div>
+    <div class="pkviewscroll"><div class="pkpage"><div class="muted">Loading the packet</div></div></div>`;
+  const close = () => { view.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  view.querySelector('[data-close]').onclick = close;
+  view.onclick = (e) => { if (e.target === view) close(); };
+  document.addEventListener('keydown', onKey);
+  document.body.append(view);
+  const page = view.querySelector('.pkpage');
+  try {
+    // the download link, without its download name
+    const res = await fetch(r.href.replace(/&dl=[^&]*/, ''));
+    if (!res.ok) throw new Error('could not load the packet (' + res.status + ')');
+    page.outerHTML = packetPagesHtml(await readPacket(res, r.name), r.name);
+  } catch (e) {
+    page.innerHTML = `<div class="bad">${esc(e.message)}</div>`;
+    if (say) say(e.message, true);
+  }
+}
+
+const answerLine = (a) => `<p class="pka">ANSWER: ${sanitizeHtml(String(a || '').replace(/^\s*ANSWER:\s*/i, ''))}</p>`;
+const metaLine = (q) => q && q.metadata ? `<p class="pkm">&lt;${esc(String(q.metadata).replace(/^<|>$/g, ''))}&gt;</p>` : '';
+
+/** A packet's pages: tossup 1, bonus 1, tossup 2, … as the packet pairs them. */
+export function packetPagesHtml(packet, name) {
+  const tus = packet.tossups || [];
+  const bns = packet.bonuses || [];
+  const n = Math.max(tus.length, bns.length);
+  const pairs = [];
+  for (let i = 0; i < n; i++) {
+    const tu = tus[i];
+    const bz = bns[i];
+    pairs.push(`<section class="pkpair">${tu ? `
+      <p class="pkq"><span class="pkno">${i + 1}.</span> ${sanitizeHtml(tu.question)}</p>
+      ${answerLine(tu.answer)}${metaLine(tu)}` : ''}${bz ? `
+      <p class="pkq pkbonus"><span class="pkno">B${i + 1}.</span> ${sanitizeHtml(bz.leadin || '')}</p>
+      ${(bz.parts || []).map((part, p) => `
+        <p class="pkq pkpart"><span class="pkno">${esc(partMarker(bz, p) || '[10]')}</span> ${sanitizeHtml(part)}</p>
+        ${answerLine((bz.answers || [])[p])}`).join('')}${metaLine(bz)}` : ''}
+    </section>`);
+  }
+  return `<div class="pkpage"><h3 class="pktitle">${esc(name)}</h3>
+    <p class="pkcounts">${plural(tus.length, 'tossup')}, ${plural(bns.length, 'bonus', 'bonuses')}</p>
+    ${pairs.join('')}</div>`;
 }

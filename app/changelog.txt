@@ -3,6 +3,9 @@ Release Notes for 10/18/2026
 [ HUB ]
 - Packet names stay as uploaded: a "+" or a long name is no longer changed, and downloads keep the exact name.
 - Fixed "Edit in MODAQ" not opening the game after today's download change.
+- Packets drag between rounds: dropping one on another swaps them, on an empty round moves it, with Undo.
+- Preview a packet as pages, each tossup followed by its bonus.
+- Packet rows use symbols: preview, download, replace.
 
 [ PUBLIC PAGE ]
 - Scoresheets and buzzpoints can go without a password once the question set is clear: "Disable password" under Public page, with a warning.
