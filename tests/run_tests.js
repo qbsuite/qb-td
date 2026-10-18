@@ -18,7 +18,7 @@ import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
-import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, questionWords, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
+import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, questionWords, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries, sideRounds } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, catOfEntry } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
@@ -1565,6 +1565,39 @@ test('roundBonuses groups per packet bonus across rooms', () => {
   assert.equal(rows[0].bonus, 2);
   assert.deepEqual(rows[0].results.map((r) => [r.room, r.team, r.total]),
     [['R1', 'Alpha', 20], ['R2', 'Gamma', 10]]);
+});
+
+test('sideRounds keeps one team or player: their buzzes, and a team\'s bonuses', () => {
+  const qbj = { ...BUZZ_QBJ,
+    match_questions: [
+      { question_number: 1,
+        tossup_question: { type: 'tossup', question_number: 1 },
+        buzzes: [buzz('Beta', 'Bob', 8, -5), buzz('Alpha', 'Ann', 33, 15)],
+        bonus: { question: { parts: 3, type: 'bonus', question_number: 1 },
+          parts: [{ controlled_points: 10 }, { controlled_points: 0 }, { controlled_points: 10 }] } },
+      { question_number: 2,
+        tossup_question: { type: 'tossup', question_number: 2 },
+        buzzes: [buzz('Alpha', 'Cy', 20, 10)],
+        bonus: { question: { parts: 3, type: 'bonus', question_number: 2 },
+          parts: [{ controlled_points: 10 }, { controlled_points: 10 }, { controlled_points: 0 }] } },
+      { question_number: 3,
+        tossup_question: { type: 'tossup', question_number: 3 },
+        buzzes: [] },
+    ] };
+  const entries = [{ round: 1, room: 'R1', qbj }, { round: 2, room: 'R1', qbj }];
+  const team = sideRounds(entries, [1], 'Alpha');
+  assert.deepEqual(team.map((r) => r.round), [1]);
+  assert.deepEqual(team[0].tossups.map((t) => [t.tossup, t.buzzes.map((b) => b.player)]),
+    [[1, ['Ann']], [2, ['Cy']]]); // Bob's neg is Beta's, the dead tossup is nobody's
+  assert.deepEqual(team[0].tossups.map((t) => t.dead), [false, false]);
+  assert.deepEqual(team[0].bonuses.map((b) => [b.bonus, b.results.map((r) => r.total)]), [[1, [20]], [2, [20]]]);
+  const ann = sideRounds(entries, [1, 2], 'Alpha', 'Ann');
+  assert.deepEqual(ann.map((r) => [r.round, r.tossups.map((t) => t.tossup), r.bonuses.length]),
+    [[1, [1], 0], [2, [1], 0]]);
+  const beta = sideRounds(entries, [1], 'Beta');
+  assert.deepEqual(beta.map((r) => [r.tossups.length, r.bonuses.length]), [[1, 0]]);
+  assert.equal(beta[0].tossups[0].dead, false); // Bob negged, but Ann got it in that game
+  assert.deepEqual(sideRounds(entries, [1], 'Gamma'), []);
 });
 
 test('mainAnswerHtml keeps the first answerline with its formatting', () => {

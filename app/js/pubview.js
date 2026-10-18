@@ -19,7 +19,7 @@ import { buildReport, reportData } from '../engine/report.js';
 import { mountReport, reportPlace } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
 import { scheduleFinished } from '../engine/finals.js';
-import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes } from '../engine/buzz.js';
+import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes, sideRounds } from '../engine/buzz.js';
 import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket, setWordFormat } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, UNKNOWN_CAT } from '../engine/cats.js';
@@ -44,11 +44,13 @@ let rawEntries = [];       // {id, round, room, qbj}, deduped — buzz + categor
 const roundCache = new Map(); // round number (as a string) -> {v, entries} already fetched
 let loadedIds = new Set();    // file ids the fetched rounds actually contained
 let roundsComplete = true;    // false when a round failed to fetch this pass
-let buzzMode = 'round';    // 'round' | 'category' | 'summary'
+let buzzMode = 'round';    // 'round' | 'category' | 'player' | 'team' | 'replacements' | 'summary'
 let buzzView = null;       // the round By Round shows
 let buzzCat = '';          // the category By Category shows
 let buzzSub = '';
 let buzzSub2 = '';
+let buzzTeam = '';         // the team By Player and By Team show
+let buzzPlayer = '';       // the player By Player shows
 let catmap = null;         // text-free per-tossup categories from /pub/:slug/cats
 let lastCats;              // its stamp
 let catView = 'cat';       // 'cat' (players) | 'team' | 'player' | 'questions'
@@ -708,6 +710,49 @@ async function renderBuzzCategory(box, rounds) {
       { label: `R${b.round} B${b.bonus}`, nest: false })).join('') || '<div class="muted">None</div>'}`;
 }
 
+// By Player (one player's buzzes) and By Team (the team's buzzes and the
+// bonuses it heard): each finished round they played, laid out as in By
+// Round with only their side kept.
+async function renderBuzzSide(box, rounds, byPlayer) {
+  const rows = buzzSummary(buzzEntries());
+  const teams = [...new Set(rows.map((p) => p.team))].sort((a, b) => a.localeCompare(b));
+  if (!teams.length) { box.innerHTML = '<div class="muted">No buzzes yet</div>'; return; }
+  if (!teams.includes(buzzTeam)) { buzzTeam = teams[0]; buzzPlayer = ''; }
+  const players = rows.filter((p) => p.team === buzzTeam).map((p) => p.player)
+    .sort((a, b) => a.localeCompare(b));
+  if (byPlayer && !players.includes(buzzPlayer)) buzzPlayer = players[0];
+  const at = { mode: buzzMode, team: buzzTeam, player: byPlayer ? buzzPlayer : '' };
+  const side = sideRounds(rawEntries, rounds, at.team, at.player);
+  // a dropdown, not chips: a big field's teams would wrap to rows of them
+  box.innerHTML = `
+    <div style="margin-bottom:10px">
+      <select id="buzzteamsel" aria-label="Team">
+        ${teams.map((t, i) => `<option value="${i}" ${t === buzzTeam ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+      </select>
+    </div>
+    ${byPlayer ? `<div class="chipstack">${chipsHtml(players.map((p) => ({ v: p, label: p })), buzzPlayer, 'buzzplayer')}</div>` : ''}
+    <div id="buzzsideout"><div class="muted">Loading packets</div></div>`;
+  $('buzzteamsel').onchange = () => {
+    buzzTeam = teams[Number($('buzzteamsel').value)];
+    buzzPlayer = '';
+    render();
+  };
+  wire(box, 'buzzplayer', (v) => { buzzPlayer = v; });
+  const packets = new Map();
+  for (const [n, p] of await Promise.all(side.map(async ({ round: n }) => [n, await buzzPacketOrNull(n)]))) {
+    if (p === false) return;
+    packets.set(n, p);
+  }
+  if (tab !== 'buzz' || buzzMode !== at.mode || buzzTeam !== at.team
+    || (byPlayer && buzzPlayer !== at.player)) return; // user moved on mid-fetch
+  const out = box.querySelector('#buzzsideout');
+  if (!out) return;
+  out.innerHTML = side.map((r, i) => `
+    <div class="rhead"${i ? ' style="margin-top:18px"' : ''}>Round ${r.round}</div>
+    ${roundHtml(r.tossups, r.bonuses, packets.get(r.round))}`).join('')
+    || '<div class="muted">No buzzes yet</div>';
+}
+
 async function renderBuzzReplacements(box, read) {
   box.innerHTML = '<div class="muted">Loading replacements</div>';
   const got = await fetchBuzzTiebreakers();
@@ -747,6 +792,7 @@ function renderBuzz(box) {
   box.innerHTML = `
     ${viewsHtml([{ v: 'round', label: 'By Round' },
       ...(byCat ? [{ v: 'category', label: 'By Category' }] : []),
+      { v: 'player', label: 'By Player' }, { v: 'team', label: 'By Team' },
       ...(anyReplacements ? [{ v: 'replacements', label: 'Replacements' }] : []),
       { grow: true }, { v: 'summary', label: 'Summary' }], buzzMode, 'buzzmode')}
     ${buzzMode === 'round' ? `<div class="chipstack">${chipsHtml([
@@ -759,6 +805,7 @@ function renderBuzz(box) {
   if (buzzMode === 'summary') renderBuzzSummary($('buzzout'));
   else if (buzzMode === 'replacements') renderBuzzReplacements($('buzzout'), replacements);
   else if (buzzMode === 'category') renderBuzzCategory($('buzzout'), rounds);
+  else if (buzzMode === 'player' || buzzMode === 'team') renderBuzzSide($('buzzout'), rounds, buzzMode === 'player');
   else renderBuzzRound($('buzzout'), buzzView);
 }
 

@@ -132,25 +132,27 @@ export function tossupMetaHtml(buzzes, heard, positioned = buzzes) {
  * right, a filled dot per correct buzz, a hollow ring per neg. `words` is
  * the question's word count; without packet text the track spans the
  * latest buzz instead. The exact words ride in the title for hover.
+ * `dead` says whether to tag it Dead, when the buzzes shown are only one
+ * side's (buzz.js sideRounds).
  */
-export function buzzTrackHtml(buzzes, words) {
+export function buzzTrackHtml(buzzes, words, dead = !buzzes.some((b) => b.value > 0)) {
   const n = Math.max(words || 0, ...buzzes.map((b) => b.position + 1), 1);
   const said = buzzes.map((b) => `${b.value < 0 ? 'neg' : b.value > 0 ? '+' + b.value : '0'} at word ${b.position + 1}`)
     .join(', ') || 'No buzzes';
   const cls = (b) => (b.value > 10 ? 'pow' : b.value > 0 ? 'get' : b.value < 0 ? 'neg' : 'zero');
-  const dead = buzzes.some((b) => b.value > 0) ? '' : '<span class="bad deadtag">Dead</span>';
-  return `${dead}<span class="btrack" role="img" title="${esc(said)}" aria-label="${esc(said)}">${
+  return `${dead ? '<span class="bad deadtag">Dead</span>' : ''}<span class="btrack" role="img" title="${esc(said)}" aria-label="${esc(said)}">${
     buzzes.map((b) => `<i class="bdot ${cls(b)}" style="left:${(((b.position + 0.5) / n) * 100).toFixed(1)}%"></i>`).join('')}</span>`;
 }
 
 /** One tossup of a packet (1-based `tossup`), collapsed to its answerline.
     `label` replaces the "T4" in front (buzzpoints by category: "R3 T4").
     Without `heard` (one tournament's rounds) the buzzes show as a track;
-    with it (a set's editors, over every room) as rates. */
-export function tossupHtml(tossup, buzzes, packet, heard, label, tb) {
+    with it (a set's editors, over every room) as rates. `dead` as
+    buzzTrackHtml takes it. */
+export function tossupHtml(tossup, buzzes, packet, heard, label, tb, dead) {
   const tu = !tb && packet && packet.tossups && packet.tossups[tossup - 1];
   const meta = heard ? tossupMetaHtml(buzzes, heard)
-    : buzzTrackHtml(buzzes, tu ? questionWords(tu.question, wordFormat).end + 1 : 0);
+    : buzzTrackHtml(buzzes, tu ? questionWords(tu.question, wordFormat).end + 1 : 0, dead);
   return `
     <details class="qd">
       <summary><span class="roundcell">${label || tb || 'T' + tossup}</span>
@@ -250,7 +252,10 @@ export function roundHtml(tossups, bonuses, packet) {
   const numbers = [...new Set([...tossupByNo.keys(), ...bonusByNo.keys()])].sort((a, b) => a - b);
   return numbers.map((n) => {
     let html = '';
-    if (tossupByNo.has(n)) html += tossupHtml(n, tossupByNo.get(n).buzzes, packet);
+    if (tossupByNo.has(n)) {
+      const t = tossupByNo.get(n);
+      html += tossupHtml(n, t.buzzes, packet, undefined, '', '', t.dead);
+    }
     if (bonusByNo.has(n)) html += bonusHtml(n, bonusByNo.get(n).results, packet);
     return html;
   }).join('');

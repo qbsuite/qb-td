@@ -16,6 +16,7 @@ Release Notes for 10/18/2026
 - Buzzpoints without a password are rate-limited per visitor, like password attempts, and the key they use is locked with a Worker secret.
 
 [ BUZZPOINTS ]
+- Added By Player (a player's buzzes) and By Team (a team's buzzes and bonuses), with the team picked from a dropdown.
 - Bonus parts show their marker as the packet writes it ([10h], [10e], [10m]), with how many rooms got each part at the right of its answer.
 - Each question shows its packet metadata line (author and category) under the answer.
 - Shorter message on Replacements before the tournament closes.

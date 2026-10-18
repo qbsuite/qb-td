@@ -103,6 +103,29 @@ export function roundTossupBuzzes(entries, round) {
 }
 
 /**
+ * One team's side of the given rounds, or with `player` one player's:
+ * per round, the tossups they buzzed on keeping only their buzzes, and
+ * for a team the bonuses it heard. [{round, tossups, bonuses}] in the
+ * shapes roundTossupBuzzes / roundBonuses give, each tossup with `dead`:
+ * nobody got it in the games they buzzed in. Tiebreakers are left out
+ * (the Replacements view lists them), and so are rounds where they did
+ * nothing.
+ */
+export function sideRounds(entries, rounds, team, player = '') {
+  const mine = (b) => b.team === team && (!player || b.player === player);
+  return rounds.map((round) => ({
+    round,
+    tossups: roundTossupBuzzes(entries, round).map((t) => {
+      const buzzes = t.buzzes.filter(mine);
+      const rooms = new Set(buzzes.map((b) => b.room));
+      return { ...t, buzzes, dead: !t.buzzes.some((b) => rooms.has(b.room) && b.value > 0) };
+    }).filter((t) => !t.tb && t.buzzes.length),
+    bonuses: player ? [] : roundBonuses(entries, round)
+      .map((b) => ({ ...b, results: b.results.filter((r) => r.team === team) })).filter((b) => !b.tb && b.results.length),
+  })).filter((r) => r.tossups.length || r.bonuses.length);
+}
+
+/**
  * Bonus results in one match qbj: [{bonus, team, parts, bounce, total,
  * bounceTotal}]. bonus = the packet bonus number MODAQ assigned; team =
  * the controlling team (from the cycle's correct buzz); parts = the
