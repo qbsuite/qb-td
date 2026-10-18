@@ -2793,6 +2793,7 @@ async function moveFile(request, env, t, fileId) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
   if (body && body.round !== undefined) return moveFileRound(env, t, fileId, Number(body.round));
+  if (body && body.modaq !== undefined) return saveModaqFiles(env, t, fileId, body.modaq);
   const bucketId = Number(body.bucket_id);
   if (!Number.isInteger(bucketId)) return err(env, 400, 'bucket_id required');
   const [file, bucket] = await Promise.all([
@@ -2890,6 +2891,43 @@ async function moveFileRound(env, t, fileId, round) {
     await markPub(env, t.id);
   }
   return json(env, { ok: true, round });
+}
+
+// MODAQ's own export files for a reader upload from before the reader saved
+// them, regenerated from its saved game with MODAQ's code
+// (tools/modaq_regen.mjs): kept beside the upload's halves as `modaq`, which
+// the qbj and game downloads hand back as they are (engine/modaqfile.js).
+// The stats' qbj half is not touched. The texts must be this game's: its
+// two teams and the round it is filed under.
+async function saveModaqFiles(env, t, fileId, modaq) {
+  if (!modaq || typeof modaq.qbj !== 'string' || typeof modaq.game !== 'string') return err(env, 400, 'modaq {qbj, game} texts required');
+  if (modaq.qbj.length + modaq.game.length > MAX_UPLOAD) return err(env, 413, 'too large');
+  const { results } = await env.DB.prepare(
+    'SELECT kind, error, round, summary, r2_key FROM files WHERE id = ?1 AND tournament_id = ?2'
+  ).bind(fileId, t.id).all();
+  if (!results.length) return err(env, 404, 'no such file');
+  const f = results[0];
+  if (f.kind !== 'combined' || f.error) return err(env, 400, 'not a reader upload');
+  let qbj; let game;
+  try { qbj = JSON.parse(modaq.qbj); game = JSON.parse(modaq.game); } catch (e) { return err(env, 400, 'not JSON'); }
+  const names = (Array.isArray(qbj && qbj.match_teams) ? qbj.match_teams : []).map((mt) => mt && mt.team && mt.team.name);
+  let teams = null;
+  try { teams = JSON.parse(f.summary || 'null').teams; } catch (e) { /* no summary */ }
+  const same = (x, y) => Array.isArray(x) && Array.isArray(y) && x.length === 2 && [...x].sort().join('\n') === [...y].sort().join('\n');
+  if (!same(names, teams)) return err(env, 400, 'these files are another game: the teams differ');
+  if (qbj._round !== f.round) return err(env, 400, `the QBJ says round ${qbj._round}; the upload is filed under round ${f.round}`);
+  // MODAQ's game file names its teams through its players
+  const gameTeams = game && Array.isArray(game.players) ? [...new Set(game.players.map((pl) => pl && pl.teamName))] : null;
+  if (!same(gameTeams, teams)) return err(env, 400, 'the game file is another game');
+  const obj = await env.DATA.get(f.r2_key);
+  if (!obj) return err(env, 404, 'stored file missing');
+  const rawKey = await blobKey(t, f.r2_key);
+  let root;
+  try { root = JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey))); } catch (e) { return err(env, 400, 'stored file unreadable'); }
+  if (!root || typeof root !== 'object' || !root.qbj) return err(env, 400, 'not a reader upload');
+  root.modaq = { qbj: modaq.qbj, game: modaq.game };
+  await putBlob(env, f.r2_key, JSON.stringify(root), 'application/json', rawKey);
+  return json(env, { ok: true });
 }
 
 // Write `round` into a qbj match as _round (the match object itself, or
