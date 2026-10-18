@@ -2369,6 +2369,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     btn.onclick = async () => {
       const to = Number(sel.value);
       if (to === was) return;
+      // a game's round decides its stats, its place in the schedule and
+      // the public page: ask before moving it
+      if (!confirm(`Move this game from round ${was} to round ${to}? Its stats, buzzpoints and the public page will count it as round ${to}. Please only do this if the game was filed under the wrong round.`)) return;
       const run = busy(btn, { label: 'Moving' });
       try {
         await pub(a + '/files/' + sel.dataset.fileround, { method: 'POST', json: { round: to } });
