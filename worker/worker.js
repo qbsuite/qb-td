@@ -2214,9 +2214,11 @@ async function updateTournament(request, env, t) {
     if (s.length > 4096) return err(env, 400, 'settings too large');
     // Scoresheets and buzzpoints are only ever behind the stats password:
     // neither switches on without one stored (settings.buzz.hash).
+    // (or with the TD's "No password: the set is clear", statsOpen)
     const key = body.settings.buzz;
     const hasKey = Boolean(key && typeof key.hash === 'string' && key.hash);
-    if ((body.settings.scoresheets === true || (key && key.mode === 'password')) && !hasKey) {
+    if ((body.settings.scoresheets === true || (key && key.mode === 'password')) && !hasKey
+      && body.settings.statsOpen !== true) {
       return err(env, 400, 'set a password first');
     }
     sets.push('settings = ?'); binds.push(s);
@@ -2231,6 +2233,16 @@ async function updateTournament(request, env, t) {
       && t.ckey && hasKey) {
       sets.push('buzz_wrap = ?');
       binds.push(await wrapKey(body.buzz_token, 'buzz', t.ckey));
+    }
+    // No password (statsOpen): the TD's own request — which holds the
+    // content key — leaves the Worker a copy it can open for viewers'
+    // finished-round packets (openContentKey). Never served; gone again the
+    // moment the TD asks for a password back.
+    if (body.settings.statsOpen === true && t.ckey) {
+      await env.DATA.put(OPEN_KEY(t.id), JSON.stringify({ wrap: await wrapKey(openSecret(env), 'open', t.ckey) }),
+        { httpMetadata: { contentType: 'application/json' } });
+    } else if (body.settings.statsOpen !== true) {
+      await env.DATA.delete(OPEN_KEY(t.id));
     }
   }
   // broadcasts were retired (9/28/2026); a dashboard still open from
@@ -3752,8 +3764,33 @@ function mirrorBuzzLocked(setSettings) {
 // (set_settings), which can veto the tournament's own.
 function buzzConfig(t) {
   if (t.set_settings && mirrorBuzzLocked(t.set_settings)) return null;
+  if (statsOpen(t)) {
+    const on = (tournamentSettings(t).buzz || {}).mode === 'password';
+    return on ? OPEN_STATS : null;
+  }
   const b = statsKey(t);
   return b && b.mode === 'password' ? b : null;
+}
+
+// The TD's "No password: the set is clear" (settings.statsOpen): buzzpoints
+// and scoresheets need no password, and the Worker opens finished rounds'
+// packets itself. Only for a question set nobody will play again — anyone
+// with the public link reads those rounds' questions. The rest holds: only
+// rounds every room has finished, and a set still being played elsewhere
+// keeps its mirrors' buzzpoints off (mirrorBuzzLocked above).
+const OPEN_STATS = Object.freeze({ open: true, mode: 'open' });
+const OPEN_KEY = (tid) => `t/${tid}/open-key.json`;
+const openSecret = (env) => env.OPEN_KEY_SECRET || 'qbtd-stats-open';
+// The content key the TD left for "No password" (saved with the setting),
+// or null when there's none — set the option again to make one.
+async function openContentKey(env, t) {
+  const obj = await env.DATA.get(OPEN_KEY(t.id));
+  const x = obj ? await obj.json().catch(() => null) : null;
+  if (!x || typeof x.wrap !== 'string') return null;
+  try { return await unwrapKey(openSecret(env), 'open', x.wrap); } catch (e) { return null; }
+}
+function statsOpen(t) {
+  return tournamentSettings(t).statsOpen === true;
 }
 
 // The stats password itself, whatever it is switched on for. settings.buzz
@@ -3779,7 +3816,7 @@ function tournamentSettings(t) {
 // Scoresheets on the public Scoreboard: the TD's switch, and only ever
 // behind the stats password.
 function scoresheetsOn(t) {
-  return tournamentSettings(t).scoresheets === true && Boolean(statsKey(t));
+  return tournamentSettings(t).scoresheets === true && (statsOpen(t) || Boolean(statsKey(t)));
 }
 
 // Category stats: the Categories tab, on unless the TD has switched it
@@ -3791,7 +3828,7 @@ function catStatsOn(t) {
 // What the public page's password unlocks, for whichever of buzzpoints
 // and scoresheets is on; null when neither is.
 function unlockKey(t) {
-  return buzzConfig(t) || (scoresheetsOn(t) ? statsKey(t) : null);
+  return buzzConfig(t) || (scoresheetsOn(t) ? (statsOpen(t) ? OPEN_STATS : statsKey(t)) : null);
 }
 
 // The game-format half of a tournament's settings, for the public page.
@@ -3926,7 +3963,25 @@ async function buzzLimit(request, env, scope) {
   }
   return null;
 }
+// The way into a gated public route: the rate limit for a request that
+// brings a password, then the published tournament. A request without one
+// is turned away unless the TD chose no password (statsOpen) — that case
+// costs the one lookup, which a password tournament's refusal used to skip.
+// {t} or {res: the refusal}.
+async function buzzEntry(request, env, slug) {
+  const authed = /^Buzz ./.test(request.headers.get('Authorization') || '');
+  if (authed) {
+    const limited = await buzzLimit(request, env, slug);
+    if (limited) return { res: limited };
+  }
+  const t = await getPublishedTournament(env, slug);
+  if (!t) return { res: err(env, 404, 'not found') };
+  if (!authed && !statsOpen(t)) return { res: err(env, 401, 'bad password') };
+  return { t };
+}
+
 async function buzzGate(request, env, b) {
+  if (b && b.open) return null; // no password: the set is clear (statsOpen)
   if (!(await buzzAllowed(request, b))) return err(env, 401, 'bad password');
   return null;
 }
@@ -3936,9 +3991,14 @@ async function buzzGate(request, env, b) {
 // that key into blobKey's holder. A missing or mismatched wrap means the
 // password was set by a client that never sent the token — setting it
 // again repairs it.
-async function gatedPacket(request, env, obj, key, name, wrap, holderOf) {
+async function gatedPacket(request, env, obj, key, name, wrap, holderOf, open = null) {
   let rawKey = null;
-  if (blobEnc(obj)) {
+  // no password (statsOpen): the key the TD left for it opens the packet
+  if (open && blobEnc(obj)) {
+    const ckey = await openContentKey(env, open);
+    if (!ckey) return err(env, 409, 'packets locked — choose No password again in the hub');
+    rawKey = await blobKey(holderOf(ckey), key);
+  } else if (blobEnc(obj)) {
     if (!wrap) return err(env, 409, 'packets locked — set the buzzpoints password again');
     try {
       const unwrapped = await unwrapKey((request.headers.get('Authorization') || '').slice(5), 'buzz', wrap);
@@ -3956,10 +4016,9 @@ async function gatedPacket(request, env, obj, key, name, wrap, holderOf) {
 // same question-security rule as the moderator route — played rounds
 // only, where played means every room has turned the round in.
 async function pubQPacket(request, url, env, slug) {
-  const limited = await buzzLimit(request, env, slug);
-  if (limited) return limited;
-  const t = await getPublishedTournament(env, slug);
-  if (!t) return err(env, 404, 'not found');
+  const entry = await buzzEntry(request, env, slug);
+  if (entry.res) return entry.res;
+  const { t } = entry;
   const b = buzzConfig(t);
   if (!b) return err(env, 404, 'not found');
   const denied = await buzzGate(request, env, b);
@@ -3976,7 +4035,7 @@ async function pubQPacket(request, url, env, slug) {
   if (!obj) return err(env, 404, 'packet missing');
   // the token opens the tournament's key; on a mirror that opens the set's
   return gatedPacket(request, env, obj, results[0].packet_r2_key, results[0].packet_name,
-    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }));
+    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }), b.open ? t : null);
 }
 
 // Checks a viewer's stats password, nothing more: the public page asks
@@ -3984,10 +4043,9 @@ async function pubQPacket(request, url, env, slug) {
 // (nothing for the qpacket probe to fetch) still turns a wrong password
 // away. Rate-limited like the other gated routes.
 async function pubUnlock(request, env, slug) {
-  const limited = await buzzLimit(request, env, slug);
-  if (limited) return limited;
-  const t = await getPublishedTournament(env, slug);
-  if (!t) return err(env, 404, 'not found');
+  const entry = await buzzEntry(request, env, slug);
+  if (entry.res) return entry.res;
+  const { t } = entry;
   const key = unlockKey(t);
   if (!key) return err(env, 404, 'not found');
   const denied = await buzzGate(request, env, key);
@@ -4000,10 +4058,9 @@ async function pubUnlock(request, env, slug) {
 // once the tournament has closed, since until then a replacement may still
 // be read in a later round. 404 when none was read.
 async function pubQTiebreakers(request, url, env, slug) {
-  const limited = await buzzLimit(request, env, slug);
-  if (limited) return limited;
-  const t = await getPublishedTournament(env, slug);
-  if (!t) return err(env, 404, 'not found');
+  const entry = await buzzEntry(request, env, slug);
+  if (entry.res) return entry.res;
+  const { t } = entry;
   const b = buzzConfig(t);
   if (!b) return err(env, 404, 'not found');
   const denied = await buzzGate(request, env, b);
@@ -4013,7 +4070,7 @@ async function pubQTiebreakers(request, url, env, slug) {
   const obj = await env.DATA.get(key);
   if (!obj) return err(env, 404, 'no tiebreakers read');
   return gatedPacket(request, env, obj, key, 'tiebreakers.json',
-    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }));
+    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }), b.open ? t : null);
 }
 
 // The /pub/:slug body. Served fresh on every page load or refresh: the
@@ -4057,7 +4114,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
   let buzzDone = [];
   let buzzV = null;
   if (key) {
-    buzzV = await buzzStamp(key);
+    buzzV = key.open ? 'open' : await buzzStamp(key);
     const sched = schedObj ? await schedObj.json().catch(() => null) : null;
     buzzDone = doneRounds(rows, buckets.results.filter((x) => !byeRoomIds(t.settings).includes(x.id)).length, sched,
       packetRounds.results.map((r) => r.number));
@@ -4072,6 +4129,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
     // buzzpoints tab: the mode, the KDF parameters a viewer's browser
     // needs to derive the key, and buzz_v — which moves with the password
     // so viewers re-enter it. Never the hash.
+    // ('open': no password, the set is clear)
     buzz: buzz ? buzz.mode : null,
     // the Scoreboard's scoresheets, behind the same password and the
     // same finished-round rule (buzz_done) as buzzpoints

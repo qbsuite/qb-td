@@ -485,7 +485,10 @@ function renderSchedule(box) {
 // stretching happens once, on unlock, rather than on every packet fetch.
 // It carries the server's buzz_v stamp, so when the TD sets a new password
 // the stamp moves, the stale entry is dropped, and viewers re-enter.
+
+// nothing to enter: everything reads as unlocked, and no key is sent.
 function buzzStored() {
+  if (state && state.buzz_v === 'open') return { tok: '', v: 'open', open: true };
   try {
     const s = JSON.parse(sessionStorage.getItem(BUZZ_KEY));
     return s && typeof s.tok === 'string' ? s : null;
@@ -494,7 +497,7 @@ function buzzStored() {
 
 function buzzAuthHeaders() {
   const s = buzzStored();
-  return (state.buzz || state.scoresheets) && s ? { Authorization: 'Buzz ' + s.tok } : {};
+  return (state.buzz || state.scoresheets) && s && !s.open ? { Authorization: 'Buzz ' + s.tok } : {};
 }
 
 // Text of every tiebreaker the tournament read, for the Replacements view:
