@@ -15,6 +15,7 @@ Release Notes for 10/18/2026
 - Each question shows its packet metadata line (author and category) under the answer.
 - Shorter message on Replacements before the tournament closes.
 - Buzzes land on the word the reader clicked: italics and pronunciation guides no longer shift them, and a buzz after the question shows at its end.
+- Pronunciation guides are faded, as in MODAQ, and a buzz marks only the word before its guide.
 
 [ EXPORTS ]
 - A game's qbj and MODAQ game file download exactly as MODAQ's own Backup to JSON writes them, under MODAQ's file names. The QBJ bundle holds the same files.

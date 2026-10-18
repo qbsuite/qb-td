@@ -79,13 +79,14 @@ export function tossupTextHtml(tu, buzzes) {
     if (!byPos.has(pos)) byPos.set(pos, []);
     byPos.get(pos).push({ i, b });
   });
-  const mark = (html, pos) => {
+  // a guide inside a word stays outside its buzz mark, as in MODAQ
+  const mark = (lead, pos, rest = '') => {
     const hits = byPos.get(pos);
-    if (!hits) return html;
+    if (!hits) return lead + rest;
     const cls = buzzWordClass(hits.map((h) => h.b));
-    return `<span class="bw ${cls}">${html}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
+    return `<span class="bw ${cls}">${lead}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>${rest}`;
   };
-  const text = words.map((w) => (w.at === null ? w.html : mark(w.html, w.at)));
+  const text = words.map((w) => (w.at === null ? w.html : mark(w.lead, w.at, w.rest)));
   if (byPos.has(end)) text.push(mark(END_MARK, end));
   return '<div class="q">' + text.join(' ') + '</div>'
     + answerLineHtml(tu.answer) + metadataHtml(tu);

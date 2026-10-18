@@ -340,6 +340,8 @@ details.rgroup summary .pill { margin: 0 4px; }
 .bw.neg sup { color: var(--bad); }
 .bw.zero { text-decoration-color: var(--muted); }
 .bw.zero sup { color: var(--muted); }
+/* a pronunciation guide, faded as MODAQ shows it */
+.q .pg { color: var(--muted); }
 .pow-t { color: var(--link); }
 details.qd summary {
   padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer;

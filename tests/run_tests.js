@@ -1615,6 +1615,11 @@ test('questionWords numbers words as MODAQ does: tags inside words, guides and p
   assert.deepEqual(questionWords('<b>for <em>ten</em></b> points', ACF).words.map((w) => w.html),
     ['<b>for</b>', '<em><b>ten</b></em>', 'points']);
   assert.deepEqual(questionWords('', ACF), { words: [], end: 0 });
+  // a guide joined to its word: one word, its buzz mark on what comes before the guide
+  const dv = questionWords('of Dvo\u0159\u00e1k&nbsp;(\u201cd\u2019VORE-zhahk\u201d).', ACF).words[1];
+  assert.equal(dv.at, 1);
+  assert.equal(dv.lead, 'Dvo\u0159\u00e1k');
+  assert.equal(dv.rest, ' <span class="pg">(\u201cd\u2019VORE-zhahk\u201d)</span>.');
 
   // locked against the installed MODAQ: the same count and the same word
   // at every index

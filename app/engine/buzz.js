@@ -284,7 +284,8 @@ const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * `format` is the game format the rooms read with (read_core.js
  * effectiveFormat): its powers and pronunciationGuideMarkers, MODAQ's
  * ["(", ")"] when it names none. Each word's html is self-contained
- * (em/b/u/sub/sup reopened around it), safe to wrap in its own span.
+ * (em/b/u/sub/sup reopened around it), safe to wrap in its own span;
+ * `lead` and `rest` split it at a guide inside the word.
  */
 export function questionWords(text, format = {}) {
   text = String(text || '');
@@ -334,11 +335,13 @@ export function questionWords(text, format = {}) {
 
   // getWords: power marks and guides don't count
   const powers = Array.isArray(format.powers) ? format.powers : [];
-  const html = (word) => word.map((sg) => {
+  // a guide is faded, as MODAQ shows it (class "pg")
+  const html = (segs) => segs.map((sg) => {
     const tags = ['em', 'b', 'u', 'sub', 'sup'].filter((k) => sg[k]);
     const body = sg.text.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ')
       .replace(/&(?!(?:amp|lt|gt|quot|#\d+|#x[\da-f]+);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return tags.map((k) => `<${k}>`).join('') + body + tags.slice().reverse().map((k) => `</${k}>`).join('');
+    const out = tags.map((k) => `<${k}>`).join('') + body + tags.slice().reverse().map((k) => `</${k}>`).join('');
+    return sg.pron ? `<span class="pg">${out}</span>` : out;
   }).join('');
   let n = 0;
   const words = [];
@@ -346,7 +349,14 @@ export function questionWords(text, format = {}) {
     // MODAQ keeps an empty word (two spaces after a guide); it shows nothing
     const full = word.map((sg) => sg.text).join('').trim();
     const counted = !powers.some((p) => full.startsWith(p.marker)) && !(word.length && word[0].pron);
-    words.push({ html: html(word), at: counted ? n++ : null });
+    // a guide joined to its word ("Dvořák&nbsp;(“d’VORE-zhahk”).") is part
+    // of that word, but a buzz marks only what comes before it: `lead`,
+    // then `rest` from the guide on
+    const g = word.findIndex((sg) => sg.pron);
+    const lead = html(g < 0 ? word : word.slice(0, g));
+    const rest = g < 0 ? '' : html(word.slice(g));
+    const trimmed = lead.replace(/\s+$/, '');
+    words.push({ html: lead + rest, lead: trimmed, rest: (trimmed !== lead ? ' ' : '') + rest, at: counted ? n++ : null });
   }
   return { words, end: n };
 }
