@@ -3780,6 +3780,8 @@ function buzzConfig(t) {
 // keeps its mirrors' buzzpoints off (mirrorBuzzLocked above).
 const OPEN_STATS = Object.freeze({ open: true, mode: 'open' });
 const OPEN_KEY = (tid) => `t/${tid}/open-key.json`;
+// OPEN_KEY_SECRET (a Worker secret) locks the stored copy, so the copy alone
+// opens nothing; the fallback only serves local development.
 const openSecret = (env) => env.OPEN_KEY_SECRET || 'qbtd-stats-open';
 // The content key the TD left for "No password" (saved with the setting),
 // or null when there's none — set the option again to make one.
@@ -3950,6 +3952,13 @@ async function buzzLimit(request, env, scope) {
   // a request with no password at all needs no lookup to turn away
   const auth = request.headers.get('Authorization') || '';
   if (!/^Buzz ./.test(auth) || auth.length > 1024) return err(env, 401, 'bad password');
+  return ipLimit(request, env, scope);
+}
+
+// The per-IP cap behind buzzLimit, for a request whatever it carries: a
+// tournament with no password (statsOpen) has nothing to guess, but its
+// packets are still only handed out at a viewer's pace.
+async function ipLimit(request, env, scope) {
   // Guessing the password is an online attack, so cap attempts per IP.
   // Generous enough for a viewer opening every round of a long tournament,
   // tight enough that a wordlist is hopeless. Two limits of what this is:
@@ -3977,6 +3986,10 @@ async function buzzEntry(request, env, slug) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return { res: err(env, 404, 'not found') };
   if (!authed && !statsOpen(t)) return { res: err(env, 401, 'bad password') };
+  if (!authed) {
+    const limited = await ipLimit(request, env, slug);
+    if (limited) return { res: limited };
+  }
   return { t };
 }
 

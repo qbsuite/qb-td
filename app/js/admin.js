@@ -600,24 +600,23 @@ function renderStatsSec(a, t, settings) {
   // own redraws (a refresh, a save) don't close a half-typed password
   if (statsUi.slug !== t.slug) Object.assign(statsUi, { slug: t.slug, want: null, changing: false, showExample: false, typed: '' });
   const hasKey = () => Boolean(settings.buzz && settings.buzz.hash);
-  // "No password: the set is clear" (settings.statsOpen): both switches work
+  // "Disable password", once the set is clear (settings.statsOpen): both switches work
   // without one (worker.js statsOpen)
   const open = () => settings.statsOpen === true;
   const canShow = () => hasKey() || open();
   const buzzOn = () => Boolean(settings.buzz && settings.buzz.mode === 'password');
   const sheetsOn = () => settings.scoresheets === true && canShow();
   const OPEN_WARNING = 'Anyone with the public link will see buzzpoints and scoresheets, and buzzpoints show the '
-    + 'questions of finished rounds. Please only choose this once the question set is clear, when no other '
-    + 'tournament will play it.';
+    + 'questions of finished rounds. Please only choose this once the question set is clear.';
   const WHAT = { scoresheets: 'scoresheets', buzz: 'buzzpoints' };
 
   const pwRow = () => {
     if (open()) {
-      return `<div class="row"><span class="pill warn">No password</span>
-          <button id="pwneed">Use a password</button></div>
+      return `<div class="row"><span class="pill warn">Password disabled</span>
+          <button id="pwneed">Enable password</button></div>
         <p class="warntext" style="margin:6px 0 0">${OPEN_WARNING}</p>`;
     }
-    const noPw = '<button class="linkbtn" id="pwopen">No password (the set is clear)</button>';
+    const noPw = '<button class="linkbtn" id="pwopen">Disable password</button>';
     if (hasKey() && !statsUi.changing) {
       return `<div class="row"><span class="pill on">Password set</span>
           <button id="pwchange">Change password</button>${noPw}</div>
@@ -766,11 +765,11 @@ function renderStatsSec(a, t, settings) {
     // no password, once the set is clear: asks first, with the warning
     if ($('pwopen')) {
       $('pwopen').onclick = async () => {
-        if (!confirm('Show scoresheets and buzzpoints without a password?\n\n' + OPEN_WARNING)) return;
+        if (!confirm('Disable the password for scoresheets and buzzpoints?\n\n' + OPEN_WARNING)) return;
         try {
           await saveSettings({ ...settings, statsOpen: true });
           statsUi.want = null; statsUi.changing = false;
-          say('No password: scoresheets and buzzpoints are open to anyone with the public link');
+          say('Password disabled: scoresheets and buzzpoints are open to anyone with the public link');
           showDetail();
         } catch (e) { say(e.message, true); }
       };
@@ -786,7 +785,7 @@ function renderStatsSec(a, t, settings) {
             if (next.buzz) next.buzz = { ...next.buzz, mode: 'off' };
           }
           await saveSettings(next);
-          say(hasKey() ? 'Password needed again' : 'Password needed again: scoresheets and buzzpoints are off until you set one');
+          say(hasKey() ? 'Password enabled' : 'Password enabled: scoresheets and buzzpoints are off until you set one');
           showDetail();
         } catch (e) { say(e.message, true); }
       };
