@@ -80,7 +80,7 @@ export function matchFilenames(round, nameA, nameB) {
     packet carried appended tiebreakers (meta.tb) also report which pool
     questions were read — always, even when the list is empty, so a
     re-export that no longer reaches the tiebreakers clears its old log. */
-export function combinedUpload(match, round, storeText, tbUsed = null, protests = null, progress = null) {
+export function combinedUpload(match, round, storeText, tbUsed = null, protests = null, progress = null, modaq = null) {
   let game = null;
   try { game = JSON.parse(storeText); } catch (e) { /* upload the qbj anyway */ }
   return JSON.stringify({
@@ -94,6 +94,8 @@ export function combinedUpload(match, round, storeText, tbUsed = null, protests 
     // the full regulation count, so the hub can't tell an early upload
     // from the file itself
     ...(progress ? { progress } : {}),
+    // MODAQ's own QBJ and game texts (engine/modaqfile.js), for downloads
+    ...(modaq ? { modaq } : {}),
   });
 }
 

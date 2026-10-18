@@ -39,6 +39,7 @@
 // stay up — the publish flag, not the admin link, gates /pub.
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
+import { modaqExport, qbjTextWithRound } from '../app/engine/modaqfile.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
@@ -2756,11 +2757,14 @@ async function storedFileResponse(env, obj, rawKey, dl, part) {
   } catch (e) { return err(env, 400, 'not a combined file'); }
   const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
   if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
+  // MODAQ's own file for this half (engine/modaqfile.js), under the round
+  // the upload is filed in
+  const round = Number(typeof parsed.qbj === 'object' && parsed.qbj ? parsed.qbj._round : NaN);
+  const text = modaqExport(parsed, Number.isInteger(round) ? round : undefined)[part];
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Content-Disposition', attachmentHeader(dl));
-  // indented as MODAQ writes its own exports (QBJ.js, ExportToJsonDialog)
-  return new Response(JSON.stringify(half, null, 2), { status: 200, headers });
+  return new Response(text, { status: 200, headers });
 }
 
 async function deleteFile(env, t, fileId) {
@@ -2859,6 +2863,8 @@ async function moveFileRound(env, t, fileId, round) {
     // a reader upload is {qbj, game, ...}; a plain .qbj is the match itself
     const qbj = root && root.qbj && typeof root.qbj === 'object' ? root.qbj : root;
     if (!stampRound(qbj, round)) return err(env, 400, 'no match in this file');
+    // and MODAQ's own QBJ text, kept for downloads (engine/modaqfile.js)
+    if (root.modaq && typeof root.modaq.qbj === 'string') root.modaq.qbj = qbjTextWithRound(root.modaq.qbj, round);
     await putBlob(env, f.r2_key, JSON.stringify(root), 'application/json', rawKey);
     const pobj = await env.DATA.get(pubGameKey(t.id, fileId));
     const entry = pobj ? await pobj.json().catch(() => null) : null;

@@ -4,7 +4,7 @@ Release Notes for 10/18/2026
 - Packet names stay as uploaded: a "+" or a long name is no longer changed, and downloads keep the exact name.
 
 [ EXPORTS ]
-- Downloaded game files (qbj and MODAQ game halves, the QBJ bundle) are indented, as MODAQ writes its own exports.
+- A game's qbj and MODAQ game file download exactly as MODAQ's own Backup to JSON writes them, under MODAQ's file names. The QBJ bundle holds the same files.
 
 Release Notes for 10/17/2026
 

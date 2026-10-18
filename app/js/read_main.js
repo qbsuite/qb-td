@@ -31,6 +31,7 @@ import { gameProgress } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
 import { protestReport } from './protests.js';
 import { Tossup } from 'modaq/src/state/PacketState.js';
+import { toQBJString } from 'modaq/src/qbj/QBJ.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 import { slotLabel } from '../engine/brackets.js';
 
@@ -273,8 +274,15 @@ function mountMODAQ(id, meta, isNew) {
       const app = tbBridge.appState;
       const progress = app && typeof meta.reached === 'number'
         ? gameProgress(Math.max(meta.reached, app.uiState.cycleIndex + 1), app.game.gameFormat.regulationTossupCount) : null;
+      // MODAQ's own export of this game, made the way its Backup to JSON
+      // dialog makes it (engine/modaqfile.js): the hub hands these texts
+      // back as they are, so a TD's download is MODAQ's file
+      const modaq = app ? {
+        qbj: toQBJString(app.game, app.game.packet.name ?? app.uiState.packetFilename, meta.round),
+        game: JSON.stringify(app.game, null, 2),
+      } : null;
       const body = combinedUpload(qbj, meta.round, storeText,
-        meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests, progress);
+        meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests, progress, modaq);
       // a stalled connection gives up rather than leave "Uploading" up
       const stop = new AbortController();
       const timer = setTimeout(() => stop.abort(), UPLOAD_WAIT_MS);

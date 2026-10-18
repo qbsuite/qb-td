@@ -1171,9 +1171,13 @@ const menu = async (id) => {
   const f = await menu('dlzip');
   const entries = await readZip(new Uint8Array(f.bytes));
   const names = entries.map((e) => e.name);
-  const wantQbj = good.map((g) => `round-${g.round}/${g.filename.replace(/\.qbtd\.json$/i, '.qbj')}`);
-  const wantGame = d.files.filter((g) => g.kind === 'combined' || g.kind === 'game')
-    .map((g) => `round-${g.round}/${g.filename.replace(/\.qbtd\.json$/i, '_Game.json')}`);
+  // a reader upload goes in under MODAQ's own names (engine/modaqfile.js):
+  // its teams in the order its QBJ lists them; a .qbj added by hand keeps its name
+  const teamsOf = (g) => { try { return JSON.parse(g.summary).teams; } catch (e) { return null; } };
+  const modaqName = (g, ext) => `round-${g.round}/Round_${g.round}_${teamsOf(g).join('_')}${ext}`;
+  const wantQbj = good.map((g) => (g.kind === 'combined' ? modaqName(g, '.qbj') : `round-${g.round}/${g.filename}`));
+  const wantGame = d.files.filter((g) => g.kind === 'combined').map((g) => modaqName(g, '_Game.json'))
+    .concat(d.files.filter((g) => g.kind === 'game').map((g) => `round-${g.round}/${g.filename}`));
   ok('17 exports: the QBJ bundle has every game as a .qbj', wantQbj.every((n) => names.includes(n)), { names, wantQbj });
   ok('17 exports: and every MODAQ game file, split out', wantGame.length >= 2 && wantGame.every((n) => names.includes(n)), { names, wantGame });
   ok('17 exports: no combined .qbtd.json in it', !names.some((n) => /\.qbtd\.json$/i.test(n)), names);

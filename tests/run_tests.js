@@ -31,6 +31,7 @@ import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk }
 import HDWHITE from '../app/engine/hdwhite.js';
 import { finalsSources, finalsProgress, finalsFill, scheduleFinished } from '../app/engine/finals.js';
 import { eachLimit } from '../app/js/limit.js';
+import { modaqExport, modaqFilenames, qbjTextWithRound } from '../app/engine/modaqfile.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -5718,5 +5719,27 @@ await testA('eachLimit: any count of items, in order, never more than n at once,
   }
 });
 
-console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
+test('modaqfile: a reader upload hands back MODAQ\'s own export texts unchanged; older uploads are rebuilt in MODAQ\'s shape', () => {
+  const qbj = { tossups_read: 20, match_teams: [{ team: { name: 'A B' } }, { team: { name: 'C' } }], match_questions: [], _round: 3, packets: 'P 1 + 2' };
+  const qbjText = JSON.stringify(qbj, null, 2);
+  const game = { packet: { tossups: [] }, cycles: [], teamNames: ['A B', 'C'] };
+  const gameText = JSON.stringify(game, null, 2);
+  // saved at upload: verbatim
+  const root = { qbj: { ...qbj }, game: { game, uiState: {} }, modaq: { qbj: qbjText, game: gameText } };
+  let out = modaqExport(root, 3);
+  assert.equal(out.qbj, qbjText);
+  assert.equal(out.game, gameText);
+  // filed under another round: only _round moves
+  out = modaqExport(root, 2);
+  assert.equal(out.qbj, JSON.stringify({ ...qbj, _round: 2 }, null, 2));
+  assert.equal(qbjTextWithRound(qbjText, 3), qbjText, 'the same round: the very same text');
+  // an older upload: the reader's qbj had _round appended after packets, and the game half was {game, uiState}
+  const old = { qbj: { tossups_read: 20, match_teams: qbj.match_teams, match_questions: [], packets: 'P 1 + 2', _round: 3 }, game: { game, uiState: { x: 1 } } };
+  out = modaqExport(old, 3);
+  assert.equal(out.qbj, qbjText, 'MODAQ\'s key order: _round before packets');
+  assert.equal(out.game, gameText, 'the game alone, as MODAQ writes it');
+  // MODAQ's file names: team names joined by "_", spaces kept
+  assert.deepEqual(modaqFilenames(3, ['A B', 'C']), { qbj: 'Round_3_A B_C.qbj', game: 'Round_3_A B_C_Game.json' });
+});
 
+console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

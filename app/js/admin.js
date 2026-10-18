@@ -27,6 +27,7 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
+import { modaqExport, modaqFilenames } from '../engine/modaqfile.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimProgress, prelimRounds, autoFill, finishedThrough } from '../engine/schedule.js';
 import { finalsProgress, finalsFill } from '../engine/finals.js';
@@ -1997,10 +1998,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const fileLinks = (f) => {
     const link = (params, label) =>
       `<a href="${esc(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}`)}" download>${label}</a>`;
+    // named as MODAQ names its own exports (engine/modaqfile.js)
     const base = f.filename.replace(/\.qbtd\.json$/i, '');
+    const s = fileSummary(f);
+    const names = s ? modaqFilenames(f.round, s.teams) : { qbj: base + '.qbj', game: base + '_Game.json' };
     return f.kind === 'combined' && !f.error
-      ? link(`part=qbj&dl=${encodeURIComponent(base + '.qbj')}`, 'qbj') + ' '
-        + link(`part=game&dl=${encodeURIComponent(base + '_Game.json')}`, 'game')
+      ? link(`part=qbj&dl=${encodeURIComponent(names.qbj)}`, 'qbj') + ' '
+        + link(`part=game&dl=${encodeURIComponent(names.game)}`, 'game')
       : link(`dl=${encodeURIComponent(f.filename)}`, 'Download');
   };
   const protestMarker = (f) => {
@@ -2728,6 +2732,7 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
   const matches = [];
   const raw = [];   // qbj halves: the zip download + the served stats bundle
   const games = []; // game halves of combined uploads, for the zip only
+  const modaqFiles = []; // MODAQ's own two files of each reader upload, for the zip
   // Each file is its own round trip to the Worker (a quarter second or
   // more), so they're read FETCH_AT_ONCE at a time rather than one after
   // another, then parsed in upload order so the output doesn't change.
@@ -2757,11 +2762,18 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
       m.filename = f.filename.replace(/\.qbtd\.json$/i, '.qbj');
       matches.push(m);
       raw.push({
-        id: f.id, round: m.round, room: m.room,
+        id: f.id, round: m.round, room: m.room, reader: f.kind === 'combined',
         filename: m.filename,
         text: JSON.stringify(payload),
       });
       if (f.kind === 'combined' && full.game && typeof full.game === 'object') {
+        // MODAQ's own two files for this game (engine/modaqfile.js)
+        const exp = modaqExport(full, m.round);
+        // the names MODAQ wrote: its own QBJ's teams, before any roster rename
+        let named = m.teams.map((tm) => tm.name);
+        try { named = JSON.parse(exp.qbj).match_teams.map((mt) => mt.team.name); } catch (e) { /* keep the parsed names */ }
+        const names = modaqFilenames(m.round, named);
+        modaqFiles.push({ round: m.round, qbjName: names.qbj, qbj: exp.qbj, gameName: names.game, game: exp.game });
         games.push({
           round: m.round,
           filename: f.filename.replace(/\.qbtd\.json$/i, '_Game.json'),
@@ -2772,7 +2784,7 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
       errors.push(f.filename + ': ' + e.message);
     }
   }
-  return { roster, matches, raw, games, errors };
+  return { roster, matches, raw, games, errors, modaqFiles };
 }
 
 /* ---------- playoff slots fill themselves ----------
@@ -2924,6 +2936,7 @@ function showStats({ a, t, files, settings, got }) {
   const matches = got.matches.filter(inPick);
   const raw = got.raw.filter(inPick);
   const games = got.games.filter(inPick);
+  const modaqFiles = (got.modaqFiles || []).filter(inPick);
   const allRaw = got.raw;
   out.innerHTML = '';
 
@@ -3022,10 +3035,15 @@ function showStats({ a, t, files, settings, got }) {
       seen.add(name);
       entries.push({ name, data });
     };
-    // indented as MODAQ writes its own exports (2 spaces)
+    // a reader upload: MODAQ's own .qbj and _Game.json, as its Backup to
+    // JSON dialog writes them (engine/modaqfile.js)
+    for (const x of modaqFiles) {
+      if (x.qbj) add(x.round, x.qbjName, x.qbj);
+      if (x.game) add(x.round, x.gameName, x.game);
+    }
+    // a .qbj the TD added by hand: indented as MODAQ writes (2 spaces)
     const indent = (text) => { try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) { return text; } };
-    for (const r of raw) add(r.round, r.filename, indent(r.text));
-    for (const g of games) add(g.round, g.filename, indent(g.text));
+    for (const r of raw.filter((x) => !x.reader)) add(r.round, r.filename, indent(r.text));
     // game files that went up separately from their .qbj (Add a game)
     for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
       try { add(f.round, f.filename, JSON.stringify(await fetchOwnedJson(a, f.r2_key), null, 2)); }
