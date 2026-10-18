@@ -96,6 +96,7 @@ export function reportSrcdoc(pages, { start = null } = {}) {
           e.preventDefault();
           e.stopPropagation();
           var to = trail.pop();
+          if (to.page === 'outside') { parent.postMessage({ qbtdReport: 'back' }, '*'); return; }
           unmark();
           show(to.page + '-top', false, to.link, to.el);
         });
@@ -128,6 +129,9 @@ export function reportSrcdoc(pages, { start = null } = {}) {
     window.addEventListener('load', function () { show(current); });
     // opened from the other layout: the same page, scrolled to the same
     // team, player, game or round when there is one
+    // opened from a page outside the report (the schedule): its Back
+    // link goes back there
+    if (startAt && startAt.back) { names.outside = startAt.back; trail.push({ page: 'outside' }); }
     if (startAt && startAt.anchor && document.getElementById(startAt.anchor)) {
       var startEl = document.getElementById(startAt.anchor);
       if (startAt.marked) mark(startEl, pageOf(startAt.anchor)); // its bar, carried over
@@ -168,7 +172,9 @@ export function reportSrcdoc(pages, { start = null } = {}) {
 }
 
 /** Mount the report in `box`; the frame grows to its content. */
-// opts.start: {page, anchor} to open at (reportPlace from the other layout)
+// opts.start: {page, anchor} to open at (reportPlace from the other layout),
+// with `back` the name of the page outside it to offer a way back to
+// (opts.onBack then goes there)
 export function mountReport(box, pages, opts = {}) {
   // transparent, not white: the frame's own document paints its background
   // (light or dark), so a dark reader gets no white flash before it loads
@@ -176,6 +182,7 @@ export function mountReport(box, pages, opts = {}) {
   const frame = box.querySelector('iframe');
   frame.srcdoc = reportSrcdoc(pages, opts);
   const onMessage = (e) => {
+    if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'back' && opts.onBack) opts.onBack();
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'height') {
       frame.style.height = Math.max(400, e.data.height + 16) + 'px';
       // a followed link: bring its target (or the page's top) into view

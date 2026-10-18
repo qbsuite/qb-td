@@ -292,25 +292,44 @@ function poolsIn(rounds) {
 const keepGame = (g) => !poolSel || poolOf(g) === poolSel;
 const roomName = (g) => (schedule.rooms[g.room] ? schedule.rooms[g.room].name : '');
 
-// One team's line of a game: the winner's line is bold, the loser's
-// muted, a playoff placeholder italic.
-function lineHtml(slot, name, pts, won, lost) {
-  return `<div class="gl${won ? ' won' : ''}${lost ? ' lost' : ''}${slot && slot.label ? ' ph' : ''}">`
-    + `<span class="t">${esc(name || '—')}</span>${pts !== null ? `<span class="s">${pts}</span>` : ''}</div>`;
+// All rounds keeps a name on one line: one longer than NAME_CAP is cut in
+// the middle and keeps its team letter ("University of Illin… D"), and
+// the full name shows on hover or tap (wireNameTips)
+const NAME_CAP = 22;
+function shortName(n) {
+  if (n.length <= NAME_CAP) return n;
+  const sp = n.lastIndexOf(' ');
+  const last = sp > 0 && n.length - sp <= 3 ? n.slice(sp + 1) : '';
+  return n.slice(0, NAME_CAP - (last ? last.length + 2 : 1)).trimEnd() + '…' + (last ? ' ' + last : '');
+}
+function nameHtml(name, short) {
+  const s = short ? shortName(name) : name;
+  return s === name ? esc(name) : `<span class="cut" tabindex="0" data-full="${esc(name)}">${esc(s)}</span>`;
 }
 
-// A game's two team lines, as [first, second].
-function gameLines(g, round, results) {
+// One team's line of a game: the winner's line is bold, the loser's
+// muted, a playoff placeholder italic. A played game's scores (`game`
+// set) open its box score in Stats.
+function lineHtml(slot, name, pts, won, lost, { short = false, game = null } = {}) {
+  const score = pts === null ? ''
+    : game ? `<a href="#" class="s" data-game="${esc(game)}" title="Box score">${pts}</a>` : `<span class="s">${pts}</span>`;
+  return `<div class="gl${won ? ' won' : ''}${lost ? ' lost' : ''}${slot && slot.label ? ' ph' : ''}">`
+    + `<span class="t">${name ? nameHtml(name, short) : '—'}</span>${score}</div>`;
+}
+
+// A game's two team lines, as [first, second]; `short` cuts long names.
+function gameLines(g, round, results, short = false) {
   const a = slotText(g.a);
   const b = slotText(g.b);
   const m = a && b && g.a.team && g.b.team ? resultFor(results, round, a, b) : null;
-  if (!m) return [lineHtml(g.a, a, null), lineHtml(g.b, b, null)];
+  if (!m) return [lineHtml(g.a, a, null, false, false, { short }), lineHtml(g.b, b, null, false, false, { short })];
   const ma = m.teams.find((t) => t.name === a);
   const mb = m.teams.find((t) => t.name === b);
   // a forfeit: W for the winner, FF for the team that forfeited
   const shown = (x, y) => (m.forfeit ? (resultOf(x, y) === 'W' ? 'W' : 'FF') : x.points);
-  return [lineHtml(g.a, a, shown(ma, mb), resultOf(ma, mb) === 'W', resultOf(ma, mb) === 'L'),
-    lineHtml(g.b, b, shown(mb, ma), resultOf(mb, ma) === 'W', resultOf(mb, ma) === 'L')];
+  const game = [round.round, a, b].map((x) => encodeURIComponent(x)).join('|');
+  return [lineHtml(g.a, a, shown(ma, mb), resultOf(ma, mb) === 'W', resultOf(ma, mb) === 'L', { short, game }),
+    lineHtml(g.b, b, shown(mb, ma), resultOf(mb, ma) === 'W', resultOf(mb, ma) === 'L', { short, game })];
 }
 const gameCell = (g, round, results) => gameLines(g, round, results).join('');
 
@@ -333,19 +352,23 @@ function renderScheduleGrid(box) {
         // two table rows a round, one per team, so a name that wraps
         // grows its whole line and the lines stay level across the rooms
         const now = round.round === cur ? ' now' : '';
+        // the byes split between the two lines too, side by side on each
+        const half = Math.ceil(round.byes.length / 2);
+        const byeLine = (list) => (list.length ? `<div class="gl${list.every((s) => s && s.label) ? ' ph' : ''}"><span class="t">${
+          list.map((s) => (slotText(s) ? nameHtml(slotText(s), true) : '—')).join(', ')}</span></div>` : '');
         const lines = schedule.rooms.map((_, roomI) => {
           if (!used[roomI]) return null;
           const g = round.games.find((x) => x.room === roomI && keepGame(x));
-          return g ? gameLines(g, round, results) : ['', ''];
+          return g ? gameLines(g, round, results, true) : ['', ''];
         }).filter(Boolean);
         return `
       <tr>
         <td class="roundcell${now}" rowspan="2">${round.round}</td>
         ${lines.map(([a]) => `<td class="la${now}">${a}</td>`).join('')}
-        ${hasByes ? `<td${now ? ' class="now"' : ''} rowspan="2">${round.byes.map((s) =>
-          `<div class="gl${s && s.label ? ' ph' : ''}"><span class="t">${esc(slotText(s)) || '—'}</span></div>`).join('')}</td>` : ''}
+        ${hasByes ? `<td class="la bye${now}">${byeLine(round.byes.slice(0, half))}</td>` : ''}
       </tr>
-      <tr>${lines.map(([, b]) => `<td class="lb${now}">${b}</td>`).join('')}</tr>`;
+      <tr>${lines.map(([, b]) => `<td class="lb${now}">${b}</td>`).join('')}${
+        hasByes ? `<td class="lb bye${now}">${byeLine(round.byes.slice(half))}</td>` : ''}</tr>`;
       }).join('')}
     </table>
     </div>`;
@@ -487,6 +510,74 @@ function renderSchedule(box) {
   if (teamFilter && teams.includes(teamFilter)) renderTeamView($('schedout'), teamFilter);
   else if (schedView === 'now') renderNow($('schedout'));
   else renderScheduleGrid($('schedout'));
+  wireNameTips($('schedout'));
+  $('schedout').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-game]');
+    if (!a) return;
+    e.preventDefault();
+    openGame(a.dataset.game);
+  });
+}
+
+// A cut name's full name, in one label laid over the page (a table's
+// scroll box would clip one inside it): on hover or focus, and on tap
+// for a phone; scrolling or tapping elsewhere closes it.
+let nameTip = null;
+function wireNameTips(box) {
+  if (!nameTip) {
+    nameTip = document.createElement('div');
+    nameTip.className = 'nametip';
+    nameTip.hidden = true;
+    document.body.appendChild(nameTip);
+    const hide = () => { nameTip.hidden = true; };
+    window.addEventListener('scroll', hide, true);
+    document.addEventListener('click', (e) => { if (!e.target.closest('.cut')) hide(); });
+  }
+  const show = (el) => {
+    nameTip.textContent = el.dataset.full;
+    nameTip.hidden = false;
+    const r = el.getBoundingClientRect();
+    const w = nameTip.offsetWidth;
+    nameTip.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+    nameTip.style.top = Math.max(8, r.top - nameTip.offsetHeight - 6) + 'px';
+  };
+  const hide = (e) => { if (e.target.closest('.cut')) nameTip.hidden = true; };
+  box.addEventListener('mouseover', (e) => { const c = e.target.closest('.cut'); if (c) show(c); });
+  box.addEventListener('mouseout', hide);
+  box.addEventListener('focusin', (e) => { const c = e.target.closest('.cut'); if (c) show(c); });
+  box.addEventListener('focusout', hide);
+  box.addEventListener('click', (e) => { const c = e.target.closest('.cut'); if (c) show(c); });
+}
+
+// A played game's score opens its box score in Stats, in the layout the
+// reader last picked, marked, with a link back to the schedule where it
+// was left (scroll, and how far each table was scrolled sideways).
+let schedPlace = null;
+let pendingGame = null; // New layout: {round, a, b} to open at
+function openGame(key) {
+  const [round, a, b] = key.split('|').map((x) => decodeURIComponent(x));
+  schedPlace = { y: window.scrollY, x: [...document.querySelectorAll('#schedout .tablewrap')].map((w) => w.scrollLeft) };
+  if (!statsLayout) statsLayout = readPref(STATS_LAYOUT_KEY) === 'new' ? 'new' : 'classic';
+  const game = { round: Number(round), a, b };
+  if (statsLayout === 'new') {
+    statsSec = 'games';
+    pendingGame = game;
+    newBack = [{ sec: 'schedule', y: 0 }];
+  } else {
+    const rd = reportData(statsOpts());
+    const g = rd.games.find((x) => sameGame(x, game));
+    pendingPlace = g ? { page: 'games', anchor: g.anchor, marked: true, back: 'Schedule' } : { page: 'games', anchor: 'games-Round-' + round };
+  }
+  setTab('stats');
+}
+const sameGame = (x, { round, a, b }) => x.round === round
+  && x.teams.length === 2 && x.teams.some((t) => t.name === a) && x.teams.some((t) => t.name === b);
+function backToSchedule() {
+  const at = schedPlace;
+  setTab('schedule');
+  if (!at) return;
+  document.querySelectorAll('#schedout .tablewrap').forEach((w, i) => { if (at.x[i]) w.scrollLeft = at.x[i]; });
+  window.scrollTo(0, at.y);
 }
 
 /* ---------- buzzpoints tab ---------- */
@@ -1489,11 +1580,24 @@ function renderNewStats(box) {
   // the whole day, its standings every team in its final place
   const stages = statStages(all);
   if (!standView) standView = readPref(STAND_VIEW_KEY) === 'grid' ? 'grid' : 'table';
+  if (pendingGame && stages.length) {
+    const st = pickStage(stages, false);
+    if (st !== 'combined' && !stages.find((x) => x.name === st).own.includes(pendingGame.round)) {
+      statStage = (stages.find((x) => x.own && x.own.includes(pendingGame.round)) || { name: 'combined' }).name;
+    }
+  }
   const stage = pickStage(stages, statsSec === 'standings' && standView === 'grid');
   const own = stage && stage !== 'combined' ? stages.find((x) => x.name === stage).own : null;
   const rd = own ? reportData({ name: state.name, matches: dedupeMatches(matches).filter((m) => own.includes(m.round)),
     roster, settings, schedule }) : all;
   const ids = newIds(rd);
+  let opened = null;
+  if (pendingGame) {
+    const g = rd.games.find((x) => sameGame(x, pendingGame));
+    newMark = g ? ids.game(g.id) : ids.round(pendingGame.round);
+    opened = newMark;
+    pendingGame = null;
+  }
   const vals = rd.vals.filter((v) => v !== 0);
   const pp = `PP${rd.regTossups}TUH`;
   const grid = statsSec === 'standings' && standView === 'grid';
@@ -1516,11 +1620,12 @@ function renderNewStats(box) {
     if (sec) el.classList.add('nmark');
     const from = newBack[newBack.length - 1];
     if (from) {
-      const label = (NEW_SECS.find(([k]) => k === from.sec) || [])[1];
+      const label = from.sec === 'schedule' ? 'Schedule' : (NEW_SECS.find(([k]) => k === from.sec) || [])[1];
       (sec ? el.querySelector('.nhead') : el).insertAdjacentHTML('beforeend',
         ` <a href="#" class="nback" data-back="1">← Back to ${esc(label || 'the last page')}</a>`);
     }
   }
+  if (opened && el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - 8));
   if (pendingPlace) {
     const at = pendingPlace.anchor && [...box.querySelectorAll('[data-at]')].find((x) => x.dataset.at === pendingPlace.anchor);
     if (at && pendingPlace.marked && at.classList.contains('nsec')) at.classList.add('nmark'); // its bar, carried over
@@ -1533,6 +1638,7 @@ function renderNewStats(box) {
     e.preventDefault();
     if (a.dataset.back) {
       const from = newBack.pop();
+      if (from.sec === 'schedule') { newMark = null; backToSchedule(); return; }
       statsSec = from.sec; newMark = from.mark;
       render();
       window.scrollTo(0, from.y);
@@ -1547,6 +1653,8 @@ function renderNewStats(box) {
     if (target) window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - 8));
   };
 }
+
+const statsOpts = () => ({ name: state.name, matches: dedupeMatches(matches), roster, settings: effectiveFormat(state.format), schedule });
 
 function renderStatsTab(box) {
   // a redraw (new games on Refresh, a new password) keeps the Classic
@@ -1585,10 +1693,10 @@ function renderStatsTab(box) {
   // same rules the TO's own download uses: the report is scaled and its
   // overtime split by the tournament's regulation tossup count, and the
   // schedule's stages and pools head its standings
-  const opts = { name: state.name, matches: dedupeMatches(matches), roster, settings: effectiveFormat(state.format), schedule };
+  const opts = statsOpts();
   let pages = buildReport(opts);
   if (state.scoresheets && buzzStored() && sheetsShown()) pages = withSheets(pages, reportData(opts));
-  unmountReport = mountReport(box.querySelector('.reportbox'), pages, { start: pendingPlace });
+  unmountReport = mountReport(box.querySelector('.reportbox'), pages, { start: pendingPlace, onBack: backToSchedule });
   pendingPlace = null;
 }
 

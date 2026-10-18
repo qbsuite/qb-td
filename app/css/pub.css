@@ -25,6 +25,18 @@
    team lines on the next, so a wrapped name keeps the lines level */
 .sched td.la { border-bottom: 0; padding-bottom: 1px; }
 .sched td.lb { padding-top: 1px; }
+/* one line a name; a cut one is underlined, its full name in .nametip */
+.sched .gl .t { white-space: nowrap; }
+.gl .cut { text-decoration: underline dotted var(--muted); text-underline-offset: 3px; cursor: default; }
+.gl .cut:focus-visible { outline: 2px solid var(--act); outline-offset: 1px; border-radius: 3px; }
+.nametip {
+  position: fixed; z-index: 50; pointer-events: none; white-space: nowrap;
+  background: var(--fg); color: var(--bg); font-size: 13px; font-weight: 500;
+  padding: 4px 8px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+/* a played game's score links to its box score */
+.gl a.s { color: inherit; text-decoration: none; }
+.gl a.s:hover, .gl a.s:focus-visible { text-decoration: underline; }
 .wtag {
   background: var(--win-bg); color: var(--win-fg); font-weight: 600;
   border-radius: 6px; padding: 1px 6px; white-space: nowrap;

@@ -1245,7 +1245,7 @@ await click('[data-schedview="all"]');
 await waitJs(`!!document.querySelector('table.sched')`, 'the All rounds grid');
 {
   const want = sched.phases.flatMap((p) => p.rounds.flatMap((r) => r.games)).length;
-  const got = await js(`document.querySelectorAll('table.sched td.la > .gl').length`);
+  const got = await js(`document.querySelectorAll('table.sched td.la:not(.bye) > .gl').length`);
   ok('20 public: All rounds lists every scheduled game', got === want, { got, want });
 }
 await reload();

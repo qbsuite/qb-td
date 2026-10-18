@@ -9,7 +9,8 @@ Release Notes for 10/18/2026
 
 [ PUBLIC PAGE ]
 - Scoresheets and buzzpoints can go without a password once the question set is clear: "Disable password" under Public page, with a warning.
-- All rounds keeps each round's team lines level across the rooms when a long team name wraps.
+- All rounds keeps each team name on one line: a long name is shortened, and hovering or tapping it shows the full name.
+- A played game's score on the schedule opens its box score in Stats (New or Classic, as last picked), with a link back to the schedule.
 - Winners on the schedule are shown in bold, without the green box.
 
 [ SECURITY ]
