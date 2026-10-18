@@ -265,34 +265,88 @@ export function tokenizeQuestion(text) {
     .filter(Boolean);
 }
 
+// MODAQ's reader directives (FormattedTextParser defaultReaderDirectives):
+// read aloud as a cue, never buzzable
+const READER_DIRECTIVES = ['(emphasize)', '(emphasise)', '(pause)', '(read slowly)',
+  '[emphasize]', '[emphasise]', '[pause]', '[read slowly]'];
+const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
- * Question text -> per-word display HTML, aligned 1:1 with
- * tokenizeQuestion's positions: every tag still acts as a word boundary
- * (so buzz indices are unchanged), but b/strong/u/i/em formatting is
- * kept — reopened and closed around each word, so every entry is
- * self-contained and safe to wrap in its own span.
+ * A tossup's words exactly as MODAQ numbers them for word_index
+ * (PacketState Tossup.getWords over FormattedTextParser), so a buzz lands
+ * on the word the reader clicked: {words: [{html, at}], end}.
+ *   - a word runs until whitespace, across tags: "<em>Blood Wedding</em>."
+ *     is two words, the second "Wedding."
+ *   - pronunciation guides, power marks and reader directives are shown
+ *     but not counted (at: null)
+ *   - `end` is MODAQ's end-of-question marker, the word after the last:
+ *     a buzz there came once the question was finished
+ * `format` is the game format the rooms read with (read_core.js
+ * effectiveFormat): its powers and pronunciationGuideMarkers, MODAQ's
+ * ["(", ")"] when it names none. Each word's html is self-contained
+ * (em/b/u/sub/sup reopened around it), safe to wrap in its own span.
  */
-export function tokenizeQuestionHtml(text) {
-  const words = [];
-  const open = [];
-  const parts = String(text || '').split(/(<[^>]*>)/);
-  for (let pi = 0; pi < parts.length; pi++) {
-    const part = parts[pi];
-    if (pi % 2) {  // captured tag — a word boundary, exactly like tokenizeQuestion
-      const m = /^<(\/?)(b|strong|u|i|em)\b[^>]*>$/i.exec(part);
-      if (!m) continue;
-      const tag = m[2].toLowerCase();
-      if (!m[1]) open.push(tag);
-      else if (open.lastIndexOf(tag) !== -1) open.splice(open.lastIndexOf(tag), 1);
-      continue;
-    }
-    for (const w of part.replace(/&nbsp;/g, ' ').split(/\s+/)) {
-      if (!w) continue;
-      const t = w.replace(/&(?!(?:amp|lt|gt|quot|#\d+|#x[\da-f]+);)/gi, '&amp;')
-        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      words.push(open.map((x) => '<' + x + '>').join('') + t
-        + open.slice().reverse().map((x) => '</' + x + '>').join(''));
-    }
+export function questionWords(text, format = {}) {
+  text = String(text || '');
+  const g = Array.isArray(format.pronunciationGuideMarkers) ? format.pronunciationGuideMarkers : ['(', ')'];
+  const guides = [[g[0], g[1]]];
+  // MODAQ reads straight and curly quotes in a guide alike
+  if (g[0].includes('"') || g[1].includes('"')) guides.push([g[0].replace(/"/g, '\u201c'), g[1].replace(/"/g, '\u201d')]);
+  if (g[0].includes('\u201c') || g[1].includes('\u201d')) guides.push([g[0].replace(/\u201c/g, '"'), g[1].replace(/\u201d/g, '"')]);
+  const extra = guides.map((m) => `|${escRe(m[0])}|${escRe(m[1])}`).join('')
+    + '|' + READER_DIRECTIVES.map(escRe).join('|');
+
+  // parseFormattedText: runs of text with their formatting
+  const segs = [];
+  const st = { em: false, b: false, u: false, sub: false, sup: false, pron: false };
+  const push = (t, pron = st.pron) => { if (t) segs.push({ ...st, pron, text: t }); };
+  let from = 0;
+  for (const m of text.matchAll(new RegExp(`<\\/?em>|<\\/?req>|<\\/?b>|<\\/?u>|<\\/?sub>|<\\/?sup>${extra}`, 'gi'))) {
+    const tag = m[0].toLowerCase();
+    // a guide's closing marker stays in the guide's text
+    const close = guides.find((x) => tag === x[1].toLowerCase());
+    push(text.slice(from, m.index + (close ? close[1].length : 0)));
+    let skip = true;
+    const t = /^<(\/?)(em|req|b|u|sub|sup)>$/.exec(tag);
+    if (t) {
+      const on = !t[1];
+      if (t[2] === 'req') { st.b = on; st.u = on; } else st[t[2]] = on;
+    } else if (guides.some((x) => tag === x[0].toLowerCase())) { skip = false; st.pron = true; }
+    else if (close) st.pron = false;
+    else push(m[0], true); // a reader directive: its own unbuzzable word
+    from = skip ? m.index + m[0].length : m.index;
   }
-  return words;
+  if (from < text.length) push(text.slice(from));
+
+  // splitFormattedTextIntoWords: whitespace ends a word, tags don't
+  const raw = [];
+  let cur = [];
+  for (const sg of segs) {
+    const parts = sg.text.split(/\s+/g);
+    if (parts.length === 1) { cur.push(sg); continue; }
+    if (parts[0]) cur.push({ ...sg, text: parts[0] });
+    raw.push(cur);
+    cur = [];
+    for (let i = 1; i < parts.length - 1; i++) if (parts[i]) raw.push([{ ...sg, text: parts[i] }]);
+    if (parts[parts.length - 1]) cur.push({ ...sg, text: parts[parts.length - 1] });
+  }
+  if (cur.length) raw.push(cur);
+
+  // getWords: power marks and guides don't count
+  const powers = Array.isArray(format.powers) ? format.powers : [];
+  const html = (word) => word.map((sg) => {
+    const tags = ['em', 'b', 'u', 'sub', 'sup'].filter((k) => sg[k]);
+    const body = sg.text.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ')
+      .replace(/&(?!(?:amp|lt|gt|quot|#\d+|#x[\da-f]+);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return tags.map((k) => `<${k}>`).join('') + body + tags.slice().reverse().map((k) => `</${k}>`).join('');
+  }).join('');
+  let n = 0;
+  const words = [];
+  for (const word of raw) {
+    // MODAQ keeps an empty word (two spaces after a guide); it shows nothing
+    const full = word.map((sg) => sg.text).join('').trim();
+    const counted = !powers.some((p) => full.startsWith(p.marker)) && !(word.length && word[0].pron);
+    words.push({ html: html(word), at: counted ? n++ : null });
+  }
+  return { words, end: n };
 }

@@ -8,7 +8,7 @@
 
 import { esc } from './api.js';
 import { normalizePacket } from './read_core.js';
-import { tokenizeQuestionHtml, mainAnswerHtml, sanitizeHtml } from '../engine/buzz.js';
+import { questionWords, mainAnswerHtml, sanitizeHtml } from '../engine/buzz.js';
 
 export { mainAnswerHtml };
 
@@ -58,23 +58,36 @@ function metadataHtml(q) {
   return `<div class="q muted qmeta">${esc(/^<.*>$/.test(m) ? m : '<' + m + '>')}</div>`;
 }
 
+// The game format the buzzes were read with: MODAQ skips its pronunciation
+// guides and power marks when it numbers words (engine/buzz.js
+// questionWords). The public page sets its tournament's; a set's page,
+// over many tournaments, keeps the presets' quoted guides and (*).
+let wordFormat = { pronunciationGuideMarkers: ['("', '")'], powers: [{ marker: '(*)' }] };
+export function setWordFormat(format) { if (format) wordFormat = format; }
+
+// MODAQ's end-of-question marker, where a buzz after the last word sits
+const END_MARK = '\u25a0';
+
 /** A tossup's text with each buzz marked on its word, then the full
     answerline. `tu` = the packet's tossup, or null for no text. */
 export function tossupTextHtml(tu, buzzes) {
   if (!tu) return '';
-  const words = tokenizeQuestionHtml(tu.question);
+  const { words, end } = questionWords(tu.question, wordFormat);
   const byPos = new Map();
   buzzes.forEach((b, i) => {
-    const pos = Math.min(b.position, words.length - 1);
+    const pos = Math.min(b.position, end);
     if (!byPos.has(pos)) byPos.set(pos, []);
     byPos.get(pos).push({ i, b });
   });
-  return '<div class="q">' + words.map((w, wi) => {
-    const hits = byPos.get(wi);
-    if (!hits) return w;
+  const mark = (html, pos) => {
+    const hits = byPos.get(pos);
+    if (!hits) return html;
     const cls = buzzWordClass(hits.map((h) => h.b));
-    return `<span class="bw ${cls}">${w}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
-  }).join(' ') + '</div>'
+    return `<span class="bw ${cls}">${html}<sup>${hits.map((h) => h.i + 1).join(',')}</sup></span>`;
+  };
+  const text = words.map((w) => (w.at === null ? w.html : mark(w.html, w.at)));
+  if (byPos.has(end)) text.push(mark(END_MARK, end));
+  return '<div class="q">' + text.join(' ') + '</div>'
     + answerLineHtml(tu.answer) + metadataHtml(tu);
 }
 
@@ -136,7 +149,7 @@ export function buzzTrackHtml(buzzes, words) {
 export function tossupHtml(tossup, buzzes, packet, heard, label, tb) {
   const tu = !tb && packet && packet.tossups && packet.tossups[tossup - 1];
   const meta = heard ? tossupMetaHtml(buzzes, heard)
-    : buzzTrackHtml(buzzes, tu ? tokenizeQuestionHtml(tu.question).length : 0);
+    : buzzTrackHtml(buzzes, tu ? questionWords(tu.question, wordFormat).end + 1 : 0);
   return `
     <details class="qd">
       <summary><span class="roundcell">${label || tb || 'T' + tossup}</span>

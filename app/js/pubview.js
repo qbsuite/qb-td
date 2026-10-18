@@ -20,7 +20,7 @@ import { mountReport, reportPlace } from './reportframe.js';
 import { slotText } from '../engine/schedule.js';
 import { scheduleFinished } from '../engine/finals.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes } from '../engine/buzz.js';
-import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket } from './buzzview.js';
+import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket, setWordFormat } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, UNKNOWN_CAT } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
@@ -1621,6 +1621,8 @@ async function load() {
     // Only the state comes from here; the heavy blobs below are served
     // off GitHub (and the Worker as their fallback).
     state = await loadState();
+    // buzzes land on words as the rooms' MODAQ numbered them
+    setWordFormat(effectiveFormat(state.format));
     // Track the snapshot's stamps when one is advertised — its blobs are
     // what we'll fetch, so refetch decisions must follow what IT holds
     // (it can trail the Worker by up to a cron tick; the next refresh

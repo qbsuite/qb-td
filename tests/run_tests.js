@@ -18,7 +18,7 @@ import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
-import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, tokenizeQuestionHtml, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
+import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, questionWords, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, catOfEntry } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
@@ -1599,24 +1599,44 @@ test('sanitizeHtml keeps b/u/i/em, escapes the rest, closes dangling tags', () =
   assert.equal(sanitizeHtml(''), '');
 });
 
-test('tokenizeQuestionHtml keeps per-word formatting at tokenizeQuestion positions', () => {
-  assert.deepEqual(tokenizeQuestionHtml('name this <b>author of <i>Faust</i></b>.'),
-    ['name', 'this', '<b>author</b>', '<b>of</b>', '<b><i>Faust</i></b>', '.']);
-  // dropped tags, comments, and stray angle brackets still land on the
-  // same word positions tokenizeQuestion produces
-  const tricky = [
-    'plain <span class="x">spanned</span> tail',
-    'a<b>b</b>c &nbsp; d <!-- note --> e',
-    'x < 5 and <u>under lined</u> words',
-    '<em>open only',
+test('questionWords numbers words as MODAQ does: tags inside words, guides and power marks skipped, an end marker', () => {
+  const ACF = PRESET_FORMATS.acf;
+  const POW = PRESET_FORMATS['macf-powers'];
+  const plain = (q, f) => questionWords(q, f).words.map((w) => [w.html.replace(/<[^>]*>/g, ''), w.at]);
+  // a tag is not a word break: the period stays on "Wedding."
+  assert.deepEqual(plain('plays like <em>Blood Wedding</em>.', ACF),
+    [['plays', 0], ['like', 1], ['Blood', 2], ['Wedding.', 3]]);
+  assert.equal(questionWords('plays like <em>Blood Wedding</em>.', ACF).end, 4);
+  // quoted guides, straight or curly, aren't counted; (*) only with powers
+  assert.deepEqual(plain('Lorca (\u201clor-kuh\u201d) wrote (*) this ("play")', ACF),
+    [['Lorca', 0], ['(\u201clor-kuh\u201d)', null], ['wrote', 1], ['(*)', 2], ['this', 3], ['("play")', null]]);
+  assert.deepEqual(plain('wrote (*) this', POW), [['wrote', 0], ['(*)', null], ['this', 1]]);
+  // formatting kept per word
+  assert.deepEqual(questionWords('<b>for <em>ten</em></b> points', ACF).words.map((w) => w.html),
+    ['<b>for</b>', '<em><b>ten</b></em>', 'points']);
+  assert.deepEqual(questionWords('', ACF), { words: [], end: 0 });
+
+  // locked against the installed MODAQ: the same count and the same word
+  // at every index
+  const { Tossup } = createRequire(import.meta.url)('modaq/src/state/PacketState.js');
+  const texts = [
+    'This composer\u2019s works include a <em>Grand Duo</em> sonata and a <em>Trout</em> quintet.',
+    'Theodor N\u00f6ldeke (\u201cnull-DECK-uh\u201d). In a chapter (*) called \u201cThe Confederates,\u201d one (pause) protagonist',
+    'a<b>b</b>c &nbsp; d <u>under lined</u> ("guide two") <req>req</req>uired [read slowly] end',
+    ' leading space and  double  spaces ("x")  after',
   ];
-  for (const q of tricky) {
-    assert.deepEqual(tokenizeQuestionHtml(q).map((w) => w.replace(/<[^>]*>/g, '')),
-      tokenizeQuestion(q).map((w) =>
-        w.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')),
-      q);
+  for (const f of [ACF, POW, PRESET_FORMATS.pace, PRESET_FORMATS['']]) {
+    for (const q of texts) {
+      const m = new Tossup(q, 'a').getWords(f).filter((w) => w.canBuzzOn);
+      const ours = questionWords(q, f);
+      assert.equal(ours.end, m.length - 1, q);
+      for (const w of ours.words.filter((x) => x.at !== null)) {
+        const mw = m.find((x) => x.wordIndex === w.at);
+        assert.equal(w.html.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&'),
+          mw.word.map((sg) => sg.text).join('').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' '), q);
+      }
+    }
   }
-  assert.deepEqual(tokenizeQuestionHtml(''), []);
 });
 
 test('roundRooms: who plays a round, by bucket link then room name; the rest have a bye', () => {
