@@ -1553,8 +1553,9 @@ async function openHubOf(adminSecret) {
   await click('#setround');
   await until(async () => (await R.detail()).tournament.current_round === R.last, 'set to the last round');
   await waitJs(`!document.querySelector('#advround') && !document.querySelector('#advall')`, 'no Advance on the last round');
-  ok('12b round robin: on the last round, no Advance and a note says so',
-    (await text('.liverail')).includes(`Round ${R.last} is the last round in the schedule.`) && await exists('#setround'), await text('.liverail'));
+  ok('12b round robin: on the last round, Advance is grayed out and a note says why',
+    (await js(`document.querySelector('.liverail button.advance').disabled`))
+      && (await text('.liverail')).includes(`Round ${R.last} is the last round in the schedule.`) && await exists('#setround'), await text('.liverail'));
 }
 
 /* ---------- 24b. the public state from qb-td-live ----------
