@@ -829,6 +829,17 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('part=game named _Game.json',
     (gres.headers.get('content-disposition') || '').includes('Round_3_Alpha_Beta_Game.json'));
 
+  // the hub ranks on games' public copies, many to a request (adminGames)
+  const batch = await call(`${A}/games?ids=${cid},${broken.body.id},999999`);
+  const btext = JSON.stringify(batch.body);
+  ok('games batch: the public copy of each, by id', batch.status === 200 && batch.body.games.length === 1
+    && batch.body.games[0].id === cid && batch.body.games[0].qbj.tossups_read === 20, batch.body);
+  ok('games batch: no packet text, no notes', !btext.includes('SECRETQUESTIONTEXT') && !btext.includes('PROTESTLEAKANSWER'));
+  ok('games batch: a flagged or unknown id is missing',
+    JSON.stringify(batch.body.missing) === JSON.stringify([broken.body.id, 999999]), batch.body.missing);
+  const tooMany = await call(`${A}/games?ids=${Array.from({ length: 101 }, (_, i) => i + 1).join(',')}`);
+  ok('games batch: at most 100 ids', tooMany.status === 400, tooMany.status);
+
   // protests: the file row's summary (teams, score, protests) is what the
   // hub's Protests drawer reads. This upload had no structured report, so
   // the protest comes from the qbj's notes — no swing.
@@ -1204,6 +1215,11 @@ ok('bucket link dead', r.status === 404);
 {
   const aslug = 'e2e-auto-' + Math.random().toString(36).slice(2, 6);
   const AA = '/a/' + (await call('/api/tournaments', { method: 'POST', json: { name: 'Auto', slug: aslug } })).body.admin_secret;
+  // another tournament's admin link can't batch-read the main one's games
+  const mainGame = (await call(A)).body.files.find((f) => f.kind === 'combined' && !f.error);
+  const cross = await call(`${AA}/games?ids=${mainGame.id}`);
+  ok('games batch: another tournament\'s game is missing', cross.status === 200 && !cross.body.games.length
+    && JSON.stringify(cross.body.missing) === JSON.stringify([mainGame.id]), cross.body);
   const mk = async (name) => (await call(AA + '/buckets', { method: 'POST', json: { room_name: name } })).body;
   const [r1, r2, r3] = [await mk('Room 1'), await mk('Room 2'), await mk('Room 3')];
   for (const n of [1, 2]) await call(`${AA}/packet?round=${n}&name=P${n}.json`, { method: 'POST', body: '{"tossups":[]}' });

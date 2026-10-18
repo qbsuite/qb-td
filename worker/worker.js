@@ -2816,6 +2816,32 @@ async function adminDownload(url, env, t) {
   return storedFileResponse(env, obj, await blobKey(t, key), dl, url.searchParams.get('part'));
 }
 
+// GET /a/:secret/games?ids=1,2,… — up to MAX_GAMES_BATCH games' public
+// copies ({id, round, room, filename, qbj}: the qbj half, notes stripped)
+// in one request. The hub ranks on these (auto-fill, Fill playoff slots):
+// one request per game, each carrying ~60KB of packet text, was most of
+// the Worker's requests on 10/17/2026. The copies are compact JSON
+// (putPubGame), joined as text like the cron's shards, so a batch costs
+// R2 reads and no parse. Only this tournament's prefix is read, so an id
+// from elsewhere is just missing; the hub reads a missing one on its own.
+const MAX_GAMES_BATCH = 100;
+async function adminGames(url, env, t) {
+  const ids = [...new Set(String(url.searchParams.get('ids') || '').split(',')
+    .map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return err(env, 400, 'no ids');
+  if (ids.length > MAX_GAMES_BATCH) return err(env, 400, 'at most ' + MAX_GAMES_BATCH + ' ids');
+  const texts = await Promise.all(ids.map(async (id) => {
+    const obj = await env.DATA.get(pubGameKey(t.id, id));
+    if (!obj) return null;
+    const text = (await obj.text()).trim();
+    return text.startsWith('{') && text.endsWith('}') ? text : null;
+  }));
+  const missing = ids.filter((id, i) => !texts[i]);
+  return new Response(`{"games":[${texts.filter(Boolean).join(',')}],"missing":${JSON.stringify(missing)}}`, {
+    status: 200, headers: { ...corsHeaders(env), 'Content-Type': 'application/json' },
+  });
+}
+
 // A stored blob as a download, decrypted with `rawKey`. part=qbj|game
 // splits a combined reader upload (.qbtd.json = {qbj, game}) into the
 // file consumers actually use. Only ever behind a credential that holds
@@ -5726,6 +5752,7 @@ export default {
       if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
       if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
       if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
+      if (sub === '/games' && method === 'GET') return adminGames(url, env, t);
       if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
       if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'POST') return moveFile(request, env, t, Number(mm[1]));
       if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);

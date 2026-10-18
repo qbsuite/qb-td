@@ -140,7 +140,13 @@ async function openHub() {
 }
 const h1 = await openHub();
 const h2 = await openHub();
-const gameReads = (s) => reqs.filter(([x, m, u]) => x === s && m === 'GET' && /\/file\?key=/.test(u) && !/schedule\.json|roster/.test(decodeURIComponent(u))).length;
+// games a hub read: one by one through /file, or batched through /games
+// (worker.js adminGames); gameRequests counts the requests themselves
+const gameFileReqs = (s) => reqs.filter(([x, m, u]) => x === s && m === 'GET' && /\/file\?key=/.test(u) && !/schedule\.json|roster/.test(decodeURIComponent(u)));
+const gameBatchReqs = (s) => reqs.filter(([x, m, u]) => x === s && m === 'GET' && /\/games\?ids=/.test(u));
+const gameReads = (s) => gameFileReqs(s).length
+  + gameBatchReqs(s).reduce((n, [, , u]) => n + new URL(u).searchParams.get('ids').split(',').length, 0);
+const gameRequests = (s) => gameFileReqs(s).length + gameBatchReqs(s).length;
 const schedPosts = () => reqs.filter(([, m, u]) => m === 'POST' && /\/schedule$/.test(u)).length;
 
 /* ---------- the day ---------- */
@@ -175,6 +181,7 @@ await sleep(1500);
 const cGames = games.filter((g) => poolOf(g.a) === 'C').length;
 ok('the hubs read pool C\'s games once each, nothing else', gameReads(h1.s) <= cGames && gameReads(h2.s) <= cGames,
   [gameReads(h1.s), gameReads(h2.s), cGames]);
+ok('…in one request per hub', gameRequests(h1.s) <= 1 && gameRequests(h2.s) <= 1, [gameRequests(h1.s), gameRequests(h2.s)]);
 ok('the hub says so', /pool C/.test(await h1.ev('document.getElementById("msg").textContent') || '')
   || /pool C/.test(await h2.ev('document.getElementById("msg").textContent') || ''));
 
@@ -237,6 +244,10 @@ ok('each tie points per 20 settled is kept on the schedule for the note, once',
 const total = dayGames.length + 1;
 ok('each hub read each prelim game at most once all day', gameReads(h1.s) <= total && gameReads(h2.s) <= total,
   [gameReads(h1.s), gameReads(h2.s), total]);
+ok('no game read on its own: every one came in a batch', !gameFileReqs(h1.s).length && !gameFileReqs(h2.s).length,
+  [gameFileReqs(h1.s).length, gameFileReqs(h2.s).length]);
+ok('a handful of game requests per hub all day', gameRequests(h1.s) <= 6 && gameRequests(h2.s) <= 6,
+  [gameRequests(h1.s), gameRequests(h2.s)]);
 ok('a handful of schedule saves', schedPosts() <= 6, schedPosts());
 
 // a room in the first playoff round sees its teams

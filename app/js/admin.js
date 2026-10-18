@@ -1686,7 +1686,7 @@ function renderSchedule(a, t, buckets, files) {
     save: (s) => pub(a + '/schedule', { method: 'POST', json: s }),
     del: () => pub(a + '/schedule', { method: 'DELETE' }),
     fill: async () => {
-      const { matches, roster } = await collectMatches(a, t, buckets, files);
+      const { matches, roster } = await collectMatches(a, t, buckets, files, () => {}, { cache: autoCache, rank: true });
       if (!matches.length) return null;
       return fillReport(sched, aggregate(matches, roster));
     },
@@ -2765,10 +2765,34 @@ async function fetchOwnedJson(a, key) {
   return res instanceof Response ? JSON.parse(await res.text()) : res;
 }
 
+// The public copies of these games (worker.js adminGames), GAMES_BATCH to
+// a request: id -> its qbj half. One the Worker has no copy of, or a
+// batch that fails, is left out for the caller to read on its own.
+const GAMES_BATCH = 100;
+async function fetchGameCopies(a, files) {
+  const out = new Map();
+  for (let i = 0; i < files.length; i += GAMES_BATCH) {
+    const ids = files.slice(i, i + GAMES_BATCH).map((f) => f.id);
+    try {
+      const got = await pub(`${a}/games?ids=${ids.join(',')}`);
+      for (const g of (got && got.games) || []) {
+        if (g && g.qbj && typeof g.qbj === 'object') out.set(g.id, g.qbj);
+      }
+    } catch (e) { /* read one by one below */ }
+  }
+  return out;
+}
+
 // Every clean game file parsed, plus the roster: shared by Compute stats
 // and the schedule's fill-from-standings.
 // onFile(done, total) after each game file, for the caller's progress.
-async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = null) {
+// opts.cache keeps what was read across calls; opts.rank says only the
+// standings are wanted, so the games come from their public copies (the
+// qbj half, notes stripped) in a request or two rather than one stored
+// upload, packet text and all, per game. Those leave the zip's MODAQ
+// files out, so Compute stats reads the uploads themselves.
+async function collectMatches(a, t, buckets, files, onFile = () => {}, opts = {}) {
+  const { cache = null, rank = false } = opts;
   const qbjFiles = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error);
   const errors = [];
   let roster = null;
@@ -2781,14 +2805,18 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
   const raw = [];   // qbj halves: the zip download + the served stats bundle
   const games = []; // game halves of combined uploads, for the zip only
   const modaqFiles = []; // MODAQ's own two files of each reader upload, for the zip
+  // the round is in the key: moving a game rewrites its file and copy
+  const keyOf = (f) => f.id + '|' + f.size + '|' + f.created + '|' + f.round;
+  const copies = rank ? await fetchGameCopies(a, qbjFiles.filter((f) => !(cache && cache.has(keyOf(f))))) : new Map();
   // Each file is its own round trip to the Worker (a quarter second or
   // more), so they're read FETCH_AT_ONCE at a time rather than one after
   // another, then parsed in upload order so the output doesn't change.
   // auto-fill keeps the games it has read: a pool finishing later
   // fetches only its own
   const got = await eachLimit(qbjFiles, FETCH_AT_ONCE, async (f) => {
-    const ck = f.id + '|' + f.size + '|' + f.created;
-    const full = cache && cache.has(ck) ? cache.get(ck) : await fetchOwnedJson(a, f.r2_key);
+    const ck = keyOf(f);
+    const full = cache && cache.has(ck) ? cache.get(ck)
+      : copies.has(f.id) ? copies.get(f.id) : await fetchOwnedJson(a, f.r2_key);
     if (cache) cache.set(ck, full);
     return full;
   }, onFile);
@@ -2851,7 +2879,7 @@ let autoSig = null;           // uploads last looked at
 let autoBusy = false;
 let autoWait = { held: [], odd: [], finals: [] }; // what waits for the TD, for the Live Hub
 let autoForce = [];           // pools (and 'F:' + a finals bracket) the TD said to fill anyway
-const autoCache = new Map();  // game files already read
+const autoCache = new Map();  // games already read (public copies), shared with Fill
 
 async function autoFillSlots(force = false) {
   if (autoBusy || !lastDetail || !sched || schedDirty || !hasPlaceholders(sched)) return;
@@ -2867,7 +2895,7 @@ async function autoFillSlots(force = false) {
   try {
     const ids = new Set();
     const need = [...prog.files, ...fin.files].filter((f) => !ids.has(f.id) && ids.add(f.id));
-    const { matches, roster } = await collectMatches(a, t, buckets, need, () => {}, autoCache);
+    const { matches, roster } = await collectMatches(a, t, buckets, need, () => {}, { cache: autoCache, rank: true });
     if (!matches.length) return;
     const saved = await fetchOwnedJson(a, `t/${t.id}/schedule.json`).catch(() => null);
     if (!saved || schedDirty) return;
@@ -2967,13 +2995,15 @@ async function computeStats(a, t, buckets, files, settings) {
   const run = busy($('calc'), { label: 'Computing stats', total: nGames, scope: $('calc').closest('.row') });
   let got;
   try {
-    got = await collectMatches(a, t, buckets, files, (done) => run.step(done));
+    got = await collectMatches(a, t, buckets, files, (done) => run.step(done), { cache: statsCache });
   } finally { run.end(); }
   lastStats = { a, t, buckets, files, settings, got };
   showStats(lastStats);
 }
 
 let lastStats = null; // the games Compute fetched, so a new pick needs no refetch
+// every upload Compute has read in this tab: pressing it again reads only new ones
+const statsCache = new Map();
 function showStats({ a, t, files, settings, got }) {
   const out = $('statsout');
   if (!out) return;

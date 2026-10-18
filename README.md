@@ -1101,6 +1101,18 @@ That part scales. What breaks first:
    stored marker instead. Also `pubStateBody` now has exactly one caller
    and could fold into `pubState` (cosmetic).
 
+5. ~~**The TD's hub read games one request each.**~~ Fixed 10/18/2026.
+   Auto-fill, Fill playoff slots and Compute stats read every game
+   through `GET /a/:secret/file`, one Worker request and one ~64KB
+   upload (packet text included) per game, again on each press or
+   reload. On 10/17/2026 (ACF Fall @ UIUC, ~170 games, plus SF) that was
+   ~11.3k of the day's 19.9k Worker requests, almost all of it in the
+   playoffs; `tests/sim_day.js` never modelled the TD doing it. Ranking
+   now reads the games' public copies, 100 to a request
+   (`GET /a/:secret/games?ids=`, worker.js `adminGames`), and Compute
+   stats keeps the uploads it has read for the tab. A reload still
+   reads again: a few requests now, not one per game.
+
 ## Potential: buzzer rooms in tournament rooms (not built)
 
 An idea on hold, written down with its numbers so it can be picked up
