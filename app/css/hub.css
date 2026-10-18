@@ -159,6 +159,7 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 .pfile.old { opacity: 0.6; }
 .pline { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .pline select { font-size: 13px; padding: 3px 6px; max-width: 200px; }
+.pmove { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .pmeta { font-size: 13px; overflow-wrap: anywhere; }
 .pacts { display: flex; gap: 14px; align-items: center; font-size: 13px; }
 

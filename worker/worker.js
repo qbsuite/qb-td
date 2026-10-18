@@ -2766,6 +2766,7 @@ async function deleteFile(env, t, fileId) {
 async function moveFile(request, env, t, fileId) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
+  if (body && body.round !== undefined) return moveFileRound(env, t, fileId, Number(body.round));
   const bucketId = Number(body.bucket_id);
   if (!Number.isInteger(bucketId)) return err(env, 400, 'bucket_id required');
   const [file, bucket] = await Promise.all([
@@ -2807,6 +2808,71 @@ async function moveFile(request, env, t, fileId) {
     }
   }
   return json(env, { ok: true, room_name: roomName });
+}
+
+// The TD refiles an upload under another round (a game read off the next
+// round's packet; a one-game final filed as the second final). Unlike a
+// room, the round is written inside the game itself (_round, which
+// parseMatch reads before the round the upload came with), so three things
+// move together, in this order: the stored file, the game's public copy,
+// then the row. A failure part way leaves the row — and with it the hub,
+// the stats' round and the public shards — where they were, and the TD
+// can press again. Nothing is deleted: the next tick rebuilds the round
+// shards from the rows (the old round's shard goes when it has no games).
+async function moveFileRound(env, t, fileId, round) {
+  if (!Number.isInteger(round) || round < 1 || round > 999) return err(env, 400, 'round must be 1 to 999');
+  const { results } = await env.DB.prepare(
+    'SELECT kind, error, round, summary, r2_key FROM files WHERE id = ?1 AND tournament_id = ?2'
+  ).bind(fileId, t.id).all();
+  if (!results.length) return err(env, 404, 'no such file');
+  const f = results[0];
+  if (f.round === round) return json(env, { ok: true, round });
+  const game = (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
+  if (game) {
+    const obj = await env.DATA.get(f.r2_key);
+    if (!obj) return err(env, 404, 'stored file missing');
+    const rawKey = await blobKey(t, f.r2_key);
+    let root;
+    try { root = JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey))); } catch (e) { return err(env, 400, 'stored file unreadable'); }
+    // a reader upload is {qbj, game, ...}; a plain .qbj is the match itself
+    const qbj = root && root.qbj && typeof root.qbj === 'object' ? root.qbj : root;
+    if (!stampRound(qbj, round)) return err(env, 400, 'no match in this file');
+    await putBlob(env, f.r2_key, JSON.stringify(root), 'application/json', rawKey);
+    const pobj = await env.DATA.get(pubGameKey(t.id, fileId));
+    const entry = pobj ? await pobj.json().catch(() => null) : null;
+    if (entry && stampRound(entry.qbj, round)) await putPubGame(env, t.id, { ...entry, round });
+  }
+  await env.DB.prepare('UPDATE files SET round = ?2 WHERE id = ?1').bind(fileId, round).run();
+  // the tiebreaker log names the round each game drew from
+  let teams = null;
+  try { teams = JSON.parse(f.summary || 'null').teams; } catch (e) { /* no summary */ }
+  if (f.kind === 'combined' && Array.isArray(teams) && teams.every(Boolean)) {
+    const pairKey = (ts) => [...ts].sort().join('\n');
+    const { cur } = await readTbPool(env, TB_KEY(t.id), t.ckey);
+    if (cur) {
+      await writeTbPool(env, TB_KEY(t.id), t.ckey, (pool) => {
+        for (const u of pool.uses) {
+          if (u.round === f.round && pairKey(u.teams || []) === pairKey(teams)) u.round = round;
+        }
+      });
+    }
+  }
+  if (game) {
+    await env.DATA.put(rebuildKey(t.id), '{}', { httpMetadata: { contentType: 'application/json' } });
+    await markPub(env, t.id);
+  }
+  return json(env, { ok: true, round });
+}
+
+// Write `round` into a qbj match as _round (the match object itself, or
+// the Match inside a tournament wrapper); false when there's no match.
+function stampRound(qbj, round) {
+  if (!qbj || typeof qbj !== 'object') return false;
+  const match = Array.isArray(qbj.objects)
+    ? qbj.objects.find((o) => o && (o.type === 'Match' || o.match_teams || o.matchTeams)) : qbj;
+  if (!match || typeof match !== 'object') return false;
+  match._round = round;
+  return true;
 }
 
 // Escape hatch for drift: the dashboard re-posts the public copies of

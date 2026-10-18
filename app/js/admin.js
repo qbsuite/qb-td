@@ -2012,6 +2012,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         ? `<button class="pill warn link" data-goto="protdrawer">${plural(ps.open)} open</button>`
         : `<button class="pill link" data-goto="protdrawer">${plural(ps.n)} &middot; ruled</button>`;
   };
+  // the rounds a game can be filed under: every round the tournament has
+  // (packets, the schedule, the round in play), and the one it's under
+  const fileRounds = (at) => {
+    const top = Math.max(at, t.current_round || 1, ...rounds.map((r) => r.number),
+      ...((sched && sched.phases) || []).flatMap((ph) => ph.rounds.map((r) => r.round)));
+    return Array.from({ length: top }, (_, i) => i + 1);
+  };
   // the open cell's files, newest first, each with its own room picker
   const cellPanel = () => {
     if (!cellOpen) return '';
@@ -2036,10 +2043,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         <div class="pline">
           <span>${s ? gameLine(s, f, true) : esc(f.filename)}
             ${superseded ? '<span class="muted" style="font-size:13px"> &middot; superseded</span>' : ''}</span>
+          <span class="pmove"><select data-fileround="${f.id}" aria-label="Round this game is filed under">
+            ${fileRounds(f.round).map((r) => `<option value="${r}" ${r === f.round ? 'selected' : ''}>Round ${r}</option>`).join('')}
+          </select><button class="small" data-moveround="${f.id}" disabled>Move files</button>
           <select data-movefile="${f.id}" aria-label="Room this game came from">
             ${buckets.some((x) => x.id === f.bucket_id) ? '' : `<option selected>#${f.bucket_id}</option>`}
             ${buckets.map((x) => `<option value="${x.id}" ${x.id === f.bucket_id ? 'selected' : ''}>${esc(x.room_name)}</option>`).join('')}
-          </select>
+          </select></span>
         </div>
         ${hint}
         <div class="pmeta muted">${esc(f.filename)} &middot; ${esc(f.kind)} &middot; ${fmtBytes(f.size)}
@@ -2348,6 +2358,24 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         say('Moved to ' + out.room_name);
         showDetail();
       } catch (e) { say(e.message, true); showDetail(); }
+    };
+  });
+  // a round picked: Move files refiles the upload there (worker.js
+  // moveFileRound: the stored file, its public copy and the row)
+  box.querySelectorAll('[data-fileround]').forEach((sel) => {
+    const btn = box.querySelector(`[data-moveround="${sel.dataset.fileround}"]`);
+    const was = Number(sel.value);
+    sel.onchange = () => { btn.disabled = Number(sel.value) === was; };
+    btn.onclick = async () => {
+      const to = Number(sel.value);
+      if (to === was) return;
+      const run = busy(btn, { label: 'Moving' });
+      try {
+        await pub(a + '/files/' + sel.dataset.fileround, { method: 'POST', json: { round: to } });
+        say(`Moved to round ${to}`);
+        if (cellOpen) cellOpen = { ...cellOpen, round: to };
+        showDetail();
+      } catch (e) { say(e.message, true); run.end(); }
     };
   });
   box.querySelectorAll('[data-editfile]').forEach((b) => {
