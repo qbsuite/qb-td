@@ -41,6 +41,17 @@ export function useFrozenData(map) {
   frozen = map;
 }
 
+/** Answers fetched ahead in one batch (the reader's /b/:secret/load):
+    {path: {s: status, t: content type, b: body text}}. pub(path) takes
+    its answer from here once, within PRELOAD_MS, exactly as the network
+    would have given it; any later call, or an unlisted one, fetches. */
+const PRELOAD_MS = 30 * 1000;
+const preloaded = new Map();
+export function preload(map) {
+  const until = Date.now() + PRELOAD_MS;
+  for (const [path, res] of Object.entries(map)) preloaded.set(path, { ...res, until });
+}
+
 /** True when pub() answers from local data (demo fixture or an archive
     capture) rather than the network. Pages must then ignore any GitHub
     snapshot pointers riding in that data — the frozen copy is already
@@ -100,7 +111,11 @@ export async function pub(path, opts = {}) {
       body: JSON.stringify(opts.json),
     };
   }
-  const res = await fetch(API + path, opts);
+  const early = !opts.method && !opts.body && preloaded.get(path);
+  if (early) preloaded.delete(path);
+  const res = early && Date.now() < early.until
+    ? new Response(early.b, { status: early.s, headers: early.t ? { 'Content-Type': early.t } : {} })
+    : await fetch(API + path, opts);
   const failed = (message) => Object.assign(new Error(message), { status: res.status });
   const ct = res.headers.get('Content-Type') || '';
   if (!ct.includes('application/json')) {

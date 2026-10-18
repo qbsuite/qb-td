@@ -249,6 +249,12 @@ ok('no game read on its own: every one came in a batch', !gameFileReqs(h1.s).len
 ok('a handful of game requests per hub all day', gameRequests(h1.s) <= 6 && gameRequests(h2.s) <= 6,
   [gameRequests(h1.s), gameRequests(h2.s)]);
 ok('a handful of schedule saves', schedPosts() <= 6, schedPosts());
+// no pool all day, so its tb_stamp never moves: fetched on load (twice if
+// that load made the bye room), not on each refresh that redrew the hub
+const tbGets = (s) => reqs.filter(([x, m, u]) => x === s && m === 'GET' && /\/tiebreakers$/.test(u)).length;
+const fullLoads = (s) => reqs.filter(([x, m, u]) => x === s && m === 'GET' && /\/a\/[a-z0-9]+(\?rev=\d+)?$/.test(u)).length;
+ok('the tiebreaker pool is fetched once per hub, not per refresh', tbGets(h1.s) <= 2 && tbGets(h2.s) <= 2,
+  [tbGets(h1.s), tbGets(h2.s), fullLoads(h1.s), fullLoads(h2.s)]);
 
 // a room in the first playoff round sees its teams
 const pr = Math.min(...final.phases[1].rounds.map((r) => r.round));

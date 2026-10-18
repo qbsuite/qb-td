@@ -25,6 +25,22 @@ const MATCH = JSON.stringify({
   ],
 });
 
+// The reader's one-request start (worker.js bucketLoad) must answer each
+// of its four parts exactly as that part's own route does: status, type
+// and body, byte for byte — the page reads them as if it had asked each.
+async function roomLoadMatches(label, sec, q = '') {
+  const res = await fetch(`${BASE}/b/${sec}/load${q}`);
+  const got = res.status === 200 ? await res.json() : null;
+  const diffs = [];
+  for (const sub of ['', '/schedule', '/roster', '/tiebreakers']) {
+    const one = await fetch(`${BASE}/b/${sec}${sub}${q}`);
+    const want = { s: one.status, t: one.headers.get('content-type') || '', b: await one.text() };
+    const have = got && got[sub];
+    if (!have || have.s !== want.s || have.t !== want.t || have.b !== want.b) diffs.push({ sub, have, want });
+  }
+  ok('room load = its four routes: ' + label, got && !diffs.length && Object.keys(got).length === 4, diffs);
+}
+
 // bad admin link is a uniform 404
 let r = await call('/a/abcdefghjkmnpqrstuvw');
 ok('bad admin link 404', r.status === 404);
@@ -116,10 +132,15 @@ for (const route of ['packet', 'tiebreakers', 'roster', 'schedule']) {
   const res = await fetch(`${BASE}/b/${secret}/${route}`);
   ok(`room before Start serves no ${route}`, res.status === 403, res.status);
 }
+await roomLoadMatches('before Start', secret);
+await roomLoadMatches('a link that is no room', 'abcdefghjkmnpqrstuvwxyz');
 // The TD's Test link: the room link plus the tournament's test token
 // reads the room before Start — reads only, and nothing counts.
 {
   let T = '?test=' + testToken(A.slice(3));
+  await roomLoadMatches('a Test link before Start', secret, T);
+  await roomLoadMatches('a wrong test key', secret, '?test=abcdefghjkmnpqrstuvw');
+  await roomLoadMatches('the admin secret as a test key', secret, '?test=' + A.slice(3));
   r = await call('/b/' + secret + T);
   ok('test link reads the room before Start', r.status === 200 && r.body.test === true
     && r.body.packets.length === 1, r.body);
@@ -181,6 +202,7 @@ ok('detail after Start: closes 48h from Start',
   ok('bye room: reads after Start, in test mode', r.status === 200 && r.body.test === true, r.body);
   r = await call('/b/' + made.secret);
   ok('bye room: its plain link is the same test read', r.status === 200 && r.body.test === true, r.body);
+  await roomLoadMatches('the bye room', made.secret);
   let res = await fetch(`${BASE}/b/${made.secret}/packet?round=1&test=bye`);
   ok('bye room: reads the round being played', res.status === 200, res.status);
   res = await fetch(`${BASE}/b/${made.secret}/packet?round=2&test=bye`);
@@ -1035,6 +1057,16 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
 {
   r = await call('/b/' + secret + '/tiebreakers');
   ok('no tiebreakers 404', r.status === 404);
+  // the hub refetches the pool only when the detail's tb_stamp moves: it
+  // must move on every write the pool route would show, and only then
+  const tbStamp = async () => (await call(A)).body.tb_stamp;
+  const stamps = [await tbStamp()];
+  const stampMoved = async (what) => {
+    const now = await tbStamp();
+    ok('tb_stamp moves: ' + what, now && !stamps.includes(now), [stamps, now]);
+    stamps.push(now);
+  };
+  ok('tb_stamp with no pool', stamps[0] === '-|-', stamps[0]);
   const TBPACKET = JSON.stringify({
     tossups: [
       { question: 'tb tossup one', answer: 'Mozart' },
@@ -1047,8 +1079,10 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     headers: { 'Content-Type': 'application/json' }, body: TBPACKET });
   ok('tiebreaker packet splits', r.status === 200 && r.body.added.tossups === 2
     && r.body.added.bonuses === 1 && r.body.tossups === 2, r.body);
+  await stampMoved('a pool uploaded');
   r = await call(`${A}/tiebreakers?name=tb2.docx`, { method: 'POST', body: 'x' });
   ok('docx tiebreaker rejected', r.status === 400, r.body);
+  ok('tb_stamp holds: a rejected upload, and a plain refresh', await tbStamp() === stamps.at(-1) && await tbStamp() === stamps.at(-1));
   r = await call(`${A}/tiebreakers?name=tb2.json`, { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tossups: [{ question: 'tb three', answer: 'Treaty of Ghent' }] }) });
@@ -1063,6 +1097,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   // one question can be taken out again; its id is not handed out twice
   r = await call(`${A}/tiebreakers?id=B2`, { method: 'DELETE' });
   ok('one tiebreaker question is removed', r.status === 200 && r.body.tossups === 3 && r.body.bonuses === 1, r.body);
+  await stampMoved('one question removed');
   r = await call(`${A}/tiebreakers?id=B2`, { method: 'DELETE' });
   ok('removing it twice is a 404', r.status === 404, r.body);
   r = await call(`${A}/tiebreakers?name=bonuses2.json`, { method: 'POST',
@@ -1081,6 +1116,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     body: JSON.stringify({ tossups: [{ question: 'no answer' }] }) });
   ok('tossup without answer rejected', r.status === 400, r.body);
   r = await call('/b/' + secret + '/tiebreakers');
+  await roomLoadMatches('a started room with a pool, roster and schedule', secret);
   ok('reader pool served with ids and empty log',
     r.status === 200 && r.body.tossups.length === 3
     && r.body.tossups[0].id === 'TU1' && r.body.tossups[2].id === 'TU3'
@@ -1096,6 +1132,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     { method: 'POST', body: JSON.stringify({ qbj: q, game: { cycles: [] },
       tb: { used: ['TU2', 'B1', 'NOPE'] } }) });
   ok('tb-reporting upload accepted', r.status === 200 && r.body.error === null, r.body);
+  await stampMoved('a room\'s upload logs its uses');
   const tbFile1 = r.body.id;
   r = await call('/b/' + secret + '/tiebreakers');
   ok('usage logged with the match',
@@ -1156,6 +1193,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('tiebreaker pool deleted', r.status === 200);
   r = await call('/b/' + secret + '/tiebreakers');
   ok('deleted pool 404', r.status === 404);
+  ok('tb_stamp back to no pool', await tbStamp() === '-|-');
 }
 
 // bucket rename: the TO edits a room name in place

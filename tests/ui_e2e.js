@@ -109,6 +109,12 @@ listeners.push((m) => {
 await S('Page.enable');
 await S('Runtime.enable');
 await S('DOM.enable');
+// what the pages ask the Worker for: [method, url]
+const netReqs = [];
+listeners.push((m) => {
+  if (m.sessionId === sessionId && m.method === 'Network.requestWillBeSent') netReqs.push([m.params.request.method, m.params.request.url]);
+});
+await S('Network.enable');
 await S('Page.setInterceptFileChooserDialog', { enabled: true });
 await S('Emulation.setFocusEmulationEnabled', { enabled: true });
 await send('Browser.grantPermissions', { origin: new URL(PAGES).origin,
@@ -882,6 +888,7 @@ async function roomUpload(bucket, round, files) {
 {
   const b = roomBucket(2);
   const g = gameIn(1, 2);
+  const net0 = netReqs.length;
   await goto(`${PAGES}/read.html?b=${b.secret}`);
   await waitJs(`document.querySelectorAll('#roundrows [data-round]').length > 0 && !document.querySelector('#schedmatch').hidden
     && document.querySelector('#starters').textContent.length > 0`, 'the reader\'s pre-game screen');
@@ -894,8 +901,34 @@ async function roomUpload(bucket, round, files) {
   await click('#start');
   await waitJs(`document.body.classList.contains('reading') && document.querySelector('#modaq').children.length > 0`, 'MODAQ mounted');
   ok('11 reader: Start game opens MODAQ', true);
+  // its first four answers come in one request (worker.js bucketLoad)
+  const asked = netReqs.slice(net0).filter(([m, u]) => m === 'GET' && u.includes('/b/' + b.secret))
+    .map(([, u]) => new URL(u).pathname.replace('/b/' + b.secret, '') || '/');
+  ok('11 reader: one request for the room, schedule, roster and pool, then the packet',
+    asked.filter((x) => x === '/load').length === 1 && !asked.some((x) => ['/', '/schedule', '/roster', '/tiebreakers'].includes(x))
+    && asked.includes('/packet'), asked);
   d = await until(async () => { const x = await detail(); return (x.starts || []).some((s) => s.bucket_id === b.id && s.round === 1) && x; }, 'start recorded');
   ok('11 reader: the Worker records the room as started', true);
+}
+
+// the same start without the one-request load (an older Worker, or the
+// request failing): the page asks for each part on its own, as before
+{
+  const b = roomBucket(3);
+  const g = gameIn(1, 3);
+  await S('Network.setBlockedURLs', { urls: ['*/load*'] });
+  const net0 = netReqs.length;
+  await goto(`${PAGES}/read.html?b=${b.secret}`);
+  await waitJs(`document.querySelectorAll('#roundrows [data-round]').length > 0 && !document.querySelector('#schedmatch').hidden
+    && document.querySelector('#starters').textContent.length > 0`, 'the pre-game screen without /load');
+  await S('Network.setBlockedURLs', { urls: [] });
+  ok('11 reader without /load: the scheduled matchup and starters still show',
+    (await text('#mteama')) === g.a.team && (await text('#mteamb')) === g.b.team
+    && (await text('#starters')).includes(player(g.a.team, 0)) && !/roster/i.test(await text('#msg')),
+    [await text('#mteama'), await text('#mteamb'), await text('#msg')]);
+  const asked = netReqs.slice(net0).filter(([m, u]) => m === 'GET' && u.includes('/b/' + b.secret))
+    .map(([, u]) => new URL(u).pathname.replace('/b/' + b.secret, '') || '/');
+  ok('11 reader without /load: each part fetched on its own', ['/', '/schedule', '/roster', '/tiebreakers'].every((x) => asked.includes(x)), asked);
 }
 
 // every room turns in round 1: a split pair, a reader upload with a protest, plain .qbj
@@ -1032,6 +1065,24 @@ await waitJs(`document.querySelector('#msg').classList.contains('show') && docum
 d = await until(async () => { const x = await detail(); return x.tournament.current_round === 2 && x; }, 'set to 2');
 ok('18 notice: a confirmation shows', true);
 await check('18 notice: and fades on its own', () => waitJs(`!document.querySelector('#msg').classList.contains('show')`, 'notice gone', 6000));
+
+/* ---------- 18b. the Live Hub's tiebreaker count follows the pool ----------
+   The hub refetches the pool only when the detail's tb_stamp moves; a
+   change made elsewhere must still show on its next refresh. */
+const hubRefresh = () => js(`document.dispatchEvent(new Event('visibilitychange')); true`);
+const tbLine = () => js(`[...document.querySelectorAll('.muted')].map((x) => x.textContent).find((x) => /^Tiebreakers /.test(x)) || ''`);
+await waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Tiebreakers 0/3 used')`, 'tiebreaker count');
+ok('18b tiebreakers: the hub counts the pool', (await tbLine()) === 'Tiebreakers 0/3 used', await tbLine());
+const late = await call(`${A}/tiebreakers?name=late.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ tossups: [{ question: 'Late tiebreaker text.', answer: 'Congress of Vienna' }] }) });
+ok('18b tiebreakers: a question added from elsewhere', late.status === 200 && late.body.tossups === 3, late.body);
+await hubRefresh();
+await check('18b tiebreakers: the hub shows it on its next refresh', () =>
+  waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Tiebreakers 0/4 used')`, 'count 0/4', 10000));
+await call(`${A}/tiebreakers?id=TU3`, { method: 'DELETE' });
+await hubRefresh();
+await check('18b tiebreakers: and drops it when it is removed', () =>
+  waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Tiebreakers 0/3 used')`, 'count 0/3', 10000));
 
 /* ---------- 12–14. round 2: started, missing, the wrong room, Add a game ---------- */
 

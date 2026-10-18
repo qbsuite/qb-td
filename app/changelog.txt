@@ -47,6 +47,8 @@ Release Notes for 10/19/2026
 
 [ PERFORMANCE ]
 - Game downloads and public page updates use less server time.
+- The reader page starts a game with one request rather than four.
+- The Live Hub fetches the tiebreaker pool only when it has changed.
 
 [ MISC ]
 - When the server fails, pages say "Something went wrong on the server. Please try again." instead of reporting a network error.

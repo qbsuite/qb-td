@@ -1550,6 +1550,15 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
   const ids = [...new Set([...tickIds, ...(await liveCandidates(env, now, LIVE_MAX_PER_RUN))])]
     .slice(0, LIVE_MAX_PER_RUN);
   if (!ids.length && !dirChanged) return { deployed: false };
+  // A deploy is going out anyway: active tournaments whose heartbeat falls
+  // due within the next half-interval ride it, rebuilt and stamped now.
+  // Their heartbeats fall into step instead of each costing a deploy (and
+  // a stored version) of its own; none waits longer than it did before.
+  if (ids.length < LIVE_MAX_PER_RUN) {
+    const { results: soon } = await env.DB.prepare(LIVE_HEARTBEAT_SQL)
+      .bind(now - LIVE_ACTIVE_MS, now - LIVE_HEARTBEAT_MS / 2, LIVE_MAX_PER_RUN, now - LIVE_RETRY_MS).all();
+    for (const r of soon) if (ids.length < LIVE_MAX_PER_RUN && !ids.includes(r.id)) ids.push(r.id);
+  }
 
   const health = await liveAsset(LIVE_HEALTH, 'json');
   const b64s = new Map([[health.hash, health.b64]]);
@@ -2149,7 +2158,7 @@ async function rotateAdmin(env, t) {
 
 async function getTournament(env, t, ctx) {
   const id = t.id;
-  const [buckets, rounds, files, starts, liveProtests, catsHead, rosterHead, sets, setPackets] = await Promise.all([
+  const [buckets, rounds, files, starts, liveProtests, catsHead, rosterHead, sets, setPackets, tbOwn, tbSet] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, secret_enc, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created, summary FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
@@ -2165,6 +2174,9 @@ async function getTournament(env, t, ctx) {
         'SELECT packet, version, name, r2_key, retired FROM set_packets WHERE set_id = ?1 ORDER BY packet, version'
       ).bind(t.set_id).all()
       : { results: [] },
+    // the two blobs the pool route merges (mergedTbPool), for tb_stamp
+    env.DATA.head(TB_KEY(id)),
+    t.set_id ? env.DATA.head(SET_TB_KEY(t.set_id)) : null,
   ]);
   // packets from before category extraction existed — or from before
   // the current parser (version in R2 custom metadata): backfill once,
@@ -2206,6 +2218,10 @@ async function getTournament(env, t, ctx) {
     starts: starts.results,
     // protests in games not uploaded yet (bucketLiveProtests)
     live_protests: liveProtests.results,
+    // which version of the tiebreaker pool GET /tiebreakers would merge:
+    // it moves on any write to either blob (an upload, a removal, a room's
+    // usage log), so the hub refetches the pool only when it moves
+    tb_stamp: (tbOwn ? tbOwn.etag : '-') + '|' + (tbSet ? tbSet.etag : '-'),
     // each room's round (its bracket's, when brackets keep their own) and
     // the game files uploaded for a round their room hasn't reached
     ...(await roomRoundsDetail(env, t, buckets.results, files.results)),
@@ -3622,6 +3638,21 @@ async function roomPlace(env, b) {
   const key = roomBracket(model, state, room, b.current_round);
   const info = key ? bracketInfo(model, key) : null;
   return { round, bracket: info ? { key: info.key, name: info.name, color: info.color } : null, model, state, room };
+}
+
+// GET /b/:secret/load — the four answers a room link's page asks for
+// first (read_main.js), in one request: the room, its schedule, roster
+// and tiebreaker pool, each exactly as its own route gives it — status,
+// type and body — so the page reads them as if it had asked each one.
+// 10/17/2026: ~490 reader loads at four requests each before the packet.
+// The routes only read, so they run side by side.
+const ROOM_LOAD = [['', bucketState], ['/schedule', bucketSchedule], ['/roster', bucketRoster], ['/tiebreakers', bucketTiebreakers]];
+async function bucketLoad(env, secret, url) {
+  const parts = await Promise.all(ROOM_LOAD.map(async ([sub, answer]) => {
+    const res = await answer(env, secret, url);
+    return JSON.stringify(sub) + ':' + JSON.stringify({ s: res.status, t: res.headers.get('Content-Type') || '', b: await res.text() });
+  }));
+  return new Response('{' + parts.join(',') + '}', { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(env) } });
 }
 
 async function bucketState(env, secret, url) {
@@ -5927,6 +5958,7 @@ async function route(request, env, ctx, url) {
   // Moderator bucket routes — the secret is the credential.
   let m;
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1], url);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/load$/)) && method === 'GET') return bucketLoad(env, m[1], url);
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url);

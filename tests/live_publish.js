@@ -294,6 +294,43 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
   void active;
 }
 
+// 7b. Heartbeats fall into step: active tournaments due within half an
+// interval ride a deploy that is going out anyway, so a quiet hour costs
+// about one deploy per interval for all of them, not one per tournament —
+// and no file ever goes longer than an interval (plus a tick) unstamped.
+{
+  clock = realNow();
+  const w = world();
+  const t0 = clock;
+  const ids = [w.add()];
+  await w.tick();
+  clock += 3 * MIN; ids.push(w.add()); await w.tick();
+  clock += 3 * MIN; ids.push(w.add()); await w.tick();
+  const quiet = w.add({ pub_built: clock - 7 * 3600 * 1000 });
+  await w.tick();
+  const quietAt0 = w.row(quiet).live_at;
+  const puts = () => w.cf.calls.filter((c) => /^PUT \/workers\/scripts\/qb-td-live$/.test(c)).length;
+  w.cf.calls.length = 0;
+  let oldest = 0;
+  for (let m = 0; m < 60; m++) {
+    clock += MIN;
+    await w.tick();
+    for (const id of ids) oldest = Math.max(oldest, clock - w.live('tour-' + id).at);
+  }
+  console.log('    deploys in the hour:', puts());
+  ok('heartbeat step: three quiet active tournaments, at most 7 deploys an hour (16 before)', puts() <= 7, puts());
+  ok('heartbeat step: no file older than an interval plus a tick', oldest <= 11 * MIN, oldest / MIN);
+  const ats = ids.map((id) => w.live('tour-' + id).at);
+  ok('heartbeat step: their stamps fall together', new Set(ats).size === 1, ats.map((x) => (x - t0) / MIN));
+  ok('heartbeat step: a tournament quiet for 6 hours never rides', w.row(quiet).live_at === quietAt0);
+  // a change still goes at once, and brings the others along only if they're half due
+  w.cf.calls.length = 0;
+  clock += MIN;
+  w.DB.raw.prepare('UPDATE tournaments SET live_want = ? WHERE id = ?').run('changed', ids[0]);
+  await w.tick();
+  ok('heartbeat step: a change still deploys on the next tick', puts() === 1, w.cf.calls);
+}
+
 // 8. Published and built, but no pubstate to publish: parked on the
 // failure cadence, not retried every minute.
 {

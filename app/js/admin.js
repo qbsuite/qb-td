@@ -276,6 +276,7 @@ let setupTab = 'rooms'; // active Tournament Setup sub-tab
 
 const staged = [];      // packets staged from a zip or loose files (packetsui.js)
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
+let tbHeld;             // the detail's tb_stamp that tbPool was fetched under
 // The roster's renames (qbj.js rosterNameMap), so a game uploaded under a
 // team's old name is listed under its new one, as the stats count it.
 // Loaded again whenever the roster is saved, here (key: null) or from
@@ -352,8 +353,14 @@ async function showDetail(quiet = false, held = null) {
     closes: t.closes, created: t.created });
   // the route, not the blob: on a set's mirror the pool is the set's
   // backup questions (read live) followed by this tournament's own.
-  // Asked for now, alongside the roster and schedule, not after them.
-  const tbReq = pub(a + '/tiebreakers').catch(() => null);
+  // Asked for now, alongside the roster and schedule, not after them —
+  // and only when the detail's tb_stamp says it moved since the one held.
+  // A failed fetch holds no stamp, so the next detail asks again; "no
+  // tiebreakers" is an answer (no pool) and is held like one.
+  const tbStamp = detail.tb_stamp;
+  const tbReq = tbStamp !== undefined && tbStamp === tbHeld ? null
+    : pub(a + '/tiebreakers').then((p) => ({ p, ok: true }),
+      (e) => ({ p: null, ok: e.message === 'no tiebreakers' }));
   await ensureSched(a, t);
   // a tournament with rooms always has a bye room: made here, once
   if (await ensureByeRoom(a, t, detail.buckets)) return showDetail(quiet, held);
@@ -361,7 +368,11 @@ async function showDetail(quiet = false, held = null) {
   const byeId = byeIdOf(t);
   detail.byeRoom = detail.buckets.find((b) => b.id === byeId) || null;
   detail.buckets = detail.buckets.filter((b) => b.id !== byeId);
-  tbPool = await tbReq;
+  if (tbReq) {
+    const got = await tbReq;
+    tbPool = got.p;
+    tbHeld = got.ok ? tbStamp : undefined;
+  }
   testToken = await testTokenReq;
   await ensureHubNames(a, t);
   lastDetail = detail;

@@ -225,17 +225,33 @@ const room = r.body.secret;
   ok('room reads the set packet', p1.status === 200 && p1.body.includes('SETSECRET-R1V1'), p1.status);
   const p2 = await text(`/b/${room}/packet?round=2`);
   ok('future set rounds stay locked', p2.status === 403);
+  // the reader's one-request start answers as the four routes do (bucketLoad)
+  const load = await (await fetch(`${BASE}/b/${room}/load`)).json();
+  const loadDiffs = [];
+  for (const sub of ['', '/schedule', '/roster', '/tiebreakers']) {
+    const one = await fetch(`${BASE}/b/${room}${sub}`);
+    const want = { s: one.status, t: one.headers.get('content-type') || '', b: await one.text() };
+    if (JSON.stringify(load[sub]) !== JSON.stringify(want)) loadDiffs.push({ sub, have: load[sub], want });
+  }
+  ok('a mirror room\'s one-request start = its four routes', !loadDiffs.length, loadDiffs);
   const tb = await call(`/b/${room}/tiebreakers`);
   ok('rooms read the set\'s backup questions, ids set apart', tb.status === 200
     && tb.body.tossups.length === 2 && tb.body.tossups[0].id === 'S-TU1' && tb.body.tossups[0].set === true
     && tb.body.tossups[0].question.includes('SETSECRET-TB') && tb.body.uses.length === 0, tb.body);
 }
 // the pool is read live: what the editors add later reaches a running mirror
+const mirrorStamp = async () => (await call(A)).body.tb_stamp;
+const st0 = await mirrorStamp();
+ok('mirror tb_stamp: the set\'s pool, none of its own', /^-\|./.test(st0) && !st0.endsWith('|-'), st0);
 r = await call(`${S}/tiebreakers?name=tb2.json`, { method: 'POST', body: packet('SETSECRET-TB2', 'History') });
 ok('editors add backup questions mid-season', r.status === 200 && r.body.tossups === 4, r.body);
+const st1 = await mirrorStamp();
+ok('mirror tb_stamp moves when the editors add questions', st1 !== st0 && st1.startsWith('-|'), [st0, st1]);
 // ...and the TD's own pool sits after it, its ids untouched
 r = await call(`${A}/tiebreakers?name=own-tb.json`, { method: 'POST', body: packet('TD-TB', 'History') });
 ok('TD adds their own backup questions', r.status === 200 && r.body.tossups === 2, r.body);
+const st2 = await mirrorStamp();
+ok('mirror tb_stamp moves when the TD adds their own', st2 !== st1 && !st2.startsWith('-|') && st2.endsWith(st1.slice(1)), [st1, st2]);
 r = await call(`${A}/tiebreakers`);
 ok('TD dashboard sees both pools merged', r.status === 200
   && r.body.tossups.map((q) => q.id).join() === 'S-TU1,S-TU2,S-TU3,S-TU4,TU1,TU2', r.body.tossups.map((q) => q.id));

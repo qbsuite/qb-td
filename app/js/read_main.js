@@ -20,7 +20,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { ModaqControl, GameFormats, parseQbjRegistration } from 'modaq';
-import { pub, esc } from './api.js';
+import { pub, esc, preload } from './api.js';
 import {
   normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, readerUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
@@ -690,6 +690,15 @@ async function boot() {
   }
 
   // Room link: always a fresh game against the live current round.
+  // The four answers this page asks for first come in one request
+  // (worker.js bucketLoad), each kept for the call below that would have
+  // fetched it; without it (an older Worker, a failure) each goes out alone.
+  try {
+    const got = await pub(tq('/b/' + secret + '/load'));
+    preload(Object.fromEntries(['', '/schedule', '/roster', '/tiebreakers']
+      .filter((sub) => got && got[sub] && Number.isInteger(got[sub].s))
+      .map((sub) => [tq('/b/' + secret + sub), got[sub]])));
+  } catch (e) { /* fetched one by one below */ }
   try {
     state = await pub(tq('/b/' + secret));
   } catch (e) {
