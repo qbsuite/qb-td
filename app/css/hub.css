@@ -163,6 +163,34 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 .pmeta { font-size: 13px; overflow-wrap: anywhere; }
 .pacts { display: flex; gap: 14px; align-items: center; font-size: 13px; }
 
+/* Fix buzzes, under its file */
+.pacts .linkbtn.on { color: var(--fg); font-weight: 600; }
+.fixbuzz { display: grid; gap: 14px; padding: 8px 0 2px; font-size: 14px; }
+.fxtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.fxtab { border: none; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 4px 12px; font-size: 13px; }
+.fxtab:hover { color: var(--fg); border: none; border-bottom: 2px solid var(--line); }
+.fxtab.on { color: var(--fg); font-weight: 600; border-bottom-color: var(--link); }
+/* inside the uploads grid's own table, so its cell rules are undone here */
+table.fxteam { width: 100%; font-variant-numeric: tabular-nums; }
+.ugrid tr.cellpanel table.fxteam th, .ugrid tr.cellpanel table.fxteam td {
+  width: auto; padding: 4px 8px; border-top: none; border-bottom: 1px solid var(--line);
+  text-align: right; white-space: nowrap; vertical-align: middle; font-size: 14px; }
+.ugrid tr.cellpanel table.fxteam th { font-size: 12px; color: var(--muted); }
+.ugrid tr.cellpanel table.fxteam th:first-child, .ugrid tr.cellpanel table.fxteam td:first-child { text-align: left; padding-left: 0; }
+.ugrid tr.cellpanel table.fxteam th:first-child { color: var(--fg); font-size: 14px; text-transform: none; letter-spacing: 0; }
+.ugrid tr.cellpanel table.fxteam td:last-child, .ugrid tr.cellpanel table.fxteam th:last-child { width: 1%; padding-right: 0; }
+.fxteam select { font-size: 13px; padding: 2px 6px; }
+.fxteam tr.chg td { background: var(--chg); }
+.ugrid tr.cellpanel table.fxteam tr.chg td:first-child { box-shadow: inset 3px 0 0 var(--chg-line); padding-left: 8px; }
+.fixbuzz .was { color: var(--muted); text-decoration: line-through; font-size: 12px; margin-right: 4px; }
+.fxbuzzes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; font-variant-numeric: tabular-nums; }
+.fxbh { font-size: 12px; font-weight: 600; color: var(--muted); padding: 2px 0; }
+.fxrow { display: grid; grid-template-columns: 26px 1fr 30px; gap: 8px; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.fxrow > span:first-child { text-align: right; }
+.fxrow.chg { background: var(--chg); box-shadow: inset 3px 0 0 var(--chg-line); }
+.fxrow select { font-size: 13px; padding: 1px 4px; width: 100%; }
+.fxacts { display: flex; gap: 12px; align-items: center; }
+
 /* Add a game */
 .addpanel { display: grid; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .addpanel[hidden] { display: none; }

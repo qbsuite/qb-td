@@ -28,6 +28,7 @@ import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { modaqExport, modaqFilenames } from '../engine/modaqfile.js';
+import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimProgress, prelimRounds, autoFill, finishedThrough } from '../engine/schedule.js';
 import { finalsProgress, finalsFill } from '../engine/finals.js';
@@ -313,6 +314,7 @@ let uploadsOpen = null;  // Set of expanded upload rounds; null = current round 
 let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
 let addOpen = null;      // Add a game panel: {bid, round} to prefill, or null when closed
 let ffOpen = null;       // Record a forfeit panel: {bid, round, win, lose}, or null when closed
+let fixOpen = null;      // Fix buzzes panel (fixPanelHtml): the file, its upload, the fix so far
 let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
 // clock time of a ruling (protests drawer)
 function clockTime(ms) {
@@ -2105,8 +2107,11 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         <div class="pacts">${fileLinks(f)}
           ${f.kind === 'combined' && !f.error && s
             ? `<button class="linkbtn" data-editfile="${f.id}" title="Reopen this game in MODAQ to correct it">Edit in MODAQ</button>` : ''}
+          ${good(f) && s && !isForfeitFile(f)
+            ? `<button class="linkbtn ${fixOpen && fixOpen.fid === f.id ? 'on' : ''}" data-fixbuzz="${f.id}">Fix buzzes</button>` : ''}
           <span class="spacer" style="flex:1"></span>
           <button class="linkbtn muted" data-delfile="${f.id}">Delete</button></div>
+        ${fixOpen && fixOpen.fid === f.id ? fixPanelHtml() : ''}
       </div>`;
     }).join('');
     return `<tr class="cellpanel"><td colspan="${roundCols.length + 1}"><div class="pop">
@@ -2432,6 +2437,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   box.querySelectorAll('[data-editfile]').forEach((b) => {
     b.onclick = () => editGame(a, buckets, files, Number(b.dataset.editfile));
   });
+  wireFix(box, a, t, buckets, files);
   $('addgame').onclick = () => addGame(a, buckets);
   $('calc').onclick = () => computeStats(a, t, buckets, files, settings);
   wireStatRange(t, files);
@@ -2584,6 +2590,199 @@ async function editGame(a, buckets, files, fileId) {
     // A new tab: the dashboard keeps its place, and the TD can flip back.
     window.open(readLink(room.secret) + '&g=' + encodeURIComponent(gid), '_blank');
   } catch (e) { say(e.message, true); }
+}
+
+/* ---------- fixing who got which buzz ----------
+   When a moderator credits a player's buzzes to a teammate. Swap players
+   trades two teammates' buzzes for the whole game (or gives a player's
+   name to a roster player who was never entered); All buzzes sets each
+   buzz's player. Both edit one fix (engine/buzzfix.js), which rewrites
+   every copy in the upload, and the result goes back up the room's own
+   upload route like Edit in MODAQ's correction: the newest upload counts,
+   and deleting it brings back the original. */
+
+const fixEdits = (x) => [...x.edits].map(([k, to]) => { const [q, j] = k.split(':').map(Number); return { q, j, to }; });
+// the upload's views: as uploaded, with the swaps, and fully fixed
+function fixDerived() {
+  const x = fixOpen;
+  const out = { base: buzzFixView(x.root), swapped: null, fixed: null, err: '' };
+  try {
+    out.swapped = buzzFixView(applyBuzzFix(x.root, { swaps: x.swaps }));
+    out.fixed = applyBuzzFix(x.root, { swaps: x.swaps, edits: fixEdits(x) });
+  } catch (e) { out.err = e.message; }
+  return out;
+}
+// edits that no longer change anything after the swaps moved, dropped
+function fixPrune() {
+  const x = fixOpen;
+  let sv = null;
+  try { sv = buzzFixView(applyBuzzFix(x.root, { swaps: x.swaps })); } catch (e) { return; }
+  for (const [k, to] of [...x.edits]) {
+    const [q, j] = k.split(':').map(Number);
+    const b = sv.buzzes && sv.buzzes.find((y) => y.q === q && y.j === j);
+    const team = b && sv.teams.find((tm) => tm.name === b.team);
+    if (!b || b.player === to || !team.players.includes(to)) x.edits.delete(k);
+  }
+}
+
+function fixPanelHtml() {
+  const x = fixOpen;
+  if (x.loading) return '<div class="fixbuzz muted">Loading the game&hellip;</div>';
+  if (!x.root) return `<div class="fixbuzz warntext">${esc(x.err || 'This game could not be loaded')}</div>`;
+  let d, was, now;
+  try {
+    d = fixDerived();
+    was = parseMatch(x.root, { filename: x.filename });
+    now = d.fixed ? parseMatch(d.fixed, { filename: x.filename }) : was;
+  } catch (e) { return `<div class="fixbuzz warntext">${esc(e.message)}</div>`; }
+  const hasAll = !!(d.base.buzzes && d.base.buzzes.length);
+  const tab = hasAll ? x.tab : 'swap';
+  const values = [...new Set([was, now].flatMap((m) => m.teams.flatMap((tm) => tm.players.flatMap((p) => p.counts.map((c) => c.value)))))]
+    .filter((v) => v !== 0).sort((p, q) => q - p);
+  const line = (m, ti, name) => {
+    const p = m.teams[ti].players.find((y) => y.name === name);
+    const n = Object.fromEntries(values.map((v) => [v, p ? (p.counts.find((c) => c.value === v) || { n: 0 }).n : 0]));
+    return { n, pts: p ? p.counts.reduce((sum, c) => sum + c.value * c.n, 0) : 0 };
+  };
+  const table = (ti) => {
+    const tm = d.base.teams[ti];
+    const names = [...tm.players, ...now.teams[ti].players.map((p) => p.name).filter((n) => !tm.players.includes(n))];
+    const rows = names.map((name) => {
+      const a = line(was, ti, name);
+      const b = line(now, ti, name);
+      const cell = (va, vb) => `<td class="num">${va !== vb ? `<span class="was">${va}</span>` : ''}${vb}</td>`;
+      const diff = a.pts !== b.pts || values.some((v) => a.n[v] !== b.n[v]);
+      const pi = tm.players.indexOf(name);
+      let ctl = '';
+      if (pi >= 0 && tab === 'swap') {
+        const mine = x.swaps.find((y) => y.team === tm.name && (y.from === name || y.to === name));
+        const partner = mine ? (mine.from === name ? mine.to : mine.from) : '';
+        const roster = x.roster[tm.name] || [];
+        ctl = `<select id="fxs-${ti}-${pi}" data-fswap="${ti}:${pi}" aria-label="Swap ${esc(name)} with">
+          <option value="">${partner ? 'Undo' : 'Swap with'}</option>
+          ${tm.players.filter((n) => n !== name).map((n) => `<option ${n === partner ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+          ${roster.length ? `<optgroup label="Not in this game">${roster.map((n) =>
+            `<option value="${esc(n)}" ${n === partner ? 'selected' : ''}>${esc(n)}</option>`).join('')}</optgroup>` : ''}
+        </select>`;
+      }
+      return `<tr class="${diff ? 'chg' : ''}"><td>${esc(name)}${pi < 0 ? '<span class="muted small"> from the roster</span>' : ''}</td>
+        ${values.map((v) => cell(a.n[v], b.n[v])).join('')}${cell(a.pts, b.pts)}<td>${ctl}</td></tr>`;
+    }).join('');
+    return `<table class="fxteam"><tr><th>${esc(tm.name)}</th>${values.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th><th></th></tr>${rows}</table>`;
+  };
+  // buzzes now on a player who was not in the lineup then
+  const before = lineupGaps(x.root);
+  const gaps = d.fixed ? [...lineupGaps(d.fixed)].filter((k) => !before.has(k)) : [];
+  const allList = () => {
+    const sv = d.swapped || d.base;
+    const orig = new Map(d.base.buzzes.map((b) => [b.q + ':' + b.j, b.player]));
+    return `<div class="fxbuzzes">${sv.teams.map((tm) => `<div><div class="fxbh">${esc(tm.name)}</div>${sv.buzzes.filter((b) => b.team === tm.name).map((b) => {
+      const key = b.q + ':' + b.j;
+      const to = x.edits.get(key) || b.player;
+      return `<div class="fxrow ${to !== orig.get(key) ? 'chg' : ''}"><span class="muted">${b.n}</span>
+        <select id="fxe-${b.q}-${b.j}" data-fedit="${key}" aria-label="Question ${b.n}, ${esc(tm.name)}">${tm.players.map((n) =>
+          `<option ${n === to ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+        <span class="num ${b.value < 0 ? 'warntext' : ''}">${b.value}</span></div>`;
+    }).join('')}</div>`).join('')}</div>`;
+  };
+  const gapNames = gaps.map((k) => {
+    const [q, j] = k.split(':').map(Number);
+    const b = buzzFixView(d.fixed).buzzes.find((y) => y.q === q && y.j === j);
+    return `${esc(b.player)} was not in the lineup on question ${q + 1}.`;
+  });
+  const changed = x.swaps.length || x.edits.size;
+  return `<div class="fixbuzz">
+    ${hasAll ? `<div class="fxtabs" role="tablist">
+      <button role="tab" class="fxtab ${tab === 'swap' ? 'on' : ''}" data-fixtab="swap" aria-selected="${tab === 'swap'}">Swap players</button>
+      <button role="tab" class="fxtab ${tab === 'all' ? 'on' : ''}" data-fixtab="all" aria-selected="${tab === 'all'}">All buzzes</button></div>` : ''}
+    ${tab === 'all' ? allList() : ''}
+    ${table(0)}${table(1)}
+    ${gapNames.length ? `<div class="warntext small">${gapNames.join(' ')}</div>` : ''}
+    ${d.err ? `<div class="warntext small">${esc(d.err)}</div>` : ''}
+    <div class="fxacts"><button class="primary" id="fixsave" ${changed && !d.err ? '' : 'disabled'}>Save correction</button>
+      <button class="linkbtn muted" data-fixcancel>Cancel</button></div>
+  </div>`;
+}
+
+// the roster players a team could have had in this game, under current names
+function fixRoster(roster, view) {
+  const out = {};
+  const map = hubNames.map;
+  for (const tm of view.teams) {
+    const cur = (map && map.teams.get(tm.name)) || tm.name;
+    const rt = (roster || []).find((r) => r.name === cur);
+    if (!rt) continue;
+    const here = new Set(tm.players.flatMap((p) => [p, (map && map.players.get(cur + '\n' + p)) || p]));
+    out[tm.name] = rt.players.filter((n) => !here.has(n));
+  }
+  return out;
+}
+
+function wireFix(box, a, t, buckets, files) {
+  box.querySelectorAll('[data-fixbuzz]').forEach((btn) => {
+    btn.onclick = async () => {
+      const fid = Number(btn.dataset.fixbuzz);
+      if (fixOpen && fixOpen.fid === fid) { fixOpen = null; render(); return; }
+      const f = files.find((y) => y.id === fid);
+      fixOpen = { fid, filename: f.filename, tab: 'swap', loading: true, root: null, err: '', roster: {}, swaps: [], edits: new Map() };
+      render();
+      const x = fixOpen;
+      try {
+        x.root = await fetchOwnedJson(a, f.r2_key);
+        const view = buzzFixView(x.root);
+        let roster = null;
+        if (t.roster_r2_key) { try { roster = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)); } catch (e) { /* teammates only */ } }
+        x.roster = fixRoster(roster, view);
+      } catch (e) { x.root = null; x.err = e.message; }
+      x.loading = false;
+      if (fixOpen === x) render();
+    };
+  });
+  if (!fixOpen || fixOpen.loading || !fixOpen.root) return;
+  const x = fixOpen;
+  box.querySelectorAll('[data-fixtab]').forEach((b) => { b.onclick = () => { x.tab = b.dataset.fixtab; render(); }; });
+  box.querySelectorAll('[data-fixcancel]').forEach((b) => { b.onclick = () => { fixOpen = null; render(); }; });
+  box.querySelectorAll('[data-fswap]').forEach((sel) => {
+    sel.onchange = () => {
+      const [ti, pi] = sel.dataset.fswap.split(':').map(Number);
+      const tm = buzzFixView(x.root).teams[ti];
+      const who = tm.players[pi];
+      const to = sel.value;
+      // a player is in one swap at a time: picking again replaces it
+      x.swaps = x.swaps.filter((y) => !(y.team === tm.name && [y.from, y.to].some((n) => n === who || n === to)));
+      if (to) x.swaps.push({ team: tm.name, from: who, to });
+      fixPrune();
+      render();
+    };
+  });
+  box.querySelectorAll('[data-fedit]').forEach((sel) => {
+    sel.onchange = () => {
+      const [q, j] = sel.dataset.fedit.split(':').map(Number);
+      const b = buzzFixView(applyBuzzFix(x.root, { swaps: x.swaps })).buzzes.find((y) => y.q === q && y.j === j);
+      if (sel.value === b.player) x.edits.delete(sel.dataset.fedit);
+      else x.edits.set(sel.dataset.fedit, sel.value);
+      render();
+    };
+  });
+  if ($('fixsave')) $('fixsave').onclick = async () => {
+    const f = files.find((y) => y.id === x.fid);
+    const room = f && buckets.find((b) => b.id === f.bucket_id);
+    if (!room) { say('This game\'s room is gone, so it cannot be fixed here', true); return; }
+    if (notStarted()) { say(START_FIRST, true); return; }
+    let fixed;
+    try { fixed = applyBuzzFix(x.root, { swaps: x.swaps, edits: fixEdits(x) }); } catch (e) { say(e.message, true); return; }
+    // through the room that played it, as Edit in MODAQ's correction goes
+    const run = busy($('fixsave'), { label: 'Saving' });
+    try {
+      const out = await pub(`/b/${room.secret}/upload?round=${f.round}&name=${encodeURIComponent(f.filename)}`,
+        { method: 'POST', body: JSON.stringify(fixed) });
+      run.end();
+      if (out && out.error) { say(out.error, true); return; }
+      fixOpen = null;
+      say('Saved as a new upload. Delete it to undo.');
+      showDetail();
+    } catch (e) { run.end(); say(e.message, true); }
+  };
 }
 
 /* ---------- forfeits ----------

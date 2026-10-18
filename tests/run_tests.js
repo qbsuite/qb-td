@@ -32,6 +32,7 @@ import HDWHITE from '../app/engine/hdwhite.js';
 import { finalsSources, finalsProgress, finalsFill, scheduleFinished } from '../app/engine/finals.js';
 import { eachLimit } from '../app/js/limit.js';
 import { modaqExport, modaqFilenames, qbjTextWithRound } from '../app/engine/modaqfile.js';
+import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -5798,6 +5799,173 @@ test('modaqfile: a reader upload hands back MODAQ\'s own export texts unchanged;
   assert.equal(out.game, gameText, 'the game alone, as MODAQ writes it');
   // MODAQ's file names: team names joined by "_", spaces kept
   assert.deepEqual(modaqFilenames(3, ['A B', 'C']), { qbj: 'Round_3_A B_C.qbj', game: 'Round_3_A B_C_Game.json' });
+});
+
+/* ---------- Fix buzzes: a moderator's flipped names, put right ----------
+   Real MODAQ games, played through its own state: the game as the
+   moderator recorded it (Ann's and Bea's buzzes credited to each other)
+   and the game as it should have been recorded. The fix has to turn the
+   first upload into the second exactly, every copy of it, and MODAQ has
+   to reopen the fixed game (the reader's resume, mobx-sync) to the same
+   result. */
+const { AppState: MApp } = modaqRequire('modaq/src/state/AppState.js');
+const { AsyncTrunk: MTrunk } = modaqRequire('mobx-sync');
+const { toQBJString: mToQBJString } = modaqRequire('modaq/src/qbj/QBJ.js');
+async function mobxStore(app) {
+  const mem = new Map();
+  const storage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
+  const trunk = new MTrunk(app, { storage, storageKey: 'g', delay: 0 });
+  await trunk.init();
+  return { mem, trunk };
+}
+// a game played out, with `who` deciding whom the moderator credits
+async function playedUpload(who) {
+  const app = new MApp();
+  const { mem, trunk } = await mobxStore(app);
+  const game = app.game;
+  const packet = new MPacket();
+  packet.setTossups(Array.from({ length: 20 }, (_, i) => new MTossup(`T${i + 1} one two three four five six`, 'a')));
+  packet.setBonuses(Array.from({ length: 20 }, (_, i) => new MBonus(`B${i + 1}`, [1, 2, 3].map(() => ({ question: 'p', answer: 'a', value: 10 })))));
+  packet.setName('Packet');
+  game.setGameFormat(ACFGameFormat);
+  game.loadPacket(packet);
+  const P = Object.fromEntries([['Ann', 'Alpha', true], ['Bea', 'Alpha', true], ['Cal', 'Alpha', true], ['Dee', 'Alpha', false],
+    ['Bob', 'Beta', true], ['Ben', 'Beta', true]].map(([n, t, s]) => [n, new MPlayer(n, t, s)]));
+  game.addNewPlayers(Object.values(P));
+  const p = (ci, name) => P[who(ci, name)];
+  const right = (ci, name, position = 3) => {
+    game.cycles[ci].addCorrectBuzz({ player: p(ci, name), position, points: 10 }, game.getTossupIndex(ci), game.gameFormat, game.getBonusIndex(ci), 3);
+    game.cycles[ci].setBonusPartAnswer(0, P[name].teamName, 10);
+  };
+  const wrong = (ci, name, position = 1) => game.cycles[ci].addWrongBuzz({ player: p(ci, name), position, points: -5, isLastWord: false }, game.getTossupIndex(ci), game.gameFormat);
+  right(0, 'Ann'); wrong(1, 'Bea'); right(1, 'Bob', 4); wrong(2, 'Ann'); wrong(2, 'Ben', 2);
+  right(3, 'Bea'); right(4, 'Ann', 2); right(5, 'Cal'); wrong(6, 'Bob'); right(6, 'Ann', 5);
+  wrong(7, 'Ann', 2); right(7, 'Bea', 2); right(8, 'Ben'); right(9, 'Bea', 1);
+  game.cycles[10].addSwapSubstitution(P.Dee, P.Cal);
+  right(10, 'Dee'); right(11, 'Ann'); wrong(12, 'Bea'); right(13, 'Bob'); right(14, 'Bea', 4);
+  for (let ci = 15; ci < 20; ci++) right(ci, ci % 2 ? 'Ann' : 'Ben');
+  await trunk.persist();
+  trunk.disposer && trunk.disposer();
+  const storeText = mem.get('g');
+  const qbj = toQBJ(game, 'Packet', 4);
+  return JSON.parse(combinedUpload(qbj, 4, storeText, null, null, null,
+    { qbj: mToQBJString(game, 'Packet', 4), game: JSON.stringify(game, null, 2) }));
+}
+// what the reader does on Edit in MODAQ: resume the saved state, export it
+async function reopened(root) {
+  const app = new MApp();
+  const { trunk } = await mobxStore(app);
+  trunk.disposer && trunk.disposer();
+  const mem = new Map([['g', JSON.stringify(root.game)]]);
+  const storage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
+  const again = new MApp();
+  const t2 = new MTrunk(again, { storage, storageKey: 'g', delay: 0 });
+  await t2.init();
+  t2.disposer && t2.disposer();
+  return { qbj: mToQBJString(again.game, 'Packet', 4), game: JSON.stringify(again.game, null, 2) };
+}
+const flipAB = (ci, n) => (n === 'Ann' ? 'Bea' : n === 'Bea' ? 'Ann' : n);
+const asIs = (ci, n) => n;
+const bfFlipped = await playedUpload(flipAB);
+const bfTruth = await playedUpload(asIs);
+// the same game, with the buzz on question 15 really Cal's
+const bfTruthCal = await playedUpload((ci, n) => (ci === 14 ? 'Cal' : n));
+// Ann was really Eve all game, never entered
+const bfEve = await playedUpload((ci, n) => (n === 'Ann' ? 'Ann' : n));
+const swapAB = { swaps: [{ team: 'Alpha', from: 'Ann', to: 'Bea' }] };
+const bfFixed = applyBuzzFix(bfFlipped, swapAB);
+const bfReopened = await reopened(bfFixed);
+// the saved game, less the time it was saved
+const noStamp = (g) => { const { lastUpdate, ...rest } = g; return rest; };
+const gameHalf = (r) => noStamp(r.game.game);
+const gameFile = (text) => noStamp(JSON.parse(text));
+
+test('Fix buzzes: swapping two teammates turns the flipped upload into the right one, all copies', () => {
+  assert.notDeepEqual(bfFlipped.qbj, bfTruth.qbj, 'the fixture really is flipped');
+  assert.deepEqual(bfFixed.qbj, bfTruth.qbj, 'the stats qbj');
+  assert.equal(bfFixed.modaq.qbj, bfTruth.modaq.qbj, 'MODAQ\'s qbj, to the byte');
+  assert.deepEqual(gameFile(bfFixed.modaq.game), gameFile(bfTruth.modaq.game), 'MODAQ\'s game file');
+  assert.deepEqual(gameHalf(bfFixed), gameHalf(bfTruth), 'the saved game the reader resumes');
+  const a = parseMatch(bfFixed, { filename: 'x.qbtd.json' });
+  const f = parseMatch(bfFlipped, { filename: 'x.qbtd.json' });
+  assert.deepEqual(a.teams.map((t) => t.points), f.teams.map((t) => t.points), 'neither score moves');
+});
+
+test('Fix buzzes: Edit in MODAQ reopens the fixed game exactly as fixed', () => {
+  assert.equal(bfReopened.qbj, bfFixed.modaq.qbj);
+  assert.equal(bfReopened.qbj, bfTruth.modaq.qbj);
+  assert.deepEqual(gameFile(bfReopened.game), gameFile(bfTruth.modaq.game));
+});
+
+test('Fix buzzes: a swap equals editing each of the two players\' buzzes, and the original is untouched', () => {
+  const before = JSON.stringify(bfFlipped);
+  const view = buzzFixView(bfFlipped);
+  const edits = view.buzzes.filter((b) => b.team === 'Alpha' && (b.player === 'Ann' || b.player === 'Bea'))
+    .map((b) => ({ q: b.q, j: b.j, to: flipAB(0, b.player) }));
+  assert.ok(edits.length > 10);
+  assert.deepEqual(applyBuzzFix(bfFlipped, { edits }), bfFixed);
+  assert.equal(JSON.stringify(bfFlipped), before);
+});
+
+test('Fix buzzes: after a swap, All buzzes shows the swapped names, and an edit there lands on top', () => {
+  // the view All buzzes draws: the upload with the swap applied
+  const shown = buzzFixView(applyBuzzFix(bfFlipped, swapAB));
+  assert.deepEqual(shown, buzzFixView(bfTruth));
+  const b = shown.buzzes.find((x) => x.q === 14);
+  assert.equal(b.player, 'Bea', 'question 15 reads Bea once swapped');
+  const both = applyBuzzFix(bfFlipped, { ...swapAB, edits: [{ q: 14, j: b.j, to: 'Cal' }] });
+  assert.deepEqual(both.qbj, bfTruthCal.qbj);
+  assert.equal(both.modaq.qbj, bfTruthCal.modaq.qbj);
+  assert.deepEqual(gameHalf(both), gameHalf(bfTruthCal));
+  // an edit back to the swapped name changes nothing
+  assert.deepEqual(applyBuzzFix(bfFlipped, { ...swapAB, edits: [{ q: 14, j: b.j, to: 'Bea' }] }), bfFixed);
+});
+
+test('Fix buzzes: buzzes stay on their team', () => {
+  const view = buzzFixView(bfFlipped);
+  const ann = view.buzzes.find((x) => x.player === 'Ann');
+  assert.throws(() => applyBuzzFix(bfFlipped, { edits: [{ q: ann.q, j: ann.j, to: 'Bob' }] }), /not playing for Alpha/);
+  assert.throws(() => applyBuzzFix(bfFlipped, { swaps: [{ team: 'Alpha', from: 'Ann', to: 'Bob' }] }), /plays for Beta/);
+  assert.throws(() => applyBuzzFix(bfFlipped, { swaps: [{ team: 'Alpha', from: 'Bob', to: 'Ann' }] }), /not playing for Alpha/);
+  assert.throws(() => applyBuzzFix(bfFlipped, { swaps: [swapAB.swaps[0], { team: 'Alpha', from: 'Bea', to: 'Cal' }] }), /another swap/);
+});
+
+test('Fix buzzes: a roster player never entered takes the name throughout', () => {
+  const fixed = applyBuzzFix(bfEve, { swaps: [{ team: 'Alpha', from: 'Ann', to: 'Eve' }] });
+  const text = JSON.stringify(fixed);
+  assert.ok(!/"Ann"/.test(text), 'no Ann left in any copy');
+  const m = parseMatch(fixed, { filename: 'x.qbtd.json' });
+  const was = parseMatch(bfEve, { filename: 'x.qbtd.json' });
+  const line = (mm, n) => mm.teams[0].players.find((x) => x.name === n);
+  assert.deepEqual(line(m, 'Eve'), { ...line(was, 'Ann'), name: 'Eve' });
+});
+const bfEveReopened = await reopened(applyBuzzFix(bfEve, { swaps: [{ team: 'Alpha', from: 'Ann', to: 'Eve' }] }));
+test('Fix buzzes: the renamed game reopens in MODAQ under the new name', () => {
+  const fixed = applyBuzzFix(bfEve, { swaps: [{ team: 'Alpha', from: 'Ann', to: 'Eve' }] });
+  assert.equal(bfEveReopened.qbj, fixed.modaq.qbj);
+});
+
+test('Fix buzzes: a bare qbj from elsewhere, counts kept in its own shape', () => {
+  const bare = JSON.parse(JSON.stringify(bfFlipped.qbj));
+  // another tool's counts: each value listed, zeros included
+  for (const mt of bare.match_teams) for (const mp of mt.match_players) {
+    for (const v of [10, 0, -5]) if (!mp.answer_counts.some((ac) => ac.answer.value === v)) mp.answer_counts.push({ answer: { value: v }, number: 0 });
+  }
+  const fixed = applyBuzzFix(bare, swapAB);
+  const truth = parseMatch(bfTruth.qbj);
+  const got = parseMatch(fixed);
+  const counts = (mm) => mm.teams.map((t) => t.players.map((p) => [p.name, [10, 0, -5].map((v) => (p.counts.find((c) => c.value === v) || { n: 0 }).n)]));
+  assert.deepEqual(counts(got), counts(truth));
+  assert.equal(fixed.match_teams[0].match_players[0].answer_counts.length, 3, 'zero entries stay');
+});
+
+test('Fix buzzes: a buzz moved to someone not in the lineup is flagged', () => {
+  const view = buzzFixView(bfFlipped);
+  const dee = view.buzzes.find((x) => x.player === 'Dee');
+  const cal = view.buzzes.find((x) => x.player === 'Cal');
+  assert.equal(lineupGaps(bfFlipped).size, 0);
+  const gaps = lineupGaps(applyBuzzFix(bfFlipped, { edits: [{ q: dee.q, j: dee.j, to: 'Cal' }, { q: cal.q, j: cal.j, to: 'Dee' }] }));
+  assert.deepEqual([...gaps].sort(), [`${cal.q}:${cal.j}`, `${dee.q}:${dee.j}`].sort());
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
