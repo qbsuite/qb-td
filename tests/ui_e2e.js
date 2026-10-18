@@ -1228,7 +1228,7 @@ const shownGames = () => js(`[...document.querySelectorAll('.nowblock')[0].query
       if (l.s !== t.points || l.won !== (t.points > o.points)) right = false;
     }
   }
-  ok('19 public: live-round scores match the games, winners tinted', right && games.filter((g) => g.lines.some((l) => l.won)).length === want.length,
+  ok('19 public: live-round scores match the games, winners marked', right && games.filter((g) => g.lines.some((l) => l.won)).length === want.length,
     { games, want: want.map((m) => m.teams.map((t) => t.name + ' ' + t.points)) });
 }
 ok('19 public: Up next lists the next round\'s games',
@@ -1245,7 +1245,7 @@ await click('[data-schedview="all"]');
 await waitJs(`!!document.querySelector('table.sched')`, 'the All rounds grid');
 {
   const want = sched.phases.flatMap((p) => p.rounds.flatMap((r) => r.games)).length;
-  const got = await js(`[...document.querySelectorAll('table.sched td')].filter((td) => td.querySelectorAll('.gl').length === 2).length`);
+  const got = await js(`document.querySelectorAll('table.sched td.la > .gl').length`);
   ok('20 public: All rounds lists every scheduled game', got === want, { got, want });
 }
 await reload();

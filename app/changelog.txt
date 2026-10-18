@@ -9,6 +9,8 @@ Release Notes for 10/18/2026
 
 [ PUBLIC PAGE ]
 - Scoresheets and buzzpoints can go without a password once the question set is clear: "Disable password" under Public page, with a warning.
+- All rounds keeps each round's team lines level across the rooms when a long team name wraps.
+- Winners on the schedule are shown in bold, without the green box.
 
 [ SECURITY ]
 - Buzzpoints without a password are rate-limited per visitor, like password attempts, and the key they use is locked with a Worker secret.

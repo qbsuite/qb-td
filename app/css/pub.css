@@ -11,16 +11,20 @@
 /* ---------- schedule ---------- */
 .schedviews select { max-width: 100%; }
 
-/* a team's line of a game; the winner's tinted, the loser's muted */
+/* a team's line of a game; the winner's bold, the loser's muted */
 .gl {
   display: flex; justify-content: space-between; gap: 8px;
   padding: 1px 6px; margin: 1px -6px; border-radius: 6px;
 }
 .gl .s { font-variant-numeric: tabular-nums; }
-.gl.won { background: var(--win-bg); color: var(--win-fg); font-weight: 600; }
+.gl.won { color: var(--fg); font-weight: 600; }
 .gl.lost { color: var(--muted); }
 .gl.ph { color: var(--muted); font-style: italic; }
 .sched .gl { min-width: 14ch; }
+/* All rounds: a round's first team lines on one table row, its second
+   team lines on the next, so a wrapped name keeps the lines level */
+.sched td.la { border-bottom: 0; padding-bottom: 1px; }
+.sched td.lb { padding-top: 1px; }
 .wtag {
   background: var(--win-bg); color: var(--win-fg); font-weight: 600;
   border-radius: 6px; padding: 1px 6px; white-space: nowrap;

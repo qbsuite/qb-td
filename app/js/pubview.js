@@ -290,25 +290,27 @@ function poolsIn(rounds) {
 const keepGame = (g) => !poolSel || poolOf(g) === poolSel;
 const roomName = (g) => (schedule.rooms[g.room] ? schedule.rooms[g.room].name : '');
 
-// One team's line of a game: the winner's line is tinted, the loser's
+// One team's line of a game: the winner's line is bold, the loser's
 // muted, a playoff placeholder italic.
 function lineHtml(slot, name, pts, won, lost) {
   return `<div class="gl${won ? ' won' : ''}${lost ? ' lost' : ''}${slot && slot.label ? ' ph' : ''}">`
     + `<span class="t">${esc(name || '—')}</span>${pts !== null ? `<span class="s">${pts}</span>` : ''}</div>`;
 }
 
-function gameCell(g, round, results) {
+// A game's two team lines, as [first, second].
+function gameLines(g, round, results) {
   const a = slotText(g.a);
   const b = slotText(g.b);
   const m = a && b && g.a.team && g.b.team ? resultFor(results, round, a, b) : null;
-  if (!m) return lineHtml(g.a, a, null) + lineHtml(g.b, b, null);
+  if (!m) return [lineHtml(g.a, a, null), lineHtml(g.b, b, null)];
   const ma = m.teams.find((t) => t.name === a);
   const mb = m.teams.find((t) => t.name === b);
   // a forfeit: W for the winner, FF for the team that forfeited
   const shown = (x, y) => (m.forfeit ? (resultOf(x, y) === 'W' ? 'W' : 'FF') : x.points);
-  return lineHtml(g.a, a, shown(ma, mb), resultOf(ma, mb) === 'W', resultOf(ma, mb) === 'L')
-    + lineHtml(g.b, b, shown(mb, ma), resultOf(mb, ma) === 'W', resultOf(mb, ma) === 'L');
+  return [lineHtml(g.a, a, shown(ma, mb), resultOf(ma, mb) === 'W', resultOf(ma, mb) === 'L'),
+    lineHtml(g.b, b, shown(mb, ma), resultOf(mb, ma) === 'W', resultOf(mb, ma) === 'L')];
 }
+const gameCell = (g, round, results) => gameLines(g, round, results).join('');
 
 function renderScheduleGrid(box) {
   const results = resultMap();
@@ -325,18 +327,24 @@ function renderScheduleGrid(box) {
     <div class="tablewrap">
     <table class="sched">
       <tr><th></th>${schedule.rooms.map((r, i) => used[i] ? `<th>${esc(r.name)}</th>` : '').join('')}${hasByes ? '<th>Bye</th>' : ''}</tr>
-      ${phase.rounds.map((round) => `
-      <tr>
-        <td class="roundcell${round.round === cur ? ' now' : ''}">${round.round}</td>
-        ${schedule.rooms.map((_, roomI) => {
-          if (!used[roomI]) return '';
+      ${phase.rounds.map((round) => {
+        // two table rows a round, one per team, so a name that wraps
+        // grows its whole line and the lines stay level across the rooms
+        const now = round.round === cur ? ' now' : '';
+        const lines = schedule.rooms.map((_, roomI) => {
+          if (!used[roomI]) return null;
           const g = round.games.find((x) => x.room === roomI && keepGame(x));
-          const cls = round.round === cur ? ' class="now"' : '';
-          return `<td${cls}>${g ? gameCell(g, round, results) : ''}</td>`;
-        }).join('')}
-        ${hasByes ? `<td${round.round === cur ? ' class="now"' : ''}>${round.byes.map((s) =>
+          return g ? gameLines(g, round, results) : ['', ''];
+        }).filter(Boolean);
+        return `
+      <tr>
+        <td class="roundcell${now}" rowspan="2">${round.round}</td>
+        ${lines.map(([a]) => `<td class="la${now}">${a}</td>`).join('')}
+        ${hasByes ? `<td${now ? ' class="now"' : ''} rowspan="2">${round.byes.map((s) =>
           `<div class="gl${s && s.label ? ' ph' : ''}"><span class="t">${esc(slotText(s)) || '—'}</span></div>`).join('')}</td>` : ''}
-      </tr>`).join('')}
+      </tr>
+      <tr>${lines.map(([, b]) => `<td class="lb${now}">${b}</td>`).join('')}</tr>`;
+      }).join('')}
     </table>
     </div>`;
   }).join('') || '<div class="muted">No games</div>';
