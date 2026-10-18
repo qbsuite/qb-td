@@ -116,8 +116,7 @@ function blobResponse(env, r2obj, filename, cacheSeconds = 0) {
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', r2obj.httpMetadata?.contentType || 'application/octet-stream');
   if (filename) {
-    headers.set('Content-Disposition',
-      `attachment; filename="${filename.replace(/["\\\r\n]/g, '_')}"`);
+    headers.set('Content-Disposition', attachmentHeader(filename));
   }
   // slow-moving public blobs let the browser self-serve on refresh spam
   if (cacheSeconds) headers.set('Cache-Control', 'public, max-age=' + cacheSeconds);
@@ -132,6 +131,27 @@ function randToken(len = 20) {
   for (const b of bytes) s += alphabet[b % alphabet.length];
   return s;
 }
+// A packet's name as the TD's file is called ("Packet 1 + 2.docx"): only a
+// path and control characters go, and a very long name keeps its head and
+// extension. It is what readers, MODAQ's game file and the exports show;
+// the R2 key still uses cleanFilename.
+function packetName(raw) {
+  const base = String(raw || '').split(/[\\/]/).pop().replace(/[\u0000-\u001f\u007f]/g, '').trim() || 'packet';
+  if (base.length <= 200) return base;
+  const ext = (/\.[A-Za-z0-9]{1,8}$/.exec(base) || [''])[0];
+  return base.slice(0, 200 - ext.length) + ext;
+}
+
+// Content-Disposition for a download: a plain-ASCII filename for old
+// clients and the exact name (RFC 6266 filename*) for the rest, so a "+",
+// an accent or a quote in a name reaches the TD's disk as it was.
+function attachmentHeader(name) {
+  const n = String(name || 'file');
+  const ascii = n.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  const exact = encodeURIComponent(n).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${exact}`;
+}
+
 function cleanFilename(name) {
   const base = String(name || 'file').split(/[\\/]/).pop().replace(/[^\w.\- ()\[\]]/g, '_');
   if (base.length <= 100) return base || 'file';
@@ -298,8 +318,7 @@ async function blobResponseDec(env, r2obj, rawKey, filename, cacheSeconds = 0) {
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', (r2obj.customMetadata || {}).ct || 'application/octet-stream');
   if (filename) {
-    headers.set('Content-Disposition',
-      `attachment; filename="${filename.replace(/["\\\r\n]/g, '_')}"`);
+    headers.set('Content-Disposition', attachmentHeader(filename));
   }
   if (cacheSeconds) headers.set('Cache-Control', 'public, max-age=' + cacheSeconds);
   return new Response(buf, { status: 200, headers });
@@ -2663,7 +2682,9 @@ async function uploadPacket(request, url, env, t) {
   const id = t.id;
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1 || round > 999) return err(env, 400, 'bad round');
+  // the key a safe filename; the round's packet_name the file's own name
   const filename = cleanFilename(url.searchParams.get('name'));
+  const name = packetName(url.searchParams.get('name'));
 
   const body = await request.arrayBuffer();
   if (!body.byteLength) return err(env, 400, 'empty body');
@@ -2676,8 +2697,8 @@ async function uploadPacket(request, url, env, t) {
   await env.DB.prepare(
     'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
     'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4'
-  ).bind(id, round, key, filename).run();
-  await updateCatmap(env, id, round, packetCategories(body, filename));
+  ).bind(id, round, key, name).run();
+  await updateCatmap(env, id, round, packetCategories(body, name));
   await markPub(env, id); // packet_rounds rides the published state
   // every room may already have started the current round, waiting only
   // on this packet (auto-advance)
@@ -2685,7 +2706,7 @@ async function uploadPacket(request, url, env, t) {
     || (t.bracket_rounds !== null && t.bracket_rounds !== undefined && round > t.current_round)) {
     await maybeAdvance(env, id);
   }
-  return json(env, { round, filename });
+  return json(env, { round, filename: name });
 }
 
 async function uploadRoster(request, url, env, t) {
@@ -2737,8 +2758,9 @@ async function storedFileResponse(env, obj, rawKey, dl, part) {
   if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
-  headers.set('Content-Disposition', `attachment; filename="${dl.replace(/["\\\r\n]/g, '_')}"`);
-  return new Response(JSON.stringify(half), { status: 200, headers });
+  headers.set('Content-Disposition', attachmentHeader(dl));
+  // indented as MODAQ writes its own exports (QBJ.js, ExportToJsonDialog)
+  return new Response(JSON.stringify(half, null, 2), { status: 200, headers });
 }
 
 async function deleteFile(env, t, fileId) {
@@ -4210,9 +4232,9 @@ async function pubQbj(env, slug, fileId) {
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Cache-Control', 'public, max-age=' + pubCache(t));
-  headers.set('Content-Disposition',
-    `attachment; filename="${String(entry.filename || 'game.qbj').replace(/\.qbtd\.json$/i, '.qbj').replace(/["\\\r\n]/g, '_')}"`);
-  return new Response(JSON.stringify(entry.qbj), { status: 200, headers });
+  headers.set('Content-Disposition', attachmentHeader(String(entry.filename || 'game.qbj').replace(/\.qbtd\.json$/i, '.qbj')));
+  // indented as MODAQ writes its own exports
+  return new Response(JSON.stringify(entry.qbj, null, 2), { status: 200, headers });
 }
 
 async function pubRoster(env, slug) {
@@ -4562,6 +4584,7 @@ async function uploadSetPacket(request, url, env, s) {
   const packet = Number(url.searchParams.get('packet'));
   if (!Number.isInteger(packet) || packet < 1 || packet > 999) return err(env, 400, 'bad packet number');
   const filename = cleanFilename(url.searchParams.get('name'));
+  const name = packetName(url.searchParams.get('name'));
   const body = await request.arrayBuffer();
   if (!body.byteLength) return err(env, 400, 'empty body');
   if (body.byteLength > MAX_PACKET) return err(env, 413, 'packet too large');
@@ -4585,13 +4608,13 @@ async function uploadSetPacket(request, url, env, s) {
       env.DB.prepare('UPDATE set_packets SET retired = 1 WHERE set_id = ?1 AND packet = ?2').bind(s.id, packet),
       env.DB.prepare(
         'INSERT INTO set_packets (set_id, packet, version, r2_key, name, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
-      ).bind(s.id, packet, version, key, filename, Date.now()),
+      ).bind(s.id, packet, version, key, name, Date.now()),
     ]);
   } catch (e) {
     // two uploads of one packet raced for the same version number
     return err(env, 409, 'concurrent upload, try again');
   }
-  const cats = packetCategories(body, filename);
+  const cats = packetCategories(body, name);
   if (cats) await updateSetCatmap(env, s.id, packet, version, cats);
 
   const open = await mirrorsOpenFor(env, s.id, packet, offer);
@@ -4599,12 +4622,12 @@ async function uploadSetPacket(request, url, env, s) {
     await env.DB.prepare(
       'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
       'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4 WHERE served = 0'
-    ).bind(tid, round, key, filename).run();
+    ).bind(tid, round, key, name).run();
     await updateCatmap(env, tid, round, cats);
     await markPub(env, tid);
   }
   await markSet(env, s.id);
-  return json(env, { packet, version, filename, mirrors: new Set(open.map((o) => o.tid)).size });
+  return json(env, { packet, version, filename: name, mirrors: new Set(open.map((o) => o.tid)).size });
 }
 
 // DELETE /s/:secret/packet?packet=N — take a packet out of the set (one

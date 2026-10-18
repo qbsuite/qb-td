@@ -3022,15 +3022,17 @@ function showStats({ a, t, files, settings, got }) {
       seen.add(name);
       entries.push({ name, data });
     };
-    for (const r of raw) add(r.round, r.filename, r.text);
-    for (const g of games) add(g.round, g.filename, g.text);
+    // indented as MODAQ writes its own exports (2 spaces)
+    const indent = (text) => { try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) { return text; } };
+    for (const r of raw) add(r.round, r.filename, indent(r.text));
+    for (const g of games) add(g.round, g.filename, indent(g.text));
     // game files that went up separately from their .qbj (Add a game)
     for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
-      try { add(f.round, f.filename, JSON.stringify(await fetchOwnedJson(a, f.r2_key))); }
+      try { add(f.round, f.filename, JSON.stringify(await fetchOwnedJson(a, f.r2_key), null, 2)); }
       catch (e) { /* bundle still useful without it */ }
     }
     if (t.roster_r2_key) {
-      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(await fetchOwnedJson(a, t.roster_r2_key)) }); }
+      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(await fetchOwnedJson(a, t.roster_r2_key), null, 2) }); }
       catch (e) { /* bundle still useful without it */ }
     }
     download(t.slug + '-qbj.zip', makeZip(entries), 'application/zip');
