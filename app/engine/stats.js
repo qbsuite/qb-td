@@ -6,6 +6,7 @@
 // counts, bonuses heard (= positive buzzes), PPB, PP20TUH.
 
 import { resultOf } from './qbj.js';
+import { answerTypes, overtimeOf, REGULATION_TOSSUPS } from './yft.js';
 
 function round2(x) {
   return Math.round(x * 100) / 100;
@@ -153,4 +154,100 @@ export function aggregate(matches, roster = null) {
   games.sort((x, y) => x.round - y.round);
 
   return { values, teams: teamList, players: playerList, games };
+}
+
+/* ---------- standings as the public page ranks them ----------
+   The public page and every export (report.js, the .yft) figure a team's
+   rates without overtime and rank teams the YellowFruit way. The hub's
+   stats table, Fill playoff slots, auto-fill and the Finals fill rank with
+   the same rules (standings below), so a team is seeded where the public
+   pool table lists it. The set page's cross-site table stays on
+   aggregate(). */
+
+/** A team's gets in a game: its positive buzzes. */
+export const teamGets = (mt) =>
+  mt.players.reduce((s, p) => s + p.counts.reduce((n, c) => n + (c.value > 0 ? c.n : 0), 0), 0);
+
+/**
+ * YF keeps overtime out of a team's rate stats when overtime has no
+ * bonuses: PP20TUH is regulation points over regulation tossups, and an
+ * overtime get is not a bonus heard. Per game first (each game's
+ * `overtime`, yft.js overtimeOf; each side's regPoints and bonusesHeard),
+ * then per team (regTuh, regPoints, bonusesHeard), on agg's rows in place.
+ * matches: what agg was made from. settings: the tournament's game format
+ * (read_core.js effectiveFormat): its regulation tossup count is where
+ * overtime starts.
+ */
+export function regulationFigures(agg, matches, settings) {
+  const rules = settings || {};
+  const regTossups = rules.regulationTossupCount ?? REGULATION_TOSSUPS;
+  const vals = answerTypes(matches, rules).values;
+  for (const g of agg.games) g.overtime = overtimeOf(matches.find((src) => src.teams === g.teams) || g, regTossups);
+  for (const g of agg.games) {
+    for (const mt of g.teams) {
+      const otCount = (positiveOnly) => vals.reduce((n, v) =>
+        n + (positiveOnly && v <= 0 ? 0 : g.overtime.count(mt.name, v)), 0);
+      mt.regPoints = mt.points - vals.reduce((s, v) => s + v * g.overtime.count(mt.name, v), 0);
+      mt.bonusesHeard = teamGets(mt) - otCount(true);
+    }
+  }
+  for (const t of agg.teams) {
+    const mine = agg.games.flatMap((g) => g.teams.filter((mt) => mt.name === t.name).map((mt) => [g, mt]));
+    t.regTuh = mine.reduce((s, [g]) => s + g.tossupsRead - g.overtime.tossups, 0);
+    t.regPoints = mine.reduce((s, [, mt]) => s + mt.regPoints, 0);
+    t.bonusesHeard = mine.reduce((s, [, mt]) => s + mt.bonusesHeard, 0);
+  }
+  return agg;
+}
+
+/* derived stats (YF StatSummaries formulas) */
+export function winPct(t) {
+  return (t.w + t.t / 2) / (t.w + t.l + t.t);
+}
+export function pptuh(t) {
+  return t.regPoints / t.regTuh; // regulation only; NaN when no tossups
+}
+
+/** YF standings order: win % desc (no games -> bottom), then PPTUH desc.
+    A stable sort: teams level on both keep their order in `teams`. */
+export function standingsOrder(teams) {
+  return [...teams].sort((a, b) => {
+    let ap = winPct(a); let bp = winPct(b);
+    if (Number.isNaN(ap)) ap = -1;
+    if (Number.isNaN(bp)) bp = -1;
+    if (ap !== bp) return bp - ap;
+    let at = pptuh(a); let bt = pptuh(b);
+    if (Number.isNaN(at)) at = -9999999;
+    if (Number.isNaN(bt)) bt = -9999999;
+    return bt - at;
+  });
+}
+
+/** Two teams ranked level ("3=" on the public page): the same winning
+    percentage, from at least one game each. */
+export const levelOn = (x, y) => !!x && !!y && winPct(x) === winPct(y);
+
+/** The record teams level on winning percentage share, as the hub writes
+    it ("5–2"); teams with different records at that percentage (a tied
+    game, or more games played) list each one ("2–2 and 1–1–2"). */
+export function recordOf(teams) {
+  return [...new Set(teams.map((x) => x.w + '–' + x.l + (x.t ? '–' + x.t : '')))].join(' and ');
+}
+
+/**
+ * aggregate(), with the team rows figured and ordered the way the public
+ * page does it: overtime out (regulationFigures), and YellowFruit's order
+ * (standingsOrder; teams level on both keep aggregate()'s order). On each
+ * row pp20tuh and ppb are the regulation figures and regTuh the regulation
+ * tossups heard; tuh stays all tossups heard. settings: the tournament's
+ * game format, as regulationFigures takes it.
+ */
+export function standings(matches, roster = null, settings = null) {
+  const agg = regulationFigures(aggregate(matches, roster), matches, settings);
+  agg.teams = standingsOrder(agg.teams).map((t) => ({
+    ...t,
+    pp20tuh: t.regTuh ? round2((t.regPoints / t.regTuh) * 20) : 0,
+    ppb: t.bonusesHeard ? round2(t.bonusPoints / t.bonusesHeard) : 0,
+  }));
+  return agg;
 }

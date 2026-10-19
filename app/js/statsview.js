@@ -1,6 +1,7 @@
 // statsview.js — render an aggregate() result as standings + individuals +
 // per-round games with expandable box scores. Shared by the TO dashboard,
-// the public stats page, and the set page — which passes {site: true,
+// whose rows are stats.js standings (the public page's order, overtime out
+// of TUH, PP20TUH and PPB), and the set page — which passes {site: true,
 // games: false}: its rows come from several mirrors (setstats.js
 // setStandings), so each carries the site it played at, and the game
 // lists stay on the mirrors' own pages.
@@ -86,7 +87,7 @@ export function renderStats(out, agg, errors = [], opts = {}) {
         <td class="num sep">${tm.w}</td><td class="num">${tm.l}</td>${ties ? `<td class="num">${tm.t}</td>` : ''}
         <td class="num sep">${tm.pp20tuh}</td>
         ${valCells(vals, tm.counts)}
-        <td class="num sep">${tm.tuh}</td><td class="num sep">${tm.ppb}</td>
+        <td class="num sep">${tm.regTuh ?? tm.tuh}</td><td class="num sep">${tm.ppb}</td>
       </tr>`).join('')}
     </table></div>
     <h2>individuals</h2>

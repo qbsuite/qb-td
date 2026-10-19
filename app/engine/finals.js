@@ -4,13 +4,14 @@
 // 1st–6th place", "2nd in Pool A": plan.js addFinals, or the editor's Add
 // phase). Once every game that bracket was scheduled to play is in, its
 // standings decide the places, the way the pools decide the playoff slots
-// (schedule.js autoFill): net wins, then points per 20 tossups heard, from
-// the bracket's own games plus the games its pool-mates carry over from the
+// (schedule.js autoFill): winning percentage, then points per 20 tossups
+// heard, as the public page ranks them (stats.js standings), from the
+// bracket's own games plus the games its pool-mates carry over from the
 // stage before — the same carryover the YellowFruit 4 file sets up
 // (yft.js yfStages). Ties are settled by points per 20 and noted, or wait
 // for the TD when the schedule has a Tiebreakers phase.
 
-import { aggregate, dedupeMatches } from './stats.js';
+import { standings, standingsOrder, levelOn, recordOf, dedupeMatches } from './stats.js';
 import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
 
 const FIN_RE = /^(\d+)(?:st|nd|rd|th) in (.+)$/;
@@ -133,10 +134,13 @@ export function finalsProgress(schedule, files) {
  * Fill the finals slots whose source bracket is done, on a copy.
  * matches: parsed games (parseMatch), at least those finalsProgress named.
  * ready: source names from finalsProgress. force: names the TD said to
- * fill anyway (ties by points per 20). opts.holdTies as in autoFill.
+ * fill anyway (ties by points per 20). opts.holdTies as in autoFill;
+ * opts.settings: the tournament's game format, for its regulation tossup
+ * count (stats.js standings).
  * Returns {schedule, filled, brackets, ties, held}:
  *   ties — [{bracket, record, teams: [{name, pp20tuh, place}]}], a tie
- *          that reaches a finals place, settled by points per 20
+ *          (the same winning percentage) that reaches a finals place,
+ *          settled by points per 20
  *   held — the same, waiting for the TD
  */
 export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
@@ -160,17 +164,19 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     // every scheduled game must be among them (a wrong team name waits)
     const got = new Set(games.map((m) => pairKey(m.round, m.teams[0].name, m.teams[1].name)));
     if (!src.games.every((g) => got.has(pairKey(g.round, g.a, g.b)))) continue;
-    const rows = aggregate(games).teams.filter((t) => members.has(t.name));
-    const rec = (t) => t.w + '–' + t.l + (t.t ? '–' + t.t : '');
+    // ranked as the public page ranks a table (stats.js standings), level
+    // teams in the bracket's own order
+    const row = new Map(standings(games, null, opts.settings).teams.map((t) => [t.name, t]));
+    const rows = standingsOrder(src.teams.map((n) => row.get(n)).filter(Boolean));
     const deepest = Math.max(...src.places);
     let hold = false;
     for (let i = 0; i < rows.length && i < deepest;) {
       let j = i + 1;
-      while (j < rows.length && rec(rows[j]) === rec(rows[i])) j++;
+      while (j < rows.length && levelOn(rows[j], rows[i])) j++;
       // a tie reaching a finals place: the order decides who plays, or who
       // is the leader
       if (j - i > 1) {
-        const x = { bracket: src.name, record: rec(rows[i]),
+        const x = { bracket: src.name, record: recordOf(rows.slice(i, j)),
           teams: rows.slice(i, j).map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, place: i + k + 1 })) };
         if (holdTies && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
       }
@@ -224,11 +230,13 @@ export function fillProgress(schedule, files) {
  * its uploads not among them (a read that failed) waits, as standings
  * without that game would be wrong. Ties points per 20 settled go on
  * schedule.filled, for the pages' notes. force: pool letters, and 'F:' +
- * a finals bracket, the TD said to fill anyway. Returns {schedule (saved
- * itself when nothing filled), playoffs, finals}: autoFill's and
- * finalsFill's results, or null when nothing of theirs was ready.
+ * a finals bracket, the TD said to fill anyway. settings: the
+ * tournament's game format, for its regulation tossup count (stats.js
+ * standings). Returns {schedule (saved itself when nothing filled),
+ * playoffs, finals}: autoFill's and finalsFill's results, or null when
+ * nothing of theirs was ready.
  */
-export function autoFillSaved(saved, files, matches, roster = null, force = []) {
+export function autoFillSaved(saved, files, matches, roster = null, force = [], settings = null) {
   const read = new Set(matches.map((m) => m.fileId));
   let next = saved;
   let playoffs = null;
@@ -238,7 +246,7 @@ export function autoFillSaved(saved, files, matches, roster = null, force = []) 
     const poolOf = new Map(Object.entries(saved.pools).flatMap(([p, ms]) => ms.map((m) => [m, p])));
     const unread = new Set(prog.files.filter((f) => !read.has(f.id)).flatMap((f) => summaryTeams(f).map((n) => poolOf.get(n))));
     const ids = new Set(prog.files.map((f) => f.id));
-    playoffs = autoFill(next, aggregate(matches.filter((m) => ids.has(m.fileId)), roster),
+    playoffs = autoFill(next, standings(matches.filter((m) => ids.has(m.fileId)), roster, settings),
       prog.ready.filter((p) => !unread.has(p)), force.filter((x) => !x.startsWith('F:')));
     if (playoffs.filled) {
       const had = new Set((next.filled || []).map((x) => x.pool + ' ' + x.record));
@@ -250,7 +258,7 @@ export function autoFillSaved(saved, files, matches, roster = null, force = []) 
   const fp = finalsProgress(next, files);
   if (fp.ready.length) {
     const ready = fp.files.every((f) => read.has(f.id)) ? fp.ready : [];
-    finals = finalsFill(next, matches, ready, force.filter((x) => x.startsWith('F:')).map((x) => x.slice(2)));
+    finals = finalsFill(next, matches, ready, force.filter((x) => x.startsWith('F:')).map((x) => x.slice(2)), { settings });
     if (finals.filled) {
       const had = new Set((next.filled || []).map((x) => (x.pool || x.bracket) + ' ' + x.record));
       finals.schedule.filled = [...(next.filled || []), ...finals.ties.filter((x) => !had.has(x.bracket + ' ' + x.record))

@@ -16,6 +16,8 @@
 // teams the generator seeded into each pool, so placeholders can later
 // be filled from standings (fillPlaceholders).
 
+import { standingsOrder, levelOn, recordOf } from './stats.js';
+
 function slotEq(a, b) {
   if (!a || !b) return false;
   return a.team ? a.team === b.team : !!a.label && a.label === b.label;
@@ -934,17 +936,17 @@ export function hasPlaceholders(schedule) {
 }
 
 /**
- * Pool-by-pool finish order from overall standings. pools: {A: [names]}
- * (schedule.pools); rankedNames: team names best-first (aggregate()
- * standings order). Teams with no games yet keep their pool (seed) order,
- * after any ranked teams.
+ * Pool-by-pool finish order: {A: [names best-first]}. pools: {A: [names]}
+ * (schedule.pools); teams: standings rows (stats.js standings). Each pool
+ * is ranked as its table on the public page ranks it (standingsOrder):
+ * teams level on winning percentage and points per tossup keep their
+ * pool (seed) order, and teams with no games yet come last, in that order.
  */
-export function poolStandings(pools, rankedNames) {
-  const rank = new Map(rankedNames.map((n, i) => [n, i]));
+export function poolStandings(pools, teams) {
+  const row = new Map(teams.map((t) => [t.name, t]));
   const out = {};
   for (const [letter, members] of Object.entries(pools || {})) {
-    out[letter] = [...members].sort((x, y) =>
-      (rank.has(x) ? rank.get(x) : Infinity) - (rank.has(y) ? rank.get(y) : Infinity));
+    out[letter] = standingsOrder(members.map((n) => row.get(n) || { name: n, w: 0, l: 0, t: 0 })).map((t) => t.name);
   }
   return out;
 }
@@ -956,15 +958,17 @@ export function poolStandings(pools, rankedNames) {
  */
 /**
  * What the TD should know before filling playoff slots. agg is
- * aggregate()'s result (teams best-first, games). Returns
+ * stats.js standings()'s result (team rows with the public page's
+ * figures, games). Returns
  *   ranks   — poolStandings, what fillPlaceholders takes
  *   missing — prelim games on the schedule with no game file:
  *             [{round, room, a, b}]
  *   extra   — prelim-round games uploaded that the schedule doesn't
  *             have (often the reason one is missing): [{round, a, b}]
- *   ties    — teams in a pool with the same record whose order sends
- *             them to different playoff brackets: [{pool, record,
- *             teams: [{name, pp20tuh, bracket}]}], in finish order
+ *   ties    — teams in a pool with the same winning percentage (the
+ *             same record, at a pool's end) whose order sends them to
+ *             different playoff brackets: [{pool, record, teams: [{name,
+ *             pp20tuh, bracket}]}], in finish order
  */
 // The rounds pools are ranked on: each phase before the first with a
 // playoff slot (a double round robin's both cycles), less tiebreaker and
@@ -980,7 +984,7 @@ export function prelimRounds(schedule) {
 }
 
 export function fillReport(schedule, agg) {
-  const ranks = poolStandings(schedule.pools, agg.teams.map((x) => x.name));
+  const ranks = poolStandings(schedule.pools, agg.teams);
   const pair = (round, x, y) => round + '\n' + [x, y].sort().join('\n');
   const prelim = prelimRounds(schedule);
   const prelimSet = new Set(prelim.map((r) => r.round));
@@ -1016,20 +1020,19 @@ export function fillReport(schedule, agg) {
   const ties = [];
   for (const [pool, list] of Object.entries(ranks)) {
     for (let i = 0; i < list.length;) {
-      const rec = (n) => { const x = row.get(n); return x ? x.w + '–' + x.l + (x.t ? '–' + x.t : '') : null; };
       let j = i + 1;
-      while (j < list.length && rec(list[j]) !== null && rec(list[j]) === rec(list[i])) j++;
+      while (j < list.length && levelOn(row.get(list[j]), row.get(list[i]))) j++;
       if (j - i > 1) {
         const teams = list.slice(i, j).map((name, k) => ({ name, pp20tuh: row.get(name).pp20tuh, bracket: bracketOf.get(pool + (i + k + 1)) || null }));
-        if (new Set(teams.map((x) => x.bracket)).size > 1) ties.push({ pool, record: rec(list[i]), teams });
+        if (new Set(teams.map((x) => x.bracket)).size > 1) ties.push({ pool, record: recordOf(list.slice(i, j).map((n) => row.get(n))), teams });
       }
       i = j;
     }
   }
   // A place compared across pools: its teams by winning percentage, then
-  // points per 20 tossups heard (the pools may differ in size). A tie in
-  // winning percentage is listed with how points per 20 broke it, or that
-  // it couldn't.
+  // points per 20 tossups heard (the pools may differ in size), level
+  // teams in pool order. A tie in winning percentage is listed with how
+  // points per 20 broke it, or that it couldn't.
   const compared = [];
   const places = new Set();
   for (const ph of schedule.phases) for (const r of ph.rounds) {
@@ -1038,16 +1041,14 @@ export function fillReport(schedule, agg) {
       if (c) places.add(Number(c[3]));
     }
   }
-  const pct = (x) => (x.w + (x.t || 0) / 2) / Math.max(1, x.w + x.l + (x.t || 0));
   const poolLists = Object.entries(ranks);
   for (const place of [...places].sort((a, b) => a - b)) {
-    const teams = poolLists.map(([pool, list]) => ({ pool, name: list[place - 1] }))
-      .filter((x) => x.name && row.has(x.name)).map((x) => ({ ...x, ...row.get(x.name) }));
-    teams.sort((x, y) => pct(y) - pct(x) || y.pp20tuh - x.pp20tuh);
+    const teams = standingsOrder(poolLists.map(([pool, list]) => ({ pool, name: list[place - 1] }))
+      .filter((x) => x.name && row.has(x.name)).map((x) => ({ ...x, ...row.get(x.name) })));
     ranks['#' + place] = teams.map((x) => x.name);
     for (let i = 0; i < teams.length;) {
       let j = i + 1;
-      while (j < teams.length && pct(teams[j]) === pct(teams[i])) j++;
+      while (j < teams.length && levelOn(teams[j], teams[i])) j++;
       if (j - i > 1) compared.push({ place, teams: teams.slice(i, j).map((x) => ({ name: x.name, pool: x.pool, pp20tuh: x.pp20tuh,
         record: x.w + '–' + x.l + (x.t ? '–' + x.t : '') })) });
       i = j;
@@ -1112,8 +1113,8 @@ export function prelimProgress(schedule, files) {
 
 /**
  * Fill the playoff slots of pools whose prelims are done (ready, from
- * prelimProgress), on a copy. agg: aggregate() of those pools' games.
- * A pool waits for the TD when a prelim-round game of its teams isn't on
+ * prelimProgress), on a copy. agg: stats.js standings() of those pools'
+ * games. A pool waits for the TD when a prelim-round game of its teams isn't on
  * the schedule (`odd`), or, when ties wait for the TD, when a tie sends
  * teams to different brackets (`held`). Ties wait when opts.holdTies says
  * so, else when the schedule has a Tiebreakers phase. Places compared

@@ -13,7 +13,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildSchedule, fillPlaceholders, fillReport, hasPlaceholders, mulberry32, prelimRounds } from '../app/engine/schedule.js';
-import { aggregate } from '../app/engine/stats.js';
+import { standings } from '../app/engine/stats.js';
 import { BASE, call, d1exec, tick, ok, summary } from './e2e_lib.js';
 
 const PAGES = process.env.QBTD_PAGES || 'http://localhost:8765';
@@ -234,10 +234,10 @@ ok('Fill anyway fills pool B', true);
 const final = await savedSched();
 const dayGames = [...games, strayB];
 const manual = structuredClone(sched);
-fillPlaceholders(manual, fillReport(sched, aggregate(dayGames.map(asMatch))).ranks);
+fillPlaceholders(manual, fillReport(sched, standings(dayGames.map(asMatch))).ranks);
 const strip = (s) => JSON.stringify({ ...s, filled: undefined, updated: undefined });
 ok('the filled schedule is what Fill playoff slots would make', strip(final) === strip(manual));
-const tiesWant = fillReport(sched, aggregate(dayGames.map(asMatch))).ties;
+const tiesWant = fillReport(sched, standings(dayGames.map(asMatch))).ties;
 ok('each tie points per 20 settled is kept on the schedule for the note, once',
   JSON.stringify((final.filled || []).map((x) => x.pool + ' ' + x.record).sort()) === JSON.stringify(tiesWant.map((x) => x.pool + ' ' + x.record).sort())
   && final.filled.some((x) => x.pool === 'A' && x.record === '6–1'), [final.filled, tiesWant.length]);

@@ -14,9 +14,9 @@
 // YellowFruit saves a report to disk and what the hsquizbowl.org tournament
 // database expects to be handed; the bare names are YF's in-app preview.
 
-import { aggregate } from './stats.js';
+import { aggregate, regulationFigures, standingsOrder, winPct, pptuh, teamGets } from './stats.js';
 import { rosterTracking, resultOf } from './qbj.js';
-import { answerTypes, importOrder, matchId, overtimeOf, schoolAndLetter, PHASE_NAME, yfStages, buildYft,
+import { answerTypes, importOrder, matchId, schoolAndLetter, PHASE_NAME, yfStages, buildYft,
   REGULATION_TOSSUPS } from './yft.js';
 
 // Stat display scaling. YellowFruit scales its rate stats by the
@@ -94,28 +94,9 @@ const abbr = (text, tip) => tagWithAttrs('abbr', [attr('title', tip)], text);
 const fmtWinPct = (p) => (Number.isNaN(p) ? MDASH : p.toFixed(3));
 const fmtPpb = (pts, heard) => (heard ? (pts / heard).toFixed(2) : MDASH);
 
-/* ---------- derived stats (YF StatSummaries formulas) ---------- */
-
-function winPct(t) {
-  return (t.w + t.t / 2) / (t.w + t.l + t.t);
-}
-function pptuh(t) {
-  return t.regPoints / t.regTuh; // regulation only; NaN when no tossups
-}
-
-// YF standings order: win % desc (no games -> bottom), then PPTUH desc.
-function sortTeamsYf(teams) {
-  return [...teams].sort((a, b) => {
-    let ap = winPct(a); let bp = winPct(b);
-    if (Number.isNaN(ap)) ap = -1;
-    if (Number.isNaN(bp)) bp = -1;
-    if (ap !== bp) return bp - ap;
-    let at = pptuh(a); let bt = pptuh(b);
-    if (Number.isNaN(at)) at = -9999999;
-    if (Number.isNaN(bt)) bt = -9999999;
-    return bt - at;
-  });
-}
+/* ---------- derived stats (YF StatSummaries formulas) ----------
+   winPct, pptuh and the standings order (standingsOrder) are stats.js's,
+   shared with the hub, which seeds playoffs by them. */
 
 // YF rank strings: teams tied on win % share "N=" (N = rank of the first
 // team in the tied run); otherwise the 1-based position.
@@ -157,8 +138,6 @@ function rankPlayers(sorted) {
   return ranks;
 }
 
-const teamGets = (mt) =>
-  mt.players.reduce((s, p) => s + p.counts.reduce((n, c) => n + (c.value > 0 ? c.n : 0), 0), 0);
 const teamBonusesHeard = (mt) => mt.bonusesHeard; // gets, less overtime's (reportModel)
 const teamCounts = (mt) => {
   const counts = {};
@@ -351,31 +330,14 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
   // the columns, game order and match ids of the .yft YF would hold
   const vals = answerTypes(matches, rules).values;
   const games = importOrder(agg.games);
-  games.forEach((g, i) => {
-    g.id = matchId(g, i);
-    g.overtime = overtimeOf(matches.find((src) => src.teams === g.teams) || g, regTossups);
-  });
+  games.forEach((g, i) => { g.id = matchId(g, i); });
   const anyTies = agg.teams.some((t) => t.t > 0);
 
-  // YF keeps overtime out of a team's rate stats when overtime has no
-  // bonuses: PP20TUH is regulation points over regulation tossups, and an
-  // overtime get is not a bonus heard. Per game first, then per team.
-  for (const g of games) {
-    for (const mt of g.teams) {
-      const otCount = (positiveOnly) => vals.reduce((n, v) =>
-        n + (positiveOnly && v <= 0 ? 0 : g.overtime.count(mt.name, v)), 0);
-      mt.regPoints = mt.points - vals.reduce((s, v) => s + v * g.overtime.count(mt.name, v), 0);
-      mt.bonusesHeard = teamGets(mt) - otCount(true);
-    }
-  }
-  for (const t of agg.teams) {
-    const mine = games.flatMap((g) => g.teams.filter((mt) => mt.name === t.name).map((mt) => [g, mt]));
-    t.regTuh = mine.reduce((s, [g]) => s + g.tossupsRead - g.overtime.tossups, 0);
-    t.regPoints = mine.reduce((s, [, mt]) => s + mt.regPoints, 0);
-    t.bonusesHeard = mine.reduce((s, [, mt]) => s + mt.bonusesHeard, 0);
-  }
+  // overtime out of the rate stats (each game's `overtime`, regulation
+  // points, TUH and bonuses heard), as the hub's standings take it too
+  regulationFigures(agg, matches, rules);
 
-  const teams = sortTeamsYf(agg.teams);
+  const teams = standingsOrder(agg.teams);
   const teamRanks = rankTeams(teams);
   // The stages the .yft gives YF (yft.js yfStages), from the schedule. With
   // one stage played, its name heads the pages and each of its pools is
@@ -387,7 +349,7 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
   const phaseName = stage ? stage.name : PHASE_NAME;
   const byName = new Map(agg.teams.map((t) => [t.name, t]));
   const pools = stage && stage.pools.length > 1 ? stage.pools.map((pl) => {
-    const sorted = sortTeamsYf(pl.teams.map((n) => byName.get(n)).filter(Boolean));
+    const sorted = standingsOrder(pl.teams.map((n) => byName.get(n)).filter(Boolean));
     return { name: pl.name, teams: sorted, ranks: rankTeams(sorted) };
   }) : null;
   // With two or more stages played, the stages as the .yft writes them
@@ -578,7 +540,7 @@ function stageSections(m) {
     const games = [...gamesOf(st), ...extra];
     return st.pools.map((pl) => {
       const stats = tally(games, pl.teams);
-      const teams = sortTeamsYf(pl.teams.map((n) => stats.get(n)));
+      const teams = standingsOrder(pl.teams.map((n) => stats.get(n)));
       return { pl, teams, ranks: rankTeams(teams) };
     });
   };

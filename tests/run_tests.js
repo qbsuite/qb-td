@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
   rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound } from '../app/engine/qbj.js';
-import { aggregate, dedupeMatches } from '../app/engine/stats.js';
+import { aggregate, dedupeMatches, standings } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc, mountReport, reportPlace } from '../app/js/reportframe.js';
@@ -3159,13 +3159,21 @@ test('buildSchedule pools2 records snake-seeded pool membership', () => {
   assert.equal(rr.pools, undefined);
 });
 
-test('poolStandings ranks pool members by overall standings', () => {
+test('poolStandings ranks each pool as its public table does: winning percentage, then points per tossup, level teams in pool order', () => {
   const pools = { A: ['A', 'D', 'E', 'H'], B: ['B', 'C', 'F', 'G'] };
-  const ranked = ['H', 'B', 'A', 'G', 'D', 'C']; // E and F unranked (no games)
-  assert.deepEqual(poolStandings(pools, ranked), {
+  const row = (name, w, l, regPoints, regTuh = 60) => ({ name, w, l, t: 0, regPoints, regTuh });
+  // E and F have no games; A and D are level on both counts; C has fewer
+  // tossups heard at the same points, so more per tossup
+  const teams = [row('H', 3, 0, 900), row('B', 3, 0, 800), row('D', 1, 2, 500), row('G', 2, 1, 400), row('A', 1, 2, 500),
+    row('C', 1, 2, 500, 50), row('E', 0, 0, 0, 0)];
+  assert.deepEqual(poolStandings(pools, teams), {
     A: ['H', 'A', 'D', 'E'],
     B: ['B', 'G', 'C', 'F'],
   });
+  // pool order, not the rows' order, settles a level pair
+  assert.deepEqual(poolStandings({ A: ['D', 'A', 'E', 'H'] }, teams).A, ['H', 'D', 'A', 'E']);
+  // a better record in fewer games ranks higher: winning percentage, not net wins
+  assert.deepEqual(poolStandings({ X: ['P', 'Q'] }, [row('P', 3, 1, 900, 80), row('Q', 2, 0, 400, 40)]).X, ['Q', 'P']);
 });
 
 test('fillReport: missing prelim files, uploads off the schedule, and ties that decide a bracket', () => {
@@ -3181,7 +3189,7 @@ test('fillReport: missing prelim files, uploads off the schedule, and ties that 
     const [w, l] = num(g.a.team) < num(g.b.team) ? [g.a.team, g.b.team] : [g.b.team, g.a.team];
     return game(r.round, w, l, 400 - num(w), 100);
   }));
-  const clean = fillReport(s, aggregate(prelimGames));
+  const clean = fillReport(s, standings(prelimGames));
   assert.deepEqual([clean.missing, clean.extra, clean.ties], [[], [], []]);
   const filled = JSON.parse(JSON.stringify(s));
   assert.equal(fillPlaceholders(filled, clean.ranks), 4 * 23);
@@ -3189,7 +3197,7 @@ test('fillReport: missing prelim files, uploads off the schedule, and ties that 
 
   // one file missing, and the same game uploaded under the wrong round
   const lost = prelimGames[5];
-  const r = fillReport(s, aggregate([...prelimGames.filter((g) => g !== lost), { ...lost, round: lost.round + 1 }]));
+  const r = fillReport(s, standings([...prelimGames.filter((g) => g !== lost), { ...lost, round: lost.round + 1 }]));
   assert.equal(r.missing.length, 1);
   assert.equal(r.missing[0].round, lost.round);
   assert.deepEqual([r.missing[0].a, r.missing[0].b].sort(), lost.teams.map((t) => t.name).sort());
@@ -3204,7 +3212,7 @@ test('fillReport: missing prelim files, uploads off the schedule, and ties that 
     return hit ? game(g.round, hit[0], hit[1], 300, 200) : g;
   });
   // A[2] beats A[0]: A[0], A[1], A[2] all 6-1 for places 1-3, across 1st–6th and 7th–12th place
-  const agg = aggregate(upset([[A[2], A[0]]]));
+  const agg = standings(upset([[A[2], A[0]]]));
   const tied = fillReport(s, agg);
   assert.equal(tied.ties.length, 1);
   const t = tied.ties[0];
@@ -3217,7 +3225,7 @@ test('fillReport: missing prelim files, uploads off the schedule, and ties that 
   assert.deepEqual(tied.ranks.A.slice(0, 3), t.teams.map((x) => x.name));
   // ties that stay inside one bracket are not notes: A[2] beats A[0] and A[3] beats A[1]
   // gives A[0], A[2] at 6-1 (both 1st–6th place) and A[1], A[3] at 5-2 (both 7th–12th place)
-  assert.deepEqual(fillReport(s, aggregate(upset([[A[2], A[0]], [A[3], A[1]]]))).ties, []);
+  assert.deepEqual(fillReport(s, standings(upset([[A[2], A[0]], [A[3], A[1]]]))).ties, []);
 });
 
 test('fillPlaceholders replaces placeholders from pool finish order', () => {
@@ -5427,13 +5435,11 @@ test('plan: a split place is compared across pools, and fill places it by winnin
   assert.deepEqual(g[0].members.map((m) => m.slot.label), ['A1', 'B1', 'A2', 'B2', 'A3', 'B3', 'Better 4th place']);
   assert.deepEqual(g[1].members.map((m) => m.slot.label).slice(0, 2), ['Other 4th place', 'A5']);
   const s = buildPlan(teams, planRooms(7), P, 'snake', 1);
-  // B4 (4–2) beats A4 (4–3) on winning percentage
-  const row = (name, w, l, pp) => ({ name, w, l, t: 0, pp20tuh: pp });
-  const order = [...s.pools.A, ...s.pools.B];
-  const agg = { teams: order.map((n, i) => row(n, 10 - i, i, 100)), games: [] };
+  // B4 (9–3) beats A4 (9–4) on winning percentage
+  const row = (name, w, l, pp) => ({ name, w, l, t: 0, regPoints: pp, regTuh: 20, pp20tuh: pp });
+  const agg = { teams: [...s.pools.A.map((n, i) => row(n, 12 - i, i, 100)), ...s.pools.B.map((n, i) => row(n, 12 - i, i, 100))], games: [] };
   const A4 = s.pools.A[3], B4 = s.pools.B[3];
-  agg.teams.find((x) => x.name === A4).w = 4; agg.teams.find((x) => x.name === A4).l = 3;
-  agg.teams.find((x) => x.name === B4).w = 4; agg.teams.find((x) => x.name === B4).l = 2;
+  agg.teams.find((x) => x.name === A4).l = 4;
   const rep = fillReport(s, agg);
   assert.deepEqual(rep.ranks['#4'], [B4, A4]);
   fillPlaceholders(s, rep.ranks);
@@ -5441,8 +5447,8 @@ test('plan: a split place is compared across pools, and fill places it by winnin
   assert.ok(all.some((x) => x.team === B4 && x.from === 'Better 4th place'));
   assert.ok(all.some((x) => x.team === A4 && x.from === 'Other 4th place'));
   // the same winning percentage: listed, PP20 decides
-  agg.teams.find((x) => x.name === B4).l = 3;
-  agg.teams.find((x) => x.name === B4).pp20tuh = 150;
+  agg.teams.find((x) => x.name === B4).l = 4;
+  agg.teams.find((x) => x.name === B4).regPoints = 150;
   const rep2 = fillReport(buildPlan(teams, planRooms(7), P, 'snake', 1), agg);
   assert.equal(rep2.compared.length, 1);
   assert.deepEqual(rep2.ranks['#4'], [B4, A4]);
@@ -5542,7 +5548,7 @@ function autoDay(s, games, seed, rename = null) {
     ready = prog.ready.length;
     const ids = new Set(prog.files.map((f) => f.id));
     const read = up.filter((x) => ids.has(x.f.id)).map((x) => (names ? underName(x, rename).m : x.m));
-    const res = autoFill(saved, aggregate(read), prog.ready);
+    const res = autoFill(saved, standings(read), prog.ready);
     // pools not done keep their slots open
     for (const p of Object.keys(saved.pools)) {
       if (!prog.ready.includes(p)) assert.ok(!res.pools.includes(p));
@@ -5553,7 +5559,7 @@ function autoDay(s, games, seed, rename = null) {
 }
 const manualFill = (s, games) => {
   const c = JSON.parse(JSON.stringify(s));
-  fillPlaceholders(c, fillReport(s, aggregate(games.map((x) => x.m))).ranks);
+  fillPlaceholders(c, fillReport(s, standings(games.map((x) => x.m))).ranks);
   return c;
 };
 
@@ -5575,7 +5581,7 @@ test('auto-fill: ACF Fall @ UIUC format (23 teams, 8/8/7 crossover), pools finis
   // a re-upload of the same game and a file that couldn't be read change nothing
   const dup = [...games, { m: games[0].m, f: { ...games[0].f, id: 999 } }, { m: null, f: { id: 1000, kind: 'qbj', round: 1, error: 'bad', summary: null } }];
   assert.deepEqual(prelimProgress(s, dup.map((x) => x.f)).ready, ['A', 'B', 'C']);
-  const res = autoFill(s, aggregate(dedupeMatches(dup.filter((x) => x.m).map((x) => x.m))), ['A', 'B', 'C']);
+  const res = autoFill(s, standings(dedupeMatches(dup.filter((x) => x.m).map((x) => x.m))), ['A', 'B', 'C']);
   assert.deepEqual(res.schedule, manualFill(s, games));
 });
 
@@ -5674,8 +5680,8 @@ test('auto-fill: pools by hand (23c, non-snake pools reseeded inside, and uneven
     assert.ok(!hasPlaceholders(saved), 'seed ' + seed);
     assert.deepEqual(saved, manualFill(s, games), 'seed ' + seed);
     // each pool's winner is the one its own games say
-    const agg = aggregate(games.map((x) => x.m));
-    const ranks = poolStandings(s.pools, agg.teams.map((t) => t.name));
+    const agg = standings(games.map((x) => x.m));
+    const ranks = poolStandings(s.pools, agg.teams);
     const firsts = saved.phases[1].rounds.flatMap((r) => r.games).flatMap((g) => [g.a, g.b]).filter((x) => /^[ABC]1$/.test(x.from));
     for (const x of firsts) assert.equal(x.team, ranks[x.from[0]][0], 'seed ' + seed + ' ' + x.from);
     // YellowFruit: the prelim stage's pools are the hand-picked ones
@@ -5722,7 +5728,7 @@ test('auto-fill: hdwhite and engine formats end where the Fill button does, plac
       if (hasCmp) {
         const firstPool = Object.keys(s.pools)[0];
         const only = games.filter((x) => s.pools[firstPool].includes(x.m.teams[0].name));
-        const part = autoFill(s, aggregate(only.map((x) => x.m)), [firstPool]);
+        const part = autoFill(s, standings(only.map((x) => x.m)), [firstPool]);
         assert.ok(!JSON.stringify(part.schedule).match(/"from":"[^"]* place"/), key + ' compared early');
         compared++;
       }
@@ -5740,11 +5746,11 @@ test('auto-fill: a game off the schedule holds its pool until the TD says fill a
   // pool A's first two teams also played an unscheduled game in round 2
   const stray = { round: 2, tossupsRead: 20, teams: [{ name: A[0], points: 300, bonusPoints: 0, players: [] }, { name: A[1], points: 100, bonusPoints: 0, players: [] }] };
   const all = [...games.map((x) => x.m), stray];
-  const res = autoFill(s, aggregate(all), ['A', 'B', 'C']);
+  const res = autoFill(s, standings(all), ['A', 'B', 'C']);
   assert.deepEqual(res.odd.map((x) => x.pool), ['A']);
   assert.deepEqual(res.pools, ['B', 'C']);
   assert.ok(JSON.stringify(res.schedule).includes('"label":"A1"'));
-  const forced = autoFill(s, aggregate(all), ['A', 'B', 'C'], ['A']);
+  const forced = autoFill(s, standings(all), ['A', 'B', 'C'], ['A']);
   assert.deepEqual([forced.odd, forced.pools], [[], ['A', 'B', 'C']]);
   assert.ok(!hasPlaceholders(forced.schedule));
 });
@@ -5766,7 +5772,7 @@ test('auto-fill: with a Tiebreakers phase, ties for different brackets wait; poi
     const bonus = { [A[3]]: 40, [A[4]]: 20, [A[5]]: 0 }[win] || 0;
     return win === a ? [300 + bonus, 100] : [100, 300 + bonus];
   });
-  const res = autoFill(s, aggregate(games.map((x) => x.m)), ['A', 'B']);
+  const res = autoFill(s, standings(games.map((x) => x.m)), ['A', 'B']);
   assert.equal(res.held.length, 1);
   assert.equal(res.held[0].pool, 'A');
   assert.deepEqual(res.held[0].teams.map((x) => x.name).sort(), [A[3], A[4], A[5]].sort());
@@ -5774,18 +5780,18 @@ test('auto-fill: with a Tiebreakers phase, ties for different brackets wait; poi
   const txt = JSON.stringify(res.schedule);
   for (const l of ['A4', 'A5', 'A6']) assert.ok(txt.includes(`"label":"${l}"`), l);
   assert.ok(!txt.includes('"label":"A1"') && !txt.includes('"label":"A7"') && !txt.includes('"label":"B1"'));
-  const pp = autoFill(res.schedule, aggregate(games.map((x) => x.m)), ['A', 'B'], ['A']);
+  const pp = autoFill(res.schedule, standings(games.map((x) => x.m)), ['A', 'B'], ['A']);
   assert.deepEqual(pp.held, []);
   assert.equal(pp.ties.length, 1);
   assert.ok(!hasPlaceholders({ ...pp.schedule, phases: pp.schedule.phases.filter((p) => !p.kind) }));
   // without a Tiebreakers phase the same tie just goes by points per 20
   const plain = buildPlan(teams, planRooms(8), [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { per: -1 })], 'snake', 1);
-  const r2 = autoFill(plain, aggregate(games.map((x) => x.m)), ['A', 'B']);
+  const r2 = autoFill(plain, standings(games.map((x) => x.m)), ['A', 'B']);
   assert.deepEqual(r2.held, []);
   assert.ok(!hasPlaceholders(r2.schedule));
   // the caller can say ties wait (or don't), whatever the schedule has
-  assert.equal(autoFill(plain, aggregate(games.map((x) => x.m)), ['A', 'B'], [], { holdTies: true }).held.length, 1);
-  assert.deepEqual(autoFill(s, aggregate(games.map((x) => x.m)), ['A', 'B'], [], { holdTies: false }).held, []);
+  assert.equal(autoFill(plain, standings(games.map((x) => x.m)), ['A', 'B'], [], { holdTies: true }).held.length, 1);
+  assert.deepEqual(autoFill(s, standings(games.map((x) => x.m)), ['A', 'B'], [], { holdTies: false }).held, []);
 });
 
 test('prelimRounds: both cycles of a double round robin, never tiebreaker rounds', () => {
@@ -6043,7 +6049,7 @@ function finalsDay(seed, opts = {}) {
       { name: b, points: t[1] * 20, bonusPoints: t[1] * 10, players: [] }] };
   };
   const games = prelimRounds(s).flatMap((r) => r.games.map((g) => game(r.round, g.a.team, g.b.team)));
-  fillPlaceholders(s, fillReport(s, aggregate(games)).ranks);
+  fillPlaceholders(s, fillReport(s, standings(games)).ranks);
   for (const r of s.phases[1].rounds) for (const g of r.games) games.push(game(r.round, g.a.team, g.b.team, opts.tens && opts.tens(g)));
   let id = 0;
   const files = games.map((m) => ({ id: ++id, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
@@ -6189,7 +6195,7 @@ test('finals: nothing fills while a game of the top bracket is missing', () => {
   assert.equal(finalsFill(s, [], prog.ready).filled, 0, 'no games read: nothing fills');
 });
 
-test('finals: filled from the bracket\'s standings, net wins then points per 20, carryover counted', () => {
+test('finals: filled from the bracket\'s standings, winning percentage then points per 20, carryover counted', () => {
   for (const seed of [5, 9, 13, 21, 34]) {
     const { s, games, files } = finalsDay(seed);
     const src = finalsSources(s)[0];
@@ -6199,7 +6205,7 @@ test('finals: filled from the bracket\'s standings, net wins then points per 20,
     const mine = games.filter((m) => m.teams.every((t) => src.teams.includes(t.name))
       && (m.round >= 8 || carried.has(m.teams.map((t) => t.name).sort().join('\n'))));
     assert.equal(mine.length, 15, `seed ${seed}: 12 bracket games and 3 carried`);
-    const order = aggregate(mine).teams.map((t) => t.name);
+    const order = standings(mine).teams.map((t) => t.name);
     assert.equal(res.filled, 4, `seed ${seed}`);
     assert.deepEqual(finalTeams(res.schedule), [[[order[0], order[1]]], [[order[0], order[1]]]], `seed ${seed}`);
     assert.deepEqual(res.brackets, ['1st–6th place']);
@@ -6324,6 +6330,116 @@ test('finals: a round robin\'s final, and pools whose winners meet, fill too', (
     const want = s.pools ? Object.values(s.pools).map((m) => m.slice().sort((x, y) => Number(x.slice(1)) - Number(y.slice(1)))[0]) : ['T1', 'T2'];
     assert.deepEqual([got.a.team, got.b.team], want, labels.join(' / '));
   }
+});
+
+/* ---------- the hub ranks teams as the public page does ---------- */
+
+// Two pools of 4 into Championship and Consolation halves. In pool A, P
+// wins all three; X, Y and Z go 1–2 each, and X beats Y 110–100 with a ten
+// on a 21st (overtime) tossup. Pool B finishes in seed order.
+function overtimeTie() {
+  const s = buildPlan(planTeams(8), planRooms(4), [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { per: -1 })], 'snake', 1);
+  tagBrackets(s);
+  const [P, X, Y, Z] = s.pools.A;
+  const score = new Map([[[P, X], [300, 50]], [[P, Y], [300, 50]], [[P, Z], [300, 0]], [[X, Y], [110, 100]], [[Z, X], [120, 100]], [[Y, Z], [105, 100]]]
+    .map(([k, v]) => [k.join('|'), v]));
+  const side = (name, points, tuh) => {
+    const tens = Math.floor(points / 20);
+    return { name, points, bonusPoints: points - 10 * tens, players: [{ name: name + ' One', tossupsHeard: tuh, counts: [{ value: 10, n: tens }] }] };
+  };
+  const games = s.phases[0].rounds.flatMap((r) => r.games.map((g) => {
+    const [a, b] = [g.a.team, g.b.team];
+    const pts = score.get(a + '|' + b) || (score.get(b + '|' + a) || []).slice().reverse();
+    const [pa, pb] = pts.length ? pts : s.pools.B.indexOf(a) < s.pools.B.indexOf(b) ? [300, 100] : [100, 300];
+    const ot = [a, b].includes(X) && [a, b].includes(Y);
+    return { round: r.round, tossupsRead: ot ? 21 : 20, teams: [side(a, pa, ot ? 21 : 20), side(b, pb, ot ? 21 : 20)],
+      ...(ot ? { tossupBuzzes: Array.from({ length: 21 }, (_, i) => (i === 20 ? [{ team: X, value: 10 }] : [])) } : {}) };
+  }));
+  return { s, games, X, Y, Z };
+}
+const { renderStats } = await import('../app/js/statsview.js');
+
+test('the hub ranks as the public page does: an overtime win doesn\'t lift a team past one with more regulation points per tossup', () => {
+  const { s, games, X, Y, Z } = overtimeTie();
+  const publicPool = (settings) => reportData({ name: 'Overtime Open', matches: dedupeMatches(games), roster: null, settings, schedule: s })
+    .stageStandings[0].pools.find((p) => p.name === 'Pool A').teams.map((t) => t.name);
+  const agg = standings(games);
+  assert.deepEqual(poolStandings(s.pools, agg.teams).A, publicPool({}));
+  // Y 85.00 points per 20 in regulation, X 83.33; with the overtime in, X was ahead (85.25 to 83.61)
+  assert.deepEqual(publicPool({}).slice(1), [Y, X, Z]);
+  const old = aggregate(games).teams.map((t) => t.name);
+  assert.ok(old.indexOf(X) < old.indexOf(Y));
+  // Y plays for the title, X in the Consolation, and the tie is noted
+  const res = autoFill(s, agg, ['A', 'B']);
+  const bracketOf = (team) => s.brackets.find((b) => b.phase === 1 && res.schedule.phases[1].rounds
+    .some((r) => r.games.some((g) => g.bracket === b.key && (g.a.team === team || g.b.team === team)))).name;
+  assert.deepEqual([bracketOf(Y), bracketOf(X)], ['Championship', 'Consolation']);
+  assert.deepEqual(res.ties.map((x) => [x.pool, x.record, x.teams.map((t) => t.name)]), [['A', '1–2', [Y, X, Z]]]);
+  // the hub's table: tossups heard, points per 20 and PPB leave the overtime out
+  const x = agg.teams.find((t) => t.name === X);
+  assert.deepEqual([x.regTuh, x.tuh, x.pp20tuh, x.bonusesHeard], [60, 61, 83.33, 11]);
+  const out = { innerHTML: '' };
+  renderStats(out, agg);
+  const row = out.innerHTML.split('<tr>').find((r) => r.includes(`>${X}<`));
+  assert.ok(row.includes('>83.33<') && row.includes('>60<') && !row.includes('>61<'), row);
+  // the tournament's regulation tossup count decides what overtime is: at
+  // 21 the 21st tossup is regulation, and X is ahead on both pages
+  const at21 = { regulationTossupCount: 21 };
+  assert.deepEqual(poolStandings(s.pools, standings(games, null, at21).teams).A, publicPool(at21));
+  assert.deepEqual(publicPool(at21).slice(1), [X, Y, Z]);
+  assert.equal(standings(games, null, at21).teams.find((t) => t.name === X).regTuh, 61);
+});
+
+test('the hub ranks as the public page does: ACF Fall @ UIUC\'s shape (22 teams, 8/7/7 into 6/6/6/4) seeds as before without overtime', () => {
+  const teams = planTeams(22);
+  const P = [planPhase('Prelims', { groups: 3 }), planPhase('Playoffs', { sizes: [6, 6, 6, 4], carry: true })];
+  const plan = buildPlan(teams, planRooms(11), P, 'snake', 1);
+  assert.deepEqual(Object.values(plan.pools).map((p) => p.length), [8, 7, 7]);
+  assert.deepEqual(planGroups(teams, P, 'snake', () => 0.5)[1].map((g) => g.members.length), [6, 6, 6, 4]);
+  // the hub's order before: net wins, then points per 20 rounded, then name
+  const before = (s, games) => {
+    const order = aggregate(games).teams.map((t) => t.name);
+    return Object.fromEntries(Object.entries(s.pools).map(([k, m]) => [k, [...m].sort((a, b) => order.indexOf(a) - order.indexOf(b))]));
+  };
+  // and as before, unless two pool-mates have the same record and the same
+  // points: the public table lists them in pool order, the old order by name
+  const level = (rows, list) => list.some((n, i) => i && rows.get(n).w === rows.get(list[i - 1]).w && rows.get(n).points === rows.get(list[i - 1]).points);
+  // the picker's plan, and the engine's pools3x2 that the saved schedule
+  // was built with (22 teams, and the 23 of 8/8/7)
+  for (const s of [plan, buildSchedule('pools3x2', teams, planRooms(11), {}), buildSchedule('pools3x2', planTeams(23), planRooms(11), {})]) {
+    let same = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      const games = playDay(s, seed).map((x) => x.m);
+      const agg = standings(games);
+      const now = autoFill(s, agg, ['A', 'B', 'C']);
+      // always the public page's pool tables, ties included
+      const pub = reportData({ name: 'UIUC', matches: dedupeMatches(games), roster: null, settings: {}, schedule: s }).stageStandings[0].pools;
+      assert.deepEqual(pub.map((p) => p.teams.map((t) => t.name)), Object.values(fillReport(s, agg).ranks), 'seed ' + seed);
+      const was = before(s, games);
+      const rows = new Map(agg.teams.map((t) => [t.name, t]));
+      if (Object.values(was).some((list) => level(rows, list))) continue;
+      const old = JSON.parse(JSON.stringify(s));
+      fillPlaceholders(old, was);
+      assert.deepEqual(now.schedule, old, 'seed ' + seed);
+      same++;
+    }
+    assert.ok(same >= 50, `${same} of 60 days with no exact tie`);
+  }
+  // and the Finals from 1st–6th place
+  let finals = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const d = finalsDay(seed);
+    const src = finalsSources(d.s)[0];
+    const carried = new Set(src.carried.map((c) => [c.a, c.b].sort().join('\n')));
+    const mine = d.games.filter((m) => m.teams.every((t) => src.teams.includes(t.name))
+      && (m.round >= 8 || carried.has(m.teams.map((t) => t.name).sort().join('\n'))));
+    const old = aggregate(mine).teams;
+    if (old.slice(1, 3).some((t, i) => t.w === old[i].w && t.points === old[i].points)) continue;
+    const res = finalsFill(d.s, d.games, finalsProgress(d.s, d.files).ready);
+    assert.deepEqual(finalTeams(res.schedule)[0][0], [old[0].name, old[1].name], 'seed ' + seed);
+    finals++;
+  }
+  assert.ok(finals >= 40, `${finals} of 60 finals with no exact tie`);
 });
 
 await testA('eachLimit: any count of items, in order, never more than n at once, failures kept apart', async () => {
