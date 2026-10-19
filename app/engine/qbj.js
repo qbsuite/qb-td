@@ -52,6 +52,8 @@ export function matchPayload(json) {
 
 // the Match among a QBJ file's {objects}
 const isMatch = (o) => o && (o.type === 'Match' || pick(o, 'match_teams', 'matchTeams'));
+// a match whose _round parseMatch already reads as `round` ("3" is 3)
+const saysRound = (m, round) => m._round != null && Number(m._round) === round;
 
 /** A match (or a QBJ file's {objects} holding one) with its _round set to
     `round`, which parseMatch reads before anything else: the same object
@@ -62,10 +64,10 @@ const isMatch = (o) => o && (o.type === 'Match' || pick(o, 'match_teams', 'match
     (modaqfile.js qbjTextWithRound). */
 export function withRound(qbj, round) {
   if (!qbj || typeof qbj !== 'object' || Array.isArray(qbj)) return null;
-  if (!Array.isArray(qbj.objects)) return qbj._round === round ? qbj : { ...qbj, _round: round };
+  if (!Array.isArray(qbj.objects)) return saysRound(qbj, round) ? qbj : { ...qbj, _round: round };
   const i = qbj.objects.findIndex(isMatch);
   if (i < 0) return null;
-  if (qbj.objects[i]._round === round) return qbj;
+  if (saysRound(qbj.objects[i], round)) return qbj;
   const objects = qbj.objects.slice();
   objects[i] = { ...objects[i], _round: round };
   return { ...qbj, objects };

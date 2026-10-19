@@ -25,14 +25,45 @@ export function modaqFilenames(round, teamNames) {
   return { qbj: base + '.qbj', game: base + '_Game.json' };
 }
 
-/** A MODAQ QBJ text with its _round set to `round` (qbj.js withRound):
-    unchanged when it already is, else the same text with only that value
-    moved, indented as MODAQ writes it. */
+// a "_round": value pair in a QBJ text (a quote inside a string is escaped,
+// so this is a key)
+const ROUND_PAIR = /("_round"\s*:\s*)(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|"(?:[^"\\]|\\.)*"|true|false|null)/g;
+
+// a match given a _round it didn't have, moved to where MODAQ's toQBJ
+// writes it: just before packets (QBJ_KEYS), else last
+function roundAsModaq(m, was) {
+  if (!m || !was || '_round' in was || !('packets' in m)) return m;
+  const o = {};
+  for (const [k, v] of Object.entries(m)) {
+    if (k === 'packets') o._round = m._round;
+    if (k !== '_round') o[k] = v;
+  }
+  return o;
+}
+
+/** A QBJ text (MODAQ's, or a .qbj added by hand) with its _round set to
+    `round` (qbj.js withRound), keeping the text's own layout: unchanged
+    when it already says `round`, else the same bytes but for that one
+    value. A match without one is written out in the text's indentation,
+    the round where MODAQ puts it, so MODAQ's text comes out as MODAQ
+    writes it for that round. Not JSON, or no match in it: the text as it
+    was. */
 export function qbjTextWithRound(text, round) {
   let obj;
   try { obj = JSON.parse(text); } catch (e) { return text; }
-  const out = withRound(obj, round);
-  return !out || out === obj ? text : JSON.stringify(out, null, 2);
+  let out = withRound(obj, round);
+  if (!out || out === obj) return text;
+  if ((text.match(ROUND_PAIR) || []).length === 1) {
+    const swapped = text.replace(ROUND_PAIR, (_, key) => key + round);
+    try { if (JSON.stringify(JSON.parse(swapped)) === JSON.stringify(out)) return swapped; } catch (e) { /* written out below */ }
+  }
+  out = Array.isArray(out.objects)
+    ? { ...out, objects: out.objects.map((o, i) => (o === obj.objects[i] ? o : roundAsModaq(o, obj.objects[i]))) }
+    : roundAsModaq(out, obj);
+  const indent = /^\s*\{[ \t]*\r?\n([ \t]+)/.exec(text);
+  let s = JSON.stringify(out, null, indent ? indent[1] : undefined);
+  if (/\r\n/.test(text)) s = s.replace(/\n/g, '\r\n');
+  return s + /\s*$/.exec(text)[0];
 }
 
 /** MODAQ's game file (parsed) under a roster's renames: its players

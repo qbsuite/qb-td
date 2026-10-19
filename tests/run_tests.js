@@ -6478,6 +6478,10 @@ test('withRound: a copy with the round moved, the same object when it already sa
   assert.equal(w.objects[0], wrapped.objects[0]);
   assert.equal(wrapped.objects[1]._round, 1);
   assert.equal(withRound(wrapped, 1), wrapped);
+  const said = { match_teams: [], _round: '3' };
+  assert.equal(withRound(said, 3), said, '"3" already reads as round 3');
+  assert.equal(withRound({ objects: [{ type: 'Match', _round: '5' }] }, 5).objects[0]._round, '5');
+  assert.equal(withRound({ match_teams: [], _round: null }, 2)._round, 2);
   assert.equal(withRound({ objects: [{ type: 'Tournament' }] }, 1), null, 'no match');
   assert.equal(withRound(null, 1), null);
   assert.equal(withRound([], 1), null);
@@ -6488,6 +6492,42 @@ test('qbjTextWithRound: MODAQ\'s QBJ text under another round is the text MODAQ 
   assert.equal(qbjTextWithRound(r2, 7), mToQBJString(roundGame, 'Packet', 7));
   assert.equal(qbjTextWithRound(r2, 2), r2, 'the same round: the very same text');
   assert.equal(qbjTextWithRound('not json', 2), 'not json');
+  // MODAQ's text with no round (exported without one): the round goes
+  // where MODAQ writes it, before packets
+  const none = mToQBJString(roundGame, 'Packet', undefined);
+  assert.ok(!none.includes('"_round"'));
+  assert.equal(qbjTextWithRound(none, 4), mToQBJString(roundGame, 'Packet', 4));
+  assert.equal(qbjTextWithRound(mToQBJString(roundGame, undefined, undefined), 4), mToQBJString(roundGame, undefined, 4), 'no packet: last');
+});
+
+test('qbjTextWithRound: a .qbj from elsewhere keeps its own layout, only its round changed', () => {
+  const m = { match_teams: [{ team: 'Alpha' }, { team: 'Beta' }], tossups_read: 20, _round: 2, notes: 'said "_round": 9' };
+  const moved = JSON.stringify({ ...m, _round: 6 });
+  assert.equal(qbjTextWithRound(JSON.stringify(m), 6), moved, 'compact stays compact');
+  assert.equal(qbjTextWithRound(JSON.stringify(m, null, 4) + '\n', 6), JSON.stringify({ ...m, _round: 6 }, null, 4) + '\n');
+  assert.equal(qbjTextWithRound(JSON.stringify(m, null, '\t').replace(/\n/g, '\r\n'), 6),
+    JSON.stringify({ ...m, _round: 6 }, null, '\t').replace(/\n/g, '\r\n'), 'tabs and CRLF too');
+  assert.equal(qbjTextWithRound('{ "_round" :2.0, "match_teams": [] }', 6), '{ "_round" :6, "match_teams": [] }');
+  assert.equal(qbjTextWithRound('{"_round":"3","match_teams":[]}', 3), '{"_round":"3","match_teams":[]}', '"3" already says 3');
+  // a tournament file holding the match: the Match's round, nothing else
+  const wrapped = { version: '2.1.1', objects: [{ type: 'Tournament', name: 'T' }, { type: 'Match', ...m }] };
+  assert.equal(qbjTextWithRound(JSON.stringify(wrapped, null, 2), 6),
+    JSON.stringify({ ...wrapped, objects: [wrapped.objects[0], { ...wrapped.objects[1], _round: 6 }] }, null, 2));
+  // no round in it: written out in its own indentation, the round before
+  // packets as MODAQ writes it, else last
+  const named = { tossups_read: 20, match_teams: [], packets: 'Round 2' };
+  assert.equal(qbjTextWithRound(JSON.stringify(named), 5), '{"tossups_read":20,"match_teams":[],"_round":5,"packets":"Round 2"}');
+  assert.equal(qbjTextWithRound(JSON.stringify({ objects: [{ type: 'Tournament' }, { type: 'Match', ...named }] }), 5),
+    '{"objects":[{"type":"Tournament"},{"type":"Match","tossups_read":20,"match_teams":[],"_round":5,"packets":"Round 2"}]}');
+  const none = { match_teams: [], tossups_read: 20 };
+  assert.equal(qbjTextWithRound(JSON.stringify(none), 5), JSON.stringify({ ...none, _round: 5 }));
+  assert.equal(qbjTextWithRound(JSON.stringify(none, null, 4), 5), JSON.stringify({ ...none, _round: 5 }, null, 4));
+  assert.equal(qbjTextWithRound(JSON.stringify(none, null, '\t').replace(/\n/g, '\r\n') + '\r\n', 5),
+    JSON.stringify({ ...none, _round: 5 }, null, '\t').replace(/\n/g, '\r\n') + '\r\n');
+  // two rounds in the text: written out whole rather than guessed at
+  const two = '{"objects":[{"type":"Match","match_teams":[],"_round":2},{"type":"Other","_round":2}]}';
+  assert.equal(JSON.parse(qbjTextWithRound(two, 4)).objects[0]._round, 4);
+  assert.equal(JSON.parse(qbjTextWithRound(two, 4)).objects[1]._round, 2);
 });
 
 test('filedText: an upload takes the round it is filed under; a reader\'s own upload is stored as it came', () => {
@@ -6505,10 +6545,22 @@ test('filedText: an upload takes the round it is filed under; a reader\'s own up
   assert.equal(root.modaq.qbj, modaq(5).qbj, 'MODAQ\'s text, as MODAQ writes it for round 5');
   assert.equal(root.modaq.game, modaq(3).game);
   assert.equal(parseMatch(root, { filename: 'Round_3_Alpha_Beta.qbtd.json' }).round, 5);
+  // a reader writes both copies under one round: its qbj half is enough
+  const odd = JSON.stringify({ ...JSON.parse(reader), modaq: modaq(2) });
+  assert.equal(filedText(JSON.parse(odd), odd, 3).text, odd);
   // a bare .qbj from MODAQ's Backup to JSON
   const bare = mToQBJString(roundGame, 'Packet', 2);
   assert.equal(filedText(JSON.parse(bare), bare, 4).text, mToQBJString(roundGame, 'Packet', 4));
   assert.equal(filedText(JSON.parse(bare), bare, 2).text, bare);
+  // one exported without a round: MODAQ's text for the filed round, and
+  // the public copy's keys in the same order
+  const unround = mToQBJString(roundGame, 'Packet', undefined);
+  const given = filedText(JSON.parse(unround), unround, 4);
+  assert.equal(given.text, mToQBJString(roundGame, 'Packet', 4));
+  assert.equal(JSON.stringify(given.qbj, null, 2), given.text);
+  // a compact .qbj stays compact, only its round changed
+  const compact = JSON.stringify(JSON.parse(bare));
+  assert.equal(filedText(JSON.parse(compact), compact, 4).text, JSON.stringify(JSON.parse(mToQBJString(roundGame, 'Packet', 4))));
   // no round anywhere: the filed one, so the stats can count it
   const none = JSON.stringify({ tossups_read: 20, match_teams: JSON.parse(bare).match_teams });
   assert.equal(parseMatch(JSON.parse(filedText(JSON.parse(none), none, 6).text), { filename: 'game.qbj' }).round, 6);

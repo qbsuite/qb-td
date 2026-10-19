@@ -1305,7 +1305,33 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('and stamps its stored file', (await raw(row.r2_key)) === as7);
   r = await call('/pub/' + slug + '/qbj/' + qbjId);
   ok('and its public copy', r.status === 200 && r.body._round === 7, r.body);
-  for (const id of [qbjId, combId, readerId]) await call(`${A}/files/${id}`, { method: 'DELETE' });
+  // a .qbj from elsewhere keeps its own layout: only the round changes
+  r = await call(`/b/${secret}/upload?round=7&name=game.qbj`, { method: 'POST', body: JSON.stringify(q) + '\n' });
+  const compactId = r.body.id;
+  ok('a compact .qbj added under another round stays compact, only its round changed',
+    (await raw((await rowOf(compactId)).r2_key)) === JSON.stringify({ ...q, _round: 7 }) + '\n');
+  // one MODAQ exported with no round gets it where MODAQ writes it, before
+  // packets, in the stored file and the public QBJ alike
+  const unround = {};
+  for (const [k, v] of Object.entries({ ...q, packets: 'Packet' })) if (k !== '_round') unround[k] = v;
+  const as5 = {};
+  for (const [k, v] of Object.entries(unround)) { if (k === 'packets') as5._round = 5; as5[k] = v; }
+  r = await call(`/b/${secret}/upload?round=5&name=game.qbj`, { method: 'POST', body: JSON.stringify(unround, null, 2) });
+  const unroundId = r.body.id;
+  ok('a .qbj with no round added under round 5 is stored as MODAQ writes it for round 5',
+    (await raw((await rowOf(unroundId)).r2_key)) === JSON.stringify(as5, null, 2));
+  r = await call('/pub/' + slug + '/qbj/' + unroundId);
+  const pubKeys = r.status === 200 ? Object.keys(r.body) : [];
+  ok('and its public QBJ has the round in the same place', r.body._round === 5
+    && pubKeys.indexOf('_round') === pubKeys.indexOf('packets') - 1, r.body);
+  // its stored file gone: moving it to its own round leaves it as it was,
+  // and to another says what is wrong
+  d1exec(`UPDATE files SET r2_key = 't/${tid}/gone.qbj' WHERE id = ${compactId}`);
+  r = await call(`${A}/files/${compactId}`, { method: 'POST', json: { round: 7 } });
+  ok('moving a game whose file is gone to its own round is fine', r.status === 200 && r.body.round === 7, r.body);
+  r = await call(`${A}/files/${compactId}`, { method: 'POST', json: { round: 4 } });
+  ok('and to another round says the file is missing', r.status === 404, r.body);
+  for (const id of [qbjId, combId, readerId, compactId, unroundId]) await call(`${A}/files/${id}`, { method: 'DELETE' });
   await tick();
 }
 

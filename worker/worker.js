@@ -3065,20 +3065,22 @@ async function moveFileRound(env, t, fileId, round) {
   if (!results.length) return err(env, 404, 'no such file');
   const f = results[0];
   const game = (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
-  if (f.round === round && !game) return json(env, { ok: true, round });
+  // already there: a file that can't be stamped is left as it was
+  const there = (status, msg) => (f.round === round ? json(env, { ok: true, round }) : err(env, status, msg));
+  if (f.round === round && !game) return there();
   let stamped = false;
   if (game) {
     const obj = await env.DATA.get(f.r2_key);
-    if (!obj) return err(env, 404, 'stored file missing');
+    if (!obj) return there(404, 'stored file missing');
     const rawKey = await blobKey(t, f.r2_key);
     let text;
     let root;
     try {
       text = new TextDecoder().decode(await readBlob(obj, rawKey));
       root = JSON.parse(text);
-    } catch (e) { return err(env, 400, 'stored file unreadable'); }
+    } catch (e) { return there(400, 'stored file unreadable'); }
     const filed = filedText(root, text, round);
-    if (!filed) return err(env, 400, 'no match in this file');
+    if (!filed) return there(400, 'no match in this file');
     if (filed.text !== text) {
       await putBlob(env, f.r2_key, filed.text, 'application/json', rawKey);
       stamped = true;
@@ -3154,18 +3156,22 @@ async function saveModaqFiles(env, t, fileId, modaq) {
 // both saying `round` (engine/qbj.js withRound), since parseMatch reads
 // _round before the round the upload is filed in. A reader upload
 // ({qbj, game, modaq?}) has its qbj half and MODAQ's own QBJ text stamped
-// together; a bare .qbj is kept as MODAQ writes one, with only its _round
-// moved. `text` comes back as it was when it already says `round`, as a
-// reader's upload always does; null when there's no match.
+// together; a bare .qbj keeps its own bytes but for its _round
+// (engine/modaqfile.js qbjTextWithRound), and its public copy reads the
+// same. `text` comes back as it was when it already says `round`, as a
+// reader's upload always does (the reader writes both QBJ copies under the
+// one round); null when there's no match.
 export function filedText(root, text, round) {
   const reader = root && root.qbj && typeof root.qbj === 'object';
   const qbj = withRound(reader ? root.qbj : root, round);
   if (!qbj) return null;
-  if (!reader) return { qbj, text: qbj === root ? text : JSON.stringify(qbj, null, 2) };
+  if (qbj === (reader ? root.qbj : root)) return { qbj, text };
+  if (!reader) {
+    const stamped = qbjTextWithRound(text, round);
+    return { qbj: JSON.parse(stamped), text: stamped };
+  }
   const m = root.modaq && typeof root.modaq.qbj === 'string' ? root.modaq : null;
-  const mq = m ? qbjTextWithRound(m.qbj, round) : null;
-  if (qbj === root.qbj && (!m || mq === m.qbj)) return { qbj, text };
-  return { qbj, text: JSON.stringify({ ...root, qbj, ...(m ? { modaq: { ...m, qbj: mq } } : {}) }) };
+  return { qbj, text: JSON.stringify({ ...root, qbj, ...(m ? { modaq: { ...m, qbj: qbjTextWithRound(m.qbj, round) } } : {}) }) };
 }
 
 // Escape hatch for drift: the dashboard re-posts the public copies of
