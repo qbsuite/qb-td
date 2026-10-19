@@ -533,6 +533,16 @@ function statsVersion(rows) {
   return (rows.length ? rows[rows.length - 1].id : 0) + ':' + rows.length;
 }
 
+// A shard's stamp is statsVersion's id:count, plus, once a forced rebuild
+// has changed what the round's games say under the same ids (a room move,
+// the TO's rebuild), that rebuild's generation: id:count:gen. D1 knows
+// only the ids, so only that part is compared with it; the whole stamp is
+// what the GitHub publisher and the viewers' caches see move.
+function splitStamp(v) {
+  const [id, n, gen] = String(v ?? '').split(':');
+  return { ids: id + ':' + n, gen: gen ? ':' + gen : '' };
+}
+
 function manifestVersion(manifest) {
   let lastId = 0;
   let count = 0;
@@ -603,6 +613,8 @@ async function materialize(env, t) {
   const forced = Boolean(await env.DATA.head(rebuildKey(tid)));
   if (forced) await env.DATA.delete(rebuildKey(tid));
   const manifest = { rounds: {}, at: Date.now() };
+  // this rebuild's generation (splitStamp), for the rounds it changes
+  const gen = forced ? ':' + manifest.at.toString(36) : '';
   const changed = [];
   const removed = [];
   let legacy;             // undefined = not looked for yet, null = none
@@ -610,7 +622,9 @@ async function materialize(env, t) {
 
   for (const [n, fs] of [...byRound].sort((a, b) => a[0] - b[0])) {
     const want = statsVersion(fs);
-    if (!forced && prev.rounds[n] === want) { manifest.rounds[n] = want; continue; }
+    const was = prev.rounds[n];
+    const same = was !== undefined && splitStamp(was).ids === want;
+    if (!forced && same) { manifest.rounds[n] = was; continue; }
 
     // Each game's public copy is compact JSON (putPubGame) keyed by its
     // file id, so the shard is those texts joined: no parse of every game
@@ -646,11 +660,23 @@ async function materialize(env, t) {
         fs.length - kept.length, 'public game blobs; will retry next tick');
     }
     const got = (keptIds.length ? keptIds[keptIds.length - 1] : 0) + ':' + kept.length;
-    await env.DATA.put(roundBlobKey(tid, n),
-      '{"v":' + JSON.stringify(got) + ',"round":' + n + ',"entries":[' + kept.join(',') + ']}', {
-        httpMetadata: { contentType: 'application/json' },
-      });
-    manifest.rounds[n] = got;
+    const shard = (v) => '{"v":' + JSON.stringify(v) + ',"round":' + n + ',"entries":[' + kept.join(',') + ']}';
+    if (forced && same && got === want) {
+      // nothing the forced rebuild re-read differs from the shard already
+      // out: its stamp stays, so nobody refetches the round
+      const cur = await env.DATA.get(roundBlobKey(tid, n));
+      if (cur && (await cur.text()) === shard(was)) { manifest.rounds[n] = was; continue; }
+    }
+    // A forced rebuild stamps what it wrote with its own generation. An
+    // ordinary one keeps the generation the round had: games only join or
+    // leave between forced rebuilds, so the ids plus that generation still
+    // name one content, and a stamp a viewer holds can't come back with
+    // other games behind it.
+    const stamp = got + (forced ? gen : splitStamp(was).gen);
+    await env.DATA.put(roundBlobKey(tid, n), shard(stamp), {
+      httpMetadata: { contentType: 'application/json' },
+    });
+    manifest.rounds[n] = stamp;
     changed.push(n);
   }
 
@@ -2904,9 +2930,8 @@ async function deleteFile(env, t, fileId) {
 // wrong room's link). The stored blob stays where it is — its R2 path is
 // only a name — but everything that reports a room follows: the row, the
 // game's public copy, and the tiebreaker log's entries for that game.
-// A shard's stamp tracks ids, not rooms, so viewers holding one keep the
-// old room until it expires; the public page sidesteps that by taking
-// each game's room from /pub/:slug's live file list.
+// The forced rebuild gives the round a new stamp (splitStamp), so the
+// GitHub snapshot and viewers holding the shard pick the new room up.
 async function moveFile(request, env, t, fileId) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
@@ -3062,7 +3087,8 @@ function stampRound(qbj, round) {
 // Escape hatch for drift: the dashboard re-posts the public copies of
 // games it fetched from the stored files, and the next tick rebuilds
 // every shard from them. The rebuild marker is what forces that —
-// otherwise unchanged round stamps would skip the rebuild. The manifest
+// otherwise unchanged round stamps would skip the rebuild — and a round
+// that comes out different gets a new stamp (splitStamp). The manifest
 // itself is left alone, so viewers keep the current shards until the
 // rebuilt ones exist rather than getting an empty page for a tick.
 //

@@ -767,7 +767,10 @@ r = await call('/pub/' + slug + '/rounds?n=1');
 ok('forced rebuild refreshes an unchanged-stamp round',
   r.status === 200 && r.body.rounds[0].entries[0].room === 'Rebuilt Room', r.body);
 r = await call('/pub/' + slug);
-ok('rebuild leaves the stamps where they were', r.body.rounds['1'] === v1.split(':')[0] + ':1', r.body.rounds);
+// same games, other contents: the stamp keeps its ids and moves, so the
+// GitHub snapshot and viewers holding the round fetch it again
+ok('a rebuilt round keeps its ids and gets a new stamp',
+  r.body.rounds['1'].startsWith(v1.split(':')[0] + ':1:'), r.body.rounds);
 // the dashboard rebuilds from admin downloads, which keep notes — the
 // Worker must strip them again on the way back in
 ok('rebuild strips notes too', !JSON.stringify(r.body).includes('PROTESTLEAKANSWER'));
@@ -1164,7 +1167,8 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
 
   await tick();
   r = await call('/pub/' + slug);
-  ok('the move keeps the round stamp', r.body.rounds['6'] === stamp6, r.body.rounds);
+  ok('the move keeps the round\'s ids and moves its stamp',
+    r.body.rounds['6'] !== stamp6 && r.body.rounds['6'].startsWith(stamp6.split(':').slice(0, 2).join(':') + ':'), r.body.rounds);
   r = await call('/pub/' + slug + '/rounds?n=6');
   ok('rebuilt shard names the new room',
     r.body.rounds[0].entries.find((e) => e.id === mvId).room === 'Room 9', r.body);

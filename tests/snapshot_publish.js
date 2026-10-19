@@ -660,8 +660,10 @@ const realFetch = globalThis.fetch;
 }
 
 // 16. The TO's rebuild re-posts games under their existing ids, so no
-// stamp moves; its marker is what makes the tick rebuild every round —
-// and it is consumed, so the tick after that leaves the shards alone.
+// D1 stamp moves; its marker is what makes the tick rebuild every round —
+// and it is consumed, so the tick after that leaves the shards alone. A
+// round that comes out different gets a new stamp (its ids plus the
+// rebuild's generation), so it reaches GitHub and viewers' caches too.
 {
   const gh = fakeGithub();
   globalThis.fetch = gh.fetch;
@@ -686,7 +688,58 @@ const realFetch = globalThis.fetch;
   await runCron(env(state, objects, gh));
   ok('rebuild: the marker forces the round', shardOf(objects, 1, 1).entries[0].room === 'Rebuilt');
   ok('rebuild: marker consumed', objects['t/1/rebuild.json'] === undefined);
-  ok('rebuild: stamp unchanged', JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === '3:1');
+  const forcedStamp = JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'];
+  ok('rebuild: the changed round gets a new stamp on the same ids',
+    /^3:1:[0-9a-z]+$/.test(forcedStamp) && shardOf(objects, 1, 1).v === forcedStamp, forcedStamp);
+  const pushed = gh.trees[gh.trees.length - 1].tree.find((e) => e.path === 'rebuild-open/r1.json');
+  ok('rebuild: the rebuilt round is committed to GitHub',
+    gh.trees.length === 2 && pushed && JSON.parse(pushed.content).entries[0].room === 'Rebuilt', gh.trees.length);
+  ok('rebuild: the descriptor advertises the new stamp',
+    JSON.parse(t.pub_snapshot).rounds['1'] === forcedStamp && JSON.parse(t.pub_snapshot).sha === 'commit-2', t.pub_snapshot);
+  ok('rebuild: the public state advertises it too',
+    JSON.parse(objects['t/1/pubstate.json'].textFor()).rounds['1'] === forcedStamp);
+
+  // a forced rebuild that finds nothing different moves nothing: no new
+  // stamp, no commit, the shard not rewritten
+  const shardObj = objects['t/1/round/1.json'];
+  objects['t/1/rebuild.json'] = r2obj('{}', 4000);
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('rebuild: an unchanged round keeps its stamp',
+    JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === forcedStamp);
+  ok('rebuild: and is neither rewritten nor committed', objects['t/1/round/1.json'] === shardObj && gh.trees.length === 2);
+
+  // games joining later keep the generation, so the stamp names one content
+  state.files.push({ id: 5, tournament_id: 1, round: 1 });
+  objects['t/1/pub/5.json'] = pubGame(5, 1);
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('rebuild: a later game keeps the generation',
+    JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'] === '5:2' + forcedStamp.slice(3));
+  const settled = objects['t/1/round/1.json'];
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  ok('rebuild: the D1 stamp still matches it, so the next tick skips the round', objects['t/1/round/1.json'] === settled);
+}
+
+// 16b. A room move and a deletion in the same tick can leave a round on
+// the ids it had (delete 5 from {5,7}, file 4 into it): the forced
+// rebuild still sees the games differ and moves the stamp.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = { id: 1, slug: 'aba-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null, created: Date.now() };
+  const state = { tournaments: [t], files: [{ id: 5, tournament_id: 1, round: 2 }, { id: 7, tournament_id: 1, round: 2 }] };
+  const objects = { 't/1/pub/5.json': pubGame(5, 2), 't/1/pub/7.json': pubGame(7, 2), 't/1/pub/4.json': pubGame(4, 1) };
+  await runCron(env(state, objects, gh));
+  ok('same ids: baseline stamp', JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['2'] === '7:2');
+  state.files = [{ id: 4, tournament_id: 1, round: 2 }, { id: 7, tournament_id: 1, round: 2 }];
+  objects['t/1/rebuild.json'] = r2obj('{}', 2000); // what moveFileRound writes
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  const v = JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['2'];
+  ok('same ids: the stamp moves', v !== '7:2' && v.startsWith('7:2:') && shardOf(objects, 1, 2).entries[0].id === 4, v);
+  ok('same ids: the round is committed again', gh.trees.length === 2);
 }
 
 // 17. A set's mirror whose own page is off, in a set that is not public
