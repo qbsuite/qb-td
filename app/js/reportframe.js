@@ -143,10 +143,9 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       parent.postMessage({ qbtdReport: 'place', page: pageOf(current),
         marked: own && own.id && !/-top$/.test(own.id) ? own.id : null, anchors: anchors }, '*');
     }
-    var placeTimer = null;
-    function placeSoon() { clearTimeout(placeTimer); placeTimer = setTimeout(tellPlace, 100); }
-    window.addEventListener('resize', placeSoon);
-    window.addEventListener('scroll', placeSoon);
+    // browsers fire these at most once a frame, so the place goes out at once
+    window.addEventListener('resize', tellPlace);
+    window.addEventListener('scroll', tellPlace);
     document.addEventListener('click', function (e) {
       var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
       if (!a || a.classList.contains('qt-back')) return;
@@ -157,16 +156,30 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       show(hash, true);
     });
     // Sandboxed, the frame is laid out in a process of its own and can get
-    // here before it knows its size, when every height reads as nothing.
-    // So the first page is shown on an animation frame, once it has one.
+    // here before its first layout, when each width and height reads as
+    // nothing. Then the first page waits for the frame's first animation
+    // frame (it runs before anything is drawn) or, still unsized, for a
+    // resize; otherwise it's shown at once, as an unsandboxed frame would.
+    var waiting = null; // what waits for the layout, in order
+    function laidOut() { return document.body.getBoundingClientRect().width > 0; }
     function whenSized(fn) {
-      requestAnimationFrame(function () {
-        if (innerWidth) { fn(); return; }
-        window.addEventListener('resize', function sized() {
-          window.removeEventListener('resize', sized);
-          whenSized(fn);
+      if (waiting) { waiting.push(fn); return; }
+      if (laidOut()) { fn(); return; }
+      waiting = [fn];
+      (function check() {
+        requestAnimationFrame(function () {
+          if (laidOut()) {
+            var run = waiting;
+            waiting = null;
+            run.forEach(function (f) { f(); });
+            return;
+          }
+          window.addEventListener('resize', function sized() {
+            window.removeEventListener('resize', sized);
+            check();
+          });
         });
-      });
+      })();
     }
     window.addEventListener('load', function () { whenSized(function () { show(current); }); });
     // opened from the other layout: the same page, scrolled to the same

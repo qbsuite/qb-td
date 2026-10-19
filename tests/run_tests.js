@@ -2620,6 +2620,67 @@ test('in-page report frame: a start place cannot end the frame\'s script', () =>
   assert.ok(!doc.includes('<script>parent.x'));
 });
 
+// The frame's own script, run against a stand-in document `width` wide
+// (0: not laid out yet, as a sandboxed frame can be when its script runs).
+function runFrameScript(doc, width) {
+  const script = /<script>([\s\S]*)<\/script>/.exec(doc)[1];
+  const posted = [];
+  const frames = [];
+  const on = {};
+  const pages = {};
+  const env = { width };
+  const document = {
+    body: { getBoundingClientRect: () => ({ width: env.width }) },
+    documentElement: { scrollHeight: 900 },
+    getElementById: (id) => (id.startsWith('page-')
+      ? (pages[id] ||= { hidden: true, querySelector: () => null, querySelectorAll: () => [] }) : null),
+    addEventListener() {},
+  };
+  const window = { scrollTo() {},
+    addEventListener: (t, fn) => (on[t] ||= []).push(fn),
+    removeEventListener: (t, fn) => { on[t] = on[t].filter((f) => f !== fn); } };
+  new Function('window', 'document', 'parent', 'requestAnimationFrame', script)(
+    window, document, { postMessage: (m) => posted.push(m) }, (fn) => frames.push(fn));
+  return { posted, env,
+    fire: (t) => [...(on[t] || [])].forEach((fn) => fn({})),
+    nextFrame: () => frames.splice(0).forEach((fn) => fn()),
+    pending: () => frames.length,
+    shown: () => Object.keys(pages).filter((k) => !pages[k].hidden) };
+}
+
+// Sandboxed, the frame's layout can be missing when its script runs; the
+// first page waits for it then, and only then.
+test('in-page report frame: the first page is shown at once when the frame is laid out', () => {
+  const doc = reportSrcdoc(REPORT, { start: { page: 'games' } });
+  const told = (f) => f.posted.map((m) => m.qbtdReport + (m.page ? ':' + m.page : ''));
+  // laid out: shown as the script runs, as before the sandbox
+  let f = runFrameScript(doc, 800);
+  assert.deepEqual(f.shown(), ['page-games']);
+  assert.deepEqual(told(f), ['height', 'place:games']);
+  assert.equal(f.pending(), 0);
+  // not yet: nothing until the frame's first animation frame, and the
+  // start page still comes before what the load event shows
+  f = runFrameScript(doc, 0);
+  f.fire('load');
+  assert.deepEqual(f.posted, []);
+  f.env.width = 800;
+  f.nextFrame();
+  assert.deepEqual(f.shown(), ['page-games']);
+  assert.deepEqual(told(f), ['height', 'place:games', 'height', 'place:games']);
+  // still unsized on that frame: it waits for a resize
+  f = runFrameScript(doc, 0);
+  f.nextFrame();
+  assert.deepEqual(f.posted, []);
+  f.env.width = 800;
+  f.fire('resize');
+  f.nextFrame();
+  assert.deepEqual(f.shown(), ['page-games']);
+  // a resize tells the page the reader's place at once
+  const n = f.posted.length;
+  f.fire('resize');
+  assert.deepEqual(told(f).slice(n), ['place:games']);
+});
+
 test('report refuses an empty tournament', () => {
   assert.throws(() => buildReport({ name: 'T', matches: [], roster: null }), /no games/);
 });
