@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport } from '../app/engine/qbj.js';
+  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
@@ -40,7 +40,7 @@ import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js'
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, withRound, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -6445,6 +6445,87 @@ test('Fix buzzes: a buzz moved to someone not in the lineup is flagged', () => {
   assert.equal(lineupGaps(bfFlipped).size, 0);
   const gaps = lineupGaps(applyBuzzFix(bfFlipped, { edits: [{ q: dee.q, j: dee.j, to: 'Cal' }, { q: cal.q, j: cal.j, to: 'Dee' }] }));
   assert.deepEqual([...gaps].sort(), [`${cal.q}:${cal.j}`, `${dee.q}:${dee.j}`].sort());
+});
+
+/* ---------- a game's round: one stamp, wherever it is written ----------
+   parseMatch reads a file's _round before the round its upload is filed
+   under, so an upload takes the filed round: the reader's, the Worker's
+   filing and moving of an upload, and MODAQ's own QBJ text all go
+   through qbj.js withRound. */
+
+const { filedText } = await import('../worker/worker.js');
+// a played MODAQ game, as the reader holds it
+const roundGame = (() => {
+  const g = replaceGame();
+  g.correct(0, g.A);
+  g.neg(1, g.B);
+  g.correct(1, g.A);
+  return g.game;
+})();
+
+test('withRound: a copy with the round moved, the same object when it already says it, the Match inside {objects}', () => {
+  const m = { tossups_read: 20, match_teams: [], _round: 2, packets: 'P' };
+  const out = withRound(m, 3);
+  assert.equal(out._round, 3);
+  assert.deepEqual(Object.keys(out), Object.keys(m), 'the key stays where it was');
+  assert.equal(m._round, 2, 'the match itself is not changed');
+  assert.equal(withRound(m, 2), m);
+  assert.deepEqual(Object.keys(withRound({ tossups_read: 20 }, 4)), ['tossups_read', '_round'], 'a match without one gets it last');
+  const wrapped = { version: '2.1.1', objects: [{ type: 'Tournament', name: 'T' }, { type: 'Match', match_teams: [], _round: 1 }] };
+  const w = withRound(wrapped, 5);
+  assert.equal(w.objects[1]._round, 5);
+  assert.equal(w._round, undefined, 'the wrapper itself is left alone');
+  assert.equal(w.objects[0], wrapped.objects[0]);
+  assert.equal(wrapped.objects[1]._round, 1);
+  assert.equal(withRound(wrapped, 1), wrapped);
+  assert.equal(withRound({ objects: [{ type: 'Tournament' }] }, 1), null, 'no match');
+  assert.equal(withRound(null, 1), null);
+  assert.equal(withRound([], 1), null);
+});
+
+test('qbjTextWithRound: MODAQ\'s QBJ text under another round is the text MODAQ writes for that round', () => {
+  const r2 = mToQBJString(roundGame, 'Packet', 2);
+  assert.equal(qbjTextWithRound(r2, 7), mToQBJString(roundGame, 'Packet', 7));
+  assert.equal(qbjTextWithRound(r2, 2), r2, 'the same round: the very same text');
+  assert.equal(qbjTextWithRound('not json', 2), 'not json');
+});
+
+test('filedText: an upload takes the round it is filed under; a reader\'s own upload is stored as it came', () => {
+  const modaq = (n) => ({ qbj: mToQBJString(roundGame, 'Packet', n), game: JSON.stringify(roundGame, null, 2) });
+  const reader = combinedUpload(toQBJ(roundGame, 'Packet', 3), 3, '{"game":{}}', null, null, null, modaq(3));
+  const same = filedText(JSON.parse(reader), reader, 3);
+  assert.equal(same.text, reader, 'already round 3: the very same text');
+  assert.equal(same.qbj._round, 3);
+  // the same upload added by hand under round 5: both QBJ copies move
+  const moved = filedText(JSON.parse(reader), reader, 5);
+  const root = JSON.parse(moved.text);
+  assert.deepEqual(Object.keys(root), Object.keys(JSON.parse(reader)));
+  assert.equal(root.qbj._round, 5);
+  assert.equal(moved.qbj._round, 5, 'the public copy\'s half too');
+  assert.equal(root.modaq.qbj, modaq(5).qbj, 'MODAQ\'s text, as MODAQ writes it for round 5');
+  assert.equal(root.modaq.game, modaq(3).game);
+  assert.equal(parseMatch(root, { filename: 'Round_3_Alpha_Beta.qbtd.json' }).round, 5);
+  // a bare .qbj from MODAQ's Backup to JSON
+  const bare = mToQBJString(roundGame, 'Packet', 2);
+  assert.equal(filedText(JSON.parse(bare), bare, 4).text, mToQBJString(roundGame, 'Packet', 4));
+  assert.equal(filedText(JSON.parse(bare), bare, 2).text, bare);
+  // no round anywhere: the filed one, so the stats can count it
+  const none = JSON.stringify({ tossups_read: 20, match_teams: JSON.parse(bare).match_teams });
+  assert.equal(parseMatch(JSON.parse(filedText(JSON.parse(none), none, 6).text), { filename: 'game.qbj' }).round, 6);
+  // a QBJ tournament file holding the match
+  const wrapper = JSON.stringify({ version: '2.1.1', objects: [{ type: 'Match', ...JSON.parse(bare) }] });
+  assert.equal(parseMatch(filedText(JSON.parse(wrapper), wrapper, 8).qbj).round, 8);
+  assert.equal(filedText({ objects: [] }, '{"objects":[]}', 1), null);
+});
+
+test('statedRound: the round a picked game file says, as the stats read it', () => {
+  assert.equal(statedRound({ _round: 2, match_teams: [] }, 'Round_5_A_B.qbj'), 2);
+  assert.equal(statedRound({ match_teams: [] }, 'Round_5_A_B.qbj'), 5);
+  assert.equal(statedRound({ qbj: { _round: 3 }, game: {} }, 'Round_1_A_B.qbtd.json'), 3);
+  assert.equal(statedRound({ objects: [{ type: 'Tournament' }, { type: 'Match', _round: 4 }] }, 'x.qbj'), 4);
+  assert.equal(statedRound(null, 'Round_6_A_B_Game.json'), 6, 'a MODAQ game file: its name');
+  assert.equal(statedRound(null, 'game.qbj'), null);
+  assert.equal(statedRound({ _round: 0 }, 'x.qbj'), null);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

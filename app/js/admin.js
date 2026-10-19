@@ -17,7 +17,7 @@
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
 import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, rosterForExport } from '../engine/qbj.js';
+  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, rosterForExport, statedRound } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
@@ -1794,13 +1794,42 @@ function addKind(name) {
   if (/\.qbj$/i.test(name)) return 'Match file';
   return 'Game file';
 }
-function addListHtml(fs) {
-  if (!fs.length) return '';
-  const kinds = fs.map((f) => addKind(f.name));
+// The round each picked file says it is, as the stats read it (qbj.js
+// statedRound): {name, match, round}. A match file or reader upload names
+// its own; a MODAQ game file has only its name.
+async function addFileRows(fs) {
+  return Promise.all(fs.map(async (f) => {
+    const kind = addKind(f.name);
+    const match = kind === 'Match file' || kind === 'Reader upload';
+    let json = null;
+    if (match) { try { json = JSON.parse(await f.text()); } catch (e) { /* the upload says what is wrong */ } }
+    return { name: f.name, match, round: statedRound(json, f.name) };
+  }));
+}
+// The rounds the picked files say, from the files that carry the match
+// when any of them names one: {from: the files saying one, rounds}.
+function addSaid(rows) {
+  const games = rows.filter((x) => x.match && x.round);
+  const from = games.length ? games : rows.filter((x) => x.round);
+  return { from, rounds: [...new Set(from.map((x) => x.round))].sort((x, y) => x - y) };
+}
+function addListHtml(rows, round) {
+  if (!rows.length) return '';
+  const kinds = rows.map((f) => addKind(f.name));
   const lone = kinds.includes('Match file') && !kinds.includes('MODAQ game file') && !kinds.includes('Reader upload');
-  return fs.map((f, i) => `<div class="addfile"><span class="mono">${esc(f.name)}</span>
+  // the upload is filed, and counted, under the round picked
+  const said = addSaid(rows);
+  const off = Number.isInteger(round) && round >= 1 && said.rounds.some((r) => r !== round);
+  const one = said.from.length === 1;
+  const kind = one ? addKind(said.from[0].name) : '';
+  const rounds = said.rounds.length === 1 ? `round ${said.rounds[0]}`
+    : `rounds ${said.rounds.slice(0, -1).join(', ')} and ${said.rounds[said.rounds.length - 1]}`;
+  return rows.map((f, i) => `<div class="addfile"><span class="mono">${esc(f.name)}</span>
       <span class="muted">${kinds[i]}</span></div>`).join('')
-    + (lone ? '<div class="muted small">Stats will count it. Without the game file it can&rsquo;t be reopened in the reader.</div>' : '');
+    + (lone ? '<div class="muted small">Stats will count it. Without the game file it can&rsquo;t be reopened in the reader.</div>' : '')
+    + (off ? `<div class="warntext small" id="addwarn">${one
+      ? `The ${kind.startsWith('MODAQ') ? kind : kind[0].toLowerCase() + kind.slice(1)} says` : 'The files say'} ${rounds}.
+      ${one ? 'It' : 'They'} will be counted as round ${round}.</div>` : '');
 }
 
 // one listener for the page's lifetime: a click outside closes the menu
@@ -2335,7 +2364,22 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   $('addtoggle').onclick = () => { addOpen = addOpen ? null : { bid: null, round: t.current_round }; render(); };
   wireForfeit(a, t, buckets, render);
   $('addcancel').onclick = () => { addOpen = null; render(); };
-  $('addfile').onchange = () => { $('addlist').innerHTML = addListHtml([...$('addfile').files]); };
+  // Round fills in with the round the picked files say; another one picked
+  // is pointed out, since the upload is counted under the picked round
+  let addRows = [];
+  const showAdd = () => { $('addlist').innerHTML = addListHtml(addRows, Number($('addround').value)); };
+  $('addfile').onchange = async () => {
+    const fs = [...$('addfile').files];
+    addRows = fs.map((f) => ({ name: f.name, match: false, round: null }));
+    showAdd();
+    const rows = await addFileRows(fs);
+    if (!$('addfile') || $('addfile').files[0] !== fs[0]) return; // picked again meanwhile
+    addRows = rows;
+    const said = addSaid(rows).rounds;
+    if (said.length === 1) $('addround').value = said[0];
+    showAdd();
+  };
+  $('addround').oninput = showAdd;
   // Download menu: closed by picking an item, Escape, or a click elsewhere
   $('dlmenu').onclick = (ev) => {
     ev.stopPropagation();

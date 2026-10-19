@@ -40,7 +40,7 @@
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
 import { modaqExport, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
-import { parseRoster, rosterNameMap, renameMatch } from '../app/engine/qbj.js';
+import { parseRoster, rosterNameMap, renameMatch, withRound } from '../app/engine/qbj.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
@@ -3055,6 +3055,8 @@ async function moveFile(request, env, t, fileId) {
 // the stats' round and the public shards — where they were, and the TD
 // can press again. Nothing is deleted: the next tick rebuilds the round
 // shards from the rows (the old round's shard goes when it has no games).
+// A game already filed under `round` whose file says another (one added
+// before uploads were stamped) is stamped where it is.
 async function moveFileRound(env, t, fileId, round) {
   if (!Number.isInteger(round) || round < 1 || round > 999) return err(env, 400, 'round must be 1 to 999');
   const { results } = await env.DB.prepare(
@@ -3062,40 +3064,51 @@ async function moveFileRound(env, t, fileId, round) {
   ).bind(fileId, t.id).all();
   if (!results.length) return err(env, 404, 'no such file');
   const f = results[0];
-  if (f.round === round) return json(env, { ok: true, round });
   const game = (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
+  if (f.round === round && !game) return json(env, { ok: true, round });
+  let stamped = false;
   if (game) {
     const obj = await env.DATA.get(f.r2_key);
     if (!obj) return err(env, 404, 'stored file missing');
     const rawKey = await blobKey(t, f.r2_key);
+    let text;
     let root;
-    try { root = JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey))); } catch (e) { return err(env, 400, 'stored file unreadable'); }
-    // a reader upload is {qbj, game, ...}; a plain .qbj is the match itself
-    const qbj = root && root.qbj && typeof root.qbj === 'object' ? root.qbj : root;
-    if (!stampRound(qbj, round)) return err(env, 400, 'no match in this file');
-    // and MODAQ's own QBJ text, kept for downloads (engine/modaqfile.js)
-    if (root.modaq && typeof root.modaq.qbj === 'string') root.modaq.qbj = qbjTextWithRound(root.modaq.qbj, round);
-    await putBlob(env, f.r2_key, JSON.stringify(root), 'application/json', rawKey);
+    try {
+      text = new TextDecoder().decode(await readBlob(obj, rawKey));
+      root = JSON.parse(text);
+    } catch (e) { return err(env, 400, 'stored file unreadable'); }
+    const filed = filedText(root, text, round);
+    if (!filed) return err(env, 400, 'no match in this file');
+    if (filed.text !== text) {
+      await putBlob(env, f.r2_key, filed.text, 'application/json', rawKey);
+      stamped = true;
+    }
     const pobj = await env.DATA.get(pubGameKey(t.id, fileId));
     const entry = pobj ? await pobj.json().catch(() => null) : null;
-    if (entry && stampRound(entry.qbj, round)) await putPubGame(env, t.id, { ...entry, round });
-  }
-  await env.DB.prepare('UPDATE files SET round = ?2 WHERE id = ?1').bind(fileId, round).run();
-  // the tiebreaker log names the round each game drew from
-  let teams = null;
-  try { teams = JSON.parse(f.summary || 'null').teams; } catch (e) { /* no summary */ }
-  if (f.kind === 'combined' && Array.isArray(teams) && teams.every(Boolean)) {
-    const pairKey = (ts) => [...ts].sort().join('\n');
-    const { cur } = await readTbPool(env, TB_KEY(t.id), t.ckey);
-    if (cur) {
-      await writeTbPool(env, TB_KEY(t.id), t.ckey, (pool) => {
-        for (const u of pool.uses) {
-          if (u.round === f.round && pairKey(u.teams || []) === pairKey(teams)) u.round = round;
-        }
-      });
+    const qbj = entry ? withRound(entry.qbj, round) : null;
+    if (qbj && (qbj !== entry.qbj || entry.round !== round)) {
+      await putPubGame(env, t.id, { ...entry, round, qbj });
+      stamped = true;
     }
   }
-  if (game) await forceRebuild(env, t.id);
+  if (f.round !== round) {
+    await env.DB.prepare('UPDATE files SET round = ?2 WHERE id = ?1').bind(fileId, round).run();
+    // the tiebreaker log names the round each game drew from
+    let teams = null;
+    try { teams = JSON.parse(f.summary || 'null').teams; } catch (e) { /* no summary */ }
+    if (f.kind === 'combined' && Array.isArray(teams) && teams.every(Boolean)) {
+      const pairKey = (ts) => [...ts].sort().join('\n');
+      const { cur } = await readTbPool(env, TB_KEY(t.id), t.ckey);
+      if (cur) {
+        await writeTbPool(env, TB_KEY(t.id), t.ckey, (pool) => {
+          for (const u of pool.uses) {
+            if (u.round === f.round && pairKey(u.teams || []) === pairKey(teams)) u.round = round;
+          }
+        });
+      }
+    }
+  }
+  if (game && (f.round !== round || stamped)) await forceRebuild(env, t.id);
   return json(env, { ok: true, round });
 }
 
@@ -3136,15 +3149,23 @@ async function saveModaqFiles(env, t, fileId, modaq) {
   return json(env, { ok: true });
 }
 
-// Write `round` into a qbj match as _round (the match object itself, or
-// the Match inside a tournament wrapper); false when there's no match.
-function stampRound(qbj, round) {
-  if (!qbj || typeof qbj !== 'object') return false;
-  const match = Array.isArray(qbj.objects)
-    ? qbj.objects.find((o) => o && (o.type === 'Match' || o.match_teams || o.matchTeams)) : qbj;
-  if (!match || typeof match !== 'object') return false;
-  match._round = round;
-  return true;
+// A game upload's text (`text`, parsed as `root`) filed under `round`:
+// {text, qbj}, the text to store and the qbj half for the public copy,
+// both saying `round` (engine/qbj.js withRound), since parseMatch reads
+// _round before the round the upload is filed in. A reader upload
+// ({qbj, game, modaq?}) has its qbj half and MODAQ's own QBJ text stamped
+// together; a bare .qbj is kept as MODAQ writes one, with only its _round
+// moved. `text` comes back as it was when it already says `round`, as a
+// reader's upload always does; null when there's no match.
+export function filedText(root, text, round) {
+  const reader = root && root.qbj && typeof root.qbj === 'object';
+  const qbj = withRound(reader ? root.qbj : root, round);
+  if (!qbj) return null;
+  if (!reader) return { qbj, text: qbj === root ? text : JSON.stringify(qbj, null, 2) };
+  const m = root.modaq && typeof root.modaq.qbj === 'string' ? root.modaq : null;
+  const mq = m ? qbjTextWithRound(m.qbj, round) : null;
+  if (qbj === root.qbj && (!m || mq === m.qbj)) return { qbj, text };
+  return { qbj, text: JSON.stringify({ ...root, qbj, ...(m ? { modaq: { ...m, qbj: mq } } : {}) }) };
 }
 
 // Escape hatch for drift: the dashboard re-posts the public copies of
@@ -3638,13 +3659,22 @@ async function bucketUpload(request, url, env, secret) {
   const kind = isQbj ? 'qbj' : isCombined ? 'combined' : /_game\.json$/i.test(filename) ? 'game' : 'other';
   let error = null;
   let qbjObj = null;
+  let stored = buf;    // what R2 keeps: the file, saying the round it is filed under
   let summary = null;  // files.summary: teams, score, protests (matchSummary)
   let tbReport = null; // {teams, used} from a reader upload's tb field
   if (isQbj || isCombined) {
-    const parsed = extractMatch(new TextDecoder().decode(buf));
+    const text = new TextDecoder().decode(buf);
+    const parsed = extractMatch(text);
     error = parsed.error;
     qbjObj = parsed.qbj || null;
     if (!error) {
+      // a game the TD adds may say another round than the one picked for
+      // it: the file takes the filed round, as on a move (moveFileRound)
+      const filed = filedText(parsed.root, text, round);
+      if (filed) {
+        qbjObj = filed.qbj;
+        if (filed.text !== text) stored = enc8(filed.text);
+      }
       summary = matchSummary(parsed.match, isCombined && parsed.root ? parsed.root.protests : null,
         isCombined && parsed.root ? parsed.root.progress : null);
     }
@@ -3661,11 +3691,11 @@ async function bucketUpload(request, url, env, secret) {
   // packet text. The extracted qbj half (text-free) goes to this game's
   // public blob below in plaintext — that is the only public copy.
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
-  await putBlob(env, key, buf, 'application/json', b.ckey);
+  await putBlob(env, key, stored, 'application/json', b.ckey);
   const out = await env.DB.prepare(
     'INSERT INTO files (tournament_id, bucket_id, round, kind, r2_key, filename, size, error, created, summary) ' +
     'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)'
-  ).bind(b.tournament_id, b.id, round, kind, key, filename, buf.byteLength, error, Date.now(), summary).run();
+  ).bind(b.tournament_id, b.id, round, kind, key, filename, stored.byteLength, error, Date.now(), summary).run();
   const fileId = out.meta.last_row_id;
 
   if (qbjObj && !error) {

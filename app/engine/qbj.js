@@ -50,6 +50,37 @@ export function matchPayload(json) {
   return json;
 }
 
+// the Match among a QBJ file's {objects}
+const isMatch = (o) => o && (o.type === 'Match' || pick(o, 'match_teams', 'matchTeams'));
+
+/** A match (or a QBJ file's {objects} holding one) with its _round set to
+    `round`, which parseMatch reads before anything else: the same object
+    when it already says `round`, else a copy with only that value changed
+    (a match without one gets it last). null when there's no match in it.
+    The one place a game's round is written: the reader's upload, the
+    Worker's filing and moving of an upload, and MODAQ's own QBJ text
+    (modaqfile.js qbjTextWithRound). */
+export function withRound(qbj, round) {
+  if (!qbj || typeof qbj !== 'object' || Array.isArray(qbj)) return null;
+  if (!Array.isArray(qbj.objects)) return qbj._round === round ? qbj : { ...qbj, _round: round };
+  const i = qbj.objects.findIndex(isMatch);
+  if (i < 0) return null;
+  if (qbj.objects[i]._round === round) return qbj;
+  const objects = qbj.objects.slice();
+  objects[i] = { ...objects[i], _round: round };
+  return { ...qbj, objects };
+}
+
+/** The round a game file says it is, as parseMatch reads it: its match's
+    _round, else a round in its filename. null when neither gives one (a
+    MODAQ game file has only its name). */
+export function statedRound(json, filename) {
+  let obj = matchPayload(json);
+  if (obj && Array.isArray(obj.objects)) obj = obj.objects.find(isMatch);
+  const round = Number((obj && typeof obj === 'object' ? pick(obj, '_round') : undefined) ?? roundFromFilename(filename));
+  return Number.isInteger(round) && round >= 1 ? round : null;
+}
+
 /**
  * Parse one match qbj. Accepts the parsed JSON object (or a whole-file
  * {objects: [...]} wrapper containing a Match). Throws Error with a
@@ -62,7 +93,7 @@ export function matchPayload(json) {
 export function parseMatch(json, opts = {}) {
   let obj = matchPayload(json);
   if (obj && Array.isArray(obj.objects)) {
-    obj = obj.objects.find((o) => o && (o.type === 'Match' || pick(o, 'match_teams', 'matchTeams')));
+    obj = obj.objects.find(isMatch);
     if (!obj) throw new Error('No Match object found in file');
   }
   if (!obj || typeof obj !== 'object') throw new Error('Not a qbj match object');

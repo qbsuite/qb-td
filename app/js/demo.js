@@ -24,7 +24,7 @@
 // round.
 
 import fixture from '../demo/fixture.js';
-import { parseMatch, matchPayload } from '../engine/qbj.js';
+import { parseMatch, matchPayload, withRound } from '../engine/qbj.js';
 import { protestsFromNotes } from './protests.js';
 
 const UPLOADS_KEY = 'qbtdDemoUploads';
@@ -208,7 +208,8 @@ async function upload(room, query, opts) {
   if (isMatch) {
     try {
       const root = JSON.parse(body);
-      qbj = matchPayload(root);
+      // filed under the round it was sent with, as the Worker files it
+      qbj = withRound(matchPayload(root), round) || matchPayload(root);
       parseMatch(qbj, { filename });
       if (Array.isArray(root.protests)) protests = root.protests;
     } catch (e) {

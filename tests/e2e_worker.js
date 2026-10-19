@@ -8,6 +8,7 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
+import { parseMatch } from '../app/engine/qbj.js';
 import { WORKER_DIR, PERSIST, BASE, storedCred, testToken, d1row, d1exec, r2get, r2put, call, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const MATCH = JSON.stringify({
@@ -1245,6 +1246,66 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   await call(`${A}/files/${mvId}`, { method: 'DELETE' });
   await call(`${A}/tiebreakers`, { method: 'DELETE' });
   await call(`${A}/buckets/${room9.id}`, { method: 'DELETE' });
+  await tick();
+}
+
+// Add a game: a file whose own _round says another round than the one the
+// TD files it under takes the filed round wherever the round is written
+// (the stored file, MODAQ's own QBJ text, the public copy), so the stats
+// count it where the hub shows it. A reader's upload, already saying its
+// round, is stored as it came.
+{
+  const raw = async (key) => (await fetch(`${BASE}${A}/file?key=${encodeURIComponent(key)}`)).text();
+  const rowOf = async (id) => (await call(A)).body.files.find((f) => f.id === id);
+  const q = JSON.parse(MATCH);
+  q._round = 2;
+  const as7 = JSON.stringify({ ...q, _round: 7 }, null, 2);
+  r = await call(`/b/${secret}/upload?round=7&name=Round_2_Alpha_Beta.qbj`, { method: 'POST', body: JSON.stringify(q, null, 2) });
+  ok('a .qbj saying round 2 is added under round 7', r.status === 200 && r.body.round === 7 && r.body.error === null, r.body);
+  const qbjId = r.body.id;
+  const row = await rowOf(qbjId);
+  ok('its files row says round 7', row.round === 7, row);
+  ok('the stored .qbj says round 7, as MODAQ writes one', (await raw(row.r2_key)) === as7);
+  // the same game as a reader upload, with MODAQ's own QBJ text inside
+  r = await call(`/b/${secret}/upload?round=7&name=Round_2_Alpha_Beta.qbtd.json`, { method: 'POST',
+    body: JSON.stringify({ qbj: q, game: { cycles: [] }, modaq: { qbj: JSON.stringify(q, null, 2), game: '{"cycles":[]}' } }) });
+  ok('a reader upload saying round 2 is added under round 7', r.status === 200 && r.body.round === 7 && r.body.error === null, r.body);
+  const combId = r.body.id;
+  const crow = await rowOf(combId);
+  const croot = JSON.parse(await raw(crow.r2_key));
+  ok('both of its QBJ copies say round 7', crow.round === 7 && croot.qbj._round === 7 && croot.modaq.qbj === as7, croot);
+  const part = await fetch(`${BASE}${A}/file?key=${encodeURIComponent(crow.r2_key)}&part=qbj`);
+  ok('its QBJ download is MODAQ\'s text for round 7', (await part.text()) === as7);
+  await tick();
+  let entries = [];
+  for (let i = 0; i < 20 && entries.length < 2; i++) {
+    r = await call('/pub/' + slug + '/rounds?n=7');
+    entries = r.body.rounds.length ? r.body.rounds[0].entries.filter((e) => e.id === qbjId || e.id === combId) : [];
+    if (entries.length < 2) await new Promise((res) => setTimeout(res, 250));
+  }
+  ok('both public copies say round 7', entries.length === 2 && entries.every((e) => e.round === 7 && e.qbj._round === 7), entries);
+  ok('the stats count both in round 7', entries.length === 2
+    && entries.every((e) => parseMatch(e.qbj, { filename: e.filename }).round === 7));
+  r = await call('/pub/' + slug + '/qbj/' + qbjId);
+  ok('the public QBJ route says round 7', r.status === 200 && r.body._round === 7, r.body);
+  // a reader's own upload already says its round
+  const q3 = { ...q, _round: 3 };
+  const readerText = JSON.stringify({ qbj: q3, game: { cycles: [] }, modaq: { qbj: JSON.stringify(q3, null, 2), game: '{}' } });
+  r = await call(`/b/${secret}/upload?round=3&name=Round_3_Alpha_Beta.qbtd.json`, { method: 'POST', body: readerText });
+  const readerId = r.body.id;
+  const rrow = await rowOf(readerId);
+  ok('a reader upload under its own round is stored as it came',
+    (await raw(rrow.r2_key)) === readerText && rrow.size === readerText.length, rrow);
+  // a game added before uploads were stamped: moving it to the round it
+  // is already filed under stamps it where it is
+  r2put(row.r2_key, JSON.stringify(q, null, 2));
+  r2put(`t/${tid}/pub/${qbjId}.json`, JSON.stringify({ id: qbjId, round: 7, room: 'Room 1', filename: 'Round_2_Alpha_Beta.qbj', qbj: q }));
+  r = await call(`${A}/files/${qbjId}`, { method: 'POST', json: { round: 7 } });
+  ok('moving an unstamped game to its own round goes through', r.status === 200 && r.body.round === 7, r.body);
+  ok('and stamps its stored file', (await raw(row.r2_key)) === as7);
+  r = await call('/pub/' + slug + '/qbj/' + qbjId);
+  ok('and its public copy', r.status === 200 && r.body._round === 7, r.body);
+  for (const id of [qbjId, combId, readerId]) await call(`${A}/files/${id}`, { method: 'DELETE' });
   await tick();
 }
 

@@ -14,7 +14,7 @@
 // the roster's map, both come back under the current names, as the stats
 // count the game. Nothing to rename leaves MODAQ's text as it was.
 
-import { renameMatch } from './qbj.js';
+import { renameMatch, withRound } from './qbj.js';
 
 // The order MODAQ's toQBJ writes a match's keys in
 const QBJ_KEYS = ['tossups_read', 'match_teams', 'match_questions', 'notes', '_round', 'packets'];
@@ -25,14 +25,14 @@ export function modaqFilenames(round, teamNames) {
   return { qbj: base + '.qbj', game: base + '_Game.json' };
 }
 
-/** A MODAQ QBJ text with its _round set to `round`: unchanged when it
-    already is, else the same text with only that value moved. */
+/** A MODAQ QBJ text with its _round set to `round` (qbj.js withRound):
+    unchanged when it already is, else the same text with only that value
+    moved, indented as MODAQ writes it. */
 export function qbjTextWithRound(text, round) {
   let obj;
   try { obj = JSON.parse(text); } catch (e) { return text; }
-  if (!obj || typeof obj !== 'object' || obj._round === round) return text;
-  obj._round = round;
-  return JSON.stringify(obj, null, 2);
+  const out = withRound(obj, round);
+  return !out || out === obj ? text : JSON.stringify(out, null, 2);
 }
 
 /** MODAQ's game file (parsed) under a roster's renames: its players

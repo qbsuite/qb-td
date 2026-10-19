@@ -2,6 +2,8 @@
 // page). No DOM, no network, no MODAQ imports: everything here runs under
 // tests/run_tests.js. read_main.js wires these to the page and to MODAQ.
 
+import { withRound } from '../engine/qbj.js';
+
 /** Validate a parsed packet JSON into MODAQ's IPacket shape
     ({tossups: [{question, answer}], bonuses?}). Throws a user-facing
     Error on a packet MODAQ would reject for its tossups. Bonuses are not
@@ -597,12 +599,6 @@ export function tbPanelRows(pool) {
     ...pool.tossups.map((q) => ({ id: q.id, kind: 'Tossup', heard: usesFor(q.id) })),
     ...pool.bonuses.map((b) => ({ id: b.id, kind: 'Bonus', heard: usesFor(b.id) })),
   ];
-}
-
-/** Stamp the round onto a qbj match (MODAQ's customExport omits _round;
-    YellowFruit and the stats engine both key on it). */
-export function withRound(match, round) {
-  return { ...match, _round: round };
 }
 
 /* ---------- game format ----------

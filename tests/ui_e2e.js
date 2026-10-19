@@ -1068,10 +1068,18 @@ await waitJs(`!document.querySelector('#addpanel').hidden`, 'the Add a game pane
 {
   const f = r2[5];
   await fill('#addroom', String(b5.id), ['change']);
-  await fill('#addround', '2', ['input']);
+  await fill('#addround', '3', ['input']);
   await setFiles('#addfile', [writeFx(f.base + '_Game.json', '{"cycles":[]}'), writeFx(f.base + '.qbj', JSON.stringify(f.qbj))]);
   await waitJs(`document.querySelectorAll('#addlist .addfile').length === 2`, 'the picked files listed');
   ok('14 add a game: both files are labelled', (await text('#addlist')).includes('Match file') && (await text('#addlist')).includes('MODAQ game file'));
+  await waitJs(`document.querySelector('#addround').value === '2'`, 'Round filled in from the file');
+  ok('14 add a game: Round fills in with the round the match file says', !(await exists('#addwarn')));
+  await fill('#addround', '3', ['input']);
+  await waitJs(`!!document.querySelector('#addwarn')`, 'the round warning');
+  ok('14 add a game: another round picked is pointed out',
+    (await text('#addwarn')).replace(/\s+/g, ' ').trim() === 'The match file says round 2. It will be counted as round 3.', await text('#addwarn'));
+  await fill('#addround', '2', ['input']);
+  await waitJs(`!document.querySelector('#addwarn')`, 'the warning gone');
   await click('#addgame');
   d = await until(async () => { const x = await detail(); return x.files.filter((y) => y.bucket_id === b5.id && y.round === 2).length === 2 && x; }, 'both added');
   const kinds = d.files.filter((y) => y.bucket_id === b5.id && y.round === 2).map((y) => y.kind).sort().join(',');
