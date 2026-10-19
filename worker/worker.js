@@ -12,8 +12,10 @@
 //             the credential. Grants upload + packet download for that
 //             one room only, once the tournament has started.
 //   /pub/*  — the public stats API. No auth, but only serves tournaments
-//             the TO has published, and only match qbj + roster blobs —
-//             never packets, never admin metadata, never secrets.
+//             the TO has published: match qbj + roster blobs, never admin
+//             metadata, never secrets. Packet text only through the
+//             buzzpoints routes the TO switches on: qpacket for rounds
+//             all rooms have finished, qtiebreakers once links close.
 // Question sets add three more on the same idiom (see "question sets"):
 //   /s/*      — a set editor's API; the set link lives a year (SET_TTL).
 //   /i/*      — a mirror invite: the editor mints one per mirror, and the
@@ -23,8 +25,10 @@
 //
 // Storage: metadata in D1 (schema.sql), blobs in R2 under t/<tid>/...
 // (a set's under s/<sid>/...).
-// All blob reads stream through the Worker so the publish gate is enforced
-// in one place. Question-text blobs are encrypted at rest under a
+// R2 is read only through the Worker, so the publish gate is enforced in
+// one place; the public copies on GitHub and qb-td-live are files the
+// cron publishes from it ("public snapshots on GitHub", "public state on
+// qb-td-live"). Question-text blobs are encrypted at rest under a
 // per-tournament key that only the link secrets can unwrap, and the
 // secrets themselves are stored hashed — see "question text encryption".
 

@@ -535,8 +535,9 @@ dashboard shows which invites are still unused, and revokes them.
   the upload carries and builds the hub's Protests drawer from it).
 - `worker/` — Cloudflare Worker (D1 metadata + R2 blobs). Auth model:
   admin link secret for the TO API (a week of setup, 48h from Start), bucket secret for
-  moderator routes, publish flag gating all public reads. No secrets to
-  provision.
+  moderator routes, publish flag gating all public reads. No auth secrets
+  to provision; the one secret a deploy must set is `OPEN_KEY_SECRET`
+  (see "Buzzpoints password").
 - `tests/` — `run_tests.js` (engine unit tests), `e2e_worker.js` (full
   TO -> moderator -> public flow against `wrangler dev`), `e2e_sets.js`
   (editor -> invite -> mirror -> set-wide reads, same dev Worker;
@@ -546,7 +547,8 @@ dashboard shows which invites are still unused, and revokes them.
   `e2e_alerts.js` (the Discord new-activity alerts against a webhook
   sink the suite runs itself), `e2e_directory.js` (the home page's list
   of running tournaments: who is listed, linked or not, the hourly sweep),
-  `snapshot_publish.js` (the cron tick, mocked).
+  `snapshot_publish.js` (the cron tick, mocked), `live_publish.js` (the
+  qb-td-live publisher, on `node:sqlite`).
 - `tools/archive.mjs` — the archive's approval CLI (see below). The only
   code here that reads the live backend outside a browser.
 - `tools/yf_parity.mjs` + `tools/yf_parity/` — `npm run yf-parity`: the
@@ -575,6 +577,54 @@ dashboard shows which invites are still unused, and revokes them.
   leaves it out of the bundle) — the fixture never rides along with
   MODAQ.
 
+## Renames: teams, players and rooms
+
+qb-td knows a team by its exact name, and a player by team and name: in
+the uploaded games, the schedule, the protest rulings, and the files that
+leave qb-td, which have to match what MODAQ and YellowFruit write. A
+rename therefore never rewrites a game already played. How it works today:
+
+- **Teams and players** are renamed in the roster (Setup > Roster, or an
+  uploaded roster). The saved roster keeps each earlier name as
+  `_formerNames` on the team or player (`qbj.js` `buildRosterQbj`,
+  `carryFormerNames`). `rosterNameMap` turns the roster into an
+  old-to-new map, and `renameMatch` applies it when a game is read: the
+  hub's stats and exports (`admin.js`), the public page (`pubview.js`),
+  the set page (`setstats.js` `siteNames`, from the map the Worker
+  writes into the set state), `tools/archive.mjs`, and the Worker's game
+  downloads and public QBJ route (`modaqfile.js` `renameModaqTexts`).
+  The hub's game lists and protests map the upload summaries the same
+  way (`admin.js` `fileSummary`, `protests.js` `renamedSummary`). The
+  schedule is the one copy rewritten: after a roster save,
+  `followRenames` (`admin.js`) runs `renameTeams` (`schedule.js`) on the
+  saved schedule. Rosters that leave qb-td drop `_formerNames`
+  (`rosterForExport`). An uploaded roster carries no list of renames, so
+  `rosterRenames` guesses team renames from shared players, then from
+  seed order; player renames come only from the editor.
+- **Rooms** are renamed in Setup > Rooms. The Worker writes the new name
+  into the saved schedule's rooms linked to that room by `bucket` id
+  (`worker.js` `renameBucket`). The public page shows each game's current
+  room from the state's file list.
+
+Known limits:
+
+- Nothing applies the map at one boundary, so code that reads games,
+  upload summaries or the tiebreaker log has to apply it itself. Some
+  readers still do not: the playoff and Finals auto-fill progress
+  (`schedule.js` `prelimProgress`, `finals.js` `finalsProgress`) and the
+  tiebreaker "heard by" log.
+- A schedule room matched to its room only by name (no `bucket` link)
+  does not follow a room rename, and loses its match.
+- Room names in the public game copies and round shards stay as they
+  were until "Rebuild public stats", and the set page's buzzpoints show
+  those.
+- Former names stay public: the public roster route and the GitHub
+  snapshot serve `_formerNames`, because the public page needs them to
+  rename games.
+- Without a GitHub snapshot (self-hosted or dev), a viewer's Refresh after
+  a rename brings the renamed schedule but not the renamed games, until
+  the page reloads or a round's games move.
+
 ## Tests
 
 ```bash
@@ -585,28 +635,31 @@ node tests/live_publish.js       # qb-td-live publisher: deploys, retries, heart
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
-# an existing local DB from before at-rest encryption needs, once:
-#   npx wrangler d1 execute qb-td --local --file migrate-crypt.sql
-# ...and one from before protests reached the hub:
-#   npx wrangler d1 execute qb-td --local --file migrate-protests.sql
-# ...and one from before question sets (re-run schema.sql first: it
-# creates the three set tables):
-#   npx wrangler d1 execute qb-td --local --file migrate-sets.sql
-# ...and one from before Start tournament:
-#   npx wrangler d1 execute qb-td --local --file migrate-start.sql
-# ...and one from before auto-advance:
-#   npx wrangler d1 execute qb-td --local --file migrate-starts.sql
-# ...and one from before the Live Hub rev (once; the ALTER isn't re-runnable):
-#   npx wrangler d1 execute qb-td --local --file migrate-rev.sql
-# ...and one from before per-bracket rounds (once; the ALTER isn't re-runnable):
-#   npx wrangler d1 execute qb-td --local --file migrate-brackets.sql
-# ...and one from before the hub's public page mark (once, same reason):
-#   npx wrangler d1 execute qb-td --local --file migrate-pubbuilt.sql
-# ...and one from before the alerts' wrap-up:
-#   npx wrangler d1 execute qb-td --local --file migrate-alertmsg.sql
-# ...and one from before the directory (then schema.sql again, for its
-# two indexes):
-#   npx wrangler d1 execute qb-td --local --file migrate-directory.sql
+# A local DB is disposable: deleting worker/.wrangler/state and running
+# schema.sql gives a fresh one. To keep an existing one instead, run each
+# migration below whose column or table it lacks (each file's header says
+# what it adds), once, in this order, then schema.sql again: it is
+# re-runnable and adds the tables, indexes and triggers the migrations
+# leave to it. migrate-rev.sql goes last, after that schema.sql, because
+# its triggers name the set tables, which only schema.sql creates. On such
+# a DB the first schema.sql above may fail; a file runs as one batch, so a
+# failed one changes nothing.
+#   npx wrangler d1 execute qb-td --local --file migrate-announce.sql      # broadcasts (retired; the column stays)
+#   npx wrangler d1 execute qb-td --local --file migrate-pub.sql           # the cron's rebuild queue
+#   npx wrangler d1 execute qb-td --local --file migrate-crypt.sql         # at-rest encryption
+#   npx wrangler d1 execute qb-td --local --file migrate-protests.sql      # protests in the hub
+#   npx wrangler d1 execute qb-td --local --file migrate-sets.sql          # question sets
+#   npx wrangler d1 execute qb-td --local --file migrate-start.sql         # Start tournament
+#   npx wrangler d1 execute qb-td --local --file migrate-starts.sql        # auto-advance
+#   npx wrangler d1 execute qb-td --local --file migrate-brackets.sql      # per-bracket rounds
+#   npx wrangler d1 execute qb-td --local --file migrate-pubbuilt.sql      # the hub's public page mark
+#   npx wrangler d1 execute qb-td --local --file migrate-live.sql          # qb-td-live
+#   npx wrangler d1 execute qb-td --local --file migrate-dirtyat.sql       # the fair rebuild queue
+#   npx wrangler d1 execute qb-td --local --file migrate-liveprotests.sql  # protests before upload
+#   npx wrangler d1 execute qb-td --local --file migrate-alertmsg.sql      # the alerts' wrap-up
+#   npx wrangler d1 execute qb-td --local --file migrate-directory.sql     # the directory
+#   npx wrangler d1 execute qb-td --local --file schema.sql
+#   npx wrangler d1 execute qb-td --local --file migrate-rev.sql           # the Live Hub rev
 # --test-scheduled is required: the cron builds the round shards the
 # public routes serve, and the tests trigger it via /__scheduled.
 # e2e_alerts.js additionally needs the dev Worker pointed at the sink it
@@ -719,6 +772,10 @@ first.
    and one from before protests showed before upload needs
    `npx wrangler d1 execute qb-td --remote --file migrate-liveprotests.sql`
    BEFORE the Worker (the admin route reads `live_protests`),
+   and one from before the alerts' wrap-up needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-alertmsg.sql`
+   BEFORE a Worker with `DISCORD_WEBHOOK` set (the hourly wrap-up reads
+   `wrapped`; see "New-activity alerts"),
    and one from before the directory needs
    `npx wrangler d1 execute qb-td --remote --file migrate-directory.sql`
    BEFORE the Worker (the tick reads and writes `tournaments.dir_entry`),
@@ -740,13 +797,18 @@ first.
    points at this Worker's own name (`qb-td`); a self-host under another
    name changes `service` to match, or the deploy fails
    (without the binding at all, the cron rebuilds inline)
-6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
+6. `openssl rand -base64 32 | npx wrangler secret put OPEN_KEY_SECRET`,
+   before the hub is in use. It locks the copy of a tournament's content
+   key that the Worker keeps when a TD disables the stats password (see
+   "Buzzpoints password"). Without it the Worker falls back to a constant
+   that is in this repo, which is only fit for local development.
+7. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
    editing the default in `app/js/api.js`. Pages served from
    `qbsuite.github.io` ignore `?server=` and `?live=` (and localStorage
    `qbtdServer` / `qbtdLive`), so a shared link cannot point them at
    another backend; any other origin honors them.
-7. Optional: serve the public state from a files-only Worker — see
+8. Optional: serve the public state from a files-only Worker — see
    "Public state on qb-td-live" below. Without it, leave `LIVE_SCRIPT`
    empty; nothing else changes.
 
@@ -1319,6 +1381,28 @@ at request time, then discards it — it is stored on neither side. A
 password set by a client that skipped the token (or a wrap that
 predates the current password) leaves the route answering 409 "packets
 locked"; setting the password again repairs it.
+
+**Disabling the password** (`settings.statsOpen`, meant for a question set
+that is already clear) opens buzzpoints and scoresheets to anyone with the
+public link, so the Worker has to open finished rounds' packets with no
+key from the viewer. The TD's own request, which holds the content key,
+leaves the Worker a copy of it in R2 (`t/<id>/open-key.json`), wrapped
+under the `OPEN_KEY_SECRET` Worker secret, and the copy is deleted when the
+TD enables a password again. The secret is what keeps that copy from
+opening anything on its own: R2 read access alone still yields no question
+text, though whoever holds both the secret and R2 can open those packets.
+Production must set it, to a long random value:
+
+```bash
+cd worker
+openssl rand -base64 32 | npx wrangler secret put OPEN_KEY_SECRET
+```
+
+Without it, `openSecret` in `worker.js` falls back to a constant that is
+in this public repo; the fallback is there so a local dev Worker works
+without secrets. Changing the secret later leaves existing copies
+unreadable: those tournaments' buzzpoints questions answer 409 until their
+TD disables the password again.
 
 Tournaments whose password predates the KDF carry `{mode, salt, hash}`
 with no `kdf`, verified the old way (`sha256("salt:password")`, password

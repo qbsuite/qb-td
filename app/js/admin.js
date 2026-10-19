@@ -2618,11 +2618,11 @@ function wireStatRange(t, files) {
    correction and the first upload is live again.
 
    It goes back through the room that played it, never some other room.
-   files.pv stamps the set packet version from the uploading room's
-   room_packets row, and doneRounds counts distinct rooms per round
-   against the room count — a correction from a stand-in room would
-   mis-stamp a set mirror's buzzpoints and skew which rounds read as
-   finished. */
+   worker.js doneRounds counts distinct rooms per round against the
+   games expected, so a correction from a stand-in room would count that
+   room as having played the round and skew which rounds read as
+   finished. (Nothing on the file records a packet version: a set
+   mirror's game takes the version its round points at.) */
 
 // Rooms take games only once the tournament has started (worker.js
 // bucketGate), and close with it, so a correction needs a started one.

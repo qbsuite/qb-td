@@ -2,7 +2,9 @@
 -- Apply with: npx wrangler d1 execute qb-td --remote --file schema.sql
 
 -- No accounts: the unguessable admin_secret in the TO's link is the only
--- credential, and it stops working 48h after creation (worker.js ADMIN_TTL).
+-- credential. It works for a week of setup from creation, and stops
+-- working 48h after the TD presses Start (worker.js SETUP_TTL, RUN_TTL,
+-- closesAt).
 --
 -- Question-text encryption (worker.js "question text encryption"): rows
 -- with admin_wrap set store SHA-256 of the admin secret in admin_secret

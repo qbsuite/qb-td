@@ -3,7 +3,7 @@
 // structure. Run: node tests/run_tests.js
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
   rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound } from '../app/engine/qbj.js';
@@ -2962,6 +2962,25 @@ test('archive report pages are rebuilt from their captures', () => {
       const committed = readFileSync(new URL(slug + '/' + p.name, ARCHIVE_DIR), 'utf8');
       assert.ok(committed === p.text, `app/archive/${slug}/${p.name} is out of date: run node tools/archive.mjs rebuild`);
     }
+  }
+});
+
+/* ---------- migrations ---------- */
+
+// A migration left out of either README list leaves that database short
+// of a column, with nothing to say so until a route fails.
+test('README names each migration for local and remote databases', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const section = (h) => {
+    const at = readme.indexOf('\n## ' + h + '\n');
+    assert.ok(at >= 0, 'README has a ' + h + ' section');
+    return readme.slice(at, readme.indexOf('\n## ', at + 1));
+  };
+  const files = readdirSync(new URL('../worker/', import.meta.url)).filter((f) => /^migrate-.+\.sql$/.test(f));
+  assert.ok(files.length > 0);
+  for (const f of files) {
+    assert.ok(section('Tests').includes('--local --file ' + f), 'README Tests leaves out ' + f);
+    assert.ok(section('Deploy (self-hosting)').includes('--remote --file ' + f), 'README Deploy leaves out ' + f);
   }
 });
 

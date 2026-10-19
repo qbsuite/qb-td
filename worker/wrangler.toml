@@ -90,9 +90,17 @@ LIVE_ACCOUNT_ID = "905b6a6cd745425d70d3c4d9612ba2d8"
 # `npx wrangler secret put DISCORD_WEBHOOK`. Apply migrate-alertmsg.sql
 # first.
 
-# The only secrets are the snapshot publisher's GitHub credential,
-# LIVE_TOKEN (above), DISCORD_WEBHOOK and CF_API_TOKEN;
-# all request access is via unguessable link secrets (see worker.js).
+# Buzzpoints and scoresheets with the password disabled (worker.js
+# OPEN_STATS): the copy of a tournament's content key the Worker keeps for
+# them is wrapped under the OPEN_KEY_SECRET secret. Production must set it:
+# `openssl rand -base64 32 | npx wrangler secret put OPEN_KEY_SECRET`.
+# Without it the Worker falls back to a constant in the public source, which
+# is only fit for local development. ../README.md ("Buzzpoints password").
+
+# The only secrets this Worker reads are the snapshot publisher's GitHub
+# credential, LIVE_TOKEN (above), DISCORD_WEBHOOK, CF_API_TOKEN and
+# OPEN_KEY_SECRET; all request access is via unguessable link secrets
+# (see worker.js).
 
 # Workers Logs, for counting how often the public page falls back to the Worker
 # (pubState logs "live fallback <slug> <reason>"). Per-request invocation
