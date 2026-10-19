@@ -148,14 +148,15 @@ export function buzzTrackHtml(buzzes, words, dead = !buzzes.some((b) => b.value 
     `label` replaces the "T4" in front (buzzpoints by category: "R3 T4").
     Without `heard` (one tournament's rounds) the buzzes show as a track;
     with it (a set's editors, over every room) as rates. `dead` as
-    buzzTrackHtml takes it. */
+    buzzTrackHtml takes it. A tiebreaker's id (`tb`) is whatever the
+    uploaded game says, so the label is escaped. */
 export function tossupHtml(tossup, buzzes, packet, heard, label, tb, dead) {
   const tu = !tb && packet && packet.tossups && packet.tossups[tossup - 1];
   const meta = heard ? tossupMetaHtml(buzzes, heard)
     : buzzTrackHtml(buzzes, tu ? questionWords(tu.question, wordFormat).end + 1 : 0, dead);
   return `
     <details class="qd">
-      <summary><span class="roundcell">${label || tb || 'T' + tossup}</span>
+      <summary><span class="roundcell">${esc(label || tb || 'T' + tossup)}</span>
         ${tu ? mainAnswerHtml(tu.answer) : `<span class="muted">${tb ? 'Tiebreaker' : '(No packet text)'}</span>`}
         <span class="qdmeta${heard ? '' : ' track'}">${meta}</span></summary>
       <div class="qdbody">
@@ -233,7 +234,7 @@ export function bonusHtml(bonus, results, packet, { label, nest = true, tb = '' 
   const bz = !tb && packet && Array.isArray(packet.bonuses) && packet.bonuses[bonus - 1];
   return `
     <details class="qd${nest ? ' bonus' : ''}">
-      <summary><span class="roundcell">${label || tb || 'B' + bonus}</span>
+      <summary><span class="roundcell">${esc(label || tb || 'B' + bonus)}</span>
         ${bonusAnswersHtml(bz, tb)}
         <span class="qdmeta">${bonusMetaHtml(results)}</span></summary>
       <div class="qdbody">${bonusBodyHtml(bz, results)}</div>

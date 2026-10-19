@@ -1991,6 +1991,27 @@ test('categoryQuestions: one category across rounds, oldest first, with its cate
 globalThis.location = globalThis.location || { search: '' };
 globalThis.localStorage = globalThis.localStorage || {};
 
+/* ---------- buzzpoints markup ---------- */
+
+const { replacementsHtml } = await import('../app/js/buzzview.js');
+
+// A tiebreaker's id rides in the uploaded game (qbtd_tiebreaker), so the
+// Replacements view must show it as text, with or without the pool's text.
+test('buzzpoints: a tiebreaker id from an uploaded game is shown as text', () => {
+  const id = '<img src=x onerror=alert(1)>';
+  const qbj = { match_teams: [{ team: { name: 'A' } }, { team: { name: 'B' } }], match_questions: [
+    { question_number: 1, tossup_question: { question_number: 1, qbtd_tiebreaker: id },
+      buzzes: [{ team: { name: 'A' }, player: { name: 'p' }, buzz_position: { word_index: 3 }, result: { value: 10 } }],
+      bonus: { question: { question_number: 1, qbtd_tiebreaker: id + 'B' }, parts: [{ controlled_points: 10 }] } }] };
+  const read = tiebreakerBuzzes([{ id: 1, round: 3, room: 'R1', qbj }]);
+  const pool = { tossups: [{ id, question: 'Q', answer: 'A' }], bonuses: [{ id: id + 'B', leadin: 'L', parts: ['p'], answers: ['a'] }] };
+  for (const html of [replacementsHtml(read, null), replacementsHtml(read, pool)]) {
+    assert.ok(!html.includes('<img'), html);
+    assert.ok(html.includes('<span class="roundcell">&lt;img src=x onerror=alert(1)&gt;</span>'));
+    assert.ok(html.includes('<span class="roundcell">&lt;img src=x onerror=alert(1)&gt;B</span>'));
+  }
+});
+
 /* ---------- Worker category extraction ---------- */
 
 const { categoryFromMetadata, packetCategories, tagWithoutWriter } = await import('../worker/worker.js');
