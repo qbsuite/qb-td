@@ -1357,7 +1357,7 @@ function renderUpPreview(a) {
       <div class="muted" style="font-size:13px;margin-top:4px">${
         u.teams.slice(0, 4).map((tm) => esc(tm.name)).join(' &middot; ')}${
         u.teams.length > 4 ? ' &hellip;' : ''}</div>
-      ${renamed.length ? `<div style="font-size:13px;margin-top:6px">Renamed teams, matched by their players or seed.
+      ${renamed.length ? `<div style="font-size:13px;margin-top:6px">Renamed teams, matched by their players.
         The schedule will use the new names: ${renamed.map(([x, y]) => `${esc(x)} &rarr; <b>${esc(y)}</b>`).join(' &middot; ')}</div>` : ''}
     </div>`;
   $('upconfirm').onclick = async () => {

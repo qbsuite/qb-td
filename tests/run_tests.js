@@ -4324,7 +4324,7 @@ test('renameTeams: a renamed team keeps its games, byes and pool', () => {
   assert.equal(renameTeams(sc, {}), 0);
 });
 
-test('rosterRenames: renamed teams found by their players, then by seed', () => {
+test('rosterRenames: renamed teams found by their players, never by seed alone', () => {
   const T = (name, ...players) => ({ name, players });
   const old = [T('A', 'a1', 'a2', 'a3', 'a4'), T('B', 'b1', 'b2', 'b3', 'b4'), T('C', 'c1', 'c2', 'c3')];
   assert.deepEqual(rosterRenames(old, [T('A', 'a1'), T('Bee', 'b1', 'b2', 'b3', 'b4'), T('C', 'c1')]), { B: 'Bee' });
@@ -4332,14 +4332,23 @@ test('rosterRenames: renamed teams found by their players, then by seed', () => 
   assert.deepEqual(rosterRenames(old, [T('Bee', 'b1', 'b2', 'b3', 'b9'), T('A', 'a1'), T('C', 'c1')]), { B: 'Bee' });
   // two renamed and swapped seeds: players decide, not position
   assert.deepEqual(rosterRenames(old, [T('Cee', 'c1', 'C2', ' c3 '), T('Bee', 'b1', 'b2'), T('A')]), { B: 'Bee', C: 'Cee' });
-  // no players in common: the same seed is the same team
-  assert.deepEqual(rosterRenames(old, [T('A'), T('Bee', 'x'), T('C')]), { B: 'Bee' });
+  // half the smaller team is enough; fewer is a different team
+  assert.deepEqual(rosterRenames(old, [old[0], T('Bee', 'b1', 'b2', 'x1', 'x2'), old[2]]), { B: 'Bee' });
+  assert.deepEqual(rosterRenames(old, [old[0], T('Bee', 'b1', 'x1', 'x2', 'x3'), old[2]]), {});
+  // no players in common: a new team, even in the same seed
+  assert.deepEqual(rosterRenames(old, [T('A'), T('Bee', 'x'), T('C')]), {});
   // reordered, dropped, or added: nothing renamed
   assert.deepEqual(rosterRenames(old, [old[2], old[0], old[1]]), {});
   assert.deepEqual(rosterRenames(old, [old[0], old[1]]), {});
   assert.deepEqual(rosterRenames(old, [...old, T('D', 'd1')]), {});
-  // a replacement team in a dropped team's seed takes its place
-  assert.deepEqual(rosterRenames(old, [old[0], T('New', 'n1', 'n2'), old[2]]), { B: 'New' });
+  // a replacement team in a withdrawn team's row is a new team: the
+  // withdrawn team's games stay its own, nothing records its name
+  const swapIn = [old[0], T('New', 'n1', 'n2'), old[2]];
+  assert.deepEqual(rosterRenames(old, swapIn), {});
+  const saved = parseRoster(buildRosterQbj('T', carryFormerNames(old, swapIn, rosterRenames(old, swapIn))));
+  assert.equal(rosterNameMap(saved), null);
+  // the withdrawn team's last row taken by a team appended after it: the same
+  assert.deepEqual(rosterRenames(old, [old[0], old[1], T('New', 'n1', 'n2')]), {});
 });
 
 /* ---------- roster renames: games played under an earlier name ---------- */

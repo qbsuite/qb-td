@@ -1277,23 +1277,25 @@ export function tradePools(schedule, x, y) {
  * Renames implied by replacing one roster with another when nothing says
  * which team became which (an uploaded file). Teams are [{name, players}].
  * Only a team whose name left the roster can have been renamed, and only
- * to a name that wasn't on it. Such teams pair up by their players first
- * (a renamed team keeps most of them, so a rename survives a reseed and a
+ * to a name that wasn't on it. Such teams pair up by their players (a
+ * renamed team keeps most of them, so a rename survives a reseed and a
  * player or two changing), most shared first, needing at least half of
- * the smaller team; any left over pair by seed. Returns {old: new}.
+ * the smaller team. Position alone pairs nothing: a new team in a dropped
+ * team's row is a new team, and the dropped team's games stay its own.
+ * Returns {old: new}.
  */
 export function rosterRenames(oldTeams, newTeams) {
   const norm = (x) => String(x || '').trim().toLowerCase();
   const before = new Set(oldTeams.map((t) => t.name));
   const after = new Set(newTeams.map((t) => t.name));
   const gone = oldTeams.map((t, i) => ({ t, i })).filter((x) => !after.has(x.t.name));
-  const fresh = newTeams.map((t, i) => ({ t, i })).filter((x) => !before.has(x.t.name));
+  const fresh = newTeams.filter((t) => !before.has(t.name));
   const players = (t) => new Set((t.players || []).map(norm).filter(Boolean));
   const pairs = [];
   for (const o of gone) {
     const op = players(o.t);
     for (const n of fresh) {
-      const np = players(n.t);
+      const np = players(n);
       const shared = [...op].filter((x) => np.has(x)).length;
       if (shared && shared * 2 >= Math.min(op.size, np.size)) pairs.push({ o, n, shared });
     }
@@ -1302,16 +1304,9 @@ export function rosterRenames(oldTeams, newTeams) {
   const out = {};
   const usedNew = new Set();
   for (const { o, n } of pairs) {
-    if (o.t.name in out || usedNew.has(n.t.name)) continue;
-    out[o.t.name] = n.t.name;
-    usedNew.add(n.t.name);
-  }
-  for (const o of gone) {
-    if (o.t.name in out) continue;
-    const n = fresh.find((x) => x.i === o.i && !usedNew.has(x.t.name));
-    if (!n) continue;
-    out[o.t.name] = n.t.name;
-    usedNew.add(n.t.name);
+    if (o.t.name in out || usedNew.has(n.name)) continue;
+    out[o.t.name] = n.name;
+    usedNew.add(n.name);
   }
   return out;
 }
