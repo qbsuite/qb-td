@@ -649,8 +649,10 @@ ok('published set page survives the link', r.status === 200 && r.body.mirrors.le
     const fix = await counted(() => call(`${F}/packet?packet=1&name=Many1-fix.json`, { method: 'POST', body: packet('MANY-R1-FIX', 'History') }));
     ok(`${n} mirrors: a fix reaches each one`, fix.out.status === 200 && fix.out.body.mirrors === n
       && onVersion(1, 1, fixV) === n, fix.out.body);
-    ok(`${n} mirrors: each one is flagged for the tick`,
-      d1row(`SELECT COUNT(*) AS n FROM tournaments WHERE set_id = ${fsid} AND pub_dirty = 1`).n === n);
+    // ...each waiting from its own moment, so the tick takes them in the
+    // fan-out's order, as when each mirror was flagged on its own
+    const flagged = d1row(`SELECT COUNT(*) AS n, COUNT(DISTINCT pub_dirty_at) AS at FROM tournaments WHERE set_id = ${fsid} AND pub_dirty = 1`);
+    ok(`${n} mirrors: each one is flagged for the tick, in order`, flagged.n === n && flagged.at === n, flagged);
     const add = await counted(() => call(`${F}/packet?packet=${newPacket}&name=Many${newPacket}.json`, { method: 'POST', body: packet('MANY-NEW', 'Trash') }));
     ok(`${n} mirrors: a new packet reaches each one`, add.out.status === 200 && add.out.body.mirrors === n
       && onVersion(newPacket, newPacket, 1) === n, add.out.body);

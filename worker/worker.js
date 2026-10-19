@@ -769,11 +769,14 @@ async function markPub(env, tid) {
     .bind(tid, Date.now()).run();
 }
 // markPub for many tournaments in one statement (a set's fan-out to its
-// mirrors), so the query count doesn't grow with them.
+// mirrors), so the query count doesn't grow with them. Each one's wait
+// starts a millisecond after the one before it in `tids`, so the tick
+// takes them in that order, as it would after one markPub per mirror.
 async function markPubs(env, tids) {
   if (!tids.length) return;
   await env.DB.prepare(
-    'UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id IN (SELECT value FROM json_each(?1))'
+    'UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2 + j.key) ' +
+    'FROM json_each(?1) AS j WHERE tournaments.id = j.value'
   ).bind(JSON.stringify([...new Set(tids)]), Date.now()).run();
 }
 
@@ -4942,12 +4945,11 @@ async function uploadSetPacket(request, url, env, s) {
 
   const open = await mirrorsOpenFor(env, s.id, packet, offer);
   // (an upsert's SELECT needs a WHERE, or SQLite reads ON as a join's)
-  await fanOut(env, open, env.DB.prepare(
+  await fanOut(env, s.id, open, env.DB.prepare(
     'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) ' +
     "SELECT j.value ->> 'tid', j.value ->> 'round', ?2, ?3 FROM json_each(?1) AS j WHERE true " +
     'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?2, packet_name = ?3 WHERE served = 0'
   ).bind(JSON.stringify(open), key, name), cats);
-  await markSet(env, s.id);
   return json(env, { packet, version, filename: name, mirrors: new Set(open.map((o) => o.tid)).size });
 }
 
@@ -4957,12 +4959,21 @@ async function uploadSetPacket(request, url, env, s) {
 // open. Each round's category map is still its own R2 write, in the same
 // order, and the mirrors are flagged after those, as markPub after
 // updateCatmap did: a tick in between must not build a mirror's public
-// state from its old map and clear the flag.
-async function fanOut(env, open, write, cats) {
-  if (!open.length) return;
-  await write.run();
-  for (const { tid, round } of open) await updateCatmap(env, tid, round, cats, false);
-  await markPubs(env, open.map((o) => o.tid));
+// state from its old map and clear the flag. The flags land even when a
+// map write throws, since the rounds are already re-pointed, and the set
+// is flagged either way, since its packet list changed.
+export async function fanOut(env, sid, open, write, cats) {
+  try {
+    if (!open.length) return;
+    await write.run();
+    try {
+      for (const { tid, round } of open) await updateCatmap(env, tid, round, cats, false);
+    } finally {
+      await markPubs(env, open.map((o) => o.tid));
+    }
+  } finally {
+    await markSet(env, sid);
+  }
 }
 
 // DELETE /s/:secret/packet?packet=N — take a packet out of the set (one
@@ -4976,12 +4987,11 @@ async function retireSetPacket(url, env, s) {
   await env.DB.prepare(
     'UPDATE set_packets SET retired = 1 WHERE set_id = ?1 AND packet = ?2'
   ).bind(s.id, packet).run();
-  await fanOut(env, open, env.DB.prepare(
+  await fanOut(env, s.id, open, env.DB.prepare(
     'DELETE FROM rounds WHERE (tournament_id, number) IN ' +
     "(SELECT j.value ->> 'tid', j.value ->> 'round' FROM json_each(?1) AS j) " +
     'AND served = 0 AND packet_r2_key LIKE ?2'
   ).bind(JSON.stringify(open), `${setPacketPrefix(s.id)}${packet}/%`), null);
-  await markSet(env, s.id);
   return json(env, { ok: true, mirrors: new Set(open.map((o) => o.tid)).size });
 }
 

@@ -4,7 +4,7 @@
 // the GitHub API all mocked. No wrangler, no network:
 //   node tests/snapshot_publish.js
 
-import worker, { Rebuild } from '../worker/worker.js';
+import worker, { Rebuild, fanOut } from '../worker/worker.js';
 
 let passed = 0;
 function ok(name, cond, extra) {
@@ -1011,6 +1011,27 @@ const realFetch = globalThis.fetch;
   const twenty = await rebuildQueries(20);
   ok('set rebuild: D1 queries do not grow with the mirrors',
     two.queries === twenty.queries && twenty.reads === 40, { two, twenty });
+}
+
+// 21. A set's packet change re-points its open mirror rounds in one
+// statement, so a category map write that throws partway must still flag
+// each of those mirrors (in fan-out order, a mirror listed twice once)
+// and the set.
+{
+  const ran = [];
+  const db = { prepare: (sql) => ({ bind: (...args) => ({ run: async () => { ran.push({ sql, args }); } }) }) };
+  let gets = 0;
+  const failing = { DB: db, DATA: { get: async () => { if (++gets === 2) throw new Error('r2 unavailable'); return null; } } };
+  const open = [{ tid: 31, round: 2 }, { tid: 33, round: 2 }, { tid: 32, round: 2 }, { tid: 31, round: 4 }];
+  let threw = null;
+  try {
+    await fanOut(failing, 8, open, db.prepare('DELETE FROM rounds -- the fan-out').bind(), null);
+  } catch (e) { threw = e; }
+  const flags = ran.find((q) => /UPDATE tournaments SET pub_dirty = 1/.test(q.sql));
+  const set = ran.find((q) => /UPDATE sets SET state_dirty = 1/.test(q.sql));
+  ok('fan-out: a failed map write still flags the re-pointed mirrors and the set',
+    threw && threw.message === 'r2 unavailable' && /the fan-out/.test(ran[0].sql)
+    && flags && flags.args[0] === '[31,33,32]' && set && set.args[0] === 8, ran);
 }
 
 globalThis.fetch = realFetch;
