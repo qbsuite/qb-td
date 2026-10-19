@@ -628,10 +628,11 @@ Known limits:
 ## Tests
 
 ```bash
+npm test                         # the three below, in this order; no Worker, no network
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
-node tests/snapshot_publish.js   # cron tick: round shards + GitHub publisher (D1/R2/GitHub mocked)
 node tests/live_publish.js       # qb-td-live publisher: deploys, retries, heartbeats, unpublish, hub mark
                                  # (real SQLite from schema.sql via node:sqlite; R2 + Cloudflare API mocked)
+node tests/snapshot_publish.js   # cron tick: round shards + GitHub publisher (D1/R2/GitHub mocked)
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
@@ -721,6 +722,12 @@ node tests/stress_worker.js
 version on `npx` rather than leaving the suite on whatever the global npx
 cache last downloaded. `e2e_worker.js` backdates the tournament row at the
 end, which is also how it exercises the `final` caching path.
+
+`npm test` needs Node 22.13 or later (`live_publish.js` runs `schema.sql`
+on `node:sqlite`). GitHub Actions runs it on each push and pull request
+(`.github/workflows/test.yml`, Node 24). The workflow only tests: it
+deploys nothing and holds no secrets. The suites that need a dev Worker or
+Chrome stay manual.
 
 ## Deploy (self-hosting)
 

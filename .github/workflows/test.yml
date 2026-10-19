@@ -1,0 +1,25 @@
+# npm test on each push and pull request: the engine suite, then the two
+# publisher suites (D1 as node:sqlite, R2 and the APIs mocked). No Worker,
+# no network, no secrets, and nothing here deploys.
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # tests/live_publish.js loads worker/schema.sql into node:sqlite,
+          # which needs Node 22.13 or later
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
