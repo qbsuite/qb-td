@@ -1931,6 +1931,33 @@ async function openHubOf(adminSecret) {
     (await text('.review')).includes('This bonus has no point values, so MODAQ will not load this packet.'));
 }
 
+/* ---------- 24f. Fix buzzes on a game whose file says another round ----------
+   A game added before uploads took their filed round can say one round
+   and be filed under another. The fix goes up under the filed round, so
+   the original takes that round first: the stats keep one game, not two. */
+{
+  const orig = (await detail()).files.find((f) => f.round === 2 && f.kind === 'qbj' && !f.error && !/_Forfeit\.qbj$/.test(f.filename));
+  d1exec(`UPDATE files SET round = 3 WHERE id = ${orig.id}`);
+  const stored = async (f) => parseMatch(await (await fetch(`${BASE}${A}/file?key=${encodeURIComponent(f.r2_key)}`)).json(),
+    { filename: f.filename });
+  await openHub();
+  await click(`[data-cell="${orig.bucket_id}:3"]`);
+  await waitJs(`!!document.querySelector('[data-fixbuzz="${orig.id}"]')`, 'Fix buzzes on the game');
+  await click(`[data-fixbuzz="${orig.id}"]`);
+  await waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'the Fix buzzes panel');
+  // the name of a roster player the moderator never entered
+  await fill('[data-fswap="0:0"]', await js(`document.querySelector('[data-fswap="0:0"] optgroup option').value`), ['change']);
+  await waitJs(`!document.querySelector('#fixsave').disabled`, 'a swap to save');
+  await click('#fixsave');
+  const fix = await until(async () => (await detail()).files.find((f) => f.id > orig.id && f.bucket_id === orig.bucket_id && f.round === 3), 'the fix uploaded');
+  const both = [{ ...(await stored(orig)), fileId: orig.id }, { ...(await stored(fix)), fileId: fix.id }];
+  ok('24f fix buzzes: the original and its fix both say the round they are filed under', both.every((m) => m.round === 3), both.map((m) => m.round));
+  ok('24f fix buzzes: the stats count the game once', dedupeMatches(both).length === 1 && dedupeMatches(both)[0].fileId === fix.id);
+  // back as it was
+  await call(`${A}/files/${fix.id}`, { method: 'DELETE' });
+  await call(`${A}/files/${orig.id}`, { method: 'POST', json: { round: 2 } });
+}
+
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);

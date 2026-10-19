@@ -2845,6 +2845,13 @@ function wireFix(box, a, t, buckets, files) {
     // through the room that played it, as Edit in MODAQ's correction goes
     const run = busy($('fixsave'), { label: 'Saving' });
     try {
+      // The Worker files the fix under f.round and writes that round into
+      // it. A game added before uploads took their filed round may say
+      // another one; it takes f.round first, so the fix still replaces it
+      // in the stats rather than counting as a second game.
+      if (statedRound(x.root, f.filename) !== f.round) {
+        await pub(`${a}/files/${f.id}`, { method: 'POST', json: { round: f.round } });
+      }
       const out = await pub(`/b/${room.secret}/upload?round=${f.round}&name=${encodeURIComponent(f.filename)}`,
         { method: 'POST', body: JSON.stringify(fixed) });
       run.end();
