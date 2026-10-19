@@ -1799,6 +1799,13 @@ async function openHubOf(adminSecret) {
     && JSON.stringify(t.formerPlayers) === JSON.stringify({ [newPlayer]: [oldPlayer] }), t);
   ok('24c rename: MODAQ still reads the roster', modaqValid(saved));
   await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+  // the Download beside the roster's name: the file as it leaves qb-td
+  await waitJs(`!!document.querySelector('#rosterget')`, 'the roster Download');
+  const got = await download('#rosterget');
+  const gotText = got.bytes.toString('utf8');
+  ok('24c rename: the roster Download leaves out the former names, and MODAQ reads it',
+    !gotText.includes('_formerNames') && parseRoster(JSON.parse(gotText)).some((x) => x.name === newTeam)
+      && modaqValid(JSON.parse(gotText)) && got.name === 'roster.qbj', got.name);
   await click('#editroster');
   await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor again');
   ok('24c rename: reopened, the editor shows the former names',
