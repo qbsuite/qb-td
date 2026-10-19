@@ -21,7 +21,7 @@ import { serializeYft3 } from '../app/engine/yft3.js';
 import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, questionWords, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries, sideRounds } from '../app/engine/buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, catOfEntry } from '../app/engine/cats.js';
-import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
+import { buzzSettings, buzzToken, sha256Hex, sha256HexJs, BUZZ_ITERS } from '../app/js/buzzkey.js';
 import { buildScoresheet, teamInitials, catTag } from '../app/engine/scoresheet.js';
 import { sheetHtml, exampleSheetHtml } from '../app/js/sheetview.js';
 import { buildSite, siteNames, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
@@ -2767,6 +2767,27 @@ test('a fresh salt gives the same password a different hash', () => {
 
 test('no kdf means the legacy scheme: the token is the password', () => {
   assert.equal(TOK_LEGACY, 'hunter2');
+});
+
+// A hub on plain http from a LAN address has no crypto.subtle; the room
+// Test links (admin.js testTokenReq) still need the same digest there.
+await testA('sha256Hex without crypto.subtle: the plain-JS digest matches node', async () => {
+  const node = (s) => schedHash('sha256').update(s).digest('hex');
+  // around the 55/56/64-byte padding edges, multi-block, and non-ASCII
+  for (const n of [0, 1, 55, 56, 63, 64, 65, 119, 120, 128, 1000]) {
+    const s = 'a'.repeat(n);
+    assert.equal(sha256HexJs(s), node(s), 'length ' + n);
+  }
+  assert.equal(sha256HexJs('Zoë → 東京 🏆'), node('Zoë → 東京 🏆'));
+  const was = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  Object.defineProperty(globalThis, 'crypto', { value: { getRandomValues: (a) => a }, configurable: true });
+  try {
+    const secret = 'abcDEF123456';
+    const token = await sha256Hex('qbtd-test:' + await sha256Hex('qbtd-cred:' + secret));
+    assert.equal(token, node('qbtd-test:' + node('qbtd-cred:' + secret)));
+  } finally {
+    Object.defineProperty(globalThis, 'crypto', was);
+  }
 });
 
 /* ---------- archive ---------- */
