@@ -768,6 +768,14 @@ async function markPub(env, tid) {
   await env.DB.prepare('UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1')
     .bind(tid, Date.now()).run();
 }
+// markPub for many tournaments in one statement (a set's fan-out to its
+// mirrors), so the query count doesn't grow with them.
+async function markPubs(env, tids) {
+  if (!tids.length) return;
+  await env.DB.prepare(
+    'UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id IN (SELECT value FROM json_each(?1))'
+  ).bind(JSON.stringify([...new Set(tids)]), Date.now()).run();
+}
 
 // For a change that rewrote games' public copies in place (the round
 // shards' stamps can't see it): the rebuild marker, then the mark, so the
@@ -2723,7 +2731,9 @@ async function rebuildCatmap(env, t) {
   await markPub(env, tid);
 }
 
-async function updateCatmap(env, tid, round, cats) {
+// mark: false when the caller flags the tournament itself afterwards (a
+// set's fan-out, which flags all its mirrors in one statement).
+async function updateCatmap(env, tid, round, cats, mark = true) {
   const key = `t/${tid}/catmap.json`;
   for (let attempt = 0; attempt < 4; attempt++) {
     const cur = await env.DATA.get(key);
@@ -2737,7 +2747,7 @@ async function updateCatmap(env, tid, round, cats) {
     else return; // nothing stored, nothing to clear
     if (!Object.keys(map.rounds).length) {
       // an empty map reads as "no categories": drop the blob so the tab hides
-      if (cur) { await env.DATA.delete(key); await markPub(env, tid); }
+      if (cur) { await env.DATA.delete(key); if (mark) await markPub(env, tid); }
       return;
     }
     // merging one round into a map an older parser wrote must not mark
@@ -2751,7 +2761,7 @@ async function updateCatmap(env, tid, round, cats) {
         customMetadata: { v },
         onlyIf,
       });
-      if (put) { await markPub(env, tid); return; }
+      if (put) { if (mark) await markPub(env, tid); return; }
     } catch (e) { /* precondition failed -> retry */ }
   }
   console.log('catmap update lost the retry race for tournament', tid);
@@ -3505,6 +3515,12 @@ function byeRoomIds(settingsText) {
   catch (e) { return []; }
 }
 function isByeRoom(b) { return byeRoomIds(b.settings).includes(b.id); }
+// The bucket rows ({id, ...}) that play, the bye room left out: what a
+// round waits on, for the tournament and for its set's state alike.
+function playingRooms(buckets, settingsText) {
+  const bye = byeRoomIds(settingsText);
+  return buckets.filter((x) => !bye.includes(x.id));
+}
 const byeRefusal = (env) => err(env, 403, 'This is a bye room, so nothing from it is saved');
 
 // The TD's Test link (admin.js renderRoomsSec): a room link that also
@@ -3830,8 +3846,7 @@ async function maybeAdvance(env, tid, onlyBracket = null) {
   if (!next.results.length) return false;
   const sched = schedObj ? await schedObj.json().catch(() => null) : null;
   // bye rooms play no round: never waited on
-  const bye = byeRoomIds(tr[0].settings);
-  const { ids, unmatched } = roomsPlaying(sched, n, buckets.results.filter((x) => !bye.includes(x.id)));
+  const { ids, unmatched } = roomsPlaying(sched, n, playingRooms(buckets.results, tr[0].settings));
   if (unmatched || !ids.length) return false;
   const started = new Set(starts.results.map((x) => x.bucket_id));
   if (!ids.every((id) => started.has(id))) return false;
@@ -4095,9 +4110,10 @@ function scheduledGames(sched, round) {
 }
 
 // Rounds every room has turned in, from the clean game rows ({round,
-// bucket_id}), the room count, the schedule (or null) and any extra
-// candidate rounds. The rule roundDone applies to one round, over all of
-// them at once: the /pub state's buzz_done, and a set's per-mirror copy.
+// bucket_id}), the count of playingRooms (no bye room), the schedule (or
+// null) and any extra candidate rounds. The rule roundDone applies to one
+// round, over all of them at once: the /pub state's buzz_done, and a
+// set's per-mirror copy.
 function doneRounds(rows, roomCount, sched, candidates = []) {
   const inByRound = new Map();
   for (const f of rows) {
@@ -4124,8 +4140,7 @@ async function roundDone(env, t, round) {
     env.DB.prepare('SELECT id FROM buckets WHERE tournament_id = ?1').bind(t.id).all(),
   ]);
   // bye rooms play no game: they don't count
-  const bye = byeRoomIds(t.settings);
-  let expected = buckets.results.filter((x) => !bye.includes(x.id)).length;
+  let expected = playingRooms(buckets.results, t.settings).length;
   const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
   if (obj) {
     const n = scheduledGames(await obj.json().catch(() => null), round);
@@ -4317,7 +4332,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
   if (key) {
     buzzV = key.open ? 'open' : await buzzStamp(key);
     const sched = schedObj ? await schedObj.json().catch(() => null) : null;
-    buzzDone = doneRounds(rows, buckets.results.filter((x) => !byeRoomIds(t.settings).includes(x.id)).length, sched,
+    buzzDone = doneRounds(rows, playingRooms(buckets.results, t.settings).length, sched,
       packetRounds.results.map((r) => r.number));
   }
   return {
@@ -4620,6 +4635,10 @@ async function pubRoster(env, slug) {
 const setPacketPrefix = (sid) => `s/${sid}/packet/`;
 const setCatmapKey = (sid) => `s/${sid}/catmap.json`;
 const setStateKey = (sid) => `s/${sid}/state.json`;
+// The state blob's shape. A blob of an older one has every mirror re-read
+// once (rebuildSetState): 2 added each mirror's renames, 3 counts its
+// rounds done without its bye room.
+const SET_STATE_V = 3;
 const setLedgerKey = (sid) => `s/${sid}/ledger.json`;
 const MAX_LEDGER = 8 * 1024 * 1024;
 const MAX_QMAP = 500;                    // questions per packet side in a question map
@@ -4922,16 +4941,28 @@ async function uploadSetPacket(request, url, env, s) {
   if (cats) await updateSetCatmap(env, s.id, packet, version, cats);
 
   const open = await mirrorsOpenFor(env, s.id, packet, offer);
-  for (const { tid, round } of open) {
-    await env.DB.prepare(
-      'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
-      'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4 WHERE served = 0'
-    ).bind(tid, round, key, name).run();
-    await updateCatmap(env, tid, round, cats);
-    await markPub(env, tid);
-  }
+  // (an upsert's SELECT needs a WHERE, or SQLite reads ON as a join's)
+  await fanOut(env, open, env.DB.prepare(
+    'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) ' +
+    "SELECT j.value ->> 'tid', j.value ->> 'round', ?2, ?3 FROM json_each(?1) AS j WHERE true " +
+    'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?2, packet_name = ?3 WHERE served = 0'
+  ).bind(JSON.stringify(open), key, name), cats);
   await markSet(env, s.id);
   return json(env, { packet, version, filename: name, mirrors: new Set(open.map((o) => o.tid)).size });
+}
+
+// The rest of a packet change, for the open mirror rounds mirrorsOpenFor
+// found: `write` re-points (or clears) all of them in one statement, so
+// the request makes the same few D1 queries however many mirrors are
+// open. Each round's category map is still its own R2 write, in the same
+// order, and the mirrors are flagged after those, as markPub after
+// updateCatmap did: a tick in between must not build a mirror's public
+// state from its old map and clear the flag.
+async function fanOut(env, open, write, cats) {
+  if (!open.length) return;
+  await write.run();
+  for (const { tid, round } of open) await updateCatmap(env, tid, round, cats, false);
+  await markPubs(env, open.map((o) => o.tid));
 }
 
 // DELETE /s/:secret/packet?packet=N — take a packet out of the set (one
@@ -4945,13 +4976,11 @@ async function retireSetPacket(url, env, s) {
   await env.DB.prepare(
     'UPDATE set_packets SET retired = 1 WHERE set_id = ?1 AND packet = ?2'
   ).bind(s.id, packet).run();
-  for (const { tid, round } of open) {
-    await env.DB.prepare(
-      'DELETE FROM rounds WHERE tournament_id = ?1 AND number = ?2 AND served = 0 AND packet_r2_key LIKE ?3'
-    ).bind(tid, round, `${setPacketPrefix(s.id)}${packet}/%`).run();
-    await updateCatmap(env, tid, round, null);
-    await markPub(env, tid);
-  }
+  await fanOut(env, open, env.DB.prepare(
+    'DELETE FROM rounds WHERE (tournament_id, number) IN ' +
+    "(SELECT j.value ->> 'tid', j.value ->> 'round' FROM json_each(?1) AS j) " +
+    'AND served = 0 AND packet_r2_key LIKE ?2'
+  ).bind(JSON.stringify(open), `${setPacketPrefix(s.id)}${packet}/%`), null);
   await markSet(env, s.id);
   return json(env, { ok: true, mirrors: new Set(open.map((o) => o.tid)).size });
 }
@@ -5474,26 +5503,51 @@ async function setMirrorFile(env, s, url) {
 
 /* ----- the set's state blob and the routes that read the games ----- */
 
-// One mirror's heavy half of the state: what its shards hold, which set
-// packet + version each of its rounds ran ([packet, version], or null
-// for a packet of the TD's own), and which rounds every room has turned in.
-async function mirrorState(env, tid, packetOf) {
-  const [manifest, rounds, files, buckets, schedObj] = await Promise.all([
-    readManifest(env, tid),
-    env.DB.prepare('SELECT number, packet_r2_key FROM rounds WHERE tournament_id = ?1').bind(tid).all(),
+// The heavy half of the state for the mirrors a rebuild re-reads (rows
+// with the tournament's id and settings), as a Map by tournament id: what
+// each one's shards hold, which set packet + version each of its rounds
+// ran ([packet, version], or null for a packet of the TD's own), which
+// rounds every playing room has turned in, and its renames. D1 is read
+// for all of them at once, so a rebuild makes the same few queries
+// however many mirrors it re-reads; the R2 reads are per mirror.
+async function mirrorStates(env, mirrors, packetOf) {
+  const out = new Map();
+  if (!mirrors.length) return out;
+  const ids = JSON.stringify(mirrors.map((t) => t.id));
+  const theirs = 'tournament_id IN (SELECT value FROM json_each(?1))';
+  const [rounds, files, buckets] = await Promise.all([
+    env.DB.prepare(`SELECT tournament_id, number, packet_r2_key FROM rounds WHERE ${theirs}`).bind(ids).all(),
     env.DB.prepare(
-      `SELECT round, bucket_id, ${UNFINISHED_SQL} AS unfinished FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL`
-    ).bind(tid).all(),
-    env.DB.prepare('SELECT COUNT(*) AS n FROM buckets WHERE tournament_id = ?1').bind(tid).all(),
-    env.DATA.get(`t/${tid}/schedule.json`),
+      `SELECT tournament_id, round, bucket_id, ${UNFINISHED_SQL} AS unfinished FROM files WHERE ${theirs} AND kind IN ('qbj', 'combined') AND error IS NULL`
+    ).bind(ids).all(),
+    env.DB.prepare(`SELECT tournament_id, id FROM buckets WHERE ${theirs}`).bind(ids).all(),
   ]);
-  const sched = schedObj ? await schedObj.json().catch(() => null) : null;
-  return {
-    rounds: manifest.rounds,
-    vmap: Object.fromEntries(rounds.results.map((r) => [r.number, packetOf.get(r.packet_r2_key) ?? null])),
-    done: doneRounds(files.results, buckets.results[0].n, sched),
-    names: await mirrorRenames(env, tid),
+  const byMirror = ({ results }) => {
+    const by = new Map();
+    for (const r of results) {
+      if (!by.has(r.tournament_id)) by.set(r.tournament_id, []);
+      by.get(r.tournament_id).push(r);
+    }
+    return (tid) => by.get(tid) || [];
   };
+  const roundsOf = byMirror(rounds);
+  const filesOf = byMirror(files);
+  const bucketsOf = byMirror(buckets);
+  for (const t of mirrors) {
+    const [manifest, schedObj] = await Promise.all([
+      readManifest(env, t.id),
+      env.DATA.get(`t/${t.id}/schedule.json`),
+    ]);
+    const sched = schedObj ? await schedObj.json().catch(() => null) : null;
+    out.set(t.id, {
+      rounds: manifest.rounds,
+      vmap: Object.fromEntries(roundsOf(t.id).map((r) => [r.number, packetOf.get(r.packet_r2_key) ?? null])),
+      // the tournament's own rule (roundDone): the bye room plays no game
+      done: doneRounds(filesOf(t.id), playingRooms(bucketsOf(t.id), t.settings).length, sched),
+      names: await mirrorRenames(env, t.id),
+    });
+  }
+  return out;
 }
 
 // A mirror's roster renames for the set page, which renames its games
@@ -5508,17 +5562,19 @@ async function mirrorRenames(env, tid) {
  * Rebuild s/<sid>/state.json. Cron-only: one writer. Only the mirrors the
  * tick flagged (set_mirrors.state_dirty, set when the tick works on the
  * mirror's tournament) and mirrors the previous blob has never seen pay
- * for mirrorState; everything else is carried forward, so a busy Saturday
- * costs D1 reads in proportion to the mirrors that moved, not to the
- * mirrors that exist. The flags clear only after the blob is written —
- * a rebuild that fails re-reads the same mirrors next tick.
+ * for mirrorStates; everything else is carried forward, so a busy
+ * Saturday costs D1 rows and R2 reads in proportion to the mirrors that
+ * moved, not to the mirrors that exist, in the same few D1 queries
+ * either way (Free allows 50 per invocation). The flags are claimed
+ * before the work; `claimed` lists them for tickSets, which puts them
+ * back when the rebuild fails.
  */
-async function rebuildSetState(env, sid) {
+async function rebuildSetState(env, sid, claimed = []) {
   const [prevObj, mirrors, packets, catsObj] = await Promise.all([
     env.DATA.get(setStateKey(sid)),
     env.DB.prepare(
       'SELECT m.id AS mirror_id, m.state_dirty, m.name AS label, m.host, m.event_date, ' +
-      't.id, t.slug, t.name, t.published, t.created, t.pub_snapshot ' +
+      't.id, t.slug, t.name, t.published, t.created, t.pub_snapshot, t.settings ' +
       'FROM set_mirrors m JOIN tournaments t ON t.id = m.tournament_id ' +
       'WHERE m.set_id = ?1 AND m.hidden = 0 ORDER BY m.id'
     ).bind(sid).all(),
@@ -5536,20 +5592,23 @@ async function rebuildSetState(env, sid) {
   }
 
   // Claim the flags before the work, like the tournament half: a flag
-  // set by an overlapping tick while this one reads stays set. A rebuild
-  // that fails puts the claimed ones back (tickSets).
-  // (and, once, mirrors carried forward from before their renames were kept)
-  const reread = mirrors.results.filter((t) => !prevBy.get(t.id) || t.state_dirty
-    || !('names' in prevBy.get(t.id))).map((t) => t.mirror_id);
-  for (const id of reread) {
-    await env.DB.prepare('UPDATE set_mirrors SET state_dirty = 0 WHERE id = ?1').bind(id).run();
+  // set by an overlapping tick while this one reads stays set. They are
+  // listed before the UPDATE, which can land even when its answer doesn't.
+  // (and, once, every mirror of a blob in an older shape: SET_STATE_V)
+  const current = prev && prev.v === SET_STATE_V;
+  const reread = mirrors.results.filter((t) => !current || !prevBy.get(t.id) || t.state_dirty);
+  if (reread.length) {
+    const ids = reread.map((t) => t.mirror_id);
+    claimed.push(...ids);
+    await env.DB.prepare('UPDATE set_mirrors SET state_dirty = 0 WHERE id IN (SELECT value FROM json_each(?1))')
+      .bind(JSON.stringify(ids)).run();
   }
+  const heavy = await mirrorStates(env, reread, packetOf);
   const out = [];
   for (const t of mirrors.results) {
     const old = prevBy.get(t.id);
-    const heavy = old && !reread.includes(t.mirror_id)
-      ? { rounds: old.rounds, vmap: old.vmap, done: old.done, names: old.names }
-      : await mirrorState(env, t.id, packetOf);
+    // (a mirror not re-read has an entry in the previous blob)
+    const { rounds, vmap, done, names } = heavy.get(t.id) || old;
     // the snapshot descriptor is on the row, so it is always current
     let pub = null;
     try {
@@ -5559,15 +5618,14 @@ async function rebuildSetState(env, sid) {
     out.push({
       id: t.id, label: t.label, host: t.host, date: t.event_date,
       slug: t.slug, name: t.name, page: !!t.published, created: t.created,
-      ...heavy, pub,
+      rounds, vmap, done, names, pub,
     });
   }
   await env.DATA.put(setStateKey(sid), JSON.stringify({
-    v: 2, at: Date.now(), cats,
+    v: SET_STATE_V, at: Date.now(), cats,
     packets: Object.fromEntries(packets.results.filter((p) => !p.retired).map((p) => [p.packet, p.version])),
     mirrors: out,
   }), { httpMetadata: { contentType: 'application/json' } });
-  return reread;
 }
 
 // The second half of the tick: state blobs for flagged sets — by their
@@ -5580,14 +5638,17 @@ async function tickSets(env) {
   for (const s of results) {
     // claim before working, as the tournament half does
     await env.DB.prepare('UPDATE sets SET state_dirty = 0 WHERE id = ?1').bind(s.id).run();
+    const claimed = [];
     try {
-      await rebuildSetState(env, s.id);
+      await rebuildSetState(env, s.id, claimed);
     } catch (e) {
       console.log('set state failed for set', s.id, e.message);
-      // whatever mirrors this rebuild had claimed are stale again
-      await env.DB.prepare(
-        'UPDATE set_mirrors SET state_dirty = 1 WHERE set_id = ?1 AND tournament_id IS NOT NULL'
-      ).bind(s.id).run();
+      // the mirrors this rebuild claimed are stale again; the others are
+      // still right in the blob it didn't replace
+      if (claimed.length) {
+        await env.DB.prepare('UPDATE set_mirrors SET state_dirty = 1 WHERE id IN (SELECT value FROM json_each(?1))')
+          .bind(JSON.stringify(claimed)).run();
+      }
       await markSet(env, s.id);
     }
   }

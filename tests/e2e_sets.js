@@ -7,10 +7,12 @@
 // tournament joined to the set) and running on them — on the rounds its
 // TD chooses — a mid-season packet fix reaching only the rounds not yet
 // opened, question maps following questions across versions, and the
-// games (and game files) coming back through the set routes.
+// games (and game files) coming back through the set routes. Last, a set
+// at 20 mirrors: its packet changes reach each one, and (on a metered
+// Worker) cost the same D1 queries as at 2.
 
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-import { BASE, storedCred, d1row, d1exec, r2get, call, maxAge, tick, ok, summary } from './e2e_lib.js';
+import { BASE, storedCred, d1row, d1exec, r2get, call, fetchRetry, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const packet = (marker, category) => JSON.stringify({
   tossups: [
@@ -209,6 +211,15 @@ ok('mirror sees the set\'s packets to choose from', r.body.set_packets.length ==
 // a room reads the set's packet through its own link
 r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 1' } });
 const room = r.body.secret;
+// ...beside the bye room the hub gives a tournament with rooms (admin.js
+// ensureByeRoom). It plays no game, so with no schedule a round is done
+// once Room 1 turns it in — on the set page as on the mirror's own.
+{
+  const bye = (await call(A + '/buckets', { method: 'POST', json: { room_name: 'Bye Room' } })).body;
+  const before = JSON.parse((await call(A)).body.tournament.settings || '{}');
+  r = await call(A, { method: 'POST', json: { settings: { ...before, byeRoom: bye.id } } });
+  ok('mirror gets its bye room', r.status === 200, r.body);
+}
 {
   const p1 = await text(`/b/${room}/packet?round=1`);
   ok('room reads the set packet', p1.status === 200 && p1.body.includes('SETSECRET-R1V1'), p1.status);
@@ -265,7 +276,7 @@ ok('an unpublished mirror still materializes for its set',
   r.body.mirrors[0].rounds['1'] !== undefined && r.body.mirrors[0].page === false, r.body.mirrors[0]);
 ok('state pins packet versions per mirror',
   JSON.stringify(r.body.mirrors[0].vmap) === JSON.stringify({ 1: [1, 1], 2: [2, 1] }), r.body.mirrors[0].vmap);
-ok('state reports finished rounds', JSON.stringify(r.body.mirrors[0].done) === '[1]', r.body.mirrors[0].done);
+ok('state reports finished rounds, the bye room not waited on', JSON.stringify(r.body.mirrors[0].done) === '[1]', r.body.mirrors[0].done);
 ok('state carries current packet versions', JSON.stringify(r.body.packets) === JSON.stringify({ 1: 1, 2: 1 }), r.body.packets);
 ok('state carries the category stamp', typeof r.body.cats === 'number');
 ok('state: no roster, no renames', r.body.mirrors[0].names === null, r.body.mirrors[0].names);
@@ -426,7 +437,9 @@ ok('state sees the mirror\'s page go public', r.body.mirrors[0].page === true);
   // the mirror's own buzzpoints: its TD's password opens the SET's packet
   const mcred = await buzzSettings('mirrorpw');
   const mtok = await buzzToken('mirrorpw', mcred);
-  await call(A, { method: 'POST', json: { settings: { rounds: 3, buzz: mcred }, buzz_token: mtok } });
+  // (the rest of its settings kept, as the hub saves them: the bye room)
+  const kept = JSON.parse((await call(A)).body.tournament.settings || '{}');
+  await call(A, { method: 'POST', json: { settings: { ...kept, rounds: 3, buzz: mcred }, buzz_token: mtok } });
   const mq = await text(`/pub/${mirrorSlug}/qpacket?round=1`, { Authorization: 'Buzz ' + mtok });
   ok('mirror buzzpoints decrypt the set packet', mq.status === 200 && mq.body.includes('SETSECRET-R1V1'), mq.status);
   const cross = await text(`${q}?packet=1&v=1`, { Authorization: 'Buzz ' + mtok });
@@ -557,6 +570,121 @@ ok('published set page survives the link', r.status === 200 && r.body.mirrors.le
 {
   const p1 = await text(`/b/${room}/packet?round=1`);
   ok('a running mirror outlives the set link', p1.status === 200 && p1.body.includes('SETSECRET-R1V1'), p1.status);
+}
+
+/* ---------- many mirrors: D1 queries flat in the mirror count ---------- */
+
+// A packet change reaches each open mirror round in the editor's own
+// request, and the set's state re-reads each mirror that moved in one
+// cron tick. Cloudflare's Free plan allows 50 D1 queries per invocation,
+// so neither may grow with the mirrors: a set of 2 and the same set at 20
+// make the same number. The counts need the dev meter (wrangler dev
+// --var METER:1); without it only the fan-out itself is checked.
+{
+  const meterOn = (await fetchRetry(BASE + '/__meter')).ok;
+  const meter = async () => (await (await fetchRetry(BASE + '/__meter')).json()).queries;
+  // the tick finishes in the background: wait until the meter stops moving
+  const settle = async () => {
+    if (!meterOn) return new Promise((res) => setTimeout(res, 1500));
+    let last = await meter();
+    for (let still = 0; still < 4;) {
+      await new Promise((res) => setTimeout(res, 200));
+      const now = await meter();
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
+  };
+  // D1 queries made by fn's requests (and the background work they start)
+  const counted = async (fn) => {
+    if (!meterOn) return { out: await fn(), queries: null };
+    await settle();
+    await fetchRetry(BASE + '/__meter', { method: 'DELETE' });
+    const out = await fn();
+    await settle();
+    return { out, queries: await meter() };
+  };
+
+  // this block's own set and mirrors, out of the daily creation caps
+  d1exec("UPDATE tournaments SET creator_ip = 'earlier-run' WHERE set_id IS NOT NULL");
+  r = await call('/api/sets', { method: 'POST', json: { name: 'E2E Many Mirrors', slug: 'e2e-many-' + rnd() } });
+  const F = '/s/' + r.body.admin_secret;
+  const fsid = r.body.id;
+  await call(`${F}/packet?packet=1&name=Many1.json`, { method: 'POST', body: packet('MANY-R1V1', 'History') });
+  const mirrorIds = [];
+  const addMirrors = async (n) => {
+    for (let i = 0; i < n; i++) {
+      const inv = (await call(`${F}/mirrors`, { method: 'POST', json: { name: 'Many ' + mirrorIds.length } })).body.invite;
+      const started = await call('/i/' + inv, { method: 'POST', json: { name: 'Many ' + mirrorIds.length, slug: 'e2e-many-m-' + rnd() } });
+      if (started.status !== 200) throw new Error('mirror start failed: ' + JSON.stringify(started.body));
+      mirrorIds.push(started.body.id);
+    }
+  };
+  // the tick until nothing of this set is left to do
+  const drain = async () => {
+    for (let i = 0; i < 20; i++) {
+      await tick();
+      await settle();
+      const left = d1row(`SELECT (SELECT COUNT(*) FROM tournaments WHERE set_id = ${fsid} AND pub_dirty = 1) `
+        + `+ (SELECT state_dirty FROM sets WHERE id = ${fsid}) AS n`).n;
+      if (!left) return;
+    }
+    throw new Error('the tick never caught up');
+  };
+  // ...then every mirror flagged as moved: the set-state rebuild re-reads
+  // all of them in one tick
+  const rebuildAll = async () => {
+    await drain();
+    d1exec(`UPDATE set_mirrors SET state_dirty = 1 WHERE set_id = ${fsid}`);
+    d1exec(`UPDATE sets SET state_dirty = 1 WHERE id = ${fsid}`);
+    return counted(tick);
+  };
+  const onVersion = (round, packetNo, v) => d1row(
+    `SELECT COUNT(*) AS n FROM rounds WHERE number = ${round} AND served = 0 AND packet_r2_key LIKE 's/${fsid}/packet/${packetNo}/v${v}-%' `
+    + `AND tournament_id IN (SELECT tournament_id FROM set_mirrors WHERE set_id = ${fsid})`).n;
+
+  // each size: a fix to packet 1, a brand-new packet (offered to the
+  // mirrors with nothing on its round) and its removal, then the tick
+  const run = async (n, newPacket, fixV) => {
+    await drain();
+    const fix = await counted(() => call(`${F}/packet?packet=1&name=Many1-fix.json`, { method: 'POST', body: packet('MANY-R1-FIX', 'History') }));
+    ok(`${n} mirrors: a fix reaches each one`, fix.out.status === 200 && fix.out.body.mirrors === n
+      && onVersion(1, 1, fixV) === n, fix.out.body);
+    ok(`${n} mirrors: each one is flagged for the tick`,
+      d1row(`SELECT COUNT(*) AS n FROM tournaments WHERE set_id = ${fsid} AND pub_dirty = 1`).n === n);
+    const add = await counted(() => call(`${F}/packet?packet=${newPacket}&name=Many${newPacket}.json`, { method: 'POST', body: packet('MANY-NEW', 'Trash') }));
+    ok(`${n} mirrors: a new packet reaches each one`, add.out.status === 200 && add.out.body.mirrors === n
+      && onVersion(newPacket, newPacket, 1) === n, add.out.body);
+    const drop = await counted(() => call(`${F}/packet?packet=${newPacket}`, { method: 'DELETE' }));
+    ok(`${n} mirrors: a removal reaches each one`, drop.out.status === 200
+      && drop.out.body.mirrors === n && onVersion(newPacket, newPacket, 1) === 0, drop.out.body);
+    const state = await rebuildAll();
+    const listed = (body) => body.mirrors.length === n && body.mirrors.every((m) => m.vmap['1'] && m.vmap['1'][1] === fixV);
+    let st;
+    for (let i = 0; i < 40; i++) {
+      st = await call(F + '/state');
+      if (listed(st.body)) break;
+      await new Promise((res) => setTimeout(res, 250));
+    }
+    ok(`${n} mirrors: the set state lists each one`, listed(st.body), st.body.mirrors.map((m) => m.vmap));
+    return { fix: fix.queries, add: add.queries, drop: drop.queries, state: state.queries };
+  };
+
+  await addMirrors(2);
+  const small = await run(2, 2, 2);
+  await addMirrors(18);
+  const large = await run(20, 3, 3);
+  if (meterOn) {
+    console.log('  D1 queries, 2 mirrors -> 20 mirrors:', JSON.stringify(small), '->', JSON.stringify(large));
+    for (const k of ['fix', 'add', 'drop', 'state']) {
+      ok(`D1 queries for ${k === 'state' ? 'the set-state tick' : 'a packet ' + k} do not grow with the mirrors`
+        + ` (${small[k]} -> ${large[k]})`, small[k] === large[k] && large[k] < 50, { small, large });
+    }
+  } else {
+    console.log('  skip D1 counts per set request: start wrangler dev with --var METER:1');
+  }
+  // out of the daily caps for the next run, as the set above is
+  d1exec(`UPDATE tournaments SET created = created - 2 * 86400000 WHERE set_id = ${fsid}`);
+  d1exec(`UPDATE sets SET created = 1 WHERE id = ${fsid}`);
 }
 
 summary('set e2e');

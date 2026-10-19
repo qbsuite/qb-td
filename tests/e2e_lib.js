@@ -61,25 +61,27 @@ export function r2put(key, body) {
   rmSync(tmp);
 }
 
+// The wrangler CLI invocations in d1row/r2get reset the dev server's
+// pooled keep-alive connections, so the next fetch can die with
+// ECONNRESET on a stale socket; a fresh connection succeeds.
+export async function fetchRetry(url, opts) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch(url, opts);
+    } catch (e) {
+      if (attempt >= 2) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+}
+
 export async function call(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
   if (opts.json !== undefined) {
     headers['Content-Type'] = 'application/json';
     opts = { ...opts, body: JSON.stringify(opts.json) };
   }
-  // The wrangler CLI invocations in d1row/r2get reset the dev server's
-  // pooled keep-alive connections, so the next fetch can die with
-  // ECONNRESET on a stale socket; a fresh connection succeeds.
-  let res;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      res = await fetch(BASE + path, { ...opts, headers });
-      break;
-    } catch (e) {
-      if (attempt >= 2) throw e;
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    }
-  }
+  const res = await fetchRetry(BASE + path, { ...opts, headers });
   const ct = res.headers.get('content-type') || '';
   const body = ct.includes('json') ? await res.json() : await res.text();
   return { status: res.status, body, cache: res.headers.get('cache-control'),
@@ -96,7 +98,7 @@ export function maxAge(cc) {
 // uploaded games into the round shards the public page reads, so the
 // public assertions tick first rather than waiting a minute.
 export async function tick() {
-  const res = await fetch(BASE + '/__scheduled');
+  const res = await fetchRetry(BASE + '/__scheduled');
   if (!res.ok) throw new Error('cron trigger failed (' + res.status + '): run wrangler dev with --test-scheduled');
   await res.text();
 }

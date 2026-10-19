@@ -19,6 +19,7 @@ function fakeDb(state) {
   // else explodes so a new query can't silently no-op in tests.
   const make = (sql, args) => ({
     async all() {
+      state.queries = (state.queries || 0) + 1; // D1 queries, for the per-invocation checks
       if (/FROM tournaments t LEFT JOIN sets s .* WHERE t\.pub_dirty = 1/.test(sql)) {
         const setOf = (t) => (state.sets || []).find((s) => s.id === t.set_id);
         const mirrorOf = (t) => (state.mirrors || []).find((m) => m.tournament_id === t.id);
@@ -52,26 +53,35 @@ function fakeDb(state) {
             return { mirror_id: m.tournament_id, state_dirty: m.state_dirty || 0,
               label: m.name, host: m.host ?? null, event_date: m.event_date ?? null,
               id: t.id, slug: t.slug, name: t.name, published: t.published,
-              created: t.created, pub_snapshot: t.pub_snapshot };
+              created: t.created, pub_snapshot: t.pub_snapshot, settings: t.settings ?? null };
           }),
         };
       }
       if (/FROM set_packets WHERE set_id/.test(sql)) {
         return { results: (state.packets || []).filter((x) => x.set_id === args[0]) };
       }
-      // mirrorState — counted, so tests can see which mirrors paid for it
-      if (/SELECT number, packet_r2_key FROM rounds/.test(sql)) {
-        state.mirrorStateReads = (state.mirrorStateReads || []).concat(args[0]);
-        return { results: (state.rounds || []).filter((r) => r.tournament_id === args[0]) };
+      // mirrorStates, over the re-read mirrors at once (a json list) —
+      // counted, so tests can see which mirrors paid for it
+      if (/SELECT tournament_id, number, packet_r2_key FROM rounds WHERE tournament_id IN/.test(sql)) {
+        const ids = JSON.parse(args[0]);
+        state.mirrorStateReads = (state.mirrorStateReads || []).concat(ids);
+        return { results: (state.rounds || []).filter((r) => ids.includes(r.tournament_id)) };
       }
-      if (/SELECT round, bucket_id(, .* AS unfinished)? FROM files/.test(sql)) {
+      if (/SELECT tournament_id, round, bucket_id, .* AS unfinished FROM files WHERE tournament_id IN/.test(sql)) {
+        const ids = JSON.parse(args[0]);
         return {
-          results: state.files.filter((f) => f.tournament_id === args[0])
-            .map((f) => ({ round: f.round, bucket_id: f.bucket_id ?? 1 })),
+          results: state.files.filter((f) => ids.includes(f.tournament_id))
+            .map((f) => ({ tournament_id: f.tournament_id, round: f.round, bucket_id: f.bucket_id ?? 1 })),
         };
       }
-      if (/SELECT COUNT\(\*\) AS n FROM buckets/.test(sql)) {
-        return { results: [{ n: (state.buckets || []).filter((b) => b.tournament_id === args[0]).length || 1 }] };
+      // a tournament with no buckets listed has one room, the files' default
+      if (/SELECT tournament_id, id FROM buckets WHERE tournament_id IN/.test(sql)) {
+        return {
+          results: JSON.parse(args[0]).flatMap((tid) => {
+            const own = (state.buckets || []).filter((b) => b.tournament_id === tid);
+            return (own.length ? own : [{ id: 1 }]).map((b) => ({ tournament_id: tid, id: b.id }));
+          }),
+        };
       }
       if (/SELECT id, round FROM files WHERE/.test(sql)) {
         return { results: state.files.filter((f) => f.tournament_id === args[0]) };
@@ -99,8 +109,10 @@ function fakeDb(state) {
       throw new Error('unexpected all(): ' + sql);
     },
     async run() {
-      if (/UPDATE set_mirrors SET state_dirty = 1 WHERE set_id/.test(sql)) {
-        for (const m of state.mirrors || []) if (m.set_id === args[0] && m.tournament_id) m.state_dirty = 1;
+      state.queries = (state.queries || 0) + 1;
+      if (/UPDATE set_mirrors SET state_dirty = 1 WHERE id IN/.test(sql)) {
+        // the mock's mirror_id is the tournament id
+        for (const id of JSON.parse(args[0])) (state.mirrors || []).find((x) => x.tournament_id === id).state_dirty = 1;
         return;
       }
       if (/UPDATE set_mirrors SET state_dirty = 1 WHERE tournament_id/.test(sql)) {
@@ -108,10 +120,9 @@ function fakeDb(state) {
         if (m) m.state_dirty = 1;
         return;
       }
-      if (/UPDATE set_mirrors SET state_dirty = 0 WHERE id/.test(sql)) {
-        // the mock's mirror_id is the tournament id
+      if (/UPDATE set_mirrors SET state_dirty = 0 WHERE id IN/.test(sql)) {
         if (state.failMirrorClear) throw new Error('d1 unavailable');
-        (state.mirrors || []).find((x) => x.tournament_id === args[0]).state_dirty = 0;
+        for (const id of JSON.parse(args[0])) (state.mirrors || []).find((x) => x.tournament_id === id).state_dirty = 0;
         return;
       }
       if (/UPDATE sets SET state_dirty/.test(sql)) {
@@ -916,10 +927,11 @@ const realFetch = globalThis.fetch;
   state.failMirrorClear = false;
   state.mirrorStateReads = [];
   await runCron(env(state, objects, gh)); // no tournament is dirty this time
-  // a failed rebuild cannot know which of its claims it got to, so every
-  // mirror of the set is re-read once — over-reading, never staleness
-  ok('failed rebuild: the next tick re-reads every mirror of the set and clears the flags',
-    JSON.stringify([...state.mirrorStateReads].sort()) === '[11,12]'
+  // the claim is one statement, so the failed rebuild knows what it
+  // claimed: only that mirror is re-read, the other carried forward from
+  // the blob the failure left in place
+  ok('failed rebuild: the next tick re-reads the mirror it had claimed and clears the flags',
+    JSON.stringify(state.mirrorStateReads) === '[11]'
     && state.sets[0].state_dirty === 0 && state.mirrors[0].state_dirty === 0
     && JSON.parse(objects['s/4/state.json'].textFor()).mirrors[0].rounds['2'] === '6:1', state.mirrorStateReads);
 
@@ -931,6 +943,74 @@ const realFetch = globalThis.fetch;
   const after = JSON.parse(objects['s/4/state.json'].textFor());
   ok('set-only change: rebuilt from the flag, nothing re-read',
     after.mirrors.length === 1 && after.mirrors[0].id === 12 && state.mirrorStateReads.length === 0, after.mirrors);
+}
+
+// 19. A mirror's bye room plays no game: a mirror with no schedule
+// finishes a round when its playing rooms have turned it in, as on its
+// own page (roundDone). And a blob in the state's older shape re-reads
+// every mirror once, so the rule reaches mirrors carried forward.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = { id: 21, slug: 'bye-site', name: 'Bye Site', published: 0, pub_dirty: 0, pub_snapshot: null,
+    roster_r2_key: null, current_round: 1, created: Date.now(), set_id: 6, settings: '{"byeRoom":2}' };
+  const u = { id: 22, slug: 'other-site', name: 'Other Site', published: 0, pub_dirty: 0, pub_snapshot: null,
+    roster_r2_key: null, current_round: 1, created: Date.now(), set_id: 6, settings: '{}' };
+  const state = {
+    tournaments: [t, u], sets: [{ id: 6, published: 0, state_dirty: 1 }],
+    mirrors: [{ set_id: 6, tournament_id: 21, name: 'Bye' }, { set_id: 6, tournament_id: 22, name: 'Other' }],
+    packets: [], rounds: [],
+    buckets: [{ id: 1, tournament_id: 21 }, { id: 2, tournament_id: 21 }, { id: 3, tournament_id: 22 }],
+    files: [{ id: 1, tournament_id: 21, round: 1, bucket_id: 1 }, { id: 2, tournament_id: 22, round: 1, bucket_id: 3 }],
+  };
+  // the previous blob: the old shape, both mirrors carried with the old
+  // rule's answer and renames already kept
+  const old = (id) => ({ id, rounds: {}, vmap: {}, done: [], names: null });
+  const objects = { 's/6/state.json': r2obj(JSON.stringify({ v: 2, mirrors: [old(21), old(22)] }), 1000) };
+  await runCron(env(state, objects, gh));
+  let setState = JSON.parse(objects['s/6/state.json'].textFor());
+  ok('older state shape: every mirror re-read once',
+    JSON.stringify([...state.mirrorStateReads].sort()) === '[21,22]', state.mirrorStateReads);
+  ok('bye room: the round its playing rooms turned in is done',
+    JSON.stringify(setState.mirrors[0].done) === '[1]' && JSON.stringify(setState.mirrors[1].done) === '[1]', setState.mirrors);
+  ok('state written in the current shape', setState.v === 3, setState.v);
+
+  state.mirrorStateReads = [];
+  state.sets[0].state_dirty = 1;
+  await runCron(env(state, objects, gh));
+  setState = JSON.parse(objects['s/6/state.json'].textFor());
+  ok('current state shape: nothing re-read, done carried',
+    state.mirrorStateReads.length === 0 && JSON.stringify(setState.mirrors[0].done) === '[1]', state.mirrorStateReads);
+}
+
+// 20. A set's rebuild makes the same D1 queries for 20 mirrors as for 2:
+// the claim and the reads cover all the re-read mirrors at once.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const rebuildQueries = async (n) => {
+    const ts = Array.from({ length: n }, (_, i) => ({ id: 100 + i, slug: 'm' + i, name: 'M' + i, published: 0,
+      pub_dirty: 0, pub_snapshot: null, roster_r2_key: null, current_round: 1, created: Date.now(), set_id: 7 }));
+    const state = {
+      tournaments: ts, sets: [{ id: 7, published: 0, state_dirty: 1 }],
+      mirrors: ts.map((x) => ({ set_id: 7, tournament_id: x.id, name: x.name, state_dirty: 1 })),
+      packets: [], rounds: [], files: ts.map((x, i) => ({ id: i + 1, tournament_id: x.id, round: 1 })),
+    };
+    const objects = {};
+    await runCron(env(state, objects, gh));
+    const built = JSON.parse(objects['s/7/state.json'].textFor());
+    if (built.mirrors.length !== n || state.mirrors.some((m) => m.state_dirty)) throw new Error('rebuild incomplete');
+    // the same set again, every mirror moved: the claim and the reads
+    state.queries = 0;
+    for (const m of state.mirrors) m.state_dirty = 1;
+    state.sets[0].state_dirty = 1;
+    await runCron(env(state, objects, gh));
+    return { queries: state.queries, reads: state.mirrorStateReads.length };
+  };
+  const two = await rebuildQueries(2);
+  const twenty = await rebuildQueries(20);
+  ok('set rebuild: D1 queries do not grow with the mirrors',
+    two.queries === twenty.queries && twenty.reads === 40, { two, twenty });
 }
 
 globalThis.fetch = realFetch;

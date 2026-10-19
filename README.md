@@ -353,7 +353,8 @@ dashboard shows which invites are still unused, and revokes them.
   shard stamps and snapshot SHAs, which packet version each round read,
   which rounds each has finished. A tick rebuilds it only for the mirrors
   it actually touched and carries the rest forward, so a busy Saturday
-  costs D1 reads in proportion to the mirrors that moved. The games
+  costs D1 rows and R2 reads in proportion to the mirrors that moved,
+  in the same few D1 queries however many moved. The games
   themselves come SHA-pinned from the mirrors' own GitHub snapshot
   folders, with one Worker request per mirror as the fallback. A
   mirror's round shards are published when *either* flag says public —
@@ -626,7 +627,9 @@ node tests/ui_e2e.js
 # (the meter is dev-only: /__meter 404s without METER). e2e_usage.js
 # asserts the idle cron and an unchanged Live Hub refresh stay flat;
 # sim_usage.js prices a whole day — TOURNAMENTS/ROOMS/ROUNDS/ROUND_MIN,
-# CLIENT=legacy|smart for the Live Hub before and after rev checks
+# CLIENT=legacy|smart for the Live Hub before and after rev checks.
+# e2e_sets.js run against it also counts D1 queries: a set's packet
+# changes and its state's rebuild must make as many with 20 mirrors as 2
 node tests/e2e_usage.js
 node tests/sim_usage.js
 
