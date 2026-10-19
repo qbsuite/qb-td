@@ -2926,23 +2926,25 @@ test('archive captures carry no question text', () => {
   }
 });
 
+const { captureReport, captureProblems } = await import('../tools/archive.mjs');
+
 test('archive captures hold the games their state lists, with scoresheets off', () => {
+  // the same check tools/archive.mjs add warns with before a commit
   for (const [slug, data] of captures) {
-    const state = data[`/pub/${slug}`];
-    const ids = new Set(data[`/pub/${slug}/bundle`].entries.map((e) => e.id));
-    // a listed game the bundle lacks reads as "just in" forever (pubview.js pendingNote)
-    assert.deepEqual((state.files || []).filter((f) => !ids.has(f.id)).map((f) => f.id), [], slug + ' bundle');
-    // scoresheets wait on buzz_done, which a capture empties: the switch
-    // would never open on an archived page
-    assert.ok(!state.scoresheets, slug + ' has scoresheets off');
+    assert.deepEqual(captureProblems(data[`/pub/${slug}`], data[`/pub/${slug}/bundle`]), [], slug);
   }
+  const bundle = { entries: [{ id: 1 }, { id: 2 }] };
+  assert.deepEqual(captureProblems({ files: [{ id: 1 }, { id: 2 }] }, bundle), []);
+  // a listed game the bundle lacks reads as "just in" forever (pubview.js pendingNote)
+  assert.match(captureProblems({ files: [{ id: 1 }, { id: 3 }] }, bundle).join(), /lack 1 listed game\(s\) \(file id 3\)/);
+  // scoresheets wait on buzz_done, which a capture empties: the switch
+  // would never open on an archived page
+  assert.match(captureProblems({ files: [], scoresheets: true }, bundle).join(), /scoresheets are on/);
 });
 
 // The static stat report linked beside each archived page must be the
 // report that page shows (pubview.js statsOpts): the tournament's game
 // format and schedule, not the 20-tossup, one-stage defaults.
-const { captureReport } = await import('../tools/archive.mjs');
-
 test('archive reports take the captured game format and schedule', () => {
   for (const [slug, data] of captures) {
     const { opts } = captureReport(slug, data);

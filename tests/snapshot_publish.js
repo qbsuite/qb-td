@@ -6,10 +6,18 @@
 
 import worker, { Rebuild, fanOut } from '../worker/worker.js';
 
+// The Worker logs the failures these tests provoke (console.log); hold
+// its lines back, and show them only above a check that fails or a crash.
+const print = console.log;
+let held = [];
+console.log = (...x) => { held.push(x.join(' ')); };
+process.on('exit', (code) => { if (code) for (const l of held) console.error('  | ' + l); });
+
 let passed = 0;
 function ok(name, cond, extra) {
-  if (cond) { passed++; console.log('  ok', name); }
-  else { console.error('FAIL', name, extra ?? ''); process.exitCode = 1; }
+  if (cond) { passed++; print('  ok', name); }
+  else { for (const l of held) console.error('  | ' + l); console.error('FAIL', name, extra ?? ''); process.exitCode = 1; }
+  held = [];
 }
 
 /* ---------- mocks ---------- */
@@ -1113,4 +1121,4 @@ globalThis.fetch = realFetch;
   globalThis.fetch = realFetch;
 }
 
-console.log(passed + ' tests passed');
+print(passed + ' tests passed');

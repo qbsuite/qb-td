@@ -122,6 +122,27 @@ function assertNoQuestionText(bundle) {
   }
 }
 
+// What run_tests.js rejects in a committed capture, as messages, so `add`
+// can say so before the commit rather than after.
+export function captureProblems(state, bundle) {
+  const problems = [];
+  // a listed game the bundle lacks would read as "just in" forever on the
+  // archived page (pubview.js pendingNote); its shard had not caught up
+  const ids = new Set(bundle.entries.map((e) => e.id));
+  const missing = (state.files || []).filter((f) => !ids.has(f.id)).map((f) => f.id);
+  if (missing.length) {
+    problems.push(`the round shards lack ${missing.length} listed game(s) (file id ${missing.join(', ')}); `
+      + 'refresh once the cron has caught up');
+  }
+  // scoresheets wait on buzz_done, which a capture empties: the archived
+  // page would show a Scoresheets switch that never opens
+  if (state.scoresheets) {
+    problems.push('scoresheets are on, and an archived page can never open them; '
+      + 'turn Scoresheets off in the hub, then refresh');
+  }
+  return problems;
+}
+
 // Every game, from the live per-round shards. A capture is frozen and
 // tiny by tournament standards, so it keeps the whole-tournament shape
 // the archived page reads (`rounds` is dropped below) rather than
@@ -300,7 +321,12 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
   console.log(`  app/archive/${slug}.js  (${(JSON.stringify(data).length / 1024).toFixed(0)} KB)`);
   console.log(`  app/archive/${slug}/  (${pages.length} report pages)`);
   if (!opts.date && !existing) console.log(`  date defaulted to today; set the real one with --date`);
-  console.log('\ncommit the result to approve it.');
+  // written all the same: nothing is approved until it is committed
+  const problems = captureProblems(data[`/pub/${slug}`], data[`/pub/${slug}/bundle`]);
+  for (const p of problems) console.warn('  warning: ' + p);
+  console.log(problems.length
+    ? '\nnpm test rejects this capture as it is; fix the warnings above before you commit it.'
+    : '\ncommit the result to approve it.');
 }
 
 // The report pages again, from the committed captures alone: the capture

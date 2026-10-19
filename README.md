@@ -1468,8 +1468,11 @@ downloads, and `archive.html` imports only the one capture being viewed.
 `add` refuses to write if the bundle contains any long string outside
 `notes` (the field MODAQ writes "Tossup thrown out on question N" into),
 since that would mean packet text leaking into a file about to be
-committed and served forever. `run_tests.js` re-runs that check on what
-actually got committed, along with manifest-to-capture agreement.
+committed and served forever. It warns, and still writes, when the round
+shards lack a game the public state lists (refresh once the cron has
+caught up) or when scoresheets are on (an archived page can never open
+them). `run_tests.js` re-runs all of these checks on what actually got
+committed, along with manifest-to-capture agreement.
 
 ## YellowFruit fidelity
 
