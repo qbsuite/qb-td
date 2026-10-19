@@ -5067,6 +5067,20 @@ test('brackets: a room rename follows the schedule room the bucket resolves to',
   s = sched();
   assert.equal(followRoomRename(s, { id: 104, room_name: 'Room 4' }, 'Annex', [101, 102, 103, 104]), true);
   assert.equal(s.rooms[3].name, 'Annex');
+  // a name another schedule room has: the schedule stays as it was and the
+  // room now matches that one, rather than the schedule gaining a twin
+  s = { rooms: [{ name: 'Room 1', bucket: null }, { name: 'Library', bucket: null }] };
+  assert.equal(followRoomRename(s, { id: 5, room_name: 'Room 1' }, ' library ', [5]), false);
+  assert.deepEqual(s.rooms.map((r) => r.name), ['Room 1', 'Library']);
+  assert.equal(roomIndexOf(s, { id: 5, room_name: ' library ' }), 1);
+  // (a linked room's schedule rooms follow it whatever the name, as always)
+  s = sched();
+  assert.equal(followRoomRename(s, { id: 101, room_name: 'Room 1' }, 'Room 2'), true);
+  assert.equal(s.rooms[0].name, 'Room 2');
+  // ...while its own name in other letters is no clash
+  s = sched();
+  assert.equal(followRoomRename(s, { id: 102, room_name: 'Room 2' }, 'ROOM 2', [102]), true);
+  assert.equal(s.rooms[1].name, 'ROOM 2');
   // nothing to follow, or nothing moved
   assert.equal(followRoomRename(sched(), { id: 105, room_name: 'Room 9' }, 'X', [105]), false);
   assert.equal(followRoomRename(sched(), { id: 101, room_name: 'Room 1' }, 'Room 1'), false);

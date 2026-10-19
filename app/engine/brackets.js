@@ -150,15 +150,18 @@ export function roomIndexOf(schedule, bucket) {
  * Follows a room's rename on the schedule (in place): the schedule room
  * roomIndexOf finds for the bucket under its old name takes the new name,
  * so a room matched only by name stays matched. Every room linked to the
- * bucket follows; a name match never takes a room linked to another of
- * the tournament's rooms (bucketIds). True when a name changed.
+ * bucket follows. A name match never takes a room linked to another of
+ * the tournament's rooms (bucketIds), and a new name another schedule
+ * room already has is left as a retarget onto that room, so the schedule
+ * never gains a second room of that name. True when a name changed.
  */
 export function followRoomRename(schedule, bucket, name, bucketIds = []) {
   const i = roomIndexOf(schedule, bucket);
   if (i === null) return false;
   const hit = schedule.rooms[i];
+  const taken = () => schedule.rooms.some((r, j) => j !== i && r && norm(r.name) === norm(name));
   const rooms = hit.bucket === bucket.id ? schedule.rooms.filter((r) => r && r.bucket === bucket.id)
-    : bucketIds.includes(hit.bucket) ? [] : [hit];
+    : bucketIds.includes(hit.bucket) || taken() ? [] : [hit];
   let moved = false;
   for (const r of rooms) if (r.name !== name) { r.name = name; moved = true; }
   return moved;
