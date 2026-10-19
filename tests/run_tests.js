@@ -3947,6 +3947,11 @@ test('readerUpload: the question record rides in the root only; a game with no a
   assert.deepEqual(added.tb.map, tbRecord(tb));
   assert.equal(added.qbj.match_questions[1].tossup_question.qbtd_tiebreaker, 'TU1');
   assert.ok(!JSON.stringify(added.qbj).includes('tuAt'), 'the qbj carries no record');
+  // a correction keeping the game's record sends no tiebreaker list, so the
+  // Worker leaves the log as the game's own upload left it
+  const fixed = JSON.parse(readerUpload(match, { round: 3, tb, tbLogged: true }, store));
+  assert.deepEqual(fixed.tb, { map: tbRecord(tb) });
+  assert.equal(JSON.stringify(fixed.qbj), JSON.stringify(added.qbj));
 });
 
 test('tbPanelRows merges tossups and bonuses with their uses', () => {
@@ -7092,7 +7097,7 @@ async function replacedUpload() {
 // game resumed as the reader resumes it, uploaded again unchanged
 async function editReupload(root) {
   const tb = tbResume(root);
-  const meta = parseMeta(JSON.stringify({ a: 'Alpha', b: 'Beta', round: 4, t: '', room: 'Room 1', started: 1, ...(tb ? { tb } : {}) }));
+  const meta = parseMeta(JSON.stringify({ a: 'Alpha', b: 'Beta', round: 4, t: '', room: 'Room 1', started: 1, ...(tb ? { tb, tbLogged: true } : {}) }));
   const storeText = JSON.stringify(root.game);
   const mem = new Map([['g', storeText]]);
   const storage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
@@ -7124,7 +7129,9 @@ test('Edit in MODAQ: a game with mid-packet replacements is numbered as it was, 
   // reopened and uploaded again: the very same
   assert.deepEqual(tbEdited.qbj, root.qbj);
   assert.deepEqual(tbEdited.protests, root.protests);
-  assert.deepEqual(tbEdited.tb, root.tb);
+  // the record, and no tiebreaker list: the log keeps the game's own entries
+  assert.deepEqual(tbEdited.tb, { map: root.tb.map });
+  assert.deepEqual(tbResume(tbEdited), root.tb.map, 'and a second correction resumes it too');
   assert.equal(tbEdited.modaq.qbj, root.modaq.qbj, 'MODAQ\'s own QBJ, to the byte');
   // as it was before: packet questions after the replacement moved up one,
   // the tiebreaker tags gone, and the protests renumbered
@@ -7149,7 +7156,7 @@ test('Edit in MODAQ: an upload from before the record has it rebuilt from MODAQ\
   assert.deepEqual(tbResume(tbOld), want);
   assert.deepEqual(tbOldEdited.qbj, root.qbj);
   assert.deepEqual(tbOldEdited.protests, root.protests);
-  assert.deepEqual(tbOldEdited.tb.used, root.tb.used);
+  assert.deepEqual(tbOldEdited.tb, { map: want });
   // one it can't rebuild resumes as before: no MODAQ QBJ, or no record kept
   assert.equal(tbResume({ ...tbOld, modaq: undefined }), null);
   assert.equal(tbResume({ ...tbOld, tb: undefined }), null);
@@ -7158,6 +7165,25 @@ test('Edit in MODAQ: an upload from before the record has it rebuilt from MODAQ\
   assert.deepEqual(tbResume({ ...root, modaq: undefined }), tbRecord(meta.tb));
   // a malformed one is not
   assert.deepEqual(tbResume({ ...root, tb: { ...root.tb, map: { t: 20, b: 20, tuAt: { x: 1 }, boAt: {} } } }), want);
+  // nor one that doesn't fit the saved game's packet (sent before MODAQ
+  // saved the game): rebuilt instead, or none
+  const ahead = { ...root.tb.map, tuAt: { ...root.tb.map.tuAt, 21: 'TU2' } };
+  assert.deepEqual(tbResume({ ...root, tb: { ...root.tb, map: ahead } }), want);
+  assert.equal(tbResume({ ...root, modaq: undefined, tb: { ...root.tb, map: ahead } }), null);
+});
+
+test('tbResume: an odd stored file never keeps Edit in MODAQ from opening', () => {
+  // an empty question in both QBJs: skipped, as the reader skips it
+  const holed = JSON.parse(JSON.stringify(tbOld));
+  holed.qbj.match_questions.push(null);
+  const mq = JSON.parse(holed.modaq.qbj);
+  (Array.isArray(mq.match_questions) ? mq : mq.objects.find((o) => o && o.match_questions)).match_questions.push(null);
+  holed.modaq.qbj = JSON.stringify(mq);
+  assert.deepEqual(tbResume(holed), tbResume(tbOld));
+  assert.deepEqual(tbUsedIds({ match_questions: [null] }, { t: 20, b: 20, tuAt: {}, boAt: {} }), []);
+  // anything else that trips it
+  const odd = { ...tbOld, game: { get game() { throw new Error('unreadable'); } } };
+  assert.equal(tbResume(odd), null);
 });
 
 test('tbRebuild: replacements, appended tiebreakers and held bonuses number as the reader numbered them', () => {

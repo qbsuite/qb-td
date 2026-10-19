@@ -2661,8 +2661,10 @@ async function editGame(a, buckets, files, fileId) {
       // how far it had got, so the corrected upload says so too
       ...(sum.progress ? { reached: sum.progress.at } : {}),
       // where questions were added or replaced, so the correction numbers
-      // them as the game did (read_core tbResume)
-      ...(tb ? { tb } : {}),
+      // them as the game did (read_core tbResume). The game's own upload
+      // logged the tiebreakers it read: the correction leaves that log as
+      // it is unless it adds or replaces questions (readerUpload).
+      ...(tb ? { tb, tbLogged: true } : {}),
     }));
     say('');
     // A new tab: the dashboard keeps its place, and the TD can flip back.

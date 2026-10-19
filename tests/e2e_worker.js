@@ -1112,6 +1112,16 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   r = await call('/b/' + secret + '/tiebreakers');
   ok('re-export replaces the game log',
     r.body.uses.length === 1 && r.body.uses[0].q === 'TU3', r.body.uses);
+  // Edit in MODAQ's correction carries the question record alone (read_core
+  // readerUpload): the log stays as the game's own upload left it
+  const logged = JSON.stringify(r.body.uses);
+  r = await call(`/b/${secret}/upload?round=5&name=Round_5_Alpha_Beta.qbtd.json`,
+    { method: 'POST', body: JSON.stringify({ qbj: q, game: { cycles: [] },
+      tb: { map: { t: 20, b: 20, tuAt: { 20: 'TU3' }, boAt: {} } } }) });
+  ok('a correction with the record alone is accepted', r.status === 200 && r.body.error === null, r.body);
+  const tbFile3 = r.body.id;
+  r = await call('/b/' + secret + '/tiebreakers');
+  ok('and leaves the log as it was', JSON.stringify(r.body.uses) === logged, r.body.uses);
 
   // the Replacements view: the text of every tiebreaker read, ciphertext at
   // rest, buzz-gated, and shut until the tournament closes
@@ -1141,6 +1151,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   // clean up so the later file counts hold
   await call(`${A}/files/${tbFile1}`, { method: 'DELETE' });
   await call(`${A}/files/${tbFile2}`, { method: 'DELETE' });
+  await call(`${A}/files/${tbFile3}`, { method: 'DELETE' });
   r = await call(`${A}/tiebreakers`, { method: 'DELETE' });
   ok('tiebreaker pool deleted', r.status === 200);
   r = await call('/b/' + secret + '/tiebreakers');

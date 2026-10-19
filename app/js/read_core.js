@@ -84,7 +84,7 @@ export function matchFilenames(round, nameA, nameB) {
     a question record (meta.tb) also send `tb`: {used, map} (readerUpload),
     the pool questions read — always, even when the list is empty, so a
     re-export that no longer reaches the tiebreakers clears its old log —
-    and the record itself. */
+    and the record itself (a correction may send the record alone). */
 export function combinedUpload(match, round, storeText, tb = null, protests = null, progress = null, modaq = null) {
   let game = null;
   try { game = JSON.parse(storeText); } catch (e) { /* upload the qbj anyway */ }
@@ -108,10 +108,14 @@ export function combinedUpload(match, round, storeText, tb = null, protests = nu
     numbered by the game's question record (tbRemapMatch), with the pool
     questions it read and the record, so Edit in MODAQ can number a
     correction the same way (tbResume). The record stays in the upload's
-    root: the qbj and MODAQ's texts are as they would be without it. */
+    root: the qbj and MODAQ's texts are as they would be without it. A
+    correction that keeps the game's record (meta.tbLogged, admin.js
+    editGame) sends the record alone, so the tiebreaker log keeps what the
+    game's own upload logged (worker logTbUses). */
 export function readerUpload(match, meta, storeText, protests = null, progress = null, modaq = null) {
   const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
-  const tb = meta.tb ? { used: tbUsedIds(qbj, meta.tb), map: tbRecord(meta.tb) } : null;
+  const tb = meta.tb
+    ? { ...(meta.tbLogged ? {} : { used: tbUsedIds(qbj, meta.tb) }), map: tbRecord(meta.tb) } : null;
   return combinedUpload(qbj, meta.round, storeText, tb, protests, progress, modaq);
 }
 
@@ -273,6 +277,7 @@ export function tbUsedIds(match, tb) {
   const tuAt = (num) => hit(tu[num - 1 - st.t]);
   const boAt = (num) => hit(bo[num - 1 - st.b]);
   for (const q of (match && match.match_questions) || []) {
+    if (!q) continue;
     const t = q.tossup_question;
     if (t && Number.isInteger(t.question_number)) tuAt(t.question_number);
     const r = q.replacement_tossup_question;
@@ -308,7 +313,22 @@ export function tbProtests(protests, tb) {
     rebuilt: that game resumes without one, as before. */
 export function tbResume(root) {
   if (!root || typeof root !== 'object' || !root.tb || typeof root.tb !== 'object') return null;
-  return cleanTbRecord(root.tb.map) || tbRebuild(root);
+  // a stored file can hold anything: whatever trips this resumes without one
+  try {
+    const rec = cleanTbRecord(root.tb.map);
+    return rec && fitsPacket(rec, root) ? rec : tbRebuild(root);
+  } catch (e) { return null; }
+}
+
+// Whether a record describes the saved game's packet: the packet's own
+// questions and the added ones. The reader saves its record at once and
+// MODAQ its game a moment later, so an upload sent in between has a record
+// the saved game doesn't have yet, which would number it wrongly.
+function fitsPacket(rec, root) {
+  const packet = root.game && root.game.game && root.game.game.packet;
+  return !!packet && Array.isArray(packet.tossups)
+    && packet.tossups.length === rec.t + Object.keys(rec.tuAt).length
+    && (packet.bonuses || []).length === rec.b + Object.keys(rec.boAt).length;
 }
 
 // A stored record, checked: sizes and indices small whole numbers, pool

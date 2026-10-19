@@ -202,8 +202,11 @@ function mountMODAQ(id, meta, isNew) {
   // and say exactly which tiebreakers this game read.
   tbBridge.pool = tbPool;
   tbBridge.addedIds = () => tbAddedIds(meta.tb);
+  // A correction (Edit in MODAQ) that adds or replaces questions reports
+  // its tiebreakers again (meta.tbLogged, read_core readerUpload).
   tbBridge.onAdd = (sel, base, at) => {
     meta.tb = tbRecordAdd(meta.tb, base, at || base, sel);
+    delete meta.tbLogged;
     localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
   };
   // Replace tossup / Replace bonus record their own changes (read_core
@@ -224,6 +227,7 @@ function mountMODAQ(id, meta, isNew) {
   tbBridge.getTb = () => meta.tb || null;
   tbBridge.setTb = (tb) => {
     meta.tb = tb;
+    delete meta.tbLogged;
     localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
   };
 
