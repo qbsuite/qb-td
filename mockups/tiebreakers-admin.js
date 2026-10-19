@@ -19,7 +19,7 @@
 
 import { API, pub, esc, fmtBytes, download } from '../app/js/api.js';
 import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks } from '../app/engine/qbj.js';
-import { aggregate, dedupeMatches } from '../app/engine/stats.js';
+import { standings, dedupeMatches } from '../app/engine/stats.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { buildReport } from '../app/engine/report.js';
@@ -1364,7 +1364,7 @@ function renderSchedule(a, t, buckets, files) {
     fill: async () => {
       const { matches, roster } = await collectMatches(a, t, buckets, files);
       if (!matches.length) return null;
-      return fillReport(sched, aggregate(matches, roster));
+      return fillReport(sched, standings(matches, roster, gameFormat(t)));
     },
     say,
     refresh: () => render(),
@@ -2242,6 +2242,15 @@ async function collectMatches(a, t, buckets, files, onFile = () => {}, cache = n
   return { roster, matches, raw, games, errors };
 }
 
+// The tournament's game format: its regulation tossup count is where
+// overtime starts when the hub ranks teams (stats.js standings), as it is
+// on the public page.
+function gameFormat(t) {
+  let settings = {};
+  try { settings = JSON.parse(t.settings) || {}; } catch (e) { /* keep {} */ }
+  return effectiveFormat(settings);
+}
+
 /* ---------- playoff slots fill themselves ----------
    Once a pool's prelim games are all in — told from the upload list the
    hub already holds, so watching costs the Worker nothing — the hub reads
@@ -2269,7 +2278,7 @@ async function autoFillSlots(force = false) {
   try {
     const { matches, roster } = await collectMatches(a, t, buckets, prog.files, () => {}, autoCache);
     if (!matches.length) return;
-    const agg = aggregate(matches, roster);
+    const agg = standings(matches, roster, gameFormat(t));
     tbAgg = agg; // MOCK
     const saved = await fetchOwnedJson(a, `t/${t.id}/schedule.json`).catch(() => null);
     if (!saved || schedDirty) return;
@@ -2833,7 +2842,7 @@ async function computeStats(a, t, buckets, files, settings) {
     return;
   }
 
-  const agg = aggregate(matches, roster);
+  const agg = standings(matches, roster, effectiveFormat(settings));
   renderStats(out, agg, errors);
 
   // The tournament's own rules reach every export: the .yft's scoring
