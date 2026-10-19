@@ -17,7 +17,7 @@ import archive from '../app/archive/ug-nats-stanford.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseMatch, parseRoster, buildRosterQbj } from '../app/engine/qbj.js';
 import { roundRobinRounds, tagBrackets, buildSchedule, renameTeams, hasPlaceholders, fillPlaceholders, fillReport } from '../app/engine/schedule.js';
-import { aggregate, dedupeMatches } from '../app/engine/stats.js';
+import { aggregate, dedupeMatches, standings } from '../app/engine/stats.js';
 import { roundTossupBuzzes } from '../app/engine/buzz.js';
 import { BASE, call, d1exec, testToken, tick, ok, summary } from './e2e_lib.js';
 
@@ -1647,7 +1647,7 @@ async function openHubOf(adminSecret) {
       .map((g) => matchFor(n, g.a.team, g.b.team, g.room % 2 === 1))),
   ].map((m) => parseMatch(m));
   const want = JSON.parse(JSON.stringify(renamed));
-  fillPlaceholders(want, fillReport(renamed, aggregate(prelims)).ranks);
+  fillPlaceholders(want, fillReport(renamed, standings(prelims)).ranks);
   const slots = (x) => x.phases.flatMap((ph) => ph.rounds.flatMap((r) => [...r.games.flatMap((g) => [g.a, g.b]), ...r.byes]))
     .filter((y) => y && y.from).map((y) => y.from + ' ' + y.team);
   ok('12d rename: each playoff slot holds the team the standings put there',
