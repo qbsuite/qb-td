@@ -312,7 +312,7 @@ let rosterUpload = null; // parsed upload awaiting confirmation
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
-let addOpen = null;      // Add a game panel: {bid, round} to prefill, or null when closed
+let addOpen = null;      // Add a game panel: {bid, round, picked: the TD chose that round}, or null when closed
 let ffOpen = null;       // Record a forfeit panel: {bid, round, win, lose}, or null when closed
 let fixOpen = null;      // Fix buzzes panel (fixPanelHtml): the file, its upload, the fix so far
 let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
@@ -2333,7 +2333,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     btn.onclick = () => {
       const [bid, n] = btn.dataset.cell.split(':').map(Number);
       const fs = cellFiles(bid, n);
-      if (!fs.length) { addOpen = { bid, round: n }; cellOpen = null; render(); $('addfile').focus(); return; }
+      if (!fs.length) { addOpen = { bid, round: n, picked: true }; cellOpen = null; render(); $('addfile').focus(); return; }
       cellOpen = cellOpen && cellOpen.bid === bid && cellOpen.round === n ? null : { bid, round: n };
       render();
     };
@@ -2345,7 +2345,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   box.querySelectorAll('[data-addfor]').forEach((b) => {
     b.onclick = () => {
       const [bid, n] = b.dataset.addfor.split(':').map(Number);
-      addOpen = { bid, round: n };
+      addOpen = { bid, round: n, picked: true };
       render();
       $('addpanel').scrollIntoView({ block: 'nearest' });
       $('addfile').focus();
@@ -2364,8 +2364,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   $('addtoggle').onclick = () => { addOpen = addOpen ? null : { bid: null, round: t.current_round }; render(); };
   wireForfeit(a, t, buckets, render);
   $('addcancel').onclick = () => { addOpen = null; render(); };
-  // Round fills in with the round the picked files say; another one picked
-  // is pointed out, since the upload is counted under the picked round
+  // Round fills in with the round the picked files say, unless the TD
+  // chose one (a grid cell, a room's Upload, or typed in); a round other
+  // than the files' is pointed out, since the upload counts under it
   let addRows = [];
   const showAdd = () => { $('addlist').innerHTML = addListHtml(addRows, Number($('addround').value)); };
   $('addfile').onchange = async () => {
@@ -2376,10 +2377,10 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     if (!$('addfile') || $('addfile').files[0] !== fs[0]) return; // picked again meanwhile
     addRows = rows;
     const said = addSaid(rows).rounds;
-    if (said.length === 1) $('addround').value = said[0];
+    if (said.length === 1 && addOpen && !addOpen.picked) $('addround').value = said[0];
     showAdd();
   };
-  $('addround').oninput = showAdd;
+  $('addround').oninput = () => { if (addOpen) addOpen.picked = true; showAdd(); };
   // Download menu: closed by picking an item, Escape, or a click elsewhere
   $('dlmenu').onclick = (ev) => {
     ev.stopPropagation();

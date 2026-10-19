@@ -1078,23 +1078,42 @@ ok('13 uploads: the grid follows (✓ in both rooms)', true);
   await waitJs(`document.querySelector('.biground').textContent.includes('Round 2')`, 'hub back on round 2');
 }
 
+// a match file that says round 1, for the Round field's checks below
+const saysRound1 = writeFx('Round_1_elsewhere.qbj', JSON.stringify({ ...r2[5].qbj, _round: 1 }));
+const addWarn = async () => (await text('#addwarn')).replace(/\s+/g, ' ').trim();
+// Add a game from an empty grid cell keeps that cell's round, and a file
+// that says another is pointed out
+{
+  const b2 = roomBucket(2);
+  await click(`[data-cell="${b2.id}:2"]`);
+  await waitJs(`!document.querySelector('#addpanel').hidden`, 'the Add a game panel, from a cell');
+  await setFiles('#addfile', [saysRound1]);
+  await waitJs(`!!document.querySelector('#addwarn')`, 'the round warning');
+  ok('14 add a game: from a grid cell, Round stays the cell\'s and the file\'s round is pointed out',
+    await js(`document.querySelector('#addround').value`) === '2'
+    && await addWarn() === 'The match file says round 1. It will be counted as round 2.', await addWarn());
+  await click('#addcancel');
+}
 // Add a game: room 6, round 2, the match file and its MODAQ game file
 await click('#addtoggle');
 await waitJs(`!document.querySelector('#addpanel').hidden`, 'the Add a game panel');
 {
   const f = r2[5];
   await fill('#addroom', String(b5.id), ['change']);
-  await fill('#addround', '3', ['input']);
+  await setFiles('#addfile', [saysRound1]);
+  await waitJs(`document.querySelector('#addround').value === '1'`, 'Round filled in from the file');
+  ok('14 add a game: Round fills in with the round the match file says', !(await exists('#addwarn')));
+  await fill('#addround', '2', ['input']);
+  await waitJs(`!!document.querySelector('#addwarn')`, 'the round warning');
+  ok('14 add a game: another round picked is pointed out',
+    await addWarn() === 'The match file says round 1. It will be counted as round 2.', await addWarn());
+  // picked again: the round typed in stays
+  await setFiles('#addfile', [writeFx('Round_1_again.qbj', JSON.stringify({ ...f.qbj, _round: 1 }))]);
+  await waitJs(`document.querySelector('#addlist').textContent.includes('Round_1_again.qbj') && !!document.querySelector('#addwarn')`, 'the new pick listed');
+  ok('14 add a game: a round typed in stays when files are picked again', await js(`document.querySelector('#addround').value`) === '2');
   await setFiles('#addfile', [writeFx(f.base + '_Game.json', '{"cycles":[]}'), writeFx(f.base + '.qbj', JSON.stringify(f.qbj))]);
   await waitJs(`document.querySelectorAll('#addlist .addfile').length === 2`, 'the picked files listed');
   ok('14 add a game: both files are labelled', (await text('#addlist')).includes('Match file') && (await text('#addlist')).includes('MODAQ game file'));
-  await waitJs(`document.querySelector('#addround').value === '2'`, 'Round filled in from the file');
-  ok('14 add a game: Round fills in with the round the match file says', !(await exists('#addwarn')));
-  await fill('#addround', '3', ['input']);
-  await waitJs(`!!document.querySelector('#addwarn')`, 'the round warning');
-  ok('14 add a game: another round picked is pointed out',
-    (await text('#addwarn')).replace(/\s+/g, ' ').trim() === 'The match file says round 2. It will be counted as round 3.', await text('#addwarn'));
-  await fill('#addround', '2', ['input']);
   await waitJs(`!document.querySelector('#addwarn')`, 'the warning gone');
   await click('#addgame');
   d = await until(async () => { const x = await detail(); return x.files.filter((y) => y.bucket_id === b5.id && y.round === 2).length === 2 && x; }, 'both added');
