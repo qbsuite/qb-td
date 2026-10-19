@@ -14,9 +14,14 @@
 //   node tools/archive.mjs list
 //   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "..."] [--name "..."]
 //   node tools/archive.mjs refresh <slug>
+//   node tools/archive.mjs rebuild [<slug>]
 //   node tools/archive.mjs remove <slug>
 //   node tools/archive.mjs name "<name>" --date YYYY-MM-DD
 //   node tools/archive.mjs unname "<name>"
+//
+// `rebuild` regenerates the report pages from the committed capture and
+// reads nothing from any backend: for a change to the report itself. With
+// no slug it rebuilds all the archived tournaments.
 //
 // `name` approves a tournament to be LISTED without being archived: its
 // name and date on the home page and the archive list, nothing to open.
@@ -26,13 +31,14 @@
 // Common flags: --server <url> to read from a different backend.
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { parseMatch, parseRoster, rosterNameMap, renameMatch } from '../app/engine/qbj.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { buildReport } from '../app/engine/report.js';
+import { effectiveFormat } from '../app/js/read_core.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ARCHIVE = join(ROOT, 'app', 'archive');
@@ -157,7 +163,7 @@ async function capture(api, slug) {
   if (cats) data[`/pub/${slug}/cats`] = cats;
   if (roster) data[`/pub/${slug}/roster`] = roster;
 
-  return { state, bundle, roster, data };
+  return { state, data };
 }
 
 /** Parse the bundle the way pubview.js does, so page and report agree:
@@ -177,6 +183,24 @@ function parseBundle(bundle, roster) {
   return { matches, errors };
 }
 
+/** The stat report for a capture, with the options the archived page's
+    own Classic report uses (pubview.js statsOpts): the tournament's game
+    format, whose regulation tossup count scales the rate stats and splits
+    off overtime, and the schedule, whose stages and pools head the
+    standings. Reads only the capture, so it can run offline. */
+export function captureReport(slug, data) {
+  const state = data[`/pub/${slug}`];
+  const rosterQbj = data[`/pub/${slug}/roster`];
+  const roster = rosterQbj ? parseRoster(rosterQbj) : null;
+  const { matches, errors } = parseBundle(data[`/pub/${slug}/bundle`], roster);
+  if (!matches.length) throw new Error('no parseable games; nothing to archive');
+  const opts = {
+    name: state.name, matches: dedupeMatches(matches), roster,
+    settings: effectiveFormat(state.format), schedule: data[`/pub/${slug}/schedule`] || null,
+  };
+  return { opts, errors, pages: buildReport(opts) };
+}
+
 /* ---------- write ---------- */
 
 function writeCapture(slug, name, data) {
@@ -193,13 +217,11 @@ export default `;
   writeFileSync(join(ARCHIVE, slug + '.js'), header + JSON.stringify(data) + ';\n');
 }
 
-function writeReport(slug, name, matches, roster) {
+function writeReport(slug, pages) {
   const dir = join(ARCHIVE, slug);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const files = buildReport({ name, matches: dedupeMatches(matches), roster });
-  for (const f of files) writeFileSync(join(dir, f.name), f.text);
-  return files.map((f) => f.name);
+  for (const f of pages) writeFileSync(join(dir, f.name), f.text);
 }
 
 /* ---------- commands ---------- */
@@ -236,14 +258,7 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
   if (!existing && refresh) throw new Error(`${slug} is not archived yet; use \`add\``);
 
   console.log(`reading ${slug} from ${opts.api} ...`);
-  const { state, roster, bundle, data } = await capture(opts.api, slug);
-  const parsedRoster = roster ? parseRoster(roster) : null;
-  const { matches, errors } = parseBundle(bundle, parsedRoster);
-  for (const e of errors) console.warn('  skipped unparseable file: ' + e);
-  if (!matches.length) throw new Error('no parseable games; nothing to archive');
-
-  const games = dedupeMatches(matches);
-  const teams = new Set(games.flatMap((m) => m.teams.map((t) => t.name)));
+  const { state, data } = await capture(opts.api, slug);
 
   // The archive's own title for it: --name, else the one it was archived
   // under (a refresh must not undo a rename), else what its TD called it.
@@ -256,8 +271,14 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
     if (o && o.type === 'Tournament' && o.name === state.name) o.name = name;
   }
 
+  // from the capture as it will be committed, so `rebuild` makes the same pages
+  const { opts: report, errors, pages } = captureReport(slug, data);
+  for (const e of errors) console.warn('  skipped unparseable file: ' + e);
+  const games = report.matches;
+  const teams = new Set(games.flatMap((m) => m.teams.map((t) => t.name)));
+
   writeCapture(slug, name, data);
-  const pages = writeReport(slug, name, matches, parsedRoster);
+  writeReport(slug, pages);
 
   const date = opts.date || (existing && existing.date) || new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('--date must be YYYY-MM-DD');
@@ -266,7 +287,7 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
     name,
     date,
     host: opts.host || (existing && existing.host) || '',
-    teams: parsedRoster ? parsedRoster.length : teams.size,
+    teams: report.roster ? report.roster.length : teams.size,
     rounds: Math.max(...games.map((m) => m.round)),
     games: games.length,
   };
@@ -280,6 +301,21 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
   console.log(`  app/archive/${slug}/  (${pages.length} report pages)`);
   if (!opts.date && !existing) console.log(`  date defaulted to today; set the real one with --date`);
   console.log('\ncommit the result to approve it.');
+}
+
+// The report pages again, from the committed captures alone: the capture
+// is the archived data, so a change to how the report is built never
+// needs the backend (which may no longer hold the tournament).
+async function cmdRebuild(slug) {
+  const slugs = readIndex().tournaments.map((t) => t.slug);
+  if (slug && !slugs.includes(slug)) throw new Error(`${slug} is not archived`);
+  for (const s of slug ? [slug] : slugs) {
+    const { default: data } = await import(pathToFileURL(join(ARCHIVE, s + '.js')).href);
+    const { errors, pages } = captureReport(s, data);
+    for (const e of errors) console.warn('  skipped unparseable file: ' + e);
+    writeReport(s, pages);
+    console.log(`rebuilt app/archive/${s}/  (${pages.length} report pages)`);
+  }
 }
 
 function cmdRemove(slug) {
@@ -332,25 +368,32 @@ const USAGE = `usage:
   node tools/archive.mjs list
   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "Stanford"] [--name "Title"]
   node tools/archive.mjs refresh <slug>
+  node tools/archive.mjs rebuild [<slug>]
   node tools/archive.mjs remove <slug>
   node tools/archive.mjs name "<name>" --date YYYY-MM-DD
   node tools/archive.mjs unname "<name>"`;
 
-try {
-  const { opts, rest } = parseArgs(process.argv.slice(2));
-  const [cmd, slug] = rest;
-  if (cmd !== 'list' && !slug) throw new Error(USAGE);
-  const byName = cmd === 'name' || cmd === 'unname';
-  if (slug && !byName && !/^[a-z0-9-]{3,40}$/.test(slug)) throw new Error('bad slug: ' + slug);
+// Only when run as a command: tests import captureReport from here.
+const isMain = Boolean(process.argv[1]) && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 
-  if (cmd === 'name') cmdName(slug, opts);
-  else if (cmd === 'unname') cmdUnname(slug);
-  else if (cmd === 'list') await cmdList(opts);
-  else if (cmd === 'add') await cmdAdd(slug, opts);
-  else if (cmd === 'refresh') await cmdAdd(slug, opts, { refresh: true });
-  else if (cmd === 'remove') cmdRemove(slug);
-  else throw new Error(USAGE);
-} catch (e) {
-  console.error(e.message);
-  process.exit(1);
+if (isMain) {
+  try {
+    const { opts, rest } = parseArgs(process.argv.slice(2));
+    const [cmd, slug] = rest;
+    if (cmd !== 'list' && cmd !== 'rebuild' && !slug) throw new Error(USAGE);
+    const byName = cmd === 'name' || cmd === 'unname';
+    if (slug && !byName && !/^[a-z0-9-]{3,40}$/.test(slug)) throw new Error('bad slug: ' + slug);
+
+    if (cmd === 'name') cmdName(slug, opts);
+    else if (cmd === 'unname') cmdUnname(slug);
+    else if (cmd === 'list') await cmdList(opts);
+    else if (cmd === 'add') await cmdAdd(slug, opts);
+    else if (cmd === 'refresh') await cmdAdd(slug, opts, { refresh: true });
+    else if (cmd === 'rebuild') await cmdRebuild(slug);
+    else if (cmd === 'remove') cmdRemove(slug);
+    else throw new Error(USAGE);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
 }

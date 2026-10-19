@@ -1338,6 +1338,7 @@ node tools/archive.mjs list                    # published tournaments, and whic
 node tools/archive.mjs add <slug> --date 2026-07-25 --host "Stanford"
 #   --name "Title" archives it under a different name than its TD gave it
 node tools/archive.mjs refresh <slug>          # recapture after a late correction
+node tools/archive.mjs rebuild [<slug>]        # report pages again from the committed capture, offline
 node tools/archive.mjs remove <slug>           # un-approve
 ```
 
@@ -1347,6 +1348,16 @@ node tools/archive.mjs remove <slug>           # un-approve
 `app/archive/index.json`. Committing that is the approval. Nothing here
 writes to the backend, and the tournament's live page is unaffected either
 way.
+
+The report pages are the stat report the archived page itself shows,
+built from the capture with the same options (`captureReport`, after
+`pubview.js` `statsOpts`): the tournament's game format, whose regulation
+tossup count scales the rate stats and splits off overtime, and the
+schedule, whose stages and pools head the standings. `run_tests.js`
+rebuilds each archive's pages and compares them byte for byte with the
+committed ones, so a change to the report's code fails `npm test` until
+`node tools/archive.mjs rebuild` has been run and its output committed.
+`rebuild` reads nothing but the committed captures.
 
 The gate is deliberately outside the Worker. An `archived` column plus an
 owner-only route would mean the first real account in a system whose whole

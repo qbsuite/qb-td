@@ -2926,6 +2926,45 @@ test('archive captures carry no question text', () => {
   }
 });
 
+test('archive captures hold the games their state lists, with scoresheets off', () => {
+  for (const [slug, data] of captures) {
+    const state = data[`/pub/${slug}`];
+    const ids = new Set(data[`/pub/${slug}/bundle`].entries.map((e) => e.id));
+    // a listed game the bundle lacks reads as "just in" forever (pubview.js pendingNote)
+    assert.deepEqual((state.files || []).filter((f) => !ids.has(f.id)).map((f) => f.id), [], slug + ' bundle');
+    // scoresheets wait on buzz_done, which a capture empties: the switch
+    // would never open on an archived page
+    assert.ok(!state.scoresheets, slug + ' has scoresheets off');
+  }
+});
+
+// The static stat report linked beside each archived page must be the
+// report that page shows (pubview.js statsOpts): the tournament's game
+// format and schedule, not the 20-tossup, one-stage defaults.
+const { captureReport } = await import('../tools/archive.mjs');
+
+test('archive reports take the captured game format and schedule', () => {
+  for (const [slug, data] of captures) {
+    const { opts } = captureReport(slug, data);
+    const format = effectiveFormat(data[`/pub/${slug}`].format);
+    assert.deepEqual(opts.settings, format, slug + ' format');
+    assert.equal(opts.schedule, data[`/pub/${slug}/schedule`] || null, slug + ' schedule');
+    const standings = readFileSync(new URL(slug + '/standings.html', ARCHIVE_DIR), 'utf8');
+    assert.ok(standings.includes(`PP${format.regulationTossupCount}TUH`), slug + ' standings scaled to its own tossup count');
+  }
+});
+
+test('archive report pages are rebuilt from their captures', () => {
+  // byte for byte, so a change to the report's code shows here until the
+  // committed pages follow it
+  for (const [slug, data] of captures) {
+    for (const p of captureReport(slug, data).pages) {
+      const committed = readFileSync(new URL(slug + '/' + p.name, ARCHIVE_DIR), 'utf8');
+      assert.ok(committed === p.text, `app/archive/${slug}/${p.name} is out of date: run node tools/archive.mjs rebuild`);
+    }
+  }
+});
+
 /* ---------- schedule: brackets, generation options, checks ---------- */
 
 // every format and field size, generated with default options, minus the
