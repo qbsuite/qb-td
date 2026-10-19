@@ -26,7 +26,7 @@ import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
-import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
+import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import { modaqExport, modaqFilenames, renameModaqTexts } from '../engine/modaqfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
@@ -2644,8 +2644,9 @@ async function editGame(a, buckets, files, fileId) {
     // MODAQ's bare game file (engine/modaqfile.js), which it can't.
     const res = await fetch(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}`);
     if (!res.ok) throw new Error('could not load the game file (' + res.status + ')');
-    let saved = null;
-    try { saved = (await res.json()).game; } catch (e) { /* reported below */ }
+    let root = null;
+    try { root = await res.json(); } catch (e) { /* reported below */ }
+    const saved = root && root.game;
     const storeText = saved && typeof saved === 'object' ? JSON.stringify(saved) : '';
     if (!storeIntact(storeText)) throw new Error('this upload has no MODAQ game in it');
 
@@ -2653,11 +2654,15 @@ async function editGame(a, buckets, files, fileId) {
     // it without touching the room's other games.
     const gid = 'fix' + Date.now().toString(36);
     const [aName, bName] = sum.teams;
+    const tb = tbResume(root);
     localStorage.setItem(gameKey(room.secret, gid), storeText);
     localStorage.setItem(metaKey(room.secret, gid), JSON.stringify({
       a: aName, b: bName, round: f.round, t: '', room: room.room_name, started: Date.now(),
       // how far it had got, so the corrected upload says so too
       ...(sum.progress ? { reached: sum.progress.at } : {}),
+      // where questions were added or replaced, so the correction numbers
+      // them as the game did (read_core tbResume)
+      ...(tb ? { tb } : {}),
     }));
     say('');
     // A new tab: the dashboard keeps its place, and the TD can flip back.

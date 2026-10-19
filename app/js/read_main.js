@@ -22,10 +22,10 @@ import ReactDOM from 'react-dom';
 import { ModaqControl, GameFormats, parseQbjRegistration } from 'modaq';
 import { pub, esc } from './api.js';
 import {
-  normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload,
+  normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, readerUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
-  staleGameKeys, roundRows, normalizeTbPool, tbUsedIds, tbPanelRows,
-  tbRecordAdd, tbAddedIds, tbRemapMatch, tbNumbering,
+  staleGameKeys, roundRows, normalizeTbPool, tbPanelRows,
+  tbRecordAdd, tbAddedIds, tbProtests,
 } from './read_core.js';
 import { gameProgress } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
@@ -157,9 +157,7 @@ function gameProtests(storeText, meta, format) {
   let protests;
   try { protests = protestReport(JSON.parse(storeText), format, Tossup); }
   catch (e) { return null; }
-  if (!meta.tb) return protests;
-  const num = tbNumbering(meta.tb);
-  return protests.map((p) => ({ ...p, q: p.kind === 'b' ? num.bo(p.q) : num.tu(p.q) }));
+  return tbProtests(protests, meta.tb);
 }
 
 // MODAQ saves the game to localStorage as it changes; every few seconds
@@ -261,17 +259,12 @@ function mountMODAQ(id, meta, isNew) {
   async function uploadGame(match) {
     try {
       const name = matchFilenames(meta.round, meta.a, meta.b).combined;
-      // games with appended tiebreakers report which ones were read,
-      // so the TD's usage log stays exact (worker logTbUses); logged
-      // protests go up structured, swing included, for the hub's
+      // logged protests go up structured, swing included, for the hub's
       // Protests drawer (the qbj's notes carry them as text only)
       // (null if the store won't parse: the Worker falls back to the
       // qbj's notes)
       const storeText = localStorage.getItem(gameKey(store, id));
       const protests = gameProtests(storeText, meta, props.gameFormat || null);
-      // questions added mid-packet shift MODAQ's numbering; number them
-      // as if appended so stats keyed on packet numbers line up
-      const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
       const app = tbBridge.appState;
       const progress = app && typeof meta.reached === 'number'
         ? gameProgress(Math.max(meta.reached, app.uiState.cycleIndex + 1), app.game.gameFormat.regulationTossupCount) : null;
@@ -282,8 +275,11 @@ function mountMODAQ(id, meta, isNew) {
         qbj: toQBJString(app.game, app.game.packet.name ?? app.uiState.packetFilename, meta.round),
         game: JSON.stringify(app.game, null, 2),
       } : null;
-      const body = combinedUpload(qbj, meta.round, storeText,
-        meta.tb ? tbUsedIds(qbj, meta.tb) : null, protests, progress, modaq);
+      // questions added mid-packet shift MODAQ's numbering: the upload
+      // numbers them as if appended, so stats keyed on packet numbers line
+      // up, says which tiebreakers were read, so the TD's usage log stays
+      // exact (worker logTbUses), and keeps the record for Edit in MODAQ
+      const body = readerUpload(match, meta, storeText, protests, progress, modaq);
       // a stalled connection gives up rather than leave "Uploading" up
       const stop = new AbortController();
       const timer = setTimeout(() => stop.abort(), UPLOAD_WAIT_MS);

@@ -124,7 +124,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
   its fallback). "Upload to qb-td" in MODAQ's
   menu sends one `.qbtd.json` per game into the bucket — the match qbj plus
   the full game state in a single file, plus which tiebreaker questions
-  the game read; no file downloads or uploads. The
+  the game read and where added or replaced questions sit, so Edit in
+  MODAQ numbers a correction as the game was; no file downloads or uploads. The
   dashboard and public routes split the qbj back out wherever a bare `.qbj`
   is needed (stats, the zip export, public downloads) — the game half,
   which contains the packet text, never leaves the TO side. Starting a game mints a per-game URL

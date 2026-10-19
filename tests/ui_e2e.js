@@ -2013,6 +2013,36 @@ async function openHubOf(adminSecret) {
   await call(`${A}/files/${orig.id}`, { method: 'POST', json: { round: 2 } });
 }
 
+/* ---------- 24g. Edit in MODAQ keeps where questions were replaced ----------
+   A reader upload carries its question record (read_core readerUpload).
+   Edit in MODAQ writes it into the game it hands the reader, so the
+   correction is numbered as the game was; an upload without one that
+   can't be rebuilt opens without one, as before. */
+{
+  const room = roomBucket(1);
+  const { qbj, base } = gameFiles(1, 1, true);
+  const store = { game: { cycles: [], packet: { tossups: [], bonuses: [] } }, uiState: {} };
+  const map = { t: 20, b: 20, tuAt: { 9: 'TU1' }, boAt: {} };
+  const [withRec, without] = await roomUpload(room, 1, [
+    { path: writeFx(base + '_rec.qbtd.json', JSON.stringify({ qbj, game: store, tb: { used: ['TU1'], map } })) },
+    { path: writeFx(base + '_old.qbtd.json', JSON.stringify({ qbj, game: store, tb: { used: [] } })) }]);
+  ok('24g edit: both uploads are taken', withRec && !withRec.error && without && !without.error, [withRec, without]);
+  // the reader's tab is not opened here; its link is kept to look up the game
+  const opened = async (fileId) => {
+    await openHub();
+    await click(`[data-cell="${room.id}:1"]`);
+    await waitJs(`!!document.querySelector('.cellpanel [data-editfile="${fileId}"]')`, 'Edit in MODAQ');
+    await js(`window.qbtdOpened = []; window.open = (u) => { window.qbtdOpened.push(u); return null; }; true`);
+    await click(`.cellpanel [data-editfile="${fileId}"]`);
+    const link = await waitJs(`window.qbtdOpened[0] || ''`, 'the reader link');
+    return js(`JSON.parse(localStorage.getItem('qbtdMeta:${room.secret}:' + new URL(${q(link)}, location.href).searchParams.get('g')))`);
+  };
+  const meta = await opened(withRec.id);
+  ok('24g edit: the reader gets the upload\'s question record', JSON.stringify(meta && meta.tb) === JSON.stringify(map), meta);
+  const old = await opened(without.id);
+  ok('24g edit: an upload with none to rebuild opens as before', old && old.round === 1 && old.tb === undefined, old);
+}
+
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);

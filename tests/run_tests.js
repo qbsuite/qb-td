@@ -40,7 +40,7 @@ import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js'
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -3912,13 +3912,41 @@ test('upload progress: the furthest question reached rides with a reader upload,
 
 test('combinedUpload carries tb.used when given, omits it otherwise', () => {
   const match = { tossups_read: 21, match_teams: [] };
-  const withTb = JSON.parse(combinedUpload(match, 5, '{"cycles":[]}', ['TU1']));
+  const withTb = JSON.parse(combinedUpload(match, 5, '{"cycles":[]}', { used: ['TU1'] }));
   assert.deepEqual(withTb.tb, { used: ['TU1'] });
   assert.equal(withTb.qbj._round, 5);
-  const emptyTb = JSON.parse(combinedUpload(match, 5, null, []));
+  const emptyTb = JSON.parse(combinedUpload(match, 5, null, { used: [] }));
   assert.deepEqual(emptyTb.tb, { used: [] }, 'empty report still clears an old log');
   const noTb = JSON.parse(combinedUpload(match, 5, null));
   assert.equal(noTb.tb, undefined);
+});
+
+test('readerUpload: the question record rides in the root only; a game with no added questions uploads as before', () => {
+  const match = { tossups_read: 20, match_teams: [], match_questions: [
+    { question_number: 1, tossup_question: { question_number: 1 }, bonus: { question: { question_number: 1 } } },
+    { question_number: 2, tossup_question: { question_number: 2 } },
+  ] };
+  const modaq = { qbj: '{"m":1}', game: '{"g":1}' };
+  const store = '{"game":{"cycles":[]},"uiState":{}}';
+  const before = JSON.parse(combinedUpload(match, 3, store, null, null, null, modaq));
+  // a game begun on the reader: the packet's own sizes, nothing added
+  const fresh = JSON.parse(readerUpload(match, { round: 3, tb: { t: 20, b: 20, tu: [], bo: [] } }, store, null, null, modaq));
+  assert.deepEqual(fresh.tb, { used: [], map: { t: 20, b: 20, tuAt: {}, boAt: {} } });
+  assert.equal(JSON.stringify(fresh.qbj), JSON.stringify(before.qbj), 'the stats qbj, to the byte');
+  assert.deepEqual(fresh.modaq, modaq, 'MODAQ\'s texts as given');
+  assert.deepEqual(fresh.game, before.game);
+  // a game with no record (resumed from before there was one) sends none
+  const none = JSON.parse(readerUpload(match, { round: 3 }, store, null, null, modaq));
+  assert.equal(none.tb, undefined);
+  assert.equal(JSON.stringify(none.qbj), JSON.stringify(before.qbj));
+  // undo stays with the reader; the held bonuses go
+  const tb = { t: 20, b: 20, tuAt: { 1: 'TU1' }, boAt: {}, reserve: { 0: 0 }, undo: [{ ci: 0 }] };
+  assert.deepEqual(tbRecord(tb), { t: 20, b: 20, tuAt: { 1: 'TU1' }, boAt: {}, reserve: { 0: 0 } });
+  assert.equal(tb.undo.length, 1, 'the meta is untouched');
+  const added = JSON.parse(readerUpload(match, { round: 3, tb }, store));
+  assert.deepEqual(added.tb.map, tbRecord(tb));
+  assert.equal(added.qbj.match_questions[1].tossup_question.qbtd_tiebreaker, 'TU1');
+  assert.ok(!JSON.stringify(added.qbj).includes('tuAt'), 'the qbj carries no record');
 });
 
 test('tbPanelRows merges tossups and bonuses with their uses', () => {
@@ -7000,6 +7028,195 @@ test('Replace a packet: a round with games read from its packet asks first; an e
     'Replace Round 2\'s packet with Round 2 fixed.json? 3 games already uploaded will use the new packet for their buzzpoints and categories.');
   assert.equal(replacePrompt({ noun: 'Round', round: 1, name: 'Packet 1.docx', had: true, games: 1 }),
     'Replace Round 1\'s packet with Packet 1.docx? 1 game already uploaded will use the new packet for its buzzpoints and categories.');
+});
+
+/* ---------- Edit in MODAQ: a game with replaced questions ----------
+   The reader numbers a question put in mid-packet as if appended
+   (tbRemapMatch), from its record of where it went (meta.tb). Edit in
+   MODAQ hands the saved game back to the reader with the record the
+   upload carries (read_core tbResume), so the correction is numbered as
+   the game was. Real MODAQ state, reopened the way the reader resumes a
+   game, and uploaded the way the reader uploads one. */
+const { runInAction: mAction } = modaqRequire('mobx');
+const mPacket = (tossups, bonuses, name) => {
+  const p = new MPacket();
+  p.setTossups(tossups);
+  p.setBonuses(bonuses);
+  p.setName(name);
+  return p;
+};
+// the reader's upload of a game: protests and qbj numbered by the meta's record
+const editProtests = (storeText, tb) => tbProtests(protestReport(JSON.parse(storeText), null, MTossup), tb);
+const readerRoot = (game, meta, storeText) => JSON.parse(readerUpload(toQBJ(game, 'Packet'), meta, storeText,
+  editProtests(storeText, meta.tb), null, { qbj: mToQBJString(game, 'Packet', meta.round), game: JSON.stringify(game, null, 2) }));
+// Alpha negs tossup 10 and the moderator replaces it with the pool's TU1,
+// which Beta gets; on question 13 the bonus is replaced with B1. Beta
+// protests packet tossup 15, and Alpha a part of the bonus after B1.
+async function replacedUpload() {
+  const app = new MApp();
+  const { mem, trunk } = await mobxStore(app);
+  const game = app.game;
+  game.setGameFormat(ACFGameFormat);
+  game.loadPacket(mPacket(Array.from({ length: 20 }, (_, i) => new MTossup(`T${i + 1} one two three four`, 'a')),
+    Array.from({ length: 20 }, (_, i) => new MBonus(`B${i + 1}`, [1, 2, 3].map(() => ({ question: 'p', answer: 'a', value: 10 })))), 'Packet'));
+  const A = new MPlayer('Ann', 'Alpha', true);
+  const B = new MPlayer('Bob', 'Beta', true);
+  game.addNewPlayers([A, B]);
+  const meta = { a: 'Alpha', b: 'Beta', round: 4, tb: { t: 20, b: 20, tu: [], bo: [] } };
+  const replace = (ci, kind, question, id) => {
+    const out = replaceQuestion({ game, cycleIndex: ci, kind, question, id, tb: meta.tb, act: mAction, makePacket: mPacket });
+    assert.ok(out.tb, out.error);
+    meta.tb = out.tb;
+  };
+  const buzz = (ci, who) => mAction(() => game.cycles[ci].addCorrectBuzz({ player: who, position: 2, points: 10 },
+    game.getTossupIndex(ci), game.gameFormat, game.getBonusIndex(ci), 3));
+  const right = (ci, who) => { buzz(ci, who); mAction(() => game.cycles[ci].setBonusPartAnswer(0, who.teamName, 10)); };
+  for (let ci = 0; ci < 9; ci++) right(ci, ci % 3 ? A : B);
+  mAction(() => game.cycles[9].addWrongBuzz({ player: A, position: 1, points: -5, isLastWord: false }, game.getTossupIndex(9), game.gameFormat));
+  replace(9, 'tossup', new MTossup('TB1 one two three', 'x'), 'TU1');
+  right(9, B);
+  for (let ci = 10; ci < 12; ci++) right(ci, A);
+  buzz(12, A);
+  replace(12, 'bonus', new MBonus('TBB1', [1, 2, 3].map(() => ({ question: 'p', answer: 'a', value: 10 }))), 'B1');
+  mAction(() => game.cycles[12].setBonusPartAnswer(1, 'Alpha', 10));
+  for (let ci = 13; ci < 20; ci++) right(ci, ci % 2 ? A : B);
+  mAction(() => {
+    game.cycles[14].addTossupProtest('Beta', game.getTossupIndex(14), 1, 'beta answer', 'it was right');
+    game.cycles[15].addBonusProtest(game.cycles[15].bonusAnswer.bonusIndex, 2, 'alpha answer', 'it was right', 'Alpha');
+  });
+  await trunk.persist();
+  trunk.disposer && trunk.disposer();
+  return { meta, root: readerRoot(game, meta, mem.get('g')) };
+}
+// Edit in MODAQ: the meta the hub writes (admin.js editGame), the saved
+// game resumed as the reader resumes it, uploaded again unchanged
+async function editReupload(root) {
+  const tb = tbResume(root);
+  const meta = parseMeta(JSON.stringify({ a: 'Alpha', b: 'Beta', round: 4, t: '', room: 'Room 1', started: 1, ...(tb ? { tb } : {}) }));
+  const storeText = JSON.stringify(root.game);
+  const mem = new Map([['g', storeText]]);
+  const storage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) };
+  const app = new MApp();
+  const trunk = new MTrunk(app, { storage, storageKey: 'g', delay: 0 });
+  await trunk.init();
+  trunk.disposer && trunk.disposer();
+  return readerRoot(app.game, meta, storeText);
+}
+const tbGame = await replacedUpload();
+const tbEdited = await editReupload(tbGame.root);
+// the same upload from before uploads carried the record
+const tbOld = { ...tbGame.root, tb: { used: tbGame.root.tb.used } };
+const tbOldEdited = await editReupload(tbOld);
+const tbLost = await editReupload({ ...tbGame.root, tb: undefined });
+const tbNums = (root) => root.qbj.match_questions.map((q) => [q.tossup_question.question_number, q.tossup_question.qbtd_tiebreaker,
+  q.bonus && q.bonus.question.question_number, q.bonus && q.bonus.question.qbtd_tiebreaker]);
+
+test('Edit in MODAQ: a game with mid-packet replacements is numbered as it was, protests and tiebreakers too', () => {
+  const { root, meta } = tbGame;
+  // the game as uploaded: packet numbers kept, the replacements after them
+  const nums = tbNums(root);
+  assert.deepEqual(nums[9], [21, 'TU1', 10, undefined]);
+  assert.deepEqual(nums[10], [11, undefined, 11, undefined]);
+  assert.deepEqual(nums[12], [13, undefined, 21, 'B1']);
+  assert.deepEqual(nums[13], [14, undefined, 14, undefined]);
+  assert.deepEqual(root.protests.map((p) => [p.kind, p.q]), [['tu', 15], ['b', 16]]);
+  assert.deepEqual(root.tb, { used: ['TU1', 'B1'], map: tbRecord(meta.tb) });
+  // reopened and uploaded again: the very same
+  assert.deepEqual(tbEdited.qbj, root.qbj);
+  assert.deepEqual(tbEdited.protests, root.protests);
+  assert.deepEqual(tbEdited.tb, root.tb);
+  assert.equal(tbEdited.modaq.qbj, root.modaq.qbj, 'MODAQ\'s own QBJ, to the byte');
+  // as it was before: packet questions after the replacement moved up one,
+  // the tiebreaker tags gone, and the protests renumbered
+  assert.deepEqual(tbNums(tbLost)[9], [11, undefined, 10, undefined]);
+  assert.deepEqual(tbNums(tbLost)[10], [12, undefined, 11, undefined]);
+  assert.deepEqual(tbLost.protests.map((p) => [p.kind, p.q]), [['tu', 16], ['b', 17]]);
+  assert.equal(tbLost.tb, undefined);
+});
+
+test('Edit in MODAQ: the record stays out of MODAQ\'s files and the game downloads', () => {
+  const { root } = tbGame;
+  const files = modaqExport(root, 4);
+  for (const text of [files.qbj, files.game, root.modaq.qbj, root.modaq.game, JSON.stringify(root.qbj)]) {
+    assert.ok(!/tuAt|boAt|"map"/.test(text), text.slice(0, 80));
+  }
+  assert.equal(files.qbj, root.modaq.qbj);
+});
+
+test('Edit in MODAQ: an upload from before the record has it rebuilt from MODAQ\'s QBJ and the stats qbj', () => {
+  const { root, meta } = tbGame;
+  const { reserve, ...want } = tbRecord(meta.tb);
+  assert.deepEqual(tbResume(tbOld), want);
+  assert.deepEqual(tbOldEdited.qbj, root.qbj);
+  assert.deepEqual(tbOldEdited.protests, root.protests);
+  assert.deepEqual(tbOldEdited.tb.used, root.tb.used);
+  // one it can't rebuild resumes as before: no MODAQ QBJ, or no record kept
+  assert.equal(tbResume({ ...tbOld, modaq: undefined }), null);
+  assert.equal(tbResume({ ...tbOld, tb: undefined }), null);
+  assert.equal(tbResume({ ...tbOld, modaq: { qbj: 'not json' } }), null);
+  // a record the upload carries is taken as it is, MODAQ's QBJ or not
+  assert.deepEqual(tbResume({ ...root, modaq: undefined }), tbRecord(meta.tb));
+  // a malformed one is not
+  assert.deepEqual(tbResume({ ...root, tb: { ...root.tb, map: { t: 20, b: 20, tuAt: { x: 1 }, boAt: {} } } }), want);
+});
+
+test('tbRebuild: replacements, appended tiebreakers and held bonuses number as the reader numbered them', () => {
+  // an upload from before the record, made from the game as it stands
+  const old = (g) => ({ qbj: withRound(g.qbj(), 1), game: { game: JSON.parse(JSON.stringify(g.game)), uiState: {} },
+    modaq: { qbj: mToQBJString(g.game, 'Packet', 1) }, tb: { used: tbUsedIds(g.qbj(), g.tb) } });
+  const check = (g, label) => {
+    const rec = tbRebuild(old(g));
+    assert.ok(rec, label + ': rebuilt');
+    assert.deepEqual(tbRemapMatch(toQBJ(g.game, 'Packet', 1), rec), g.qbj(), label + ': numbered as the reader did');
+    return rec;
+  };
+  // a replaced bonus
+  const bonus = replaceGame();
+  for (let ci = 0; ci < 5; ci++) bonus.correct(ci, bonus.A);
+  bonus.game.cycles[5].addCorrectBuzz({ player: bonus.B, position: 2, points: 10 }, bonus.game.getTossupIndex(5), bonus.game.gameFormat, bonus.game.getBonusIndex(5), 3);
+  assert.equal(bonus.replace(5, 'bonus', bonus.bo(1, 'TB'), 'B1'), '');
+  for (let ci = 6; ci < 20; ci++) bonus.correct(ci, bonus.A);
+  assert.deepEqual(check(bonus, 'bonus'), { t: 20, b: 20, tuAt: {}, boAt: { 6: 'B1' } });
+  // a tossup replaced twice on one question: the first replacement was
+  // thrown out unread, so its pool id is not known
+  const twice = replaceGame();
+  for (let ci = 0; ci < 3; ci++) twice.correct(ci, twice.A);
+  twice.neg(3, twice.A);
+  assert.equal(twice.replace(3, 'tossup', twice.tu(1, 'TB'), 'TU1'), '');
+  twice.neg(3, twice.B);
+  assert.equal(twice.replace(3, 'tossup', twice.tu(2, 'TB'), 'TU2'), '');
+  for (let ci = 3; ci < 20; ci++) twice.correct(ci, twice.B);
+  assert.deepEqual(twice.tb.tuAt, { 4: 'TU1', 5: 'TU2' });
+  assert.deepEqual(check(twice, 'twice').tuAt, { 4: '', 5: 'TU2' });
+  // two tiebreakers added after a tied regulation, one read
+  const ot = replaceGame();
+  for (let ci = 0; ci < 20; ci++) ot.correct(ci, ci % 2 ? ot.A : ot.B);
+  ot.tb = tbRecordAdd(null, { t: 20, b: 20 }, { t: 20, b: 20 }, { tu: ['TU1', 'TU2'], bo: [] });
+  ot.game.loadPacket(mPacket([...ot.game.packet.tossups, ot.tu(1, 'TB'), ot.tu(2, 'TB')], ot.game.packet.bonuses, 'Packet'));
+  ot.correct(20, ot.A);
+  assert.deepEqual(tbUsedIds(ot.qbj(), ot.tb), ['TU1']);
+  assert.deepEqual(check(ot, 'overtime'), { t: 20, b: 20, tuAt: { 20: 'TU1', 21: '' }, boAt: {} });
+  // an earlier answered tossup replaced, its bonus held while the
+  // replacement goes dead: positions rebuilt, the hold is not
+  const held = playedGame();
+  assert.equal(held.replace(2, 'tossup', held.tu(1, 'TB'), 'TU1', held.bo(1, 'TB'), 'B1'), '');
+  assert.ok(held.tb.reserve);
+  assert.deepEqual(check(held, 'held'), { t: 20, b: 20, tuAt: { 3: 'TU1' }, boAt: {} });
+  // an earlier dead tossup replaced: the blank bonus held for it is placed
+  const blank = playedGame();
+  assert.equal(blank.replace(4, 'tossup', blank.tu(1, 'TB'), 'TU1', blank.bo(1, 'Blank'), ''), '');
+  assert.deepEqual(blank.tb.boAt, { 4: '' });
+  assert.deepEqual(check(blank, 'blank').boAt, { 4: '' });
+  // numbers that no record explains are refused
+  const bad = old(bonus);
+  bad.qbj.match_questions[7].tossup_question.question_number = 3;
+  assert.equal(tbRebuild(bad), null);
+  const other = old(bonus);
+  other.modaq.qbj = mToQBJString(twice.game, 'Packet', 1);
+  assert.equal(tbRebuild(other), null, 'MODAQ\'s QBJ of another game');
+  const wrongUsed = old(bonus);
+  wrongUsed.tb.used = ['B2'];
+  assert.equal(tbRebuild(wrongUsed), null);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

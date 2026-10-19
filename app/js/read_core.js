@@ -80,17 +80,18 @@ export function matchFilenames(round, nameA, nameB) {
 }
 
 /** The single per-game upload: MODAQ's qbj (round stamped) + the persisted
-    game state (may be null if persistence hasn't flushed yet). Games whose
-    packet carried appended tiebreakers (meta.tb) also report which pool
-    questions were read — always, even when the list is empty, so a
-    re-export that no longer reaches the tiebreakers clears its old log. */
-export function combinedUpload(match, round, storeText, tbUsed = null, protests = null, progress = null, modaq = null) {
+    game state (may be null if persistence hasn't flushed yet). Games with
+    a question record (meta.tb) also send `tb`: {used, map} (readerUpload),
+    the pool questions read — always, even when the list is empty, so a
+    re-export that no longer reaches the tiebreakers clears its old log —
+    and the record itself. */
+export function combinedUpload(match, round, storeText, tb = null, protests = null, progress = null, modaq = null) {
   let game = null;
   try { game = JSON.parse(storeText); } catch (e) { /* upload the qbj anyway */ }
   return JSON.stringify({
     qbj: withRound(match, round),
     game,
-    ...(tbUsed ? { tb: { used: tbUsed } } : {}),
+    ...(tb ? { tb } : {}),
     // the game's protests, structured (protests.js protestReport); the
     // Worker falls back to the qbj's notes when absent
     ...(Array.isArray(protests) && protests.length ? { protests } : {}),
@@ -101,6 +102,17 @@ export function combinedUpload(match, round, storeText, tbUsed = null, protests 
     // MODAQ's own QBJ and game texts (engine/modaqfile.js), for downloads
     ...(modaq ? { modaq } : {}),
   });
+}
+
+/** A reader's upload of its game (read_main uploadGame): MODAQ's match
+    numbered by the game's question record (tbRemapMatch), with the pool
+    questions it read and the record, so Edit in MODAQ can number a
+    correction the same way (tbResume). The record stays in the upload's
+    root: the qbj and MODAQ's texts are as they would be without it. */
+export function readerUpload(match, meta, storeText, protests = null, progress = null, modaq = null) {
+  const qbj = meta.tb ? tbRemapMatch(match, meta.tb) : match;
+  const tb = meta.tb ? { used: tbUsedIds(qbj, meta.tb), map: tbRecord(meta.tb) } : null;
+  return combinedUpload(qbj, meta.round, storeText, tb, protests, progress, modaq);
 }
 
 /** How far a game got, for its upload: {at, of}, the furthest question
@@ -269,6 +281,148 @@ export function tbUsedIds(match, tb) {
     if (bq && Number.isInteger(bq.question_number)) boAt(bq.question_number);
   }
   return used;
+}
+
+/** The question record as an upload keeps it (root.tb.map): where added
+    and replaced questions sit, and the bonuses held for replacements.
+    Undo stays with the reader that made the replacement. */
+export function tbRecord(tb) {
+  const st = tbState(tb);
+  if (!st) return null;
+  const { undo, ...rec } = st;
+  return rec;
+}
+
+/** Protests (protests.js protestReport) numbered the way the upload
+    numbers questions. */
+export function tbProtests(protests, tb) {
+  if (!tb) return protests;
+  const num = tbNumbering(tb);
+  return protests.map((p) => ({ ...p, q: p.kind === 'b' ? num.bo(p.q) : num.tu(p.q) }));
+}
+
+/** The question record to resume an uploaded game with (Edit in MODAQ),
+    so its correction is numbered as the game was: the upload's own
+    (root.tb.map), or for an upload from before it carried one, tbRebuild's.
+    null for a game the reader kept no record for, or one that can't be
+    rebuilt: that game resumes without one, as before. */
+export function tbResume(root) {
+  if (!root || typeof root !== 'object' || !root.tb || typeof root.tb !== 'object') return null;
+  return cleanTbRecord(root.tb.map) || tbRebuild(root);
+}
+
+// A stored record, checked: sizes and indices small whole numbers, pool
+// ids strings. null for anything else.
+function cleanTbRecord(rec) {
+  if (!rec || typeof rec !== 'object') return null;
+  const size = (n) => Number.isInteger(n) && n >= 0 && n <= 999;
+  const map = (m, ok) => (m && typeof m === 'object' && !Array.isArray(m)
+    && Object.entries(m).every(([k, v]) => /^\d{1,3}$/.test(k) && ok(v)) ? { ...m } : null);
+  const tuAt = map(rec.tuAt, (v) => typeof v === 'string');
+  const boAt = map(rec.boAt, (v) => typeof v === 'string');
+  const reserve = rec.reserve === undefined ? undefined : map(rec.reserve, size);
+  if (!size(rec.t) || !size(rec.b) || !tuAt || !boAt || reserve === null) return null;
+  return { t: rec.t, b: rec.b, tuAt, boAt, ...(reserve ? { reserve } : {}) };
+}
+
+const qbjMatch = (x) => (x && Array.isArray(x.match_questions) ? x
+  : x && Array.isArray(x.objects) ? x.objects.find((o) => o && Array.isArray(o.match_questions)) || null : null);
+
+/** The question record of an upload from before uploads carried it,
+    rebuilt from what the upload keeps. MODAQ's own QBJ (root.modaq.qbj)
+    numbers each question by its place in the game's packet; the stats qbj
+    (root.qbj) numbers the same questions as tbRemapMatch did, the packet's
+    own 1 to t in order and added ones after, tagged with their pool ids.
+    Where the two part says which questions were added, and the saved
+    game's packet gives the total. Questions the game never numbered
+    (thrown out, or not reached) can't say: added ones among them go
+    latest, as a replacement follows the question it replaced and a
+    tiebreaker follows the packet. Kept only when it numbers MODAQ's QBJ
+    exactly as the stats qbj does and names the same pool questions read;
+    otherwise null, as for an upload without MODAQ's QBJ (from before
+    10/18/2026, unless tools/modaq_regen.mjs gave it one). Bonuses held
+    for a replacement (reserve) and the pool ids of added questions never
+    read are not recovered. */
+export function tbRebuild(root) {
+  const used = root && root.tb && root.tb.used;
+  const stats = qbjMatch(root && root.qbj);
+  let modaq = null;
+  try { modaq = qbjMatch(JSON.parse(root.modaq.qbj)); } catch (e) { return null; }
+  const packet = root.game && root.game.game && root.game.game.packet;
+  if (!Array.isArray(used) || !stats || !modaq || !packet || !Array.isArray(packet.tossups)) return null;
+  const sq = stats.match_questions;
+  const mq = modaq.match_questions;
+  if (sq.length !== mq.length) return null;
+  // each numbered question: game index -> {n: its stats number, id}
+  const refs = { tu: new Map(), bo: new Map() };
+  const note = (kind, s, m) => {
+    if (!s !== !m) return false;
+    if (!s) return true;
+    const g = m.question_number - 1;
+    const n = s.question_number;
+    const id = typeof s.qbtd_tiebreaker === 'string' ? s.qbtd_tiebreaker : '';
+    if (!Number.isInteger(g) || g < 0 || !Number.isInteger(n) || n < 1) return false;
+    const was = refs[kind].get(g);
+    if (was && (was.n !== n || was.id !== id)) return false;
+    refs[kind].set(g, { n, id });
+    return true;
+  };
+  const slots = (q) => [q.tossup_question, q.replacement_tossup_question, q.bonus && q.bonus.question];
+  for (let i = 0; i < sq.length; i++) {
+    const [st, sr, sb] = slots(sq[i] || {});
+    const [mt, mr, mb] = slots(mq[i] || {});
+    if (!note('tu', st, mt) || !note('tu', sr, mr) || !note('bo', sb, mb)) return null;
+  }
+  const tu = rebuildKind(refs.tu, packet.tossups.length);
+  const bo = rebuildKind(refs.bo, (packet.bonuses || []).length);
+  if (!tu || !bo) return null;
+  const rec = { t: tu.t, b: bo.t, tuAt: tu.at, boAt: bo.at };
+  // the check: MODAQ's numbering, renumbered by the record, is the stats qbj's
+  const again = tbRemapMatch(modaq, rec).match_questions;
+  const same = (x, y) => !x === !y && (!x || (x.question_number === y.question_number && x.qbtd_tiebreaker === y.qbtd_tiebreaker));
+  for (let i = 0; i < sq.length; i++) {
+    const want = slots(sq[i] || {});
+    if (!slots(again[i] || {}).every((x, j) => same(x, want[j]))) return null;
+  }
+  if (JSON.stringify(tbUsedIds(stats, rec)) !== JSON.stringify(used)) return null;
+  return rec;
+}
+
+// One kind (tossups or bonuses) for tbRebuild: the packet's own size t and
+// the added questions' game indices -> pool ids, from the numbered ones
+// ({game index -> {n, id}}) and the game packet's size. A packet question
+// at game index g numbered n has g + 1 - n added questions before it; an
+// added one numbered n has n - t - 1. The largest t the numbers allow
+// (the fewest added questions) is taken.
+function rebuildKind(refs, size) {
+  const gs = [...refs.keys()].sort((x, y) => x - y);
+  // numbers past the packet's end (an overtime question with no tossup
+  // left to read) have every added question before them
+  const past = gs.filter((g) => g >= size).map((g) => ({ g, ...refs.get(g) }));
+  for (let t = size; t >= 0; t--) {
+    if (past.some((x) => x.id || x.g + 1 - x.n !== size - t)) continue;
+    const at = {};
+    let prev = -1; // the last numbered question's game index
+    let upTo = 0; // added questions up to and including it
+    let ok = true;
+    for (const g of gs.filter((x) => x < size)) {
+      const { n, id } = refs.get(g);
+      const added = n > t;
+      const before = added ? n - t - 1 : g + 1 - n;
+      const gap = before - upTo; // added among the unnumbered ones since prev
+      if ((id && !added) || before < 0 || gap < 0 || gap > g - prev - 1) { ok = false; break; }
+      for (let x = g - gap; x < g; x++) at[x] = '';
+      if (added) at[g] = id;
+      prev = g;
+      upTo = before + (added ? 1 : 0);
+    }
+    // added past the last numbered question: never read, so appended
+    const rest = size - t - upTo;
+    if (!ok || rest < 0 || rest > size - 1 - prev) continue;
+    for (let x = size - rest; x < size; x++) at[x] = '';
+    return { t, at };
+  }
+  return null;
 }
 
 /** Where questions added "at the reader's place" go: game indices {t, b}
