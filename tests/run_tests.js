@@ -15,7 +15,7 @@ import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, finishedThrough, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
-import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
+import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, questionWords, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries, sideRounds } from '../app/engine/buzz.js';
@@ -5029,6 +5029,33 @@ test('brackets: a room is on its bracket\'s round; idle rooms on current_round',
   assert.equal(roomIndexOf(m.schedule, { id: 102, room_name: 'x' }), 1, 'bucket link');
   assert.equal(roomIndexOf(m.schedule, { id: 999, room_name: ' room 3 ' }), 2, 'name fallback');
   assert.equal(roomIndexOf(m.schedule, { id: 999, room_name: 'nope' }), null);
+});
+
+test('brackets: a room rename follows the schedule room the bucket resolves to', () => {
+  const sched = () => ({ rooms: [{ name: 'Room 1', bucket: 101 }, { name: 'Room 2', bucket: null },
+    { name: 'Room 3', bucket: 103 }, { name: 'Room 4', bucket: 77 }] });
+  // linked: the link wins over any name
+  let s = sched();
+  assert.equal(followRoomRename(s, { id: 101, room_name: 'Room 1' }, 'Library'), true);
+  assert.deepEqual(s.rooms.map((r) => r.name), ['Library', 'Room 2', 'Room 3', 'Room 4']);
+  // matched by name only (a room made after the schedule): it keeps matching
+  s = sched();
+  assert.equal(followRoomRename(s, { id: 102, room_name: ' room 2 ' }, 'Gym', [101, 102, 103]), true);
+  assert.equal(s.rooms[1].name, 'Gym');
+  assert.equal(roomIndexOf(s, { id: 102, room_name: 'Gym' }), 1);
+  assert.equal(s.rooms[1].bucket, null, 'renamed, not linked');
+  // a name match never takes a room linked to another of the rooms
+  s = sched();
+  assert.equal(followRoomRename(s, { id: 104, room_name: 'Room 3' }, 'Annex', [101, 102, 103, 104]), false);
+  assert.equal(s.rooms[2].name, 'Room 3');
+  // ...but a link to a room since removed is no claim
+  s = sched();
+  assert.equal(followRoomRename(s, { id: 104, room_name: 'Room 4' }, 'Annex', [101, 102, 103, 104]), true);
+  assert.equal(s.rooms[3].name, 'Annex');
+  // nothing to follow, or nothing moved
+  assert.equal(followRoomRename(sched(), { id: 105, room_name: 'Room 9' }, 'X', [105]), false);
+  assert.equal(followRoomRename(sched(), { id: 101, room_name: 'Room 1' }, 'Room 1'), false);
+  assert.equal(followRoomRename(null, { id: 101, room_name: 'Room 1' }, 'X'), false);
 });
 
 test('brackets: auto-advance moves a finished bracket one round and nothing else', () => {

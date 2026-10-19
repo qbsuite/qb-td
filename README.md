@@ -461,6 +461,11 @@ dashboard shows which invites are still unused, and revokes them.
   stamp per round and clients refetch only the rounds that moved — a
   round that has finished never moves again, so a viewer arriving late
   in a long day pays for the round in progress, not for the tournament.
+  (The exception is a fix in place — the TD's Rebuild, a room move or
+  rename — which rewrites games under their old ids: the forced rebuild
+  that follows gives each round it changed a new stamp, newest id and
+  count plus the rebuild's generation, so the snapshot and viewers'
+  caches pick it up.)
   Request *count* stays flat as rounds multiply: whatever the snapshot
   can't answer is fetched from the Worker in a single
   `/pub/:slug/rounds?n=…` (the shards streamed back to back), so a first

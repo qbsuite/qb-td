@@ -147,6 +147,24 @@ export function roomIndexOf(schedule, bucket) {
 }
 
 /**
+ * Follows a room's rename on the schedule (in place): the schedule room
+ * roomIndexOf finds for the bucket under its old name takes the new name,
+ * so a room matched only by name stays matched. Every room linked to the
+ * bucket follows; a name match never takes a room linked to another of
+ * the tournament's rooms (bucketIds). True when a name changed.
+ */
+export function followRoomRename(schedule, bucket, name, bucketIds = []) {
+  const i = roomIndexOf(schedule, bucket);
+  if (i === null) return false;
+  const hit = schedule.rooms[i];
+  const rooms = hit.bucket === bucket.id ? schedule.rooms.filter((r) => r && r.bucket === bucket.id)
+    : bucketIds.includes(hit.bucket) ? [] : [hit];
+  let moved = false;
+  for (const r of rooms) if (r.name !== name) { r.name = name; moved = true; }
+  return moved;
+}
+
+/**
  * Auto-advance. started(n) → Set of room indices that started round n;
  * matched(roomIndex) → whether a bucket plays in that room; hasPacket(n).
  * only: a bracket key (a room's start moves only its bracket), or null

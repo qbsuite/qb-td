@@ -33,7 +33,7 @@ import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams,
   hasPlaceholders, prelimProgress, prelimRounds, autoFill, finishedThrough } from '../engine/schedule.js';
 import { finalsProgress, finalsFill } from '../engine/finals.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
-import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
+import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, followRoomRename, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials, sha256Hex } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
@@ -946,9 +946,11 @@ function renderRoomsSec(a, t, buckets, files) {
         await pub(a + '/buckets/' + inp.dataset.roomrename, {
           method: 'POST', json: { room_name: name } });
         // the Worker renamed the saved schedule's copy; the one held here
-        // (saved or mid-edit) follows, so a later save doesn't undo it
+        // (saved or mid-edit) follows by the same rule, so a later save
+        // doesn't undo it
         const bid = Number(inp.dataset.roomrename);
-        if (sched && Array.isArray(sched.rooms)) sched.rooms.forEach((r) => { if (r && r.bucket === bid) r.name = name; });
+        const was = buckets.find((b) => b.id === bid);
+        if (was) followRoomRename(sched, was, name, [...buckets, bye].filter(Boolean).map((b) => b.id));
         say('Renamed to ' + name);
         showDetail();
       } catch (e) { say(e.message, true); }

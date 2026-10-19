@@ -41,7 +41,7 @@
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
 import { modaqExport, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
 import { parseRoster, rosterNameMap, renameMatch } from '../app/engine/qbj.js';
-import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance,
+import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
 const SETUP_TTL = 7 * 24 * 3600 * 1000;
@@ -520,7 +520,8 @@ const PUB_BACKFILL_PER_TICK = 200;
 const pubGameKey = (tid, fileId) => `t/${tid}/pub/${fileId}.json`;
 const roundBlobKey = (tid, n) => `t/${tid}/round/${n}.json`;
 const manifestKey = (tid) => `t/${tid}/rounds.json`;
-// Written by the TO's rebuild (putBundle), consumed by the next
+// Written by whatever rewrites games' public copies in place (the TO's
+// rebuild, putBundle; a room move or rename), consumed by the next
 // materialize: "rebuild every shard, whether or not its stamp moved".
 // A separate object rather than a flag inside the manifest so that
 // setting it is a bare put — no read-modify-write to race the cron on.
@@ -2358,20 +2359,43 @@ async function renameBucket(request, env, t, bucketId) {
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }
   const roomName = cleanName(body.room_name);
   if (!roomName) return err(env, 400, 'room_name required');
+  // the rooms before the rename: the schedule finds this one by its old name
+  const { results: rooms } = await env.DB.prepare(
+    'SELECT id, room_name FROM buckets WHERE tournament_id = ?1'
+  ).bind(t.id).all();
+  const was = rooms.find((b) => b.id === bucketId);
+  if (!was) return err(env, 404, 'no such room');
   const out = await env.DB.prepare(
     'UPDATE buckets SET room_name = ?3 WHERE id = ?1 AND tournament_id = ?2'
   ).bind(bucketId, t.id, roomName).run();
   if (!out.meta.changes) return err(env, 404, 'no such room');
   // The saved schedule keeps its own copy of each room's name: follow the
-  // rename on the rooms linked to this one, so the public schedule and the
-  // reader say the new name without a trip through the schedule editor.
+  // rename on the schedule room this one resolves to (its link, else its
+  // old name), so the public schedule and the reader say the new name
+  // without a trip through the schedule editor, and a room matched by
+  // name stays matched.
   const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
   const sched = obj ? await obj.json().catch(() => null) : null;
-  if (sched && Array.isArray(sched.rooms) && sched.rooms.some((r) => r && r.bucket === Number(bucketId))) {
-    for (const r of sched.rooms) if (r && r.bucket === Number(bucketId)) r.name = roomName;
+  if (followRoomRename(sched, was, roomName, rooms.map((b) => b.id))) {
     await env.DATA.put(`t/${t.id}/schedule.json`, JSON.stringify(sched), {
       httpMetadata: { contentType: 'application/json' },
     });
+  }
+  // The room's games carry its name in their public copies, and the round
+  // shards hold those: rewrite them and force the rebuild, as moveFile
+  // does, so set pages (which label buzzes from the shards) follow too.
+  const { results: games } = await env.DB.prepare(
+    "SELECT id FROM files WHERE tournament_id = ?1 AND bucket_id = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL"
+  ).bind(t.id, bucketId).all();
+  const rewrote = await Promise.all(games.map(async (f) => {
+    const pobj = await env.DATA.get(pubGameKey(t.id, f.id));
+    const entry = pobj ? await pobj.json().catch(() => null) : null;
+    if (!entry || entry.room === roomName) return false;
+    await putPubGame(env, t.id, { ...entry, room: roomName });
+    return true;
+  }));
+  if (rewrote.some(Boolean)) {
+    await env.DATA.put(rebuildKey(t.id), '{}', { httpMetadata: { contentType: 'application/json' } });
   }
   // game rows on the public page carry the room's name
   await markPub(env, t.id);

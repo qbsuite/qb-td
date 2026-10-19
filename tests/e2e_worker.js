@@ -1090,6 +1090,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
 // bucket rename: the TO edits a room name in place
 {
   const bid = (await call(A)).body.buckets[0].id;
+  const stampBefore = (await call('/pub/' + slug)).body.rounds['1'];
   r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: 'Library 204' } });
   ok('bucket renamed', r.status === 200 && r.body.room_name === 'Library 204', r.body);
   r = await call('/b/' + secret);
@@ -1112,6 +1113,13 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   r = await call('/pub/' + slug);
   ok('rebuilt public game rows carry the new room name', r.body.files.some((f) => f.room === 'Library 204')
     && !r.body.files.some((f) => f.room === 'Room 1'), r.body.files.map((f) => f.room));
+  // the round shards too, which set pages label buzzes from: the rename
+  // rewrites the room's public copies and forces their rebuild
+  r = await call('/pub/' + slug + '/rounds?n=1');
+  ok('the rebuilt shard carries the new room name',
+    r.body.rounds[0].entries.find((e) => e.id === firstQbjId).room === 'Library 204', r.body.rounds[0].entries.map((e) => e.room));
+  ok('and its stamp moved', r.body.rounds[0].v !== stampBefore && r.body.rounds[0].v.startsWith(stampBefore.split(':').slice(0, 2).join(':') + ':'),
+    [stampBefore, r.body.rounds[0].v]);
   r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: 'Room 1' } });
   ok('rename back', r.status === 200);
   r = await call('/b/' + secret + '/schedule');
@@ -1120,6 +1128,21 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('rename unknown room 404', r.status === 404, r.body);
   r = await call(`${A}/buckets/${bid}`, { method: 'POST', json: { room_name: '  ' } });
   ok('empty rename rejected', r.status === 400, r.body);
+  // a schedule room matched only by its name (its room was made after the
+  // schedule was saved) follows a rename too, and so stays matched
+  const late = (await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 2' } })).body;
+  r = await call('/b/' + late.secret + '/schedule');
+  const lateIdx = r.body.room;
+  ok('a late room matches its schedule room by name',
+    Number.isInteger(lateIdx) && r.body.schedule.rooms[lateIdx].bucket === null, r.body);
+  r = await call(`${A}/buckets/${late.id}`, { method: 'POST', json: { room_name: 'Library 205' } });
+  ok('the late room renamed', r.status === 200, r.body);
+  r = await call('/b/' + late.secret + '/schedule');
+  ok('its schedule room follows, and still matches it', r.body.room === lateIdx
+    && r.body.schedule.rooms[lateIdx].name === 'Library 205' && r.body.schedule.rooms[lateIdx].bucket === null, r.body);
+  await call(`${A}/buckets/${late.id}`, { method: 'POST', json: { room_name: 'Room 2' } });
+  r = await call(`${A}/buckets/${late.id}`, { method: 'DELETE' });
+  ok('the late room removed again', r.status === 200, r.body);
 }
 
 // room reassignment: a moderator uploaded from the wrong room's link, and
