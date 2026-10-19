@@ -216,9 +216,10 @@ function topLinks(m) {
   return tableTag([trTag(cells)], { width: '100%', border: '0' });
 }
 
+// `text` is plain text, often a stage's name, so it is escaped here
 function headerWithDivider(m, text, pageFile, { noTopLink, sticky } = {}) {
   const classes = sticky ? cls('headerAndDivider', 'scoreboardRoundHeader') : cls('headerAndDivider');
-  const pieces = [genericTag('h2', text + NBSP), tagWithAttrs('div', [cls('inlineDivider')])];
+  const pieces = [genericTag('h2', esc(text) + NBSP), tagWithAttrs('div', [cls('inlineDivider')])];
   if (!noTopLink) {
     pieces.push(genericTag('span', NBSP),
       aTag(`${m.filePrefix}${pageFile}#top`, tagWithAttrs('span', [cls('smallText')], '&#x2191;Top')));
@@ -554,13 +555,13 @@ function standingsHeaderRow(m, { anyTies, cumulative = false, advance = false })
   ]);
 }
 
-// "Winner def. Loser (box)" lines, for finals and tiebreakers (YF writes
-// the names as they are)
+// "Winner def. Loser (box)" lines, for finals and tiebreakers
 function resultList(m, games) {
   return genericTag('ul', games.map((g) => {
     const [a, b] = g.teams;
-    const line = a.points === b.points ? `${a.name} tied ${b.name}`
-      : a.points > b.points ? `${a.name} def. ${b.name}` : `${b.name} def. ${a.name}`;
+    const [an, bn] = [esc(a.name), esc(b.name)];
+    const line = a.points === b.points ? `${an} tied ${bn}`
+      : a.points > b.points ? `${an} def. ${bn}` : `${bn} def. ${an}`;
     return genericTag('li', `${line} (${gameLink(m, g, 'box')})`);
   }).join('\n'));
 }
@@ -667,7 +668,7 @@ function stagedStandingsHtml(m) {
     return tables.map(({ pl, teams, ranks }) => {
       const rows = [standingsHeaderRow(m, { anyTies, advance: assigned }),
         ...teams.map((t, i) => trTag(standingsCells(m, t, ranks[i], {
-          anyTies, advance: assigned ? ((next.pools.find((x) => x.teams.includes(t.name)) || {}).name || '') : undefined,
+          anyTies, advance: assigned ? esc((next.pools.find((x) => x.teams.includes(t.name)) || {}).name) : undefined,
         })))];
       const tbGames = tb ? gamesOf(tb).filter((g) => g.teams.some((x) => pl.teams.includes(x.name))) : [];
       const tbList = tbGames.length
@@ -813,7 +814,7 @@ function boxScore(m, g) {
     tagWithAttrs('h3', [cls('boxScoreTitle')], scoreString(g)),
     // a prelim game a playoff bracket carries, named as YF does
     ...((m.stages && (m.stages.carryOf.get(g) || []).length)
-      ? [genericTag('p', `Carries over to: ${m.stages.carryOf.get(g).map((st) => st.name).join(', ')}`)] : []),
+      ? [genericTag('p', `Carries over to: ${m.stages.carryOf.get(g).map((st) => esc(st.name)).join(', ')}`)] : []),
     genericTag('p', tossups),
     tagWithAttrs('div', [cls('boxScoreTable')], boxScoreTeamTable(g.teams[0], m.vals), boxScoreTeamTable(g.teams[1], m.vals)),
     '<br />',
@@ -828,8 +829,8 @@ function scoreboardHtml(m) {
     rounds: st.rounds.filter((rd) => rd.games.length).map((rd) => rd.number) }))
     : [{ name: m.phaseName, full: true, numeric: true, rounds: m.rounds }];
   const toc = tagWithAttrs('div', [cls('floatingTOC')], genericTag('ul', stages.filter((st) => st.rounds.length).flatMap((st) => (st.numeric
-    ? [st.name, ...st.rounds.map((r) => `${NBSP}${NBSP}${roundLink(m, r, `Round ${r}`)}`)]
-    : [roundLink(m, st.rounds[0], st.name)])).map((item) => genericTag('li', item)).join('\n')));
+    ? [esc(st.name), ...st.rounds.map((r) => `${NBSP}${NBSP}${roundLink(m, r, `Round ${r}`)}`)]
+    : [roundLink(m, st.rounds[0], esc(st.name))])).map((item) => genericTag('li', item)).join('\n')));
   const sections = stages.flatMap((st) => st.rounds.map((r) => genericTag('div', [
     ...(r !== 1 ? ['<br /><br />'] : []),
     tagWithAttrs('div', [`id=Round-${r}`]),
@@ -846,7 +847,7 @@ function stageCell(stages) {
   const colors = stages.map((st) => st.color).filter((c) => c !== '');
   const style = colors.length === 1 ? `background-color:${colors[0]}`
     : `background-image: linear-gradient(to bottom right, ${colors[0]} 50%, ${colors[1]} 51%)`;
-  return tagWithAttrs('td', [attr('style', style)], stages.map((st) => st.name).join(', '));
+  return tagWithAttrs('td', [attr('style', style)], stages.map((st) => esc(st.name)).join(', '));
 }
 
 /* ---------- team detail ---------- */

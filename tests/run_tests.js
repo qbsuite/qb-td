@@ -2532,6 +2532,40 @@ test('report escapes team and player names', () => {
   }
 });
 
+// The staged report writes names in more places than the one-stage one:
+// Finals and Tiebreaker result lines, stage headings, the scoreboard's
+// contents, the Stage and Carried To cells, Advanced To. A team name
+// comes from whoever uploaded the game; stage and bracket names from the
+// schedule.
+test('staged report escapes team, stage and bracket names', () => {
+  const sc = STAGED.find((x) => x.key === 'tiebreak'); // prelims, tiebreakers, playoffs, final: all played
+  const swap = { 'Ames A': '<xss-final onclick=x>', Elm: '<xss-tb>', Prelims: '<xss-prelims>', Tiebreakers: '<xss-tbs>',
+    Playoffs: '<xss-playoffs> & more', Finals: '<xss-finals>', '1st–6th place': '<xss-bracket>' };
+  let text = JSON.stringify(sc);
+  for (const [from, to] of Object.entries(swap)) text = text.replaceAll(JSON.stringify(from), JSON.stringify(to));
+  const ev = JSON.parse(text);
+  const matches = dedupeMatches(ev.games.map((g) => parseMatch(g.qbj, { filename: g.filename })));
+  const pages = buildReport({ name: ev.name, matches, roster: parseRoster(ev.roster), schedule: ev.schedule });
+  const page = (p) => pages.find((f) => f.name === p + '.html').text;
+  for (const f of pages) assert.ok(!f.text.includes('<xss'), f.name + ' writes a name as markup');
+  // every sink was reached, its name written as text
+  const st = page('standings');
+  assert.ok(st.includes('<li>\n&lt;xss-final onclick=x&gt; def. Bloom ('), 'the Finals result line');
+  assert.ok(st.includes('<li>\n&lt;xss-tb&gt; def. Gale A ('), 'the Tiebreakers result line');
+  for (const h of ['&lt;xss-finals&gt;', '&lt;xss-playoffs&gt; &amp; more', '&lt;xss-prelims&gt;']) {
+    assert.ok(st.includes(`<h2>\n${h}&nbsp;\n</h2>`), 'the heading ' + h);
+  }
+  assert.ok(st.includes('<td    >&lt;xss-bracket&gt;</td>'), 'Advanced To');
+  const games = page('games');
+  assert.ok(games.includes('<li>\n&lt;xss-tbs&gt;\n</li>'), 'the scoreboard\'s contents');
+  assert.ok(games.includes('<h2>\nRound 7 - &lt;xss-playoffs&gt; &amp; more&nbsp;\n</h2>'), 'a round\'s heading');
+  assert.ok(games.includes('<p>\nCarries over to: &lt;xss-playoffs&gt; &amp; more\n</p>'), 'Carries over to');
+  assert.ok(page('teamdetail').includes('">\n&lt;xss-prelims&gt;\n</td>'), 'the Stage cell');
+  assert.ok(page('individuals').includes('<h2>\n&lt;xss-prelims&gt;&nbsp;\n</h2>'), 'the individuals heading');
+  // and the in-page frame keeps them text
+  assert.ok(!reportSrcdoc(pages).includes('<xss'));
+});
+
 test('report refuses an empty tournament', () => {
   assert.throws(() => buildReport({ name: 'T', matches: [], roster: null }), /no games/);
 });
