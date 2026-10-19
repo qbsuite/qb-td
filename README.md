@@ -594,30 +594,42 @@ rename therefore never rewrites a game already played. How it works today:
   writes into the set state), `tools/archive.mjs`, and the Worker's game
   downloads and public QBJ route (`modaqfile.js` `renameModaqTexts`).
   The hub's game lists and protests map the upload summaries the same
-  way (`admin.js` `fileSummary`, `protests.js` `renamedSummary`). The
-  schedule is the one copy rewritten: after a roster save,
+  way (`admin.js` `fileSummary`, `protests.js` `renamedSummary`), and so
+  do the playoff and Finals auto-fill and the "Finished rounds only"
+  label (`schedule.js` `namedFiles`, `summaryTeams`). Auto-fill decides
+  what is ready from the saved schedule, not the tab's copy
+  (`finals.js` `fillProgress`, `autoFillSaved`). The hub loads the
+  rename map again when the roster's save time (`roster_at` in the admin
+  detail) moves, so a rename saved in another tab reaches it on its next
+  refresh. The schedule is the one copy rewritten: after a roster save,
   `followRenames` (`admin.js`) runs `renameTeams` (`schedule.js`) on the
   saved schedule. Rosters that leave qb-td drop `_formerNames`
-  (`rosterForExport`). An uploaded roster carries no list of renames, so
-  `rosterRenames` guesses team renames from shared players, then from
-  seed order; player renames come only from the editor.
+  (`rosterForExport`; the hub's roster Download goes through the
+  Worker's `part=roster`, `rosterExportResponse`). An uploaded roster
+  carries no list of renames, so `rosterRenames` pairs a dropped team
+  with a new one only by shared players (at least half of the smaller
+  team); position alone pairs nothing. Player renames come only from the
+  editor.
 - **Rooms** are renamed in Setup > Rooms. The Worker writes the new name
-  into the saved schedule's rooms linked to that room by `bucket` id
-  (`worker.js` `renameBucket`). The public page shows each game's current
-  room from the state's file list.
+  into the saved schedule room the bucket resolves to, by its `bucket`
+  link or else by its old name (`worker.js` `renameBucket`,
+  `brackets.js` `roomIndexOf`, `followRoomRename`). When another
+  schedule room already has the new name, the schedule is left as it is
+  and the renamed room matches that room instead. The room's games get
+  the new name in their public copies, and the rename forces a rebuild,
+  so the round shards and the set page's buzzpoints follow. The public
+  page shows each game's current room from the state's file list.
 
 Known limits:
 
 - Nothing applies the map at one boundary, so code that reads games,
-  upload summaries or the tiebreaker log has to apply it itself. Some
-  readers still do not: the playoff and Finals auto-fill progress
-  (`schedule.js` `prelimProgress`, `finals.js` `finalsProgress`) and the
-  tiebreaker "heard by" log.
-- A schedule room matched to its room only by name (no `bucket` link)
-  does not follow a room rename, and loses its match.
-- Room names in the public game copies and round shards stay as they
-  were until "Rebuild public stats", and the set page's buzzpoints show
-  those.
+  upload summaries or the tiebreaker log has to apply it itself. The
+  tiebreaker "heard by" log (`packetsui.js`, `tb_add_dialog.js`) still
+  does not: it names the teams as they were when the game was uploaded.
+- A protest ruling is found under the game's current team names or the
+  names it was uploaded under (`protests.js` `protestRows`). A ruling
+  made between two renames of one of its teams is filed under the middle
+  name, so after the second rename the protest shows as open again.
 - Former names stay public: the public roster route and the GitHub
   snapshot serve `_formerNames`, because the public page needs them to
   rename games.
