@@ -1302,24 +1302,25 @@ export function rosterRenames(oldTeams, newTeams) {
   const norm = (x) => String(x || '').trim().toLowerCase();
   const before = new Set(oldTeams.map((t) => t.name));
   const after = new Set(newTeams.map((t) => t.name));
-  const gone = oldTeams.map((t, i) => ({ t, i })).filter((x) => !after.has(x.t.name));
+  const gone = oldTeams.filter((t) => !after.has(t.name));
   const fresh = newTeams.filter((t) => !before.has(t.name));
   const players = (t) => new Set((t.players || []).map(norm).filter(Boolean));
   const pairs = [];
   for (const o of gone) {
-    const op = players(o.t);
+    const op = players(o);
     for (const n of fresh) {
       const np = players(n);
       const shared = [...op].filter((x) => np.has(x)).length;
       if (shared && shared * 2 >= Math.min(op.size, np.size)) pairs.push({ o, n, shared });
     }
   }
-  pairs.sort((x, y) => y.shared - x.shared || x.o.i - y.o.i);
+  // most shared first; the sort is stable, so equal counts keep roster order
+  pairs.sort((x, y) => y.shared - x.shared);
   const out = {};
   const usedNew = new Set();
   for (const { o, n } of pairs) {
-    if (o.t.name in out || usedNew.has(n.name)) continue;
-    out[o.t.name] = n.name;
+    if (o.name in out || usedNew.has(n.name)) continue;
+    out[o.name] = n.name;
     usedNew.add(n.name);
   }
   return out;
