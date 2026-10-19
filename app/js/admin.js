@@ -1970,7 +1970,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   let rulings = {};
   try { rulings = JSON.parse(t.rulings || '{}') || {}; } catch (e) { /* keep {} */ }
   const roomOf = (bid) => { const b = buckets.find((x) => x.id === bid); return b ? b.room_name : '#' + bid; };
-  const { rows: prows, byFile: pfiles } = protestRows(files, rulings, roomOf, lastDetail.live_protests || []);
+  const { rows: prows, byFile: pfiles } = protestRows(files, rulings, roomOf, lastDetail.live_protests || [], hubNames.map);
   const popen = prows.filter((r) => r.ruling === 'open');
   const openProt = protOpen === null ? !!popen.length : protOpen;
 

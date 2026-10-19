@@ -10,12 +10,16 @@ Release Notes for 10/18/2026
 [ LIVE HUB ]
 - On the schedule's last round, the Advance button is grayed out, and a note says it is the last round. Set round still works.
 - Added "Fix buzzes" on an upload: swap two teammates' buzzes, or change who got a single buzz. The fix saves as a new upload.
+- Protests list a renamed team under its new name, and rulings made before the rename stay with them.
 
 [ PUBLIC PAGE ]
 - Scoresheets and buzzpoints can go without a password once the question set is clear: "Disable password" under Public page, with a warning.
 - All rounds keeps each team name on one line: a long name is shortened, and hovering or tapping it shows the full name.
 - A played game's score on the schedule opens its box score in Stats (New or Classic, as last picked), with a link back to the schedule.
 - Winners on the schedule are shown in bold, without the green box.
+
+[ SETS ]
+- Set-wide stats and buzzpoints use each mirror's roster renames, so a renamed team or player is one line.
 
 [ SECURITY ]
 - Buzzpoints without a password are rate-limited per visitor, like password attempts, and the key they use is locked with a Worker secret.
@@ -32,6 +36,7 @@ Release Notes for 10/18/2026
 - A game's qbj and MODAQ game file download exactly as MODAQ's own Backup to JSON writes them, under MODAQ's file names. The QBJ bundle holds the same files.
 - Games uploaded before today get MODAQ's own files too, rebuilt from each game with MODAQ's code.
 - Those files and the QBJ bundle use the roster's current team and player names, as the stats do.
+- A set editor's download of a mirror's games has the same MODAQ files, under that mirror's current names.
 
 [ PERFORMANCE ]
 - The Live Hub fetches games for playoff slots in one or two requests rather than one per game, so it loads faster after the prelims.

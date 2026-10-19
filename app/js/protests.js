@@ -230,6 +230,19 @@ export function fileSummary(f) {
   };
 }
 
+/** A summary under the roster's renames (qbj.js rosterNameMap): its
+    teams and each protest's team, to and from. The same object when
+    nothing is renamed. */
+function renamedSummary(s, names) {
+  const team = (n) => (names && typeof n === 'string' && names.teams.get(n)) || n;
+  if (!names || !names.teams.size) return s;
+  return {
+    ...s,
+    teams: s.teams.map(team),
+    protests: s.protests.map((p) => (p && typeof p === 'object' ? { ...p, team: team(p.team), to: team(p.to), from: team(p.from) } : p)),
+  };
+}
+
 /** The score if the protest is upheld, and whether that changes the
     result (MODAQ's protestsMatter: in a tied game every protest does). */
 export function projectUpheld(summary, p) {
@@ -257,15 +270,19 @@ export function projectUpheld(summary, p) {
  *   upload of it is newer, and only those its newest upload doesn't
  *   already list; such rows have `live` set and no score.
  * @returns {rows, byFile} — byFile: file id -> {n, open, superseded}
+ * @param names the roster's renames (rosterNameMap): games and protests
+ *   under a team's old name list under its new one, and a ruling made
+ *   before the rename still finds its protest
  */
-export function protestRows(files, rulings, roomOf, live = []) {
+export function protestRows(files, rulings, roomOf, live = [], names = null) {
   const latest = new Map();
   const sums = new Map();
   for (const f of files) {
     if (!f || f.error || (f.kind !== 'qbj' && f.kind !== 'combined')) continue;
-    const s = fileSummary(f);
-    if (!s) continue;
-    sums.set(f.id, s);
+    const was = fileSummary(f);
+    if (!was) continue;
+    const s = renamedSummary(was, names);
+    sums.set(f.id, { s, was });
     const k = f.round + '\n' + [...s.teams].sort().join('\n');
     const prev = latest.get(k);
     if (!prev || f.id > prev.id) latest.set(k, f);
@@ -273,14 +290,17 @@ export function protestRows(files, rulings, roomOf, live = []) {
   const current = new Set([...latest.values()].map((f) => f.id));
   const rows = [];
   const byFile = new Map();
-  for (const [id, s] of sums) {
+  // a ruling is filed under the names the game had when it was made
+  const rulingOf = (key, round, wasTeams, wasP) =>
+    (rulings && (rulings[key] || rulings[rulingKey(round, wasTeams, wasP)])) || null;
+  for (const [id, { s, was }] of sums) {
     if (!s.protests.length) continue;
     const f = files.find((x) => x.id === id);
     const state = { n: s.protests.length, open: 0, superseded: !current.has(id) };
     byFile.set(id, state);
     s.protests.forEach((p, i) => {
       const key = rulingKey(f.round, s.teams, p);
-      const r = (rulings && rulings[key]) || null;
+      const r = rulingOf(key, f.round, was.teams, was.protests[i]);
       const ruling = r && RULINGS.some(([v]) => v === r.r) ? r.r : 'open';
       // A superseded upload's protests are history: the newest upload is
       // the game now. Its ruled ones stay listed (greyed, with the score
@@ -306,7 +326,10 @@ export function protestRows(files, rulings, roomOf, live = []) {
     let s = l && l.summary;
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { continue; } }
     if (!s || !Array.isArray(s.teams) || s.teams.length !== 2 || !Array.isArray(s.protests)) continue;
-    const teams = s.teams.map(String);
+    const wasTeams = s.teams.map(String);
+    const wasProtests = s.protests;
+    s = renamedSummary({ teams: wasTeams, protests: wasProtests }, names);
+    const teams = s.teams;
     const up = latest.get(l.round + '\n' + [...teams].sort().join('\n'));
     if (up && up.created >= l.at) continue; // the uploaded game has them
     const f = { id: 0, kind: 'live', round: l.round, bucket_id: l.bucket_id, created: l.at };
@@ -315,7 +338,7 @@ export function protestRows(files, rulings, roomOf, live = []) {
       const key = rulingKey(l.round, teams, p);
       if (listed.has(key)) return;
       listed.add(key);
-      const r = (rulings && rulings[key]) || null;
+      const r = rulingOf(key, l.round, wasTeams, wasProtests[i]);
       const ruling = r && RULINGS.some(([v]) => v === r.r) ? r.r : 'open';
       rows.push({
         id: `live:${l.bucket_id}:${l.game}:${i}`, file: f, round: l.round, room: roomOf(l.bucket_id),

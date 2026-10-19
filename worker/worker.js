@@ -40,7 +40,7 @@
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
 import { modaqExport, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
-import { parseRoster, rosterNameMap } from '../app/engine/qbj.js';
+import { parseRoster, rosterNameMap, renameMatch } from '../app/engine/qbj.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
@@ -4447,15 +4447,16 @@ async function streamRounds(env, tid, url, cacheSeconds) {
 async function pubQbj(env, slug, fileId) {
   const t = await getPublishedTournament(env, slug);
   if (!t) return err(env, 404, 'not found');
-  const obj = await env.DATA.get(pubGameKey(t.id, fileId));
+  const [obj, names] = await Promise.all([env.DATA.get(pubGameKey(t.id, fileId)),
+    t.roster_r2_key ? rosterNames(env, t.roster_r2_key, null) : null]);
   const entry = obj ? await obj.json().catch(() => null) : null;
   if (!entry || !entry.qbj) return err(env, 404, 'no such file');
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Cache-Control', 'public, max-age=' + pubCache(t));
   headers.set('Content-Disposition', attachmentHeader(String(entry.filename || 'game.qbj').replace(/\.qbtd\.json$/i, '.qbj')));
-  // indented as MODAQ writes its own exports
-  return new Response(JSON.stringify(entry.qbj, null, 2), { status: 200, headers });
+  // indented as MODAQ writes its own exports, under the roster's current names
+  return new Response(JSON.stringify(renameMatch(entry.qbj, names), null, 2), { status: 200, headers });
 }
 
 async function pubRoster(env, slug) {
@@ -5409,7 +5410,20 @@ async function mirrorState(env, tid, packetOf) {
     rounds: manifest.rounds,
     vmap: Object.fromEntries(rounds.results.map((r) => [r.number, packetOf.get(r.packet_r2_key) ?? null])),
     done: doneRounds(files.results, buckets.results[0].n, sched),
+    names: await mirrorRenames(env, tid),
   };
+}
+
+// A mirror's roster renames for the set page, which renames its games
+// with them before counting them with the other mirrors' (setstats.js
+// siteNames): {teams: {old: new}, players: {"team\nold": new}}, or null.
+async function mirrorRenames(env, tid) {
+  const obj = await env.DATA.get(`t/${tid}/roster.qbj`);
+  if (!obj) return null;
+  try {
+    const map = rosterNameMap(parseRoster(JSON.parse(new TextDecoder().decode(await readBlob(obj, null)))));
+    return map ? { teams: Object.fromEntries(map.teams), players: Object.fromEntries(map.players) } : null;
+  } catch (e) { return null; }
 }
 
 /**
@@ -5446,7 +5460,9 @@ async function rebuildSetState(env, sid) {
   // Claim the flags before the work, like the tournament half: a flag
   // set by an overlapping tick while this one reads stays set. A rebuild
   // that fails puts the claimed ones back (tickSets).
-  const reread = mirrors.results.filter((t) => !prevBy.get(t.id) || t.state_dirty).map((t) => t.mirror_id);
+  // (and, once, mirrors carried forward from before their renames were kept)
+  const reread = mirrors.results.filter((t) => !prevBy.get(t.id) || t.state_dirty
+    || !('names' in prevBy.get(t.id))).map((t) => t.mirror_id);
   for (const id of reread) {
     await env.DB.prepare('UPDATE set_mirrors SET state_dirty = 0 WHERE id = ?1').bind(id).run();
   }
@@ -5454,7 +5470,7 @@ async function rebuildSetState(env, sid) {
   for (const t of mirrors.results) {
     const old = prevBy.get(t.id);
     const heavy = old && !reread.includes(t.mirror_id)
-      ? { rounds: old.rounds, vmap: old.vmap, done: old.done }
+      ? { rounds: old.rounds, vmap: old.vmap, done: old.done, names: old.names }
       : await mirrorState(env, t.id, packetOf);
     // the snapshot descriptor is on the row, so it is always current
     let pub = null;

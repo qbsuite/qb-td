@@ -593,12 +593,16 @@ async function downloadMirrorFiles(m) {
   for (const f of [...files].reverse()) {
     if (f.error || f.kind === 'other') continue;
     try {
-      const full = await pub(`${S}/gamefile?m=${tid}&id=${f.id}`);
-      const body = full instanceof Response ? JSON.parse(await full.text()) : full;
+      // MODAQ's own files, under the mirror's current names (worker.js
+      // storedFileResponse), as its director downloads them
+      const text = async (part) => {
+        const got = await pub(`${S}/gamefile?m=${tid}&id=${f.id}${part ? '&part=' + part : ''}`);
+        return got instanceof Response ? got.text() : JSON.stringify(got, null, 2);
+      };
       if (f.kind === 'combined') {
-        if (body.qbj) add(f.round, f.filename.replace(/\.qbtd\.json$/i, '.qbj'), JSON.stringify(body.qbj));
-        if (body.game) add(f.round, f.filename.replace(/\.qbtd\.json$/i, '_Game.json'), JSON.stringify(body.game));
-      } else add(f.round, f.filename, JSON.stringify(body));
+        add(f.round, f.filename.replace(/\.qbtd\.json$/i, '.qbj'), await text('qbj'));
+        add(f.round, f.filename.replace(/\.qbtd\.json$/i, '_Game.json'), await text('game'));
+      } else add(f.round, f.filename, await text(f.kind === 'qbj' || f.kind === 'game' ? f.kind : null));
     } catch (e) { failed++; }
   }
   if (!entries.length) { say('No game files yet', true); return; }

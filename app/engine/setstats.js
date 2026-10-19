@@ -14,23 +14,35 @@
 //   matches parseMatch output; entries the raw {id, round, room, qbj}
 //           rows, deduped — the buzz- and category-based views read those
 
-import { parseMatch } from './qbj.js';
+import { parseMatch, renameMatch } from './qbj.js';
 import { aggregate } from './stats.js';
 import { dedupeEntries, matchBuzzes, matchBonuses, buzzSummary } from './buzz.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, roundCats, catInfo, catOfEntry,
   catCompare } from './cats.js';
 
+/** A mirror's roster renames as renameMatch takes them (qbj.js
+    rosterNameMap), from the plain {teams, players} the set state carries
+    (worker.js mirrorRenames); null when it has none. */
+export function siteNames(mirror) {
+  const n = mirror && mirror.names;
+  if (!n || typeof n !== 'object') return null;
+  return { teams: new Map(Object.entries(n.teams || {})), players: new Map(Object.entries(n.players || {})) };
+}
+
 /** One mirror's state entry + its round shards' entries -> a site. */
 export function buildSite(mirror, shardEntries, errors = []) {
   const matches = [];
   const raw = [];
+  const names = siteNames(mirror);
   for (const entry of shardEntries) {
     try {
-      const m = parseMatch(entry.qbj, { filename: entry.filename });
+      // under the mirror's current names, as its own stats count the game
+      const qbj = renameMatch(entry.qbj, names);
+      const m = parseMatch(qbj, { filename: entry.filename });
       m.room = entry.room;
       m.fileId = entry.id;
       matches.push(m);
-      raw.push({ id: entry.id, round: m.round, room: entry.room, qbj: entry.qbj });
+      raw.push({ id: entry.id, round: m.round, room: entry.room, qbj });
     } catch (e) { errors.push(mirror.label + ' · ' + entry.filename + ': ' + e.message); }
   }
   return {

@@ -843,6 +843,9 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('admin part=qbj: under the roster\'s new name',
     renamed.match_teams[0].match_players[0].player.name === 'Annie' && !JSON.stringify(renamed).includes('"Ann"'), renamed.match_teams[0]);
   ok('admin part=qbj: the same game otherwise', renamed.tossups_read === 20 && renamed.match_teams[0].bonus_points === 30);
+  const pubRenamed = JSON.parse(await (await fetch(`${BASE}/pub/${slug}/qbj/${cid}`)).text());
+  ok('public qbj: under the roster\'s new name too', pubRenamed.match_teams[0].match_players[0].player.name === 'Annie'
+    && !JSON.stringify(pubRenamed).includes('SECRETQUESTIONTEXT'), pubRenamed.match_teams[0]);
   r2put(rosterKey, rosterWas);
   ok('admin part=qbj: no rename, MODAQ\'s text again', (await (await fetch(fileUrl('&part=qbj&dl=x.qbj'))).text()) === qtext);
 

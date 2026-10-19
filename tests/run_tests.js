@@ -24,7 +24,7 @@ import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBrea
 import { buzzSettings, buzzToken, sha256Hex, BUZZ_ITERS } from '../app/js/buzzkey.js';
 import { buildScoresheet, teamInitials, catTag } from '../app/engine/scoresheet.js';
 import { sheetHtml, exampleSheetHtml } from '../app/js/sheetview.js';
-import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
+import { buildSite, siteNames, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
 import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
 import { checkPacket } from '../app/engine/packetcheck.js';
 import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk } from '../app/engine/plan.js';
@@ -4334,6 +4334,32 @@ test('protestRows: protests lodged before the upload show until the game arrives
   assert.deepEqual(rows.map((r) => [r.file.id, r.p.q]).sort(), [[0, 9], [7, 4]]);
 });
 
+test('protestRows: a renamed team lists under its new name, and keeps rulings made before the rename', () => {
+  const sum = (teams, score, protests) => JSON.stringify({ teams, score, protests });
+  const tu4 = { kind: 'tu', q: 4, team: 'UCSD Unc', word: 9, given: 'x', reason: 'r', to: 'UCSD Unc', from: 'Beta', gain: 20, loss: 0, detail: { tu: 10, neg: 0, bonus: 10 } };
+  const names = rosterNameMap([{ name: 'UC San Diego', players: ['P'], formerNames: ['UCSD Unc'] }, { name: 'Beta', players: ['Q'] }]);
+  const old = { id: 7, bucket_id: 1, round: 2, kind: 'combined', error: null, created: 800, summary: sum(['UCSD Unc', 'Beta'], [100, 110], [tu4]) };
+  // ruled while the team still had its old name
+  const rulings = { [rulingKey(2, ['UCSD Unc', 'Beta'], tu4)]: { r: 'upheld', note: 'n', at: 900 } };
+  let { rows } = protestRows([old], rulings, () => 'x', [], names);
+  assert.deepEqual(rows[0].teams, ['UC San Diego', 'Beta']);
+  assert.deepEqual([rows[0].p.team, rows[0].p.to, rows[0].p.from], ['UC San Diego', 'UC San Diego', 'Beta']);
+  assert.equal(rows[0].ruling, 'upheld', 'the ruling made under the old name');
+  assert.equal(rows[0].key, rulingKey(2, ['UC San Diego', 'Beta'], tu4), 'a new ruling files under the new name');
+  assert.deepEqual(rows[0].upheld, [120, 110]);
+  // a correction uploaded under the new name supersedes the old upload
+  const fixed = { ...old, id: 9, created: 1000, summary: sum(['UC San Diego', 'Beta'], [100, 110], [{ ...tu4, team: 'UC San Diego', to: 'UC San Diego' }]) };
+  ({ rows } = protestRows([old, fixed], rulings, () => 'x', [], names));
+  assert.deepEqual(rows.map((r) => [r.file.id, r.superseded]).sort(), [[7, true], [9, false]]);
+  // a protest lodged live, under the old name
+  const live = [{ bucket_id: 1, round: 3, game: 'g', at: 500, summary: JSON.stringify({ teams: ['UCSD Unc', 'Beta'], protests: [tu4, 'junk'] }) }];
+  ({ rows } = protestRows([], {}, () => 'x', live, names));
+  assert.deepEqual([rows.length, rows[0].teams[0], rows[0].p.to], [1, 'UC San Diego', 'UC San Diego']);
+  // no roster renames: as before
+  ({ rows } = protestRows([old], rulings, () => 'x', []));
+  assert.equal(rows[0].teams[0], 'UCSD Unc');
+});
+
 test('protestRows: newest upload per game, rulings keyed by game + question, corrected detection', () => {
   const sum = (teams, score, protests) => JSON.stringify({ teams, score, protests });
   const tu7 = { kind: 'tu', q: 7, team: 'UIUC', word: 41, given: 'J', reason: 'r', to: 'UIUC', from: 'ASU', gain: 45, loss: 30, detail: { tu: 10, neg: 5, bonus: 30, oppTu: 10, oppBonus: 20 } };
@@ -4449,6 +4475,21 @@ const SITE_B = buildSite({ id: 2, label: 'South', vmap: { 3: [1, 2] }, done: [3]
 const SITE_C = buildSite({ id: 3, label: 'East', vmap: { 1: [1, 2], 2: null }, done: [] }, [
   setGame(9, 1, 'Team C', 'Team D', [[1, 'Team C', 'Cy', 5, 15]], [1, 20]),
 ]);
+
+test('buildSite: a mirror\'s roster renames apply to its games, and only to its own', () => {
+  // at North, Team A is now Team Alpha and its Ann is Annie (worker.js mirrorRenames)
+  const names = { teams: { 'Team A': 'Team Alpha' }, players: { 'Team Alpha\nAnn': 'Annie' } };
+  const games = [setGame(1, 1, 'Team A', 'Team B', [[1, 'Team A', 'Ann', 10, 15]], [1, 10])];
+  const north = buildSite({ id: 1, label: 'North', vmap: { 1: [1, 1] }, done: [1], names }, games);
+  const south = buildSite({ id: 2, label: 'South', vmap: { 1: [1, 1] }, done: [1] }, games);
+  const st = setStandings([north, south]);
+  assert.deepEqual(st.teams.filter((t) => t.site === 'North').map((t) => t.name).sort(), ['Team Alpha', 'Team B']);
+  assert.ok(st.players.some((p) => p.site === 'North' && p.name === 'Annie' && p.team === 'Team Alpha'));
+  assert.ok(!st.players.some((p) => p.site === 'North' && p.name === 'Ann'));
+  assert.ok(st.players.some((p) => p.site === 'South' && p.name === 'Ann' && p.team === 'Team A'), 'another mirror keeps its names');
+  assert.ok(!JSON.stringify(north.entries).includes('"Ann"'), 'buzzpoints read the renamed game');
+  assert.equal(siteNames({ names: null }), null);
+});
 
 test('buildSite: parses, dedupes re-uploads inside one site only', () => {
   const again = buildSite({ id: 1, label: 'North', vmap: {}, done: [] }, [

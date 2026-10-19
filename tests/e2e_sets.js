@@ -268,6 +268,28 @@ ok('state pins packet versions per mirror',
 ok('state reports finished rounds', JSON.stringify(r.body.mirrors[0].done) === '[1]', r.body.mirrors[0].done);
 ok('state carries current packet versions', JSON.stringify(r.body.packets) === JSON.stringify({ 1: 1, 2: 1 }), r.body.packets);
 ok('state carries the category stamp', typeof r.body.cats === 'number');
+ok('state: no roster, no renames', r.body.mirrors[0].names === null, r.body.mirrors[0].names);
+
+// the mirror's TD renames a player (Ann is Annie now): the set page renames
+// that mirror's games with it (setstats.js siteNames), and its files follow
+r = await call(`${A}/roster?name=roster.qbj`, { method: 'POST', body: JSON.stringify({ objects: [{ type: 'Tournament', registrations: [
+  { name: 'Alpha', teams: [{ name: 'Alpha', players: [{ name: 'Annie', _formerNames: ['Ann'] }] }] },
+  { name: 'Beta', teams: [{ name: 'Beta', players: [{ name: 'Bob' }] }] }] }] }) });
+ok('mirror roster renames a player', r.status === 200, r.body);
+// the tick works in the background: wait for its set state, so the
+// checks after this one start from a quiet queue
+await tick();
+for (let i = 0; i < 40; i++) {
+  r = await call(S + '/state');
+  if (r.body.mirrors[0].names) break;
+  await new Promise((res) => setTimeout(res, 250));
+}
+ok('state carries the mirror\'s renames', JSON.stringify(r.body.mirrors[0].names)
+  === JSON.stringify({ teams: {}, players: { 'Alpha\nAnn': 'Annie' } }), r.body.mirrors[0].names);
+{
+  const qb = await text(`${S}/gamefile?m=${tid}&id=${gameFileId}&part=qbj`);
+  ok('editor downloads the match qbj under the new name', qb.body.includes('"Annie"') && !qb.body.includes('"Ann"'), qb.body.slice(0, 300));
+}
 
 r = await call(`${S}/rounds?m=${tid}&n=1`);
 ok('editor reads a mirror\'s games', r.status === 200 && r.body.rounds.length === 1
