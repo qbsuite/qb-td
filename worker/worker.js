@@ -621,75 +621,86 @@ async function materialize(env, t) {
   let legacy;             // undefined = not looked for yet, null = none
   let backfill = PUB_BACKFILL_PER_TICK;
 
-  for (const [n, fs] of [...byRound].sort((a, b) => a[0] - b[0])) {
-    const want = statsVersion(fs);
-    const was = prev.rounds[n];
-    const same = was !== undefined && splitStamp(was).ids === want;
-    if (!forced && same) { manifest.rounds[n] = was; continue; }
+  // A forced tick that fails partway puts the marker back: shards it has
+  // already written carry its generation, which the manifest left in
+  // place doesn't, and only another forced tick brings the two together.
+  try {
+    for (const [n, fs] of [...byRound].sort((a, b) => a[0] - b[0])) {
+      const want = statsVersion(fs);
+      const was = prev.rounds[n];
+      const same = was !== undefined && splitStamp(was).ids === want;
+      if (!forced && same) { manifest.rounds[n] = was; continue; }
 
-    // Each game's public copy is compact JSON (putPubGame) keyed by its
-    // file id, so the shard is those texts joined: no parse of every game
-    // and re-stringify of the round, which was most of a busy tick's CPU
-    // (bench_routes.mjs: ~4-5ms a tournament on 13KB games, against the
-    // Free plan's 10ms per cron invocation). A blob that isn't a JSON
-    // object is left out like a missing one.
-    const entries = new Array(fs.length).fill(null);
-    await Promise.all(fs.map(async (f, i) => {
-      const obj = await env.DATA.get(pubGameKey(tid, f.id));
-      if (!obj) return;
-      const text = (await obj.text()).trim();
-      if (text.startsWith('{') && text.endsWith('}')) entries[i] = text;
-    }));
+      // Each game's public copy is compact JSON (putPubGame) keyed by its
+      // file id, so the shard is those texts joined: no parse of every game
+      // and re-stringify of the round, which was most of a busy tick's CPU
+      // (bench_routes.mjs: ~4-5ms a tournament on 13KB games, against the
+      // Free plan's 10ms per cron invocation). A blob that isn't a JSON
+      // object is left out like a missing one.
+      const entries = new Array(fs.length).fill(null);
+      await Promise.all(fs.map(async (f, i) => {
+        const obj = await env.DATA.get(pubGameKey(tid, f.id));
+        if (!obj) return;
+        const text = (await obj.text()).trim();
+        if (text.startsWith('{') && text.endsWith('}')) entries[i] = text;
+      }));
 
-    const gaps = entries.map((e, i) => (e ? -1 : i)).filter((i) => i >= 0);
-    if (gaps.length) {
-      if (legacy === undefined) legacy = await readLegacyBundle(env, tid);
-      for (const i of gaps) {
-        if (backfill <= 0) break;
-        const entry = legacy && legacy.get(fs[i].id);
-        if (!entry) continue;
-        entries[i] = JSON.stringify(entry);
-        backfill -= 1;
-        await putPubGame(env, tid, entry);
+      const gaps = entries.map((e, i) => (e ? -1 : i)).filter((i) => i >= 0);
+      if (gaps.length) {
+        if (legacy === undefined) legacy = await readLegacyBundle(env, tid);
+        for (const i of gaps) {
+          if (backfill <= 0) break;
+          const entry = legacy && legacy.get(fs[i].id);
+          if (!entry) continue;
+          entries[i] = JSON.stringify(entry);
+          backfill -= 1;
+          await putPubGame(env, tid, entry);
+        }
+      }
+
+      const keptIds = fs.filter((f, i) => entries[i]).map((f) => f.id);
+      const kept = entries.filter(Boolean);
+      if (kept.length < fs.length) {
+        console.log('tournament', tid, 'round', n, 'is missing',
+          fs.length - kept.length, 'public game blobs; will retry next tick');
+      }
+      const got = (keptIds.length ? keptIds[keptIds.length - 1] : 0) + ':' + kept.length;
+      const shard = (v) => '{"v":' + JSON.stringify(v) + ',"round":' + n + ',"entries":[' + kept.join(',') + ']}';
+      if (forced && same && got === want) {
+        // nothing the forced rebuild re-read differs from the shard already
+        // out: its stamp stays, so nobody refetches the round
+        const cur = await env.DATA.get(roundBlobKey(tid, n));
+        if (cur && (await cur.text()) === shard(was)) { manifest.rounds[n] = was; continue; }
+      }
+      // A forced rebuild stamps what it wrote with its own generation. An
+      // ordinary one keeps the generation the round had: games only join or
+      // leave between forced rebuilds, so the ids plus that generation still
+      // name one content, and a stamp a viewer holds can't come back with
+      // other games behind it.
+      const stamp = got + (forced ? gen : splitStamp(was).gen);
+      await env.DATA.put(roundBlobKey(tid, n), shard(stamp), {
+        httpMetadata: { contentType: 'application/json' },
+      });
+      manifest.rounds[n] = stamp;
+      changed.push(n);
+    }
+
+    for (const n of Object.keys(prev.rounds)) {
+      if (manifest.rounds[n] === undefined) {
+        await env.DATA.delete(roundBlobKey(tid, n));
+        removed.push(Number(n));
       }
     }
-
-    const keptIds = fs.filter((f, i) => entries[i]).map((f) => f.id);
-    const kept = entries.filter(Boolean);
-    if (kept.length < fs.length) {
-      console.log('tournament', tid, 'round', n, 'is missing',
-        fs.length - kept.length, 'public game blobs; will retry next tick');
-    }
-    const got = (keptIds.length ? keptIds[keptIds.length - 1] : 0) + ':' + kept.length;
-    const shard = (v) => '{"v":' + JSON.stringify(v) + ',"round":' + n + ',"entries":[' + kept.join(',') + ']}';
-    if (forced && same && got === want) {
-      // nothing the forced rebuild re-read differs from the shard already
-      // out: its stamp stays, so nobody refetches the round
-      const cur = await env.DATA.get(roundBlobKey(tid, n));
-      if (cur && (await cur.text()) === shard(was)) { manifest.rounds[n] = was; continue; }
-    }
-    // A forced rebuild stamps what it wrote with its own generation. An
-    // ordinary one keeps the generation the round had: games only join or
-    // leave between forced rebuilds, so the ids plus that generation still
-    // name one content, and a stamp a viewer holds can't come back with
-    // other games behind it.
-    const stamp = got + (forced ? gen : splitStamp(was).gen);
-    await env.DATA.put(roundBlobKey(tid, n), shard(stamp), {
+    await env.DATA.put(manifestKey(tid), JSON.stringify(manifest), {
       httpMetadata: { contentType: 'application/json' },
     });
-    manifest.rounds[n] = stamp;
-    changed.push(n);
-  }
-
-  for (const n of Object.keys(prev.rounds)) {
-    if (manifest.rounds[n] === undefined) {
-      await env.DATA.delete(roundBlobKey(tid, n));
-      removed.push(Number(n));
+  } catch (e) {
+    if (forced) {
+      await env.DATA.put(rebuildKey(tid), '{}', { httpMetadata: { contentType: 'application/json' } })
+        .catch((e2) => console.log('rebuild marker:', e2.message));
     }
+    throw e;
   }
-  await env.DATA.put(manifestKey(tid), JSON.stringify(manifest), {
-    httpMetadata: { contentType: 'application/json' },
-  });
   return { manifest, changed, removed, rows };
 }
 
@@ -756,6 +767,15 @@ function snapshotsEnabled(env) {
 async function markPub(env, tid) {
   await env.DB.prepare('UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1')
     .bind(tid, Date.now()).run();
+}
+
+// For a change that rewrote games' public copies in place (the round
+// shards' stamps can't see it): the rebuild marker, then the mark, so the
+// tick the mark wakes finds the marker. Called after the blobs are
+// written, so a materialize that sees the marker sees them too.
+async function forceRebuild(env, tid) {
+  await env.DATA.put(rebuildKey(tid), '{}', { httpMetadata: { contentType: 'application/json' } });
+  await markPub(env, tid);
 }
 
 // The Live Hub's change counter (tournaments.rev) moves by trigger on
@@ -2393,11 +2413,8 @@ async function renameBucket(request, env, t, bucketId) {
     await putPubGame(env, t.id, { ...entry, room: roomName });
     return true;
   }));
-  if (rewrote.some(Boolean)) {
-    await env.DATA.put(rebuildKey(t.id), '{}', { httpMetadata: { contentType: 'application/json' } });
-  }
-  // game rows on the public page carry the room's name
-  await markPub(env, t.id);
+  // game rows on the public page carry the room's name either way
+  await (rewrote.some(Boolean) ? forceRebuild(env, t.id) : markPub(env, t.id));
   return json(env, { id: bucketId, room_name: roomName });
 }
 
@@ -2997,8 +3014,7 @@ async function moveFile(request, env, t, fileId) {
     if (entry) await putPubGame(env, t.id, { ...entry, room: roomName });
     // Force the shards to be rebuilt: a set's pages label buzzes with the
     // room held in them, and nothing else would rewrite them.
-    await env.DATA.put(rebuildKey(t.id), '{}', { httpMetadata: { contentType: 'application/json' } });
-    await markPub(env, t.id);
+    await forceRebuild(env, t.id);
   }
   let teams = null;
   try { teams = JSON.parse(f.summary || 'null').teams; } catch (e) { /* no summary */ }
@@ -3066,10 +3082,7 @@ async function moveFileRound(env, t, fileId, round) {
       });
     }
   }
-  if (game) {
-    await env.DATA.put(rebuildKey(t.id), '{}', { httpMetadata: { contentType: 'application/json' } });
-    await markPub(env, t.id);
-  }
+  if (game) await forceRebuild(env, t.id);
   return json(env, { ok: true, round });
 }
 
@@ -3147,9 +3160,7 @@ async function putBundle(request, env, t) {
   await Promise.all(entries.map((e) => putPubGame(env, id, {
     id: e.id, round: e.round, room: e.room, filename: e.filename, qbj: stripMatchNotes(e.qbj),
   })));
-  // After the blobs, so a materialize that sees the marker sees them too.
-  await env.DATA.put(rebuildKey(id), '{}', { httpMetadata: { contentType: 'application/json' } });
-  await markPub(env, id);
+  await forceRebuild(env, id);
   return json(env, { entries: entries.length });
 }
 

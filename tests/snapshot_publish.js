@@ -744,6 +744,42 @@ const realFetch = globalThis.fetch;
   ok('same ids: the round is committed again', gh.trees.length === 2);
 }
 
+// 16c. A forced tick that fails after writing a shard but before the
+// manifest: the marker comes back, so the next tick is forced too and
+// the shard's stamp and the advertised one agree again.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = { id: 1, slug: 'halfway-open', published: 1, pub_dirty: 1, pub_snapshot: null, roster_r2_key: null, created: Date.now() };
+  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }, { id: 4, tournament_id: 1, round: 2 }] };
+  const objects = { 't/1/pub/3.json': pubGame(3, 1), 't/1/pub/4.json': pubGame(4, 2) };
+  await runCron(env(state, objects, gh));
+  for (const id of [3, 4]) {
+    objects[`t/1/pub/${id}.json`] = r2obj(JSON.stringify(
+      { id, round: id - 2, room: 'Moved', filename: 'g.qbj', qbj: { tossups_read: 20 } }), 2000);
+  }
+  objects['t/1/rebuild.json'] = r2obj('{}', 2000);
+  t.pub_dirty = 1;
+  const e = env(state, objects, gh);
+  const put = e.DATA.put;
+  e.DATA.put = async (key, body) => {
+    if (key === 't/1/round/2.json') throw new Error('r2 unavailable');
+    return put(key, body);
+  };
+  await runCron(e);
+  const stale = JSON.parse(objects['t/1/rounds.json'].textFor()).rounds['1'];
+  ok('halfway: round 1 written, the manifest not', shardOf(objects, 1, 1).v !== stale && stale === '3:1', stale);
+  ok('halfway: the marker is back', Boolean(objects['t/1/rebuild.json']));
+  ok('halfway: and the tournament is queued again', t.pub_dirty === 1);
+  await runCron(env(state, objects, gh));
+  const m = JSON.parse(objects['t/1/rounds.json'].textFor()).rounds;
+  ok('halfway: the next tick brings shard and manifest together',
+    shardOf(objects, 1, 1).v === m['1'] && shardOf(objects, 1, 2).v === m['2'] && m['1'].startsWith('3:1:')
+    && shardOf(objects, 1, 2).entries[0].room === 'Moved', m);
+  ok('halfway: the marker consumed', objects['t/1/rebuild.json'] === undefined);
+  globalThis.fetch = realFetch;
+}
+
 // 17. A set's mirror whose own page is off, in a set that is not public
 // either: the tick still materializes it (its set's editors read those
 // shards) and writes the set's state blob, but nothing goes to GitHub.
