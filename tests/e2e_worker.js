@@ -79,6 +79,32 @@ ok('upload roster', r.status === 200, r.body);
   const again = (await call(A)).body.tournament.roster_at;
   ok('detail: saving the roster again moves it', r.status === 200 && again > at, [at, again]);
 }
+// Setup's roster Download (part=roster): the roster as it leaves qb-td,
+// without the former names only qb-td reads; one with none, as stored
+{
+  const rosterUrl = (part) => `${BASE}${A}/file?key=${encodeURIComponent(`t/${tid}/roster.qbj`)}&dl=roster.qbj${part}`;
+  let res = await fetch(rosterUrl('&part=roster'));
+  ok('roster download: a roster with no former names comes down byte for byte',
+    res.status === 200 && (await res.text()) === ROSTER0
+      && res.headers.get('content-disposition').startsWith('attachment; filename="roster.qbj"'), res.status);
+  const renamed = { objects: [{ type: 'Tournament', registrations: [
+    { name: 'Alpha', teams: [{ name: 'Alpha', players: [{ name: 'Ann' }], _formerNames: ['Alef'] }] },
+    { name: 'Beta', teams: [{ name: 'Beta', players: [{ name: 'Bob', _formerNames: ['Bobby'] }] }] },
+  ] }] };
+  await call(`${A}/roster?name=roster.qbj`, { method: 'POST', body: JSON.stringify(renamed, null, 2) });
+  res = await fetch(rosterUrl('&part=roster'));
+  const text = await res.text();
+  const want = JSON.parse(JSON.stringify(renamed));
+  delete want.objects[0].registrations[0].teams[0]._formerNames;
+  delete want.objects[0].registrations[1].teams[0].players[0]._formerNames;
+  ok('roster download: after a rename, the former names are left out', res.status === 200
+    && !text.includes('_formerNames') && text === JSON.stringify(want, null, 2)
+    && res.headers.get('content-type') === 'application/json', text);
+  // the hub's own read keeps them: its renames come from there
+  res = await fetch(rosterUrl(''));
+  ok('roster download: the hub\'s read still has them', (await res.text()).includes('_formerNames'));
+  await call(`${A}/roster?name=roster.qbj`, { method: 'POST', body: ROSTER0 });
+}
 
 // Before Start, a room link serves nothing: not the round's packet, not
 // the tiebreakers, not uploads — the mod's page shows the message.

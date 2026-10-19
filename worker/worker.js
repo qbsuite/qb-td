@@ -40,7 +40,7 @@
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
 import { modaqExport, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
-import { parseRoster, rosterNameMap, renameMatch, withRound } from '../app/engine/qbj.js';
+import { parseRoster, rosterNameMap, renameMatch, withRound, rosterForExport } from '../app/engine/qbj.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
@@ -2905,8 +2905,27 @@ async function adminDownload(url, env, t) {
   if (!obj) return err(env, 404, 'no such file');
   const dl = url.searchParams.get('dl') || key.split('/').pop();
   const part = url.searchParams.get('part');
+  if (part === 'roster' && key === t.roster_r2_key) return rosterExportResponse(env, obj, await blobKey(t, key), dl);
   return storedFileResponse(env, obj, await blobKey(t, key), dl, part,
     part && t.roster_r2_key ? await rosterNames(env, t.roster_r2_key, await blobKey(t, t.roster_r2_key)) : null);
+}
+
+// The roster as it leaves qb-td (the Setup Download): without the former
+// names only qb-td reads (qbj.js rosterForExport), as the roster editor's
+// download and the QBJ bundle give it. A roster with none comes down as
+// it was stored, byte for byte.
+async function rosterExportResponse(env, obj, rawKey, dl) {
+  const buf = await readBlob(obj, rawKey);
+  let body = buf;
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(buf));
+    const out = rosterForExport(parsed);
+    if (JSON.stringify(out) !== JSON.stringify(parsed)) body = JSON.stringify(out, null, 2);
+  } catch (e) { /* not JSON: as it is */ }
+  const headers = new Headers(corsHeaders(env));
+  headers.set('Content-Type', (blobEnc(obj) ? (obj.customMetadata || {}).ct : obj.httpMetadata?.contentType) || 'application/octet-stream');
+  headers.set('Content-Disposition', attachmentHeader(dl));
+  return new Response(body, { status: 200, headers });
 }
 
 // The roster's renames (qbj.js rosterNameMap) for a game download, so a

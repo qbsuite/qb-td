@@ -201,6 +201,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
   are generated client-side in the dashboard. Combined reader uploads are
   never handed out raw: the dashboard's per-file downloads (Worker
   `part=qbj|game`) and the zip both split them into those two real files.
+  Likewise the roster: Setup's Download (`part=roster`) and the zip leave
+  out the former names qb-td keeps to follow renames.
 - **Question sets** (`app/set.html`, no account): the editor's side of a
   mirrored tournament. A set's packets, tiebreakers and reader game
   format are uploaded once; each mirror gets an **invite link** the

@@ -1261,12 +1261,14 @@ function testRoster(n, tricky) {
 
 function renderRosterSec(a, t) {
   const box = $('setupsec');
+  // Download gives the roster as it leaves qb-td (part=roster, worker.js
+  // adminDownload): without the former names only qb-td reads
   box.innerHTML = `
     <h2>Roster</h2>
     <div class="row">
       ${t.roster_name
         ? `<span>${esc(t.roster_name)}</span>
-           <button id="rosterget" class="linkbtn">Download</button>`
+           <a id="rosterget" href="${esc(`${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}&part=roster`)}" download>Download</a>`
         : '<span class="muted">None yet</span>'}
       <span class="spacer" style="flex:1"></span>
       <button id="pickroster">Upload roster QBJ</button>
@@ -1288,16 +1290,6 @@ function renderRosterSec(a, t) {
       rosterUpload = { filename: `test-roster-${teams.length}.qbj`,
         text: JSON.stringify(buildRosterQbj(t.name, teams)), teams };
       renderUpPreview(a);
-    };
-  }
-  // the roster as it leaves qb-td, as the editor's download gives it:
-  // without the former names only qb-td reads
-  if ($('rosterget')) {
-    $('rosterget').onclick = async () => {
-      try {
-        download(t.roster_name, JSON.stringify(rosterForExport(await fetchOwnedJson(a, t.roster_r2_key)), null, 2),
-          'application/json');
-      } catch (e) { say('Roster: ' + e.message, true); }
     };
   }
   $('pickroster').onclick = () => $('rfile').click();
