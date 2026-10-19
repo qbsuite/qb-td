@@ -1,3 +1,56 @@
+Release Notes for 10/19/2026
+
+[ SECURITY ]
+- Team, stage and bracket names with special characters now show as text in the stat report, so they can no longer run as code.
+- The Classic stat report on the public page runs in a sandboxed frame.
+- Room Test links no longer contain the admin link's secret. Test links made before this update stop working, so please copy them again.
+- On qbsuite.github.io, pages always use the qb-td server, even when a shared link names another one.
+
+[ SETUP ]
+- The Rooms note now points to the Bye Room link for unofficial scrims, since nothing played there is saved.
+- An uploaded roster now renames a team only when its players match. A new team in a withdrawn team's row starts with no games.
+- The roster Download leaves out the former names qb-td keeps to follow renames.
+- Replacing the packet of a round that already has games now asks first.
+
+[ LIVE HUB ]
+- Playoff and Finals slots fill on their own after a team is renamed, also in a hub tab opened before the rename.
+- The Finished rounds only option counts the games of renamed teams.
+- A rename saved in another tab reaches the hub on its next refresh.
+- When a game cannot be read, its playoff slots wait and the hub tries again, instead of filling from incomplete standings.
+- A game added under a different round than its file names now counts in the round it is filed under, as the hub shows it.
+- Add a game fills in Round from the match file, and notes when the round picked differs from the one the file names.
+- Playoff slots, auto-fill and the Finals rank teams the way the public page does, without overtime in points per 20.
+- Compute stats leaves overtime out of TUH, points per 20 and PPB, and sorts teams by winning percentage, as the public page does.
+- Edit in MODAQ keeps the question numbers of replaced and added questions, so a corrected game matches the original.
+
+[ SCHEDULE ]
+- When the same pools play again, such as a double round robin or Copy this phase, playoff and Finals slots are seeded on all of their games.
+- Renaming a room renames its line on the saved schedule, also when the room was matched by name.
+
+[ PUBLIC PAGE ]
+- After a TD's Rebuild, a room move or a room rename, the public page shows the corrected games without waiting for new ones.
+
+[ BUZZPOINTS ]
+- Buzz marks land on the right word when a question uses an encoded space (&nbsp;) or other HTML entities, as in MODAQ.
+- A tiebreaker's name in Replacements shows as text.
+
+[ SETS ]
+- The set page no longer waits on a mirror's Bye Room before showing a round as finished.
+- Packet uploads and removals work for sets with many mirrors.
+- Turning off mirror buzzpoints is no longer undone by adding or removing a packet or changing the format afterward.
+- The parse review says when MODAQ will not load a packet, for example a bonus with no point values.
+- A question ledger or category map that can't be read is left as it is, and the editor says so, instead of being overwritten.
+- Renaming a room updates the room name shown with buzzes on set pages.
+
+[ ARCHIVE ]
+- Archived stat reports use each tournament's own tossup count and show standings by stage, matching the archived page.
+
+[ PERFORMANCE ]
+- Game downloads and public page updates use less server time.
+
+[ MISC ]
+- When the server fails, pages say "Something went wrong on the server. Please try again." instead of reporting a network error.
+
 Release Notes for 10/18/2026
 
 [ HUB ]
