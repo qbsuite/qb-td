@@ -60,6 +60,16 @@ remapped onto qb-td's display categories. No packet-parser code is
 redistributed — the spellings themselves are factual category names as
 they appear in published packets.
 
+## he — HTML named character references
+
+`app/engine/entities.js` embeds the HTML Standard's table of named
+character references (© WHATWG, CC BY 4.0) as
+[he](https://github.com/mathiasbynens/he) 1.2.0 lists it (MIT © Mathias
+Bynens). MODAQ decodes packet text with he before it numbers a
+question's words, and qb-td's buzzpoint marks decode it the same way. The
+decoder itself is qb-td's own; `npm test` checks it against he name by
+name.
+
 ## External services and formats
 
 - `.docx` packets are converted in the moderator's browser by the public

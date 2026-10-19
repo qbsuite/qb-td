@@ -7,6 +7,7 @@
 // TD-gated packet route.
 
 import { matchPayload } from './qbj.js';
+import { decodeEntities } from './entities.js';
 
 export function unwrapMatch(json) {
   let obj = matchPayload(json);
@@ -293,6 +294,12 @@ export function tokenizeQuestion(text) {
 const READER_DIRECTIVES = ['(emphasize)', '(emphasise)', '(pause)', '(read slowly)',
   '[emphasize]', '[emphasise]', '[pause]', '[read slowly]'];
 const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// stand-ins for "<" and ">" that a character reference spelled out:
+// noncharacters, which packet text never holds
+const LT = '\ufdd0';
+const GT = '\ufdd1';
+const LT_ALL = /\ufdd0/g;
+const GT_ALL = /\ufdd1/g;
 
 /**
  * A tossup's words exactly as MODAQ numbers them for word_index
@@ -311,7 +318,12 @@ const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * `lead` and `rest` split it at a guide inside the word.
  */
 export function questionWords(text, format = {}) {
-  text = String(text || '');
+  // MODAQ numbers the text as he.decode leaves it (PacketLoaderController),
+  // so "&nbsp;" splits two words there and here alike. A bracket that a
+  // reference spells out ("&lt;p&gt;") is shown as written, never stripped
+  // as a tag: `shown` marks it, character for character with `text`.
+  const shown = decodeEntities(text, (t) => t.replace(/</g, LT).replace(/>/g, GT));
+  text = shown.replace(LT_ALL, '<').replace(GT_ALL, '>');
   const g = Array.isArray(format.pronunciationGuideMarkers) ? format.pronunciationGuideMarkers : ['(', ')'];
   const guides = [[g[0], g[1]]];
   // MODAQ reads straight and curly quotes in a guide alike
@@ -323,13 +335,15 @@ export function questionWords(text, format = {}) {
   // parseFormattedText: runs of text with their formatting
   const segs = [];
   const st = { em: false, b: false, u: false, sub: false, sup: false, pron: false };
-  const push = (t, pron = st.pron) => { if (t) segs.push({ ...st, pron, text: t }); };
+  const push = (a, b, pron = st.pron) => {
+    if (b > a) segs.push({ ...st, pron, text: text.slice(a, b), shown: shown.slice(a, b) });
+  };
   let from = 0;
   for (const m of text.matchAll(new RegExp(`<\\/?em>|<\\/?req>|<\\/?b>|<\\/?u>|<\\/?sub>|<\\/?sup>${extra}`, 'gi'))) {
     const tag = m[0].toLowerCase();
     // a guide's closing marker stays in the guide's text
     const close = guides.find((x) => tag === x[1].toLowerCase());
-    push(text.slice(from, m.index + (close ? close[1].length : 0)));
+    push(from, m.index + (close ? close[1].length : 0));
     let skip = true;
     const t = /^<(\/?)(em|req|b|u|sub|sup)>$/.exec(tag);
     if (t) {
@@ -337,22 +351,24 @@ export function questionWords(text, format = {}) {
       if (t[2] === 'req') { st.b = on; st.u = on; } else st[t[2]] = on;
     } else if (guides.some((x) => tag === x[0].toLowerCase())) { skip = false; st.pron = true; }
     else if (close) st.pron = false;
-    else push(m[0], true); // a reader directive: its own unbuzzable word
+    else push(m.index, m.index + m[0].length, true); // a reader directive: its own unbuzzable word
     from = skip ? m.index + m[0].length : m.index;
   }
-  if (from < text.length) push(text.slice(from));
+  if (from < text.length) push(from, text.length);
 
   // splitFormattedTextIntoWords: whitespace ends a word, tags don't
   const raw = [];
   let cur = [];
   for (const sg of segs) {
     const parts = sg.text.split(/\s+/g);
+    const shownParts = sg.shown.split(/\s+/g); // the same whitespace, so the same split
+    const part = (i) => ({ ...sg, text: parts[i], shown: shownParts[i] });
     if (parts.length === 1) { cur.push(sg); continue; }
-    if (parts[0]) cur.push({ ...sg, text: parts[0] });
+    if (parts[0]) cur.push(part(0));
     raw.push(cur);
     cur = [];
-    for (let i = 1; i < parts.length - 1; i++) if (parts[i]) raw.push([{ ...sg, text: parts[i] }]);
-    if (parts[parts.length - 1]) cur.push({ ...sg, text: parts[parts.length - 1] });
+    for (let i = 1; i < parts.length - 1; i++) if (parts[i]) raw.push([part(i)]);
+    if (parts[parts.length - 1]) cur.push(part(parts.length - 1));
   }
   if (cur.length) raw.push(cur);
 
@@ -361,8 +377,9 @@ export function questionWords(text, format = {}) {
   // a guide is faded, as MODAQ shows it (class "pg")
   const html = (segs) => segs.map((sg) => {
     const tags = ['em', 'b', 'u', 'sub', 'sup'].filter((k) => sg[k]);
-    const body = sg.text.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ')
-      .replace(/&(?!(?:amp|lt|gt|quot|#\d+|#x[\da-f]+);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // the text is decoded, so an "&" left in it is one to show
+    const body = sg.shown.replace(/<[^>]*>/g, '').replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(LT_ALL, '&lt;').replace(GT_ALL, '&gt;');
     const out = tags.map((k) => `<${k}>`).join('') + body + tags.slice().reverse().map((k) => `</${k}>`).join('');
     return sg.pron ? `<span class="pg">${out}</span>` : out;
   }).join('');
@@ -372,14 +389,13 @@ export function questionWords(text, format = {}) {
     // MODAQ keeps an empty word (two spaces after a guide); it shows nothing
     const full = word.map((sg) => sg.text).join('').trim();
     const counted = !powers.some((p) => full.startsWith(p.marker)) && !(word.length && word[0].pron);
-    // a guide joined to its word ("Dvořák&nbsp;(“d’VORE-zhahk”).") is part
-    // of that word, but a buzz marks only what comes before it: `lead`,
-    // then `rest` from the guide on
+    // a guide joined to its word ("Dvořák(“d’VORE-zhahk”).") is part of
+    // that word, but a buzz marks only what comes before it: `lead`, then
+    // `rest` from the guide on
     const g = word.findIndex((sg) => sg.pron);
     const lead = html(g < 0 ? word : word.slice(0, g));
     const rest = g < 0 ? '' : html(word.slice(g));
-    const trimmed = lead.replace(/\s+$/, '');
-    words.push({ html: lead + rest, lead: trimmed, rest: (trimmed !== lead ? ' ' : '') + rest, at: counted ? n++ : null });
+    words.push({ html: lead + rest, lead, rest, at: counted ? n++ : null });
   }
   return { words, end: n };
 }

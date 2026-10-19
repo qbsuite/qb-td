@@ -19,6 +19,7 @@ import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, follo
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { tiebreakerBuzzes, matchBuzzes, roundTossupBuzzes, buzzSummary, tokenizeQuestion, questionWords, matchBonuses, roundBonuses, mainAnswerHtml, sanitizeHtml, dedupeEntries, sideRounds } from '../app/engine/buzz.js';
+import { decodeEntities } from '../app/engine/entities.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, catOfEntry } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, sha256HexJs, BUZZ_ITERS } from '../app/js/buzzkey.js';
@@ -1650,32 +1651,60 @@ test('questionWords numbers words as MODAQ does: tags inside words, guides and p
     ['<b>for</b>', '<em><b>ten</b></em>', 'points']);
   assert.deepEqual(questionWords('', ACF), { words: [], end: 0 });
   // a guide joined to its word: one word, its buzz mark on what comes before the guide
-  const dv = questionWords('of Dvo\u0159\u00e1k&nbsp;(\u201cd\u2019VORE-zhahk\u201d).', ACF).words[1];
+  const dv = questionWords('of Dvo\u0159\u00e1k(\u201cd\u2019VORE-zhahk\u201d).', ACF).words[1];
   assert.equal(dv.at, 1);
   assert.equal(dv.lead, 'Dvo\u0159\u00e1k');
-  assert.equal(dv.rest, ' <span class="pg">(\u201cd\u2019VORE-zhahk\u201d)</span>.');
+  assert.equal(dv.rest, '<span class="pg">(\u201cd\u2019VORE-zhahk\u201d)</span>.');
+  // an encoded no-break space is a space, as MODAQ decodes it: the guide is a word of its own
+  assert.deepEqual(plain('of Dvo\u0159\u00e1k&nbsp;(\u201cd\u2019VORE-zhahk\u201d).', ACF),
+    [['of', 0], ['Dvo\u0159\u00e1k', 1], ['(\u201cd\u2019VORE-zhahk\u201d).', null]]);
+  // references show as the characters they are; brackets one spells out are text, not a tag
+  assert.deepEqual(questionWords('see &lt;p&gt; at AT&amp;T, caf&eacute; &copy 2026 &bogus;', ACF).words.map((w) => w.html),
+    ['see', '&lt;p&gt;', 'at', 'AT&amp;T,', 'caf\u00e9', '\u00a9', '2026', '&amp;bogus;']);
 
-  // locked against the installed MODAQ: the same count and the same word
-  // at every index
-  const { Tossup } = createRequire(import.meta.url)('modaq/src/state/PacketState.js');
+  // locked against the installed MODAQ, loading the text as its reader
+  // does (loadPacket, which decodes references first): the same count and
+  // the same word at every index
+  const { loadPacket } = createRequire(import.meta.url)('modaq/src/components/PacketLoaderController.js');
+  const modaqTossup = (q) => loadPacket({ uiState: { setPacketStatus() {} } }, { tossups: [{ question: q, answer: 'a' }] }).tossups[0];
+  const shownText = (html) => html.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   const texts = [
     'This composer\u2019s works include a <em>Grand Duo</em> sonata and a <em>Trout</em> quintet.',
     'Theodor N\u00f6ldeke (\u201cnull-DECK-uh\u201d). In a chapter (*) called \u201cThe Confederates,\u201d one (pause) protagonist',
     'a<b>b</b>c &nbsp; d <u>under lined</u> ("guide two") <req>req</req>uired [read slowly] end',
     ' leading space and  double  spaces ("x")  after',
+    'Mr.&nbsp;Smith wrote this book. For 10 points, name him.',
+    'one&#160;two&#xA0;three&ensp;four (&quot;kai poh CHAY&quot;) &ldquo;five&rdquo; &lt;b&gt;six&lt;/b&gt; seven&lpar;*&rpar; eight',
+    'AT&amp;T &amp;nbsp; &copy 2026 &notit; &bogus; &#128; &#xD800; end',
   ];
   for (const f of [ACF, POW, PRESET_FORMATS.pace, PRESET_FORMATS['']]) {
     for (const q of texts) {
-      const m = new Tossup(q, 'a').getWords(f).filter((w) => w.canBuzzOn);
+      const m = modaqTossup(q).getWords(f).filter((w) => w.canBuzzOn);
       const ours = questionWords(q, f);
       assert.equal(ours.end, m.length - 1, q);
       for (const w of ours.words.filter((x) => x.at !== null)) {
         const mw = m.find((x) => x.wordIndex === w.at);
-        assert.equal(w.html.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&'),
-          mw.word.map((sg) => sg.text).join('').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' '), q);
+        assert.equal(shownText(w.html), mw.word.map((sg) => sg.text).join(''), q);
       }
     }
   }
+});
+
+test('decodeEntities decodes as he does, which MODAQ decodes packet text with', () => {
+  const he = createRequire(import.meta.url)('he');
+  // he's own table, read from its source: it exports no list of names
+  const src = readFileSync(createRequire(import.meta.url).resolve('he'), 'utf8');
+  const names = Object.keys(new Function('return ' + /var decodeMap = (\{.*?\});/s.exec(src)[1])());
+  assert.ok(names.length > 2000);
+  // every named reference, with and without its semicolon, and run into more text
+  for (const n of names) {
+    for (const t of [`&${n};`, `&${n}`, `x&${n}y;`, `&${n}=1`]) assert.equal(decodeEntities(t), he.decode(t), t);
+  }
+  const odd = ['&#0;', '&#65', '&#x41;', '&#X41', '&#128;', '&#x9F;', '&#xD800;', '&#1114112;', '&#99999999999999999999;',
+    '&#;', '&#x;', '& amp;', '&&amp;;', '&ampamp;', '&notin;', '&notit;', '&NotNestedLessLess;', '&fjlig;', 'no refs'];
+  for (const t of odd) assert.equal(decodeEntities(t), he.decode(t), t);
+  // what each reference decodes to can be marked, and nothing else
+  assert.equal(decodeEntities('<a> &lt;b&gt; &ltc', (s) => '[' + s + ']'), '<a> [<]b[>] [<]c');
 });
 
 test('roundRooms: who plays a round, by bucket link then room name; the rest have a bye', () => {
