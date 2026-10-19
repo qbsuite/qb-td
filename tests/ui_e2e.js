@@ -83,12 +83,13 @@ const S = (method, params) => send(method, params, sessionId);
 
 const pageErrors = [];
 const dialogs = [];
+let dialogAccept = true; // false: the next dialogs are dismissed (Cancel)
 let here = 'about:blank';
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
   if (m.method === 'Page.javascriptDialogOpening') {
     dialogs.push(m.params.message);
-    S('Page.handleJavaScriptDialog', { accept: true });
+    S('Page.handleJavaScriptDialog', { accept: dialogAccept });
   } else if (m.method === 'Runtime.exceptionThrown') {
     const d = m.params.exceptionDetails;
     pageErrors.push(here + ': ' + ((d.exception && d.exception.description) || d.text));
@@ -971,12 +972,27 @@ await expectLive('round 1, all in', 1);
   await waitJs(`!!document.querySelector('[data-step="packets"]')`, 'the step list');
   await click('[data-step="packets"]');
   await waitJs(`!!document.querySelector('[data-pickround="1"]')`, 'the packets step');
-  const asked = dialogs.length;
+  // the games read off round 1's packet: one per pair, MODAQ game files aside
+  const pairs = new Set((await detail()).files.filter((f) => f.round === 1 && (f.kind === 'qbj' || f.kind === 'combined') && !f.error)
+    .map((f) => { const sum = typeof f.summary === 'string' ? JSON.parse(f.summary) : f.summary; return sum ? sum.teams.slice().sort().join('\n') : f.id; })).size;
+  // Cancel keeps the packet the games were read from
+  let asked = dialogs.length;
+  const before = (await detail()).rounds.find((r) => r.number === 1);
+  dialogAccept = false;
+  await clickPick('[data-pickround="1"]', [writeFx('Round 1 other.json', packets[1])]);
+  await until(() => dialogs.length > asked, 'the Replace question');
+  dialogAccept = true;
+  await new Promise((res) => setTimeout(res, 500));
+  const kept = (await detail()).rounds.find((r) => r.number === 1);
+  ok('6 packets: Cancel on the Replace question keeps the packet',
+    kept.packet_name === 'Round 1 revised.json' && kept.packet_r2_key === before.packet_r2_key
+    && !(await exists('.slot.up')), kept);
+  asked = dialogs.length;
   await clickPick('[data-pickround="1"]', [revised]);
   await waitJs(`document.querySelector('#msg').textContent === 'Round 1: Round 1 revised.json'`, 'the replacement uploaded');
   const msg = dialogs.slice(asked).find((x) => x.startsWith('Replace'));
-  ok('6 packets: Replace on a round with games in asks first', /^Replace Round 1's packet with Round 1 revised\.json\? \d+ games already uploaded will use the new packet for their buzzpoints and categories\.$/.test(msg || ''),
-    dialogs.slice(asked));
+  ok('6 packets: Replace on a round with games in asks first', pairs > 1 && msg === `Replace Round 1's packet with Round 1 revised.json? ${pairs} games already uploaded will use the new packet for their buzzpoints and categories.`,
+    [pairs, dialogs.slice(asked)]);
   await openHub();
 }
 // a tournament made on the home page starts with auto-advance on

@@ -1042,6 +1042,11 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
     // a set's mirror keeps its rounds: the set re-points them by number
     movePacket: t.set ? null : (from, to) => pub(`${a}/packets/move`, { method: 'POST', json: { from, to } }),
     roundGames: (k) => ((lastDetail && lastDetail.files) || []).filter((f) => f.round === k && !f.error).length,
+    // one per pair of teams, as the stats count them; a MODAQ game file or
+    // a forfeit has no buzzpoints of its own
+    packetGames: (k) => new Set(((lastDetail && lastDetail.files) || [])
+      .filter((f) => f.round === k && (f.kind === 'qbj' || f.kind === 'combined') && !f.error && !isForfeitFile(f))
+      .map((f) => { const s = uploadedSummary(f); return s && s.teams ? [...s.teams].sort().join('\n') : 'file ' + f.id; })).size,
     uploadTb: async (name, data) => {
       try {
         const out = await pub(`${a}/tiebreakers?name=${encodeURIComponent(name)}`,

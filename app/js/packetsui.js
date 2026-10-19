@@ -65,7 +65,9 @@ export function replacePrompt({ noun = 'Round', round, name, had, games }) {
  *   uploadPacket(staged, round), uploadTb(name, data) -> true on success,
  *   clearTb()     the caller's routes
  *   movePacket(from, to)  optional: a placed packet drags to another round
- *   roundGames(round)     optional: the games a round has in; a move or a
+ *   roundGames(round)     optional: the games a round has in; a move over
+ *                 them asks first
+ *   packetGames(round)    optional: the games read off a round's packet; a
  *                 replace over them asks first
  *   removeTb(id)  optional: take one question out (adds a Remove link per row)
  *   pool          the tiebreaker pool blob, or null
@@ -215,7 +217,7 @@ export function renderPacketsUi(box, o) {
   // a file onto a round whose packet games were read from asks first
   const replaceOk = (k, name) => {
     const ask = replacePrompt({ noun, round: k, name, had: rounds.some((x) => x.number === k),
-      games: o.roundGames ? o.roundGames(k) : 0 });
+      games: o.packetGames ? o.packetGames(k) : 0 });
     return !ask || confirm(ask);
   };
   // The Worker splits JSON only, so a .docx goes through YAPP here first,
