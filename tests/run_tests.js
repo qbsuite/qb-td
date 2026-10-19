@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf } from '../app/engine/qbj.js';
+  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
@@ -4122,6 +4122,20 @@ test('roster renames: former names round-trip through the roster file, and MODAQ
   assert.ok(reg.value.some((p) => p.teamName === 'UC San Diego' && p.name === 'Jacob Anderson'));
   // a roster with no renames is the file it always was
   assert.ok(!JSON.stringify(buildRosterQbj('T', renameRoster)).includes('_formerNames'));
+});
+
+test('roster renames: a roster leaving qb-td drops the former names, keeps the rest', () => {
+  const saved = buildRosterQbj('T', [{ name: 'New U', players: ['Annie', 'Bo'], formerNames: ['Old U'],
+    formerPlayers: { Annie: ['Ann'] }, marks: { Annie: { ug: true }, Bo: { ug: true } } }], { trackUG: true, trackDiv2: false });
+  const out = rosterForExport(saved);
+  assert.ok(JSON.stringify(saved).includes('_formerNames'), 'the saved roster keeps them');
+  assert.ok(!JSON.stringify(out).includes('_formerNames') && !JSON.stringify(out).includes('Old U') && !JSON.stringify(out).includes('"Ann"'));
+  const back = parseRoster(out);
+  assert.deepEqual(back.map((t) => [t.name, t.players, t.ug]), [['New U', ['Annie', 'Bo'], true]]);
+  assert.deepEqual(back[0].marks, { Annie: { ug: true, d2: false }, Bo: { ug: true, d2: false } });
+  assert.equal(JSON.stringify(rosterForExport(renameRoster)), JSON.stringify(renameRoster), 'nothing to drop: the same content');
+  const reg = parseRegistration(JSON.stringify(out));
+  assert.equal(reg.success, true, reg.message);
 });
 
 test('roster renames: a second rename keeps both earlier names; a team taking a freed name starts fresh', () => {

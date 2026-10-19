@@ -37,6 +37,7 @@ Release Notes for 10/18/2026
 - Games uploaded before today get MODAQ's own files too, rebuilt from each game with MODAQ's code.
 - Those files and the QBJ bundle use the roster's current team and player names, as the stats do.
 - A set editor's download of a mirror's games has the same MODAQ files, under that mirror's current names.
+- The roster in the QBJ bundle and the roster download leave out qb-td's record of former names, so the file is standard.
 
 [ PERFORMANCE ]
 - The Live Hub fetches games for playoff slots in one or two requests rather than one per game, so it loads faster after the prelims.

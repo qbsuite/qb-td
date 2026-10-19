@@ -231,6 +231,15 @@ export function buildRosterQbj(tournamentName, teams, track = rosterTracking(tea
   };
 }
 
+/** A roster .qbj as it leaves qb-td (the QBJ bundle, the roster
+    download): without the `_formerNames` only qb-td reads, so the file is
+    the standard schema plus YellowFruit's YfData. A copy. */
+export function rosterForExport(json) {
+  const strip = (o) => (Array.isArray(o) ? o.map(strip) : o && typeof o === 'object'
+    ? Object.fromEntries(Object.entries(o).filter(([k]) => k !== '_formerNames').map(([k, v]) => [k, strip(v)])) : o);
+  return strip(json);
+}
+
 /**
  * A team's marks, from its players': Division II when every player is
  * Division II, otherwise Undergraduate when every player is Undergraduate

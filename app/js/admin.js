@@ -17,7 +17,7 @@
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
 import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj } from '../engine/qbj.js';
+  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, rosterForExport } from '../engine/qbj.js';
 import { aggregate, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
@@ -1571,7 +1571,7 @@ function renderRosterEditor(a, t) {
   $('rosterdl').onclick = () => {
     const clean = validated();
     if (!clean) return;
-    download('roster.qbj', JSON.stringify(buildRosterQbj(t.name, clean, rosterTrack), null, 2),
+    download('roster.qbj', JSON.stringify(rosterForExport(buildRosterQbj(t.name, clean, rosterTrack)), null, 2),
       'application/json');
   };
   $('rostersave').onclick = async () => {
@@ -3340,7 +3340,7 @@ function showStats({ a, t, files, settings, got }) {
       catch (e) { /* bundle still useful without it */ }
     }
     if (t.roster_r2_key) {
-      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(await fetchOwnedJson(a, t.roster_r2_key), null, 2) }); }
+      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(rosterForExport(await fetchOwnedJson(a, t.roster_r2_key)), null, 2) }); }
       catch (e) { /* bundle still useful without it */ }
     }
     download(t.slug + '-qbj.zip', makeZip(entries), 'application/zip');
