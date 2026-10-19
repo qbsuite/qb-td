@@ -1792,6 +1792,85 @@ async function openHubOf(adminSecret) {
   ok('24d forfeit: the public scoreboard shows the result', (await js('document.body.innerText')).includes(`${win} defeats ${lose} by forfeit`));
 }
 
+/* ---------- 24e. the set editor: settings saves and the question ledger ----------
+   A settings save sends the whole object, so one built from a stale copy
+   writes an earlier change back out: the mirror-buzzpoints lock must
+   survive Add a packet, a tab switch and a format change. A question
+   ledger the page can't use is refused, never overwritten, and the parse
+   review says when MODAQ will not load a packet. */
+{
+  // sets made by earlier runs don't count against this one's per-IP cap
+  d1exec("UPDATE sets SET creator_ip = 'earlier-run'");
+  const created = await call('/api/sets', { method: 'POST', json: { name: 'UI Set', slug: 'ui-set-' + Math.random().toString(36).slice(2, 7) } });
+  const SS = '/s/' + created.body.admin_secret;
+  const saved = async () => JSON.parse((await call(SS)).body.set.settings || '{}');
+  const toTab = async (key) => {
+    await click(`[data-settab="${key}"]`);
+    await waitJs(`document.querySelector('[data-settab="${key}"]').classList.contains('active')`, 'the ' + key + ' tab');
+  };
+  const lockBox = async (locked) => {
+    await js(`(() => { const c = document.querySelector('#mirrorbuzz'); c.checked = ${!locked};
+      c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+    await waitJs(`/${locked ? 'Mirror buzzpoints are off' : 'Mirrors may run their own buzzpoints'}/.test(document.querySelector('#msg').textContent)`, 'the lock saved');
+  };
+  await goto(`${PAGES}/set.html?a=${created.body.admin_secret}`);
+  await waitJs(`!!document.querySelector('#addslot')`, 'the set dashboard');
+
+  await toTab('settings');
+  await lockBox(true);
+  ok('24e set: unticking the box locks mirror buzzpoints', (await saved()).lockMirrorBuzz === true);
+  await toTab('packets');
+  await click('#addslot');
+  await until(async () => (await saved()).rounds === 2, 'the second packet slot');
+  ok('24e set: Add a packet keeps the lock', (await saved()).lockMirrorBuzz === true, await saved());
+
+  // a toggle, then a tab switch with nothing refetched in between
+  await toTab('settings');
+  await lockBox(false);
+  await toTab('mirrors');
+  await toTab('settings');
+  ok('24e set: Settings drawn again show the box as last saved', await js(`document.querySelector('#mirrorbuzz').checked`));
+  await lockBox(true);
+  await toTab('mirrors');
+  await toTab('settings');
+  ok('24e set: and again once it is unticked', await js(`!document.querySelector('#mirrorbuzz').checked`));
+  await fill('#gformat', 'acf', ['change']);
+  await until(async () => (await saved()).gameFormat === 'acf', 'the format saved');
+  const after = await saved();
+  ok('24e set: a format change keeps the lock and the packet count', after.lockMirrorBuzz === true && after.rounds === 2, after);
+
+  // packets uploaded straight to the Worker: packet 1 carries a ledger
+  // from a newer qb-td, packet 2 waits to be matched, and its bonus has
+  // no point values
+  const two = JSON.parse(packetFor(2));
+  delete two.bonuses[0].values;
+  await call(`${SS}/packet?packet=1&name=One.json`, { method: 'POST', body: packetFor(1) });
+  await call(`${SS}/packet?packet=2&name=Two.json`, { method: 'POST', body: JSON.stringify(two) });
+  const ledgerOf = async () => (await call(SS + '/ledger')).body;
+  for (const [what, ledger, said] of [
+    ['a ledger from a newer qb-td', JSON.stringify({ v: 2, seq: 40, questions: { 7: { kind: 't' } } }), /newer version of this page/],
+    ['a ledger that is not JSON', '{not json}', /could not be read/],
+  ]) {
+    const before = await ledgerOf();
+    const etag = before.split('\n')[0] || null;
+    const put = await call(SS + '/qmap', { method: 'POST',
+      body: JSON.stringify({ packet: 1, v: 1, q: { t: [], b: [] }, etag }) + '\n' + ledger });
+    ok('24e set: ' + what + ' is stored', put.status === 200, put.body);
+    const stored = await ledgerOf();
+    await reload();
+    await waitJs(`!!document.querySelector('[data-match="2:1"]')`, 'the Match button');
+    await click('[data-match="2:1"]');
+    await waitJs(`${said}.test(document.querySelector('#msg').textContent)`, 'the refusal');
+    ok('24e set: Match refuses ' + what + ' and says so', said.test(await text('#msg')), await text('#msg'));
+    ok('24e set: ' + what + ' is left as it is', (await ledgerOf()) === stored);
+  }
+  await click('[data-review="2:1"]');
+  await waitJs(`!!document.querySelector('.review')`, 'the parse review');
+  ok('24e set: the review still shows, with the ledger refusal said', /could not be read/.test(await text('#msg')));
+  ok('24e set: the review says MODAQ will not load a bonus with no point values',
+    (await text('.review')).includes('no point values — MODAQ will not load this packet'));
+}
+
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);

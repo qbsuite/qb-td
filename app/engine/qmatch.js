@@ -102,9 +102,36 @@ export function emptyLedger() {
 }
 
 /**
+ * Throws, with a message for the editor, unless `ledger` is one this code
+ * can extend; null (a set with no ledger yet) passes. Never start over
+ * from an empty ledger in place of one that exists: the write that
+ * follows would replace it and hand out question ids already in use.
+ */
+export function checkLedger(ledger) {
+  if (ledger === null || ledger === undefined) return;
+  if (ledger && typeof ledger === 'object' && typeof ledger.v === 'number' && ledger.v > 1) {
+    throw new Error('The set\'s question ledger was saved by a newer version of this page, so nothing was changed. '
+      + 'Please reload the page and try again.');
+  }
+  if (!ledger || typeof ledger !== 'object' || ledger.v !== 1 || !Number.isInteger(ledger.seq)
+    || !ledger.questions || typeof ledger.questions !== 'object') {
+    throw new Error('The set\'s question ledger could not be read, so nothing was changed. '
+      + 'Please reload the page and try again.');
+  }
+}
+
+// a match's working copy: the set's ledger, or a new one for a new set
+function startFrom(ledger) {
+  if (ledger === null || ledger === undefined) return emptyLedger();
+  checkLedger(ledger);
+  return JSON.parse(JSON.stringify(ledger));
+}
+
+/**
  * Match one packet version's questions into the ledger.
  *
- * @param ledger    the set's ledger (not mutated), or null for a new set
+ * @param ledger    the set's ledger (not mutated), or null for a new set;
+ *                  one it can't use throws (checkLedger)
  * @param packet    the packet number being uploaded
  * @param questions packetQuestions() of it
  * @param current   this version is the packet's current one (the normal
@@ -119,8 +146,7 @@ export function emptyLedger() {
  *           and in no current packet now
  */
 export function matchPacket(ledger, packet, questions, current = true) {
-  const next = ledger && ledger.v === 1 && ledger.questions
-    ? JSON.parse(JSON.stringify(ledger)) : emptyLedger();
+  const next = startFrom(ledger);
   const q = { t: [], b: [] };
   const report = [];
   const used = new Set(); // ids already placed in this packet version
@@ -214,8 +240,7 @@ export function matchPacket(ledger, packet, questions, current = true) {
  * with putQmap, like matchPacket. `current` as for matchPacket.
  */
 export function assignQuestion(ledger, packet, questions, q, kind, pos, target, current = true) {
-  const next = ledger && ledger.v === 1 && ledger.questions
-    ? JSON.parse(JSON.stringify(ledger)) : emptyLedger();
+  const next = startFrom(ledger);
   const map = { t: [...(q && q.t) || []], b: [...(q && q.b) || []] };
   const item = (questions[kind] || [])[pos - 1];
   if (!item) throw new Error('no such question');

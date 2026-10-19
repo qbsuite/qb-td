@@ -4802,15 +4802,19 @@ async function updateSet(request, env, s) {
 // one set can have played different versions of a packet. `q` is the
 // version's question map ({t: [[qid, rev] | null, ...], b: [...]}, see
 // putQmap); t/b are absent for a packet with no category data. `patch`
-// is merged into the version's entry. Text-free, so public.
+// is merged into the version's entry. Text-free, so public. Returns
+// 'ok', 'race' (other writers kept winning) or 'unreadable'.
 async function updateSetCatmap(env, sid, packet, version, patch) {
   const key = setCatmapKey(sid);
   for (let attempt = 0; attempt < 4; attempt++) {
     const cur = await env.DATA.get(key);
     let map = { packets: {} };
     if (cur) {
-      map = await cur.json().catch(() => ({ packets: {} }));
-      if (!map || typeof map.packets !== 'object') map = { packets: {} };
+      map = await readSetCatmap(cur);
+      if (!map) {
+        console.log('set catmap unreadable, left as it is', sid);
+        return 'unreadable';
+      }
     }
     const p = String(packet);
     if (!map.packets[p] || typeof map.packets[p] !== 'object') map.packets[p] = {};
@@ -4824,11 +4828,20 @@ async function updateSetCatmap(env, sid, packet, version, patch) {
         customMetadata: { v },
         onlyIf,
       });
-      if (put) return true;
+      if (put) return 'ok';
     } catch (e) { /* precondition failed -> retry */ }
   }
   console.log('catmap update lost the retry race for set', sid);
-  return false;
+  return 'race';
+}
+
+// A stored set category map, or null when it can't be read. Its question
+// maps are the editors' work and exist nowhere else, so neither writer
+// replaces a map it can't read: starting over from an empty one would
+// drop them all.
+async function readSetCatmap(obj) {
+  const map = await obj.json().catch(() => null);
+  return map && map.packets && typeof map.packets === 'object' && !Array.isArray(map.packets) ? map : null;
 }
 
 // Recompute every version's categories from the stored packets (a parser
@@ -4839,10 +4852,14 @@ async function rebuildSetCatmap(env, s) {
     env.DB.prepare('SELECT packet, version, r2_key, name FROM set_packets WHERE set_id = ?1').bind(s.id).all(),
     env.DATA.get(setCatmapKey(s.id)),
   ]);
-  const prev = (prevObj && await prevObj.json().catch(() => null)) || { packets: {} };
+  const prev = prevObj ? await readSetCatmap(prevObj) : { packets: {} };
+  if (!prev) {
+    console.log('set catmap unreadable, not rebuilt', s.id);
+    return;
+  }
   const map = { packets: {} };
   for (const row of results) {
-    const old = ((prev.packets || {})[String(row.packet)] || {})[String(row.version)] || {};
+    const old = (prev.packets[String(row.packet)] || {})[String(row.version)] || {};
     let cats = null;
     if (/\.json$/i.test(row.name)) {
       const obj = await env.DATA.get(row.r2_key);
@@ -5110,9 +5127,9 @@ async function putQmap(request, env, s) {
     put = await putBlob(env, setLedgerKey(s.id), ledger, 'application/json', s.ckey, { onlyIf });
   } catch (e) { /* precondition failed */ }
   if (!put) return err(env, 409, 'ledger moved, match again');
-  if (!(await updateSetCatmap(env, s.id, Number(body.packet), Number(body.v), { q: { t: t.list, b: b.list } }))) {
-    return err(env, 409, 'concurrent update, try again');
-  }
+  const saved = await updateSetCatmap(env, s.id, Number(body.packet), Number(body.v), { q: { t: t.list, b: b.list } });
+  if (saved === 'unreadable') return err(env, 500, 'the set category map could not be read, so the question map was not saved');
+  if (saved !== 'ok') return err(env, 409, 'concurrent update, try again');
   await markSet(env, s.id);
   return json(env, { ok: true, etag: put.etag });
 }

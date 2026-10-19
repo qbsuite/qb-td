@@ -26,7 +26,7 @@ import { mountSetView } from './setview.js';
 import { readPacket } from './buzzview.js';
 import { sanitizeHtml } from '../engine/buzz.js';
 import { makeZip } from '../engine/zip.js';
-import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../engine/qmatch.js';
+import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices, checkLedger } from '../engine/qmatch.js';
 import { checkPacket } from '../engine/packetcheck.js';
 
 const $ = (id) => document.getElementById(id);
@@ -154,6 +154,14 @@ function settingsOf(s) {
   try { return JSON.parse(s.settings) || {}; } catch (e) { return {}; }
 }
 
+// A save sends the whole settings object, so the cached copy is kept in
+// step with it: the next save, from any tab, starts from this one and
+// does not write an earlier value back (the mirror-buzzpoints lock).
+async function saveSettings(next, extra) {
+  await pub(S, { method: 'POST', json: { settings: next, ...extra } });
+  detail.set.settings = JSON.stringify(next);
+}
+
 function render() {
   if (!detail) return;
   const scrollWas = window.scrollY;
@@ -210,12 +218,17 @@ const reviewWord = (p) => p.checked ? 'checked' : p.warnings ? p.warnings + ' wa
 
 // The ledger, as the Worker hands it over: its etag on the first line,
 // its JSON after (worker.js getLedger — the Worker never parses it).
+// One that is stored but can't be read here is never taken for an empty
+// one: the next match would overwrite it and hand its question ids out
+// again.
 async function fetchLedger() {
   const text = await (await pub(S + '/ledger', { cache: 'no-cache' })).text();
   const nl = text.indexOf('\n');
   const etag = nl > 0 ? text.slice(0, nl) : null;
-  let ledger = null;
-  try { ledger = nl >= 0 && text.length > nl + 1 ? JSON.parse(text.slice(nl + 1)) : null; } catch (e) { /* start afresh */ }
+  if (!etag) return { etag: null, ledger: null };
+  let ledger = false; // not a ledger: checkLedger refuses it
+  try { ledger = JSON.parse(text.slice(nl + 1)) ?? false; } catch (e) { /* refused below */ }
+  checkLedger(ledger);
   return { etag, ledger };
 }
 
@@ -284,7 +297,7 @@ function renderPackets() {
       href: `${API}${S}/file?packet=${p.packet}&v=${p.version}`,
       warn: !p.checked,
     })),
-    setSlots: (n) => pub(S, { method: 'POST', json: { settings: { ...settings, rounds: n } } }),
+    setSlots: (n) => saveSettings({ ...settingsOf(detail.set), rounds: n }),
     uploadPacket: async (st, packet) => {
       // read the questions first: a packet that cannot be read is still
       // uploaded, but it is said up front that it will stand alone
@@ -383,9 +396,12 @@ function renderPackets() {
     };
   });
   // taking a packet out of the set altogether (one on the wrong slot, or
-  // emptied by a repacketizing)
-  if (current.length) {
-    box.querySelector('.chiprow').insertAdjacentHTML('afterend', `
+  // emptied by a repacketizing). Its anchor left packetsui's markup in
+  // the 9/29 redesign; until the row has a new place it is skipped,
+  // rather than throwing out of render()
+  const chips = box.querySelector('.chiprow');
+  if (current.length && chips) {
+    chips.insertAdjacentHTML('afterend', `
       <div class="row" style="margin-top:8px">
         <label class="muted">Remove packet
           <select id="rmround">${current.map((p) => `<option>${p.packet}</option>`).join('')}</select>
@@ -452,13 +468,15 @@ async function renderReview() {
   let ledger = null;
   try {
     parsed = await parsePacket(await fetchPacketBytes(packet, v), 'packet ' + packet);
-    ledger = (await fetchLedger()).ledger;
   } catch (e) {
     box.innerHTML = back + `<div class="bad" style="margin-top:8px">This packet could not be read as questions: ${esc(e.message)}.
       A packet MODAQ cannot read is one no mirror can play — replace it.</div>`;
     $('reviewback').onclick = (ev) => { ev.preventDefault(); reviewing = null; render(); };
     return;
   }
+  // the ledger only labels the questions here: the review still shows
+  // without it, and a reassignment refetches it (and refuses) itself
+  try { ledger = (await fetchLedger()).ledger; } catch (e) { say(e.message, true); }
   const review = checkPacket(parsed);
   const qmap = ((((setCats || {}).packets || {})[packet] || {})[v] || {}).q || null;
   const questions = packetQuestions(parsed);
@@ -727,7 +745,9 @@ function renderStats() {
 
 function renderSettings() {
   const s = detail.set;
-  let settings = settingsOf(s);
+  const settings = settingsOf(s);
+  // what a change builds on: the settings as last saved, not as drawn
+  const current = () => settingsOf(detail.set);
   const box = $('setbody');
   box.innerHTML = `
     <h2>Public set page</h2>
@@ -774,12 +794,8 @@ function renderSettings() {
       <button id="rotate" class="small">New set link</button>
     </div>`;
 
-  const saveSettings = async (next, extra) => {
-    await pub(S, { method: 'POST', json: { settings: next, ...extra } });
-    settings = next;
-  };
   wireFormat(box, {
-    settings: () => settings, save: saveSettings, say, refresh: showDetail,
+    settings: current, save: saveSettings, say, refresh: showDetail,
     onToggle: (open) => { fmtOpen = open; },
   });
   $('pub').onchange = async () => {
@@ -791,7 +807,7 @@ function renderSettings() {
   };
   $('mirrorbuzz').onchange = async () => {
     try {
-      const next = { ...settings };
+      const next = { ...current() };
       if ($('mirrorbuzz').checked) delete next.lockMirrorBuzz;
       else next.lockMirrorBuzz = true;
       await saveSettings(next);
@@ -801,11 +817,11 @@ function renderSettings() {
   $('buzzmode').onchange = async () => {
     const mode = $('buzzmode').value;
     try {
-      const next = { ...settings };
+      const next = { ...current() };
       if (!mode) delete next.buzz;
-      else if (settings.buzz && settings.buzz.hash) {
+      else if (next.buzz && next.buzz.hash) {
         // spread whole: dropping kdf/iters would demote a stretched password
-        next.buzz = { ...settings.buzz, mode: 'password' };
+        next.buzz = { ...next.buzz, mode: 'password' };
       } else {
         $('buzzpw').hidden = false;
         $('buzzset').hidden = false;
@@ -825,7 +841,7 @@ function renderSettings() {
       // the Worker can wrap the set's content key for the gated route
       say('Setting password…');
       const cred = await buzzCredentials(pw);
-      await saveSettings({ ...settings, buzz: cred.settings }, { buzz_token: cred.token });
+      await saveSettings({ ...current(), buzz: cred.settings }, { buzz_token: cred.token });
       say('Buzzpoints password set');
       showDetail();
     } catch (e) { say(e.message, true); }

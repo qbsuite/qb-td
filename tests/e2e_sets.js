@@ -12,7 +12,7 @@
 // Worker) cost the same D1 queries as at 2.
 
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-import { BASE, storedCred, d1row, d1exec, r2get, call, fetchRetry, maxAge, tick, ok, summary } from './e2e_lib.js';
+import { BASE, storedCred, d1row, d1exec, r2get, r2put, call, fetchRetry, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const packet = (marker, category) => JSON.stringify({
   tossups: [
@@ -687,6 +687,45 @@ ok('published set page survives the link', r.status === 200 && r.body.mirrors.le
   // out of the daily caps for the next run, as the set above is
   d1exec(`UPDATE tournaments SET created = created - 2 * 86400000 WHERE set_id = ${fsid}`);
   d1exec(`UPDATE sets SET created = 1 WHERE id = ${fsid}`);
+}
+
+/* ---------- a category map that can't be read is left as it is ----------
+   Its question maps are the editors' work and exist nowhere else: no
+   writer replaces a map it can't read with one holding only its own
+   version. A map that reads is rebuilt as before, question maps kept. */
+
+{
+  r = await call('/api/sets', { method: 'POST', json: { name: 'Unreadable', slug: 'e2e-unread-' + rnd() } });
+  const U = '/s/' + r.body.admin_secret;
+  const usid = r.body.id;
+  const key = `s/${usid}/catmap.json`;
+  await call(`${U}/packet?packet=1&name=One.json`, { method: 'POST', body: packet('UNREAD-1', 'History') });
+  r = await call(U + '/qmap', { method: 'POST', body: qmapBody({ packet: 1, v: 1, q: { t: [[1, 1], [2, 1]], b: [[3, 1]] }, etag: null }, ledger1) });
+  const etag = r.body.etag;
+  // a dashboard load rebuilds a map an older parser wrote (no version
+  // mark here): categories recomputed, the question map carried over
+  r2put(key, JSON.stringify({ packets: { 1: { 1: { q: { t: [[1, 1], [2, 1]], b: [[3, 1]] } } } } }));
+  await call(U);
+  const rebuilt = await (async () => {
+    for (let i = 0; i < 40; i++) {
+      const m = JSON.parse(r2get(key).toString());
+      if (m.packets['1']['1'].t) return m;
+      await new Promise((res) => setTimeout(res, 250));
+    }
+    return null;
+  })();
+  ok('a readable category map is rebuilt with its question maps',
+    rebuilt && rebuilt.packets['1']['1'].t[0].c === 'History' && rebuilt.packets['1']['1'].q.t[1][0] === 2, rebuilt);
+
+  r2put(key, '{"packets": not json');
+  r = await call(U + '/qmap', { method: 'POST', body: qmapBody({ packet: 1, v: 1, q: { t: [[1, 1], [2, 1]], b: [[3, 1]] }, etag }, ledger1) });
+  ok('a question map is refused over a category map that can\'t be read', r.status === 500
+    && /could not be read/.test(r.body.error) && !/concurrent/.test(r.body.error), r.body);
+  r = await call(`${U}/packet?packet=2&name=Two.json`, { method: 'POST', body: packet('UNREAD-2', 'Literature') });
+  ok('an upload still goes through', r.status === 200 && r.body.version === 1, r.body);
+  await call(U); // and asks for a rebuild, which must not run
+  await new Promise((res) => setTimeout(res, 1500));
+  ok('the unreadable map is left as it is', r2get(key).toString() === '{"packets": not json');
 }
 
 summary('set e2e');

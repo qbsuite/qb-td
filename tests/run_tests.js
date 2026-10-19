@@ -26,7 +26,7 @@ import { buzzSettings, buzzToken, sha256Hex, sha256HexJs, BUZZ_ITERS } from '../
 import { buildScoresheet, teamInitials, catTag } from '../app/engine/scoresheet.js';
 import { sheetHtml, exampleSheetHtml } from '../app/js/sheetview.js';
 import { buildSite, siteNames, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
-import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices } from '../app/engine/qmatch.js';
+import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices, checkLedger } from '../app/engine/qmatch.js';
 import { checkPacket } from '../app/engine/packetcheck.js';
 import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk } from '../app/engine/plan.js';
 import HDWHITE from '../app/engine/hdwhite.js';
@@ -4999,6 +4999,23 @@ test('assignQuestion: the editor overrides a match, and the ledger follows', () 
   const choices = ledgerChoices(split.ledger, 't');
   assert.deepEqual(choices.map((c) => [c.id, !!c.at]), [[1, true], [4, true], [2, false], [3, false]]);
   assert.equal(choices[0].label, 'Author 1');
+});
+
+test('matchPacket and assignQuestion refuse a ledger they cannot read rather than start over', () => {
+  const p1 = matchPacket(null, 1, pkt([TU(1), TU(2)]));
+  checkLedger(p1.ledger);
+  checkLedger(null);
+  // a newer format (a tab left open across a deploy) or a damaged one:
+  // starting from an empty ledger would hand out ids 1, 2, ... again
+  const newer = { ...p1.ledger, v: 2 };
+  for (const bad of [newer, { v: 1, questions: {} }, { v: 1, seq: 2 }, { v: 1, seq: 2, questions: null }, [], 'x', false]) {
+    assert.throws(() => checkLedger(bad), /question ledger/, JSON.stringify(bad));
+    assert.throws(() => matchPacket(bad, 2, pkt([TU(3)])), /nothing was changed/, JSON.stringify(bad));
+    assert.throws(() => assignQuestion(bad, 1, pkt([TU(1), TU(2)]), p1.q, 't', 1, null), /nothing was changed/, JSON.stringify(bad));
+  }
+  assert.throws(() => matchPacket(newer, 2, pkt([TU(3)])), /newer version/);
+  // a new set still starts from nothing
+  assert.deepEqual(matchPacket(undefined, 1, pkt([TU(1)])).q.t, [[1, 1]]);
 });
 
 /* ---------- parse review (packetcheck.js) ---------- */
