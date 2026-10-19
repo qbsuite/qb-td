@@ -5728,140 +5728,156 @@ function metered(env) {
 }
 
 /* ---------- router ---------- */
+async function route(request, env, ctx, url) {
+  const path = url.pathname;
+  const method = request.method;
+
+  if (env.METER && path === '/__meter') {
+    if (method === 'DELETE') Object.assign(meter, METER_ZERO);
+    return new Response(JSON.stringify(meter), { headers: { 'Content-Type': 'application/json' } });
+  }
+
+  if (method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(env) });
+  }
+
+  if (path === '/') return new Response('qb-td: tournament hub backend.', { status: 200 });
+
+  // Moderator bucket routes — the secret is the credential.
+  let m;
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1], url);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/protests$/)) && method === 'POST') return bucketLiveProtests(request, url, env, m[1]);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1], url);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1], url);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1], url);
+
+  // Public stats routes — publish-gated inside.
+  if (path === '/pub/directory' && method === 'GET') return pubDirectory(env);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1], ctx, url.searchParams.get('fb'));
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubRounds(env, m[1], url);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubQPacket(request, url, env, m[1]);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qtiebreakers$/)) && method === 'GET') return pubQTiebreakers(request, url, env, m[1]);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/unlock$/)) && method === 'GET') return pubUnlock(request, env, m[1]);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubCats(env, m[1]);
+
+  // Public set routes — gated by the set's own publish flag inside.
+  if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubSetState(env, m[1]);
+  if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubSetRounds(env, m[1], url);
+  if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubSetCats(env, m[1]);
+  if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubSetQPacket(request, url, env, m[1]);
+
+  // Open (rate-limited) tournament creation; the response carries the
+  // admin secret, shown to the TO exactly once by the dashboard.
+  if (path === '/api/tournaments' && method === 'POST') return createTournament(request, env, ctx);
+  if (path === '/api/sets' && method === 'POST') return createSet(request, env, ctx);
+
+  // A mirror invite: read what it is, or start it (once).
+  if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'GET') return getInvite(env, m[1]);
+  if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'POST') return startInvite(request, env, m[1], ctx);
+
+  // Set editor routes — the set link is the credential (SET_TTL).
+  if ((m = path.match(/^\/s\/([a-z0-9]{10,40})(\/.*)?$/))) {
+    const s = await getAdminSet(env, m[1]);
+    if (!s) return err(env, 404, 'bad link');
+    if (setClosed(s)) return err(env, 410, 'set closed');
+    const sub = m[2] || '';
+    let mm;
+    if (sub === '' && method === 'GET') return getSet(env, s, ctx);
+    if (sub === '' && method === 'POST') return updateSet(request, env, s);
+    if (sub === '/rotate' && method === 'POST') return rotateSet(env, s);
+    if (sub === '/packet' && method === 'POST') return uploadSetPacket(request, url, env, s);
+    if (sub === '/packet' && method === 'DELETE') return retireSetPacket(url, env, s);
+    if (sub === '/packet/status' && method === 'POST') return setPacketStatus(request, env, s);
+    if (sub === '/ledger' && method === 'GET') return getLedger(env, s);
+    if (sub === '/qmap' && method === 'POST') return putQmap(request, env, s);
+    if (sub === '/files' && method === 'GET') return setMirrorFiles(env, s, url);
+    if (sub === '/gamefile' && method === 'GET') return setMirrorFile(env, s, url);
+    if (sub === '/file' && method === 'GET') return setPacketFile(url, env, s);
+    if (sub === '/tiebreakers' && method === 'GET') return setTiebreakers(env, s);
+    if (sub === '/tiebreakers' && method === 'POST') return bumpSetRev(env, s.id, await uploadTiebreakers(request, url, env, SET_TB_KEY(s.id), s.ckey));
+    if (sub === '/tiebreakers' && method === 'DELETE') {
+      const one = url.searchParams.get('id');
+      return bumpSetRev(env, s.id, one ? await removeTiebreaker(env, SET_TB_KEY(s.id), s.ckey, one) : await clearSetTiebreakers(env, s));
+    }
+    if (sub === '/mirrors' && method === 'POST') return createMirror(request, env, s);
+    if ((mm = sub.match(/^\/mirrors\/(\d+)$/)) && method === 'POST') return updateMirror(request, env, s, Number(mm[1]));
+    if (sub === '/state' && method === 'GET') return json(env, await setStateBody(env, s));
+    if (sub === '/rounds' && method === 'GET') return setRounds(env, s, url, 0);
+    if (sub === '/cats' && method === 'GET') return setCats(env, s, 0);
+  }
+
+  // Admin routes — the admin secret is the credential, and it expires.
+  if ((m = path.match(/^\/a\/([a-z0-9]{10,40})(\/.*)?$/))) {
+    const t = await getAdminTournament(env, m[1]);
+    if (!t) return err(env, 404, 'bad link');
+    if (adminClosed(t)) return err(env, 410, 'tournament closed');
+    const sub = m[2] || '';
+    let mm;
+    if (sub === '' && method === 'GET') {
+      // The Live Hub's refresh sends the rev of the detail it holds; when
+      // nothing has moved (tournaments.rev, bumped by triggers — see
+      // migrate-rev.sql) the answer is the admin lookup already paid for,
+      // not the rooms + files + starts reads of a full detail.
+      const held = url.searchParams.get('rev');
+      if (held !== null && /^\d+$/.test(held) && Number(held) === t.rev) {
+        // the public page mark rides along: the cron's columns don't move rev
+        return json(env, { unchanged: true, rev: t.rev, pub_dirty: t.pub_dirty, pub_built: t.pub_built ?? null,
+          live: liveMark(env, t) });
+      }
+      return getTournament(env, t, ctx);
+    }
+    if (sub === '' && method === 'POST') return updateTournament(request, env, t);
+    if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
+    if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
+    if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
+    if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
+    if (sub === '/start' && method === 'POST') return startTournament(env, t, ctx);
+    if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
+    if (sub === '/tiebreakers' && method === 'POST') return bumpRev(env, t.id, await uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey));
+    if (sub === '/tiebreakers' && method === 'DELETE') {
+      const one = url.searchParams.get('id');
+      return bumpRev(env, t.id, one ? await removeTiebreaker(env, TB_KEY(t.id), t.ckey, one) : await deleteTiebreakers(env, TB_KEY(t.id)));
+    }
+    if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
+    if (sub === '/packets/move' && method === 'POST') return movePacket(request, env, t);
+    if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
+    if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
+    if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
+    if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
+    if (sub === '/games' && method === 'GET') return adminGames(url, env, t);
+    if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
+    if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'POST') return moveFile(request, env, t, Number(mm[1]));
+    if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);
+    if (sub === '/setpacket' && method === 'POST') return chooseSetPacket(request, env, t);
+    if (sub === '/join' && method === 'POST') return joinSet(request, env, t);
+  }
+
+  return err(env, 404, 'not found');
+}
+
+// A credential in a route's path, kept out of the logs.
+const CRED_PATH = /^\/([absi])\/[a-z0-9]{10,40}/;
+
 export default {
   async fetch(request, env, ctx) {
     env = metered(env);
     const url = new URL(request.url);
-    const path = url.pathname;
-    const method = request.method;
-
-    if (env.METER && path === '/__meter') {
-      if (method === 'DELETE') Object.assign(meter, METER_ZERO);
-      return new Response(JSON.stringify(meter), { headers: { 'Content-Type': 'application/json' } });
+    try {
+      return await route(request, env, ctx, url);
+    } catch (e) {
+      // An error thrown in a route (D1 or R2 failing, a key that won't
+      // unwrap, a corrupt blob) would otherwise reach the page as
+      // Cloudflare's own 500, which has no CORS headers, so the page could
+      // only report a network failure.
+      console.error('route failed:', request.method, url.pathname.replace(CRED_PATH, '/$1/…'), (e && e.stack) || e);
+      return err(env, 500, 'Something went wrong on the server. Please try again.');
     }
-
-    if (method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(env) });
-    }
-
-    if (path === '/') return new Response('qb-td: tournament hub backend.', { status: 200 });
-
-    // Moderator bucket routes — the secret is the credential.
-    let m;
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1], url);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/protests$/)) && method === 'POST') return bucketLiveProtests(request, url, env, m[1]);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1], url);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1], url);
-    if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1], url);
-
-    // Public stats routes — publish-gated inside.
-    if (path === '/pub/directory' && method === 'GET') return pubDirectory(env);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubState(env, m[1], ctx, url.searchParams.get('fb'));
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubRounds(env, m[1], url);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qbj\/(\d+)$/)) && method === 'GET') return pubQbj(env, m[1], Number(m[2]));
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/roster$/)) && method === 'GET') return pubRoster(env, m[1]);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubQPacket(request, url, env, m[1]);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qtiebreakers$/)) && method === 'GET') return pubQTiebreakers(request, url, env, m[1]);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/unlock$/)) && method === 'GET') return pubUnlock(request, env, m[1]);
-    if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubCats(env, m[1]);
-
-    // Public set routes — gated by the set's own publish flag inside.
-    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubSetState(env, m[1]);
-    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/rounds$/)) && method === 'GET') return pubSetRounds(env, m[1], url);
-    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubSetCats(env, m[1]);
-    if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubSetQPacket(request, url, env, m[1]);
-
-    // Open (rate-limited) tournament creation; the response carries the
-    // admin secret, shown to the TO exactly once by the dashboard.
-    if (path === '/api/tournaments' && method === 'POST') return createTournament(request, env, ctx);
-    if (path === '/api/sets' && method === 'POST') return createSet(request, env, ctx);
-
-    // A mirror invite: read what it is, or start it (once).
-    if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'GET') return getInvite(env, m[1]);
-    if ((m = path.match(/^\/i\/([a-z0-9]{10,40})$/)) && method === 'POST') return startInvite(request, env, m[1], ctx);
-
-    // Set editor routes — the set link is the credential (SET_TTL).
-    if ((m = path.match(/^\/s\/([a-z0-9]{10,40})(\/.*)?$/))) {
-      const s = await getAdminSet(env, m[1]);
-      if (!s) return err(env, 404, 'bad link');
-      if (setClosed(s)) return err(env, 410, 'set closed');
-      const sub = m[2] || '';
-      let mm;
-      if (sub === '' && method === 'GET') return getSet(env, s, ctx);
-      if (sub === '' && method === 'POST') return updateSet(request, env, s);
-      if (sub === '/rotate' && method === 'POST') return rotateSet(env, s);
-      if (sub === '/packet' && method === 'POST') return uploadSetPacket(request, url, env, s);
-      if (sub === '/packet' && method === 'DELETE') return retireSetPacket(url, env, s);
-      if (sub === '/packet/status' && method === 'POST') return setPacketStatus(request, env, s);
-      if (sub === '/ledger' && method === 'GET') return getLedger(env, s);
-      if (sub === '/qmap' && method === 'POST') return putQmap(request, env, s);
-      if (sub === '/files' && method === 'GET') return setMirrorFiles(env, s, url);
-      if (sub === '/gamefile' && method === 'GET') return setMirrorFile(env, s, url);
-      if (sub === '/file' && method === 'GET') return setPacketFile(url, env, s);
-      if (sub === '/tiebreakers' && method === 'GET') return setTiebreakers(env, s);
-      if (sub === '/tiebreakers' && method === 'POST') return bumpSetRev(env, s.id, await uploadTiebreakers(request, url, env, SET_TB_KEY(s.id), s.ckey));
-      if (sub === '/tiebreakers' && method === 'DELETE') {
-        const one = url.searchParams.get('id');
-        return bumpSetRev(env, s.id, one ? await removeTiebreaker(env, SET_TB_KEY(s.id), s.ckey, one) : await clearSetTiebreakers(env, s));
-      }
-      if (sub === '/mirrors' && method === 'POST') return createMirror(request, env, s);
-      if ((mm = sub.match(/^\/mirrors\/(\d+)$/)) && method === 'POST') return updateMirror(request, env, s, Number(mm[1]));
-      if (sub === '/state' && method === 'GET') return json(env, await setStateBody(env, s));
-      if (sub === '/rounds' && method === 'GET') return setRounds(env, s, url, 0);
-      if (sub === '/cats' && method === 'GET') return setCats(env, s, 0);
-    }
-
-    // Admin routes — the admin secret is the credential, and it expires.
-    if ((m = path.match(/^\/a\/([a-z0-9]{10,40})(\/.*)?$/))) {
-      const t = await getAdminTournament(env, m[1]);
-      if (!t) return err(env, 404, 'bad link');
-      if (adminClosed(t)) return err(env, 410, 'tournament closed');
-      const sub = m[2] || '';
-      let mm;
-      if (sub === '' && method === 'GET') {
-        // The Live Hub's refresh sends the rev of the detail it holds; when
-        // nothing has moved (tournaments.rev, bumped by triggers — see
-        // migrate-rev.sql) the answer is the admin lookup already paid for,
-        // not the rooms + files + starts reads of a full detail.
-        const held = url.searchParams.get('rev');
-        if (held !== null && /^\d+$/.test(held) && Number(held) === t.rev) {
-          // the public page mark rides along: the cron's columns don't move rev
-          return json(env, { unchanged: true, rev: t.rev, pub_dirty: t.pub_dirty, pub_built: t.pub_built ?? null,
-            live: liveMark(env, t) });
-        }
-        return getTournament(env, t, ctx);
-      }
-      if (sub === '' && method === 'POST') return updateTournament(request, env, t);
-      if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
-      if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
-      if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
-      if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
-      if (sub === '/start' && method === 'POST') return startTournament(env, t, ctx);
-      if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
-      if (sub === '/tiebreakers' && method === 'POST') return bumpRev(env, t.id, await uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey));
-      if (sub === '/tiebreakers' && method === 'DELETE') {
-        const one = url.searchParams.get('id');
-        return bumpRev(env, t.id, one ? await removeTiebreaker(env, TB_KEY(t.id), t.ckey, one) : await deleteTiebreakers(env, TB_KEY(t.id)));
-      }
-      if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
-      if (sub === '/packets/move' && method === 'POST') return movePacket(request, env, t);
-      if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
-      if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
-      if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
-      if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
-      if (sub === '/games' && method === 'GET') return adminGames(url, env, t);
-      if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
-      if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'POST') return moveFile(request, env, t, Number(mm[1]));
-      if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);
-      if (sub === '/setpacket' && method === 'POST') return chooseSetPacket(request, env, t);
-      if (sub === '/join' && method === 'POST') return joinSet(request, env, t);
-    }
-
-    return err(env, 404, 'not found');
   },
 
   // Cron (wrangler.toml [triggers]): rebuilds dirty tournaments' round

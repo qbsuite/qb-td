@@ -82,7 +82,8 @@ export async function call(path, opts = {}) {
   }
   const ct = res.headers.get('content-type') || '';
   const body = ct.includes('json') ? await res.json() : await res.text();
-  return { status: res.status, body, cache: res.headers.get('cache-control') };
+  return { status: res.status, body, cache: res.headers.get('cache-control'),
+    cors: res.headers.get('access-control-allow-origin') };
 }
 
 // max-age seconds from a Cache-Control header, or null.

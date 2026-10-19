@@ -784,6 +784,20 @@ await tick();
 r = await call('/pub/' + slug + '/rounds?n=1');
 ok('second rebuild restores the room', r.body.rounds[0].entries[0].room === 'Room 1', r.body);
 
+// A route that throws (here on a corrupt prebuilt state) answers a JSON
+// 500 with CORS headers, which the page can read, rather than Cloudflare's
+// bare 500, which it could only report as a network failure.
+{
+  const built = r2get(`t/${tid}/pubstate.json`);
+  r2put(`t/${tid}/pubstate.json`, 'not json');
+  r = await call('/pub/' + slug);
+  ok('a thrown error is a JSON 500 the page can read',
+    r.status === 500 && typeof r.body.error === 'string' && Boolean(r.cors), [r.status, r.body, r.cors]);
+  r2put(`t/${tid}/pubstate.json`, built);
+  r = await call('/pub/' + slug);
+  ok('the route answers again once the blob is whole', r.status === 200, r.status);
+}
+
 // A tournament published before the shards existed is in the state
 // "games, no manifest". The state must flag itself for the next tick
 // rather than sit there empty — a finished tournament can't be mutated

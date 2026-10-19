@@ -2043,6 +2043,21 @@ await testA('api.js: the production pages ignore ?server= and ?live=, other orig
   }
 });
 
+// The reader retries a protest send on a network failure or a server
+// fault, and waits on a refusal: pub() carries the status to tell them
+// apart (the Worker now answers a fault with a JSON 500, not a bare one).
+await testA('pub: a failed call carries the HTTP status', async () => {
+  const { pub } = await import('../app/js/api.js');
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: 'Something went wrong on the server. Please try again.' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } });
+    await assert.rejects(pub('/b/x/protests', { method: 'POST' }), (e) => e.status === 500 && /server/.test(e.message));
+    globalThis.fetch = async () => new Response('nope', { status: 403 });
+    await assert.rejects(pub('/a/x/file'), (e) => e.status === 403 && /403/.test(e.message));
+  } finally { globalThis.fetch = realFetch; }
+});
+
 /* ---------- Worker category extraction ---------- */
 
 const { categoryFromMetadata, packetCategories, tagWithoutWriter } = await import('../worker/worker.js');

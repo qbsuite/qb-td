@@ -186,9 +186,9 @@ function watchProtests(id, meta, format) {
       if (!(out && out.error)) sent = body;
       lastText = text;
     } catch (e) {
-      // offline (fetch's TypeError): the next check tries again; a refusal
-      // waits for the game to change
-      if (!(e instanceof TypeError)) lastText = text;
+      // offline (fetch's TypeError) or a server fault (a 5xx): the next
+      // check tries again; a refusal waits for the game to change
+      if (!(e instanceof TypeError) && !(e.status >= 500)) lastText = text;
     } finally { busy = false; }
   };
   setInterval(check, PROTEST_CHECK_MS);

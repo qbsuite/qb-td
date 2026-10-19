@@ -73,9 +73,9 @@ export async function directory() {
   }
 }
 
-/** JSON call to any Worker route. Throws Error(message) on failure.
-    Pass opts.json to send a JSON body. Non-JSON responses (blobs) return
-    the raw Response. */
+/** JSON call to any Worker route. Throws Error(message) on failure, with
+    the HTTP status as .status when the Worker answered. Pass opts.json to
+    send a JSON body. Non-JSON responses (blobs) return the raw Response. */
 export async function pub(path, opts = {}) {
   if (DEMO) {
     // Resolved against the page URL at runtime (every page lives in app/),
@@ -101,13 +101,14 @@ export async function pub(path, opts = {}) {
     };
   }
   const res = await fetch(API + path, opts);
+  const failed = (message) => Object.assign(new Error(message), { status: res.status });
   const ct = res.headers.get('Content-Type') || '';
   if (!ct.includes('application/json')) {
-    if (!res.ok) throw new Error('request failed (' + res.status + ')');
+    if (!res.ok) throw failed('request failed (' + res.status + ')');
     return res;
   }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'request failed (' + res.status + ')');
+  if (!res.ok) throw failed(data.error || 'request failed (' + res.status + ')');
   return data;
 }
 
