@@ -34,7 +34,7 @@ import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams,
 import { finalsProgress, finalsFill } from '../engine/finals.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
-import { buzzCredentials } from './buzzkey.js';
+import { buzzCredentials, sha256Hex } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
 import { eachLimit } from './limit.js';
@@ -361,6 +361,7 @@ async function showDetail(quiet = false, held = null) {
   detail.byeRoom = detail.buckets.find((b) => b.id === byeId) || null;
   detail.buckets = detail.buckets.filter((b) => b.id !== byeId);
   tbPool = await tbReq;
+  testToken = await testTokenReq;
   await ensureHubNames(a, t);
   lastDetail = detail;
   render();
@@ -819,13 +820,23 @@ function nextRoomNumber(buckets) {
 
 // The bye room (settings.byeRoom, a bucket id): one room, apart from the
 // playing rooms, to read to teams on a bye. Its link reads the reader's
-// test mode before and after Start, with no admin secret in it, and the
+// test mode before and after Start, with no test token in it, and the
 // Worker keeps nothing it does.
 function byeIdOf(t) {
   try { const s = JSON.parse(t.settings || '{}') || {}; return Number.isInteger(s.byeRoom) ? s.byeRoom : null; }
   catch (e) { return null; }
 }
 const byeLink = (secret) => readLink(secret) + '&test=bye';
+
+// A room's Test link carries the tournament's test token (worker.js
+// testToken): a hash of the admin secret's stored hash, never the secret
+// itself. A forwarded Test link reads that room before Start and opens
+// nothing else, and a new admin link retires it.
+const testTokenReq = adminSecret
+  ? sha256Hex('qbtd-cred:' + adminSecret).then((h) => sha256Hex('qbtd-test:' + h)).catch(() => '')
+  : Promise.resolve('');
+let testToken = '';
+const testLink = (secret) => readLink(secret) + '&test=' + testToken;
 
 // A tournament with rooms gets the bye room without being asked (it reads
 // packets for teams on a bye, or for anyone else). Made once.
@@ -860,8 +871,8 @@ function renderRoomsSec(a, t, buckets, files) {
         return `<tr>
           <td><input class="inlinename" data-roomrename="${b.id}" value="${esc(b.room_name)}" aria-label="Room name"></td>
           <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(link)}', '${js(b.room_name)} reader link')">Copy</button>
-            <a class="muted" href="${esc(link)}" target="_blank">Open</a>${t.started ? ''
-              : `<a href="${esc(readLink(b.secret) + '&test=' + adminSecret)}" target="_blank">Test</a>`}</td>
+            <a class="muted" href="${esc(link)}" target="_blank">Open</a>${t.started || !testToken ? ''
+              : `<a href="${esc(testLink(b.secret))}" target="_blank">Test</a>`}</td>
           <td class="num muted">${files.filter((f) => f.bucket_id === b.id).length}</td>
           <td class="num"><button class="linkbtn muted" data-delbucket="${b.id}">Remove</button></td>
         </tr>`;

@@ -8,7 +8,7 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-import { WORKER_DIR, PERSIST, BASE, storedCred, d1row, d1exec, r2get, r2put, call, maxAge, tick, ok, summary } from './e2e_lib.js';
+import { WORKER_DIR, PERSIST, BASE, storedCred, testToken, d1row, d1exec, r2get, r2put, call, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
@@ -80,10 +80,10 @@ for (const route of ['packet', 'tiebreakers', 'roster', 'schedule']) {
   const res = await fetch(`${BASE}/b/${secret}/${route}`);
   ok(`room before Start serves no ${route}`, res.status === 403, res.status);
 }
-// The TD's Test link: the room link plus the tournament's own admin
-// secret reads the room before Start — reads only, and nothing counts.
+// The TD's Test link: the room link plus the tournament's test token
+// reads the room before Start — reads only, and nothing counts.
 {
-  const T = '?test=' + A.slice(3);
+  let T = '?test=' + testToken(A.slice(3));
   r = await call('/b/' + secret + T);
   ok('test link reads the room before Start', r.status === 200 && r.body.test === true
     && r.body.packets.length === 1, r.body);
@@ -99,6 +99,22 @@ for (const route of ['packet', 'tiebreakers', 'roster', 'schedule']) {
   ok('test link starts no round', r.status === 403, r.body);
   r = await call(A);
   ok('a test leaves no trace', !r.body.files.length && !(r.body.starts || []).length, r.body.starts);
+  // the token is no credential, and the admin secret is no test key
+  r = await call('/b/' + secret + '?test=' + A.slice(3));
+  ok('the admin secret is not a test key', r.status === 403, r.body);
+  r = await call('/a/' + testToken(A.slice(3)));
+  ok('the test token is no admin link', r.status === 404, r.body);
+  r = await call('/b/' + secret + '?test=' + storedCred(A.slice(3)));
+  ok('nor is the stored hash a test key', r.status === 403, r.body);
+  // a new admin link retires the old Test links
+  r = await call(A + '/rotate', { method: 'POST' });
+  ok('test link: rotate before Start', r.status === 200, r.body);
+  A = '/a/' + r.body.admin_secret;
+  r = await call('/b/' + secret + T);
+  ok('a new admin link retires the old Test link', r.status === 403, r.body);
+  T = '?test=' + testToken(A.slice(3));
+  r = await call('/b/' + secret + T);
+  ok('the new Test link reads the room', r.status === 200 && r.body.test === true, r.body);
 }
 r = await call(A);
 ok('detail before Start: not started, a week of setup',

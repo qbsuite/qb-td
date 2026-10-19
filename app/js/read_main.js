@@ -44,8 +44,9 @@ const params = new URLSearchParams(location.search);
 const secret = params.get('b') || '';
 const gid = params.get('g') || '';
 // The TD's Test link (admin.js): the room before Start, read with the
-// admin secret (worker.js testAccess). A test game is this device's only:
-// it sends nothing, and keeps its storage apart from the room's games.
+// tournament's test token (worker.js testAccess). A test game is this
+// device's only: it sends nothing, and keeps its storage apart from the
+// room's games.
 const testKey = params.get('test') || '';
 const store = testKey ? secret + '-test' : secret;
 const tq = (path) => (testKey

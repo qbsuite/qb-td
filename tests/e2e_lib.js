@@ -20,6 +20,10 @@ export const PERSIST = process.env.QBTD_PERSIST ? ` --persist-to "${process.env.
 // backdating UPDATEs match on it, and the at-rest checks assert it.
 export const storedCred = (secret) =>
   createHash('sha256').update('qbtd-cred:' + secret).digest('hex');
+// A room Test link's ?test= value for this admin secret (worker.js
+// testToken, admin.js testTokenReq).
+export const testToken = (adminSecret) =>
+  createHash('sha256').update('qbtd-test:' + storedCred(adminSecret)).digest('hex');
 
 // One row from the local D1 behind the dev Worker.
 export function d1row(sql) {

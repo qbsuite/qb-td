@@ -3421,7 +3421,7 @@ function bucketGate(env, b, test) {
 }
 // The bye room (settings.byeRoom: a bucket id): the one room the hub keeps
 // to read to teams on a bye, apart from the playing rooms. It is read like
-// a Test link, before Start and after it, with no admin secret in its link:
+// a Test link, before Start and after it, with no test token in its link:
 // it reads the packets up to the round being played (never a later one),
 // and nothing it does is kept
 // — no uploads, round starts or protests. It is no room of the schedule:
@@ -3434,17 +3434,29 @@ function isByeRoom(b) { return byeRoomIds(b.settings).includes(b.id); }
 const byeRefusal = (env) => err(env, 403, 'This is a bye room, so nothing from it is saved');
 
 // The TD's Test link (admin.js renderRoomsSec): a room link that also
-// carries the tournament's own admin secret (?test=) reads the room
-// before Start, so the TD can try a game with the real packets. Reads
-// only — uploads, round starts and protests keep the gate — and only
-// until Start: from then on the link is the plain room link.
+// carries the tournament's test token (?test=) reads the room before
+// Start, so the TD can try a game with the real packets. Reads only —
+// uploads, round starts and protests keep the gate — and only until
+// Start: from then on the link is the plain room link.
+// The token is a hash of the admin credential's stored hash (admin.js
+// derives the same from the raw secret). No column holds it, so a
+// forwarded Test link opens no admin route and unwraps no key, and a new
+// admin link changes it.
+async function testToken(stored) {
+  // legacy rows hold the raw secret, new ones its 64-hex hash (schema.sql)
+  const hash = /^[0-9a-f]{64}$/.test(stored) ? stored : await secretHash(stored);
+  return sha256Hex('qbtd-test:' + hash);
+}
 async function testAccess(env, b, url) {
   // a bye room is always read this way, before Start and after it
   if (b && isByeRoom(b)) return 'bye';
   const key = url.searchParams.get('test');
   if (!key || !b || b.started) return false;
-  const t = await getAdminTournament(env, key);
-  return !!t && t.id === b.tournament_id && !adminClosed(t);
+  const { results } = await env.DB.prepare(
+    'SELECT admin_secret, created, started FROM tournaments WHERE id = ?1'
+  ).bind(b.tournament_id).all();
+  const t = results[0];
+  return !!t && !adminClosed(t) && sameDigest(key, await testToken(t.admin_secret));
 }
 
 // Where this room is: its round and bracket. With brackets off

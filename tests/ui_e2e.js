@@ -19,7 +19,7 @@ import { parseMatch, parseRoster, buildRosterQbj } from '../app/engine/qbj.js';
 import { roundRobinRounds, tagBrackets, buildSchedule } from '../app/engine/schedule.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { roundTossupBuzzes } from '../app/engine/buzz.js';
-import { BASE, call, d1exec, tick, ok, summary } from './e2e_lib.js';
+import { BASE, call, d1exec, testToken, tick, ok, summary } from './e2e_lib.js';
 
 const PAGES = process.env.QBTD_PAGES || 'http://localhost:8765';
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -324,13 +324,21 @@ await fill(`[data-roomrename="${d.buckets[0].id}"]`, LONG, ['change']);
 d = await until(async () => { const x = await detail(); return x.buckets[0].room_name === LONG && x; }, 'rename saved');
 ok('3 rooms: an inline rename reaches the Worker', d.buckets[0].room_name === LONG);
 await waitJs(`document.querySelector('[data-roomrename="${d.buckets[0].id}"]').value === ${q(LONG)}`, 'renamed row');
-// before Start each room also has the TD's Test link (the reader link plus the admin secret)
+// before Start each room also has the TD's Test link (the reader link plus
+// the test token, never the admin secret)
 ok('3 rooms: every room has its reader link and its Test link, and no other', await js(`(() => {
   const hrefs = [...document.querySelectorAll('.roomtable a')].map((a) => a.getAttribute('href'));
-  return hrefs.length === 12
+  return hrefs.length === 12 && !hrefs.some((h) => h.includes(${q(secret)}))
     && ${q(d.buckets.map((b) => b.secret))}.every((s) => hrefs.some((h) => h.endsWith('read.html?b=' + s))
-      && hrefs.some((h) => h.endsWith('read.html?b=' + s + '&test=' + ${q(secret)})));
+      && hrefs.some((h) => h.endsWith('read.html?b=' + s + '&test=' + ${q(testToken(secret))})));
 })()`));
+{
+  // the hub's token is the one the Worker takes: its Test link reads the room
+  const href = await js(`document.querySelector('.roomtable a[href*="&test="]').getAttribute('href')`);
+  const u = new URL(href, PAGES);
+  const r = await call('/b/' + u.searchParams.get('b') + '?test=' + u.searchParams.get('test'));
+  ok('3 rooms: a Test link reads its room before Start', r.status === 200 && r.body.test === true, r.body);
+}
 ok('3 rooms: a Copy button for the link on every row',
   await js(`document.querySelectorAll('.roomtable .linkpair button').length === 6`));
 await click('.roomtable tr:nth-child(2) .linkpair button');
