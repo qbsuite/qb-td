@@ -50,7 +50,8 @@ function r2() {
   return {
     objects, counts,
     get: async (k) => { counts.get++; return objects[k] ? obj(objects[k].text, objects[k].at) : null; },
-    head: async (k) => (objects[k] ? { key: k, uploaded: new Date(objects[k].at) } : null),
+    head: async (k) => (objects[k] ? { key: k, uploaded: new Date(objects[k].at),
+      size: new TextEncoder().encode(objects[k].text).byteLength } : null),
     put: async (k, body) => {
       counts.put++;
       objects[k] = { text: typeof body === 'string' ? body : new TextDecoder().decode(body), at: Date.now() };

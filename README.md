@@ -1106,12 +1106,13 @@ That part scales. What breaks first:
    what matters: a tick that outlives its minute overlaps the next one,
    which is the only way the shards could ever have two writers.
 
-4. **Small waste in the hot path.** `pubStateBody` does full
-   `env.DATA.get()` on the schedule and catmap (the third and fifth
-   entries of its `Promise.all`) when usually only their timestamps are wanted; the
-   catmap also gets parsed to test non-emptiness, which wants a cheap
-   stored marker instead. Also `pubStateBody` now has exactly one caller
-   and could fold into `pubState` (cosmetic).
+4. ~~**Small waste in the hot path.**~~ Fixed 10/19/2026: `pubStateBody`
+   reads only the schedule's head unless buzzpoints need its rounds, and
+   tells the empty category-map marker from a real map by the object's
+   size (the marker is the only empty map ever stored), so the catmap is
+   neither read nor parsed; `buildPublish` drops the same parse. It has
+   two callers (the cron's prebuilt state and `pubState`'s live
+   fallback), so it stays its own function.
 
 5. ~~**The TD's hub read games one request each.**~~ Fixed 10/18/2026.
    Auto-fill, Fill playoff slots and Compute stats read every game

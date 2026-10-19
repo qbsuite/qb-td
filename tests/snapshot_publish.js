@@ -138,6 +138,7 @@ function r2obj(text, uploadedMs) {
     text: async () => text, // R2ObjectBody.text(), as materialize reads game copies
     textFor: () => text,
     uploaded: new Date(uploadedMs),
+    size: buf.byteLength,
   };
 }
 
@@ -147,7 +148,8 @@ function r2obj(text, uploadedMs) {
 function fakeR2(objects) {
   return {
     get: async (key) => objects[key] || null,
-    head: async (key) => (objects[key] ? { key } : null),
+    // metadata only, as R2's head answers
+    head: async (key) => (objects[key] ? { key, uploaded: objects[key].uploaded, size: objects[key].size } : null),
     put: async (key, body) => { objects[key] = r2obj(String(body), Date.now()); },
     delete: async (key) => { delete objects[key]; },
   };
@@ -946,6 +948,31 @@ globalThis.fetch = realFetch;
       === JSON.stringify(ghB.trees.map((t) => t.tree.map((e) => e.path).sort())), { a: ghA.trees, b: ghB.trees });
   ok('rebuild binding: both tournaments clean after the tick',
     bound.state.tournaments.every((t) => t.pub_dirty === 0 && t.pub_snapshot));
+  globalThis.fetch = realFetch;
+}
+
+// 19. The category map: the empty "checked, nothing found" marker keeps
+// the tab hidden and off GitHub; a map with a round is published, and the
+// public state and the descriptor carry its stamp.
+{
+  const gh = fakeGithub();
+  globalThis.fetch = gh.fetch;
+  const t = { id: 1, slug: 'cats-open', name: 'Cats Open', published: 1, pub_dirty: 1, pub_snapshot: null,
+    roster_r2_key: null, current_round: 1, created: Date.now() };
+  const state = { tournaments: [t], files: [{ id: 3, tournament_id: 1, round: 1 }] };
+  const objects = { 't/1/pub/3.json': pubGame(3, 1), 't/1/catmap.json': r2obj('{"rounds":{}}', 5000) };
+  await runCron(env(state, objects, gh));
+  ok('cats: an empty map is not advertised',
+    JSON.parse(t.pub_snapshot).cats === null && JSON.parse(objects['t/1/pubstate.json'].textFor()).cats === null);
+  ok('cats: nor committed', !gh.trees[0].tree.some((e) => e.path === 'cats-open/cats.json'));
+
+  objects['t/1/catmap.json'] = r2obj(JSON.stringify({ rounds: { 1: { t: [{ c: 'History', s: 'World' }], b: [] } } }), 6000);
+  t.pub_dirty = 1;
+  await runCron(env(state, objects, gh));
+  const pushed = gh.trees[gh.trees.length - 1].tree.find((e) => e.path === 'cats-open/cats.json');
+  ok('cats: a map with a round is advertised',
+    JSON.parse(t.pub_snapshot).cats === 6000 && JSON.parse(objects['t/1/pubstate.json'].textFor()).cats === 6000);
+  ok('cats: and committed as stored', pushed && JSON.parse(pushed.content).rounds['1'].t[0].c === 'History', pushed);
   globalThis.fetch = realFetch;
 }
 

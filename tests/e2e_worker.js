@@ -649,6 +649,16 @@ execSync(`node -e "process.stdout.write(JSON.stringify({rounds:{}}))" | npx wran
   { cwd: WORKER_DIR, stdio: 'ignore', shell: true });
 r = await call('/pub/' + slug + '/cats');
 ok('stale map planted', r.status === 200 && !Object.keys(r.body.rounds).length, r.body);
+// an empty map is the "checked, nothing found" marker: the public state
+// keeps the Categories tab hidden
+d1exec(`UPDATE tournaments SET pub_dirty = 1 WHERE id = ${tid}`);
+await tick();
+let hidden = false;
+for (let i = 0; i < 20 && !hidden; i++) {
+  hidden = (await call('/pub/' + slug)).body.cats === null;
+  if (!hidden) await new Promise((resolve) => setTimeout(resolve, 250));
+}
+ok('an empty map keeps the tab hidden', hidden);
 await call(A); // triggers the version-stale backfill
 let healed = null;
 for (let i = 0; i < 20 && healed === null; i++) {
@@ -879,6 +889,11 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   const pubRenamed = JSON.parse(await (await fetch(`${BASE}/pub/${slug}/qbj/${cid}`)).text());
   ok('public qbj: under the roster\'s new name too', pubRenamed.match_teams[0].match_players[0].player.name === 'Annie'
     && !JSON.stringify(pubRenamed).includes('SECRETQUESTIONTEXT'), pubRenamed.match_teams[0]);
+  // the rename key spelled with a \u escape is still the key (the Worker
+  // skips parsing rosters that hold no renames, and must not skip this one)
+  r2put(rosterKey, rosterWith({ name: 'Annie', _formerNames: ['Ann'] }).replace('"_formerNames"', '"\\u005fformerNames"'));
+  const escaped = JSON.parse(await (await fetch(fileUrl('&part=qbj&dl=Round_3_Alpha_Beta.qbj'))).text());
+  ok('admin part=qbj: an escaped rename key renames too', escaped.match_teams[0].match_players[0].player.name === 'Annie', escaped.match_teams[0]);
   r2put(rosterKey, rosterWas);
   ok('admin part=qbj: no rename, MODAQ\'s text again', (await (await fetch(fileUrl('&part=qbj&dl=x.qbj'))).text()) === qtext);
 

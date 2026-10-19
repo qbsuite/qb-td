@@ -934,19 +934,11 @@ async function buildPublish(env, t, manifest, shardsOnly = false) {
   ]);
 
   // cats: same non-empty rule as pubState — an empty backfill marker
-  // keeps the tab hidden, so it isn't published either.
-  let catsStamp = null;
-  let catsBody = null;
-  if (catsObj) {
-    const buf = await catsObj.arrayBuffer();
-    const parsed = (() => {
-      try { return JSON.parse(new TextDecoder().decode(buf)); } catch (e) { return null; }
-    })();
-    if (parsed && parsed.rounds && Object.keys(parsed.rounds).length) {
-      catsStamp = catsObj.uploaded.getTime();
-      catsBody = buf;
-    }
-  }
+  // keeps the tab hidden, so it isn't published either. (The body is read
+  // regardless: an unread one would hold one of the invocation's few
+  // open connections.)
+  const catsStamp = catmapHasRounds(catsObj) ? catsObj.uploaded.getTime() : null;
+  const catsBody = catsObj ? await catsObj.arrayBuffer() : null;
   const schedStamp = schedObj ? schedObj.uploaded.getTime() : null;
   const rosterStamp = rosterObj ? rosterObj.uploaded.getTime() : null;
 
@@ -994,7 +986,7 @@ async function buildPublish(env, t, manifest, shardsOnly = false) {
   if (prev && prev.bundle) entries.push([`${t.slug}/bundle.json`, null, true]);
 
   want('schedule.json', schedObj ? await schedObj.arrayBuffer() : null, 'schedule');
-  want('cats.json', catsBody, 'cats');
+  want('cats.json', catsStamp === null ? null : catsBody, 'cats');
   want('roster.json', rosterObj ? await rosterObj.arrayBuffer() : null, 'roster');
 
   return {
@@ -1451,13 +1443,19 @@ async function liveBody(env, t, now) {
   return JSON.stringify(body);
 }
 
-// Cloudflare's asset hash: 32 hex of SHA-256 over base64(content) + the
-// extension, the way its direct-upload docs compute it.
-async function liveHash(text, ext) {
-  const b64 = b64bytes(new TextEncoder().encode(text));
+// A file as a deploy ships it: Cloudflare's asset hash (32 hex of SHA-256
+// over base64(content) + the extension, the way its direct-upload docs
+// compute it), its size in bytes, and that base64, which is also what
+// the upload sends. Each is worked out once: the base64 was most of a
+// deploy's CPU when the upload encoded it again.
+async function liveAsset(text, ext) {
+  const bytes = new TextEncoder().encode(text);
+  const b64 = b64bytes(bytes);
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(b64 + ext));
-  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+  const hash = [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+  return { hash, size: bytes.byteLength, b64 };
 }
+const liveHash = async (text, ext) => (await liveAsset(text, ext)).hash;
 
 async function cfLive(env, method, path, body, bearer) {
   const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.LIVE_ACCOUNT_ID}${path}`, {
@@ -1478,22 +1476,22 @@ async function cfLive(env, method, path, body, bearer) {
   return out ? out.result : null;
 }
 
-// One deploy of the whole site. manifest: {path: {hash, size}}; texts:
-// hash -> content for every file this run built. Answers { missing } —
-// the hashes Cloudflare asked for that this run didn't build — instead of
-// deploying, so the caller can rebuild those files and try once more.
-async function deployLive(env, manifest, texts) {
+// One deploy of the whole site. manifest: {path: {hash, size}}; b64s:
+// hash -> content as base64 (liveAsset) for every file this run built.
+// Answers { missing } — the hashes Cloudflare asked for that this run
+// didn't build — instead of deploying, so the caller can rebuild those
+// files and try once more.
+async function deployLive(env, manifest, b64s) {
   const session = await cfLive(env, 'POST', `/workers/scripts/${env.LIVE_SCRIPT}/assets-upload-session`,
     JSON.stringify({ manifest }));
   const buckets = session.buckets || [];
-  const missing = buckets.flat().filter((h) => !texts.has(h));
+  const missing = buckets.flat().filter((h) => !b64s.has(h));
   if (missing.length) return { missing };
   let jwt = session.jwt;
   for (const bucket of buckets) {
     const form = new FormData();
     for (const h of bucket) {
-      form.append(h, new Blob([b64bytes(new TextEncoder().encode(texts.get(h)))],
-        { type: 'application/json' }), h);
+      form.append(h, new Blob([b64s.get(h)], { type: 'application/json' }), h);
     }
     // 202 per bucket, 201 with the completion token on the last
     const up = await cfLive(env, 'POST', '/workers/assets/upload?base64=true', form, jwt);
@@ -1518,13 +1516,14 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
     .slice(0, LIVE_MAX_PER_RUN);
   if (!ids.length && !dirChanged) return { deployed: false };
 
-  const texts = new Map([[await liveHash(LIVE_HEALTH, 'json'), LIVE_HEALTH]]);
+  const health = await liveAsset(LIVE_HEALTH, 'json');
+  const b64s = new Map([[health.hash, health.b64]]);
   // The directory rides every deploy (a deploy carries the whole site), as
   // it stands in R2 now. dirChanged: it is why this deploy is happening.
   const dirObj = await env.DATA.get(DIR_KEY);
   const dirText = dirObj ? await dirObj.text() : null;
-  const dirHash = dirText === null ? null : await liveHash(dirText, 'json');
-  if (dirHash) texts.set(dirHash, dirText);
+  const dir = dirText === null ? null : await liveAsset(dirText, 'json');
+  if (dir) b64s.set(dir.hash, dir.b64);
   const built = new Map(); // id -> { slug, hash, size, at } | { slug, remove: true }
   const unbuildable = [];
   const build = async (rows) => {
@@ -1532,9 +1531,9 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
       if (!t.published) { built.set(t.id, { slug: t.slug, remove: true }); continue; }
       const text = await liveBody(env, t, now);
       if (text === null) { unbuildable.push(t.id); continue; }
-      const hash = await liveHash(text, 'json');
-      texts.set(hash, text);
-      built.set(t.id, { slug: t.slug, hash, size: new TextEncoder().encode(text).byteLength, at: now });
+      const file = await liveAsset(text, 'json');
+      b64s.set(file.hash, file.b64);
+      built.set(t.id, { slug: t.slug, hash: file.hash, size: file.size, at: now });
     }
   };
   const rowsFor = async (list) => (await env.DB.prepare(TICK_ROW_SELECT + `WHERE t.id IN (${inList(list.length)})`)
@@ -1567,8 +1566,8 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
       const { results: live } = await env.DB.prepare(
         'SELECT id, slug, published, live_hash, live_size FROM tournaments WHERE live_hash IS NOT NULL'
       ).all();
-      const manifest = { '/health.json': { hash: [...texts.keys()][0], size: LIVE_HEALTH.length } };
-      if (dirHash) manifest[DIR_LIVE_PATH] = { hash: dirHash, size: new TextEncoder().encode(dirText).byteLength };
+      const manifest = { '/health.json': { hash: health.hash, size: health.size } };
+      if (dir) manifest[DIR_LIVE_PATH] = { hash: dir.hash, size: dir.size };
       const files = []; // what this deploy ships, for the live_hash write
       for (const r of live) {
         // An unpublished tournament's file goes, whatever its columns say:
@@ -1584,7 +1583,7 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
         manifest[livePath(b.slug)] = { hash: b.hash, size: b.size };
         files.push({ id, h: b.hash, s: b.size, at: b.at });
       }
-      const res = await deployLive(env, manifest, texts);
+      const res = await deployLive(env, manifest, b64s);
       if (res.ok) { deployed = files; break; }
       // Cloudflare no longer holds a file an earlier deploy shipped (the
       // Worker was deleted and recreated): rebuild as many as one run may
@@ -1629,8 +1628,8 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
     }
     // what the hourly sweep checks, written only when the directory is
     // what this deploy was for
-    if (dirChanged && dirHash) {
-      await env.DATA.put(DIR_LIVE_KEY, dirHash).catch((e) => console.log('directory.live:', e.message));
+    if (dirChanged && dir) {
+      await env.DATA.put(DIR_LIVE_KEY, dir.hash).catch((e) => console.log('directory.live:', e.message));
     }
     return { deployed: true, files: deployed.length, built: built.size };
   } catch (e) {
@@ -2673,12 +2672,19 @@ export function packetCategories(body, filename) {
 // '5': bare "Narratives" / "Practices" are Beliefs; slash-joined writers.
 const CATMAP_VERSION = '5';
 
+// The "checked, nothing found" map rebuildCatmap leaves. It is the only
+// empty map ever stored (the other writers add a round or delete the
+// blob), so a stored map longer than this has a round, and the public
+// state can tell from the object's size alone, without a parse.
+const EMPTY_CATMAP = JSON.stringify({ rounds: {} });
+const catmapHasRounds = (obj) => Boolean(obj) && obj.size > EMPTY_CATMAP.length;
+
 // Backfill for packets uploaded before category extraction existed (or
 // before the current parser understood their format): recompute the
 // whole map from the stored packets. Triggered from the dashboard load
-// when the map is missing or version-stale; writes an empty {rounds:{}}
-// marker when nothing has categories so the attempt isn't repeated
-// every load.
+// when the map is missing or version-stale; writes the empty marker
+// (EMPTY_CATMAP) when nothing has categories so the attempt isn't
+// repeated every load.
 async function rebuildCatmap(env, t) {
   const tid = t.id;
   const { results } = await env.DB.prepare(
@@ -2876,7 +2882,14 @@ async function rosterNames(env, rosterKey, rawKey) {
   if (!rosterKey) return null;
   const obj = await env.DATA.get(rosterKey);
   if (!obj) return null;
-  try { return rosterNameMap(parseRoster(JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey))))); } catch (e) { return null; }
+  try {
+    const text = new TextDecoder().decode(await readBlob(obj, rawKey));
+    // Renames are held only under `_formerNames` (qbj.js parseRoster): a
+    // roster without that key, spelled out or \u-escaped, has none, and
+    // most rosters are that, so they skip the parse.
+    if (!text.includes('_formerNames') && !text.includes('\\u')) return null;
+    return rosterNameMap(parseRoster(JSON.parse(text)));
+  } catch (e) { return null; }
 }
 
 // GET /a/:secret/games?ids=1,2,… — up to MAX_GAMES_BATCH games' public
@@ -4262,6 +4275,7 @@ async function pubQTiebreakers(request, url, env, slug) {
 // (same query, same order), so building the prebuilt state doesn't read
 // them twice
 async function pubStateBody(env, t, pub, loaded = null) {
+  const key = unlockKey(t);
   const [files, buckets, schedObj, packetRounds, catsHead, manifest, started] = await Promise.all([
     loaded && loaded.rows ? { results: loaded.rows } : env.DB.prepare(
       `SELECT id, bucket_id, round, filename, ${UNFINISHED_SQL} AS unfinished FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id`
@@ -4269,25 +4283,20 @@ async function pubStateBody(env, t, pub, loaded = null) {
     env.DB.prepare(
       'SELECT id, room_name FROM buckets WHERE tournament_id = ?1'
     ).bind(t.id).all(),
-    env.DATA.get(`t/${t.id}/schedule.json`),
+    // the schedule's rounds count only toward buzz_done below; otherwise
+    // its upload time (the tab's stamp) is all this needs
+    key ? env.DATA.get(`t/${t.id}/schedule.json`) : env.DATA.head(`t/${t.id}/schedule.json`),
     env.DB.prepare(
       'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     ).bind(t.id, t.current_round).all(),
-    env.DATA.get(`t/${t.id}/catmap.json`),
+    env.DATA.head(`t/${t.id}/catmap.json`),
     loaded && loaded.manifest ? loaded.manifest : readManifest(env, t.id),
     env.DB.prepare('SELECT MAX(round) AS n FROM room_starts WHERE tournament_id = ?1').bind(t.id).all(),
   ]);
   // an empty map is a "checked, nothing found" backfill marker: the
   // tab stays hidden
-  let catsStamp = null;
-  if (catsHead) {
-    const parsed = await catsHead.json().catch(() => null);
-    if (parsed && parsed.rounds && Object.keys(parsed.rounds).length) {
-      catsStamp = catsHead.uploaded.getTime();
-    }
-  }
+  const catsStamp = catmapHasRounds(catsHead) ? catsHead.uploaded.getTime() : null;
   const buzz = buzzConfig(t);
-  const key = unlockKey(t);
   const rooms = Object.fromEntries(buckets.results.map((b) => [b.id, b.room_name]));
   const rows = files.results;
   // rounds every room has turned in — the only rounds the buzz tab and
@@ -5480,12 +5489,8 @@ async function mirrorState(env, tid, packetOf) {
 // with them before counting them with the other mirrors' (setstats.js
 // siteNames): {teams: {old: new}, players: {"team\nold": new}}, or null.
 async function mirrorRenames(env, tid) {
-  const obj = await env.DATA.get(`t/${tid}/roster.qbj`);
-  if (!obj) return null;
-  try {
-    const map = rosterNameMap(parseRoster(JSON.parse(new TextDecoder().decode(await readBlob(obj, null)))));
-    return map ? { teams: Object.fromEntries(map.teams), players: Object.fromEntries(map.players) } : null;
-  } catch (e) { return null; }
+  const map = await rosterNames(env, `t/${tid}/roster.qbj`, null);
+  return map ? { teams: Object.fromEntries(map.teams), players: Object.fromEntries(map.players) } : null;
 }
 
 /**

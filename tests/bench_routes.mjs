@@ -2,6 +2,7 @@
 // tournament, against the local Worker under wrangler dev's CPU profiler.
 //   cd worker && npx wrangler dev --local --port 8799 --test-scheduled --var METER:1
 //   SHAPE=large node tests/bench_routes.mjs
+// (PACKETS=json for categorized JSON packets, INSPECTOR= for another port)
 //
 // A whole-day profile can't split CPU between routes (an await drops the
 // handler from the sampled stack), so each route is run on its own, REPS
@@ -123,8 +124,20 @@ function matchFor(round, a, b) {
   return JSON.stringify(m);
 }
 
+// PACKETS=json: categorized JSON packets, as qbreader-format sets come, so
+// the tournament has a category map (the public state the cron builds
+// reads it); PDFs otherwise
+const JSON_PACKETS = process.env.PACKETS === 'json';
+const CATS = ['Literature', 'History', 'Science', 'Fine Arts', 'Religion', 'Mythology', 'Philosophy', 'Social Science', 'Geography', 'Other Academic'];
+const packetFor = (n) => (JSON_PACKETS ? JSON.stringify({
+  tossups: Array.from({ length: 20 }, (_, i) => ({ question: 'Round ' + n + ' tossup ' + (i + 1) + ' text '.repeat(40), answer: 'answer ' + i,
+    category: CATS[i % CATS.length], subcategory: 'World' })),
+  bonuses: Array.from({ length: 20 }, (_, i) => ({ leadin: 'Round ' + n + ' bonus ' + (i + 1), parts: ['a', 'b', 'c'], answers: ['x', 'y', 'z'],
+    category: CATS[(i + 3) % CATS.length], subcategory: 'World', difficultyModifiers: ['e', 'm', 'h'] })),
+}) : 'PDF'.repeat(500));
+
 const K = Number(process.env.TOURNAMENTS || 4); // for the several-at-once cron case
-console.log(`bench_routes: ${K} x ${SHAPE} tournament (${ROOMS} rooms x ${ROUNDS} rounds = ${ROOMS * ROUNDS} games of ~${(matchFor(1, 0, 1).length / 1024).toFixed(0)}KB), ${REPS} reps per route`);
+console.log(`bench_routes: ${K} x ${SHAPE} tournament (${ROOMS} rooms x ${ROUNDS} rounds = ${ROOMS * ROUNDS} games of ~${(matchFor(1, 0, 1).length / 1024).toFixed(0)}KB, ${JSON_PACKETS ? 'JSON' : 'PDF'} packets), ${REPS} reps per route`);
 
 async function playedTournament(i) {
   d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
@@ -138,7 +151,9 @@ async function playedTournament(i) {
   await call(A + '/schedule', { method: 'POST', json: { v: 1, rooms: rooms.map((b, k) => ({ name: 'Room ' + (k + 1), bucket: b.id })),
     phases: [{ name: 'Prelims', rounds: Array.from({ length: ROUNDS }, (_, ri) => ({ round: ri + 1,
       games: pairings(ri + 1).map(([a, b], room) => ({ room, a: { team: teamName(a) }, b: { team: teamName(b) } })), byes: [] })) }], updated: 0 } });
-  for (let n = 1; n <= ROUNDS; n++) await call(A + '/packet?round=' + n + '&name=Packet' + n + '.pdf', { method: 'POST', body: 'PDF'.repeat(500) });
+  for (let n = 1; n <= ROUNDS; n++) {
+    await call(A + '/packet?round=' + n + '&name=Packet' + n + (JSON_PACKETS ? '.json' : '.pdf'), { method: 'POST', body: packetFor(n) });
+  }
   await call(A + '/start', { method: 'POST' });
   await call(A, { method: 'POST', json: { published: true, current_round: ROUNDS } });
   for (let n = 1; n <= ROUNDS; n++) {
@@ -153,7 +168,11 @@ for (let i = 0; i < K; i++) Ts.push(await playedTournament(i));
 for (let i = 0; i < 2 + Math.ceil(K / 4) * 2; i++) await call('/__scheduled');
 const { slug, A, rooms } = Ts[0];
 const S = '/b/' + rooms[0].secret;
-const rev = (await call(A)).body.tournament.rev;
+const detail0 = (await call(A)).body;
+const rev = detail0.tournament.rev;
+// a played game, for the download routes
+const game0 = detail0.files.find((f) => f.kind === 'qbj' && !f.error);
+const gameIds = detail0.files.filter((f) => f.kind === 'qbj' && !f.error).slice(0, ROOMS).map((f) => f.id).join(',');
 console.log('tournaments played and built; profiling...\n');
 
 // a moderator re-exporting the last round's game: dirties the tournament
@@ -173,6 +192,10 @@ const ROUTES = [
   ['moderator: packet', () => call(S + '/packet?round=1&warm=1')],
   ['moderator: start game', () => call(S + '/start?round=' + ROUNDS, { method: 'POST' })],
   ['moderator: upload game (re-export)', () => reexport(Ts[0])],
+  // downloads: each reads the roster for its renames
+  ['TD download: a game\'s QBJ (part=qbj)', () => call(A + '/file?key=' + encodeURIComponent(game0.r2_key) + '&part=qbj&dl=g.qbj')],
+  ['public per-game QBJ (GET /pub/:slug/qbj/:id)', () => call('/pub/' + slug + '/qbj/' + game0.id)],
+  ['TD games batch (GET /games, a round\'s ids)', () => call(A + '/games?ids=' + gameIds)],
 ];
 const rows = [];
 for (const [label, fn] of ROUTES) {
