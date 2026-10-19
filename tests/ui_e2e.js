@@ -16,7 +16,7 @@ import path from 'node:path';
 import archive from '../app/archive/ug-nats-stanford.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseMatch, parseRoster, buildRosterQbj } from '../app/engine/qbj.js';
-import { roundRobinRounds, tagBrackets, buildSchedule, renameTeams, hasPlaceholders } from '../app/engine/schedule.js';
+import { roundRobinRounds, tagBrackets, buildSchedule, renameTeams, hasPlaceholders, fillPlaceholders, fillReport } from '../app/engine/schedule.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { roundTossupBuzzes } from '../app/engine/buzz.js';
 import { BASE, call, d1exec, testToken, tick, ok, summary } from './e2e_lib.js';
@@ -1638,6 +1638,20 @@ async function openHubOf(adminSecret) {
   ok('12d rename: the hub fills the renamed team\'s pool too, with no slot left open', !!filled, await text('#msg'));
   ok('12d rename: the playoff slots name the team by its new name',
     !!filled && JSON.stringify(filled).includes(JSON.stringify(to)) && !JSON.stringify(filled).includes(JSON.stringify(from)));
+  // and hold the teams the standings put there, all the prelim games
+  // counted under the new name, as the Fill button would fill them
+  const swap = (n) => (n === from ? to : n);
+  const prelims = [
+    ...R.games(first).map((g) => matchFor(first, swap(g.a.team), swap(g.b.team), g.room % 2 === 1)),
+    ...rest.flatMap((n) => renamed.phases[0].rounds.find((r) => r.round === n).games.filter((x) => x.a && x.b)
+      .map((g) => matchFor(n, g.a.team, g.b.team, g.room % 2 === 1))),
+  ].map((m) => parseMatch(m));
+  const want = JSON.parse(JSON.stringify(renamed));
+  fillPlaceholders(want, fillReport(renamed, aggregate(prelims)).ranks);
+  const slots = (x) => x.phases.flatMap((ph) => ph.rounds.flatMap((r) => [...r.games.flatMap((g) => [g.a, g.b]), ...r.byes]))
+    .filter((y) => y && y.from).map((y) => y.from + ' ' + y.team);
+  ok('12d rename: each playoff slot holds the team the standings put there',
+    !!filled && !hasPlaceholders(want) && JSON.stringify(slots(filled)) === JSON.stringify(slots(want)), [filled && slots(filled), slots(want)]);
 }
 {
   // a round robin: one bracket, no bracket anything

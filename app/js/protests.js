@@ -243,25 +243,6 @@ function renamedSummary(s, names) {
   };
 }
 
-/** A file row's summary (fileSummary) under the roster's renames: what
-    the hub lists and counts a game as. */
-export function namedSummary(f, names) {
-  const s = fileSummary(f);
-  return s && renamedSummary(s, names);
-}
-
-/** File rows with their summaries under the roster's renames, for what
-    pairs uploads with the saved schedule, which a roster save renames
-    (schedule.js prelimProgress, finals.js finalsProgress). The same rows
-    when nothing is renamed. */
-export function namedFiles(files, names) {
-  if (!names || !names.teams.size) return files;
-  return files.map((f) => {
-    const s = namedSummary(f, names);
-    return s ? { ...f, summary: s } : f;
-  });
-}
-
 /** The score if the protest is upheld, and whether that changes the
     result (MODAQ's protestsMatter: in a tied game every protest does). */
 export function projectUpheld(summary, p) {

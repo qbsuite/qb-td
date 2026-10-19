@@ -11,7 +11,7 @@
 // for the TD when the schedule has a Tiebreakers phase.
 
 import { aggregate, dedupeMatches } from './stats.js';
-import { playedMap, teamOf, gameKey, summaryTeams } from './schedule.js';
+import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
 
 const FIN_RE = /^(\d+)(?:st|nd|rd|th) in (.+)$/;
 const MINOR = new Set(['tiebreak', 'final']);
@@ -105,7 +105,7 @@ export function finalsSources(schedule) {
  * Which finals sources have every game in, from upload metadata alone
  * (each good upload's summary names its two teams), as prelimProgress
  * does for pools. files: the hub's file rows, their summaries under the
- * schedule's team names (protests.js namedFiles). Returns
+ * schedule's team names (schedule.js namedFiles). Returns
  *   ready — source bracket names with nothing left to play
  *   files — the uploads their standings are made from
  *   sig   — changes whenever one of those uploads does
@@ -195,6 +195,70 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     }
   }
   return { schedule: copy, filled, brackets: [...done], ties: ties.filter((x) => done.has(x.bracket)), held };
+}
+
+/**
+ * What the hub's auto-fill looks at (admin.js autoFillSlots), from upload
+ * metadata alone: prelimProgress for the pools (none ready without pools)
+ * and finalsProgress for the Finals. files: the hub's file rows under the
+ * roster's renames (schedule.js namedFiles). Returns
+ *   pools, finals — those two results
+ *   files — the uploads both rank on, each once
+ *   sig   — changes whenever one of them does
+ */
+export function fillProgress(schedule, files) {
+  const pools = schedule.pools ? prelimProgress(schedule, files) : { ready: [], left: {}, files: [], sig: '' };
+  const finals = finalsProgress(schedule, files);
+  const ids = new Set();
+  const all = [...pools.files, ...finals.files].filter((f) => !ids.has(f.id) && ids.add(f.id));
+  return { pools, finals, files: all, sig: pools.sig + '#' + finals.sig };
+}
+
+/**
+ * The hub's auto-fill of the saved schedule, on a copy: the pools rank on
+ * their prelim games only (autoFill), then the Finals on the schedule
+ * with the pools filled (finalsFill). Readiness comes from `saved`, never
+ * from an older copy of it: a rename saved since would leave a pool's
+ * games out of what was read. matches: the games of fillProgress(saved,
+ * files).files, each with its fileId. A pool or the Finals with one of
+ * its uploads not among them (a read that failed) waits, as standings
+ * without that game would be wrong. Ties points per 20 settled go on
+ * schedule.filled, for the pages' notes. force: pool letters, and 'F:' +
+ * a finals bracket, the TD said to fill anyway. Returns {schedule (saved
+ * itself when nothing filled), playoffs, finals}: autoFill's and
+ * finalsFill's results, or null when nothing of theirs was ready.
+ */
+export function autoFillSaved(saved, files, matches, roster = null, force = []) {
+  const read = new Set(matches.map((m) => m.fileId));
+  let next = saved;
+  let playoffs = null;
+  let finals = null;
+  const prog = saved.pools ? prelimProgress(saved, files) : null;
+  if (prog && prog.ready.length) {
+    const poolOf = new Map(Object.entries(saved.pools).flatMap(([p, ms]) => ms.map((m) => [m, p])));
+    const unread = new Set(prog.files.filter((f) => !read.has(f.id)).flatMap((f) => summaryTeams(f).map((n) => poolOf.get(n))));
+    const ids = new Set(prog.files.map((f) => f.id));
+    playoffs = autoFill(next, aggregate(matches.filter((m) => ids.has(m.fileId)), roster),
+      prog.ready.filter((p) => !unread.has(p)), force.filter((x) => !x.startsWith('F:')));
+    if (playoffs.filled) {
+      const had = new Set((next.filled || []).map((x) => x.pool + ' ' + x.record));
+      playoffs.schedule.filled = [...(next.filled || []), ...playoffs.ties.filter((x) => !had.has(x.pool + ' ' + x.record))
+        .map((x) => ({ pool: x.pool, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, bracket: tm.bracket })) }))];
+      next = playoffs.schedule;
+    }
+  }
+  const fp = finalsProgress(next, files);
+  if (fp.ready.length) {
+    const ready = fp.files.every((f) => read.has(f.id)) ? fp.ready : [];
+    finals = finalsFill(next, matches, ready, force.filter((x) => x.startsWith('F:')).map((x) => x.slice(2)));
+    if (finals.filled) {
+      const had = new Set((next.filled || []).map((x) => (x.pool || x.bracket) + ' ' + x.record));
+      finals.schedule.filled = [...(next.filled || []), ...finals.ties.filter((x) => !had.has(x.bracket + ' ' + x.record))
+        .map((x) => ({ bracket: x.bracket, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, place: tm.place })) }))];
+      next = finals.schedule;
+    }
+  }
+  return { schedule: next, playoffs, finals };
 }
 
 /** True when the schedule has a finals slot still to fill. */

@@ -1058,8 +1058,7 @@ export function fillReport(schedule, agg) {
 
 /**
  * The two teams a file row's summary names, or null. The Worker stores
- * the summary as JSON text; the hub hands over its own, under the
- * roster's renames (protests.js namedFiles), as an object.
+ * the summary as JSON text; namedFiles hands it over as an object.
  */
 export function summaryTeams(f) {
   let s = f.summary;
@@ -1068,10 +1067,25 @@ export function summaryTeams(f) {
 }
 
 /**
+ * File rows with their summaries' teams under the roster's renames
+ * (qbj.js rosterNameMap), for what pairs uploads with the saved schedule,
+ * which a roster save renames (prelimProgress, finals.js finalsProgress).
+ * A renamed row's summary keeps only its teams. The same rows when
+ * nothing is renamed.
+ */
+export function namedFiles(files, names) {
+  if (!names || !names.teams.size) return files;
+  return files.map((f) => {
+    const x = summaryTeams(f);
+    return x ? { ...f, summary: { teams: x.map((n) => names.teams.get(n) || n) } } : f;
+  });
+}
+
+/**
  * Which pools have all their prelim games in, from upload metadata alone
  * (each good upload's summary names its two teams), so the hub can tell
  * without fetching a game. files: the hub's file rows, their summaries
- * under the schedule's team names (protests.js namedFiles). Returns
+ * under the schedule's team names (namedFiles). Returns
  *   ready — pool letters with no prelim game left
  *   left  — {A: games still to come}
  *   files — the good prelim uploads of the ready pools' teams

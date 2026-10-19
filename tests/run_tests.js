@@ -13,7 +13,7 @@ import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc, mountReport, reportPlace } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, finishedThrough, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, finishedThrough, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked, summaryTeams, namedFiles } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -30,7 +30,7 @@ import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoic
 import { checkPacket } from '../app/engine/packetcheck.js';
 import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk } from '../app/engine/plan.js';
 import HDWHITE from '../app/engine/hdwhite.js';
-import { finalsSources, finalsProgress, finalsFill, scheduleFinished } from '../app/engine/finals.js';
+import { finalsSources, finalsProgress, finalsFill, scheduleFinished, fillProgress, autoFillSaved } from '../app/engine/finals.js';
 import { eachLimit } from '../app/js/limit.js';
 import { modaqExport, modaqFilenames, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js';
@@ -39,7 +39,7 @@ import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js'
 // roster builder's output must satisfy it, since read.html feeds the
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
-import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary, namedSummary, namedFiles } from '../app/js/protests.js';
+import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
 import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from '../app/js/read_core.js';
 
 let passed = 0;
@@ -5600,7 +5600,7 @@ test('auto-fill: a team renamed mid-prelims, its earlier games under the old nam
   assert.equal(prog.files.length, games.length);
   assert.equal(prog.sig, prelimProgress(s, games.map((g) => g.f)).sig, 'the same uploads');
   // the hub's finished-rounds label reads its rounds the same way
-  const asGames = (fs, m) => fs.map((f) => ({ round: f.round, teams: namedSummary(f, m).teams.map((name) => ({ name, points: 0 })) }));
+  const asGames = (fs, m) => namedFiles(fs, m).map((f) => ({ round: f.round, teams: summaryTeams(f).map((name) => ({ name, points: 0 })) }));
   assert.equal(finishedThrough(after, asGames(files, names)), finishedThrough(s, asGames(games.map((g) => g.f), null)));
   assert.equal(finishedThrough(after, asGames(files, null)), 0, 'as uploaded: none yet');
   assert.ok(finishedThrough(after, asGames(files, names)) >= 7);
@@ -5614,6 +5614,44 @@ test('auto-fill: a team renamed mid-prelims, its earlier games under the old nam
     assert.ok(fills >= 1, 'seed ' + seed);
     assert.ok(!hasPlaceholders(saved), 'seed ' + seed);
     assert.deepEqual(saved, manualFill(renamedAs(from, rename.to), day.map((g) => underName(g, rename))), 'seed ' + seed);
+  }
+});
+
+test('auto-fill: a hub tab holding the schedule from before another tab\'s rename fills from the saved one', () => {
+  // The hub open all day (admin.js autoFillSlots): its copy has a pool A
+  // team's old name, the saved schedule the new one. Round 1 is in under
+  // the old name, the rest under the new, before the tab looks again.
+  const s = buildSchedule('pools2', planTeams(12), planRooms(6), {});
+  const r = { from: s.pools.A[0], to: s.pools.A[0] + ' Cardinal' };
+  const saved = JSON.parse(JSON.stringify(s));
+  renameTeams(saved, { [r.from]: r.to });
+  const names = rosterNameMap([{ name: r.to, players: ['p'], formerNames: [r.from] }]);
+  const first = prelimRounds(s)[0].round;
+  const strip = ({ filled, ...rest }) => rest;
+  for (let seed = 1; seed <= 30; seed++) {
+    const day = playDay(s, seed);
+    const files = namedFiles(day.map((g) => (g.f.round === first ? g : underName(g, r)).f), names);
+    // what the hub reads of an upload: the game under the roster's names (collectMatches)
+    const game = new Map(day.map((g) => [g.f.id, { ...underName(g, r).m, fileId: g.f.id }]));
+    const readOf = (fs) => fs.map((f) => game.get(f.id));
+    // the tab's copy as it stands finds pool A's games missing; under the
+    // roster's renames, as the hub checks it, both pools are done
+    assert.deepEqual(fillProgress(s, files).pools.ready, ['B'], 'seed ' + seed);
+    const mine = JSON.parse(JSON.stringify(s));
+    renameTeams(mine, Object.fromEntries(names.teams));
+    assert.deepEqual(fillProgress(mine, files).pools.ready, ['A', 'B'], 'seed ' + seed);
+    // the saved schedule decides which games are read: all of them, and
+    // both pools fill as the Fill button would
+    const plan = fillProgress(saved, files);
+    assert.equal(plan.files.length, day.length);
+    const res = autoFillSaved(saved, files, readOf(plan.files));
+    assert.deepEqual(res.playoffs.pools, ['A', 'B'], 'seed ' + seed);
+    assert.deepEqual(strip(res.schedule), manualFill(saved, day.map((g) => underName(g, r))), 'seed ' + seed);
+    // given only the games the old copy names (pool B's), pool A waits
+    // rather than fill in seed order from none of its games
+    const part = autoFillSaved(saved, files, readOf(fillProgress(s, files).files));
+    assert.deepEqual(part.playoffs.pools, ['B'], 'seed ' + seed);
+    assert.ok(JSON.stringify(part.schedule).includes('"label":"A1"'), 'seed ' + seed);
   }
 });
 
@@ -6008,8 +6046,7 @@ function finalsDay(seed, opts = {}) {
   fillPlaceholders(s, fillReport(s, aggregate(games)).ranks);
   for (const r of s.phases[1].rounds) for (const g of r.games) games.push(game(r.round, g.a.team, g.b.team, opts.tens && opts.tens(g)));
   let id = 0;
-  const files = games.map((m) => ({ id: ++id, kind: 'qbj', round: m.round,
-    summary: JSON.stringify({ teams: m.teams.map((t) => t.name), score: m.teams.map((t) => t.points) }) }));
+  const files = games.map((m) => ({ id: ++id, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
   return { s, games, files };
 }
 const finalTeams = (s) => s.phases.find((ph) => ph.kind === 'final').rounds.map((r) => r.games.map((g) => [g.a.team || g.a.label, g.b.team || g.b.label]));
@@ -6209,6 +6246,25 @@ test('finals: a team renamed mid-tournament still fills the Finals, its carried 
     const raw = finalsProgress(renamed, day.files.map((f) => (f.round <= lastPrelim ? f : newName(f))));
     assert.deepEqual(raw.ready, ['1st–6th place']);
     assert.equal(raw.files.length, 14);
+  }
+});
+
+test('finals: the hub fills the Finals only with all the games they rank on read', () => {
+  for (const seed of [5, 9, 13]) {
+    const day = finalsDay(seed);
+    const byId = new Map(day.games.map((m, i) => [day.files[i].id, { ...m, fileId: day.files[i].id }]));
+    const plan = fillProgress(day.s, day.files);
+    assert.deepEqual(plan.finals.ready, ['1st–6th place']);
+    const res = autoFillSaved(day.s, day.files, plan.files.map((f) => byId.get(f.id)));
+    assert.equal(res.finals.filled, 4, `seed ${seed}`);
+    assert.deepEqual(finalTeams(res.schedule), finalTeams(finalsFill(day.s, day.games, plan.finals.ready).schedule), `seed ${seed}`);
+    // a carried prelim game that couldn't be read: the Finals wait, though
+    // the bracket's own games are all there
+    const pre = new Set(prelimRounds(day.s).map((x) => x.round));
+    const carried = plan.finals.files.find((f) => pre.has(f.round));
+    const short = autoFillSaved(day.s, day.files, plan.files.filter((f) => f !== carried).map((f) => byId.get(f.id)));
+    assert.equal(short.finals.filled, 0, `seed ${seed}`);
+    assert.equal(short.schedule, day.s);
   }
 });
 
