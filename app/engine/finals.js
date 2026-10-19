@@ -8,8 +8,10 @@
 // heard, as the public page ranks them (stats.js standings), from the
 // bracket's own games plus the games its pool-mates carry over from the
 // stage before — the same carryover the YellowFruit 4 file sets up
-// (yft.js yfStages). Ties are settled by points per 20 and noted, or wait
-// for the TD when the schedule has a Tiebreakers phase.
+// (yft.js yfStages). A bracket whose pools play again (a double round
+// robin, Copy this phase) counts each time they played. Ties are settled
+// by points per 20 and noted, or wait for the TD when the schedule has a
+// Tiebreakers phase.
 
 import { standings, standingsOrder, levelOn, recordOf, dedupeMatches } from './stats.js';
 import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
@@ -40,6 +42,40 @@ function bracketGames(schedule, p, key) {
   return { games, teams: [...teams], open };
 }
 
+// A slot as a phase of the same pools again copies it: its team, or the
+// place it holds or was filled from
+const slotId = (s) => (!s ? null : s.label || s.from ? 'L' + (s.label || s.from) : s.team ? 'T' + s.team : null);
+
+// Each time the pools of bracket `key` in phase p played, earliest first:
+// [{phase, key}]. A phase of the same pools again (plan.js planGroups
+// `same`: a double round robin's second cycle, Copy this phase, the
+// replay Add phase puts after tiered pools) copies the phase before's
+// groups slot for slot, so each of its brackets holds exactly the slots of
+// one bracket there. Pools made anew (places, tiers, crossovers) hold
+// places from the phase before instead, and the walk back stops there.
+function cyclesOf(schedule, p, key) {
+  const slots = (q, k) => {
+    const ids = new Set();
+    for (const r of schedule.phases[q].rounds || []) {
+      for (const g of r.games || []) if (g.bracket === k) for (const s of [g.a, g.b]) if (slotId(s)) ids.add(slotId(s));
+    }
+    return [...ids].sort().join('\n');
+  };
+  const out = [{ phase: p, key }];
+  if (schedule.phases[p].kind) return out;
+  for (let q = p - 1; q >= 0; q--) {
+    const ph = schedule.phases[q];
+    if (MINOR.has(ph.kind)) continue;
+    if (ph.kind) break;
+    const mine = slots(out[0].phase, out[0].key);
+    const keys = new Set((ph.rounds || []).flatMap((r) => (r.games || []).map((g) => g.bracket)).filter(Boolean));
+    const k = [...keys].find((x) => slots(q, x) === mine);
+    if (k === undefined) break;
+    out.unshift({ phase: q, key: k });
+  }
+  return out;
+}
+
 // Groups of the nearest full stage before phase p: the pools, or that
 // phase's brackets. [{teams: [...]}]
 function groupsBefore(schedule, p) {
@@ -64,7 +100,8 @@ function groupsBefore(schedule, p) {
  * Every finals source: the bracket each "Nth in <name>" slot reads.
  * Returns [{name, phase, key, places: [n…], teams, games, open, carry,
  *   carried: [{a, b}] (pool-mate pairs whose earlier games count),
- *   prevRounds: [round…]}]
+ *   prevRounds: [round…]}]. games are the bracket's over each time its
+ * pools played (cyclesOf); teams in the order its own games list them.
  */
 export function finalsSources(schedule) {
   if (!schedule || !Array.isArray(schedule.phases)) return [];
@@ -84,11 +121,15 @@ export function finalsSources(schedule) {
     }
   });
   return [...out.values()].map((src) => {
-    const { games, teams, open } = bracketGames(schedule, src.phase, src.key);
+    const each = cyclesOf(schedule, src.phase, src.key).map((c) => ({ ...c, ...bracketGames(schedule, c.phase, c.key) }));
+    const { teams } = each[each.length - 1];
+    const games = each.flatMap((c) => c.games);
+    const open = each.some((c) => c.open);
     // carryover: pool-mates of the stage before whose pair this bracket
-    // doesn't play again (the YellowFruit rule, yft.js yfStages)
-    const prev = groupsBefore(schedule, src.phase);
-    const here = new Set(games.map((g) => key2(g.a, g.b)));
+    // doesn't play again (the YellowFruit rule, yft.js yfStages), from the
+    // first time its pools played
+    const prev = groupsBefore(schedule, each[0].phase);
+    const here = new Set(each[0].games.map((g) => key2(g.a, g.b)));
     const mates = [];
     if (prev && !['single', 'double'].includes(schedule.phases[src.phase].kind)) {
       for (let i = 0; i < teams.length; i++) for (let j = i + 1; j < teams.length; j++) {

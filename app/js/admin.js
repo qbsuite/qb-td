@@ -3164,7 +3164,8 @@ function gameFormat(t) {
    Tiebreakers phase: then those slots wait for the TD (autoFill).
    The Finals ("1st in 1st–6th place") fill the same way once that
    bracket's games are all in, ranked on its own games plus the ones its
-   pool-mates carry over (finals.js). */
+   pool-mates carry over, and on each time its pools played when they
+   played again (finals.js). */
 let autoSig = null;           // uploads last looked at
 let autoBusy = false;
 let autoWait = { held: [], odd: [], finals: [] }; // what waits for the TD, for the Live Hub

@@ -6332,6 +6332,117 @@ test('finals: a round robin\'s final, and pools whose winners meet, fill too', (
   }
 });
 
+/* ---------- the same pools again: seeding counts each time they played ---------- */
+
+// Pool play with set results, phases 0 to upTo - 1: ahead(p, team) is the
+// finish order of that team's pool in phase p, and the team ahead wins
+// each game 300–100. With the uploads the hub holds.
+function playedCycles(s, upTo, ahead) {
+  const games = [];
+  s.phases.slice(0, upTo).forEach((ph, p) => {
+    for (const r of ph.rounds) for (const g of r.games) {
+      const order = ahead(p, g.a.team);
+      const [w, l] = order.indexOf(g.a.team) < order.indexOf(g.b.team) ? [g.a.team, g.b.team] : [g.b.team, g.a.team];
+      games.push({ round: r.round, tossupsRead: 20, teams: [{ name: w, points: 300, bonusPoints: 0, players: [] }, { name: l, points: 100, bonusPoints: 0, players: [] }] });
+    }
+  });
+  const files = games.map((m, i) => ({ id: i + 1, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
+  return { games, files };
+}
+// The first time in seed order; the second 3rd > 5th > 1st > 2nd > 4th
+// seed. Over both the 1st and 3rd seeds go 6–2, the 2nd 4–4, the 5th 3–5
+// and the 4th 1–7; the second time alone puts the 5th seed second.
+const againOrder = (pools) => (p, team) => {
+  const pool = pools.find((x) => x.includes(team));
+  return p % 2 === 0 ? pool : [2, 4, 0, 1, 3].map((i) => pool[i]);
+};
+const bracketTeams = (s, phase, name) => {
+  const b = s.brackets.find((x) => x.phase === phase && x.name === name);
+  return [...new Set(s.phases[phase].rounds.flatMap((r) => r.games.filter((g) => g.bracket === b.key).flatMap((g) => [g.a.team, g.b.team])))].sort();
+};
+
+test('the same pools again: hdwhite 5b\'s top 3/bottom 2 split ranks on both round robins', () => {
+  const teams = planTeams(5);
+  // 5b as the picker builds it (schededit.js phasesFor)
+  const P = [planPhase('Prelims 1'), planPhase('Prelims 2', { same: true }), planPhase('Playoffs', { sizes: [3, 2], carry: false })];
+  const s = buildPlan(teams, planRooms(2), P, 'snake', 1);
+  tagBrackets(s);
+  assert.ok(JSON.stringify(s.phases[2]).includes('"label":"1st in Prelims 2"'));
+  const { games, files } = playedCycles(s, 2, againOrder([teams]));
+  // nothing fills while a game of the first round robin is missing
+  assert.deepEqual(finalsProgress(s, files.filter((f) => f.round !== 1)).ready, []);
+  const prog = finalsProgress(s, files);
+  assert.deepEqual(prog.ready, ['Prelims 2']);
+  assert.equal(prog.files.length, 20);
+  const res = finalsFill(s, games, prog.ready);
+  assert.ok(!hasPlaceholders(res.schedule));
+  // T2 (4–4) goes up, not T5 (3–5)
+  assert.deepEqual(bracketTeams(res.schedule, 2, '1st–3rd place'), ['T1', 'T2', 'T3']);
+  assert.deepEqual(bracketTeams(res.schedule, 2, '4th–5th place'), ['T4', 'T5']);
+});
+
+test('the same pools again: a double round robin\'s Finals rank on both cycles, and so does "two wins clear"', () => {
+  const teams = planTeams(5);
+  const P = [planPhase('Round robin 1'), planPhase('Round robin 2', { same: true })];
+  const build = (style) => {
+    const s = buildPlan(teams, planRooms(2), P, 'snake', 1);
+    addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P, undefined, style);
+    tagBrackets(s);
+    return s;
+  };
+  // a one-game final: T1 and T3 (6–2), not the second cycle's top two (T3 and T5)
+  const s = build('one');
+  const { games, files } = playedCycles(s, 2, againOrder([teams]));
+  const res = finalsFill(s, games, finalsProgress(s, files).ready);
+  assert.deepEqual(finalTeams(res.schedule).flat(2).sort(), ['T1', 'T3']);
+  // an advantaged final, seed order both times: T1 8–0 is two wins clear
+  // of T2 6–2 (the second cycle alone, one win), so no final is played
+  const adv = build('advantaged');
+  const day = playedCycles(adv, 2, () => teams);
+  const filled = finalsFill(adv, day.games, finalsProgress(adv, day.files).ready).schedule;
+  assert.deepEqual(finalTeams(filled)[0][0], ['T1', 'T2']);
+  assert.equal(scheduleFinished(filled, day.games), true);
+});
+
+test('the same pools again: Copy this phase, then crossover playoffs, seeds on both times the pools played', () => {
+  const teams = planTeams(10);
+  // two pools, Copy this phase (schededit.js copyOf), then playoffs of 4/4/2
+  const P = [planPhase('Prelims 1', { groups: 2 }), planPhase('Prelims 2', { groups: 2, same: true }), planPhase('Playoffs', { sizes: [4, 4, 2], carry: true })];
+  const s = buildPlan(teams, planRooms(5), P, 'snake', 1);
+  tagBrackets(s);
+  const pools = Object.values(s.pools);
+  const { games, files } = playedCycles(s, 2, againOrder(pools));
+  const prog = finalsProgress(s, files);
+  assert.deepEqual(prog.ready.slice().sort(), ['Pool A', 'Pool B']);
+  const res = finalsFill(s, games, prog.ready);
+  assert.ok(!hasPlaceholders(res.schedule));
+  // each pool's 1st and 3rd seeds (6–2) play for 1st–4th place, its 5th seed (3–5) for 5th–8th
+  assert.deepEqual(bracketTeams(res.schedule, 2, '1st–4th place'), [pools[0][0], pools[0][2], pools[1][0], pools[1][2]].sort());
+  for (const pool of pools) assert.ok(bracketTeams(res.schedule, 2, '5th–8th place').includes(pool[4]));
+});
+
+test('the same pools again: the replay after tiered pools counts both meetings and the tier\'s carryover; pools made anew are not a replay', () => {
+  const teams = planTeams(8);
+  // Add phase after tiered pools plays them again (schededit.js data-add)
+  const P = [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { sizes: [4, 4], carry: true }), planPhase('Phase 3', { same: true })];
+  const s = buildPlan(teams, planRooms(4), P, 'snake', 1);
+  addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P, undefined, 'one');
+  tagBrackets(s);
+  fillPlaceholders(s, s.pools);
+  const src = finalsSources(s)[0];
+  assert.equal(src.name, '1st–4th place');
+  assert.deepEqual([...new Set(src.games.map((g) => g.round))].sort((a, b) => a - b), [4, 5, 6, 7, 8]);
+  assert.deepEqual([src.carry, src.carried.length, src.prevRounds], [true, 2, [1, 2, 3]]);
+  // a later phase of all five teams again, but by place: its own games only
+  const t5 = planTeams(5);
+  const P2 = [planPhase('Round robin'), planPhase('Again by place', { sizes: [5], carry: false })];
+  const s2 = buildPlan(t5, planRooms(2), P2, 'snake', 1);
+  addFinals(s2, planGroups(t5, P2, 'snake', () => 0.5), P2, undefined, 'one');
+  const filled = finalsFill(s2, playedCycles(s2, 1, () => t5).games, ['Round robin']).schedule;
+  const again = finalsSources(filled).find((x) => x.name === 'Again by place');
+  assert.deepEqual([...new Set(again.games.map((g) => g.round))].sort((a, b) => a - b), [6, 7, 8, 9, 10]);
+});
+
 /* ---------- the hub ranks teams as the public page does ---------- */
 
 // Two pools of 4 into Championship and Consolation halves. In pool A, P
