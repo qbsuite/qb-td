@@ -13,7 +13,7 @@
 // by points per 20 and noted, or wait for the TD when the schedule has a
 // Tiebreakers phase.
 
-import { standings, standingsOrder, levelOn, recordOf, dedupeMatches } from './stats.js';
+import { standings, dedupeMatches } from './stats.js';
 import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
 
 const FIN_RE = /^(\d+)(?:st|nd|rd|th) in (.+)$/;
@@ -52,7 +52,9 @@ const slotId = (s) => (!s ? null : s.label || s.from ? 'L' + (s.label || s.from)
 // replay Add phase puts after tiered pools) copies the phase before's
 // groups slot for slot, so each of its brackets holds exactly the slots of
 // one bracket there. Pools made anew (places, tiers, crossovers) hold
-// places from the phase before instead, and the walk back stops there.
+// places from the phase before instead, and the walk back stops there. So
+// does a replay edited by hand (a team benched, a slot changed): it seeds
+// on its own games, as before.
 function cyclesOf(schedule, p, key) {
   const slots = (q, k) => {
     const ids = new Set();
@@ -101,7 +103,7 @@ function groupsBefore(schedule, p) {
  * Returns [{name, phase, key, places: [n…], teams, games, open, carry,
  *   carried: [{a, b}] (pool-mate pairs whose earlier games count),
  *   prevRounds: [round…]}]. games are the bracket's over each time its
- * pools played (cyclesOf); teams in the order its own games list them.
+ * pools played (cyclesOf).
  */
 export function finalsSources(schedule) {
   if (!schedule || !Array.isArray(schedule.phases)) return [];
@@ -180,8 +182,7 @@ export function finalsProgress(schedule, files) {
  * count (stats.js standings).
  * Returns {schedule, filled, brackets, ties, held}:
  *   ties — [{bracket, record, teams: [{name, pp20tuh, place}]}], a tie
- *          (the same winning percentage) that reaches a finals place,
- *          settled by points per 20
+ *          that reaches a finals place, settled by points per 20
  *   held — the same, waiting for the TD
  */
 export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
@@ -205,19 +206,19 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     // every scheduled game must be among them (a wrong team name waits)
     const got = new Set(games.map((m) => pairKey(m.round, m.teams[0].name, m.teams[1].name)));
     if (!src.games.every((g) => got.has(pairKey(g.round, g.a, g.b)))) continue;
-    // ranked as the public page ranks a table (stats.js standings), level
-    // teams in the bracket's own order
-    const row = new Map(standings(games, null, opts.settings).teams.map((t) => [t.name, t]));
-    const rows = standingsOrder(src.teams.map((n) => row.get(n)).filter(Boolean));
+    // ranked as the public page ranks a table (stats.js standings); teams
+    // level on both keep standings' order, which ends by name, as before
+    const rows = standings(games, null, opts.settings).teams.filter((t) => members.has(t.name));
+    const rec = (t) => t.w + '–' + t.l + (t.t ? '–' + t.t : '');
     const deepest = Math.max(...src.places);
     let hold = false;
     for (let i = 0; i < rows.length && i < deepest;) {
       let j = i + 1;
-      while (j < rows.length && levelOn(rows[j], rows[i])) j++;
+      while (j < rows.length && rec(rows[j]) === rec(rows[i])) j++;
       // a tie reaching a finals place: the order decides who plays, or who
       // is the leader
       if (j - i > 1) {
-        const x = { bracket: src.name, record: recordOf(rows.slice(i, j)),
+        const x = { bracket: src.name, record: rec(rows[i]),
           teams: rows.slice(i, j).map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, place: i + k + 1 })) };
         if (holdTies && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
       }

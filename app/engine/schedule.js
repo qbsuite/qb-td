@@ -16,7 +16,7 @@
 // teams the generator seeded into each pool, so placeholders can later
 // be filled from standings (fillPlaceholders).
 
-import { standingsOrder, levelOn, recordOf } from './stats.js';
+import { standingsOrder, winPct } from './stats.js';
 
 function slotEq(a, b) {
   if (!a || !b) return false;
@@ -939,14 +939,19 @@ export function hasPlaceholders(schedule) {
  * Pool-by-pool finish order: {A: [names best-first]}. pools: {A: [names]}
  * (schedule.pools); teams: standings rows (stats.js standings). Each pool
  * is ranked as its table on the public page ranks it (standingsOrder):
- * teams level on winning percentage and points per tossup keep their
- * pool (seed) order, and teams with no games yet come last, in that order.
+ * winning percentage, then points per tossup. Teams level on both keep
+ * their order in `teams` (standings: aggregate()'s, which ends by name, as
+ * the hub always settled them), and teams with no games yet come last, in
+ * pool (seed) order.
  */
 export function poolStandings(pools, teams) {
+  const at = new Map(teams.map((t, i) => [t.name, i]));
   const row = new Map(teams.map((t) => [t.name, t]));
+  const played = (n) => row.has(n) && row.get(n).w + row.get(n).l + (row.get(n).t || 0) > 0;
   const out = {};
   for (const [letter, members] of Object.entries(pools || {})) {
-    out[letter] = standingsOrder(members.map((n) => row.get(n) || { name: n, w: 0, l: 0, t: 0 })).map((t) => t.name);
+    const ranked = members.filter(played).sort((x, y) => at.get(x) - at.get(y)).map((n) => row.get(n));
+    out[letter] = [...standingsOrder(ranked).map((t) => t.name), ...members.filter((n) => !played(n))];
   }
   return out;
 }
@@ -965,10 +970,9 @@ export function poolStandings(pools, teams) {
  *             [{round, room, a, b}]
  *   extra   — prelim-round games uploaded that the schedule doesn't
  *             have (often the reason one is missing): [{round, a, b}]
- *   ties    — teams in a pool with the same winning percentage (the
- *             same record, at a pool's end) whose order sends them to
- *             different playoff brackets: [{pool, record, teams: [{name,
- *             pp20tuh, bracket}]}], in finish order
+ *   ties    — teams in a pool with the same record whose order sends
+ *             them to different playoff brackets: [{pool, record,
+ *             teams: [{name, pp20tuh, bracket}]}], in finish order
  */
 // The rounds pools are ranked on: each phase before the first with a
 // playoff slot (a double round robin's both cycles), less tiebreaker and
@@ -1020,11 +1024,12 @@ export function fillReport(schedule, agg) {
   const ties = [];
   for (const [pool, list] of Object.entries(ranks)) {
     for (let i = 0; i < list.length;) {
+      const rec = (n) => { const x = row.get(n); return x ? x.w + '–' + x.l + (x.t ? '–' + x.t : '') : null; };
       let j = i + 1;
-      while (j < list.length && levelOn(row.get(list[j]), row.get(list[i]))) j++;
+      while (j < list.length && rec(list[j]) !== null && rec(list[j]) === rec(list[i])) j++;
       if (j - i > 1) {
         const teams = list.slice(i, j).map((name, k) => ({ name, pp20tuh: row.get(name).pp20tuh, bracket: bracketOf.get(pool + (i + k + 1)) || null }));
-        if (new Set(teams.map((x) => x.bracket)).size > 1) ties.push({ pool, record: recordOf(list.slice(i, j).map((n) => row.get(n))), teams });
+        if (new Set(teams.map((x) => x.bracket)).size > 1) ties.push({ pool, record: rec(list[i]), teams });
       }
       i = j;
     }
@@ -1048,7 +1053,7 @@ export function fillReport(schedule, agg) {
     ranks['#' + place] = teams.map((x) => x.name);
     for (let i = 0; i < teams.length;) {
       let j = i + 1;
-      while (j < teams.length && levelOn(teams[j], teams[i])) j++;
+      while (j < teams.length && winPct(teams[j]) === winPct(teams[i])) j++;
       if (j - i > 1) compared.push({ place, teams: teams.slice(i, j).map((x) => ({ name: x.name, pool: x.pool, pp20tuh: x.pp20tuh,
         record: x.w + '–' + x.l + (x.t ? '–' + x.t : '') })) });
       i = j;

@@ -3159,19 +3159,22 @@ test('buildSchedule pools2 records snake-seeded pool membership', () => {
   assert.equal(rr.pools, undefined);
 });
 
-test('poolStandings ranks each pool as its public table does: winning percentage, then points per tossup, level teams in pool order', () => {
+test('poolStandings ranks each pool as its public table does: winning percentage, then points per tossup, level teams as standings lists them', () => {
   const pools = { A: ['A', 'D', 'E', 'H'], B: ['B', 'C', 'F', 'G'] };
   const row = (name, w, l, regPoints, regTuh = 60) => ({ name, w, l, t: 0, regPoints, regTuh });
   // E and F have no games; A and D are level on both counts; C has fewer
   // tossups heard at the same points, so more per tossup
-  const teams = [row('H', 3, 0, 900), row('B', 3, 0, 800), row('D', 1, 2, 500), row('G', 2, 1, 400), row('A', 1, 2, 500),
+  const teams = [row('H', 3, 0, 900), row('B', 3, 0, 800), row('A', 1, 2, 500), row('G', 2, 1, 400), row('D', 1, 2, 500),
     row('C', 1, 2, 500, 50), row('E', 0, 0, 0, 0)];
   assert.deepEqual(poolStandings(pools, teams), {
     A: ['H', 'A', 'D', 'E'],
     B: ['B', 'G', 'C', 'F'],
   });
-  // pool order, not the rows' order, settles a level pair
-  assert.deepEqual(poolStandings({ A: ['D', 'A', 'E', 'H'] }, teams).A, ['H', 'D', 'A', 'E']);
+  // the rows' order (standings: by name at the end), not pool order,
+  // settles a level pair, as the hub's ranking always has
+  assert.deepEqual(poolStandings({ A: ['D', 'A', 'E', 'H'] }, teams).A, ['H', 'A', 'D', 'E']);
+  // teams with no games, listed or not, come last in pool order
+  assert.deepEqual(poolStandings({ Z: ['F', 'E', 'H'] }, teams).Z, ['H', 'F', 'E']);
   // a better record in fewer games ranks higher: winning percentage, not net wins
   assert.deepEqual(poolStandings({ X: ['P', 'Q'] }, [row('P', 3, 1, 900, 80), row('Q', 2, 0, 400, 40)]).X, ['Q', 'P']);
 });
@@ -6395,6 +6398,12 @@ test('the same pools again: a double round robin\'s Finals rank on both cycles, 
   const { games, files } = playedCycles(s, 2, againOrder([teams]));
   const res = finalsFill(s, games, finalsProgress(s, files).ready);
   assert.deepEqual(finalTeams(res.schedule).flat(2).sort(), ['T1', 'T3']);
+  // advantaged: T1 and T3 are level on both counts, so the first seed goes
+  // by name, as the hub always settled it, not to T3 for coming first in
+  // Round robin 2's games
+  const lead = build('advantaged');
+  const both = playedCycles(lead, 2, againOrder([teams]));
+  assert.deepEqual(finalTeams(finalsFill(lead, both.games, finalsProgress(lead, both.files).ready).schedule)[0][0], ['T1', 'T3']);
   // an advantaged final, seed order both times: T1 8–0 is two wins clear
   // of T2 6–2 (the second cycle alone, one win), so no final is played
   const adv = build('advantaged');
@@ -6501,6 +6510,21 @@ test('the hub ranks as the public page does: an overtime win doesn\'t lift a tea
   assert.equal(standings(games, null, at21).teams.find((t) => t.name === X).regTuh, 61);
 });
 
+test('the hub ranks as the public page does: a tie note needs the same record, as before; another record at that winning percentage goes by points per 20', () => {
+  const { s } = overtimeTie();
+  const [P, X, Y, Z] = s.pools.A;
+  const row = (name, w, l, t, regPoints) => ({ name, w, l, t, regPoints, regTuh: 80, pp20tuh: regPoints / 4 });
+  const agg = (yRecord) => ({ games: [], teams: [row(P, 4, 0, 0, 1200), row(X, 1, 1, 2, 900), row(Y, ...yRecord, 800), row(Z, 0, 4, 0, 400),
+    ...s.pools.B.map((n, i) => row(n, 4 - i, i, 0, 1000 - 100 * i))] });
+  // X 1–1–2 and Y 2–2, .500 both: X goes up on points per 20, with no note
+  const apart = fillReport(s, agg([2, 2, 0]));
+  assert.deepEqual(apart.ranks.A, [P, X, Y, Z]);
+  assert.deepEqual(apart.ties, []);
+  // the same record: noted
+  const tied = fillReport(s, agg([1, 1, 2]));
+  assert.deepEqual(tied.ties.map((x) => [x.record, x.teams.map((t) => t.name)]), [['1–1–2', [X, Y]]]);
+});
+
 test('the hub ranks as the public page does: ACF Fall @ UIUC\'s shape (22 teams, 8/7/7 into 6/6/6/4) seeds as before without overtime', () => {
   const teams = planTeams(22);
   const P = [planPhase('Prelims', { groups: 3 }), planPhase('Playoffs', { sizes: [6, 6, 6, 4], carry: true })];
@@ -6512,32 +6536,36 @@ test('the hub ranks as the public page does: ACF Fall @ UIUC\'s shape (22 teams,
     const order = aggregate(games).teams.map((t) => t.name);
     return Object.fromEntries(Object.entries(s.pools).map(([k, m]) => [k, [...m].sort((a, b) => order.indexOf(a) - order.indexOf(b))]));
   };
-  // and as before, unless two pool-mates have the same record and the same
-  // points: the public table lists them in pool order, the old order by name
+  // two pool-mates with the same record and the same points: the old order
+  // put them by name, and still does; the public table lists them in pool
+  // order, both at the same rank
   const level = (rows, list) => list.some((n, i) => i && rows.get(n).w === rows.get(list[i - 1]).w && rows.get(n).points === rows.get(list[i - 1]).points);
+  let levelDays = 0;
   // the picker's plan, and the engine's pools3x2 that the saved schedule
   // was built with (22 teams, and the 23 of 8/8/7)
   for (const s of [plan, buildSchedule('pools3x2', teams, planRooms(11), {}), buildSchedule('pools3x2', planTeams(23), planRooms(11), {})]) {
-    let same = 0;
     for (let seed = 1; seed <= 60; seed++) {
       const games = playDay(s, seed).map((x) => x.m);
       const agg = standings(games);
       const now = autoFill(s, agg, ['A', 'B', 'C']);
-      // always the public page's pool tables, ties included
-      const pub = reportData({ name: 'UIUC', matches: dedupeMatches(games), roster: null, settings: {}, schedule: s }).stageStandings[0].pools;
-      assert.deepEqual(pub.map((p) => p.teams.map((t) => t.name)), Object.values(fillReport(s, agg).ranks), 'seed ' + seed);
       const was = before(s, games);
-      const rows = new Map(agg.teams.map((t) => [t.name, t]));
-      if (Object.values(was).some((list) => level(rows, list))) continue;
       const old = JSON.parse(JSON.stringify(s));
       fillPlaceholders(old, was);
       assert.deepEqual(now.schedule, old, 'seed ' + seed);
-      same++;
+      // the public page's pool tables, but for the order of an exact tie
+      const rows = new Map(agg.teams.map((t) => [t.name, t]));
+      const pub = reportData({ name: 'UIUC', matches: dedupeMatches(games), roster: null, settings: {}, schedule: s }).stageStandings[0].pools
+        .map((p) => p.teams.map((t) => t.name));
+      const hub = Object.values(fillReport(s, agg).ranks);
+      const marks = (lists) => lists.map((list) => list.map((n) => rows.get(n).w + '/' + rows.get(n).points));
+      if (Object.values(was).some((list) => level(rows, list))) {
+        assert.deepEqual(marks(pub), marks(hub), 'seed ' + seed);
+        levelDays++;
+      } else assert.deepEqual(pub, hub, 'seed ' + seed);
     }
-    assert.ok(same >= 50, `${same} of 60 days with no exact tie`);
   }
-  // and the Finals from 1st–6th place
-  let finals = 0;
+  assert.ok(levelDays > 0, 'some days have an exact tie');
+  // and the Finals from 1st–6th place, exact ties too
   for (let seed = 1; seed <= 60; seed++) {
     const d = finalsDay(seed);
     const src = finalsSources(d.s)[0];
@@ -6545,12 +6573,9 @@ test('the hub ranks as the public page does: ACF Fall @ UIUC\'s shape (22 teams,
     const mine = d.games.filter((m) => m.teams.every((t) => src.teams.includes(t.name))
       && (m.round >= 8 || carried.has(m.teams.map((t) => t.name).sort().join('\n'))));
     const old = aggregate(mine).teams;
-    if (old.slice(1, 3).some((t, i) => t.w === old[i].w && t.points === old[i].points)) continue;
     const res = finalsFill(d.s, d.games, finalsProgress(d.s, d.files).ready);
     assert.deepEqual(finalTeams(res.schedule)[0][0], [old[0].name, old[1].name], 'seed ' + seed);
-    finals++;
   }
-  assert.ok(finals >= 40, `${finals} of 60 finals with no exact tie`);
 });
 
 await testA('eachLimit: any count of items, in order, never more than n at once, failures kept apart', async () => {

@@ -161,7 +161,8 @@ export function aggregate(matches, roster = null) {
    rates without overtime and rank teams the YellowFruit way. The hub's
    stats table, Fill playoff slots, auto-fill and the Finals fill rank with
    the same rules (standings below), so a team is seeded where the public
-   pool table lists it. The set page's cross-site table stays on
+   pool table ranks it; teams level on both counts still go by name, as
+   the hub always settled them. The set page's cross-site table stays on
    aggregate(). */
 
 /** A team's gets in a game: its positive buzzes. */
@@ -223,21 +224,11 @@ export function standingsOrder(teams) {
   });
 }
 
-/** Two teams ranked level ("3=" on the public page): the same winning
-    percentage, from at least one game each. */
-export const levelOn = (x, y) => !!x && !!y && winPct(x) === winPct(y);
-
-/** The record teams level on winning percentage share, as the hub writes
-    it ("5–2"); teams with different records at that percentage (a tied
-    game, or more games played) list each one ("2–2 and 1–1–2"). */
-export function recordOf(teams) {
-  return [...new Set(teams.map((x) => x.w + '–' + x.l + (x.t ? '–' + x.t : '')))].join(' and ');
-}
-
 /**
  * aggregate(), with the team rows figured and ordered the way the public
  * page does it: overtime out (regulationFigures), and YellowFruit's order
- * (standingsOrder; teams level on both keep aggregate()'s order). On each
+ * (standingsOrder; teams level on both keep aggregate()'s order, which
+ * ends by name, as the public page's overall table does). On each
  * row pp20tuh and ppb are the regulation figures and regTuh the regulation
  * tossups heard; tuh stays all tossups heard. settings: the tournament's
  * game format, as regulationFigures takes it.
