@@ -727,7 +727,10 @@ first.
    (without the binding at all, the cron rebuilds inline)
 6. Host `app/` anywhere static; set `ALLOWED_ORIGIN` in `wrangler.toml` to
    that origin. Point the pages at your Worker with `?server=...` or by
-   editing the default in `app/js/api.js`.
+   editing the default in `app/js/api.js`. Pages served from
+   `qbsuite.github.io` ignore `?server=` and `?live=` (and localStorage
+   `qbtdServer` / `qbtdLive`), so a shared link cannot point them at
+   another backend; any other origin honors them.
 7. Optional: serve the public state from a files-only Worker — see
    "Public state on qb-td-live" below. Without it, leave `LIVE_SCRIPT`
    empty; nothing else changes.
@@ -839,7 +842,9 @@ How it works (worker.js "public state on qb-td-live"):
   deployed, then Up to date; Delayed while deploys are failing.
 - Only the production pages use it: `app/js/api.js` reads the file only
   when talking to the default backend, or when `?live=<url>` (or
-  localStorage `qbtdLive`) names one. `?live=off` turns it off.
+  localStorage `qbtdLive`) names one. `?live=off` turns it off. Pages
+  served from `qbsuite.github.io` ignore `?live=` and `qbtdLive`, and
+  always read it.
 
 Setup:
 

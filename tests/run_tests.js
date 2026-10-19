@@ -2012,6 +2012,37 @@ test('buzzpoints: a tiebreaker id from an uploaded game is shown as text', () =>
   }
 });
 
+// A shared link's ?server= / ?live= must not move the production pages
+// (they hold the saved admin and set links); any other origin keeps them.
+// Each import is its own module instance, read with its own location.
+await testA('api.js: the production pages ignore ?server= and ?live=, other origins keep them', async () => {
+  const was = [globalThis.location, globalThis.localStorage];
+  const load = (origin, search, storage, tag) => {
+    globalThis.location = { origin, search };
+    globalThis.localStorage = storage;
+    return import('../app/js/api.js?' + tag);
+  };
+  const PROD = 'https://qb-td.denisliu10.workers.dev';
+  const PROD_LIVE = 'https://qb-td-live.denisliu10.workers.dev';
+  try {
+    let m = await load('https://qbsuite.github.io', '?t=x&server=https://evil.example&live=https://evil.example', {}, 'prod1');
+    assert.deepEqual([m.API, m.LIVE], [PROD, PROD_LIVE]);
+    m = await load('https://qbsuite.github.io', '?t=x&live=off', { qbtdServer: 'https://evil.example', qbtdLive: 'https://evil.example' }, 'prod2');
+    assert.deepEqual([m.API, m.LIVE], [PROD, PROD_LIVE]);
+    // local tests and self-hosted copies: exactly as before
+    m = await load('http://localhost:8765', '?a=x&server=http://127.0.0.1:8799', {}, 'local1');
+    assert.deepEqual([m.API, m.LIVE], ['http://127.0.0.1:8799', null]);
+    m = await load('http://localhost:8765', '?live=https://live.example', { qbtdServer: 'https://self.example' }, 'local2');
+    assert.deepEqual([m.API, m.LIVE], ['https://self.example', 'https://live.example']);
+    m = await load('https://td.example.org', '?live=off', {}, 'self1');
+    assert.deepEqual([m.API, m.LIVE], [PROD, null]);
+    m = await load('https://td.example.org', '', {}, 'self2');
+    assert.deepEqual([m.API, m.LIVE], [PROD, PROD_LIVE]);
+  } finally {
+    [globalThis.location, globalThis.localStorage] = was;
+  }
+});
+
 /* ---------- Worker category extraction ---------- */
 
 const { categoryFromMetadata, packetCategories, tagWithoutWriter } = await import('../worker/worker.js');

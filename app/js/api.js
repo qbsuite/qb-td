@@ -5,14 +5,20 @@
 
 const qs = new URLSearchParams(location.search);
 const PROD_API = 'https://qb-td.denisliu10.workers.dev';
-export const API = qs.get('server') || localStorage.qbtdServer || PROD_API;
+// The production pages take no override: a shared link carrying ?server=
+// or ?live= would otherwise show another host's data on the origin that
+// holds this device's saved admin and set links. Pages served from
+// anywhere else (local tests, a self-hosted copy) keep both overrides.
+const PROD_PAGES = location.origin === 'https://qbsuite.github.io';
+const override = (param, key) => (PROD_PAGES ? null : qs.get(param) || localStorage[key]);
+export const API = override('server', 'qbtdServer') || PROD_API;
 
 // Where the public page reads each tournament's state file (worker.js
 // "public state on qb-td-live"): a files-only Worker, free to read. Only
 // for the production backend unless ?live= (or localStorage qbtdLive)
 // names one — a test or self-hosted backend must never read production's
 // files. ?live=off turns it off. null means: ask the Worker, as before.
-const liveOpt = qs.get('live') || localStorage.qbtdLive;
+const liveOpt = override('live', 'qbtdLive');
 export const LIVE = liveOpt === 'off' ? null
   : liveOpt || (API === PROD_API ? 'https://qb-td-live.denisliu10.workers.dev' : null);
 
