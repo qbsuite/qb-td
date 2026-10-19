@@ -16,7 +16,7 @@ import path from 'node:path';
 import archive from '../app/archive/ug-nats-stanford.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseMatch, parseRoster, buildRosterQbj } from '../app/engine/qbj.js';
-import { roundRobinRounds, tagBrackets, buildSchedule } from '../app/engine/schedule.js';
+import { roundRobinRounds, tagBrackets, buildSchedule, renameTeams, hasPlaceholders } from '../app/engine/schedule.js';
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { roundTossupBuzzes } from '../app/engine/buzz.js';
 import { BASE, call, d1exec, testToken, tick, ok, summary } from './e2e_lib.js';
@@ -1604,6 +1604,40 @@ async function openHubOf(adminSecret) {
   }
   const after = await js(`[...document.querySelectorAll('.sgfillcheck li')].map((l) => l.textContent)`);
   ok('12c fill: with every game in, no game is missing', after.every((l) => /^Pool [AB]: .* are tied at /.test(l)), after);
+}
+{
+  // A team renamed after round 1 from another tab: the roster keeps the old
+  // name and the schedule follows. The hub open since before picks up the
+  // new names on its next check and fills both pools' playoff slots, the
+  // renamed team's round 1 game (uploaded under the old name) counted.
+  const R = await bracketDay('UI E2E Rename Fill', 'pools2');
+  const [first, ...rest] = R.s2.phases[0].rounds.map((r) => r.round);
+  for (const g of R.games(first)) { await R.start(g, first); await R.upload(g, first); }
+  await openHubOf(R.t.admin_secret);
+  const from = R.games(first)[0].a.team;
+  const to = from + ' Cardinal';
+  await call(R.TA + '/roster?name=roster.qbj', { method: 'POST',
+    body: JSON.stringify(buildRosterQbj('UI E2E Rename Fill', TEAMS.map((n) => (n === from
+      ? { name: to, players: [player(n, 0)], formerNames: [from] } : { name: n, players: [player(n, 0)] })))) });
+  const renamed = JSON.parse(JSON.stringify(R.s2));
+  renameTeams(renamed, { [from]: to });
+  await call(R.TA + '/schedule', { method: 'POST', json: renamed });
+  // the rest of the prelims, under the new name
+  for (const n of rest) {
+    for (const g of renamed.phases[0].rounds.find((r) => r.round === n).games.filter((x) => x.a && x.b)) {
+      await R.start(g, n);
+      await R.upload(g, n);
+    }
+  }
+  // the hub's next check, as on a return to the tab
+  await js(`document.dispatchEvent(new Event('visibilitychange')); true`);
+  await waitJs(`/Filled the playoff slots/.test(document.querySelector('#msg').textContent)`, 'the playoff slots filled', 20000);
+  const savedSched = () => call(`${R.TA}/file?key=${encodeURIComponent(`t/${R.t.id}/schedule.json`)}`).then((x) => x.body);
+  const filled = await until(async () => { const x = await savedSched(); return x && !hasPlaceholders(x) && x; }, 'every playoff slot filled', 10000)
+    .catch(() => null);
+  ok('12d rename: the hub fills the renamed team\'s pool too, with no slot left open', !!filled, await text('#msg'));
+  ok('12d rename: the playoff slots name the team by its new name',
+    !!filled && JSON.stringify(filled).includes(JSON.stringify(to)) && !JSON.stringify(filled).includes(JSON.stringify(from)));
 }
 {
   // a round robin: one bracket, no bracket anything

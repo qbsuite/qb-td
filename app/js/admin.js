@@ -278,15 +278,16 @@ const staged = [];      // packets staged from a zip or loose files (packetsui.j
 let tbPool = null;      // tiebreaker pool blob (questions + uses), or null
 // The roster's renames (qbj.js rosterNameMap), so a game uploaded under a
 // team's old name is listed under its new one, as the stats count it.
-// Loaded once, and again after the hub saves a roster (key: null).
+// Loaded again whenever the roster is saved, here (key: null) or from
+// another tab (its save time, roster_at, moves).
 const hubNames = { key: null, map: null };
 async function ensureHubNames(a, t) {
-  const key = t.roster_r2_key || '';
+  const key = t.roster_r2_key ? t.roster_r2_key + '@' + (t.roster_at || '') : '';
   if (hubNames.key === key) return;
   hubNames.key = key;
   hubNames.map = null;
   if (!key) return;
-  try { hubNames.map = rosterNameMap(parseRoster(await fetchOwnedJson(a, key))); } catch (e) { /* listed as uploaded */ }
+  try { hubNames.map = rosterNameMap(parseRoster(await fetchOwnedJson(a, t.roster_r2_key))); } catch (e) { /* listed as uploaded */ }
 }
 // a file's summary (protests.js), its teams under their current names
 function fileSummary(f) { return namedSummary(f, hubNames.map); }

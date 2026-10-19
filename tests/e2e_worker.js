@@ -53,6 +53,7 @@ ok('demo slug reserved', r.status === 409, r.body);
 r = await call(A);
 ok('admin detail', r.status === 200 && r.body.tournament.slug === slug, r.body);
 ok('detail omits secrets', r.body.tournament.admin_secret === undefined && r.body.tournament.creator_ip === undefined);
+ok('detail: no roster, no roster save time', r.body.tournament.roster_at === null, r.body.tournament.roster_at);
 
 // bucket
 r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 1' } });
@@ -62,14 +63,22 @@ const secret = r.body.secret;
 // packet upload + roster
 r = await call(`${A}/packet?round=1&name=Packet1.pdf`, { method: 'POST', body: 'PDFBYTES' });
 ok('upload packet', r.status === 200, r.body);
-r = await call(`${A}/roster?name=roster.qbj`, {
-  method: 'POST',
-  body: JSON.stringify({ objects: [{ type: 'Tournament', registrations: [
-    { name: 'Alpha', teams: [{ name: 'Alpha', players: [{ name: 'Ann' }] }] },
-    { name: 'Beta', teams: [{ name: 'Beta', players: [{ name: 'Bob' }] }] },
-  ] }] }),
-});
+const ROSTER0 = JSON.stringify({ objects: [{ type: 'Tournament', registrations: [
+  { name: 'Alpha', teams: [{ name: 'Alpha', players: [{ name: 'Ann' }] }] },
+  { name: 'Beta', teams: [{ name: 'Beta', players: [{ name: 'Bob' }] }] },
+] }] });
+r = await call(`${A}/roster?name=roster.qbj`, { method: 'POST', body: ROSTER0 });
 ok('upload roster', r.status === 200, r.body);
+// the detail says when the roster was saved: a hub reloads its renames
+// when that moves, so another tab's rename reaches it
+{
+  const at = (await call(A)).body.tournament.roster_at;
+  ok('detail: the roster\'s save time', Number.isInteger(at) && Math.abs(Date.now() - at) < 60000, at);
+  await new Promise((res) => setTimeout(res, 20));
+  r = await call(`${A}/roster?name=roster.qbj`, { method: 'POST', body: ROSTER0 });
+  const again = (await call(A)).body.tournament.roster_at;
+  ok('detail: saving the roster again moves it', r.status === 200 && again > at, [at, again]);
+}
 
 // Before Start, a room link serves nothing: not the round's packet, not
 // the tiebreakers, not uploads — the mod's page shows the message.

@@ -2145,13 +2145,14 @@ async function rotateAdmin(env, t) {
 
 async function getTournament(env, t, ctx) {
   const id = t.id;
-  const [buckets, rounds, files, starts, liveProtests, catsHead, sets, setPackets] = await Promise.all([
+  const [buckets, rounds, files, starts, liveProtests, catsHead, rosterHead, sets, setPackets] = await Promise.all([
     env.DB.prepare('SELECT id, room_name, secret, secret_enc, created FROM buckets WHERE tournament_id = ?1 ORDER BY id').bind(id).all(),
     env.DB.prepare('SELECT number, packet_name, packet_r2_key FROM rounds WHERE tournament_id = ?1 ORDER BY number').bind(id).all(),
     env.DB.prepare('SELECT id, bucket_id, round, kind, r2_key, filename, size, error, created, summary FROM files WHERE tournament_id = ?1 ORDER BY created DESC').bind(id).all(),
     env.DB.prepare('SELECT bucket_id, round, at FROM room_starts WHERE tournament_id = ?1').bind(id).all(),
     env.DB.prepare('SELECT bucket_id, round, game, summary, at FROM live_protests WHERE tournament_id = ?1').bind(id).all(),
     env.DATA.head(`t/${id}/catmap.json`),
+    t.roster_r2_key ? env.DATA.head(t.roster_r2_key) : null,
     t.set_id
       ? env.DB.prepare('SELECT slug, name, published, settings FROM sets WHERE id = ?1').bind(t.set_id).all()
       : { results: [] },
@@ -2184,6 +2185,9 @@ async function getTournament(env, t, ctx) {
     // set_packets lets the TD put any of the set's packets on any round.
     tournament: {
       ...pub_t, closes: closesAt(t), live: liveMark(env, t),
+      // when the roster was last saved: the hub reloads its renames when
+      // this moves, so another tab's rename reaches it (admin.js hubNames)
+      roster_at: rosterHead ? rosterHead.uploaded.getTime() : null,
       set: sets.results[0] ? {
         slug: sets.results[0].slug, name: sets.results[0].name, published: sets.results[0].published,
         lock_buzz: mirrorBuzzLocked(sets.results[0].settings),
