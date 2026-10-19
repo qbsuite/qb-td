@@ -4,7 +4,9 @@
 
 /** Validate a parsed packet JSON into MODAQ's IPacket shape
     ({tossups: [{question, answer}], bonuses?}). Throws a user-facing
-    Error on anything MODAQ would reject. */
+    Error on a packet MODAQ would reject for its tossups. Bonuses are not
+    checked here: what MODAQ refuses in them (a bonus with no values,
+    say) is a warning in the set's parse review (engine/packetcheck.js). */
 export function normalizePacket(json, name, opts = {}) {
   // opts.bonusOnly: a tiebreaker pool packet may be bonuses alone
   if (opts.bonusOnly && json && typeof json === 'object' && !(json.tossups || []).length

@@ -5004,7 +5004,7 @@ test('assignQuestion: the editor overrides a match, and the ledger follows', () 
 /* ---------- parse review (packetcheck.js) ---------- */
 
 test('checkPacket: lays a packet out for a reviewer and flags what looks off', () => {
-  const good = { tossups: [TU(1), TU(2)], bonuses: [BN(1), BN(2)] };
+  const good = { tossups: [TU(1), TU(2)], bonuses: [BN(1), BN(2)].map((b) => ({ ...b, values: [10, 10, 10] })) };
   good.tossups.forEach((t) => { t.category = 'History'; });
   const r = checkPacket(good);
   assert.equal(r.count, 0);
@@ -5027,11 +5027,50 @@ test('checkPacket: lays a packet out for a reviewer and flags what looks off', (
   assert.ok(b.tossups[1].warnings.includes('"ANSWER:" inside the question text'));
   assert.ok(b.tossups[1].warnings.some((w) => /power marks/.test(w)));
   assert.deepEqual(b.bonuses[0].warnings.sort(), [
-    '2 parts', '3 answers for 2 parts', 'no lead-in', 'part 1 still carries its "[10]" marker'].sort());
+    '2 parts', '3 answers for 2 parts — MODAQ will not load this packet', 'no lead-in',
+    'part 1 still carries its "[10]" marker'].sort());
   assert.ok(b.warnings.includes('3 tossups but 1 bonuses'));
   assert.ok(b.warnings.some((w) => /share an answerline \(Author 1\)/.test(w)));
   assert.ok(b.warnings.some((w) => /2 tossups without category data/.test(w)));
   assert.equal(b.count, b.warnings.length + b.tossups.flatMap((t) => t.warnings).length + b.bonuses[0].warnings.length);
+});
+
+test('checkPacket: says so when MODAQ\'s own loader would refuse the packet', () => {
+  // locked against the installed MODAQ: each of these fails its loadPacket
+  // (a throw, or a refusal with no packet), and the review names it
+  const { loadPacket } = createRequire(import.meta.url)('modaq/src/components/PacketLoaderController.js');
+  const loads = (p) => {
+    try { return !!loadPacket({ uiState: { setPacketStatus() {} } }, JSON.parse(JSON.stringify(p))); } catch (e) { return false; }
+  };
+  const tu = { ...TU(1), category: 'History' };
+  const bn = { ...BN(1), values: [10, 10, 10] };
+  const NO = /MODAQ will not load this packet$/;
+  const flagged = (p) => checkPacket(p).tossups.concat(checkPacket(p).bonuses).flatMap((q) => q.warnings).filter((w) => NO.test(w));
+  const refused = {
+    'no point values': { bonuses: [{ ...bn, values: undefined }] },
+    'an empty values list': { bonuses: [{ ...bn, values: [] }] },
+    'too few values': { bonuses: [{ ...bn, values: [10, 10] }] },
+    'no parts': { bonuses: [{ ...bn, parts: undefined }] },
+    'no answers': { bonuses: [{ ...bn, answers: undefined }] },
+    'an answer that is not text': { bonuses: [{ ...bn, answers: ['A1', null, 'C1'] }] },
+    'a part that is not text': { bonuses: [{ ...bn, parts: ['Part one of 1', 5, 'Part three of 1'] }] },
+    'no lead-in at all': { bonuses: [{ ...bn, leadin: undefined }] },
+    'a bonus that is not one': { bonuses: [null] },
+    'tossup metadata that is not text': { tossups: [{ ...tu, metadata: { author: 'x' } }] },
+    'bonus metadata that is not text': { bonuses: [{ ...bn, metadata: 7 }] },
+  };
+  for (const [what, p] of Object.entries(refused)) {
+    const packet = { tossups: [tu], bonuses: [bn], ...p };
+    assert.equal(loads(packet), false, what + ': MODAQ refuses it');
+    assert.equal(flagged(packet).length, 1, what + ': ' + JSON.stringify(flagged(packet)));
+  }
+  assert.deepEqual(flagged({ tossups: [tu], bonuses: [{ ...bn, values: undefined }] }), ['no point values — MODAQ will not load this packet']);
+  // what MODAQ loads draws no such warning, odd as it may look
+  for (const p of [{ tossups: [tu], bonuses: [bn] }, { tossups: [tu], bonuses: [{ ...bn, leadin: '' }] },
+    { tossups: [{ ...tu, metadata: '' }], bonuses: [{ ...bn, values: ['10', '10', '10'] }] }, { tossups: [tu] }]) {
+    assert.equal(loads(p), true, JSON.stringify(p));
+    assert.deepEqual(flagged(p), []);
+  }
 });
 
 /* ---------- per-bracket rounds (brackets.js) ---------- */
