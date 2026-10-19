@@ -1257,6 +1257,13 @@ await waitJs(`!!document.querySelector('iframe.report')`, 'the classic report');
 ok('21 stats: Classic is the default', await js(`document.querySelector('[data-layout="classic"]').classList.contains('on')`));
 await check('21 stats: the classic report renders its standings', () => waitJs(`(() => { const f = document.querySelector('iframe.report');
   return (f.srcdoc || '').includes('Team Standings'); })()`, 'report content'));
+// sandboxed, the report runs in an origin of its own (the page can't
+// reach into it, nor it into the page), and still sizes itself by message
+await check('21 stats: the classic report is sandboxed and still sized to its content', () => waitJs(`(() => {
+  const f = document.querySelector('iframe.report');
+  const s = (f.getAttribute('sandbox') || '').split(' ');
+  return s.includes('allow-scripts') && !s.includes('allow-same-origin') && f.contentDocument === null
+    && parseInt(f.style.height, 10) > 400; })()`, 'a sandboxed, sized report'));
 await click('[data-layout="new"]');
 await waitJs(`document.querySelectorAll('table.nstats').length > 0`, 'the New layout');
 {

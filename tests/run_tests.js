@@ -10,7 +10,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
 import { aggregate, dedupeMatches } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
-import { reportSrcdoc } from '../app/js/reportframe.js';
+import { reportSrcdoc, mountReport, reportPlace } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
 import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, finishedThrough, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked } from '../app/engine/schedule.js';
@@ -2585,6 +2585,39 @@ test('staged report escapes team, stage and bracket names', () => {
   assert.ok(page('individuals').includes('<h2>\n&lt;xss-prelims&gt;&nbsp;\n</h2>'), 'the individuals heading');
   // and the in-page frame keeps them text
   assert.ok(!reportSrcdoc(pages).includes('<xss'));
+});
+
+// The frame is sandboxed, so the page can't read where the reader is; the
+// frame says so by message, and only its own, well-formed messages count.
+test('in-page report frame: sandboxed, its place read from its own messages', () => {
+  const frame = { contentWindow: {}, style: {}, getBoundingClientRect: () => ({ top: 100 }) };
+  const box = { html: '', set innerHTML(v) { this.html = v; }, querySelector: () => frame };
+  const had = globalThis.window;
+  let onMessage = null;
+  globalThis.window = { addEventListener: (type, fn) => { if (type === 'message') onMessage = fn; }, removeEventListener() {} };
+  try {
+    mountReport(box, REPORT);
+    const sandbox = /sandbox="([^"]*)"/.exec(box.html);
+    assert.ok(sandbox && sandbox[1].split(' ').includes('allow-scripts'), box.html);
+    assert.ok(!sandbox[1].includes('allow-same-origin'), 'the frame gets an origin of its own');
+    assert.equal(reportPlace(box), null, 'nothing said yet');
+    const say = (data, source = frame.contentWindow) => onMessage({ source, data: { qbtdReport: 'place', ...data } });
+    // the frame is 100px down the screen: the last anchor at most 80px from the top
+    say({ page: 'games', marked: null, anchors: [['games-Round-1', -400], ['games-Match_1', -30], ['games-Round-2', 500]] });
+    assert.deepEqual(reportPlace(box), { page: 'games', anchor: 'games-Match_1' });
+    say({ page: 'teamdetail', marked: 'teamdetail-Ames', anchors: [['teamdetail-Ames', 0]] });
+    assert.deepEqual(reportPlace(box), { page: 'teamdetail', anchor: 'teamdetail-Ames', marked: true });
+    say({ page: 'games', marked: null, anchors: [] }, {}); // another window
+    say({ page: '__proto__', marked: null, anchors: [] }); // no such page
+    say({ page: 'games', marked: null, anchors: 'x' });
+    assert.deepEqual(reportPlace(box), { page: 'teamdetail', anchor: 'teamdetail-Ames', marked: true });
+  } finally { globalThis.window = had; }
+});
+
+test('in-page report frame: a start place cannot end the frame\'s script', () => {
+  const doc = reportSrcdoc(REPORT, { start: { page: 'games', anchor: '</script><script>parent.x=1</script>', back: 'Schedule' } });
+  assert.equal((doc.match(/<\/script>/gi) || []).length, 1, 'one script, closed once');
+  assert.ok(!doc.includes('<script>parent.x'));
 });
 
 test('report refuses an empty tournament', () => {

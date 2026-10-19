@@ -4,6 +4,12 @@
 // (`teamdetail.html#Team`) turned into hash navigation inside the frame.
 // The report's stylesheet stays inside the frame, where it can't touch
 // the surrounding page.
+//
+// The frame is sandboxed without allow-same-origin: the report is built
+// from the names games were uploaded with, so anything that slips into it
+// runs in an origin of its own, away from the links this site saves in
+// the browser. The frame and the page talk only by postMessage (height,
+// place, back).
 
 const FILES = ['standings', 'individuals', 'games', 'teamdetail', 'playerdetail', 'rounds'];
 
@@ -19,6 +25,9 @@ function styleOf(html) {
 
 const PAGE_NAMES = { standings: 'Standings', individuals: 'Individuals', games: 'Scoreboard',
   teamdetail: 'Team Detail', playerdetail: 'Player Detail', rounds: 'Round Report' };
+
+// JSON for inside an inline <script>: no "</script>" can end it early
+const scriptJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
 
 /** buildReport()'s pages -> the srcdoc of a frame that shows them. */
 export function reportSrcdoc(pages, { start = null } = {}) {
@@ -50,11 +59,15 @@ export function reportSrcdoc(pages, { start = null } = {}) {
   // that was followed. Both stay until the next click. Back returns to the
   // page as it was, with its own mark and Back link, so a reader can step
   // back as many links as they followed; going to a page's top starts over.
+  // The page can't look inside the sandboxed frame, so the frame tells it
+  // where the reader is (reportPlace): the page shown, the anchor a
+  // followed link marked, and each anchor's distance from the frame's top,
+  // sent again whenever a resize or scroll could move them.
   const script = `
     var files = ${JSON.stringify(FILES)};
     var names = ${JSON.stringify(PAGE_NAMES)};
     var current = '';
-    var startAt = ${JSON.stringify(start || null)};
+    var startAt = ${scriptJson(start || null)};
     var marked = null; // {el, box, back}: undone on the next click
     var trail = [];    // {page, link, el}: each link followed to another page, and what was marked there
     function pageOf(hash) {
@@ -116,7 +129,24 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       else if (remark) mark(remark, pg);
       var y = el ? el.getBoundingClientRect().top : 0;
       parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight, y: y, go: !!(go || link) }, '*');
+      tellPlace();
     }
+    function tellPlace() {
+      var sec = document.getElementById('page-' + pageOf(current));
+      if (sec.hidden) return; // no page shown yet
+      var bar = sec.querySelector('.qt-mark');
+      var own = bar && (bar.querySelector('[id]') || bar.previousElementSibling);
+      var anchors = [];
+      sec.querySelectorAll('[id]').forEach(function (el) {
+        if (!/-top$/.test(el.id)) anchors.push([el.id, el.getBoundingClientRect().top]);
+      });
+      parent.postMessage({ qbtdReport: 'place', page: pageOf(current),
+        marked: own && own.id && !/-top$/.test(own.id) ? own.id : null, anchors: anchors }, '*');
+    }
+    var placeTimer = null;
+    function placeSoon() { clearTimeout(placeTimer); placeTimer = setTimeout(tellPlace, 100); }
+    window.addEventListener('resize', placeSoon);
+    window.addEventListener('scroll', placeSoon);
     document.addEventListener('click', function (e) {
       var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
       if (!a || a.classList.contains('qt-back')) return;
@@ -126,17 +156,31 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       else if (pageOf(hash) !== pageOf(current)) trail.push({ page: pageOf(current), link: a, el: marked && marked.el });
       show(hash, true);
     });
-    window.addEventListener('load', function () { show(current); });
+    // Sandboxed, the frame is laid out in a process of its own and can get
+    // here before it knows its size, when every height reads as nothing.
+    // So the first page is shown on an animation frame, once it has one.
+    function whenSized(fn) {
+      requestAnimationFrame(function () {
+        if (innerWidth) { fn(); return; }
+        window.addEventListener('resize', function sized() {
+          window.removeEventListener('resize', sized);
+          whenSized(fn);
+        });
+      });
+    }
+    window.addEventListener('load', function () { whenSized(function () { show(current); }); });
     // opened from the other layout: the same page, scrolled to the same
     // team, player, game or round when there is one
     // opened from a page outside the report (the schedule): its Back
     // link goes back there
     if (startAt && startAt.back) { names.outside = startAt.back; trail.push({ page: 'outside' }); }
-    if (startAt && startAt.anchor && document.getElementById(startAt.anchor)) {
-      var startEl = document.getElementById(startAt.anchor);
-      if (startAt.marked) mark(startEl, pageOf(startAt.anchor)); // its bar, carried over
-      show(startAt.anchor, false, startEl);
-    } else show(startAt && startAt.page ? startAt.page + '-top' : '');`;
+    whenSized(function () {
+      if (startAt && startAt.anchor && document.getElementById(startAt.anchor)) {
+        var startEl = document.getElementById(startAt.anchor);
+        if (startAt.marked) mark(startEl, pageOf(startAt.anchor)); // its bar, carried over
+        show(startAt.anchor, false, startEl);
+      } else show(startAt && startAt.page ? startAt.page + '-top' : '');
+    });`;
   // Dark mode lives HERE, never in engine/report.js. The report YF writes
   // is a white page, and the files a TD downloads must stay exactly that —
   // byte-identical to YellowFruit's own (tools/yf_parity.mjs), and legible
@@ -171,18 +215,36 @@ export function reportSrcdoc(pages, { start = null } = {}) {
     <body>${sections.join('\n')}<script>${script}</script></body></html>`;
 }
 
+// each mounted frame's last place message (reportPlace)
+const places = new WeakMap();
+
+// A place message, checked: it comes from the sandboxed report, so only
+// a known page and string ids with numeric offsets are kept.
+function cleanPlace(d) {
+  if (!FILES.includes(d.page) || !Array.isArray(d.anchors)) return null;
+  const anchors = d.anchors.filter((a) => Array.isArray(a) && typeof a[0] === 'string' && Number.isFinite(a[1]));
+  return { page: d.page, marked: typeof d.marked === 'string' ? d.marked : null, anchors };
+}
+
 /** Mount the report in `box`; the frame grows to its content. */
 // opts.start: {page, anchor} to open at (reportPlace from the other layout),
 // with `back` the name of the page outside it to offer a way back to
 // (opts.onBack then goes there)
 export function mountReport(box, pages, opts = {}) {
   // transparent, not white: the frame's own document paints its background
-  // (light or dark), so a dark reader gets no white flash before it loads
-  box.innerHTML = '<iframe class="report" title="stat report" style="width:100%;border:0;min-height:60vh;background:transparent"></iframe>';
+  // (light or dark), so a dark reader gets no white flash before it loads.
+  // Scripts only: its links are followed by its own script, and the one
+  // link that would open a window (YF's credit line) is hidden here.
+  box.innerHTML = '<iframe class="report" title="stat report" sandbox="allow-scripts"'
+    + ' style="width:100%;border:0;min-height:60vh;background:transparent"></iframe>';
   const frame = box.querySelector('iframe');
   frame.srcdoc = reportSrcdoc(pages, opts);
   const onMessage = (e) => {
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'back' && opts.onBack) opts.onBack();
+    if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'place') {
+      const at = cleanPlace(e.data);
+      if (at) places.set(frame, at);
+    }
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'height') {
       frame.style.height = Math.max(400, e.data.height + 16) + 'px';
       // a followed link: bring its target (or the page's top) into view
@@ -198,26 +260,19 @@ export function mountReport(box, pages, opts = {}) {
 
 /** Where the reader is in a mounted report: its page, and the anchor (a
     team, player, game or round) nearest above the top of the screen, or
-    null. The srcdoc frame shares the page's origin, so it's read directly. */
+    null. Read from what the frame last said (its place message). */
 export function reportPlace(box) {
   const frame = box && box.querySelector('iframe.report');
-  const doc = frame && frame.contentDocument;
-  const sec = doc && [...doc.querySelectorAll('section[id^="page-"]')].find((x) => !x.hidden);
-  if (!sec) return null;
-  const page = sec.id.slice('page-'.length);
+  const at = frame && places.get(frame);
+  if (!at) return null;
   // a section marked by a followed link is what the reader is on, even
   // when the page can't scroll it to the top
-  const mark = sec.querySelector('.qt-mark');
-  if (mark) {
-    const own = mark.querySelector('[id]') || mark.previousElementSibling;
-    if (own && own.id && !/-top$/.test(own.id)) return { page, anchor: own.id, marked: true };
-  }
+  if (at.marked) return { page: at.page, anchor: at.marked, marked: true };
   const top = frame.getBoundingClientRect().top;
   let anchor = null;
-  for (const el of sec.querySelectorAll('[id]')) {
-    if (/-top$/.test(el.id)) continue;
-    if (top + el.getBoundingClientRect().top > 80) break;
-    anchor = el.id;
+  for (const [id, y] of at.anchors) {
+    if (top + y > 80) break;
+    anchor = id;
   }
-  return { page, anchor };
+  return { page: at.page, anchor };
 }
