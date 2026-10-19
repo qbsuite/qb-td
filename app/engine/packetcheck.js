@@ -23,7 +23,8 @@ const SHORT_TOSSUP = 25;   // words; a real tossup is rarely under 50
 const LONG_TOSSUP = 220;   // two questions run together read as one very long one
 const LONG_ANSWER = 40;    // words in the main answerline: probably question text
 
-const NO_LOAD = ' — MODAQ will not load this packet';
+// what MODAQ refuses is said as a sentence: unlike the hints, it is a fact
+const noLoad = (what) => what + ', so MODAQ will not load this packet.';
 // MODAQ decodes metadata as text whenever it is there at all
 const badMetadata = (q) => !!q.metadata && typeof q.metadata !== 'string';
 
@@ -44,7 +45,7 @@ function checkTossup(tu, n) {
   if (words.length && !/for\s+(10|ten)\s+points|ftp\b|for ten points/i.test(plain(tu.question))) {
     warnings.push('no "For 10 points"');
   }
-  if (badMetadata(tu)) warnings.push('metadata is not text' + NO_LOAD);
+  if (badMetadata(tu)) warnings.push(noLoad('This tossup\'s metadata is not text'));
   return {
     n, words: words.length, answer, power: powers === 1,
     head: words.slice(0, 12).join(' '), tail: words.slice(-8).join(' '),
@@ -55,38 +56,34 @@ function checkTossup(tu, n) {
 // {leadin, parts, answers, values} -> its review row
 function checkBonus(bn, n) {
   if (!bn || typeof bn !== 'object') {
-    return { n, leadin: '', parts: [], answers: [], values: [], warnings: ['this entry is not a bonus' + NO_LOAD] };
+    return { n, leadin: '', parts: [], answers: [], values: [], warnings: [noLoad('This entry is not a bonus')] };
   }
   const parts = Array.isArray(bn.parts) ? bn.parts.map(plain) : [];
   const answers = Array.isArray(bn.answers) ? bn.answers.map(mainAnswer) : [];
   const values = Array.isArray(bn.values) ? bn.values.map(Number) : [];
   const warnings = [];
   if (parts.length !== 3) warnings.push(parts.length + ' part' + (parts.length === 1 ? '' : 's'));
-  // MODAQ reads part i from parts[i], answers[i] and values[i]: three
-  // lists of one length, or the packet does not load
-  const lists = { parts: 'parts', answers: 'answers', values: 'point values' };
-  const missing = Object.keys(lists).filter((k) => !Array.isArray(bn[k]));
-  if (missing.length) {
-    const said = missing.map((k) => lists[k]);
-    warnings.push('no ' + (said.length > 1 ? said.slice(0, -1).join(', ') + ' or ' : '') + said[said.length - 1] + NO_LOAD);
-  } else {
-    if (answers.length !== parts.length) warnings.push(answers.length + ' answers for ' + parts.length + ' parts' + NO_LOAD);
-    if (values.length !== parts.length) warnings.push((values.length ? 'values do not match the parts' : 'no point values') + NO_LOAD);
-  }
+  if (answers.length !== parts.length) warnings.push(answers.length + ' answers for ' + parts.length + ' parts');
+  // a part, answer or lead-in that is not text (MODAQ can't decode it)
+  // is said so, unless a hint already flags it
   parts.forEach((p, i) => {
-    if (typeof bn.parts[i] !== 'string') warnings.push('part ' + (i + 1) + ' is not text' + NO_LOAD);
-    else if (!p) warnings.push('part ' + (i + 1) + ' is empty');
+    if (!p) warnings.push('part ' + (i + 1) + ' is empty');
     else if (/^\s*\[\d+\]/.test(p)) warnings.push('part ' + (i + 1) + ' still carries its "[10]" marker');
     else if (p.split(/\s+/).length < 4) warnings.push('part ' + (i + 1) + ' is very short');
+    else if (typeof bn.parts[i] !== 'string') warnings.push(noLoad('Part ' + (i + 1) + ' is not text'));
   });
   answers.forEach((a, i) => {
-    if (typeof bn.answers[i] !== 'string') warnings.push('answer ' + (i + 1) + ' is not text' + NO_LOAD);
-    else if (!a) warnings.push('answer ' + (i + 1) + ' is empty');
+    if (!a) warnings.push('answer ' + (i + 1) + ' is empty');
+    else if (typeof bn.answers[i] !== 'string') warnings.push(noLoad('Answer ' + (i + 1) + ' is not text'));
   });
+  if (values.length && values.length !== parts.length) warnings.push('values do not match the parts');
+  // MODAQ reads part i's value from values[i]: with no list, the packet
+  // does not load
+  else if (!Array.isArray(bn.values) || (!values.length && parts.length)) warnings.push(noLoad('This bonus has no point values'));
   if (values.some((v) => !Number.isFinite(v) || v <= 0)) warnings.push('a part has no point value');
-  if (typeof bn.leadin !== 'string') warnings.push('no lead-in' + NO_LOAD);
-  else if (!plain(bn.leadin)) warnings.push('no lead-in');
-  if (badMetadata(bn)) warnings.push('metadata is not text' + NO_LOAD);
+  if (!plain(bn.leadin)) warnings.push('no lead-in');
+  else if (typeof bn.leadin !== 'string') warnings.push(noLoad('This bonus\'s lead-in is not text'));
+  if (badMetadata(bn)) warnings.push(noLoad('This bonus\'s metadata is not text'));
   return { n, leadin: plain(bn.leadin), parts, answers, values, warnings };
 }
 
