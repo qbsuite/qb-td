@@ -882,7 +882,7 @@ function renderRoomsSec(a, t, buckets, files) {
       ? `Room links work until ${esc(new Date(t.closes).toLocaleString())}, when the tournament closes.`
       : 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament. '
         + 'Test simulates a room for json testing purposes without needing to start the tournament. '
-        + 'Games that are exported from test rooms are NOT saved. Test rooms can also be used for unofficial scrims.'}</p>`
+        + 'Games that are exported from test rooms are NOT saved. Please use the Bye Room link for unofficial scrims, since nothing played there is saved.'}</p>`
     : '<div class="muted">No rooms yet</div>'}
     <div class="row" style="margin-top:10px">
       <label>${buckets.length ? 'Add' : 'Create'}
