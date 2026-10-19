@@ -102,21 +102,33 @@ export function emptyLedger() {
 }
 
 /**
+ * Why `ledger` is not one this code can extend: 'newer' (a later format;
+ * a reload fixes it), 'unreadable', or null when it is fine. null and
+ * undefined (a set with no ledger yet) are fine.
+ */
+export function ledgerProblem(ledger) {
+  if (ledger === null || ledger === undefined) return null;
+  if (ledger && typeof ledger === 'object' && typeof ledger.v === 'number' && ledger.v > 1) return 'newer';
+  if (!ledger || typeof ledger !== 'object' || ledger.v !== 1 || !Number.isInteger(ledger.seq)
+    || !ledger.questions || typeof ledger.questions !== 'object') return 'unreadable';
+  return null;
+}
+
+/**
  * Throws, with a message for the editor, unless `ledger` is one this code
- * can extend; null (a set with no ledger yet) passes. Never start over
- * from an empty ledger in place of one that exists: the write that
- * follows would replace it and hand out question ids already in use.
+ * can extend (ledgerProblem). Never start over from an empty ledger in
+ * place of one that exists: the write that follows would replace it and
+ * hand out question ids already in use.
  */
 export function checkLedger(ledger) {
-  if (ledger === null || ledger === undefined) return;
-  if (ledger && typeof ledger === 'object' && typeof ledger.v === 'number' && ledger.v > 1) {
+  const problem = ledgerProblem(ledger);
+  if (problem === 'newer') {
     throw new Error('The set\'s question ledger was saved by a newer version of this page, so nothing was changed. '
       + 'Please reload the page and try again.');
   }
-  if (!ledger || typeof ledger !== 'object' || ledger.v !== 1 || !Number.isInteger(ledger.seq)
-    || !ledger.questions || typeof ledger.questions !== 'object') {
+  if (problem) {
     throw new Error('The set\'s question ledger could not be read, so nothing was changed. '
-      + 'Please reload the page and try again.');
+      + 'Please report the problem, since reloading the page will not fix it.');
   }
 }
 

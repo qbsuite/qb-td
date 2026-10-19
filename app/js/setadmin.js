@@ -26,7 +26,7 @@ import { mountSetView } from './setview.js';
 import { readPacket } from './buzzview.js';
 import { sanitizeHtml } from '../engine/buzz.js';
 import { makeZip } from '../engine/zip.js';
-import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices, checkLedger } from '../engine/qmatch.js';
+import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices, checkLedger, ledgerProblem } from '../engine/qmatch.js';
 import { checkPacket } from '../engine/packetcheck.js';
 
 const $ = (id) => document.getElementById(id);
@@ -219,17 +219,23 @@ const reviewWord = (p) => p.checked ? 'checked' : p.warnings ? p.warnings + ' wa
 // The ledger, as the Worker hands it over: its etag on the first line,
 // its JSON after (worker.js getLedger — the Worker never parses it).
 // One that is stored but can't be read here is never taken for an empty
-// one: the next match would overwrite it and hand its question ids out
-// again.
-async function fetchLedger() {
+// one (it comes back as `false`): the next match would overwrite it and
+// hand its question ids out again.
+async function loadLedger() {
   const text = await (await pub(S + '/ledger', { cache: 'no-cache' })).text();
   const nl = text.indexOf('\n');
   const etag = nl > 0 ? text.slice(0, nl) : null;
   if (!etag) return { etag: null, ledger: null };
-  let ledger = false; // not a ledger: checkLedger refuses it
-  try { ledger = JSON.parse(text.slice(nl + 1)) ?? false; } catch (e) { /* refused below */ }
-  checkLedger(ledger);
+  let ledger = false;
+  try { ledger = JSON.parse(text.slice(nl + 1)) ?? false; } catch (e) { /* not a ledger */ }
   return { etag, ledger };
+}
+
+// the ledger a match or a reassignment extends: one it can't use refuses
+async function fetchLedger() {
+  const got = await loadLedger();
+  checkLedger(got.ledger);
+  return got;
 }
 
 // Record one version's question map with the ledger it was matched into
@@ -468,6 +474,7 @@ async function renderReview() {
   let ledger = null;
   try {
     parsed = await parsePacket(await fetchPacketBytes(packet, v), 'packet ' + packet);
+    ledger = (await loadLedger()).ledger;
   } catch (e) {
     box.innerHTML = back + `<div class="bad" style="margin-top:8px">This packet could not be read as questions: ${esc(e.message)}.
       A packet MODAQ cannot read is one no mirror can play — replace it.</div>`;
@@ -475,8 +482,15 @@ async function renderReview() {
     return;
   }
   // the ledger only labels the questions here: the review still shows
-  // without it, and a reassignment refetches it (and refuses) itself
-  try { ledger = (await fetchLedger()).ledger; } catch (e) { say(e.message, true); }
+  // without one it can't use, and a reassignment refetches it (and
+  // refuses) itself
+  const problem = ledgerProblem(ledger);
+  if (problem) {
+    ledger = null;
+    say(problem === 'newer'
+      ? 'The set\'s question ledger was saved by a newer version of this page, so the question labels below may be incomplete. Please reload the page.'
+      : 'The set\'s question ledger could not be read, so the question labels below may be incomplete. Please report the problem.', true);
+  }
   const review = checkPacket(parsed);
   const qmap = ((((setCats || {}).packets || {})[packet] || {})[v] || {}).q || null;
   const questions = packetQuestions(parsed);

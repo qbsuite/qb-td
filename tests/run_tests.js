@@ -26,7 +26,7 @@ import { buzzSettings, buzzToken, sha256Hex, sha256HexJs, BUZZ_ITERS } from '../
 import { buildScoresheet, teamInitials, catTag } from '../app/engine/scoresheet.js';
 import { sheetHtml, exampleSheetHtml } from '../app/js/sheetview.js';
 import { buildSite, siteNames, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
-import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices, checkLedger } from '../app/engine/qmatch.js';
+import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices, checkLedger, ledgerProblem } from '../app/engine/qmatch.js';
 import { checkPacket } from '../app/engine/packetcheck.js';
 import { buildPlan, planGroups, rebracketChecks, addFinals, shareRooms, handOk } from '../app/engine/plan.js';
 import HDWHITE from '../app/engine/hdwhite.js';
@@ -5013,7 +5013,10 @@ test('matchPacket and assignQuestion refuse a ledger they cannot read rather tha
     assert.throws(() => matchPacket(bad, 2, pkt([TU(3)])), /nothing was changed/, JSON.stringify(bad));
     assert.throws(() => assignQuestion(bad, 1, pkt([TU(1), TU(2)]), p1.q, 't', 1, null), /nothing was changed/, JSON.stringify(bad));
   }
-  assert.throws(() => matchPacket(newer, 2, pkt([TU(3)])), /newer version/);
+  // a reload fixes a newer format, and only that
+  assert.throws(() => matchPacket(newer, 2, pkt([TU(3)])), /newer version.*Please reload the page/);
+  assert.throws(() => checkLedger({ v: 1, seq: 2 }), /could not be read.*Please report the problem, since reloading/);
+  assert.deepEqual([newer, false, null, undefined, p1.ledger].map(ledgerProblem), ['newer', 'unreadable', null, null, null]);
   // a new set still starts from nothing
   assert.deepEqual(matchPacket(undefined, 1, pkt([TU(1)])).q.t, [[1, 1]]);
 });

@@ -718,9 +718,13 @@ ok('published set page survives the link', r.status === 200 && r.body.mirrors.le
     rebuilt && rebuilt.packets['1']['1'].t[0].c === 'History' && rebuilt.packets['1']['1'].q.t[1][0] === 2, rebuilt);
 
   r2put(key, '{"packets": not json');
-  r = await call(U + '/qmap', { method: 'POST', body: qmapBody({ packet: 1, v: 1, q: { t: [[1, 1], [2, 1]], b: [[3, 1]] }, etag }, ledger1) });
+  const ledgerBefore = (await call(U + '/ledger')).body;
+  r = await call(U + '/qmap', { method: 'POST', body: qmapBody({ packet: 1, v: 1, q: { t: [[1, 1], [2, 1]], b: [[3, 1]] }, etag },
+    { ...ledger1, seq: 4 }) });
   ok('a question map is refused over a category map that can\'t be read', r.status === 500
-    && /could not be read/.test(r.body.error) && !/concurrent/.test(r.body.error), r.body);
+    && /could not be read, so nothing was saved/.test(r.body.error), r.body);
+  ok('and its ledger is not written either', (await call(U + '/ledger')).body === ledgerBefore
+    && ledgerBefore.startsWith(etag + '\n'));
   r = await call(`${U}/packet?packet=2&name=Two.json`, { method: 'POST', body: packet('UNREAD-2', 'Literature') });
   ok('an upload still goes through', r.status === 200 && r.body.version === 1, r.body);
   await call(U); // and asks for a rebuild, which must not run

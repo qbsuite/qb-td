@@ -1848,8 +1848,8 @@ async function openHubOf(adminSecret) {
   await call(`${SS}/packet?packet=2&name=Two.json`, { method: 'POST', body: JSON.stringify(two) });
   const ledgerOf = async () => (await call(SS + '/ledger')).body;
   for (const [what, ledger, said] of [
-    ['a ledger from a newer qb-td', JSON.stringify({ v: 2, seq: 40, questions: { 7: { kind: 't' } } }), /newer version of this page/],
-    ['a ledger that is not JSON', '{not json}', /could not be read/],
+    ['a ledger from a newer qb-td', JSON.stringify({ v: 2, seq: 40, questions: { 7: { kind: 't' } } }), /newer version of this page, so nothing was changed\. Please reload/],
+    ['a ledger that is not JSON', '{not json}', /could not be read, so nothing was changed\. Please report the problem/],
   ]) {
     const before = await ledgerOf();
     const etag = before.split('\n')[0] || null;
@@ -1866,9 +1866,10 @@ async function openHubOf(adminSecret) {
   }
   await click('[data-review="2:1"]');
   await waitJs(`!!document.querySelector('.review')`, 'the parse review');
-  ok('24e set: the review still shows, with the ledger refusal said', /could not be read/.test(await text('#msg')));
+  ok('24e set: the review still shows, and says its labels may be incomplete',
+    /could not be read, so the question labels below may be incomplete/.test(await text('#msg')), await text('#msg'));
   ok('24e set: the review says MODAQ will not load a bonus with no point values',
-    (await text('.review')).includes('no point values — MODAQ will not load this packet'));
+    (await text('.review')).includes('This bonus has no point values, so MODAQ will not load this packet.'));
 }
 
 /* ---------- 25. no page errors anywhere ---------- */
