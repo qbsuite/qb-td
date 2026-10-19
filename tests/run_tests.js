@@ -6528,4 +6528,14 @@ test('statedRound: the round a picked game file says, as the stats read it', () 
   assert.equal(statedRound({ _round: 0 }, 'x.qbj'), null);
 });
 
+const { replacePrompt } = await import('../app/js/packetsui.js');
+test('Replace a packet: a round with games read from its packet asks first; an empty or unplayed round does not', () => {
+  assert.equal(replacePrompt({ round: 2, name: 'Round 2 fixed.json', had: true, games: 0 }), null);
+  assert.equal(replacePrompt({ round: 2, name: 'Round 2 fixed.json', had: false, games: 3 }), null);
+  assert.equal(replacePrompt({ round: 2, name: 'Round 2 fixed.json', had: true, games: 3 }),
+    'Replace Round 2\'s packet with Round 2 fixed.json? 3 games already uploaded will use the new packet for their buzzpoints and categories.');
+  assert.equal(replacePrompt({ noun: 'Round', round: 1, name: 'Packet 1.docx', had: true, games: 1 }),
+    'Replace Round 1\'s packet with Packet 1.docx? 1 game already uploaded will use the new packet for its buzzpoints and categories.');
+});
+
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

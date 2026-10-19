@@ -757,6 +757,7 @@ await clickPick('[data-pickround="1"]', [revised]);
 d = await until(async () => { const x = await detail(); return x.rounds.find((r) => r.number === 1).packet_name === 'Round 1 revised.json' && x; }, 'replacement uploaded');
 await waitJs(`document.querySelector('.pktable tr[data-round="1"] .pkfile .pkitem').lastChild.textContent === 'Round 1 revised.json'`, 'row 1 renamed');
 ok('6 packets: Replace puts a new file on one round', true);
+ok('6 packets: with no games in, Replace asks nothing', !dialogs.some((x) => x.startsWith('Replace')), dialogs);
 await setFiles('#tbfile', [tbPath]);
 await waitJs(`[...document.querySelectorAll('#setupsec table tr')].filter((tr) => tr.textContent.includes('Unused')).length === 3`, 'tiebreaker questions listed');
 const tb = (await call(`${A}/tiebreakers`)).body;
@@ -963,6 +964,21 @@ async function expectLive(label, round) {
   ok(`12 live: ${label}: auto-advance says ${k}/6 started`, railText.includes(`${k}/6 started`), railText);
 }
 await expectLive('round 1, all in', 1);
+// Replace on a round whose games are in asks first (the same file again,
+// so nothing after this changes)
+{
+  await click('[data-view="setup"]');
+  await waitJs(`!!document.querySelector('[data-step="packets"]')`, 'the step list');
+  await click('[data-step="packets"]');
+  await waitJs(`!!document.querySelector('[data-pickround="1"]')`, 'the packets step');
+  const asked = dialogs.length;
+  await clickPick('[data-pickround="1"]', [revised]);
+  await waitJs(`document.querySelector('#msg').textContent === 'Round 1: Round 1 revised.json'`, 'the replacement uploaded');
+  const msg = dialogs.slice(asked).find((x) => x.startsWith('Replace'));
+  ok('6 packets: Replace on a round with games in asks first', /^Replace Round 1's packet with Round 1 revised\.json\? \d+ games already uploaded will use the new packet for their buzzpoints and categories\.$/.test(msg || ''),
+    dialogs.slice(asked));
+  await openHub();
+}
 // a tournament made on the home page starts with auto-advance on
 ok('12 live: auto-advance is on from creation', settingsOf(await detail()).autoAdvance === true
   && await js(`document.querySelector('#autoadv').checked`));

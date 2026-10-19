@@ -41,6 +41,16 @@ export function stagedBlob(s) {
   return new Blob([s.data], { type: PACKET_TYPE(s.name) });
 }
 
+/** What to ask before `name` replaces the packet `round` already reads
+    (`had`) once `games` are in: their buzzpoints and categories follow
+    the packet, as on a move. null when there's nothing to ask: an empty
+    round, or one with no games yet. */
+export function replacePrompt({ noun = 'Round', round, name, had, games }) {
+  if (!had || !games) return null;
+  return `Replace ${noun} ${round}'s packet with ${name}? `
+    + `${plural(games, 'game')} already uploaded will use the new packet for ${games === 1 ? 'its' : 'their'} buzzpoints and categories.`;
+}
+
 /**
  * Render into `box`. Options:
  *   staged        the caller's staging array (mutated in place, so it
@@ -54,6 +64,9 @@ export function stagedBlob(s) {
  *   slotName      what one slot is called ('Round', or 'Packet' for a set)
  *   uploadPacket(staged, round), uploadTb(name, data) -> true on success,
  *   clearTb()     the caller's routes
+ *   movePacket(from, to)  optional: a placed packet drags to another round
+ *   roundGames(round)     optional: the games a round has in; a move or a
+ *                 replace over them asks first
  *   removeTb(id)  optional: take one question out (adds a Remove link per row)
  *   pool          the tiebreaker pool blob, or null
  *   showUses      list which teams have heard each question (a
@@ -199,6 +212,12 @@ export function renderPacketsUi(box, o) {
     const m = /^round:(\d+)$/.exec(e.dataTransfer.getData('text/plain'));
     return m ? Number(m[1]) : null;
   };
+  // a file onto a round whose packet games were read from asks first
+  const replaceOk = (k, name) => {
+    const ask = replacePrompt({ noun, round: k, name, had: rounds.some((x) => x.number === k),
+      games: o.roundGames ? o.roundGames(k) : 0 });
+    return !ask || confirm(ask);
+  };
   // The Worker splits JSON only, so a .docx goes through YAPP here first,
   // the same parser the reader uses for docx packets
   const uploadTb = async (name, data) => {
@@ -333,6 +352,7 @@ export function renderPacketsUi(box, o) {
       if (from !== null) { movePacket(from, Number(slot.dataset.round)); return; }
       const s = droppedChip(e);
       if (!s) return;
+      if (!replaceOk(Number(slot.dataset.round), s.name)) return;
       slot.classList.add('up');
       try {
         await o.uploadPacket(s, Number(slot.dataset.round));
@@ -409,6 +429,7 @@ export function renderPacketsUi(box, o) {
   $('rowfile').onchange = async () => {
     const f = $('rowfile').files[0];
     if (!f || !rowTarget) return;
+    if (!replaceOk(rowTarget, f.name)) return;
     const slot = box.querySelector(`.slot[data-round="${rowTarget}"]`);
     if (slot) slot.classList.add('up');
     try {
