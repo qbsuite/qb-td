@@ -650,15 +650,10 @@ execSync(`node -e "process.stdout.write(JSON.stringify({rounds:{}}))" | npx wran
 r = await call('/pub/' + slug + '/cats');
 ok('stale map planted', r.status === 200 && !Object.keys(r.body.rounds).length, r.body);
 // an empty map is the "checked, nothing found" marker: the public state
-// keeps the Categories tab hidden
-d1exec(`UPDATE tournaments SET pub_dirty = 1 WHERE id = ${tid}`);
-await tick();
-let hidden = false;
-for (let i = 0; i < 20 && !hidden; i++) {
-  hidden = (await call('/pub/' + slug)).body.cats === null;
-  if (!hidden) await new Promise((resolve) => setTimeout(resolve, 250));
-}
-ok('an empty map keeps the tab hidden', hidden);
+// (built live here, as no tick has run yet) tells it by R2's object size
+// and keeps the Categories tab hidden
+r = await call('/pub/' + slug);
+ok('an empty map keeps the tab hidden', r.status === 200 && r.body.cats === null, r.body.cats);
 await call(A); // triggers the version-stale backfill
 let healed = null;
 for (let i = 0; i < 20 && healed === null; i++) {
@@ -1124,8 +1119,9 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('bucket renamed', r.status === 200 && r.body.room_name === 'Library 204', r.body);
   r = await call('/b/' + secret);
   ok('rename reflected in bucket state', r.body.room === 'Library 204', r.body.room);
-  // the saved schedule's copy of the name follows (linked rooms only), and
-  // the public data is flagged for a rebuild so game rows follow too
+  // the saved schedule's copy of the name follows on the schedule room the
+  // room resolves to (roomIndexOf: its link, else its old name), and the
+  // public data is flagged for a rebuild so game rows follow too
   r = await call('/b/' + secret + '/schedule');
   ok('rename reaches the saved schedule', r.body.schedule.rooms[r.body.room].name === 'Library 204'
     && r.body.schedule.rooms.some((x) => x.bucket === null && x.name === 'Room 2'), r.body.schedule && r.body.schedule.rooms);
@@ -1192,11 +1188,24 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
       tb: { used: ['TU1'] } }) });
   ok('game uploaded from the wrong room', r.status === 200 && r.body.error === null, r.body);
   const mvId = r.body.id;
+  // A tick's rebuild runs in its own invocation (REBUILD) and can land
+  // after the trigger returns; a forced one (the renames above leave one
+  // pending) rereads all rounds, so wait for it rather than read once.
+  const settled = async (path, done) => {
+    for (let i = 0; ; i++) {
+      const got = await call(path);
+      if (done(got.body) || i === 20) return got;
+      await new Promise((res) => setTimeout(res, 250));
+    }
+  };
+  const roomIn6 = (body) => {
+    const e = body && body.rounds && body.rounds[0] && body.rounds[0].entries.find((x) => x.id === mvId);
+    return e ? e.room : null;
+  };
   await tick();
-  r = await call('/pub/' + slug + '/rounds?n=6');
-  ok('shard names the uploading room first',
-    r.body.rounds[0].entries.find((e) => e.id === mvId).room === 'Room 1', r.body);
-  const stamp6 = (await call('/pub/' + slug)).body.rounds['6'];
+  r = await settled('/pub/' + slug + '/rounds?n=6', roomIn6);
+  ok('shard names the uploading room first', roomIn6(r.body) === 'Room 1', r.body);
+  const stamp6 = (await settled('/pub/' + slug, (b) => b.rounds && b.rounds['6'])).body.rounds['6'];
 
   r = await call(`${A}/files/${mvId}`, { method: 'POST', json: { bucket_id: room9.id } });
   ok('file moved to another room', r.status === 200 && r.body.room_name === 'Room 9', r.body);
@@ -1210,7 +1219,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   // the public state is prebuilt by the cron: a move shows there on the
   // next tick, like the stats always have
   await tick();
-  r = await call('/pub/' + slug);
+  r = await settled('/pub/' + slug, (b) => (b.files || []).some((f) => f.id === mvId && f.room === 'Room 9'));
   ok('public file list names the new room after the tick',
     r.status === 200 && r.body.files.find((f) => f.id === mvId).room === 'Room 9', r.body.files);
   r = await call('/b/' + secret + '/tiebreakers');
@@ -1218,12 +1227,11 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
     r.body.uses.length === 1 && r.body.uses[0].room === 'Room 9', r.body.uses);
 
   await tick();
-  r = await call('/pub/' + slug);
+  r = await settled('/pub/' + slug, (b) => b.rounds['6'] !== stamp6);
   ok('the move keeps the round\'s ids and moves its stamp',
     r.body.rounds['6'] !== stamp6 && r.body.rounds['6'].startsWith(stamp6.split(':').slice(0, 2).join(':') + ':'), r.body.rounds);
   r = await call('/pub/' + slug + '/rounds?n=6');
-  ok('rebuilt shard names the new room',
-    r.body.rounds[0].entries.find((e) => e.id === mvId).room === 'Room 9', r.body);
+  ok('rebuilt shard names the new room', roomIn6(r.body) === 'Room 9', r.body);
 
   r = await call(`${A}/files/${mvId}`, { method: 'POST', json: { bucket_id: room9.id } });
   ok('move to the same room is a no-op', r.status === 200, r.body);

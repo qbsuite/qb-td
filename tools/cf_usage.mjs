@@ -12,7 +12,10 @@
 // (worker.js Rebuild), so a minute with a high p99 during a tournament is
 // either a rebuild, a heavy route, or the tick's GitHub commit. Analytics
 // can't split by entrypoint; a p99 that sits well under 10ms everywhere is
-// the answer we want. Analytics keep ~90 days.
+// the answer we want. A route that throws is caught (worker.js fetch) and
+// answers a JSON 500, so it counts as a request that succeeded, not as an
+// error: look for `route failed:` lines in Workers Logs instead. Analytics
+// keep ~90 days.
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';

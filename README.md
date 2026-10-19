@@ -646,7 +646,9 @@ SHAPE=large node tests/bench_routes.mjs  # CPU per route under wrangler's profil
 SHAPE=large node tests/profile_day.mjs   # a whole day's CPU profile
 
 # what a real day cost, from Cloudflare's own analytics (wrangler login):
-# invocations, errors, CPU percentiles, the minutes past 10ms CPU, D1 rows
+# invocations, errors, CPU percentiles, the minutes past 10ms CPU, D1 rows.
+# A route that throws answers a JSON 500 and is not counted as an error
+# there; it logs `route failed: <method> <path>` to Workers Logs.
 node tools/cf_usage.mjs 2026-09-19
 
 # optional, and slow: a full-size tournament end to end (72 teams, 36
