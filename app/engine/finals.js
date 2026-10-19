@@ -11,7 +11,7 @@
 // for the TD when the schedule has a Tiebreakers phase.
 
 import { aggregate, dedupeMatches } from './stats.js';
-import { playedMap, teamOf, gameKey } from './schedule.js';
+import { playedMap, teamOf, gameKey, summaryTeams } from './schedule.js';
 
 const FIN_RE = /^(\d+)(?:st|nd|rd|th) in (.+)$/;
 const MINOR = new Set(['tiebreak', 'final']);
@@ -104,19 +104,15 @@ export function finalsSources(schedule) {
 /**
  * Which finals sources have every game in, from upload metadata alone
  * (each good upload's summary names its two teams), as prelimProgress
- * does for pools. files: the hub's file rows. Returns
+ * does for pools. files: the hub's file rows, their summaries under the
+ * schedule's team names (protests.js namedFiles). Returns
  *   ready — source bracket names with nothing left to play
  *   files — the uploads their standings are made from
  *   sig   — changes whenever one of those uploads does
  */
 export function finalsProgress(schedule, files) {
-  const teamsOf = (f) => {
-    let s = f.summary;
-    if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { s = null; } }
-    return s && Array.isArray(s.teams) && s.teams.length === 2 ? s.teams.map(String) : null;
-  };
   const good = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && Number.isInteger(f.round));
-  const have = new Set(good.map((f) => { const x = teamsOf(f); return x && pairKey(f.round, x[0], x[1]); }).filter(Boolean));
+  const have = new Set(good.map((f) => { const x = summaryTeams(f); return x && pairKey(f.round, x[0], x[1]); }).filter(Boolean));
   const ready = [];
   const need = new Set();
   for (const src of finalsSources(schedule)) {
@@ -125,7 +121,7 @@ export function finalsProgress(schedule, files) {
     const rounds = new Set([...src.games.map((g) => g.round), ...src.prevRounds]);
     const members = new Set(src.teams);
     for (const f of good) {
-      const x = teamsOf(f);
+      const x = summaryTeams(f);
       if (x && rounds.has(f.round) && members.has(x[0]) && members.has(x[1])) need.add(f);
     }
   }

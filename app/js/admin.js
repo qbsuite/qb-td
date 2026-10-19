@@ -38,7 +38,7 @@ import { buzzCredentials, sha256Hex } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
 import { eachLimit } from './limit.js';
-import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
+import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, namedSummary, namedFiles } from './protests.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -289,11 +289,7 @@ async function ensureHubNames(a, t) {
   try { hubNames.map = rosterNameMap(parseRoster(await fetchOwnedJson(a, key))); } catch (e) { /* listed as uploaded */ }
 }
 // a file's summary (protests.js), its teams under their current names
-function fileSummary(f) {
-  const s = uploadedSummary(f);
-  if (!s || !hubNames.map) return s;
-  return { ...s, teams: s.teams.map((n) => hubNames.map.teams.get(n) || n) };
-}
+function fileSummary(f) { return namedSummary(f, hubNames.map); }
 
 let rosterOpen = false;
 // structured editor working copy [{name, players, was, flags, orig}]; was:
@@ -2534,13 +2530,12 @@ function statStages() {
     return rounds.length ? { i, name: ph.name, lo: Math.min(...rounds), hi: Math.max(...rounds) } : null;
   }).filter(Boolean);
 }
-// uploads as just enough of a game for finishedThrough: the round and the two teams
+// uploads as just enough of a game for finishedThrough: the round and the
+// two teams, under their current names, as the schedule has them
 function filesAsGames(files) {
   return files.map((f) => {
-    let x = f.summary;
-    if (typeof x === 'string') { try { x = JSON.parse(x); } catch (e) { x = null; } }
-    return (f.kind === 'qbj' || f.kind === 'combined') && !f.error && x && Array.isArray(x.teams) && x.teams.length === 2
-      ? { round: f.round, teams: x.teams.map((name) => ({ name: String(name), points: 0 })) } : null;
+    const x = (f.kind === 'qbj' || f.kind === 'combined') && !f.error ? fileSummary(f) : null;
+    return x ? { round: f.round, teams: x.teams.map((name) => ({ name, points: 0 })) } : null;
   }).filter(Boolean);
 }
 // the rounds the stats use, from the pick: a Set, or null for every round
@@ -3162,11 +3157,16 @@ const autoCache = new Map();  // games already read (public copies), shared with
 async function autoFillSlots(force = false) {
   if (autoBusy || !lastDetail || !sched || schedDirty || !hasPlaceholders(sched)) return;
   if (shownView === 'setup' && setupTab === 'sched') return; // the editor holds this schedule
-  const { tournament: t, buckets, files } = lastDetail;
+  const { tournament: t, buckets } = lastDetail;
   if (!t.started) return;
+  // the uploads under the teams' current names: a roster save renames the
+  // schedule, while a game keeps the names it was played under
+  const files = namedFiles(lastDetail.files, hubNames.map);
   const prog = sched.pools ? prelimProgress(sched, files) : { ready: [], files: [], sig: '' };
   const fin = finalsProgress(sched, files);
-  const sig = prog.sig + '#' + fin.sig;
+  // the names too: a pool that waited on a rename this tab hadn't loaded
+  // fills once it has, with no new upload
+  const sig = prog.sig + '#' + fin.sig + '#' + hubNames.key;
   if ((!prog.ready.length && !fin.ready.length) || (sig === autoSig && !force)) return;
   autoBusy = true;
   const a = '/a/' + adminSecret;

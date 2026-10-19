@@ -1057,9 +1057,21 @@ export function fillReport(schedule, agg) {
 }
 
 /**
+ * The two teams a file row's summary names, or null. The Worker stores
+ * the summary as JSON text; the hub hands over its own, under the
+ * roster's renames (protests.js namedFiles), as an object.
+ */
+export function summaryTeams(f) {
+  let s = f.summary;
+  if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { s = null; } }
+  return s && Array.isArray(s.teams) && s.teams.length === 2 ? s.teams.map(String) : null;
+}
+
+/**
  * Which pools have all their prelim games in, from upload metadata alone
  * (each good upload's summary names its two teams), so the hub can tell
- * without fetching a game. files: the hub's file rows. Returns
+ * without fetching a game. files: the hub's file rows, their summaries
+ * under the schedule's team names (protests.js namedFiles). Returns
  *   ready — pool letters with no prelim game left
  *   left  — {A: games still to come}
  *   files — the good prelim uploads of the ready pools' teams
@@ -1069,13 +1081,8 @@ export function prelimProgress(schedule, files) {
   const prelim = prelimRounds(schedule);
   const rounds = new Set(prelim.map((r) => r.round));
   const pair = (round, x, y) => round + '\n' + [x, y].sort().join('\n');
-  const teamsOf = (f) => {
-    let s = f.summary;
-    if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { s = null; } }
-    return s && Array.isArray(s.teams) && s.teams.length === 2 ? s.teams.map(String) : null;
-  };
   const mine = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && rounds.has(f.round));
-  const have = new Set(mine.map((f) => teamsOf(f)).map((x, i) => x && pair(mine[i].round, x[0], x[1])).filter(Boolean));
+  const have = new Set(mine.map(summaryTeams).map((x, i) => x && pair(mine[i].round, x[0], x[1])).filter(Boolean));
   const poolOf = new Map(Object.entries(schedule.pools || {}).flatMap(([p, ms]) => ms.map((m) => [m, p])));
   const left = Object.fromEntries(Object.keys(schedule.pools || {}).map((p) => [p, 0]));
   for (const r of prelim) {
@@ -1085,7 +1092,7 @@ export function prelimProgress(schedule, files) {
     }
   }
   const ready = Object.keys(left).filter((p) => !left[p]);
-  const files2 = mine.filter((f) => { const x = teamsOf(f); return x && x.some((n) => ready.includes(poolOf.get(n))); });
+  const files2 = mine.filter((f) => { const x = summaryTeams(f); return x && x.some((n) => ready.includes(poolOf.get(n))); });
   return { ready, left, files: files2, sig: mine.map((f) => f.id).sort((x, y) => x - y).join(',') };
 }
 
