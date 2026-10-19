@@ -4176,10 +4176,11 @@ function scheduledGames(sched, round) {
 }
 
 // Rounds every room has turned in, from the clean game rows ({round,
-// bucket_id}), the count of playingRooms (no bye room), the schedule (or
-// null) and any extra candidate rounds. The rule roundDone applies to one
-// round, over all of them at once: the /pub state's buzz_done, and a
-// set's per-mirror copy.
+// bucket_id}), the count of rooms that play (playingRooms: no bye room),
+// the schedule (or null) and any extra candidate rounds: roundDone's rule
+// over all rounds at once, for the /pub state's buzz_done and a set's
+// per-mirror copy. A bye room never turns a game in, so a count that
+// includes one leaves a round no schedule covers never done.
 function doneRounds(rows, roomCount, sched, candidates = []) {
   const inByRound = new Map();
   for (const f of rows) {

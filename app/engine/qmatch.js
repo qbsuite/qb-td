@@ -15,9 +15,9 @@
 //   - the same WORDING (one revision of an id): only then does a buzz's
 //     word index point at the same word, so only then are buzz positions
 //     drawn over one text. A revision is the exact token sequence of the
-//     question as read — adding a power mark or one word shifts every
-//     later index, so it is a new revision, while a change to the
-//     answerline alone is not.
+//     question as read — adding one word shifts every later index, so it
+//     is a new revision (so is an added or moved power mark, to be safe:
+//     see tokens), while a change to the answerline alone is not.
 //
 // Ledger: {v: 1, seq, questions: {<id>: {kind: 't'|'b', revs: [{key,
 // answer, label}], at: [packet, position] | null, last?}}} — `key` is
@@ -38,9 +38,11 @@ const stripTags = (s) => String(s ?? '').replace(/<\/?(?:b|u|i|em|strong)\b[^>]*
   .replace(/&amp;/gi, '&').replace(/&(?:lt|gt|quot|#\d+|#x[\da-f]+);/gi, ' ');
 
 // The wording as a token sequence, one token per whitespace-separated
-// word exactly as MODAQ counts them; case and punctuation are dropped
-// from each token but a punctuation-only token (a power mark) still
-// holds its place, because it holds a word index.
+// word; case and punctuation are dropped from each token but a
+// punctuation-only token (a power mark) still holds its place. MODAQ
+// skips a power mark when it numbers words unless the format has no
+// powers, so this errs toward a new revision: two wordings that differ
+// only in a power mark are kept apart.
 function tokens(text) {
   return stripTags(text).split(/\s+/).filter(Boolean)
     .map((w) => w.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '') || '*');

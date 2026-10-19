@@ -70,9 +70,12 @@ export function orderPlayers(players, order) {
     .map((x) => x.pl));
 }
 
-/** MODAQ-convention filenames. The reader uploads only `combined`
-    (one `.qbtd.json` = {qbj, game} per game); `qbj`/`game` are the names
-    consumers derive when splitting it back apart. */
+/** qb-td's upload filenames, in MODAQ's Round_<n>_<team>_<team> shape
+    but with each name kept to ASCII letters, digits and underscores, at
+    most 40 (MODAQ's own export keeps the names as they are:
+    modaqfile.js). The reader uploads only `combined` (one `.qbtd.json` =
+    {qbj, game} per game); `qbj`/`game` are the names consumers derive
+    when splitting it back apart. */
 export function matchFilenames(round, nameA, nameB) {
   const clean = (s) => String(s).replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'Team';
   const base = `Round_${round}_${clean(nameA)}_${clean(nameB)}`;

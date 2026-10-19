@@ -1307,25 +1307,32 @@ remove one (spam, a test that got published), do it with operator
 credentials from `worker/`:
 
 ```bash
-# find the id and its uploaded blobs
+# find the id, its uploaded games and its own round packets (a set
+# mirror's rounds point at the set's packets under s/, which stay)
 npx wrangler d1 execute qb-td --remote --command \
   "SELECT id FROM tournaments WHERE slug='<slug>'"
 npx wrangler d1 execute qb-td --remote --command \
-  "SELECT r2_key FROM files WHERE tournament_id=<id>"
+  "SELECT r2_key FROM files WHERE tournament_id=<id> UNION SELECT packet_r2_key FROM rounds WHERE tournament_id=<id> AND packet_r2_key LIKE 't/<id>/%'"
 
-# delete rows (all four tables key off the tournament; a set's mirror
-# also has a set_mirrors row — DELETE FROM set_mirrors WHERE
-# tournament_id=<id> — and its packets are the SET's blobs under s/, which
-# stay). A whole set: its sets / set_packets / set_mirrors rows and every
+# delete rows: these six tables key off the tournament. A set's mirror
+# also has a set_mirrors row (DELETE FROM set_mirrors WHERE
+# tournament_id=<id>); its packets are the SET's blobs under s/, which
+# stay. A whole set: its sets / set_packets / set_mirrors rows and each
 # blob under s/<sid>/ (packet versions, tiebreakers, catmap, ledger,
-# state). Then each blob —
-# everything lives under the t/<id>/ prefix: the uploads from the query
-# above, packet keys from the rounds table, the public game copies
-# (pub/<file id>.json) and their round shards (round/<n>.json,
-# rounds.json), and schedule.json / catmap.json / roster.qbj /
-# tiebreakers.json where present
+# state).
 npx wrangler d1 execute qb-td --remote --command \
-  "DELETE FROM files WHERE tournament_id=<id>; DELETE FROM buckets WHERE tournament_id=<id>; DELETE FROM rounds WHERE tournament_id=<id>; DELETE FROM tournaments WHERE id=<id>"
+  "DELETE FROM files WHERE tournament_id=<id>; DELETE FROM buckets WHERE tournament_id=<id>; DELETE FROM rounds WHERE tournament_id=<id>; DELETE FROM room_starts WHERE tournament_id=<id>; DELETE FROM live_protests WHERE tournament_id=<id>; DELETE FROM tournaments WHERE id=<id>"
+
+# then each blob it has, all under the t/<id>/ prefix:
+#   the keys from the query above (bucket/... and packet/...)
+#   roster.qbj, schedule.json, catmap.json
+#   tiebreakers.json, tbread.json (the tiebreaker pool, and the questions
+#     the games read from it)
+#   open-key.json (the content key kept for the password-free buzzpoints
+#     and scoresheets; see OPEN_KEY_SECRET)
+#   the public copies: pub/<file id>.json, round/<n>.json, rounds.json
+#     and pubstate.json; rebuild.json (a pending rebuild); combined.json
+#     (the older whole-tournament copy)
 npx wrangler r2 object delete "qb-td-data/<r2_key>" --remote
 ```
 
