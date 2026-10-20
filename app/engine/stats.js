@@ -161,9 +161,10 @@ export function aggregate(matches, roster = null) {
    rates without overtime and rank teams the YellowFruit way. The hub's
    stats table, Fill playoff slots, auto-fill and the Finals fill rank with
    the same rules (standings below), so a team is seeded where the public
-   pool table ranks it; teams level on both counts still go by name, as
-   the hub always settled them. The set page's cross-site table stays on
-   aggregate(). */
+   pool table ranks it. Teams level on both counts go in the order the
+   public pool table lists them: their pool (seed) order (byPool below,
+   schedule.js poolStandings, finals.js finalsFill). The set page's
+   cross-site table stays on aggregate(). */
 
 /** A team's gets in a game: its positive buzzes. */
 export const teamGets = (mt) =>
@@ -209,33 +210,88 @@ export function pptuh(t) {
   return t.regPoints / t.regTuh; // regulation only; NaN when no tossups
 }
 
-/** YF standings order: win % desc (no games -> bottom), then PPTUH desc.
-    A stable sort: teams level on both keep their order in `teams`. */
+/** YF standings comparison: win % desc (no games -> bottom), then PPTUH
+    desc; 0 when two teams are level on both. */
+export function standingsCompare(a, b) {
+  let ap = winPct(a); let bp = winPct(b);
+  if (Number.isNaN(ap)) ap = -1;
+  if (Number.isNaN(bp)) bp = -1;
+  if (ap !== bp) return bp - ap;
+  let at = pptuh(a); let bt = pptuh(b);
+  if (Number.isNaN(at)) at = -9999999;
+  if (Number.isNaN(bt)) bt = -9999999;
+  return bt - at;
+}
+
+/** YF standings order (standingsCompare). A stable sort: teams level on
+    both keep their order in `teams`. */
 export function standingsOrder(teams) {
-  return [...teams].sort((a, b) => {
-    let ap = winPct(a); let bp = winPct(b);
-    if (Number.isNaN(ap)) ap = -1;
-    if (Number.isNaN(bp)) bp = -1;
-    if (ap !== bp) return bp - ap;
-    let at = pptuh(a); let bt = pptuh(b);
-    if (Number.isNaN(at)) at = -9999999;
-    if (Number.isNaN(bt)) bt = -9999999;
-    return bt - at;
-  });
+  return [...teams].sort(standingsCompare);
+}
+
+/** Two rows level on both counts (standingsCompare): the public page
+    keeps them in its table's own order. */
+export const levelOn = (a, b) => !!a && !!b && standingsCompare(a, b) === 0;
+
+/**
+ * Runs of rows level on both counts (levelOn), in order: [[rows…]], each
+ * of two or more. rows: in standingsOrder.
+ */
+export function levelRuns(rows) {
+  const out = [];
+  for (let i = 0; i < rows.length;) {
+    let j = i + 1;
+    while (j < rows.length && levelOn(rows[j], rows[i])) j++;
+    if (j - i > 1) out.push(rows.slice(i, j));
+    i = j;
+  }
+  return out;
+}
+
+/**
+ * Rows in standingsOrder, with teams level on both counts in their pool
+ * (seed) order, as the public page's pool tables list them: in each run
+ * of level teams (levelRuns), the teams of one pool take that pool's
+ * places in the run in pool order. Teams in no pool, and a run's only
+ * team from its pool, keep their places. pools: {A: [names]}
+ * (schedule.pools), or null for the rows as they are. A new array.
+ */
+export function byPool(rows, pools) {
+  const out = [...rows];
+  if (!pools) return out;
+  const at = new Map(Object.entries(pools).flatMap(([k, ms]) => ms.map((n, i) => [n, [k, i]])));
+  for (const run of levelRuns(rows)) {
+    const start = rows.indexOf(run[0]);
+    const mine = new Map(); // pool -> its places in the run, and its teams
+    run.forEach((t, k) => {
+      const p = at.get(t.name);
+      if (!p) return;
+      if (!mine.has(p[0])) mine.set(p[0], { places: [], teams: [] });
+      mine.get(p[0]).places.push(start + k);
+      mine.get(p[0]).teams.push(t);
+    });
+    for (const { places, teams } of mine.values()) {
+      teams.sort((x, y) => at.get(x.name)[1] - at.get(y.name)[1]);
+      places.forEach((place, k) => { out[place] = teams[k]; });
+    }
+  }
+  return out;
 }
 
 /**
  * aggregate(), with the team rows figured and ordered the way the public
  * page does it: overtime out (regulationFigures), and YellowFruit's order
  * (standingsOrder; teams level on both keep aggregate()'s order, which
- * ends by name, as the public page's overall table does). On each
- * row pp20tuh and ppb are the regulation figures and regTuh the regulation
- * tossups heard; tuh stays all tossups heard. settings: the tournament's
- * game format, as regulationFigures takes it.
+ * ends by name, as the public page's overall table does, or with pools,
+ * a pool's level teams in pool order, as its table lists them: byPool).
+ * On each row pp20tuh and ppb are the regulation figures and regTuh the
+ * regulation tossups heard; tuh stays all tossups heard. settings: the
+ * tournament's game format, as regulationFigures takes it. pools:
+ * {A: [names]} (schedule.pools), for the hub's stats table.
  */
-export function standings(matches, roster = null, settings = null) {
+export function standings(matches, roster = null, settings = null, pools = null) {
   const agg = regulationFigures(aggregate(matches, roster), matches, settings);
-  agg.teams = standingsOrder(agg.teams).map((t) => ({
+  agg.teams = byPool(standingsOrder(agg.teams), pools).map((t) => ({
     ...t,
     pp20tuh: t.regTuh ? round2((t.regPoints / t.regTuh) * 20) : 0,
     ppb: t.bonusesHeard ? round2(t.bonusPoints / t.bonusesHeard) : 0,

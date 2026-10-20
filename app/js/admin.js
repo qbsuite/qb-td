@@ -31,7 +31,7 @@ import { modaqExport, modaqFilenames, renameModaqTexts } from '../engine/modaqfi
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
-import { fillProgress, autoFillSaved } from '../engine/finals.js';
+import { fillProgress, autoFillSaved, filledNote } from '../engine/finals.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, followRoomRename, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials, sha256Hex } from './buzzkey.js';
@@ -3256,9 +3256,10 @@ async function autoFillSlots(force = false) {
 const andList = (xs) => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
 const ordinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
 
-// The Live Hub's Playoffs line: ties points per 20 settled, and pools
-// waiting for the TD. Gone once a playoff game is in. The Finals line the
-// same, gone once a finals game is in.
+// The Live Hub's Playoffs line: ties points per 20 settled, or teams level
+// on it too kept in pool order (finals.js filledNote), and pools waiting
+// for the TD. Gone once a playoff game is in. The Finals line the same,
+// gone once a finals game is in.
 function playoffNoteHtml(files) {
   if (!sched) return '';
   const played = (rounds) => files.some((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && rounds.has(f.round));
@@ -3267,9 +3268,7 @@ function playoffNoteHtml(files) {
   const out = [];
   if (![...all].some((n) => !prelim.has(n) && played(new Set([n])))) {
     const lines = [];
-    for (const x of (sched.filled || []).filter((y) => y.pool)) {
-      lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} were tied at ${esc(x.record)}, so points per 20 decided their places.`);
-    }
+    for (const x of (sched.filled || []).filter((y) => y.pool)) lines.push(esc(filledNote(x)));
     for (const x of autoWait.odd) {
       lines.push(`Pool ${esc(x.pool)} has ${x.games.map((g) => `${esc(g.a)} vs ${esc(g.b)} (round ${g.round})`).join(', ')}, which isn&rsquo;t on the schedule.
         <button class="linkbtn" data-fillpool="${esc(x.pool)}">Fill anyway</button>`);
@@ -3287,9 +3286,7 @@ function playoffNoteHtml(files) {
   if (finalRounds.size && !played(finalRounds)) {
     const lines = [];
     const places = (teams) => andList(teams.map((tm) => ordinal(tm.place)));
-    for (const x of (sched.filled || []).filter((y) => y.bracket)) {
-      lines.push(`${esc(x.bracket)}: ${esc(andList(x.teams.map((tm) => tm.name)))} were tied at ${esc(x.record)}, so points per 20 decided their places.`);
-    }
+    for (const x of (sched.filled || []).filter((y) => y.bracket)) lines.push(esc(filledNote(x)));
     for (const x of autoWait.finals) {
       lines.push(`${esc(x.bracket)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${places(x.teams)} place.
         <button class="linkbtn" data-fillpool="${esc('F:' + x.bracket)}">Use points per 20</button>`);
@@ -3345,8 +3342,9 @@ function showStats({ a, t, files, settings, got }) {
     return;
   }
 
-  // ranked and figured as the public page does it (overtime out)
-  renderStats(out, standings(matches, roster, effectiveFormat(settings)), errors);
+  // ranked and figured as the public page does it (overtime out), pool-mates
+  // level on both counts in pool order, as its pool tables list them
+  renderStats(out, standings(matches, roster, effectiveFormat(settings), sched && sched.pools), errors);
 
   // The tournament's own rules reach every export: the .yft's scoring
   // rules, the overtime split, and the stat report's rate-stat scaling all

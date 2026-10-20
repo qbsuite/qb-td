@@ -752,18 +752,28 @@ function renderCreator(box, env) {
 
 // The notes shown before filling playoff slots: prelim games with no
 // file, uploads the schedule doesn't have, and tied records that decide
-// a bracket. Filling still works; the TD decides.
+// a bracket. Filling still works; the TD decides. r: fillReport's result,
+// with `game` when ties are settled by a tiebreaker game.
 const andList = (xs) => (xs.length < 3 ? xs.join(' and ') : xs.slice(0, -1).join(', ') + ', and ' + xs.at(-1));
-function fillCheckHtml(r) {
+export function fillCheckHtml(r) {
   const pp = (x) => (Math.round(x.pp20tuh * 100) / 100).toFixed(2);
   // r.game: the schedule breaks rebracketing ties with a tiebreaker game
   const items = [
     ...r.missing.map((m) => `Round ${m.round}, ${esc(m.room)}: there is no game file for ${esc(m.a)} vs ${esc(m.b)}.`),
     ...r.extra.map((m) => `Round ${m.round}: a game file for ${esc(m.a)} vs ${esc(m.b)} was uploaded, but that game is not on the schedule.`),
-    ...r.ties.map((t) => `Pool ${esc(t.pool)}: ${andList(t.teams.map((x) => esc(x.name)))} are tied at ${t.record}. ` + (r.game
-      ? 'Please play a tiebreaker game, then place the teams by hand. Filling now orders them by points per 20 tossups heard: '
-      : 'Points per 20 tossups heard breaks the tie: ')
-      + t.teams.map((x) => `${esc(x.name)} (${pp(x)}) goes to ${esc(x.bracket || 'no bracket')}`).join(', ') + '.'),
+    ...r.ties.map((t) => {
+      const head = `Pool ${esc(t.pool)}: ${andList(t.teams.map((x) => esc(x.name)))} are tied at ${t.record}. `
+        + (r.game ? 'Please play a tiebreaker game, then place the teams by hand. ' : '');
+      const goes = (withPp) => t.teams.map((x) => `${esc(x.name)}${withPp ? ` (${pp(x)})` : ''} goes to ${esc(x.bracket || 'no bracket')}`).join(', ');
+      // teams level on points per 20 too keep their pool order (t.level)
+      const level = t.level || [];
+      if (level.length === 1 && level[0].length === t.teams.length) {
+        return head + `They have the same points per 20 tossups heard, so filling${r.game ? ' now' : ''} keeps their pool order: ${goes(false)}.`;
+      }
+      return head + (r.game ? 'Filling now orders them by points per 20 tossups heard: ' : 'Points per 20 tossups heard breaks the tie: ')
+        + goes(true) + '.'
+        + level.map((g) => ` ${andList(g.map(esc))} have the same points per 20 tossups heard, so they keep their pool order.`).join('');
+    }),
     ...(r.compared || []).map((c) => `${ORDN(c.place)} places ${andList(c.teams.map((x) => `${esc(x.name)} (Pool ${esc(x.pool)}, ${x.record})`))} `
       + `have the same winning percentage. ${r.game ? 'Please play a tiebreaker game, then place them by hand. Filling now goes by' : 'They go up by'} points per 20 tossups heard: `
       + c.teams.map((x) => `${esc(x.name)} ${pp(x)}`).join(', ') + '.'),
