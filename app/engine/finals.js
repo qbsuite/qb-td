@@ -17,6 +17,7 @@
 import { standings, standingsOrder, levelRuns, dedupeMatches } from './stats.js';
 import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
 import { reportData } from './report.js';
+import { isGameFile } from './games.js';
 
 const FIN_RE = /^(\d+)(?:st|nd|rd|th) in (.+)$/;
 const MINOR = new Set(['tiebreak', 'final']);
@@ -201,7 +202,7 @@ function publicOrder(schedule, src, all, rows, settings) {
  *   sig   — changes whenever one of those uploads does
  */
 export function finalsProgress(schedule, files) {
-  const good = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && Number.isInteger(f.round));
+  const good = files.filter((f) => isGameFile(f) && Number.isInteger(f.round));
   const have = new Set(good.map((f) => { const x = summaryTeams(f); return x && pairKey(f.round, x[0], x[1]); }).filter(Boolean));
   const ready = [];
   const need = new Set();
