@@ -35,6 +35,7 @@ import { eachLimit } from '../app/js/limit.js';
 import { modaqExport, modaqFilenames, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js';
 import { isGameFile, readGame, readGames, newestOf, rosterNamesFromText } from '../app/engine/games.js';
+import { uploadQbjName, publicQbjName, publicQbjText, storedFileText, rosterExportBody, fileDownloads } from '../app/engine/exportfile.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -7802,6 +7803,159 @@ test('games.js: rosterNamesFromText reads renames as the Worker does, and skips 
   assert.throws(() => rosterNamesFromText('not json _formerNames'), SyntaxError);
   assert.throws(() => rosterNamesFromText('{"_formerNames":1}'), /No teams found in roster file/);
   assert.equal(rosterNamesFromText(escapedPlain), null, 'escaped but nothing renamed');
+});
+
+/* ---------- exportfile.js: one game file or the roster as a download ----------
+   The Worker's file routes and the hub's file links spelled these out at
+   0529311; exportfile.js is those lines in one place. These hold it to
+   the inline code it replaces. tests/worker_inproc.mjs (E3) holds the
+   Worker's answers, byte for byte, on every kind of stored file. */
+
+// the files and renames both sides are tried on
+const efNames = rosterNameMap(renamedRoster());
+const efGame = renameGames.find((e) => JSON.stringify(e.qbj).includes('UCSD Unc')).qbj;
+const efModaqGame = { players: [{ name: 'Jake Anderson', teamName: 'UCSD Unc' }], teamNames: ['UCSD Unc', 'Other'], cycles: [] };
+
+test('exportfile.js: storedFileText answers what storedFileResponse worked out, text for text', () => {
+  // worker.js storedFileResponse at 0529311, after its read and decode:
+  // { status: 404 } or { text }
+  const inline = (raw, part, names) => {
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch (e) { /* not JSON */ }
+    let text;
+    if (!parsed || typeof parsed !== 'object') text = raw;
+    else if (!parsed.qbj && !parsed.game) {
+      text = renameModaqTexts(part === 'qbj' ? { qbj: raw, game: null } : { qbj: null, game: raw }, names)[part];
+    } else {
+      const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
+      if (!half || typeof half !== 'object') return { status: 404 };
+      const round = Number(typeof parsed.qbj === 'object' && parsed.qbj ? parsed.qbj._round : NaN);
+      text = modaqExport(parsed, Number.isInteger(round) ? round : undefined, names)[part];
+    }
+    return { text };
+  };
+  const withR = (r) => ({ ...efGame, _round: r });
+  const noRound = { ...efGame };
+  delete noRound._round;
+  const modaq = (q) => ({ qbj: JSON.stringify(q, null, 4), game: JSON.stringify(efModaqGame, null, 2) });
+  const raws = [
+    JSON.stringify({ qbj: withR(2), game: { game: efModaqGame, uiState: {} }, modaq: modaq(withR(2)) }),
+    JSON.stringify({ qbj: withR(2), game: { game: efModaqGame, uiState: {} } }),
+    JSON.stringify({ qbj: withR(2), game: null }),
+    JSON.stringify({ qbj: null, game: { game: efModaqGame, uiState: {} } }),
+    JSON.stringify({ qbj: 'text', game: 7 }),
+    ...[undefined, '3', null, true, false, 2.5, 'x', [4], 0].map((r) => JSON.stringify({ qbj: r === undefined ? noRound : withR(r),
+      game: { game: efModaqGame, uiState: {} }, ...(r === '3' || r === undefined ? { modaq: modaq(r === undefined ? noRound : withR(r)) } : {}) })),
+    JSON.stringify(efGame), JSON.stringify(efGame, null, 4), JSON.stringify(efGame, null, 2).replace(/\n/g, '\r\n'),
+    JSON.stringify(noRound, null, 2), JSON.stringify(efModaqGame, null, 2), JSON.stringify({ objects: [{ type: 'Match', ...efGame }] }),
+    '{"x":1}', '[]', '[1,2]', 'null', '7', '"text"', 'not json at all', '', '{"qbj":0,"game":""}',
+  ];
+  let n = 0;
+  for (const raw of raws) {
+    for (const part of ['qbj', 'game']) {
+      for (const names of [null, efNames, rosterNameMap(renameRoster)]) {
+        const got = storedFileText(raw, part, names);
+        const want = inline(raw, part, names);
+        if (want.status === 404) assert.deepEqual(got, { missing: true }, raw.slice(0, 60));
+        else assert.deepEqual(got, { text: want.text }, raw.slice(0, 60));
+        n++;
+      }
+    }
+  }
+  assert.equal(n, raws.length * 6);
+  // a rename reaches a reader upload's halves and a hand-added file
+  assert.ok(storedFileText(raws[0], 'qbj', efNames).text.includes('UC San Diego'));
+  assert.ok(storedFileText(raws[0], 'game', efNames).text.includes('Jacob Anderson'));
+  assert.ok(storedFileText(JSON.stringify(efGame), 'qbj', efNames).text.includes('UC San Diego'));
+  assert.deepEqual(storedFileText(raws[2], 'game', null), { missing: true });
+});
+
+test('exportfile.js: rosterExportBody gives the body rosterExportResponse sent, or null for the stored bytes', () => {
+  // worker.js rosterExportResponse at 0529311, after its read: the text
+  // it sent, or BUF for the stored bytes
+  const BUF = Symbol('stored bytes');
+  const inline = (text) => {
+    let body = BUF;
+    try {
+      const parsed = JSON.parse(text);
+      const out = rosterForExport(parsed);
+      if (JSON.stringify(out) !== JSON.stringify(parsed)) body = JSON.stringify(out, null, 2);
+    } catch (e) { /* not JSON */ }
+    return body;
+  };
+  const renamed = buildRosterQbj('T', renamedRoster());
+  const texts = [JSON.stringify(renamed), JSON.stringify(renamed, null, 2), JSON.stringify(renameArchive['/pub/2026terrapinopenatusc/roster']),
+    JSON.stringify(buildRosterQbj('T', renameRoster), null, 2), 'null', '[]', '{}', '7', '"x"', 'not json', '',
+    '{"objects":[{"type":"Tournament","registrations":[],"type":"Tournament"}],"version":"2.1.1"}',
+    '{"__proto__":{"x":1},"objects":[{"type":"Tournament","registrations":[{"name":"A","_formerNames":["B"],"teams":[]}]}]}',
+    '[{"_formerNames":["x"]},{"a":[{"_formerNames":[]}]}]'];
+  for (const text of texts) {
+    const want = inline(text);
+    assert.equal(rosterExportBody(text), want === BUF ? null : want, text.slice(0, 60));
+  }
+  assert.ok(!rosterExportBody(JSON.stringify(renamed)).includes('_formerNames'));
+  assert.equal(rosterExportBody(JSON.stringify(buildRosterQbj('T', renameRoster))), null, 'nothing to take out');
+});
+
+test('exportfile.js: the names a game goes by, and the public QBJ text, as the Worker and the hub wrote them', () => {
+  const names = ['Round_1_A_B.qbtd.json', 'Round_1_A_B.QBTD.JSON', 'x.qbtd.json.qbtd.json', 'Round_1_A_B.qbj', 'Round_1_A_B_Game.json',
+    'a.qbtd.jsonx', '.qbtd.json', 'notes.txt', ''];
+  for (const n of names) {
+    assert.equal(uploadQbjName(n), n.replace(/\.qbtd\.json$/i, '.qbj'));
+    assert.equal(publicQbjName(n), String(n || 'game.qbj').replace(/\.qbtd\.json$/i, '.qbj'));
+  }
+  for (const n of [null, undefined, 0, 7]) assert.equal(publicQbjName(n), String(n || 'game.qbj').replace(/\.qbtd\.json$/i, '.qbj'));
+  assert.equal(uploadQbjName('Round_2_A_B.qbtd.json'), 'Round_2_A_B.qbj');
+  assert.equal(publicQbjName(undefined), 'game.qbj');
+  for (const nm of [null, efNames, rosterNameMap(renameRoster)]) {
+    assert.equal(publicQbjText(efGame, nm), JSON.stringify(renameMatch(efGame, nm), null, 2));
+  }
+  assert.ok(publicQbjText(efGame, efNames).includes('UC San Diego'));
+});
+
+test('exportfile.js: fileDownloads makes the links fileLinks made, file for file', () => {
+  // admin.js fileLinks at 0529311, with fileSummary's answer passed in
+  const API = 'http://w', a = '/a/sec', esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const inline = (f, s) => {
+    const link = (params, label) =>
+      `<a href="${esc(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}`)}" download>${label}</a>`;
+    const base = f.filename.replace(/\.qbtd\.json$/i, '');
+    const names = s ? modaqFilenames(f.round, s.teams) : { qbj: base + '.qbj', game: base + '_Game.json' };
+    const own = (f.kind === 'qbj' || f.kind === 'game') && !f.error ? `part=${f.kind}&` : '';
+    return f.kind === 'combined' && !f.error
+      ? link(`part=qbj&dl=${encodeURIComponent(names.qbj)}`, 'qbj') + ' '
+        + link(`part=game&dl=${encodeURIComponent(names.game)}`, 'game')
+      : link(`${own}dl=${encodeURIComponent(f.filename)}`, 'Download');
+  };
+  // and as admin.js fileLinks builds them now
+  const viaModule = (f, s) => {
+    const key = encodeURIComponent(f.r2_key);
+    let html = '';
+    for (const { params, label } of fileDownloads(f, s ? s.teams : null)) {
+      html += (html ? ' ' : '') + `<a href="${esc(`${API}${a}/file?key=${key}&${params}`)}" download>${label}</a>`;
+    }
+    return html;
+  };
+  const summaries = [null, { teams: ['Alpha', 'Beta'] }, { teams: ['A/B Club', 'C & D "U"'] }, { teams: ['Évry', 'x+y #1'] }];
+  let n = 0;
+  for (const kind of ['combined', 'qbj', 'game', 'other', 'roster']) {
+    for (const error of [null, '', 'No teams found']) {
+      for (const filename of ['Round_3_Alpha_Beta.qbtd.json', 'R 3 A&B.QBTD.JSON', 'Round_3_Alpha_Beta.qbj', 'notes (1).txt', 'é+%.qbj']) {
+        for (const round of [3, 12]) {
+          for (const s of summaries) {
+            const f = { kind, error, filename, round, r2_key: `t/1/bucket/2/ab12cd34-${filename}` };
+            assert.equal(viaModule(f, s), inline(f, s), JSON.stringify({ f, s }));
+            n++;
+          }
+        }
+      }
+    }
+  }
+  assert.equal(n, 5 * 3 * 5 * 2 * 4);
+  assert.deepEqual(fileDownloads({ kind: 'combined', error: null, filename: 'Round_1_A_B.qbtd.json', round: 1 }, ['A', 'B']).map((l) => l.label), ['qbj', 'game']);
+  assert.deepEqual(fileDownloads({ kind: 'combined', error: null, filename: 'Round_1_A_B.qbtd.json', round: 1 }, null),
+    [{ params: 'part=qbj&dl=Round_1_A_B.qbj', label: 'qbj' }, { params: 'part=game&dl=Round_1_A_B_Game.json', label: 'game' }]);
+  assert.deepEqual(fileDownloads({ kind: 'other', error: null, filename: 'a b.txt', round: 1 }, ['A', 'B']), [{ params: 'dl=a%20b.txt', label: 'Download' }]);
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

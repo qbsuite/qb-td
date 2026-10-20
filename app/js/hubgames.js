@@ -11,6 +11,7 @@
 import { parseRoster, matchPayload, rosterNameMap } from '../engine/qbj.js';
 import { isGameFile, readGame } from '../engine/games.js';
 import { modaqExport, modaqFilenames } from '../engine/modaqfile.js';
+import { uploadQbjName } from '../engine/exportfile.js';
 import { effectiveFormat } from './read_core.js';
 import { eachLimit } from './limit.js';
 import { fileSummary } from './protests.js';
@@ -94,7 +95,7 @@ export async function collectMatches(pub, a, t, buckets, files, onFile = () => {
       const { m, qbj: payload } = readGame(qbj, names, { id: f.id, filename: f.filename, room: room ? room.room_name : '' });
       // the name this game's .qbj carries in the QBJ bundle, which the
       // .yft records the way YellowFruit notes an imported file
-      m.filename = f.filename.replace(/\.qbtd\.json$/i, '.qbj');
+      m.filename = uploadQbjName(f.filename);
       matches.push(m);
       raw.push({
         id: f.id, round: m.round, room: m.room, reader: f.kind === 'combined',

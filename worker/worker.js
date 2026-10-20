@@ -43,9 +43,10 @@
 // stay up — the publish flag, not the admin link, gates /pub.
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
-import { modaqExport, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
-import { renameMatch, withRound, rosterForExport } from '../app/engine/qbj.js';
+import { qbjTextWithRound } from '../app/engine/modaqfile.js';
+import { withRound } from '../app/engine/qbj.js';
 import { rosterNamesFromText } from '../app/engine/games.js';
+import { storedFileText, rosterExportBody, publicQbjName, publicQbjText } from '../app/engine/exportfile.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
@@ -2958,17 +2959,13 @@ async function adminDownload(url, env, t) {
 }
 
 // The roster as it leaves qb-td (the Setup Download): without the former
-// names only qb-td reads (qbj.js rosterForExport), as the roster editor's
-// download and the QBJ bundle give it. A roster with none comes down as
-// it was stored, byte for byte.
+// names only qb-td reads (engine/exportfile.js rosterExportBody), as the
+// roster editor's download and the QBJ bundle give it. A roster with none
+// comes down as it was stored, byte for byte.
 async function rosterExportResponse(env, obj, rawKey, dl) {
   const buf = await readBlob(obj, rawKey);
-  let body = buf;
-  try {
-    const parsed = JSON.parse(new TextDecoder().decode(buf));
-    const out = rosterForExport(parsed);
-    if (JSON.stringify(out) !== JSON.stringify(parsed)) body = JSON.stringify(out, null, 2);
-  } catch (e) { /* not JSON: as it is */ }
+  const text = rosterExportBody(new TextDecoder().decode(buf));
+  const body = text === null ? buf : text;
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', (blobEnc(obj) ? (obj.customMetadata || {}).ct : obj.httpMetadata?.contentType) || 'application/octet-stream');
   headers.set('Content-Disposition', attachmentHeader(dl));
@@ -3022,22 +3019,10 @@ async function adminGames(url, env, t) {
 // or the link of the set it mirrors: the game half carries the packet text.
 async function storedFileResponse(env, obj, rawKey, dl, part, names = null) {
   if (part !== 'qbj' && part !== 'game') return blobResponseDec(env, obj, rawKey, dl);
-  const raw = new TextDecoder().decode(await readBlob(obj, rawKey));
-  let parsed = null;
-  try { parsed = JSON.parse(raw); } catch (e) { /* not JSON: a bare file goes down as it is */ }
-  let text;
-  if (!parsed || typeof parsed !== 'object') text = raw;
-  else if (!parsed.qbj && !parsed.game) {
-    // a .qbj or game file added by hand: itself, renamed
-    text = renameModaqTexts(part === 'qbj' ? { qbj: raw, game: null } : { qbj: null, game: raw }, names)[part];
-  } else {
-    const half = parsed && typeof parsed === 'object' ? parsed[part] : null;
-    if (!half || typeof half !== 'object') return err(env, 404, 'no ' + part + ' half in this file');
-    // MODAQ's own file for this half (engine/modaqfile.js), under the round
-    // the upload is filed in
-    const round = Number(typeof parsed.qbj === 'object' && parsed.qbj ? parsed.qbj._round : NaN);
-    text = modaqExport(parsed, Number.isInteger(round) ? round : undefined, names)[part];
-  }
+  // MODAQ's own file for this half, or the hand-added file renamed
+  // (engine/exportfile.js storedFileText)
+  const { text, missing } = storedFileText(new TextDecoder().decode(await readBlob(obj, rawKey)), part, names);
+  if (missing) return err(env, 404, 'no ' + part + ' half in this file');
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Content-Disposition', attachmentHeader(dl));
@@ -4680,9 +4665,9 @@ async function pubQbj(env, slug, fileId) {
   const headers = new Headers(corsHeaders(env));
   headers.set('Content-Type', 'application/json');
   headers.set('Cache-Control', 'public, max-age=' + pubCache(t));
-  headers.set('Content-Disposition', attachmentHeader(String(entry.filename || 'game.qbj').replace(/\.qbtd\.json$/i, '.qbj')));
+  headers.set('Content-Disposition', attachmentHeader(publicQbjName(entry.filename)));
   // indented as MODAQ writes its own exports, under the roster's current names
-  return new Response(JSON.stringify(renameMatch(entry.qbj, names), null, 2), { status: 200, headers });
+  return new Response(publicQbjText(entry.qbj, names), { status: 200, headers });
 }
 
 async function pubRoster(env, slug) {

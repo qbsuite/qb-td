@@ -27,7 +27,8 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { modaqFilenames, renameModaqTexts } from '../engine/modaqfile.js';
+import { renameModaqTexts } from '../engine/modaqfile.js';
+import { fileDownloads } from '../engine/exportfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
@@ -2090,20 +2091,17 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
           aria-label="${esc(b.room_name)}, round ${n}: ${esc(title || 'empty')}">${mark}</button>`
       : `<span class="umark ${cls}" title="${esc(title)}">${mark}</span>`}</td>`;
   };
+  // a reader upload's two files named as MODAQ names its own exports, a
+  // game file under the roster's current names (engine/exportfile.js
+  // fileDownloads, worker.js storedFileResponse)
   const fileLinks = (f) => {
-    const link = (params, label) =>
-      `<a href="${esc(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}`)}" download>${label}</a>`;
-    // named as MODAQ names its own exports (engine/modaqfile.js)
-    const base = f.filename.replace(/\.qbtd\.json$/i, '');
     const s = fileSummary(f);
-    const names = s ? modaqFilenames(f.round, s.teams) : { qbj: base + '.qbj', game: base + '_Game.json' };
-    // a game file comes down under the roster's current names (worker.js
-    // storedFileResponse)
-    const own = (f.kind === 'qbj' || f.kind === 'game') && !f.error ? `part=${f.kind}&` : '';
-    return f.kind === 'combined' && !f.error
-      ? link(`part=qbj&dl=${encodeURIComponent(names.qbj)}`, 'qbj') + ' '
-        + link(`part=game&dl=${encodeURIComponent(names.game)}`, 'game')
-      : link(`${own}dl=${encodeURIComponent(f.filename)}`, 'Download');
+    const key = encodeURIComponent(f.r2_key);
+    let html = '';
+    for (const { params, label } of fileDownloads(f, s ? s.teams : null)) {
+      html += (html ? ' ' : '') + `<a href="${esc(`${API}${a}/file?key=${key}&${params}`)}" download>${label}</a>`;
+    }
+    return html;
   };
   const protestMarker = (f) => {
     const ps = pfiles.get(f.id);
