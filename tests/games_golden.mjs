@@ -7,21 +7,23 @@
 // module adds its own functions to `candidates` below: each fixture goes
 // through them too, and they must give what the reference copies give.
 // app/engine/games.js is one: readGames as the page and the archive call
-// it, and readGame in the hub's per-game step (hubPerGame). The callers
-// that have moved onto it are run as themselves: tools/archive.mjs
-// parseBundle, and the public page's fetchMatches as app/js/pubview.js
-// has it (tests/pubview_src.mjs).
+// it. The callers that have moved onto it are run as themselves:
+// tools/archive.mjs parseBundle, the public page's fetchMatches as
+// app/js/pubview.js has it (tests/pubview_src.mjs), and the hub's
+// collectMatches in app/js/hubgames.js (hubPerGame; tests/hubgames_ref.mjs
+// holds the rest of the hub's loading to its reference).
 // Run: node tests/games_golden.mjs (part of npm test).
 // QBTD_UPDATE_GOLDEN=1 rewrites the golden from the current code.
 
 import assert from 'node:assert/strict';
-import { parseRoster, rosterNameMap, matchPayload } from '../app/engine/qbj.js';
+import { parseRoster, rosterNameMap } from '../app/engine/qbj.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { buildReport, reportData } from '../app/engine/report.js';
 import { serializeYft } from '../app/engine/yft.js';
 import { serializeYft3 } from '../app/engine/yft3.js';
 import { roundTossupBuzzes, buzzSummary, dedupeEntries } from '../app/engine/buzz.js';
-import { readGame, readGames } from '../app/engine/games.js';
+import { readGames } from '../app/engine/games.js';
+import { collectMatches } from '../app/js/hubgames.js';
 import { categoryStats } from '../app/engine/cats.js';
 import { effectiveFormat } from '../app/js/read_core.js';
 import { parseBundle } from '../tools/archive.mjs';
@@ -116,11 +118,11 @@ function derived(fx, r) {
   };
 }
 
-// The hub's per-game step (admin.js collectMatches, tests/ref_games.mjs)
-// against readGame in its place, on the fixture's games as hub uploads:
-// every other one a reader upload ({qbj, game: null}, so no MODAQ files),
-// every fourth one in a room deleted since. The games come from the
-// cache, so only the roster is read. Matches, raw rows and errors must be
+// The hub's collectMatches (app/js/hubgames.js) against the reference
+// copy of admin.js's (tests/ref_games.mjs), on the fixture's games as hub
+// uploads: every other one a reader upload ({qbj, game: null}, so no
+// MODAQ files), every fourth one in a room deleted since. The games come
+// from the cache, so only the roster is read. Everything it gives must be
 // the reference's, key order included.
 async function hubPerGame(fx) {
   const rooms = [...new Set(fx.entries.map((e) => e.room))];
@@ -139,22 +141,8 @@ async function hubPerGame(fx) {
   };
   const t = { roster_r2_key: fx.rosterQbj ? 't/1/roster.qbj' : null };
   const ref = await hubRef({ pub }).collectMatches('/a/x', t, buckets, files, () => {}, { cache: cacheOf() });
-  const got = [...cacheOf().values()];
-  const matches = [];
-  const raw = [];
-  const errors = [];
-  for (const [i, f] of files.entries()) {
-    try {
-      const bucket = buckets.find((b) => b.id === f.bucket_id);
-      const { m, qbj: payload } = readGame(matchPayload(got[i]), ref.names,
-        { id: f.id, filename: f.filename, room: bucket ? bucket.room_name : '' });
-      m.filename = f.filename.replace(/\.qbtd\.json$/i, '.qbj');
-      matches.push(m);
-      raw.push({ id: f.id, round: m.round, room: m.room, reader: f.kind === 'combined', filename: m.filename,
-        text: JSON.stringify(payload) });
-    } catch (e) { errors.push(f.filename + ': ' + e.message); }
-  }
-  return { ref, matches, raw, errors };
+  const got = await collectMatches(pub, '/a/x', t, buckets, files, () => {}, { cache: cacheOf() });
+  return { ref, got };
 }
 
 const fixtures = await allFixtures();
@@ -179,12 +167,13 @@ for (const fx of fixtures) {
     assert.deepEqual(s.errors, r.errors);
     assert.equal(jsonSha(s.rawEntries), golden[fx.label].pub.rawEntries);
   });
-  await test(fx.label + ': readGame does the hub\'s per-game step', async () => {
-    const h = await hubPerGame(fx);
-    assert.ok(h.matches.length > 0);
-    assert.equal(JSON.stringify(h.matches), JSON.stringify(h.ref.matches));
-    assert.equal(JSON.stringify(h.raw), JSON.stringify(h.ref.raw));
-    assert.deepEqual(h.errors, h.ref.errors.filter((e) => !e.startsWith('Roster: ')));
+  await test(fx.label + ': app/js/hubgames.js collectMatches loads what the hub\'s did', async () => {
+    const { ref, got } = await hubPerGame(fx);
+    assert.ok(got.matches.length > 0);
+    for (const k of ['roster', 'matches', 'raw', 'games', 'modaqFiles', 'errors']) {
+      assert.equal(JSON.stringify(got[k]), JSON.stringify(ref[k]), k);
+    }
+    assert.deepEqual(got.names, ref.names);
   });
   for (const cand of candidates) {
     if (cand.pub) {

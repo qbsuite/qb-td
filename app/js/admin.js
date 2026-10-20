@@ -39,6 +39,7 @@ import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
 import { ownedJson, collectMatches, gameFormat, createHubNames } from './hubgames.js';
+import { isGameFile, newestOf } from '../engine/games.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -972,7 +973,7 @@ function renderRoomsSec(a, t, buckets, files) {
 function setPacketsHtml(slots, rounds, files) {
   const versions = lastDetail.set_packets || [];
   const current = versions.filter((v) => !v.retired);
-  const played = new Set(files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error).map((f) => f.round));
+  const played = new Set(files.filter(isGameFile).map((f) => f.round));
   const rows = Array.from({ length: slots }, (_, i) => i + 1).map((n) => {
     const r = rounds.find((x) => x.number === n);
     const v = r && versions.find((x) => x.r2_key === r.packet_r2_key);
@@ -1043,7 +1044,7 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
     // one per pair of teams, as the stats count them; a MODAQ game file or
     // a forfeit has no buzzpoints of its own
     packetGames: (k) => new Set(((lastDetail && lastDetail.files) || [])
-      .filter((f) => f.round === k && (f.kind === 'qbj' || f.kind === 'combined') && !f.error && !isForfeitFile(f))
+      .filter((f) => f.round === k && isGameFile(f) && !isForfeitFile(f))
       .map((f) => { const s = uploadedSummary(f); return s && s.teams ? [...s.teams].sort().join('\n') : 'file ' + f.id; })).size,
     uploadTb: async (name, data) => {
       try {
@@ -1699,8 +1700,7 @@ function renderSchedule(a, t, buckets, files) {
     teams: schedTeams || [],
     buckets,
     // rounds with a game in: pool trades close once a prelim round has one
-    played: () => new Set(files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error
-      && Number.isInteger(f.round)).map((f) => f.round)),
+    played: () => new Set(files.filter((f) => isGameFile(f) && Number.isInteger(f.round)).map((f) => f.round)),
     roomsN: () => schedRoomsN,
     setRoomsN: (n) => { schedRoomsN = n; },
     save: (s) => pub(a + '/schedule', { method: 'POST', json: s }),
@@ -1859,9 +1859,9 @@ function liveBrackets(t, buckets, files) {
   const top = maxRound(st, t.current_round);
   const starts = lastDetail.starts || [];
   const early = new Set(lastDetail.early || []);
-  const good = (f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
   const startedAt = (bid, n) => starts.some((x) => x.bucket_id === bid && x.round === n);
-  const goodIn = (bid, n) => files.filter((f) => f.bucket_id === bid && f.round === n && good(f)).sort((x, y) => y.id - x.id)[0] || null;
+  // the upload that counts in a room's round: the newest game file
+  const goodIn = (bid, n) => newestOf(files.filter((f) => f.bucket_id === bid && f.round === n));
   const rooms = buckets.map((b) => {
     const idx = roomIndexOf(bm.schedule, b);
     const rr = (lastDetail.room_rounds && lastDetail.room_rounds[b.id]) || roomRound(bm, st, idx, t.current_round);
@@ -2024,12 +2024,12 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   // ---- the rooms of the current round: schedule + uploads + starts ----
   const started = new Set((lastDetail.starts || [])
     .filter((x) => x.round === t.current_round).map((x) => x.bucket_id));
-  const good = (f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
+  const good = isGameFile;
   const liveRooms = roundRooms(sched, t.current_round, buckets);
   const liveRows = liveRooms.map((r) => {
     const b = buckets.find((x) => x.id === r.id);
     const mine = files.filter((f) => f.bucket_id === r.id && f.round === t.current_round);
-    const g = mine.filter(good).sort((x, y) => y.id - x.id)[0] || null;
+    const g = newestOf(mine);
     const sum = g ? fileSummary(g) : null;
     const planned = scheduledGame(b, t.current_round);
     const ps = g ? pfiles.get(g.id) : null;
@@ -2061,7 +2061,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     let mark = '', cls = '', title = '';
     // the newest readable upload counts: ✓, or a pie while it is
     // unfinished; several uploads ride on it as a small count
-    const newest = goods.length ? [...goods].sort((x, y) => y.id - x.id)[0] : null;
+    const newest = newestOf(goods);
     const part = newest ? unfinishedOf(fileSummary(newest)) : null;
     if (errs.length) { mark = '!'; cls = 'warn'; title = errs.length + ' file' + (errs.length === 1 ? '' : 's') + ' could not be read'; }
     else if (goods.length) {
@@ -2538,7 +2538,7 @@ function statStages() {
 // two teams, under their current names, as the schedule has them
 function filesAsGames(files) {
   return namedFiles(files, hubNames.map).map((f) => {
-    const x = (f.kind === 'qbj' || f.kind === 'combined') && !f.error ? summaryTeams(f) : null;
+    const x = isGameFile(f) ? summaryTeams(f) : null;
     return x ? { round: f.round, teams: x.map((name) => ({ name, points: 0 })) } : null;
   }).filter(Boolean);
 }
@@ -3136,7 +3136,7 @@ const ordinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2
 // is in. The Finals line the same, gone once a finals game is in.
 function playoffNoteHtml(files) {
   if (!sched) return '';
-  const played = (rounds) => files.some((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && rounds.has(f.round));
+  const played = (rounds) => files.some((f) => isGameFile(f) && rounds.has(f.round));
   const prelim = new Set(prelimRounds(sched).map((r) => r.round));
   const all = new Set(sched.phases.flatMap((ph) => ph.rounds.map((r) => r.round)));
   const out = [];
@@ -3178,7 +3178,7 @@ async function computeStats(a, t, buckets, files, settings) {
   out.innerHTML = '';
   $('statsec').hidden = false;
   // counts the games it fetches, one request each
-  const nGames = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error).length;
+  const nGames = files.filter(isGameFile).length;
   const run = busy($('calc'), { label: 'Computing stats', total: nGames, scope: $('calc').closest('.row') });
   let got;
   try {

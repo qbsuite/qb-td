@@ -9,7 +9,7 @@
 // code runs in Node.
 
 import { parseRoster, matchPayload, rosterNameMap } from '../engine/qbj.js';
-import { readGame } from '../engine/games.js';
+import { isGameFile, readGame } from '../engine/games.js';
 import { modaqExport, modaqFilenames } from '../engine/modaqfile.js';
 import { effectiveFormat } from './read_core.js';
 import { eachLimit } from './limit.js';
@@ -53,7 +53,7 @@ export async function gameCopies(pub, a, files) {
 // files out, so Compute stats reads the uploads themselves.
 export async function collectMatches(pub, a, t, buckets, files, onFile = () => {}, opts = {}) {
   const { cache = null, rank = false } = opts;
-  const qbjFiles = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error);
+  const qbjFiles = files.filter(isGameFile);
   const errors = [];
   let roster = null;
   if (t.roster_r2_key) {

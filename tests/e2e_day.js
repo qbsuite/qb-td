@@ -20,9 +20,10 @@
 // file list and rooms, categories, buzzpoints, room pages, the cron's
 // rebuilds going through the REBUILD binding, a view's D1 cost.
 //
-// E8: the hub's own game loading (collectMatches, tests/ref_games.mjs as it
-// is at 0cd19c5) runs on the same uploads through a Node pub(), and what
-// it gives — matches, raw rows, MODAQ files, errors — must equal
+// E8: the hub's own game loading (app/js/hubgames.js collectMatches, the
+// code the hub runs; the golden was written from admin.js as it was at
+// 0cd19c5) runs on the same uploads through a Node pub(), and what it
+// gives — matches, raw rows, MODAQ files, errors — must equal
 // tests/golden/e2e_day_collect.json, with file ids by their order.
 // QBTD_UPDATE_GOLDEN=1 rewrites it.
 
@@ -32,7 +33,7 @@ import { aggregate } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
 import { BASE, call, d1exec, tick, ok, summary, nodePub } from './e2e_lib.js';
-import { hubRef } from './ref_games.mjs';
+import { collectMatches } from '../app/js/hubgames.js';
 import { checkGolden, jsonSha } from './golden_lib.mjs';
 
 const ROOMS = 4;
@@ -263,8 +264,7 @@ for (const f of qbjFiles) {
 const exportAgg = aggregate(exportMatches, rosterParsed);
 {
   // E8: the hub's collectMatches on the same uploads
-  const { collectMatches } = hubRef({ pub: nodePub });
-  const got = await collectMatches(A, detail.tournament, detail.buckets, detail.files);
+  const got = await collectMatches(nodePub, A, detail.tournament, detail.buckets, detail.files);
   const order = [...new Set(detail.files.map((f) => f.id))].sort((x, y) => x - y);
   const rank = (id) => order.indexOf(id);
   const plainMatches = got.matches.map((m) => ({ ...m, fileId: rank(m.fileId) }));

@@ -640,13 +640,15 @@ Known limits:
 ## Tests
 
 ```bash
-npm test                         # the five below, in this order; no Worker, no network
+npm test                         # the six below, in this order; no Worker, no network
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
 node tests/live_publish.js       # qb-td-live publisher: deploys, retries, heartbeats, unpublish, hub mark
                                  # (real SQLite from schema.sql via node:sqlite; R2 + Cloudflare API mocked)
 node tests/snapshot_publish.js   # cron tick: round shards + GitHub publisher (D1/R2/GitHub mocked)
 node tests/games_golden.mjs      # game loading as the public page and the archive do it, and what is
                                  # built from it, held to tests/golden/games.json
+node tests/hubgames_ref.mjs      # the hub's game loading (app/js/hubgames.js) against admin.js's as it
+                                 # was: the same requests, in order and at once, and the same games
 node tests/worker_inproc.mjs     # worker.js in Node (SQLite, in-memory R2): download bytes, each
                                  # request's D1, R2 and crypto operations and its CORS/X-Qbtd-* headers,
                                  # held to tests/golden/worker_*.json
