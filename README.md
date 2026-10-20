@@ -205,10 +205,11 @@ Part of [qbsuite](https://qbsuite.github.io/).
   Likewise the roster: Setup's Download (`part=roster`) and the zip leave
   out the former names qb-td keeps to follow renames. Where they are
   built: the hub reads the games once (`app/js/hubgames.js`
-  `collectMatches`, the requests and their order as before), and
-  `app/engine/exports.js` makes each tournament file from them
-  (`yftFile` for both YellowFruits, `reportZipFile` and `reportPages`,
-  `qbjZipFile`, `rosterFileText`). One game file or the roster as the
+  `collectMatches`, the requests and their order as before), and the
+  same file makes each tournament file from them (`yftFile` for both
+  YellowFruits, `reportZipFile` and `reportPages`, `qbjZipFile`,
+  `rosterFileText`); they share one module so the hub's cold load asks
+  for no more files than it must. One game file or the roster as the
   Worker serves it is `app/engine/exportfile.js`, which the Worker and
   the hub's per-file links share; the Worker imports only that file, so
   the zip, YellowFruit, report and stats code stay out of its bundle
@@ -638,7 +639,7 @@ rename therefore never rewrites a game already played. How it works today:
   saved schedule. Rosters that leave qb-td drop `_formerNames`: the
   hub's roster Download goes through the Worker's `part=roster`
   (`rosterExportResponse`, `exportfile.js` `rosterExportBody`), and the
-  roster editor's Download and the QBJ bundle use `exports.js`
+  roster editor's Download and the QBJ bundle use `hubgames.js`
   `rosterFileText`. An uploaded roster carries no list of renames, so
   `rosterRenames` pairs a dropped team with a new one only by shared
   players (at least half of the smaller team); position alone pairs

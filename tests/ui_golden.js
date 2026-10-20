@@ -32,7 +32,7 @@ import { checkGolden, sha } from './golden_lib.mjs';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APP = path.join(ROOT, 'app');
 const PORT = Number(process.env.QBTD_GOLDEN_PORT || 9611);
-const NEW_MODULES = ['/engine/games.js', '/js/hubgames.js', '/engine/exportfile.js', '/engine/exports.js', '/js/saves.js'];
+const NEW_MODULES = ['/engine/games.js', '/js/hubgames.js', '/engine/exportfile.js', '/js/saves.js'];
 const newSeen = new Set();
 const staticsOf = (log) => {
   const all = [...new Set(log.map((r) => r.path))].sort();

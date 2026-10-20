@@ -26,7 +26,7 @@ import '../engine/hdwhite.js';
 import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
   carryFormerNames, forfeitQbj, statedRound } from '../engine/qbj.js';
 import { standings, dedupeMatches } from '../engine/stats.js';
-// engine/exports.js builds the downloads with these four. They are
+// hubgames.js builds the downloads with these four. They are
 // imported here too, where this file used them before, so a cold load
 // asks for them as early as it did: found one module later, report.js
 // held up the hub's first render on a slow link.
@@ -39,7 +39,6 @@ import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import '../engine/modaqfile.js'; // asked for as early as before (see above)
-import { fileDownloads, yftFile, reportPages, reportZipFile, qbjZipFile, rosterFileText } from '../engine/exports.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
@@ -50,7 +49,8 @@ import { buzzCredentials, sha256Hex } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
-import { ownedJson, collectMatches, gameFormat, createHubNames } from './hubgames.js';
+import { ownedJson, collectMatches, gameFormat, createHubNames,
+  fileDownloads, yftFile, reportPages, reportZipFile, qbjZipFile, rosterFileText } from './hubgames.js';
 import { isGameFile, newestOf } from '../engine/games.js';
 import { readTagged, settingsBody, rulingsBody, postSchedule, postRoster, FORMAT_KEYS,
   SCHED_CONFLICT, SCHED_KEPT, ROSTER_CONFLICT, ROSTER_KEPT } from './saves.js';
@@ -3442,7 +3442,7 @@ function showStats({ a, t, files, settings, got }) {
   };
   const buildZip = async () => {
     // Every game as its separated files: match .qbj + MODAQ game file
-    // (engine/exports.js qbjZipFile). The game files that went up apart
+    // (hubgames.js qbjZipFile). The game files that went up apart
     // from their .qbj (Add a game) are read one after another, in upload
     // order, then the roster.
     const gameFiles = [];

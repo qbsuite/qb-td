@@ -37,7 +37,7 @@ import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js'
 import { isGameFile, readGame, readGames, newestOf, rosterNamesFromText } from '../app/engine/games.js';
 import { uploadQbjName, publicQbjName, publicQbjText, storedFileText, rosterExportBody, fileDownloads } from '../app/engine/exportfile.js';
 import * as exportfileMod from '../app/engine/exportfile.js';
-import * as exportsMod from '../app/engine/exports.js';
+import * as hubgamesMod from '../app/js/hubgames.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -7960,15 +7960,16 @@ test('exportfile.js: fileDownloads makes the links fileLinks made, file for file
   assert.deepEqual(fileDownloads({ kind: 'other', error: null, filename: 'a b.txt', round: 1 }, ['A', 'B']), [{ params: 'dl=a%20b.txt', label: 'Download' }]);
 });
 
-/* ---------- exports.js: the hub's tournament downloads ----------
+/* ---------- hubgames.js: the hub's tournament downloads ----------
    admin.js showStats and the roster editor built these inline at
-   cc92cf4; exports.js is those lines in one place. These hold it to the
-   inline code. tests/hubgames_ref.mjs holds the QBJ bundle, its reads
-   included, to admin.js's buildZip as it was, and tests/ui_golden.js the
-   demo hub's downloads, byte for byte. */
+   cc92cf4; hubgames.js holds those lines in one place (they were
+   engine/exports.js until the hub's cold load asked for one module
+   fewer). These hold it to the inline code. tests/hubgames_ref.mjs holds
+   the QBJ bundle, its reads included, to admin.js's buildZip as it was,
+   and tests/ui_golden.js the demo hub's downloads, byte for byte. */
 
-test('exports.js: the YellowFruit files and the report are the ones showStats built, byte for byte', () => {
-  const { yftFile, reportPages, reportZipFile } = exportsMod;
+test('hubgames.js: the YellowFruit files and the report are the ones showStats built, byte for byte', () => {
+  const { yftFile, reportPages, reportZipFile } = hubgamesMod;
   const same = (x, y) => assert.ok(Buffer.from(x).equals(Buffer.from(y)));
   let n = 0;
   for (const sc of STAGED) {
@@ -7998,8 +7999,8 @@ test('exports.js: the YellowFruit files and the report are the ones showStats bu
   assert.throws(() => reportPages('t', { name: 'T', matches: [] }), /no games to report/);
 });
 
-test('exports.js: the roster file is the one the roster editor and the bundle wrote', () => {
-  const { rosterFileText } = exportsMod;
+test('hubgames.js: the roster file is the one the roster editor and the bundle wrote', () => {
+  const { rosterFileText } = hubgamesMod;
   const qbjs = [buildRosterQbj('T', renamedRoster()), buildRosterQbj('T', renameRoster), renameArchive['/pub/2026terrapinopenatusc/roster'],
     ...Object.values(TRACKS).map((track) => buildRosterQbj('Open', markedTeams(), track)),
     { objects: [{ type: 'Tournament', registrations: [{ name: 'A', _formerNames: ['B'], teams: [] }] }] }, {}, [], null, 7, 'x'];
@@ -8007,10 +8008,11 @@ test('exports.js: the roster file is the one the roster editor and the bundle wr
   assert.ok(!rosterFileText(buildRosterQbj('T', renamedRoster())).includes('_formerNames'));
 });
 
-test('exports.js: passes on exportfile.js, so the hub imports its downloads from one place', () => {
-  for (const name of Object.keys(exportfileMod)) assert.equal(exportsMod[name], exportfileMod[name], name);
-  assert.deepEqual(Object.keys(exportsMod).sort(), [...Object.keys(exportfileMod),
-    'yftFile', 'reportPages', 'reportZipFile', 'rosterFileText', 'qbjZipFile'].sort());
+test('hubgames.js: passes on exportfile.js, so the hub imports its downloads from one place', () => {
+  for (const name of Object.keys(exportfileMod)) assert.equal(hubgamesMod[name], exportfileMod[name], name);
+  assert.deepEqual(Object.keys(hubgamesMod).sort(), [...Object.keys(exportfileMod),
+    'yftFile', 'reportPages', 'reportZipFile', 'rosterFileText', 'qbjZipFile',
+    'ownedJson', 'gameCopies', 'collectMatches', 'gameFormat', 'createHubNames'].sort());
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
