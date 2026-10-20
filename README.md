@@ -922,7 +922,10 @@ How it works (worker.js "public state on qb-td-live"):
 - Heartbeat: while a tournament is active (rebuilt in the last 6 h) its
   file is redeployed at least every 10 minutes, and says so. A page that
   finds a file well overdue knows deploys are stuck and asks the Worker
-  instead of showing frozen results.
+  instead of showing frozen results. When one tournament's heartbeat
+  deploys, other active tournaments due one within 5 minutes ride along
+  (a failed deploy doesn't mark them Delayed), so quiet tournaments share
+  one deploy per 10 minutes rather than costing one each.
 - The page (`pubview.js` `loadState`) reads the file first and falls
   back to `/pub/:slug` at most once per load or refresh: on a 404 (not
   deployed yet, or unpublished), or — skipping the file for 10 minutes in

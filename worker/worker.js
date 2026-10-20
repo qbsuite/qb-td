@@ -1403,6 +1403,8 @@ async function pubDirectory(env) {
    is redeployed at least every LIVE_HEARTBEAT_MS, riding the same
    one-deploy tick, and the file says so (hb_ms, hb_until): a page that
    finds it well overdue knows deploys are stuck and asks the Worker.
+   Active tournaments due one within half an interval ride another's
+   heartbeat deploy (livePublish), so their heartbeats fall into step.
 
    Config — all optional; with any missing this section is dead code and
    the page's /pub/:slug path is exactly as before: LIVE_SCRIPT and
@@ -1455,13 +1457,17 @@ const LIVE_BACKFILL_SQL =
   'SELECT id FROM tournaments WHERE published = 1 AND live_hash IS NULL AND pub_built IS NOT NULL ' +
   'AND live_want IS NULL LIMIT ?1';
 
+// ids: all three, in that order; beats: the ones due a heartbeat.
 async function liveCandidates(env, now, limit) {
   const [todo, hb, fill] = await Promise.all([
     env.DB.prepare(LIVE_TODO_SQL).bind(now - LIVE_RETRY_MS, limit).all(),
     env.DB.prepare(LIVE_HEARTBEAT_SQL).bind(now - LIVE_ACTIVE_MS, now - LIVE_HEARTBEAT_MS, limit, now - LIVE_RETRY_MS).all(),
     env.DB.prepare(LIVE_BACKFILL_SQL).bind(Math.min(limit, LIVE_BACKFILL_PER_RUN)).all(),
   ]);
-  return [...todo.results, ...hb.results, ...fill.results].map((r) => r.id);
+  return {
+    ids: [...todo.results, ...hb.results, ...fill.results].map((r) => r.id),
+    beats: hb.results.map((r) => r.id),
+  };
 }
 
 // The file: what /pub/:slug serves (the prebuilt pubstate plus the row's
@@ -1547,18 +1553,9 @@ const inList = (n) => Array.from({ length: n }, (_, i) => '?' + (i + 1)).join(',
 // throws: a failure is recorded on the rows (live_failed_at) and retried.
 async function livePublish(env, tickIds = [], dirChanged = false) {
   const now = Date.now();
-  const ids = [...new Set([...tickIds, ...(await liveCandidates(env, now, LIVE_MAX_PER_RUN))])]
-    .slice(0, LIVE_MAX_PER_RUN);
+  const due = await liveCandidates(env, now, LIVE_MAX_PER_RUN);
+  const ids = [...new Set([...tickIds, ...due.ids])].slice(0, LIVE_MAX_PER_RUN);
   if (!ids.length && !dirChanged) return { deployed: false };
-  // A deploy is going out anyway: active tournaments whose heartbeat falls
-  // due within the next half-interval ride it, rebuilt and stamped now.
-  // Their heartbeats fall into step instead of each costing a deploy (and
-  // a stored version) of its own; none waits longer than it did before.
-  if (ids.length < LIVE_MAX_PER_RUN) {
-    const { results: soon } = await env.DB.prepare(LIVE_HEARTBEAT_SQL)
-      .bind(now - LIVE_ACTIVE_MS, now - LIVE_HEARTBEAT_MS / 2, LIVE_MAX_PER_RUN, now - LIVE_RETRY_MS).all();
-    for (const r of soon) if (ids.length < LIVE_MAX_PER_RUN && !ids.includes(r.id)) ids.push(r.id);
-  }
 
   const health = await liveAsset(LIVE_HEALTH, 'json');
   const b64s = new Map([[health.hash, health.b64]]);
@@ -1568,24 +1565,47 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
   const dirText = dirObj ? await dirObj.text() : null;
   const dir = dirText === null ? null : await liveAsset(dirText, 'json');
   if (dir) b64s.set(dir.hash, dir.b64);
-  const built = new Map(); // id -> { slug, hash, size, at } | { slug, remove: true }
+  // id -> { slug, hash, size, at } | { slug, remove: true }; a rider (see
+  // below) also has was: the live_hash it had when this run read it
+  const built = new Map();
   const unbuildable = [];
-  const build = async (rows) => {
+  const build = async (rows, ride = false) => {
     for (const t of rows) {
-      if (!t.published) { built.set(t.id, { slug: t.slug, remove: true }); continue; }
+      // a rider is only ever a file to restamp: anything else about it is
+      // left to the run that has it due
+      if (!t.published) { if (!ride) built.set(t.id, { slug: t.slug, remove: true }); continue; }
       const text = await liveBody(env, t, now);
-      if (text === null) { unbuildable.push(t.id); continue; }
+      if (text === null) { if (!ride) unbuildable.push(t.id); continue; }
       const file = await liveAsset(text, 'json');
       b64s.set(file.hash, file.b64);
-      built.set(t.id, { slug: t.slug, hash: file.hash, size: file.size, at: now });
+      built.set(t.id, { slug: t.slug, hash: file.hash, size: file.size, at: now, ...(ride ? { was: t.live_hash } : {}) });
     }
   };
   const rowsFor = async (list) => (await env.DB.prepare(TICK_ROW_SELECT + `WHERE t.id IN (${inList(list.length)})`)
     .bind(...list).all()).results;
-  const wanted = () => JSON.stringify([...built].map(([id, b]) => ({ id, w: b.remove ? null : b.hash })));
+  const isRider = (b) => b.was !== undefined;
+  const wanted = () => JSON.stringify([...built].filter(([, b]) => !isRider(b))
+    .map(([id, b]) => ({ id, w: b.remove ? null : b.hash })));
 
   try {
     if (ids.length) await build(await rowsFor(ids));
+    // Heartbeats fall into step. When this deploy is already some active
+    // tournament's heartbeat, the others whose heartbeat falls due within
+    // half an interval ride it, rebuilt and stamped now, instead of each
+    // costing a deploy (and a stored version) of its own a few minutes
+    // later. Only then: a deploy for a change, a retry or the directory
+    // takes nobody along (in a busy hour that would only rebuild files
+    // sooner), and a run whose rows are all parked still ships nothing.
+    // A rider gets no intent and no failure stamp; its live_want moves
+    // with live_hash once the deploy has landed. So a failed deploy
+    // leaves it as if it had never ridden, and its hub never reads
+    // Delayed for a deploy it didn't need.
+    if (ids.length < LIVE_MAX_PER_RUN && due.beats.some((id) => built.has(id) && !built.get(id).remove)) {
+      const { results: soon } = await env.DB.prepare(LIVE_HEARTBEAT_SQL)
+        .bind(now - LIVE_ACTIVE_MS, now - LIVE_HEARTBEAT_MS / 2, LIVE_MAX_PER_RUN, now - LIVE_RETRY_MS).all();
+      const riders = soon.map((r) => r.id).filter((id) => !ids.includes(id)).slice(0, LIVE_MAX_PER_RUN - ids.length);
+      if (riders.length) await build(await rowsFor(riders), true);
+    }
     // Intent before the deploy: a slower run that lands after this one
     // then leaves live_hash != live_want, and the next run repairs it.
     // The failure stamp goes on now too and success clears it, so a run
@@ -1625,7 +1645,7 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
       for (const [id, b] of built) {
         if (b.remove) continue;
         manifest[livePath(b.slug)] = { hash: b.hash, size: b.size };
-        files.push({ id, h: b.hash, s: b.size, at: b.at });
+        files.push({ id, h: b.hash, s: b.size, at: b.at, ...(isRider(b) ? { was: b.was } : {}) });
       }
       const res = await deployLive(env, manifest, b64s);
       if (res.ok) { deployed = files; break; }
@@ -1655,11 +1675,16 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
 
     // What is live now, for every file this deploy carried — unchanged
     // ones included, which is what repairs an out-of-order deploy. Rows
-    // already saying so aren't rewritten.
+    // already saying so aren't rewritten. A rider's live_want follows its
+    // new hash only if the row still reads as this run found it (in sync,
+    // at the hash it had): an intent another run wrote meanwhile stays,
+    // and the difference brings that tournament back next tick.
     await env.DB.prepare(
       "UPDATE tournaments SET live_hash = j.value ->> 'h', live_size = j.value ->> 's', " +
       "live_at = COALESCE(j.value ->> 'at', tournaments.live_at), " +
-      "live_failed_at = CASE WHEN j.value ->> 'at' IS NULL THEN tournaments.live_failed_at ELSE NULL END " +
+      "live_failed_at = CASE WHEN j.value ->> 'at' IS NULL THEN tournaments.live_failed_at ELSE NULL END, " +
+      "live_want = CASE WHEN (j.value ->> 'was') IS NOT NULL AND tournaments.live_hash IS (j.value ->> 'was') " +
+      "AND tournaments.live_want IS (j.value ->> 'was') THEN j.value ->> 'h' ELSE tournaments.live_want END " +
       "FROM json_each(?1) AS j WHERE tournaments.id = j.value ->> 'id' " +
       "AND (tournaments.live_hash IS NOT (j.value ->> 'h') OR j.value ->> 'at' IS NOT NULL)"
     ).bind(JSON.stringify(deployed)).run();
@@ -1678,7 +1703,8 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
     return { deployed: true, files: deployed.length, built: built.size };
   } catch (e) {
     console.log('live publish failed:', e.message);
-    const tried = [...built.keys()];
+    // riders aren't stamped: they had nothing waiting on this deploy
+    const tried = [...built].filter(([, b]) => !isRider(b)).map(([id]) => id);
     if (tried.length) {
       await env.DB.prepare(
         'UPDATE tournaments SET live_failed_at = ?2 WHERE id IN (SELECT value FROM json_each(?1))'
@@ -1706,7 +1732,7 @@ export const LivePublish = {
 async function tickLive(env, ids, dirChanged = false) {
   if (!liveEnabled(env)) return;
   try {
-    if (!ids.length && !dirChanged && !(await liveCandidates(env, Date.now(), 1)).length) return;
+    if (!ids.length && !dirChanged && !(await liveCandidates(env, Date.now(), 1)).ids.length) return;
     if (!env.LIVE) { await livePublish(env, ids, dirChanged); return; }
     const res = await env.LIVE.fetch('https://live/?ids=' + ids.join(',') + (dirChanged ? '&dir=1' : ''));
     // read it either way: a binding call whose answer is never read ends

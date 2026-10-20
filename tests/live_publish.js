@@ -295,9 +295,9 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
 }
 
 // 7b. Heartbeats fall into step: active tournaments due within half an
-// interval ride a deploy that is going out anyway, so a quiet hour costs
-// about one deploy per interval for all of them, not one per tournament —
-// and no file ever goes longer than an interval (plus a tick) unstamped.
+// interval ride another's heartbeat deploy, so a quiet hour costs about
+// one deploy per interval for all of them, not one per tournament — and
+// no file ever goes longer than an interval (plus a tick) unstamped.
 {
   clock = realNow();
   const w = world();
@@ -323,12 +323,118 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
   const ats = ids.map((id) => w.live('tour-' + id).at);
   ok('heartbeat step: their stamps fall together', new Set(ats).size === 1, ats.map((x) => (x - t0) / MIN));
   ok('heartbeat step: a tournament quiet for 6 hours never rides', w.row(quiet).live_at === quietAt0);
-  // a change still goes at once, and brings the others along only if they're half due
+  ok('heartbeat step: riders end in sync (live_want follows the hash they shipped)',
+    ids.every((id) => w.row(id).live_want === w.row(id).live_hash), ids.map((id) => w.row(id)));
+  // a change still goes at once
   w.cf.calls.length = 0;
   clock += MIN;
   w.DB.raw.prepare('UPDATE tournaments SET live_want = ? WHERE id = ?').run('changed', ids[0]);
   await w.tick();
   ok('heartbeat step: a change still deploys on the next tick', puts() === 1, w.cf.calls);
+}
+
+// 7c. Riders only ride a heartbeat. A run that only a parked row brought
+// up (published, but no pubstate to publish) still ships nothing, so a
+// parked row next to an active tournament costs no deploys of its own.
+{
+  const deploysIn2h = async (parked) => {
+    clock = realNow();
+    const w = world();
+    w.add();
+    await w.tick();
+    clock += 3 * MIN;
+    if (parked === 'never built') addNoPubstate(w);
+    if (parked === 'lost') {
+      // deployed once, then its pubstate went missing
+      const lost = w.add();
+      await w.tick();
+      delete w.DATA.objects[`t/${lost}/pubstate.json`];
+    }
+    await w.tick();
+    w.cf.calls.length = 0;
+    for (let m = 0; m < 120; m++) { clock += MIN; await w.tick(); }
+    return w.cf.calls.filter((c) => /^PUT \/workers\/scripts\/qb-td-live$/.test(c)).length;
+  };
+  const alone = await deploysIn2h(null);
+  const neverBuilt = await deploysIn2h('never built');
+  const lost = await deploysIn2h('lost');
+  ok('parked + active: no deploys beyond the active one\'s heartbeats (never built)', neverBuilt === alone, { alone, neverBuilt });
+  ok('parked + active: no deploys beyond the active one\'s heartbeats (pubstate lost)', lost === alone, { alone, lost });
+}
+
+// 7d. A failed deploy with a rider on it: the tournament whose heartbeat
+// it was reads Delayed, as before. The rider doesn't (nothing of its was
+// waiting on that deploy), and its own heartbeat comes when it would have.
+{
+  clock = realNow();
+  const w = world();
+  const a = w.add();
+  await w.tick();
+  clock += 4 * MIN;
+  const b = w.add();
+  await w.tick();
+  const b0 = w.row(b);
+  const markOf = async (id) => (await (await worker.fetch(new Request('https://w/a/' + w.row(id).admin_secret), w.env,
+    { waitUntil() {} })).json()).tournament.live.state;
+  // 7 minutes later: a's heartbeat is due, b is half due and rides
+  clock += 7 * MIN;
+  w.cf.failPut = true;
+  await w.tick();
+  const tried = w.cf.sessions.at(-1).manifest;
+  ok('rider failure: the failed deploy carried a rebuilt file for the rider',
+    tried['/t/tour-2.json'] && tried['/t/tour-2.json'].hash !== b0.live_hash, tried);
+  const b1 = w.row(b);
+  ok('rider failure: the rider\'s row is as it was',
+    ['live_want', 'live_hash', 'live_at', 'live_failed_at'].every((k) => b1[k] === b0[k]), { b0, b1 });
+  ok('rider failure: the heartbeat\'s own tournament is stamped, as before',
+    w.row(a).live_failed_at === clock && w.row(a).live_want !== w.row(a).live_hash, w.row(a));
+  clock += 2 * MIN;
+  ok('rider failure: the hub reads Delayed for the heartbeat\'s tournament only',
+    (await markOf(a)) === 'failing' && (await markOf(b)) === 'ok', [await markOf(a), await markOf(b)]);
+  w.cf.failPut = false;
+  const marks = [];
+  let oldest = 0;
+  for (let m = 0; m < 12; m++) {
+    clock += MIN;
+    await w.tick();
+    marks.push(await markOf(b));
+    oldest = Math.max(oldest, clock - w.live('tour-2').at);
+  }
+  ok('rider failure: the rider never reads Delayed afterwards', !marks.includes('failing'), marks.join(','));
+  ok('rider failure: its file is restamped on its own heartbeat, within an interval plus a tick',
+    oldest <= 11 * MIN && w.live('tour-2').at > b0.live_at, oldest / MIN);
+  ok('rider failure: both settle', [a, b].every((id) => w.row(id).live_want === w.row(id).live_hash
+    && w.row(id).live_failed_at === null), [w.row(a), w.row(b)]);
+}
+
+// 7e. A busy hour: one tournament changes each minute, so a deploy goes
+// out on each tick. The quiet ones are still restamped about once per
+// interval, not on each change's deploy: that would rebuild and upload
+// their files twice as often and save no deploy.
+{
+  clock = realNow();
+  const w = world();
+  const busy = w.add();
+  await w.tick();
+  const quiet = [];
+  for (let i = 0; i < 3; i++) { clock += 3 * MIN; quiet.push(w.add()); await w.tick(); }
+  const stamps = Object.fromEntries(quiet.map((id) => [id, [w.row(id).live_at]]));
+  w.cf.calls.length = 0;
+  for (let m = 0; m < 60; m++) {
+    clock += MIN;
+    w.DB.raw.prepare('UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = ? WHERE id = ?').run(clock, busy);
+    await w.tick();
+    for (const id of quiet) if (w.row(id).live_at !== stamps[id].at(-1)) stamps[id].push(w.row(id).live_at);
+  }
+  const puts = w.cf.calls.filter((c) => /^PUT \/workers\/scripts\/qb-td-live$/.test(c)).length;
+  const restamps = quiet.map((id) => stamps[id].length - 1);
+  print('    busy hour: restamps of the quiet three:', restamps.join(', '));
+  ok('busy hour: a deploy on each tick', puts === 60, puts);
+  ok('busy hour: quiet tournaments restamped at most 6 times each in the hour', restamps.every((n) => n <= 6), restamps);
+  // once in step, a quiet file is restamped only when its heartbeat is due
+  const lastGaps = quiet.map((id) => stamps[id].slice(-3)).map(([x, y, z]) => [y - x, z - y]).flat();
+  ok('busy hour: in step, no quiet file restamped before its heartbeat', lastGaps.every((g) => g > 10 * MIN),
+    lastGaps.map((g) => g / MIN));
 }
 
 // 8. Published and built, but no pubstate to publish: parked on the
