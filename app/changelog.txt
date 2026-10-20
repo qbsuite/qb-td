@@ -6,6 +6,10 @@ Release Notes for 10/19/2026
 - Room Test links no longer contain the admin link's secret. Test links made before this update stop working, so please copy them again.
 - On qbsuite.github.io, pages always use the qb-td server, even when a shared link names another one.
 
+[ HUB ]
+- Settings and protest rulings saved in two hub tabs no longer undo each other. The change made in each tab is kept.
+- If another tab saved the schedule or the roster after this tab loaded it, saving asks first. Cancel keeps your edits here, unsaved.
+
 [ SETUP ]
 - The Rooms note now points to the Bye Room link for unofficial scrims, since nothing played there is saved.
 - An uploaded roster now renames a team only when its players match. A new team in a withdrawn team's row starts with no games.

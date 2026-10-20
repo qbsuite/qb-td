@@ -9,6 +9,8 @@
 //                      CF_API_BASE=http://127.0.0.1:8798/cf
 //   cd worker && npx wrangler dev --local --port 8799 --test-scheduled
 // then: node tests/e2e_alerts.js
+// QBTD_HOOK_PORT=<port> puts the sink on another port (the two URLs in
+// .dev.vars name the same one).
 //
 // The sink plays Discord's side of a webhook: a POST creates a message
 // and answers its id, and a PATCH or DELETE on that id edits or removes
@@ -26,7 +28,7 @@
 import { createServer } from 'node:http';
 import { BASE, call, d1exec, d1row, ok, summary } from './e2e_lib.js';
 
-const HOOK_PORT = 8798;
+const HOOK_PORT = Number(process.env.QBTD_HOOK_PORT || 8798);
 
 const channel = new Map();   // message id -> its current body
 const log = [];              // every call the Worker made: { method, id, body }

@@ -203,7 +203,18 @@ Part of [qbsuite](https://qbsuite.github.io/).
   never handed out raw: the dashboard's per-file downloads (Worker
   `part=qbj|game`) and the zip both split them into those two real files.
   Likewise the roster: Setup's Download (`part=roster`) and the zip leave
-  out the former names qb-td keeps to follow renames.
+  out the former names qb-td keeps to follow renames. Where they are
+  built: the hub reads the games once (`app/js/hubgames.js`
+  `collectMatches`, the requests and their order as before), and
+  `app/engine/exports.js` makes each tournament file from them
+  (`yftFile` for both YellowFruits, `reportZipFile` and `reportPages`,
+  `qbjZipFile`, `rosterFileText`). One game file or the roster as the
+  Worker serves it is `app/engine/exportfile.js`, which the Worker and
+  the hub's per-file links share; the Worker imports only that file, so
+  the zip, YellowFruit, report and stats code stay out of its bundle
+  (`npm run check:bundles`). The QBJ bundle keeps the first file under a
+  name, and uploads list newest first, so a re-exported game keeps its
+  latest upload and a reader's file beats one added by hand.
 - **Question sets** (`app/set.html`, no account): the editor's side of a
   mirrored tournament. A set's packets, tiebreakers and reader game
   format are uploaded once; each mirror gets an **invite link** the
@@ -588,28 +599,50 @@ rename therefore never rewrites a game already played. How it works today:
   uploaded roster). The saved roster keeps each earlier name as
   `_formerNames` on the team or player (`qbj.js` `buildRosterQbj`,
   `carryFormerNames`). `rosterNameMap` turns the roster into an
-  old-to-new map, and `renameMatch` applies it when a game is read: the
-  hub's stats and exports (`admin.js`), the public page (`pubview.js`),
-  the set page (`setstats.js` `siteNames`, from the map the Worker
-  writes into the set state), `tools/archive.mjs`, and the Worker's game
-  downloads and public QBJ route (`modaqfile.js` `renameModaqTexts`).
-  The hub's game lists and protests map the upload summaries the same
-  way (`admin.js` `fileSummary`, `protests.js` `renamedSummary`), and so
-  do the playoff and Finals auto-fill and the "Finished rounds only"
-  label (`schedule.js` `namedFiles`, `summaryTeams`). Auto-fill decides
-  what is ready from the saved schedule, not the tab's copy
-  (`finals.js` `fillProgress`, `autoFillSaved`). The hub loads the
+  old-to-new map, and `renameMatch` applies it when a game is read.
+  Where each rule lives:
+  - Reading a game is one function, `engine/games.js` `readGame`: rename,
+    parse, then tag the room and file id. The public page
+    (`pubview.js` `fetchMatches`) and `tools/archive.mjs` call it through
+    `readGames`; the hub's stats, exports and playoff fill call it from
+    `hubgames.js` `collectMatches`. With no renames nothing is copied.
+  - Which uploads count as games is `games.js` `isGameFile` (a `.qbj` or
+    a reader upload, without an error), and the one that counts in a
+    room's round is `newestOf` (the highest id). The hub (`admin.js`,
+    `hubgames.js`) and `finals.js` use them. `schedule.js` and
+    `protests.js` keep the same test written out, because they are
+    bundled into the reader, which is held byte for byte
+    (`npm run check:bundles`).
+  - One file as it leaves qb-td is `engine/exportfile.js`: the Worker's
+    game downloads (`storedFileText`, over `modaqfile.js`
+    `renameModaqTexts` and `modaqExport`), its public QBJ route
+    (`publicQbjText`), the roster's Setup download (`rosterExportBody`,
+    which drops `_formerNames` through `qbj.js` `rosterForExport`), and
+    the names and links the hub shows for each upload (`fileDownloads`,
+    `uploadQbjName`). The Worker reads a roster's map with `games.js`
+    `rosterNamesFromText`, which skips the parse when the text has no
+    `_formerNames`.
+  - The set page renames with the map the Worker writes into the set
+    state (`setstats.js` `siteNames`).
+  - The hub's game lists and protests map the upload summaries the same
+    way (`hubgames.js` `createHubNames`, `protests.js` `renamedSummary`),
+    and so do the playoff and Finals auto-fill and the "Finished rounds
+    only" label (`schedule.js` `namedFiles`, `summaryTeams`).
+
+  Auto-fill decides what is ready from the saved schedule, not the tab's
+  copy (`finals.js` `fillProgress`, `autoFillSaved`). The hub loads the
   rename map again when the roster's save time (`roster_at` in the admin
   detail) moves, so a rename saved in another tab reaches it on its next
   refresh. The schedule is the one copy rewritten: after a roster save,
   `followRenames` (`admin.js`) runs `renameTeams` (`schedule.js`) on the
-  saved schedule. Rosters that leave qb-td drop `_formerNames`
-  (`rosterForExport`; the hub's roster Download goes through the
-  Worker's `part=roster`, `rosterExportResponse`). An uploaded roster
-  carries no list of renames, so `rosterRenames` pairs a dropped team
-  with a new one only by shared players (at least half of the smaller
-  team); position alone pairs nothing. Player renames come only from the
-  editor.
+  saved schedule. Rosters that leave qb-td drop `_formerNames`: the
+  hub's roster Download goes through the Worker's `part=roster`
+  (`rosterExportResponse`, `exportfile.js` `rosterExportBody`), and the
+  roster editor's Download and the QBJ bundle use `exports.js`
+  `rosterFileText`. An uploaded roster carries no list of renames, so
+  `rosterRenames` pairs a dropped team with a new one only by shared
+  players (at least half of the smaller team); position alone pairs
+  nothing. Player renames come only from the editor.
 - **Rooms** are renamed in Setup > Rooms. The Worker writes the new name
   into the saved schedule room the bucket resolves to, by its `bucket`
   link or else by its old name (`worker.js` `renameBucket`,
@@ -618,14 +651,20 @@ rename therefore never rewrites a game already played. How it works today:
   and the renamed room matches that room instead. The room's games get
   the new name in their public copies, and the rename forces a rebuild,
   so the round shards and the set page's buzzpoints follow. The public
-  page shows each game's current room from the state's file list.
+  page shows each game's current room from the state's file list. The
+  schedule write lands only on the copy the Worker read, so a hub's
+  schedule save made in between is renamed too, not overwritten; the
+  answer names both copies (`sched_was`, `sched_etag`), so the hub that
+  held the renamed copy keeps saving without a question (see "Saves from
+  two hub tabs").
 
 Known limits:
 
-- Nothing applies the map at one boundary, so code that reads games,
-  upload summaries or the tiebreaker log has to apply it itself. The
-  tiebreaker "heard by" log (`packetsui.js`, `tb_add_dialog.js`) still
-  does not: it names the teams as they were when the game was uploaded.
+- Games are renamed in one place (`games.js` `readGame`), but upload
+  summaries, the Worker's downloads, the set page and the tiebreaker log
+  each apply the map themselves. The tiebreaker "heard by" log
+  (`packetsui.js`, `tb_add_dialog.js`) still does not: it names the
+  teams as they were when the game was uploaded.
 - A protest ruling is found under the game's current team names or the
   names it was uploaded under (`protests.js` `protestRows`). A ruling
   made between two renames of one of its teams is filed under the middle
@@ -637,10 +676,66 @@ Known limits:
   a rename brings the renamed schedule but not the renamed games, until
   the page reloads or a round's games move.
 
+## Saves from two hub tabs
+
+A TD may have the hub open in two tabs, or two TDs on two laptops. Each
+save says which copy the tab edited (`app/js/saves.js`), so a save from a
+tab whose copy is out of date keeps the other tab's change instead of
+writing over it. One tab alone gets what it always got, from the same
+requests.
+
+- **Settings**: the body adds `settings_base`, the settings text the
+  tab's copy was read as, and `settings_touched`, the keys the save sets
+  whatever its copy held (Reset to preset, `statsSeen`, auto-advance,
+  the round count, the bye room). When the base is what is stored, the
+  whole object is stored, as before. Otherwise only this tab's changes go
+  onto what is stored (`worker.js` `mergeSettings`): the preset and its
+  overrides move together, and `buzz` merges key by key unless the tab
+  sets a password, which takes its whole `buzz` so the hash and
+  `buzz_wrap` stay a pair. The open key and `buzz_wrap` are made once,
+  for what is finally stored. Opening the next round when auto-advance
+  is switched on runs only when this save is the one switching it on.
+- **Rulings**: the body adds `rulings_prev`, each ruling the tab changed
+  as its copy had it (not the whole map). A current copy stores the map
+  as sent; a stale one puts only those rulings onto the stored map
+  (`mergeRulings`; `rulingsCurrent` settles the usual one-ruling case
+  from the texts).
+- With a base, either one lands with one UPDATE that holds only while
+  the column is what was read (`updateGuarded`). A write in the moment
+  between makes it read the row again and merge once more, three tries
+  in all, then 409.
+- **Schedule and roster** are whole files. The hub reads them with their
+  R2 etag (`X-Qbtd-Etag`, exposed, sent only on the admin file route's
+  raw read of these two keys) and saves onto that copy (`putOver`, R2
+  `onlyIf`): the schedule names it in an `X-Qbtd-Base` header on its
+  already preflighted JSON POST, the roster in `?base=` on its simple
+  text POST, so neither adds a request. A refused schedule save answers
+  `{ok: false, conflict: true, etag, schedule}` with the stored copy, or
+  `etag` and `schedule` null when it was deleted; the same bytes count as
+  saved with no write, so two hubs filling the same playoff slots never
+  ask. A refused roster save answers the stored etag (one R2 head).
+  Nothing is written either way. The editor then asks (`SCHED_CONFLICT`,
+  `ROSTER_CONFLICT`): OK saves this tab's version over the other, and
+  Cancel keeps the edits in the tab, unsaved. Auto-fill never asks: it
+  fills the stored copy once more, and stops when the schedule was
+  deleted or the tab has unsaved edits.
+- A save with no base is the plain save it always was: the demo, a copy
+  with no etag, any older page. The client never sends `none`. Without a
+  conflict, each save's D1 statements and R2 operations are the ones it
+  made before, with the UPDATE and the put made conditional
+  (`tests/golden/worker_meter.json`); the day totals are unchanged
+  (`meter_totals.json`, with `QBTD_SEND_BASE=1` too). The save bodies
+  grow by the base text.
+
+Known limit: the first save of a new schedule (Generate) sends no base,
+and the Worker answers an etag only to a save that sent one, so that
+schedule is unguarded in its tab until the tab reads it again (a reload,
+a roster save, or its own auto-fill).
+
 ## Tests
 
 ```bash
-npm test                         # the six below, in this order; no Worker, no network
+npm test                         # the seven below, in this order; no Worker, no network
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
 node tests/live_publish.js       # qb-td-live publisher: deploys, retries, heartbeats, unpublish, hub mark
                                  # (real SQLite from schema.sql via node:sqlite; R2 + Cloudflare API mocked)
@@ -653,6 +748,8 @@ node tests/hubgames_ref.mjs      # the hub's game loading (app/js/hubgames.js) a
 node tests/worker_inproc.mjs     # worker.js in Node (SQLite, in-memory R2): download bytes, each
                                  # request's D1, R2 and crypto operations and its CORS/X-Qbtd-* headers,
                                  # held to tests/golden/worker_*.json
+node tests/saves_worker.mjs      # two tabs saving one tournament, the Worker side (see "Saves from two
+                                 # hub tabs"): what is kept, what is refused, and what each costs
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
@@ -690,6 +787,7 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   DISCORD_WEBHOOK=http://127.0.0.1:8798/hook
 #   CF_API_TOKEN=e2e-token
 #   CF_API_BASE=http://127.0.0.1:8798/cf
+# (QBTD_HOOK_PORT=<port> moves the sink; the two URLs then name that port)
 npx wrangler dev --local --port 8799 --test-scheduled &
 cd .. && node tests/e2e_worker.js && node tests/e2e_sets.js && node tests/e2e_brackets.js \
   && node tests/e2e_alerts.js && node tests/e2e_directory.js
@@ -775,6 +873,7 @@ QBTD_CAPTURE=<dir> QBTD_PAGE_BASE=http://127.0.0.1:9615 QBTD_LIVE_PORT=9616 QBTD
 node tools/ab_compare.mjs <baseline capture> <other capture>
 
 node tests/e2e_autofill.js       # also each hub's requests all day, exactly (tests/golden/e2e_autofill_counts.json)
+node tests/e2e_saves.js          # two hub tabs in Chrome saving what the other just changed: kept, or asked about
 node tests/e2e_day.js            # (--meter) also the hub's collectMatches (tests/golden/e2e_day_collect.json)
 
 # what a day costs, held to tests/golden/meter_totals.json (--meter, a fresh
