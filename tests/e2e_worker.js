@@ -380,6 +380,65 @@ ok('schedule stamp cleared', r.body.schedule === null, r.body.schedule);
 r = await call(A + '/schedule', { method: 'POST', json: SCHED });
 ok('schedule restored', r.status === 200);
 
+// Two tabs (E10, here on wrangler's own R2 and D1): a save that names the
+// copy it edited lands only on that copy. Schedule: X-Qbtd-Base, which
+// the preflight allows; roster: ?base=; each read names its copy in
+// X-Qbtd-Etag. Settings: settings_base, merged onto what is stored.
+{
+  const fileUrl = (key) => `${BASE}${A}/file?key=${encodeURIComponent(key)}`;
+  const schedKey = `t/${tid}/schedule.json`;
+  let res = await fetchRetry(fileUrl(schedKey));
+  const e1 = res.headers.get('x-qbtd-etag');
+  ok('E10: the schedule read names its copy', res.status === 200 && !!e1
+    && res.headers.get('access-control-expose-headers') === 'X-Qbtd-Etag', [...res.headers]);
+  res = await fetchRetry(`${BASE}${A}/schedule`, { method: 'OPTIONS', headers: { Origin: 'http://localhost',
+    'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,x-qbtd-base' } });
+  ok('E10: the preflight allows X-Qbtd-Base', res.status === 204
+    && res.headers.get('access-control-allow-headers') === 'Authorization, Content-Type, X-Qbtd-Base', [...res.headers]);
+  const SCHED2 = { ...SCHED, updated: 2 };
+  r = await call(A + '/schedule', { method: 'POST', json: SCHED2, headers: { 'X-Qbtd-Base': e1 } });
+  const e2 = r.body.etag;
+  ok('E10: a schedule save on the copy it read lands, with the new etag', r.status === 200 && r.body.ok === true
+    && typeof e2 === 'string' && e2 !== e1, r.body);
+  res = await fetchRetry(fileUrl(schedKey));
+  ok('E10: ...which the next read names', res.headers.get('x-qbtd-etag') === e2, res.headers.get('x-qbtd-etag'));
+  r = await call(A + '/schedule', { method: 'POST', json: { ...SCHED, updated: 3 }, headers: { 'X-Qbtd-Base': e1 } });
+  ok('E10: a save on a copy another tab replaced is refused, with the stored copy', r.status === 200
+    && r.body.ok === false && r.body.conflict === true && r.body.etag === e2
+    && JSON.stringify(r.body.schedule) === JSON.stringify(SCHED2), r.body);
+  r = await call(A + '/schedule', { method: 'POST', json: SCHED2, headers: { 'X-Qbtd-Base': e1 } });
+  ok('E10: the same bytes count as saved', r.body.ok === true && r.body.etag === e2, r.body);
+  r = await call(A + '/schedule', { method: 'POST', json: SCHED, headers: { 'X-Qbtd-Base': e2 } });
+  ok('E10: the schedule as it was', r.body.ok === true, r.body);
+
+  const rosterKey = `t/${tid}/roster.qbj`;
+  res = await fetchRetry(fileUrl(rosterKey));
+  const r1 = res.headers.get('x-qbtd-etag');
+  ok('E10: the roster read names its copy', res.status === 200 && !!r1 && (await res.text()) === ROSTER0, r1);
+  // (R2's etag is the content's hash: the same bytes saved again keep it)
+  const ROSTER0b = JSON.stringify(JSON.parse(ROSTER0), null, 2);
+  r = await call(`${A}/roster?name=roster.qbj&base=${encodeURIComponent(r1)}`, { method: 'POST', body: ROSTER0b });
+  const r2 = r.body.etag;
+  ok('E10: a roster save on the copy it read lands, with the new etag', r.status === 200
+    && r.body.filename === 'roster.qbj' && typeof r2 === 'string' && r2 !== r1, r.body);
+  r = await call(`${A}/roster?name=roster.qbj&base=${encodeURIComponent(r1)}`, { method: 'POST', body: ROSTER0 });
+  ok('E10: a roster save on a replaced copy is refused, with the stored etag', r.status === 200
+    && r.body.ok === false && r.body.conflict === true && r.body.etag === r2, r.body);
+  r = await call(`${A}/roster?name=roster.qbj&base=${encodeURIComponent(r2)}`, { method: 'POST', body: ROSTER0 });
+  ok('E10: the roster as it was', r.status === 200 && r.body.etag === r1, r.body);
+
+  const held = (await call(A)).body.tournament.settings;
+  const tab = JSON.parse(held);
+  r = await call(A, { method: 'POST', json: { settings: { ...tab, catStats: false }, settings_base: held } });
+  ok('E10: settings saved on the copy read', r.status === 200, r.body);
+  r = await call(A, { method: 'POST', json: { settings: { ...tab, rounds: 9 }, settings_base: held } });
+  const merged = JSON.parse((await call(A)).body.tournament.settings);
+  ok('E10: a stale tab\'s settings save keeps the other tab\'s change', r.status === 200
+    && merged.catStats === false && merged.rounds === 9 && merged.gameFormat === tab.gameFormat, merged);
+  r = await call(A, { method: 'POST', json: { settings: tab } });
+  ok('E10: the settings as they were', r.status === 200 && (await call(A)).body.tournament.settings === held);
+}
+
 // broadcasts were retired (9/28/2026): a dashboard still open from before
 // hears so, and no surface carries the field any more
 r = await call(A, { method: 'POST', json: { announce: [] } });

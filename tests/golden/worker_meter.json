@@ -7307,7 +7307,7 @@
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
-   "r2 put t/1/roster.qbj",
+   "r2 put t/1/roster.qbj (conditional)",
    "d1 run UPDATE tournaments SET roster_r2_key = ?2, roster_name = ?3 WHERE id = ?1",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
@@ -7721,7 +7721,7 @@
    "crypto deriveKey",
    "crypto decrypt",
    "r2 delete t/1/open-key.json",
-   "d1 run UPDATE tournaments SET settings = ? WHERE id = ?",
+   "d1 run UPDATE tournaments SET settings = ? WHERE id = ? AND settings = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
  },
@@ -7766,7 +7766,7 @@
    "crypto deriveKey",
    "crypto encrypt",
    "r2 put t/1/open-key.json",
-   "d1 run UPDATE tournaments SET settings = ? WHERE id = ?",
+   "d1 run UPDATE tournaments SET settings = ? WHERE id = ? AND settings = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
  },
@@ -7779,7 +7779,7 @@
    "crypto deriveKey",
    "crypto decrypt",
    "r2 delete t/1/open-key.json",
-   "d1 run UPDATE tournaments SET settings = ? WHERE id = ?",
+   "d1 run UPDATE tournaments SET settings = ? WHERE id = ? AND settings = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
  },
@@ -7810,7 +7810,7 @@
    "crypto deriveKey",
    "crypto decrypt",
    "r2 delete t/1/open-key.json",
-   "d1 run UPDATE tournaments SET settings = ? WHERE id = ?",
+   "d1 run UPDATE tournaments SET settings = ? WHERE id = ? AND settings = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
  },
@@ -7823,7 +7823,7 @@
    "crypto deriveKey",
    "crypto decrypt",
    "r2 delete t/1/open-key.json",
-   "d1 run UPDATE tournaments SET settings = ? WHERE id = ?",
+   "d1 run UPDATE tournaments SET settings = ? WHERE id = ? AND settings = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1",
    "d1 all SELECT current_round, settings, bracket_rounds FROM tournaments WHERE id = ?1",
    "d1 all SELECT id, room_name FROM buckets WHERE tournament_id = ?1",
@@ -7862,7 +7862,7 @@
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
-   "d1 run UPDATE tournaments SET rulings = ? WHERE id = ?",
+   "d1 run UPDATE tournaments SET rulings = ? WHERE id = ? AND rulings = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
  },
@@ -7910,7 +7910,7 @@
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
-   "r2 put t/1/schedule.json",
+   "r2 put t/1/schedule.json (conditional)",
    "d1 run UPDATE tournaments SET current_round = current_round, bracket_rounds = NULL WHERE id = ?1",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
@@ -7945,7 +7945,7 @@
   "status": 204,
   "ops": [],
   "headers": {
-   "access-control-allow-headers": "Authorization, Content-Type",
+   "access-control-allow-headers": "Authorization, Content-Type, X-Qbtd-Base",
    "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
    "access-control-allow-origin": "http://localhost"
   }
@@ -7961,7 +7961,7 @@
    "d1 all SELECT id, room_name FROM buckets WHERE tournament_id = ?1",
    "d1 run UPDATE buckets SET room_name = ?3 WHERE id = ?1 AND tournament_id = ?2",
    "r2 get t/1/schedule.json",
-   "r2 put t/1/schedule.json",
+   "r2 put t/1/schedule.json (conditional)",
    "d1 all SELECT id FROM files WHERE tournament_id = ?1 AND bucket_id = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL",
    "r2 get t/1/pub/1.json",
    "r2 get t/1/pub/8.json",
@@ -7982,7 +7982,7 @@
    "d1 all SELECT id, room_name FROM buckets WHERE tournament_id = ?1",
    "d1 run UPDATE buckets SET room_name = ?3 WHERE id = ?1 AND tournament_id = ?2",
    "r2 get t/1/schedule.json",
-   "r2 put t/1/schedule.json",
+   "r2 put t/1/schedule.json (conditional)",
    "d1 all SELECT id FROM files WHERE tournament_id = ?1 AND bucket_id = ?2 AND kind IN ('qbj', 'combined') AND error IS NULL",
    "r2 get t/1/pub/4.json",
    "r2 put t/1/pub/4.json",

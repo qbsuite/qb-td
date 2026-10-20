@@ -33,8 +33,13 @@ const readerBody = JSON.stringify({ qbj: match(1), game: { game, uiState: {} },
 const rosterQbj = (renamed) => JSON.stringify({ objects: [{ type: 'Tournament', registrations: [
   { name: 'Alpha', teams: [{ name: 'Alpha', players: [renamed ? { name: 'Annie', _formerNames: ['Ann'] } : { name: 'Ann' }] }] },
   { name: 'Beta', teams: [{ name: 'Beta', players: [{ name: 'Bob' }] }] }] }] });
-// a 64 KB rulings map, the most the hub keeps
-const bigRulings = Object.fromEntries(Array.from({ length: 700 }, (_, i) => [`r${1 + (i % 12)}|q${i}|Team ${i}|Team ${i + 1}`, { r: 'upheld', note: 'x'.repeat(40) }]));
+// a rulings map near the most the Worker keeps (500 rulings, 64 KB as
+// stored; 61 KB here), each ruling with its time, as cleanRulings stores
+// it and the hub holds it
+const bigRulings = Object.fromEntries(Array.from({ length: 480 }, (_, i) => [`r${1 + (i % 12)}|q${i}|Team ${i}|Team ${i + 1}`, { r: 'upheld', note: 'x'.repeat(58), at: 1760000000000 + i }]));
+const ruledKey = Object.keys(bigRulings)[0];
+// the map with its first ruling set to r, as the hub's saveRuling sends one change
+const ruled = (r) => ({ ...bigRulings, [ruledKey]: { ...bigRulings[ruledKey], r } });
 
 // One Worker set up with a played tournament and a set mirror; its routes.
 async function setup(root) {
@@ -69,6 +74,7 @@ async function setup(root) {
   const enc = encodeURIComponent;
   const settingsNow = () => sql('SELECT settings FROM tournaments WHERE id = ?', t.id)[0].settings || '{}';
   let flip = false;
+  let held = 'upheld';
   const routes = {
     ['upload reader .qbtd.json (~' + Math.round(readerBody.length / 1024) + ' KB)']: () => call('/b/' + room.secret + '/upload?round=1&name=Round_1_Alpha_Beta.qbtd.json', { method: 'POST', body: readerBody }),
     'admin raw download': () => call(`${A}/file?key=${enc(key)}&dl=x`),
@@ -79,8 +85,13 @@ async function setup(root) {
     'roster download (part=roster), no renames': () => call(`${A}/file?key=${enc(`t/${t.id}/roster.qbj`)}&part=roster&dl=r.qbj`),
     'settings save, no base': () => call(A, { method: 'POST', json: { settings: { gameFormat: (flip = !flip) ? 'acf' : 'naqt' } } }),
     'settings save, equal base': () => { const b = JSON.stringify(JSON.parse(settingsNow())); return call(A, { method: 'POST', json: { settings: { gameFormat: (flip = !flip) ? 'acf' : 'naqt' }, settings_base: b } }); },
-    'rulings save (64 KB map), no base': () => call(A, { method: 'POST', json: { rulings: bigRulings } }),
-    'rulings save (64 KB map), equal base': () => call(A, { method: 'POST', json: { rulings: bigRulings, rulings_prev: { [Object.keys(bigRulings)[0]]: bigRulings[Object.keys(bigRulings)[0]] } } }),
+    // one ruling changed per save, flipping, so the stored map is always
+    // the hub's copy (held): with rulings_prev, the Worker's current-copy path
+    'rulings save (64 KB map), no base': () => call(A, { method: 'POST', json: { rulings: ruled(held = held === 'upheld' ? 'denied' : 'upheld') } }),
+    'rulings save (64 KB map), equal base': () => {
+      const prev = ruled(held)[ruledKey];
+      return call(A, { method: 'POST', json: { rulings: ruled(held = held === 'upheld' ? 'denied' : 'upheld'), rulings_prev: { [ruledKey]: prev } } });
+    },
     'schedule save, no header': () => call(A + '/schedule', { method: 'POST', json: sched }),
     'schedule save, matching header': () => call(A + '/schedule', { method: 'POST', json: sched, headers: { 'X-Qbtd-Base': etag(`t/${t.id}/schedule.json`) } }),
     'roster save, no base': () => call(A + '/roster?name=roster.qbj', { method: 'POST', body: rosterQbj(false) }),

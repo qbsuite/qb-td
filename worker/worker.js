@@ -478,6 +478,124 @@ function cleanRulings(map) {
   return { error: null, json };
 }
 
+/* A stale tab's save onto what is stored now (updateGuarded). A key is
+   this tab's change when its JSON differs between the copy the tab read
+   and the object it sends (a key it dropped counts); that key takes the
+   tab's value, or goes. Every other key keeps what is stored. */
+const isPlainObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const ownValue = (o, k) => (hasOwn(o, k) ? o[k] : undefined);
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// keys as JSON.parse makes them: own data keys, "__proto__" included
+function putOwn(o, k, v) {
+  Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true });
+}
+function applyChanges(stored, mine, keys) {
+  const out = { ...stored };
+  for (const k of keys) {
+    if (hasOwn(mine, k)) putOwn(out, k, mine[k]);
+    else delete out[k];
+  }
+  return out;
+}
+// The game format is the preset and the overrides from it, together.
+const FORMAT_KEYS = ['gameFormat', 'formatOverrides'];
+
+/**
+ * Settings. baseText: the settings text the tab's copy was read as; mine:
+ * the object it saves; storedText: the column now; touched: keys the tab
+ * sets or clears whatever its copy held (Reset to preset, statsSeen), so
+ * they apply even when its copy already agreed. Whole values, except:
+ * gameFormat and formatOverrides move together when either changes, and
+ * buzz merges key by key unless the tab changes its password (buzz.hash,
+ * or wholeBuzz: the request carries buzz_token), which takes the tab's
+ * whole buzz so the hash and buzz_wrap stay a pair.
+ * Returns {settings, changed} or {error}.
+ */
+export function mergeSettings(baseText, mine, storedText, touched = [], wholeBuzz = false) {
+  let base;
+  try { base = JSON.parse(baseText); } catch (e) { return { error: 'bad settings' }; }
+  if (!isPlainObject(base) || !isPlainObject(mine)) return { error: 'bad settings' };
+  const changed = [...new Set([...Object.keys(base), ...Object.keys(mine), ...touched])]
+    .filter((k) => touched.includes(k) || !sameJson(ownValue(base, k), ownValue(mine, k)));
+  if (FORMAT_KEYS.some((k) => changed.includes(k))) {
+    for (const k of FORMAT_KEYS) if (!changed.includes(k)) changed.push(k);
+  }
+  let stored = null;
+  try { stored = JSON.parse(storedText); } catch (e) { /* unreadable: the tab's whole copy */ }
+  if (!isPlainObject(stored)) return { settings: mine, changed };
+  const keyed = changed.includes('buzz') && !wholeBuzz && !touched.includes('buzz')
+    && isPlainObject(ownValue(base, 'buzz')) && isPlainObject(ownValue(mine, 'buzz')) && isPlainObject(ownValue(stored, 'buzz'))
+    && sameJson(base.buzz.hash, mine.buzz.hash);
+  const out = applyChanges(stored, mine, keyed ? changed.filter((k) => k !== 'buzz') : changed);
+  if (keyed) {
+    const buzzKeys = [...new Set([...Object.keys(base.buzz), ...Object.keys(mine.buzz)])]
+      .filter((k) => !sameJson(ownValue(base.buzz, k), ownValue(mine.buzz, k)));
+    putOwn(out, 'buzz', applyChanges(stored.buzz, mine.buzz, buzzKeys));
+  }
+  return { settings: out, changed };
+}
+
+/**
+ * Rulings. prev: each ruling the tab changes, as its copy had it (null:
+ * none); mine: the whole map it saves; storedText: the column now. The
+ * tab's copy is mine with those put back: when that is what is stored,
+ * mine is the result, as a save without prev stores it. Otherwise only
+ * the rulings it changed go onto the stored map, each whole. Returns the
+ * map for cleanRulings.
+ */
+export function mergeRulings(prev, mine, storedText) {
+  if (!isPlainObject(mine)) return mine;
+  const changed = rulingChanges(prev, mine);
+  const was = { ...mine };
+  for (const k of changed) {
+    if (prev[k] === null || prev[k] === undefined) delete was[k];
+    else putOwn(was, k, prev[k]);
+  }
+  if (JSON.stringify(was) === storedText) return mine;
+  let stored = null;
+  try { stored = JSON.parse(storedText); } catch (e) { /* unreadable: the tab's whole map */ }
+  if (!isPlainObject(stored)) return mine;
+  return applyChanges(stored, mine, changed);
+}
+const rulingChanges = (prev, mine) => Object.keys(prev)
+  .filter((k) => !sameJson(prev[k] ?? null, hasOwn(mine, k) ? mine[k] : null));
+
+/**
+ * mergeRulings' first question, told from the texts alone, which costs a
+ * save of a large map next to nothing: the cleaned map the tab sends
+ * (mineJson, cleanRulings) is the stored text with the one ruling it
+ * changed put in, new at the end or changed in its place. Then the tab's
+ * copy is what is stored and mineJson is the result. False when the texts
+ * say otherwise or can't say (no change, a ruling dropped, several):
+ * mergeRulings then compares the whole copy.
+ */
+export function rulingsCurrent(prev, mine, mineJson, storedText) {
+  if (!isPlainObject(mine)) return false;
+  const changed = rulingChanges(prev, mine);
+  const k = changed[0];
+  if (changed.length !== 1 || !hasOwn(mine, k)) return false;
+  const seg = (v, clean) => {
+    const one = {};
+    putOwn(one, k, v);
+    return ((clean ? cleanRulings(one).json : JSON.stringify(one)) || '{}').slice(1, -1);
+  };
+  const now = seg(mine[k], true);
+  if (!now) return false;
+  // compared in slices, which copy neither text
+  if (prev[k] === null || prev[k] === undefined) {
+    const n = storedText.length - 1;
+    return storedText === '{}' ? mineJson === '{' + now + '}'
+      : mineJson.slice(n) === ',' + now + '}' && mineJson.slice(0, n) === storedText.slice(0, n);
+  }
+  // `"k":{` unescaped is only ever ruling k's own place in the text
+  const i = mineJson.indexOf(now);
+  const was = seg(prev[k], false);
+  return i > 0 && storedText.slice(i, i + was.length) === was
+    && storedText.slice(0, i) === mineJson.slice(0, i)
+    && storedText.slice(i + was.length) === mineJson.slice(i + now.length);
+}
+
 // MODAQ writes protest reasons — moderator free text that routinely
 // quotes answers — verbatim into the match's `notes`. Nothing public
 // renders notes, so every public copy of a qbj (the per-game blob, the
@@ -2318,6 +2436,13 @@ async function updateTournament(request, env, t) {
     // deploy (want != hash) drops it. On is the tick's rebuild's job.
     if (!body.published && liveEnabled(env)) sets.push('live_want = NULL');
   }
+  // A hub's save that says what its copy was (settings_base, rulings_prev)
+  // lands on what is stored now: updateGuarded, below. Without either, the
+  // request's whole object is stored, as it always was.
+  if ((body.settings !== undefined && body.settings_base !== undefined)
+    || (body.rulings !== undefined && body.rulings_prev !== undefined)) {
+    return updateGuarded(env, t, body, sets, binds);
+  }
   if (body.settings !== undefined) {
     if (typeof body.settings !== 'object' || body.settings === null) return err(env, 400, 'bad settings');
     const s = JSON.stringify(body.settings);
@@ -2379,6 +2504,109 @@ async function updateTournament(request, env, t) {
   // switching auto-advance on after every room has already started opens
   // the next round now, rather than at a start that will never come
   const advanced = body.settings && body.settings.autoAdvance ? await maybeAdvance(env, id) : false;
+  return json(env, { ok: true, advanced });
+}
+
+// A hub's settings or rulings save that says what its copy was
+// (app/js/saves.js): settings_base, the settings text its copy was read
+// as, with settings_touched, the keys it sets or clears whatever its copy
+// held; rulings_prev, each ruling it changes as its copy had it. When the
+// copy is what is stored (one tab, the usual case) the request's whole
+// object is stored, exactly as updateTournament stores it without them.
+// When another tab saved in between, only this tab's changes go onto
+// what is stored now (mergeSettings, mergeRulings), so the other tab's
+// are kept. Either way the UPDATE lands only while the column still
+// holds what was read; a write in the moment between makes it read the
+// row again and merge once more, three tries in all. The password rule,
+// buzz_wrap and the open key follow what is stored, made once each.
+async function updateGuarded(env, t, body, sets, binds) {
+  const id = t.id;
+  const mine = body.settings;
+  const sBase = mine !== undefined ? body.settings_base : undefined;
+  const rPrev = body.rulings !== undefined ? body.rulings_prev : undefined;
+  if (mine !== undefined && (typeof mine !== 'object' || mine === null)) return err(env, 400, 'bad settings');
+  if (sBase !== undefined && typeof sBase !== 'string') return err(env, 400, 'bad settings');
+  if (rPrev !== undefined && (!rPrev || typeof rPrev !== 'object' || Array.isArray(rPrev))) return err(env, 400, 'bad rulings');
+  const touched = Array.isArray(body.settings_touched) ? body.settings_touched.filter((k) => typeof k === 'string') : [];
+  const token = typeof body.buzz_token === 'string' && body.buzz_token ? body.buzz_token : null;
+  let row = { settings: t.settings, rulings: t.rulings }; // what this try merges onto
+  let wrap = null;      // buzz_wrap under the token, made once
+  let openFor = null;   // the statsOpen the open key was last put or deleted for
+  // the open key follows statsOpen, as in updateTournament, once per state
+  const openKey = async (s) => {
+    const on = s.statsOpen === true;
+    if (openFor === on) return;
+    openFor = on;
+    if (on && t.ckey) {
+      await env.DATA.put(OPEN_KEY(t.id), JSON.stringify({ wrap: await wrapKey(openSecret(env), 'open', t.ckey) }),
+        { httpMetadata: { contentType: 'application/json' } });
+    } else if (!on) {
+      await env.DATA.delete(OPEN_KEY(t.id));
+    }
+  };
+  // a try that stores nothing leaves the open key as the stored settings have it
+  const refuse = async (status, message) => {
+    if (openFor !== null) {
+      let s = {};
+      try { s = JSON.parse(row.settings) || {}; } catch (e) { /* keep {} */ }
+      await openKey(s);
+    }
+    return err(env, status, message);
+  };
+  let settings = null;  // what the last try stores
+  let merged = null;    // its merge, or null: the request's whole object
+  for (let attempt = 1; ; attempt++) {
+    const s = sets.slice();
+    const b = binds.slice();
+    const cas = [];
+    const casBinds = [];
+    if (mine !== undefined) {
+      merged = sBase !== undefined && sBase !== row.settings
+        ? mergeSettings(sBase, mine, row.settings, touched, token !== null) : null;
+      if (merged && merged.error) return refuse(400, merged.error);
+      settings = merged ? merged.settings : mine;
+      const text = JSON.stringify(settings);
+      if (text.length > 4096) return refuse(400, 'settings too large');
+      const key = settings.buzz;
+      const hasKey = Boolean(key && typeof key.hash === 'string' && key.hash);
+      if ((settings.scoresheets === true || (key && key.mode === 'password')) && !hasKey
+        && settings.statsOpen !== true) {
+        return refuse(400, 'set a password first');
+      }
+      s.push('settings = ?'); b.push(text);
+      if (token && t.ckey && hasKey) {
+        s.push('buzz_wrap = ?'); b.push(wrap || (wrap = await wrapKey(token, 'buzz', t.ckey)));
+      }
+      if (attempt === 1) await openKey(settings);
+      if (sBase !== undefined) { cas.push('settings = ?'); casBinds.push(row.settings); }
+    }
+    if (body.announce !== undefined) return refuse(400, 'broadcasts were removed');
+    if (body.rulings !== undefined) {
+      // the map as sent, as without rulings_prev, when the tab's copy is current
+      let cleaned = cleanRulings(body.rulings);
+      if (rPrev !== undefined && !(cleaned.json && rulingsCurrent(rPrev, body.rulings, cleaned.json, row.rulings))) {
+        cleaned = cleanRulings(mergeRulings(rPrev, body.rulings, row.rulings));
+      }
+      if (cleaned.error) return refuse(400, cleaned.error);
+      s.push('rulings = ?'); b.push(cleaned.json);
+      if (rPrev !== undefined) { cas.push('rulings = ?'); casBinds.push(row.rulings); }
+    }
+    const out = await env.DB.prepare(
+      `UPDATE tournaments SET ${s.join(', ')} WHERE id = ?${cas.map((c) => ' AND ' + c).join('')}`
+    ).bind(...b, id, ...casBinds).run();
+    if (!cas.length || out.meta.changes) break;
+    const now = await env.DB.prepare('SELECT settings, rulings FROM tournaments WHERE id = ?1').bind(id).first();
+    if (!now) return refuse(404, 'bad link');
+    row = now;
+    if (attempt === 3) return refuse(409, 'Another tab saved a change at the same moment. Please try again.');
+  }
+  // a later try may have stored another statsOpen than the first one's
+  if (settings) await openKey(settings);
+  await markPub(env, id);
+  // auto-advance switched on (updateTournament); a merge runs it only when
+  // this request is the one switching it on, not on another tab's say
+  const advanced = settings && settings.autoAdvance && (!merged || merged.changed.includes('autoAdvance'))
+    ? await maybeAdvance(env, id) : false;
   return json(env, { ok: true, advanced });
 }
 
@@ -2455,13 +2683,21 @@ async function renameBucket(request, env, t, bucketId) {
   // rename on the schedule room this one resolves to (its link, else its
   // old name), so the public schedule and the reader say the new name
   // without a trip through the schedule editor, and a room matched by
-  // name stays matched.
-  const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
-  const sched = obj ? await obj.json().catch(() => null) : null;
-  if (followRoomRename(sched, was, roomName, rooms.map((b) => b.id))) {
-    await env.DATA.put(`t/${t.id}/schedule.json`, JSON.stringify(sched), {
+  // name stays matched. The write lands only on the copy it read, so a
+  // hub's schedule save in between is renamed too, not overwritten; the
+  // answer names both copies (sched_was, sched_etag), so the hub that
+  // held the one renamed knows its copy is current.
+  const schedKey = `t/${t.id}/schedule.json`;
+  let follow = {};
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const obj = await env.DATA.get(schedKey);
+    const sched = obj ? await obj.json().catch(() => null) : null;
+    if (!followRoomRename(sched, was, roomName, rooms.map((b) => b.id))) break;
+    const put = await putOver(env, schedKey, JSON.stringify(sched), {
       httpMetadata: { contentType: 'application/json' },
-    });
+    }, obj.etag);
+    if (put) { follow = { sched_was: obj.etag, sched_etag: put.etag }; break; }
+    if (attempt === 3) console.log('room rename lost the schedule retry race for tournament', t.id);
   }
   // The room's games carry its name in their public copies, and the round
   // shards hold those: rewrite them and force the rebuild, as moveFile
@@ -2478,7 +2714,7 @@ async function renameBucket(request, env, t, bucketId) {
   }));
   // game rows on the public page carry the room's name either way
   await (rewrote.some(Boolean) ? forceRebuild(env, t.id) : markPub(env, t.id));
-  return json(env, { id: bucketId, room_name: roomName });
+  return json(env, { id: bucketId, room_name: roomName, ...follow });
 }
 
 /* Text-free per-question category map (t/<tid>/catmap.json, {rounds:
@@ -2929,12 +3165,34 @@ async function uploadRoster(request, url, env, t) {
   if (body.byteLength > MAX_UPLOAD) return err(env, 413, 'roster too large');
 
   const key = `t/${id}/roster.qbj`;
-  await env.DATA.put(key, body, { httpMetadata: { contentType: 'application/json' } });
+  // ?base=: the etag of the copy a hub's roster editor or upload read
+  // (app/js/saves.js), in the query so the POST stays a simple request
+  // with no preflight. The put lands only on that copy; refused, one head
+  // tells the hub the copy stored now, and nothing is written.
+  const base = url.searchParams.get('base');
+  const put = await putOver(env, key, body, { httpMetadata: { contentType: 'application/json' } }, base);
+  if (base && !put) {
+    const cur = await env.DATA.head(key);
+    return json(env, { ok: false, conflict: true, etag: cur ? cur.etag : null });
+  }
   await env.DB.prepare(
     'UPDATE tournaments SET roster_r2_key = ?2, roster_name = ?3 WHERE id = ?1'
   ).bind(id, key, filename).run();
   await markPub(env, id);
-  return json(env, { filename });
+  return json(env, base ? { filename, etag: put.etag } : { filename });
+}
+
+// An R2 put that lands only on the stored copy whose etag is `base` (a
+// hub's read): null when another save got there first. Without a base,
+// the plain put.
+async function putOver(env, key, body, opts, base) {
+  if (!base) return env.DATA.put(key, body, opts);
+  try {
+    return await env.DATA.put(key, body, { ...opts, onlyIf: { etagMatches: base } });
+  } catch (e) {
+    if (/precondition/i.test(String(e && e.message))) return null;
+    throw e;
+  }
 }
 
 async function adminDownload(url, env, t) {
@@ -2954,8 +3212,15 @@ async function adminDownload(url, env, t) {
   const dl = url.searchParams.get('dl') || key.split('/').pop();
   const part = url.searchParams.get('part');
   if (part === 'roster' && key === t.roster_r2_key) return rosterExportResponse(env, obj, await blobKey(t, key), dl);
-  return storedFileResponse(env, obj, await blobKey(t, key), dl, part,
+  const res = await storedFileResponse(env, obj, await blobKey(t, key), dl, part,
     part && t.roster_r2_key ? await rosterNames(env, t.roster_r2_key, await blobKey(t, t.roster_r2_key)) : null);
+  // the schedule and the roster as stored: which copy this is, for the
+  // hub's next save of it (X-Qbtd-Base, ?base=)
+  if (!part && (key === `t/${t.id}/schedule.json` || key === t.roster_r2_key)) {
+    res.headers.set('X-Qbtd-Etag', obj.etag);
+    res.headers.set('Access-Control-Expose-Headers', 'X-Qbtd-Etag');
+  }
+  return res;
 }
 
 // The roster as it leaves qb-td (the Setup Download): without the former
@@ -3274,19 +3539,44 @@ async function putSchedule(request, env, t) {
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return err(env, 400, 'bad json'); }
   const shapeErr = scheduleShapeError(parsed);
   if (shapeErr) return err(env, 400, shapeErr);
-  await env.DATA.put(`t/${t.id}/schedule.json`, body, {
+  // A hub's save names the stored copy it edited (X-Qbtd-Base: the etag
+  // of its read, app/js/saves.js) and lands only on that copy. Without
+  // the header the put is unconditional, as before.
+  const base = request.headers.get('X-Qbtd-Base');
+  const put = await putOver(env, `t/${t.id}/schedule.json`, body, {
     httpMetadata: { contentType: 'application/json' },
-  });
+  }, base);
   // brackets keep their own rounds only when the schedule has more than
   // one bracket in a phase; keep rounds already stored across re-saves
   const model = bracketModel(parsed);
   const multi = !!(model && model.multi);
+  if (base && !put) return scheduleRefused(env, t, body, multi);
   await env.DB.prepare(
     'UPDATE tournaments SET current_round = current_round, bracket_rounds = ' +
     (multi ? "COALESCE(bracket_rounds, '{}')" : 'NULL') + ' WHERE id = ?1'
   ).bind(t.id).run();
   await markPub(env, t.id);
-  return json(env, { ok: true, brackets: multi });
+  return json(env, base ? { ok: true, brackets: multi, etag: put.etag } : { ok: true, brackets: multi });
+}
+
+// A schedule save refused because the stored copy moved on: one read of
+// what is stored now. The same bytes (two hubs filling the same slots)
+// count as saved, with no write. Otherwise the hub gets the stored copy
+// (joined as stored: it was JSON when saved) and its etag, and nothing
+// is written; a schedule deleted meanwhile comes back as null.
+async function scheduleRefused(env, t, body, multi) {
+  const cur = await env.DATA.get(`t/${t.id}/schedule.json`);
+  if (!cur) return json(env, { ok: false, conflict: true, etag: null, schedule: null });
+  const stored = new Uint8Array(await cur.arrayBuffer());
+  const sent = new Uint8Array(body);
+  if (stored.length === sent.length && stored.every((x, i) => x === sent[i])) {
+    return json(env, { ok: true, brackets: multi, etag: cur.etag });
+  }
+  const text = new TextDecoder().decode(stored).trim();
+  const schedule = text.startsWith('{') && text.endsWith('}') ? text : 'null';
+  return new Response(`{"ok":false,"conflict":true,"etag":${JSON.stringify(cur.etag)},"schedule":${schedule}}`, {
+    status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(env) },
+  });
 }
 
 async function deleteSchedule(env, t) {
@@ -5966,7 +6256,11 @@ async function route(request, env, ctx, url) {
   }
 
   if (method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders(env) });
+    // X-Qbtd-Base: the stored copy a hub's schedule save edited
+    // (putSchedule). Browsers read Allow-Headers only here, on the
+    // preflight, so the other responses keep corsHeaders as it is.
+    return new Response(null, { status: 204, headers: { ...corsHeaders(env),
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Qbtd-Base' } });
   }
 
   if (path === '/') return new Response('qb-td: tournament hub backend.', { status: 200 });

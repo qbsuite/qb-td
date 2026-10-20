@@ -34,11 +34,13 @@ const headersOf = {};
 let failures = 0;
 
 // the response headers a browser acts on beyond the body: CORS, Vary, and
-// qb-td's own (X-Qbtd-*), names lowercased, sorted
+// qb-td's own (X-Qbtd-*), names lowercased, sorted; an etag's value is
+// which copy is stored, so it shows as {etag} (saves_worker.mjs checks it)
 const HEADER_RE = /^(access-control-|x-qbtd-|vary$)/;
 function noteHeaders(label, res) {
   if (!res || !res.headers) return;
-  const kept = Object.fromEntries(Object.entries(res.headers).filter(([k]) => HEADER_RE.test(k)).sort(([a], [b]) => a.localeCompare(b)));
+  const kept = Object.fromEntries(Object.entries(res.headers).filter(([k]) => HEADER_RE.test(k))
+    .map(([k, v]) => [k, k === 'x-qbtd-etag' ? '{etag}' : v]).sort(([a], [b]) => a.localeCompare(b)));
   const id = sha(JSON.stringify(kept)).slice(0, 8);
   headerSets[id] = kept;
   headersOf[label] = id;
