@@ -7,7 +7,9 @@
 // module adds its own functions to `candidates` below: each fixture goes
 // through them too, and they must give what the reference copies give.
 // app/engine/games.js is one: readGames as the page and the archive call
-// it, and readGame in the hub's per-game step (hubPerGame).
+// it, and readGame in the hub's per-game step (hubPerGame). The callers
+// that have moved onto it are run as themselves: tools/archive.mjs
+// parseBundle.
 // Run: node tests/games_golden.mjs (part of npm test).
 // QBTD_UPDATE_GOLDEN=1 rewrites the golden from the current code.
 
@@ -21,6 +23,7 @@ import { roundTossupBuzzes, buzzSummary, dedupeEntries } from '../app/engine/buz
 import { readGame, readGames } from '../app/engine/games.js';
 import { categoryStats } from '../app/engine/cats.js';
 import { effectiveFormat } from '../app/js/read_core.js';
+import { parseBundle } from '../tools/archive.mjs';
 import { pubviewFetchMatches, pubviewLoop, archiveParseBundle, hubRef } from './ref_games.mjs';
 import { allFixtures } from './games_fixtures.mjs';
 import { attempt, checkGolden, jsonSha } from './golden_lib.mjs';
@@ -55,6 +58,8 @@ const candidates = [
     const { matches } = readGames(bundle.entries, rosterNameMap(roster), errors);
     return { matches, errors };
   } },
+  // the archive builder itself, now on readGames
+  { name: 'tools/archive.mjs parseBundle', archive: parseBundle },
 ];
 
 const parsedRoster = (q) => {

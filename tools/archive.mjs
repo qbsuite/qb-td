@@ -35,7 +35,8 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSyn
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { parseMatch, parseRoster, rosterNameMap, renameMatch } from '../app/engine/qbj.js';
+import { parseRoster, rosterNameMap } from '../app/engine/qbj.js';
+import { readGames } from '../app/engine/games.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { buildReport } from '../app/engine/report.js';
 import { effectiveFormat } from '../app/js/read_core.js';
@@ -187,20 +188,13 @@ async function capture(api, slug) {
   return { state, data };
 }
 
-/** Parse the bundle the way pubview.js does, so page and report agree:
-    renamed teams and players under the roster's current names. */
-function parseBundle(bundle, roster) {
-  const matches = [];
+/** Parse the bundle the way pubview.js does (games.js readGames), so
+    page and report agree: renamed teams and players under the roster's
+    current names, in bundle order, each game keeping its captured room.
+    Exported for tests/games_golden.mjs. */
+export function parseBundle(bundle, roster) {
   const errors = [];
-  const names = rosterNameMap(roster);
-  for (const entry of bundle.entries) {
-    try {
-      const m = parseMatch(renameMatch(entry.qbj, names), { filename: entry.filename });
-      m.room = entry.room;
-      m.fileId = entry.id;
-      matches.push(m);
-    } catch (e) { errors.push(entry.filename + ': ' + e.message); }
-  }
+  const { matches } = readGames(bundle.entries, rosterNameMap(roster), errors);
   return { matches, errors };
 }
 
