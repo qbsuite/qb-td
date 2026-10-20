@@ -7,6 +7,9 @@
 //                them reader uploads, whose MODAQ files are built too),
 //                every game already read (the cache), so only the parse
 //                and export work is timed
+//   public page, as committed
+//                pubview.js's own fetchMatches (tests/pubview_src.mjs),
+//                roster names included, against the pinned copy of it
 // Each runs the candidate and the reference interleaved, REPS (200) times,
 // the order alternating, each sample long enough (~4 ms) to time. Pass:
 // the median of the paired ratios <= 1.05, and p95 over p95 <= 1.10.
@@ -20,7 +23,8 @@ import { existsSync } from 'node:fs';
 import { rosterNameMap, parseRoster } from '../app/engine/qbj.js';
 import { dedupeEntries } from '../app/engine/buzz.js';
 import { archiveFixture, demoFixture, renamedRosterText, ARCHIVE_SLUGS } from './games_fixtures.mjs';
-import { pubviewLoop, hubRef } from './ref_games.mjs';
+import { pubviewLoop, pubviewFetchMatches, hubRef } from './ref_games.mjs';
+import { pubviewOwnFetchMatches } from './pubview_src.mjs';
 import { jsonSha } from './golden_lib.mjs';
 
 const REPS = Number(process.env.REPS || 200);
@@ -106,6 +110,15 @@ for (const [label, roster] of [['public page, Terrapin, no renames', parseRoster
   const eCand = structuredClone(terp.entries);
   rows.push(await compare(label + ' [' + pubC.name + ']',
     () => pubviewLoop(eRef, names, terp.files), () => pubC.fn(eCand, names, terp.files), pubCheck));
+}
+// the page's fetchMatches itself, as pubview.js has it now
+const pageOwn = await pubviewOwnFetchMatches();
+for (const [label, roster] of [['public page fetchMatches, Terrapin, no renames', parseRoster(terp.rosterQbj)], ['public page fetchMatches, Terrapin, renames', renamed]]) {
+  const eRef = structuredClone(terp.entries);
+  const eCand = structuredClone(terp.entries);
+  rows.push(await compare(label + ' [pubview.js as committed]',
+    () => pubviewFetchMatches({ entries: eRef, files: terp.files, roster }),
+    () => pageOwn({ entries: eCand, files: terp.files, roster }), pubCheck));
 }
 
 /* ---------- the hub's parse phase on 300 uploads ---------- */

@@ -9,7 +9,8 @@
 // app/engine/games.js is one: readGames as the page and the archive call
 // it, and readGame in the hub's per-game step (hubPerGame). The callers
 // that have moved onto it are run as themselves: tools/archive.mjs
-// parseBundle.
+// parseBundle, and the public page's fetchMatches as app/js/pubview.js
+// has it (tests/pubview_src.mjs).
 // Run: node tests/games_golden.mjs (part of npm test).
 // QBTD_UPDATE_GOLDEN=1 rewrites the golden from the current code.
 
@@ -25,6 +26,7 @@ import { categoryStats } from '../app/engine/cats.js';
 import { effectiveFormat } from '../app/js/read_core.js';
 import { parseBundle } from '../tools/archive.mjs';
 import { pubviewFetchMatches, pubviewLoop, archiveParseBundle, hubRef } from './ref_games.mjs';
+import { pubviewOwnFetchMatches } from './pubview_src.mjs';
 import { allFixtures } from './games_fixtures.mjs';
 import { attempt, checkGolden, jsonSha } from './golden_lib.mjs';
 
@@ -60,6 +62,8 @@ const candidates = [
   } },
   // the archive builder itself, now on readGames
   { name: 'tools/archive.mjs parseBundle', archive: parseBundle },
+  // the public page's fetchMatches, taken from pubview.js as it is now
+  { name: 'app/js/pubview.js fetchMatches', pub: await pubviewOwnFetchMatches() },
 ];
 
 const parsedRoster = (q) => {

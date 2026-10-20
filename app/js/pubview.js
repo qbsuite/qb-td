@@ -13,7 +13,8 @@
 // so behind a moderator's upload).
 
 import { pub, esc, usingStaticData, usingArchive, LIVE } from './api.js';
-import { parseMatch, parseRoster, rosterNameMap, renameMatch, resultOf } from '../engine/qbj.js';
+import { parseRoster, rosterNameMap, resultOf } from '../engine/qbj.js';
+import { readGames } from '../engine/games.js';
 import { dedupeMatches } from '../engine/stats.js';
 import { buildReport, reportData } from '../engine/report.js';
 import { mountReport, reportPlace } from './reportframe.js';
@@ -206,19 +207,8 @@ async function fetchMatches(errors, rosterP) {
   // list is read live, so a TD's room reassignment (or rename) shows here
   // without the shard having to move.
   const liveRoom = new Map((state.files || []).map((f) => [f.id, f.room]));
-  const out = [];
-  const raw = [];
-  for (const entry of entries) {
-    if (liveRoom.get(entry.id)) entry.room = liveRoom.get(entry.id);
-    try {
-      const qbj = renameMatch(entry.qbj, names);
-      const m = parseMatch(qbj, { filename: entry.filename });
-      m.room = entry.room;
-      m.fileId = entry.id;
-      out.push(m);
-      raw.push({ id: entry.id, round: m.round, room: entry.room, qbj });
-    } catch (e) { errors.push(entry.filename + ': ' + e.message); }
-  }
+  for (const entry of entries) if (liveRoom.get(entry.id)) entry.room = liveRoom.get(entry.id);
+  const { matches: out, raw } = readGames(entries, names, errors);
   rawEntries = dedupeEntries(raw);
   return out;
 }
