@@ -104,7 +104,11 @@ async function bothSides(makePub, calls, measure = null) {
   }
   const { ref, cand } = sides;
   assert.deepEqual(cand.rec.log, ref.rec.log, 'the same requests in the same order');
-  assert.deepEqual(cand.ops, ref.ops, 'the same D1 statements and R2 operations');
+  // Six file reads run at once, so the Worker's operations interleave in
+  // whatever order its reads finish: call by call, the same operations,
+  // as many of each, in any order. The requests' order is held above.
+  const each = (ops) => ops.map((x) => [...x].sort());
+  assert.deepEqual(each(cand.ops), each(ref.ops), 'the same D1 statements and R2 operations');
   assert.equal(cand.rec.fileMax, ref.rec.fileMax, 'as many file reads at once');
   assert.equal(cand.rec.gamesMax, ref.rec.gamesMax, 'as many /games batches at once');
   for (const [i, r] of ref.runs.entries()) {
@@ -114,8 +118,11 @@ async function bothSides(makePub, calls, measure = null) {
     assert.deepEqual(c.out.names, r.out.names, `call ${i + 1}: the same renames`);
     assert.deepEqual(Object.keys(c.out), Object.keys(r.out), `call ${i + 1}: the same fields`);
     if (r.cache) {
-      assert.deepEqual([...c.cache.keys()], [...r.cache.keys()], `call ${i + 1}: the same cache keys`);
-      assert.deepEqual([...c.cache.values()], [...r.cache.values()], `call ${i + 1}: the same cached games`);
+      // filled as the reads finish, so in no fixed order; the hub only
+      // asks it has() and get()
+      const byKey = (m) => [...m.entries()].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
+      assert.deepEqual(byKey(c.cache).map(([k]) => k), byKey(r.cache).map(([k]) => k), `call ${i + 1}: the same cache keys`);
+      assert.deepEqual(byKey(c.cache).map(([, v]) => v), byKey(r.cache).map(([, v]) => v), `call ${i + 1}: the same cached games`);
     }
   }
   return cand;
