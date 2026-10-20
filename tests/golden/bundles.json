@@ -1,13 +1,15 @@
 {
  "worker": {
-  "gzip": 57656,
-  "bytes": 233817,
+  "gzip": 60395,
+  "bytes": 245343,
   "inputs": {
    "app/engine/qbj.js": 7950,
    "app/engine/modaqfile.js": 4037,
+   "app/engine/games.js": 222,
+   "app/engine/exportfile.js": 1270,
    "app/engine/schedule.js": 2692,
    "app/engine/brackets.js": 6458,
-   "worker/worker.js": 212233
+   "worker/worker.js": 222157
   }
  },
  "read": {
