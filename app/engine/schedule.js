@@ -973,6 +973,9 @@ export function poolStandings(pools, teams) {
  *             teams: [{name, pp20tuh, bracket}], level}], in finish
  *             order; level: [[names…]], its teams level on points per 20
  *             too, which keep their pool order
+ *   compared — places compared across pools whose teams have the same
+ *             winning percentage: [{place, teams: [{name, pool, pp20tuh,
+ *             record}], level}], level as for ties, its teams in pool order
  */
 // The rounds pools are ranked on: each phase before the first with a
 // playoff slot (a double round robin's both cycles), less tiebreaker and
@@ -1038,7 +1041,7 @@ export function fillReport(schedule, agg) {
   // A place compared across pools: its teams by winning percentage, then
   // points per 20 tossups heard (the pools may differ in size), level
   // teams in pool order. A tie in winning percentage is listed with how
-  // points per 20 broke it, or that it couldn't.
+  // points per 20 broke it, or which of its teams it couldn't (level).
   const compared = [];
   const places = new Set();
   for (const ph of schedule.phases) for (const r of ph.rounds) {
@@ -1056,7 +1059,7 @@ export function fillReport(schedule, agg) {
       let j = i + 1;
       while (j < teams.length && winPct(teams[j]) === winPct(teams[i])) j++;
       if (j - i > 1) compared.push({ place, teams: teams.slice(i, j).map((x) => ({ name: x.name, pool: x.pool, pp20tuh: x.pp20tuh,
-        record: x.w + '–' + x.l + (x.t ? '–' + x.t : '') })) });
+        record: x.w + '–' + x.l + (x.t ? '–' + x.t : '') })), level: levelRuns(teams.slice(i, j)).map((run) => run.map((x) => x.name)) });
       i = j;
     }
   }

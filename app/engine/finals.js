@@ -12,10 +12,11 @@
 // robin, Copy this phase) counts each time they played. Ties are settled
 // by points per 20 and noted, or wait for the TD when the schedule has a
 // Tiebreakers phase. Teams level on points per 20 too keep the order the
-// public page lists the bracket's teams in (listedOrder).
+// public page lists them in (publicOrder).
 
 import { standings, standingsOrder, levelRuns, dedupeMatches } from './stats.js';
 import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
+import { reportData } from './report.js';
 
 const FIN_RE = /^(\d+)(?:st|nd|rd|th) in (.+)$/;
 const MINOR = new Set(['tiebreak', 'final']);
@@ -149,26 +150,41 @@ export function finalsSources(schedule, opts = {}) {
   });
 }
 
-// The order the public page lists a source bracket's teams in before it
-// ranks them (report.js, from yft.js yfStages), which teams level on both
-// counts keep. A bracket whose pools played more than once (cyclesOf) goes
-// by the first time, as its pools were made. The prelim pools are listed
-// in pool (seed) order, and any other bracket in the order its games list
-// them. A single round robin has no pool table there, only the one table
-// of the whole field, which keeps standings' own order: null.
-function listedOrder(schedule, src) {
-  const at = cyclesOf(schedule, src.phase, src.key)[0];
-  const full = schedule.phases.flatMap((ph, p) => (MINOR.has(ph.kind) ? [] : [p]));
-  const pools = schedule.pools || {};
-  let order;
-  if (at.phase === full[0] && Object.keys(pools).length > 1 && pools[at.key]) order = pools[at.key];
-  else {
-    const keys = new Set((schedule.phases[at.phase].rounds || []).flatMap((r) => (r.games || []).map((g) => g.bracket)));
-    const single = at.phase === full[0] && full.length === 1 && keys.size < 2;
-    order = single ? null : bracketGames(schedule, at.phase, at.key).teams;
+// The order the public page lists a source bracket's teams in, which
+// teams level on both counts keep: {order: [names] or null, kept}. Read
+// from the public page's own tables (report.js reportData, its stages and
+// pools from yft.js yfStages): the table showing the bracket's teams with
+// the figures they rank on here, so over the same games. That is a prelim
+// pool's table (kept 'pool'), a playoff bracket's, or a double round
+// robin's Total (kept 'table'). With none, as for a single round robin or
+// Copy this phase, the public page lists them only in its standings of
+// the whole field, in standings' own order, which ends by name: order
+// null (kept 'standings'). all: the games, as finalsFill has them; rows:
+// the bracket's standings rows here.
+function publicOrder(schedule, src, all, rows, settings) {
+  let rd;
+  try {
+    rd = reportData({ name: '', matches: all, roster: null, settings: settings || {}, schedule });
+  } catch (e) {
+    return { order: null, kept: 'standings' }; // no public tables to read: the fill still goes ahead
   }
-  if (!order) return null;
-  return [...order.filter((n) => src.teams.includes(n)), ...src.teams.filter((n) => !order.includes(n))];
+  const mine = new Map(rows.map((t) => [t.name, t]));
+  const pp = (t) => (t.regTuh ? (t.regPoints / t.regTuh) * rd.regTossups : null);
+  const same = (x) => {
+    const t = mine.get(x.name);
+    return !!t && x.w === t.w && x.l === t.l && x.t === t.t && x.regTuh === t.regTuh
+      && (x.pp === pp(t) || (x.pp !== null && pp(t) !== null && Math.abs(x.pp - pp(t)) < 1e-9));
+  };
+  const full = schedule.phases.findIndex((ph) => !MINOR.has(ph.kind));
+  const prelim = src.phase === full && !!(schedule.pools && schedule.pools[src.key]);
+  for (const sec of rd.stageStandings || []) {
+    for (const pl of sec.pools) {
+      // teams with no games aren't ranked here
+      const played = pl.teams.filter((x) => x.w + x.l + x.t > 0);
+      if (played.length === mine.size && played.every(same)) return { order: played.map((x) => x.name), kept: prelim ? 'pool' : 'table' };
+    }
+  }
+  return { order: null, kept: 'standings' };
 }
 
 /**
@@ -207,10 +223,12 @@ export function finalsProgress(schedule, files) {
  * opts.settings: the tournament's game format, for its regulation tossup
  * count (stats.js standings).
  * Returns {schedule, filled, brackets, ties, held}:
- *   ties — [{bracket, record, teams: [{name, pp20tuh, place}], level}], a
- *          tie that reaches a finals place, settled by points per 20;
- *          level: [[names…]], its teams level on points per 20 too, which
- *          keep the bracket's order (listedOrder)
+ *   ties — [{bracket, record, teams: [{name, pp20tuh, place}], level,
+ *          kept}], a tie that reaches a finals place, settled by points
+ *          per 20; level: [[names…]], its teams level on points per 20
+ *          too, which keep the order the public page lists them in, and
+ *          kept, which order that is (publicOrder: 'pool', 'table' or
+ *          'standings')
  *   held — the same, waiting for the TD
  */
 export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
@@ -236,10 +254,11 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     if (!src.games.every((g) => got.has(pairKey(g.round, g.a, g.b)))) continue;
     // ranked as the public page ranks the bracket's table (stats.js
     // standings), teams level on both in the order it lists them
+    // (publicOrder); with no such teams, nothing to look up
     const ranked = standings(games, null, opts.settings).teams.filter((t) => members.has(t.name));
-    const listed = listedOrder(schedule, src);
+    const pub = levelRuns(ranked).length ? publicOrder(schedule, src, all, ranked, opts.settings) : { order: null, kept: 'standings' };
     const row = new Map(ranked.map((t) => [t.name, t]));
-    const rows = listed ? standingsOrder(listed.map((n) => row.get(n)).filter(Boolean)) : ranked;
+    const rows = pub.order ? standingsOrder(pub.order.map((n) => row.get(n))) : ranked;
     const rec = (t) => t.w + '–' + t.l + (t.t ? '–' + t.t : '');
     const deepest = Math.max(...src.places);
     let hold = false;
@@ -251,7 +270,7 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
       if (j - i > 1) {
         const x = { bracket: src.name, record: rec(rows[i]),
           teams: rows.slice(i, j).map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, place: i + k + 1 })),
-          level: levelRuns(rows.slice(i, j)).map((run) => run.map((t) => t.name)) };
+          level: levelRuns(rows.slice(i, j)).map((run) => run.map((t) => t.name)), kept: pub.kept };
         if (holdTies && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
       }
       i = j;
@@ -295,8 +314,9 @@ export function fillProgress(schedule, files) {
 }
 
 // A tie's teams level on points per 20 too, as schedule.filled keeps
-// them for the note: {level: [[names…]]}, or nothing when none were.
-const levelOf = (x) => (x.level && x.level.length ? { level: x.level } : {});
+// them for the note: {level: [[names…]]}, with a Finals tie's `kept`
+// (finalsFill), or nothing when none were.
+const levelOf = (x) => (x.level && x.level.length ? { level: x.level, ...(x.kept ? { kept: x.kept } : {}) } : {});
 
 /**
  * The hub's auto-fill of the saved schedule, on a copy: the pools rank on
@@ -307,13 +327,13 @@ const levelOf = (x) => (x.level && x.level.length ? { level: x.level } : {});
  * files).files, each with its fileId. A pool or the Finals with one of
  * its uploads not among them (a read that failed) waits, as standings
  * without that game would be wrong. Ties points per 20 settled go on
- * schedule.filled, for the pages' notes, with `level` when some of a
- * tie's teams were level on points per 20 too (levelOf). force: pool
- * letters, and 'F:' + a finals bracket, the TD said to fill anyway.
- * settings: the tournament's game format, for its regulation tossup count
- * (stats.js standings). Returns {schedule (saved itself when nothing
- * filled), playoffs, finals}: autoFill's and finalsFill's results, or
- * null when nothing of theirs was ready.
+ * schedule.filled, for the pages' notes, with `level` (and a Finals tie's
+ * `kept`) when some of a tie's teams were level on points per 20 too
+ * (levelOf). force: pool letters, and 'F:' + a finals bracket, the TD
+ * said to fill anyway. settings: the tournament's game format, for its
+ * regulation tossup count (stats.js standings). Returns {schedule (saved
+ * itself when nothing filled), playoffs, finals}: autoFill's and
+ * finalsFill's results, or null when nothing of theirs was ready.
  */
 export function autoFillSaved(saved, files, matches, roster = null, force = [], settings = null) {
   const read = new Set(matches.map((m) => m.fileId));
@@ -351,20 +371,49 @@ export function autoFillSaved(saved, files, matches, roster = null, force = [], 
 const andList = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
 
 /**
+ * The order a tie's teams level on points per 20 too keep: 'pool' for a
+ * pool's tie (autoFill) or a Finals tie from a prelim pool, 'table' for
+ * one from another bracket (its table's order), 'standings' with no table
+ * of their own (finalsFill `kept`). keptOrder: the same, for the hub's
+ * notes.
+ */
+export const keptOf = (x) => (x.pool || x.kept === 'pool' ? 'pool' : x.kept === 'standings' ? 'standings' : 'table');
+export function keptOrder(x) {
+  const kept = keptOf(x);
+  return kept === 'pool' ? 'their pool order' : kept === 'standings' ? 'their order in the standings' : `their order in the ${x.bracket} table`;
+}
+
+/** True when all of a tie's teams were level on points per 20 too. */
+export const allLevel = (x) => !!x.level && x.level.length === 1 && x.level[0].length === x.teams.length;
+
+const KEPT_LABEL = { pool: 'Fill in pool order', table: 'Fill in table order', standings: 'Fill in standings order' };
+
+/**
+ * What the Live Hub adds to a tie waiting for the TD (autoFill's or
+ * finalsFill's `held`) when its teams are level on points per 20 too, as
+ * plain text: {text, label}. text follows the tie's own sentence ('' when
+ * none are level); label is the fill button's, to match what filling now
+ * does: points per 20, or for teams all level, the order they keep.
+ */
+export function heldLevel(x) {
+  if (allLevel(x)) return { text: ` They have the same points per 20, so filling now keeps ${keptOrder(x)}.`, label: KEPT_LABEL[keptOf(x)] };
+  return { text: (x.level || []).map((g) => ` ${andList(g)} also have the same points per 20, so filling now keeps ${keptOrder(x)}.`).join(''),
+    label: 'Use points per 20' };
+}
+
+/**
  * The Live Hub's note for a tie points per 20 settled (a schedule.filled
  * entry), as plain text: headed by its pool ("Pool A") or its finals
- * source bracket. Teams level on points per 20 too (`level`) kept their
- * pool order, so the note says so rather than that points per 20 decided.
+ * source bracket. Teams level on points per 20 too (`level`) kept the
+ * order the public page lists them in (keptOrder), so the note says so
+ * rather than that points per 20 decided.
  */
 export function filledNote(x) {
   const head = x.pool ? 'Pool ' + x.pool : x.bracket;
   const names = andList(x.teams.map((tm) => tm.name));
-  const level = x.level || [];
-  if (level.length === 1 && level[0].length === x.teams.length) {
-    return `${head}: ${names} were tied at ${x.record} with the same points per 20, so they keep their pool order.`;
-  }
+  if (allLevel(x)) return `${head}: ${names} were tied at ${x.record} with the same points per 20, so they kept ${keptOrder(x)}.`;
   return `${head}: ${names} were tied at ${x.record}, so points per 20 decided their places.`
-    + level.map((g) => ` ${andList(g)} also had the same points per 20, so they keep their pool order.`).join('');
+    + (x.level || []).map((g) => ` ${andList(g)} also had the same points per 20, so they kept ${keptOrder(x)}.`).join('');
 }
 
 /** True when the schedule has a finals slot still to fill. */

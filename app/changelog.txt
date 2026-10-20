@@ -21,14 +21,14 @@ Release Notes for 10/19/2026
 - Add a game fills in Round from the match file, and notes when the round picked differs from the one the file names.
 - Playoff slots, auto-fill and the Finals rank teams the way the public page does, without overtime in points per 20.
 - Compute stats leaves overtime out of TUH, points per 20 and PPB, and sorts teams by winning percentage, as the public page does.
-- Teams tied on both winning percentage and points per 20 now keep their pool order, as the public page lists them, instead of going by name.
-- When tied teams also had the same points per 20, the Playoffs and Finals notes say they kept their pool order.
+- Teams tied on both winning percentage and points per 20 now fill playoff and Finals slots in the order the public page lists them, instead of always by name.
+- When tied teams also had the same points per 20, the Playoffs and Finals notes say which order they kept, and a waiting tie's button says so too.
 - Edit in MODAQ keeps the question numbers of replaced and added questions, so a corrected game matches the original.
 
 [ SCHEDULE ]
 - When the same pools play again, such as a double round robin or Copy this phase, playoff and Finals slots are seeded on all of their games.
 - Renaming a room renames its line on the saved schedule, also when the room was matched by name.
-- Fill playoff slots says when tied teams have the same points per 20, so they keep their pool order.
+- Fill playoff slots says when tied teams, also from different pools, have the same points per 20, so filling keeps them in pool order.
 
 [ PUBLIC PAGE ]
 - After a TD's Rebuild, a room move or a room rename, the public page shows the corrected games without waiting for new ones.

@@ -31,6 +31,7 @@ import { effectiveFormat, metaKey, gameKey, storeIntact, formatKey, GAME_FORMAT_
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimProgress, prelimRounds, autoFill, fillPlaceholders, renumber } from '../app/engine/schedule.js';
 import { renderSchedStep, schedEscape } from '../app/js/schededit.js';
+import { filledNote } from '../app/engine/finals.js';
 import mockFixture from '../app/demo/fixture.js'; // MOCK: tiebreaker packets
 import { tbBlocks, tbAfter as tbAfterRound, tbEditorHtml } from './tiebreakers-view.js'; // MOCK
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../app/engine/brackets.js';
@@ -2305,16 +2306,14 @@ async function autoFillSlots(force = false) {
 }
 const andList = (xs) => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
 
-// The Live Hub's Playoffs line: ties points per 20 settled, and pools
-// waiting for the TD. Gone once a playoff game is in.
+// The Live Hub's Playoffs line: ties points per 20 settled (finals.js
+// filledNote), and pools waiting for the TD. Gone once a playoff game is in.
 function playoffNoteHtml(files) {
   if (!sched) return '';
   const prelim = new Set(prelimRounds(sched).map((r) => r.round));
   if (files.some((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && Number.isInteger(f.round) && !prelim.has(f.round))) return '';
   const lines = [];
-  for (const x of sched.filled || []) {
-    lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} were tied at ${esc(x.record)}, so points per 20 decided their places.`);
-  }
+  for (const x of sched.filled || []) lines.push(esc(filledNote(x)));
   for (const x of autoWait.odd) {
     lines.push(`Pool ${esc(x.pool)} has ${x.games.map((g) => `${esc(g.a)} vs ${esc(g.b)} (round ${g.round})`).join(', ')}, which isn&rsquo;t on the schedule.
       <button class="linkbtn" data-fillpool="${esc(x.pool)}">Fill anyway</button>`);

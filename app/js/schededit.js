@@ -774,9 +774,18 @@ export function fillCheckHtml(r) {
         + goes(true) + '.'
         + level.map((g) => ` ${andList(g.map(esc))} have the same points per 20 tossups heard, so they keep their pool order.`).join('');
     }),
-    ...(r.compared || []).map((c) => `${ORDN(c.place)} places ${andList(c.teams.map((x) => `${esc(x.name)} (Pool ${esc(x.pool)}, ${x.record})`))} `
-      + `have the same winning percentage. ${r.game ? 'Please play a tiebreaker game, then place them by hand. Filling now goes by' : 'They go up by'} points per 20 tossups heard: `
-      + c.teams.map((x) => `${esc(x.name)} ${pp(x)}`).join(', ') + '.'),
+    ...(r.compared || []).map((c) => {
+      const head = `${ORDN(c.place)} places ${andList(c.teams.map((x) => `${esc(x.name)} (Pool ${esc(x.pool)}, ${x.record})`))} `
+        + `have the same winning percentage. ${r.game ? 'Please play a tiebreaker game, then place them by hand. ' : ''}`;
+      // teams level on points per 20 too go in pool order (c.level)
+      const level = c.level || [];
+      if (level.length === 1 && level[0].length === c.teams.length) {
+        return head + `They also have the same points per 20 tossups heard (${pp(c.teams[0])}), so filling${r.game ? ' now' : ''} puts them in pool order.`;
+      }
+      return head + `${r.game ? 'Filling now goes by' : 'They go up by'} points per 20 tossups heard: `
+        + c.teams.map((x) => `${esc(x.name)} ${pp(x)}`).join(', ') + '.'
+        + level.map((g) => ` ${andList(g.map(esc))} have the same points per 20 tossups heard, so they go in pool order.`).join('');
+    }),
   ];
   return `<div class="sgnotice sgfillcheck">
     <div><b>Before filling playoff slots</b>

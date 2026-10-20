@@ -61,12 +61,14 @@ const savedSched = async () => (await call(`${A}/file?key=t/${tid}/schedule.json
 // the day's prelim games: random results, a three-way tie at the top of
 // pool A; in pool B the teams finish in pool order, but for its 3rd, 4th
 // and 5th, who beat one another in a cycle and win and lose all their
-// games 200–100, so they end 4–3 and level on points per 20 too, across
-// the line between two playoff brackets
+// games 200–100, so they end level on points per 20 too, across the line
+// between two playoff brackets: 3 losses (to the top two and once in the
+// cycle), and a win over each team below them and once in the cycle
 const rnd = mulberry32(17);
 const PA = sched.pools.A;
 const PB = sched.pools.B;
 const LEVEL = PB.slice(2, 5);
+const LEVEL_RECORD = `${PB.length - 4}–3`;
 const cyc = [[PA[0], PA[1]], [PA[1], PA[2]], [PA[2], PA[0]], [LEVEL[0], LEVEL[1]], [LEVEL[1], LEVEL[2]], [LEVEL[2], LEVEL[0]]];
 const games = [];
 for (const r of prelimRounds(sched)) {
@@ -242,16 +244,20 @@ await h2.ev(`document.querySelector('[data-fillpool="B"]').click(); true`);
 await until(async () => !hasPlaceholders(await savedSched()), 'all filled');
 ok('Fill anyway fills pool B', true);
 const final = await savedSched();
-// pool B's level three keep their pool order, which isn't their order by
-// name, and the Live Hub says so rather than that points per 20 decided
+// pool B's level three keep their pool order, as its public table lists
+// them, and the Live Hub says so rather than that points per 20 decided.
+// On the generated schedule that isn't their order by name (seeded in
+// reverse), so the check tells the two apart; a saved schedule's names
+// may happen to sort in pool order.
 const fromSlot = (s, lab) => s.phases[1].rounds.flatMap((r) => r.games.flatMap((g) => [g.a, g.b])).find((x) => x && x.from === lab).team;
-ok('pool B\'s level teams fill in pool order, not by name', JSON.stringify(['B3', 'B4', 'B5'].map((l) => fromSlot(final, l))) === JSON.stringify(LEVEL)
-  && JSON.stringify(LEVEL) !== JSON.stringify([...LEVEL].sort()), [['B3', 'B4', 'B5'].map((l) => fromSlot(final, l)), LEVEL]);
+ok('pool B\'s level teams fill in pool order', JSON.stringify(['B3', 'B4', 'B5'].map((l) => fromSlot(final, l))) === JSON.stringify(LEVEL),
+  [['B3', 'B4', 'B5'].map((l) => fromSlot(final, l)), LEVEL]);
+if (!process.env.QBTD_SCHEDULE) ok('pool B\'s pool order is not their order by name', JSON.stringify(LEVEL) !== JSON.stringify([...LEVEL].sort()), LEVEL);
 await h2.refresh();
 const levelNote = await until(() => h2.ev(`[...document.querySelectorAll('.playoffnote > div > div')].map((d) => d.innerText).find((l) => l.startsWith('Pool B: ${LEVEL[0]}')) || ''`), 'pool B tie note');
 await h2.shot('hub-tie-level');
-ok('the Live Hub says pool B\'s level teams keep their pool order',
-  levelNote === `Pool B: ${LEVEL[0]}, ${LEVEL[1]} and ${LEVEL[2]} were tied at 4–3 with the same points per 20, so they keep their pool order.`, levelNote);
+ok('the Live Hub says pool B\'s level teams kept their pool order',
+  levelNote === `Pool B: ${LEVEL[0]}, ${LEVEL[1]} and ${LEVEL[2]} were tied at ${LEVEL_RECORD} with the same points per 20, so they kept their pool order.`, levelNote);
 const dayGames = [...games, strayB];
 const manual = structuredClone(sched);
 fillPlaceholders(manual, fillReport(sched, standings(dayGames.map(asMatch))).ranks);
@@ -261,7 +267,7 @@ const tiesWant = fillReport(sched, standings(dayGames.map(asMatch))).ties;
 ok('each tie points per 20 settled is kept on the schedule for the note, once',
   JSON.stringify((final.filled || []).map((x) => x.pool + ' ' + x.record).sort()) === JSON.stringify(tiesWant.map((x) => x.pool + ' ' + x.record).sort())
   && final.filled.some((x) => x.pool === 'A' && x.record === '6–1')
-  && final.filled.some((x) => x.pool === 'B' && x.record === '4–3' && JSON.stringify(x.level) === JSON.stringify([LEVEL])), [final.filled, tiesWant.length]);
+  && final.filled.some((x) => x.pool === 'B' && x.record === LEVEL_RECORD && JSON.stringify(x.level) === JSON.stringify([LEVEL])), [final.filled, tiesWant.length]);
 const total = dayGames.length + 1;
 ok('each hub read each prelim game at most once all day', gameReads(h1.s) <= total && gameReads(h2.s) <= total,
   [gameReads(h1.s), gameReads(h2.s), total]);

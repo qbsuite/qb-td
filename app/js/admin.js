@@ -31,7 +31,7 @@ import { modaqExport, modaqFilenames, renameModaqTexts } from '../engine/modaqfi
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
-import { fillProgress, autoFillSaved, filledNote } from '../engine/finals.js';
+import { fillProgress, autoFillSaved, filledNote, heldLevel } from '../engine/finals.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
 import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomIndexOf, followRoomRename, roomRound, roomBracket, gameIn, advanceAll, slotLabel, liveLayout } from '../engine/brackets.js';
 import { buzzCredentials, sha256Hex } from './buzzkey.js';
@@ -3256,10 +3256,10 @@ async function autoFillSlots(force = false) {
 const andList = (xs) => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
 const ordinal = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
 
-// The Live Hub's Playoffs line: ties points per 20 settled, or teams level
-// on it too kept in pool order (finals.js filledNote), and pools waiting
-// for the TD. Gone once a playoff game is in. The Finals line the same,
-// gone once a finals game is in.
+// The Live Hub's Playoffs line: ties points per 20 settled (finals.js
+// filledNote), and pools waiting for the TD (heldLevel: what filling now
+// does with teams level on points per 20 too). Gone once a playoff game
+// is in. The Finals line the same, gone once a finals game is in.
 function playoffNoteHtml(files) {
   if (!sched) return '';
   const played = (rounds) => files.some((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error && rounds.has(f.round));
@@ -3277,8 +3277,9 @@ function playoffNoteHtml(files) {
       const by = {};
       x.teams.forEach((tm) => { by[tm.bracket] = (by[tm.bracket] || 0) + 1; });
       const spots = Object.entries(by).map(([b, n]) => `${n === 1 ? 'one spot' : n + ' spots'} in ${esc(b)}`);
-      lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${andList(spots)}.
-        <button class="linkbtn" data-fillpool="${esc(x.pool)}">Use points per 20</button>`);
+      const lv = heldLevel(x);
+      lines.push(`Pool ${esc(x.pool)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${andList(spots)}.${esc(lv.text)}
+        <button class="linkbtn" data-fillpool="${esc(x.pool)}">${esc(lv.label)}</button>`);
     }
     if (lines.length) out.push(['Playoffs', lines]);
   }
@@ -3288,8 +3289,9 @@ function playoffNoteHtml(files) {
     const places = (teams) => andList(teams.map((tm) => ordinal(tm.place)));
     for (const x of (sched.filled || []).filter((y) => y.bracket)) lines.push(esc(filledNote(x)));
     for (const x of autoWait.finals) {
-      lines.push(`${esc(x.bracket)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${places(x.teams)} place.
-        <button class="linkbtn" data-fillpool="${esc('F:' + x.bracket)}">Use points per 20</button>`);
+      const lv = heldLevel(x);
+      lines.push(`${esc(x.bracket)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${places(x.teams)} place.${esc(lv.text)}
+        <button class="linkbtn" data-fillpool="${esc('F:' + x.bracket)}">${esc(lv.label)}</button>`);
     }
     if (lines.length) out.push(['Finals', lines]);
   }
@@ -3342,9 +3344,8 @@ function showStats({ a, t, files, settings, got }) {
     return;
   }
 
-  // ranked and figured as the public page does it (overtime out), pool-mates
-  // level on both counts in pool order, as its pool tables list them
-  renderStats(out, standings(matches, roster, effectiveFormat(settings), sched && sched.pools), errors);
+  // ranked and figured as the public page does it (overtime out)
+  renderStats(out, standings(matches, roster, effectiveFormat(settings)), errors);
 
   // The tournament's own rules reach every export: the .yft's scoring
   // rules, the overtime split, and the stat report's rate-stat scaling all
