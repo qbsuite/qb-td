@@ -189,10 +189,20 @@ const pageErrors = [];
 const dialogs = [];
 let dialogAccept = true; // false: the next dialogs are dismissed (Cancel)
 let here = 'about:blank';
+// The hub's questions about a schedule or roster saved in another tab
+// (app/js/saves.js SCHED_CONFLICT, ROSTER_CONFLICT; read from its source,
+// which can't load in Node). This run has one tab, so one showing means a
+// save lost track of its own copy: the run fails, whatever is answered.
+const conflictAsks = ['SCHED_CONFLICT', 'ROSTER_CONFLICT'].map((name) => {
+  const m = new RegExp(`export const ${name} = ([^;]+);`).exec(readFileSync(new URL('../app/js/saves.js', import.meta.url), 'utf8'));
+  if (!m) throw new Error('saves.js has no ' + name);
+  return Function(`"use strict"; return (${m[1]});`)();
+});
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
   if (m.method === 'Page.javascriptDialogOpening') {
     dialogs.push(m.params.message);
+    if (conflictAsks.includes(m.params.message)) ok(`a one-tab save asks about another tab (${curFlow})`, false, m.params.message);
     S('Page.handleJavaScriptDialog', { accept: dialogAccept });
   } else if (m.method === 'Runtime.exceptionThrown') {
     const d = m.params.exceptionDetails;
@@ -2374,6 +2384,8 @@ await flow('25. no page errors anywhere');
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);
+ok('25 no save asked about a schedule or roster saved in another tab', !dialogs.some((x) => conflictAsks.includes(x)),
+  dialogs.filter((x) => conflictAsks.includes(x)));
 
 if (CAPTURE) {
   // the pages' Worker requests, counted by section, page and route

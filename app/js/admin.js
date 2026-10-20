@@ -45,6 +45,8 @@ import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
 import { ownedJson, collectMatches, gameFormat, createHubNames } from './hubgames.js';
 import { isGameFile, newestOf } from '../engine/games.js';
+import { readTagged, settingsBody, rulingsBody, postSchedule, postRoster, FORMAT_KEYS,
+  SCHED_CONFLICT, SCHED_KEPT, ROSTER_CONFLICT, ROSTER_KEPT } from './saves.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -298,11 +300,16 @@ let rosterTeams = null;
 // the saved roster the editor opened (parseRoster), whose former names a
 // save carries forward; null when it started blank
 let rosterSaved = null;
+// the etag of that saved copy (saves.js): the editor's save lands only on
+// it, so a roster saved in another tab meanwhile asks first
+let rosterEtag = null;
 // which marks the roster tracks (YellowFruit's Track Undergrad / Track
 // Division 2). A mark is shown, saved and exported only while its switch
 // is on; with both off the roster is the file it always was.
 let rosterTrack = { trackUG: false, trackDiv2: false };
-let rosterUpload = null; // parsed upload awaiting confirmation
+// parsed upload awaiting confirmation; renames and etag: what it renames
+// against the saved roster, and that copy's etag (renderUpPreview)
+let rosterUpload = null;
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
@@ -577,7 +584,13 @@ function renderModaqSec(a, t, settings) {
   box.innerHTML = '<h2>MODAQ settings</h2>' + formatHtml(settings, true);
   wireFormat(box, {
     settings: () => settings,
-    save: async (next) => { await pub(a, { method: 'POST', json: { settings: next } }); },
+    // each save here picks the format: the preset and its overrides are
+    // both set, whatever this tab's copy held (saves.js), and the next
+    // save builds on this one, as saveSettings does
+    save: async (next) => {
+      await pub(a, { method: 'POST', json: settingsBody(settings, next, {}, FORMAT_KEYS) });
+      settings = next;
+    },
     say, refresh: showDetail, onToggle: () => {},
   });
 }
@@ -593,10 +606,11 @@ function renderStatsSec(a, t, settings) {
   // Opening this tab is the decision the checklist wants: the page starts
   // public, so a TD who looks and leaves it on has chosen too.
   if (!settings.statsSeen) {
-    // set here too, so a buzzpoints save below (which writes the whole
-    // settings object) can't undo it
+    // set here too, and each save below sets it again (saveSettings), so
+    // a buzzpoints save can't undo it and a failed save here is made good
+    const was = settings;
     settings = { ...settings, statsSeen: true };
-    pub(a, { method: 'POST', json: { settings } }).then(showDetail, () => {});
+    pub(a, { method: 'POST', json: settingsBody(was, settings, {}, ['statsSeen']) }).then(showDetail, () => {});
   }
   const locked = !!(t.set && t.set.lock_buzz);
   // Scoresheets and buzzpoints are only ever behind the stats password
@@ -703,9 +717,19 @@ function renderStatsSec(a, t, settings) {
     wireStats();
   };
 
+  // from this tab's copy, with statsSeen set again (see above). The copy
+  // moves on as the save goes out, so a second change made before the
+  // answer comes back is made on this one (saves.js); a failed save puts
+  // it back, as it was before.
   const saveSettings = async (next, extra) => {
-    await pub(a, { method: 'POST', json: { settings: next, ...extra } });
+    const was = settings;
     settings = next;
+    try {
+      await pub(a, { method: 'POST', json: settingsBody(was, next, extra, ['statsSeen']) });
+    } catch (e) {
+      if (settings === next) settings = was;
+      throw e;
+    }
   };
 
   // A new password, keeping each switch as it is, plus the one that asked
@@ -854,8 +878,9 @@ async function ensureByeRoom(a, t, buckets) {
     for (let i = 2; taken.has(name); i++) name = 'Bye Room ' + i;
     const room = await pub(a + '/buckets', { method: 'POST', json: { room_name: name } });
     const settings = JSON.parse(t.settings || '{}') || {};
+    const was = { ...settings };
     settings.byeRoom = room.id;
-    await pub(a, { method: 'POST', json: { settings } });
+    await pub(a, { method: 'POST', json: settingsBody(was, settings, {}, ['byeRoom']) });
     return true;
   } catch (e) { return false; }
 }
@@ -947,14 +972,19 @@ function renderRoomsSec(a, t, buckets, files) {
       const name = inp.value.trim();
       if (!name) { inp.value = ''; return; }
       try {
-        await pub(a + '/buckets/' + inp.dataset.roomrename, {
+        const out = await pub(a + '/buckets/' + inp.dataset.roomrename, {
           method: 'POST', json: { room_name: name } });
         // the Worker renamed the saved schedule's copy; the one held here
         // (saved or mid-edit) follows by the same rule, so a later save
         // doesn't undo it
         const bid = Number(inp.dataset.roomrename);
         const was = buckets.find((b) => b.id === bid);
-        if (was) followRoomRename(sched, was, name, [...buckets, bye].filter(Boolean).map((b) => b.id));
+        if (was) {
+          followRoomRename(sched, was, name, [...buckets, bye].filter(Boolean).map((b) => b.id));
+          // held from the copy the Worker renamed (sched_was), it is now
+          // the renamed copy's (sched_etag), so its next save isn't asked
+          if (out && out.sched_was && out.sched_was === schedEtag) schedEtag = out.sched_etag;
+        }
         say('Renamed to ' + name);
         showDetail();
       } catch (e) { say(e.message, true); }
@@ -1038,7 +1068,7 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
       name: r.packet_name + (fromSet(r) ? ' (from ' + t.set.name + ')' : ''),
       href: `${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}`,
     })),
-    setSlots: (n) => pub(a, { method: 'POST', json: { settings: { ...settings, rounds: n } } }),
+    setSlots: (n) => pub(a, { method: 'POST', json: settingsBody(settings, { ...settings, rounds: n }, {}, ['rounds']) }),
     minSlots,
     countNote: fromSched ? (slots > fromSched ? `the schedule has ${fromSched}` : 'from the schedule') : '',
     uploadPacket: (s, round) => pub(`${a}/packet?round=${round}&name=${encodeURIComponent(s.name)}`,
@@ -1313,13 +1343,16 @@ function renderRosterSec(a, t) {
     if (rosterOpen && rosterTeams === null) {
       if (t.roster_r2_key) {
         try {
-          rosterSaved = parseRoster(await ownedJson(pub, a, t.roster_r2_key));
+          const got = await readTagged(a, t.roster_r2_key);
+          rosterSaved = parseRoster(got.json);
           rosterTeams = editRoster(rosterSaved);
+          rosterEtag = got.etag;
         } catch (e) { /* unparseable upload: start blank */ }
       }
       if (rosterTeams === null) {
         rosterTrack = { trackUG: false, trackDiv2: false };
         rosterSaved = null;
+        rosterEtag = null;
         rosterTeams = [blankRosterTeam()];
       }
     }
@@ -1329,12 +1362,29 @@ function renderRosterSec(a, t) {
   renderRosterEditor(a, t);
 }
 
-// What an uploaded roster renames, against the saved one ({} if none).
+// What an uploaded roster renames, against the saved one ({} if none),
+// and that saved copy's etag (null if none), which the upload's save
+// names: renames matched against a roster saved over since are not kept
+// without asking.
 async function upRenames(a) {
   const t = lastDetail.tournament;
-  if (!t.roster_r2_key || !rosterUpload) return {};
-  try { return rosterRenames(parseRoster(await ownedJson(pub, a, t.roster_r2_key)), rosterUpload.teams); }
-  catch (e) { return {}; }
+  if (!t.roster_r2_key || !rosterUpload) return { renames: {}, etag: null };
+  try {
+    const got = await readTagged(a, t.roster_r2_key);
+    return { renames: rosterRenames(parseRoster(got.json), rosterUpload.teams), etag: got.etag };
+  } catch (e) { return { renames: {}, etag: null }; }
+}
+
+// A roster save that lands only on the copy this tab read (etag, saves.js).
+// One saved in another tab since then asks first; null when the TD keeps
+// theirs unsaved.
+async function saveRoster(a, name, body, etag) {
+  let out = await postRoster(a, name, body, etag);
+  while (out && out.conflict) {
+    if (!confirm(ROSTER_CONFLICT)) return null;
+    out = await postRoster(a, name, body, out.etag);
+  }
+  return out;
 }
 
 function renderUpPreview(a) {
@@ -1347,7 +1397,8 @@ function renderUpPreview(a) {
   if (u.renames === undefined) {
     u.renames = null;
     upRenames(a).then((r) => {
-      u.renames = r;
+      // (unless a save of this upload has set them since: below)
+      if (u.renames === null) { u.renames = r.renames; u.etag = r.etag; }
       if (rosterUpload === u) renderUpPreview(a);
     });
   }
@@ -1369,34 +1420,52 @@ function renderUpPreview(a) {
       ${renamed.length ? `<div style="font-size:13px;margin-top:6px">Renamed teams, matched by their players.
         The schedule will use the new names: ${renamed.map(([x, y]) => `${esc(x)} &rarr; <b>${esc(y)}</b>`).join(' &middot; ')}</div>` : ''}
     </div>`;
-  $('upconfirm').onclick = async () => {
-    try {
-      const t = lastDetail.tournament;
-      const renames = u.renames || await upRenames(a);
-      // the saved roster's former names carry over, and a renamed team
-      // adds its old name, so games already played follow it
-      let saved = null;
-      if (t.roster_r2_key) {
-        try { saved = parseRoster(await ownedJson(pub, a, t.roster_r2_key)); } catch (e) { /* none to carry */ }
-      }
-      const teams = carryFormerNames(saved, u.teams, renames);
-      // Save the roster rebuilt from its parsed teams, not the file as
-      // uploaded: MODAQ reads only a versioned tournament with a name, and
-      // a file qb-td can parse may be neither. Names are all either keeps.
-      await pub(`${a}/roster?name=${encodeURIComponent(u.filename)}`,
-        { method: 'POST', body: JSON.stringify(buildRosterQbj(lastDetail.tournament.name, teams, rosterTracking(teams))) });
-      hubNames.key = null; // the hub's listings follow the new names
-      rosterUpload = null;
-      rosterTeams = null;   // editor reloads from the new roster
-      schedFetched = false; // schedule editor re-reads the team list
-      // …and has the new names at once, so a schedule generated before
-      // that refetch lands is built from this roster, not the last one
-      schedTeams = u.teams.map((tm) => tm.name);
-      say(await savedNote(a, t, renames));
-      showDetail();
-    } catch (e) { say('Roster: ' + e.message, true); }
-  };
+  // A second press while a save of this upload is out waits for it, then
+  // saves once more onto the copy that save left (u.etag): two presses
+  // save twice, as they always did, and the second isn't asked about the
+  // first.
+  $('upconfirm').onclick = () => { u.queue = (u.queue || Promise.resolve()).then(() => saveUpload(a, u)); };
   $('upcancel').onclick = () => { rosterUpload = null; renderUpPreview(a); };
+}
+
+// The upload's save (renderUpPreview's Save as tournament roster).
+async function saveUpload(a, u) {
+  try {
+    const t = lastDetail.tournament;
+    const pre = u.renames ? { renames: u.renames, etag: u.etag } : await upRenames(a);
+    const renames = pre.renames;
+    // the saved roster's former names carry over, and a renamed team
+    // adds its old name, so games already played follow it
+    let saved = null;
+    let savedEtag = null;
+    if (t.roster_r2_key) {
+      try {
+        const got = await readTagged(a, t.roster_r2_key);
+        savedEtag = got.etag;
+        saved = parseRoster(got.json);
+      } catch (e) { /* none to carry */ }
+    }
+    const teams = carryFormerNames(saved, u.teams, renames);
+    // Save the roster rebuilt from its parsed teams, not the file as
+    // uploaded: MODAQ reads only a versioned tournament with a name, and
+    // a file qb-td can parse may be neither. Names are all either keeps.
+    // It lands on the copy the renames were matched against, else the
+    // one just read.
+    const out = await saveRoster(a, u.filename,
+      JSON.stringify(buildRosterQbj(lastDetail.tournament.name, teams, rosterTracking(teams))), pre.etag || savedEtag);
+    if (!out) { say(ROSTER_KEPT, true); return; }
+    u.renames = renames;
+    u.etag = out.etag;
+    hubNames.key = null; // the hub's listings follow the new names
+    rosterUpload = null;
+    rosterTeams = null;   // editor reloads from the new roster
+    schedFetched = false; // schedule editor re-reads the team list
+    // …and has the new names at once, so a schedule generated before
+    // that refetch lands is built from this roster, not the last one
+    schedTeams = u.teams.map((tm) => tm.name);
+    say(await savedNote(a, t, renames));
+    showDetail();
+  } catch (e) { say('Roster: ' + e.message, true); }
 }
 
 function renderRosterEditor(a, t) {
@@ -1606,8 +1675,11 @@ function renderRosterEditor(a, t) {
     // count under the new ones
     const saving = carryFormerNames(rosterSaved, clean, renames, playerRenames);
     try {
-      await pub(`${a}/roster?name=roster.qbj`,
-        { method: 'POST', body: JSON.stringify(buildRosterQbj(t.name, saving, rosterTrack), null, 2) });
+      const out = await saveRoster(a, 'roster.qbj', JSON.stringify(buildRosterQbj(t.name, saving, rosterTrack), null, 2), rosterEtag);
+      if (!out) { say(ROSTER_KEPT, true); run.end(); return; }
+      // an upload waiting here was matched against the copy this save
+      // replaced: this tab's own save, so its save isn't asked about it
+      if (rosterUpload && rosterUpload.etag && rosterUpload.etag === rosterEtag) rosterUpload.etag = out.etag;
       hubNames.key = null; // the hub's listings follow the new names
       rosterTeams = null; // the editor reloads from what was saved
       rosterOpen = false;
@@ -1624,18 +1696,32 @@ function renderRosterEditor(a, t) {
 // The schedule holds team names, so without this a renamed team would
 // stay in it under its old name, next to the new one. The saved schedule
 // is rewritten and saved; a working copy with unsaved edits is renamed in
-// place and stays unsaved.
+// place and stays unsaved. The save lands only on the copy read here; one
+// saved in another tab meanwhile comes back, and is renamed and saved once
+// more (deleted meanwhile: nothing to rename).
 async function followRenames(a, t, renames) {
   if (!Object.keys(renames).length) return 0;
   let saved = null;
-  try { saved = await ownedJson(pub, a, `t/${t.id}/schedule.json`); } catch (e) { /* none saved */ }
+  let etag = null;
+  try { ({ json: saved, etag } = await readTagged(a, `t/${t.id}/schedule.json`)); } catch (e) { /* none saved */ }
+  let from = etag; // the copy the one saved here was renamed from
   let n = 0;
   if (saved && saved.phases && renameTeams(saved, renames)) {
-    await pub(a + '/schedule', { method: 'POST', json: saved });
-    n = 1;
+    let out = await postSchedule(a, saved, etag);
+    if (out && out.conflict) {
+      saved = out.schedule;
+      from = etag = out.etag;
+      out = saved && saved.phases && renameTeams(saved, renames) ? await postSchedule(a, saved, etag) : null;
+      if (out && out.conflict) throw new Error('The schedule was changed in another tab at the same moment.');
+    }
+    if (out) etag = out.etag;
+    if (saved) n = 1;
   }
-  if (sched && schedDirty) n = renameTeams(sched, renames) || n;
-  else if (sched && saved) sched = saved;
+  if (sched && schedDirty) {
+    n = renameTeams(sched, renames) || n;
+    // edits made on the copy renamed above are edits of the renamed one
+    if (schedEtag && schedEtag === from) schedEtag = etag;
+  } else if (sched && saved) { sched = saved; schedEtag = etag; }
   return n;
 }
 
@@ -1656,6 +1742,11 @@ async function savedNote(a, t, renames) {
    the admin file route; roster changes invalidate the team cache. */
 
 let sched = null;          // working schedule (or null: creator shown)
+// the etag of the saved copy `sched` was read as or saved to (saves.js):
+// its next save lands only on that copy, so a schedule changed in another
+// tab since asks first. Moved wherever sched comes from the Worker; null
+// when none is known (no base: the plain save)
+let schedEtag = null;
 let schedFetched = false;
 let schedTeams = null;     // roster team names, seed order
 let schedDirty = false;
@@ -1673,10 +1764,26 @@ async function ensureSched(a, t) {
   // both at once: each is a round trip to the Worker
   const [names, got] = await Promise.all([
     ownedJson(pub, a, t.roster_r2_key).then((r) => parseRoster(r).map((x) => x.name), () => []),
-    ownedJson(pub, a, `t/${t.id}/schedule.json`).catch(() => null),
+    readTagged(a, `t/${t.id}/schedule.json`).catch(() => null),
   ]);
   schedTeams = names;
-  if (sched === before) sched = got;
+  if (sched === before) {
+    sched = got && got.json;
+    schedEtag = got && got.etag;
+  }
+}
+
+// The editor's Save and Generate. A schedule changed in another tab (or
+// filled by a hub) since this one was loaded asks before it is replaced;
+// Cancel keeps the edits here, unsaved (schededit.js says the message).
+async function saveSchedule(a, s) {
+  let out = await postSchedule(a, s, schedEtag);
+  while (out && out.conflict) {
+    if (!confirm(SCHED_CONFLICT)) throw new Error(SCHED_KEPT);
+    out = await postSchedule(a, s, out.etag);
+  }
+  schedEtag = out && out.etag;
+  return out;
 }
 
 function renderScheduleSec(a, t, buckets, files) {
@@ -1707,8 +1814,8 @@ function renderSchedule(a, t, buckets, files) {
     played: () => new Set(files.filter((f) => isGameFile(f) && Number.isInteger(f.round)).map((f) => f.round)),
     roomsN: () => schedRoomsN,
     setRoomsN: (n) => { schedRoomsN = n; },
-    save: (s) => pub(a + '/schedule', { method: 'POST', json: s }),
-    del: () => pub(a + '/schedule', { method: 'DELETE' }),
+    save: (s) => saveSchedule(a, s),
+    del: () => pub(a + '/schedule', { method: 'DELETE' }).then((out) => { schedEtag = null; return out; }),
     fill: async () => {
       const { matches, roster } = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true });
       if (!matches.length) return null;
@@ -2396,8 +2503,10 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   };
 
   /* protests: rulings are the TD's record only — a whole-map write, like
-     settings. Nothing goes to the room; the moderator applies an
-     upheld ruling in MODAQ and uploads the game again. */
+     settings, that names the ruling it changes as this tab had it, so a
+     ruling made in another tab is kept (saves.js). Nothing goes to the
+     room; the moderator applies an upheld ruling in MODAQ and uploads the
+     game again. */
   $('protdrawer').ontoggle = () => { protOpen = $('protdrawer').open; };
   box.querySelectorAll('[data-goto]').forEach((el) => {
     el.onclick = () => {
@@ -2414,12 +2523,20 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     // the timestamp marks the ruling, not the note: a later re-upload of
     // the game counts as the correction only against the ruling's time
     else next[key] = { r, note, at: prev && prev.r === r ? prev.at : Date.now() };
+    // this copy moves on as the save goes out, so a second ruling made
+    // before the answer comes back is made on this one (saves.js); a
+    // failed save puts it back
+    const was = rulings;
+    rulings = next;
     try {
-      await pub(a, { method: 'POST', json: { rulings: next } });
+      await pub(a, { method: 'POST', json: rulingsBody(was, next, [key]) });
       t.rulings = JSON.stringify(next);
       say(r === 'open' && !note ? 'Reopened' : `Saved: ${rulingLabel(r)}`);
       render();
-    } catch (e) { say(e.message, true); }
+    } catch (e) {
+      if (rulings === next) rulings = was;
+      say(e.message, true);
+    }
   };
   box.querySelectorAll('[data-rule]').forEach((sel) => {
     sel.onchange = () => saveRuling(sel.dataset.rule, sel.value,
@@ -2444,7 +2561,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       const next = { ...settings };
       if ($('autoadv').checked) next.autoAdvance = true;
       else delete next.autoAdvance;
-      const out = await pub(a, { method: 'POST', json: { settings: next } });
+      // the switch sets the key whatever this copy held: a second click
+      // before the redraw lands is the TD's say too (saves.js)
+      const out = await pub(a, { method: 'POST', json: settingsBody(settings, next, {}, ['autoAdvance']) });
       say(out && out.advanced ? `Round ${t.current_round + 1} opened: every room had started Round ${t.current_round}`
         : $('autoadv').checked ? 'Rounds open automatically' : 'Rounds open when you advance them');
       showDetail();
@@ -3092,37 +3211,63 @@ async function autoFillSlots(force = false) {
     const opts = { cache: autoCache, rank: true };
     const got = await collectMatches(pub, a, t, buckets, prog.files, () => {}, opts);
     if (!got.matches.length) return;
-    const saved = await ownedJson(pub, a, `t/${t.id}/schedule.json`).catch(() => null);
+    let saved = null;
+    let etag = null;
+    try { ({ json: saved, etag } = await readTagged(a, `t/${t.id}/schedule.json`)); } catch (e) { /* none saved */ }
     if (!saved || schedDirty) return;
     // the saved schedule says what is ready and which games that takes;
     // this tab's copy may be older (another tab's save)
-    const want = fillProgress(saved, files);
-    const read = new Set(got.matches.map((m) => m.fileId));
-    const more = want.files.filter((f) => !read.has(f.id));
-    if (more.length) {
-      got.matches.push(...(await collectMatches(pub, a, t, buckets, more, () => {}, opts)).matches);
-      if (schedDirty) return;
-    }
-    // a game that couldn't be read holds its pool: look again on the next refresh
-    const ids = new Set(got.matches.map((m) => m.fileId));
-    autoSig = want.files.every((f) => ids.has(f.id)) ? sig : null;
-    const res = autoFillSaved(saved, files, got.matches, got.roster, autoForce, gameFormat(t));
-    const said = [];
-    if (res.playoffs) {
-      autoWait = { ...autoWait, held: res.playoffs.held, odd: res.playoffs.odd };
-      const ps = res.playoffs.pools;
-      if (res.playoffs.filled) said.push(ps.length ? `the playoff slots from ${ps.length > 1 ? 'pools' : 'pool'} ${andList(ps)}` : 'some playoff slots');
-    }
-    if (res.finals) {
-      autoWait = { ...autoWait, finals: res.finals.held };
-      if (res.finals.filled) said.push(`the Finals from ${andList(res.finals.brackets)}`);
-    }
+    const fill = async (copy) => {
+      const want = fillProgress(copy, files);
+      const read = new Set(got.matches.map((m) => m.fileId));
+      const more = want.files.filter((f) => !read.has(f.id));
+      if (more.length) {
+        got.matches.push(...(await collectMatches(pub, a, t, buckets, more, () => {}, opts)).matches);
+        if (schedDirty) return null;
+      }
+      // a game that couldn't be read holds its pool: look again on the next refresh
+      const ids = new Set(got.matches.map((m) => m.fileId));
+      autoSig = want.files.every((f) => ids.has(f.id)) ? sig : null;
+      const res = autoFillSaved(copy, files, got.matches, got.roster, autoForce, gameFormat(t));
+      const said = [];
+      if (res.playoffs) {
+        autoWait = { ...autoWait, held: res.playoffs.held, odd: res.playoffs.odd };
+        const ps = res.playoffs.pools;
+        if (res.playoffs.filled) said.push(ps.length ? `the playoff slots from ${ps.length > 1 ? 'pools' : 'pool'} ${andList(ps)}` : 'some playoff slots');
+      }
+      if (res.finals) {
+        autoWait = { ...autoWait, finals: res.finals.held };
+        if (res.finals.filled) said.push(`the Finals from ${andList(res.finals.brackets)}`);
+      }
+      return { schedule: res.schedule, said };
+    };
+    let res = await fill(saved);
+    if (!res) return;
+    // the save lands only on the copy read here (saves.js). Another tab's
+    // save since then comes back: that copy is filled once more, with the
+    // games already read; deleted since, there is nothing to fill
+    let out = null;
     if (res.schedule !== saved) {
-      await pub(a + '/schedule', { method: 'POST', json: res.schedule });
+      out = await postSchedule(a, res.schedule, etag);
+      if (out && out.conflict) {
+        if (!out.schedule || schedDirty) return;
+        saved = out.schedule;
+        etag = out.etag;
+        res = await fill(saved);
+        if (!res) return;
+        out = res.schedule !== saved ? await postSchedule(a, res.schedule, etag) : null;
+        if (out && out.conflict) throw new Error('the schedule was saved again meanwhile');
+      }
+    }
+    if (out) {
       if (schedDirty) return;
       sched = res.schedule;
-      say('Filled ' + andList(said));
-    } else sched = saved;
+      schedEtag = out.etag;
+      say('Filled ' + andList(res.said));
+    } else {
+      sched = saved;
+      schedEtag = etag;
+    }
     if (shownView === 'live') render();
   } catch (e) {
     autoSig = null; // try again on the next refresh
