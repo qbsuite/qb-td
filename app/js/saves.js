@@ -32,10 +32,10 @@ export const FORMAT_KEYS = ['gameFormat', 'formatOverrides'];
 export const SCHED_CONFLICT = 'The schedule was changed in another tab, or its playoff slots were filled, after this '
   + 'page loaded it. Would you like to save your version anyway? It will replace the other one. Choose Cancel to keep '
   + 'your edits here without saving.';
-export const SCHED_KEPT = 'The schedule was changed in another tab. Your edits are still here.';
+export const SCHED_KEPT = 'The schedule was not saved, because another tab changed it. Your version is still on this page.';
 export const ROSTER_CONFLICT = 'The roster was saved in another tab after this page loaded it. Would you like to save '
   + 'your version anyway? It will replace the other one. Choose Cancel to keep your version here without saving.';
-export const ROSTER_KEPT = 'Roster not saved. Your edits are still here.';
+export const ROSTER_KEPT = 'The roster was not saved, because another tab changed it. Your version is still on this page.';
 
 /** pub(path) for a GET, as {data, etag}: the same request, answer and
     errors, plus the X-Qbtd-Etag the Worker sends on the raw schedule and

@@ -426,12 +426,12 @@ await test('schedule: deleted in another tab, a save with a base answers conflic
   assert.deepEqual(writes(ops), []);
 });
 
-await test('schedule: without a base, as before (unconditional, the same answer)', async () => {
+await test('schedule: without a base, unconditional as before, and the answer carries the new etag', async () => {
   const { res, ops } = await postSched(sched(2));
-  assert.equal(res.text, '{"ok":true,"brackets":false}');
+  assert.equal(res.text, JSON.stringify({ ok: true, brackets: false, etag: etag(SCHED) }));
   assert.ok(ops.includes(`r2 put ${SCHED}`));
   const over = await postSched(sched(3));
-  assert.equal(over.res.text, '{"ok":true,"brackets":false}');
+  assert.equal(over.res.text, JSON.stringify({ ok: true, brackets: false, etag: etag(SCHED) }));
   assert.equal(raw(SCHED), JSON.stringify(sched(3)));
 });
 

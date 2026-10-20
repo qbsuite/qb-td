@@ -3556,7 +3556,9 @@ async function putSchedule(request, env, t) {
     (multi ? "COALESCE(bracket_rounds, '{}')" : 'NULL') + ' WHERE id = ?1'
   ).bind(t.id).run();
   await markPub(env, t.id);
-  return json(env, base ? { ok: true, brackets: multi, etag: put.etag } : { ok: true, brackets: multi });
+  // the etag goes back on any save, so a hub that just made the schedule
+  // (Generate) guards its next save too; older pages ignore it
+  return json(env, { ok: true, brackets: multi, etag: put.etag });
 }
 
 // A schedule save refused because the stored copy moved on: one read of

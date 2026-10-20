@@ -728,10 +728,9 @@ requests.
   (`meter_totals.json`, with `QBTD_SEND_BASE=1` too). The save bodies
   grow by the base text.
 
-Known limit: the first save of a new schedule (Generate) sends no base,
-and the Worker answers an etag only to a save that sent one, so that
-schedule is unguarded in its tab until the tab reads it again (a reload,
-a roster save, or its own auto-fill).
+The first save of a new schedule (Generate) sends no base, but the Worker
+answers the new etag to any schedule save, so the tab's next save is
+guarded from then on.
 
 ## Tests
 
