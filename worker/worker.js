@@ -44,7 +44,8 @@
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
 import { modaqExport, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
-import { parseRoster, rosterNameMap, renameMatch, withRound, rosterForExport } from '../app/engine/qbj.js';
+import { renameMatch, withRound, rosterForExport } from '../app/engine/qbj.js';
+import { rosterNamesFromText } from '../app/engine/games.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
@@ -2981,13 +2982,9 @@ async function rosterNames(env, rosterKey, rawKey) {
   if (!rosterKey) return null;
   const obj = await env.DATA.get(rosterKey);
   if (!obj) return null;
+  // A roster without renames skips the parse (games.js rosterNamesFromText).
   try {
-    const text = new TextDecoder().decode(await readBlob(obj, rawKey));
-    // Renames are held only under `_formerNames` (qbj.js parseRoster): a
-    // roster without that key, spelled out or \u-escaped, has none, and
-    // most rosters are that, so they skip the parse.
-    if (!text.includes('_formerNames') && !text.includes('\\u')) return null;
-    return rosterNameMap(parseRoster(JSON.parse(text)));
+    return rosterNamesFromText(new TextDecoder().decode(await readBlob(obj, rawKey)));
   } catch (e) { return null; }
 }
 
