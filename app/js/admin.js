@@ -16,6 +16,13 @@
 // until setup is complete.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
+// Asked for first, though the hub needs them only through the files below
+// (packetsui.js, schededit.js): found there, they and entities.js were
+// the last modules a cold load waited for, and on a slow link they held up
+// the hub's first render.
+import '../engine/buzz.js';
+import '../engine/plan.js';
+import '../engine/hdwhite.js';
 import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
   carryFormerNames, forfeitQbj, statedRound } from '../engine/qbj.js';
 import { standings, dedupeMatches } from '../engine/stats.js';
