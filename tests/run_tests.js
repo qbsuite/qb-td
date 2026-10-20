@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound } from '../app/engine/qbj.js';
+  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound, matchPayload } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches, standings } from '../app/engine/stats.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
@@ -34,6 +34,7 @@ import { finalsSources, finalsProgress, finalsFill, scheduleFinished, fillProgre
 import { eachLimit } from '../app/js/limit.js';
 import { modaqExport, modaqFilenames, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js';
+import { isGameFile, readGame, readGames, newestOf, rosterNamesFromText } from '../app/engine/games.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -7652,6 +7653,155 @@ test('tbRebuild: replacements, appended tiebreakers and held bonuses number as t
   const wrongUsed = old(bonus);
   wrongUsed.tb.used = ['B2'];
   assert.equal(tbRebuild(wrongUsed), null);
+});
+
+/* ---------- games.js: one way to read uploaded games ----------
+   The public page, the archive, the hub and the Worker each read games
+   their own way at 0cd19c5; games.js is those lines in one place. These
+   hold it to the inline code it replaces. tests/games_golden.mjs (E1)
+   holds readGames to the page's and the archive's whole loops on every
+   fixture. */
+
+test('games.js: isGameFile answers what the inline good-file test answers, value for value', () => {
+  const inline = (f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error;
+  let n = 0;
+  for (const kind of ['qbj', 'combined', 'game', 'roster', 'other', 'QBJ', '', null, undefined]) {
+    for (const error of [null, undefined, '', 0, false, 'No teams', true, {}]) {
+      const f = { kind, error };
+      assert.equal(isGameFile(f), inline(f), JSON.stringify(f));
+      n++;
+    }
+  }
+  assert.equal(isGameFile({}), inline({}));
+  assert.equal(n, 72);
+});
+
+test('games.js: readGame parses as the page did: room, then file id, and no copy with nothing renamed', () => {
+  const entry = renameGames.find((e) => JSON.stringify(e.qbj).includes('UCSD Unc'));
+  const before = JSON.stringify(entry);
+  const plain = readGame(entry.qbj, null, entry);
+  assert.equal(plain.qbj, entry.qbj, 'nothing renamed: the same object');
+  const want = parseMatch(entry.qbj, { filename: entry.filename });
+  want.room = entry.room;
+  want.fileId = entry.id;
+  assert.equal(JSON.stringify(plain.m), JSON.stringify(want), 'same keys, same order');
+  assert.deepEqual(Object.keys(plain.m).slice(-2), ['room', 'fileId']);
+  // renamed: a copy under the new names; the entry itself untouched
+  const names = rosterNameMap(renamedRoster());
+  const ren = readGame(entry.qbj, names, { id: 7, filename: 'Round_1_x.qbj', room: 'Room 9' });
+  assert.notEqual(ren.qbj, entry.qbj);
+  assert.equal(JSON.stringify(ren.qbj), JSON.stringify(renameMatch(entry.qbj, names)));
+  const wantRen = parseMatch(renameMatch(entry.qbj, names), { filename: 'Round_1_x.qbj' });
+  wantRen.room = 'Room 9';
+  wantRen.fileId = 7;
+  assert.equal(JSON.stringify(ren.m), JSON.stringify(wantRen));
+  assert.ok(ren.m.teams.some((t) => t.name === 'UC San Diego') && !ren.m.teams.some((t) => t.name === 'UCSD Unc'));
+  assert.equal(JSON.stringify(entry), before, 'the entry and its game are not edited');
+  // a hub upload: the qbj half of a reader upload, a deleted room
+  const hub = readGame(matchPayload({ qbj: entry.qbj, game: null }), null, { id: 3, filename: 'R.qbtd.json', room: '' });
+  assert.equal(hub.qbj, entry.qbj);
+  assert.equal(hub.m.room, '');
+  // a game that won't parse throws parseMatch's own error
+  const bad = { tossups_read: 20, match_teams: [] };
+  let msg = null;
+  try { parseMatch(bad, { filename: 'x.qbj' }); } catch (e) { msg = e.message; }
+  assert.ok(msg);
+  assert.throws(() => readGame(bad, null, { id: 1, filename: 'x.qbj', room: 'A' }), (e) => e.message === msg);
+});
+
+test('games.js: readGames keeps the order, the raw rows and the error lines the page wrote', () => {
+  const broken = { id: 999, round: 2, room: 'Room 1', filename: 'Round_2_broken.qbj', qbj: { tossups_read: 20, match_teams: [] } };
+  const entries = [...renameGames.slice(0, 4), broken, ...renameGames.slice(4, 8)];
+  const before = JSON.stringify(entries);
+  for (const names of [null, rosterNameMap(renamedRoster())]) {
+    const errors = ['earlier'];
+    const got = readGames(entries, names, errors);
+    // the page's loop as it was, without the live-room step
+    const want = { matches: [], raw: [], errors: ['earlier'] };
+    for (const entry of entries) {
+      try {
+        const qbj = renameMatch(entry.qbj, names);
+        const m = parseMatch(qbj, { filename: entry.filename });
+        m.room = entry.room;
+        m.fileId = entry.id;
+        want.matches.push(m);
+        want.raw.push({ id: entry.id, round: m.round, room: entry.room, qbj });
+      } catch (e) { want.errors.push(entry.filename + ': ' + e.message); }
+    }
+    assert.equal(JSON.stringify(got.matches), JSON.stringify(want.matches));
+    assert.equal(JSON.stringify(got.raw), JSON.stringify(want.raw));
+    assert.deepEqual(errors, want.errors);
+    assert.equal(errors.length, 2);
+    assert.ok(errors[1].startsWith('Round_2_broken.qbj: '));
+    assert.deepEqual(got.matches.map((m) => m.fileId), entries.filter((e) => e !== broken).map((e) => e.id));
+    assert.deepEqual(Object.keys(got.raw[0]), ['id', 'round', 'room', 'qbj']);
+    if (!names) assert.ok(got.raw.every((r, i) => r.qbj === entries.filter((e) => e !== broken)[i].qbj), 'no copies');
+  }
+  assert.equal(JSON.stringify(entries), before, 'entries are not edited, reordered or copied over');
+  assert.deepEqual(readGames([], null, []), { matches: [], raw: [] });
+});
+
+test('games.js: newestOf picks what a newest-first sort picks, equal ids included', () => {
+  const rnd = mulberry32(20261019);
+  const kinds = ['qbj', 'combined', 'game', 'roster'];
+  const newestFirst = (x, y) => y.id - x.id;
+  for (let n = 0; n < 2000; n++) {
+    const list = Array.from({ length: Math.floor(rnd() * 9) }, (_, i) => ({
+      i, id: 1 + Math.floor(rnd() * 6), kind: kinds[Math.floor(rnd() * kinds.length)], error: rnd() < 0.2 ? 'Bad file' : null,
+    }));
+    const order = list.map((f) => f.i).join();
+    // liveRows and goodIn (admin.js): the good files sorted, the first
+    assert.equal(newestOf(list), list.filter(isGameFile).sort(newestFirst)[0] || null);
+    // gridCell: its list already narrowed to the good files
+    const goods = list.filter(isGameFile);
+    assert.equal(newestOf(goods), goods.length ? [...goods].sort(newestFirst)[0] : null);
+    assert.equal(list.map((f) => f.i).join(), order, 'the list is not sorted in place');
+  }
+  assert.equal(newestOf([]), null);
+  assert.equal(newestOf([{ id: 5, kind: 'game', error: null }, { id: 4, kind: 'qbj', error: 'x' }]), null);
+});
+
+test('games.js: rosterNamesFromText reads renames as the Worker does, and skips the parse when there can be none', () => {
+  // worker.js rosterNames at 0cd19c5, after its R2 read
+  const workerNames = (text) => {
+    try {
+      if (!text.includes('_formerNames') && !text.includes('\\u')) return null;
+      return rosterNameMap(parseRoster(JSON.parse(text)));
+    } catch (e) { return null; }
+  };
+  const plain = JSON.stringify(renameArchive['/pub/2026terrapinopenatusc/roster']);
+  const renamed = JSON.stringify(buildRosterQbj('T', renamedRoster()));
+  const escaped = renamed.replace(/UC San Diego/g, 'UC San Dieg\\u006f');
+  // the key itself escaped: still a rename, which is why '\\u' is looked for
+  const escapedKey = renamed.replace(/_formerNames/g, '\\u005fformerNames');
+  const escapedPlain = plain.replace(/"name":"([^"]+)"/, (_, n) => `"name":"${n.slice(0, -1)}\\u${n.charCodeAt(n.length - 1).toString(16).padStart(4, '0')}"`);
+  const texts = [plain, renamed, JSON.stringify(JSON.parse(renamed), null, 2), escaped, escapedKey, escapedPlain,
+    'not json', 'not json _formerNames', '\\u not json', '{"_formerNames":1}', '[]', '{}'];
+  for (const text of texts) {
+    let got;
+    try { got = rosterNamesFromText(text); } catch (e) { got = null; }
+    assert.deepEqual(got, workerNames(text), text.slice(0, 40));
+  }
+  assert.ok(escapedPlain.includes('\\u') && escapedPlain !== plain);
+  const map = rosterNamesFromText(renamed);
+  assert.equal(map.teams.get('UCSD Unc'), 'UC San Diego');
+  assert.equal(map.players.get('UC San Diego\nJake Anderson'), 'Jacob Anderson');
+  assert.deepEqual(rosterNamesFromText(escaped), rosterNameMap(parseRoster(JSON.parse(escaped))));
+  assert.ok(!escapedKey.includes('_formerNames'));
+  assert.deepEqual(rosterNamesFromText(escapedKey), map);
+  // nothing to rename: no parse at all, so a text that isn't JSON is fine
+  const parse = JSON.parse;
+  let calls = 0;
+  JSON.parse = (...a) => { calls++; return parse(...a); };
+  try {
+    assert.equal(rosterNamesFromText(plain), null);
+    assert.equal(rosterNamesFromText('not json'), null);
+  } finally { JSON.parse = parse; }
+  assert.equal(calls, 0);
+  // otherwise the caller hears what went wrong
+  assert.throws(() => rosterNamesFromText('not json _formerNames'), SyntaxError);
+  assert.throws(() => rosterNamesFromText('{"_formerNames":1}'), /No teams found in roster file/);
+  assert.equal(rosterNamesFromText(escapedPlain), null, 'escaped but nothing renamed');
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
