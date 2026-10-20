@@ -13,9 +13,12 @@
 // does), on Fast 4G (165 ms latency, 8.1 Mbps down, 1.35 Mbps up; DevTools'
 // preset), the two checkouts taking turns. The time is from navigation
 // start to the first render with data: the public page's first tab, the
-// hub's round line. Pass: each median within max(3%, 20 ms) of the
-// baseline's. The script files each page fetches, and how many, are
-// printed for both, for the module list the design allows.
+// hub's round line. Pass: each cold median within max(3%, 20 ms) of the
+// baseline's. Warm loads take 5-12 ms here, under that 20 ms floor, so
+// their rows are shown for reference and are not a gate (the CPU gates
+// for game loading are bench_games.mjs and cpubench.mjs). The script
+// files each page fetches, and how many, are printed for both, for the
+// module list the design allows.
 // Ports 9611 (this checkout), 9612 (stand-in Worker) and 9619 (baseline);
 // QBTD_BENCH_PORTS="a,b,c" moves them.
 
@@ -106,8 +109,10 @@ for (const [label, url] of PAGES) {
         const gone = scripts[1].filter((x) => !scripts[0].includes(x));
         if (added.length || gone.length) row.modules = (added.length ? '+' + added.join(' +') : '') + (gone.length ? ' -' + gone.join(' -') : '');
       }
-      row.ok = a <= b + Math.max(0.03 * b, 20);
-      if (!row.ok) failed++;
+      if (cold) {
+        row.ok = a <= b + Math.max(0.03 * b, 20);
+        if (!row.ok) failed++;
+      } else row.ok = 'info';
     }
     rows.push(row);
   }

@@ -647,8 +647,9 @@ node tests/live_publish.js       # qb-td-live publisher: deploys, retries, heart
 node tests/snapshot_publish.js   # cron tick: round shards + GitHub publisher (D1/R2/GitHub mocked)
 node tests/games_golden.mjs      # game loading as the public page and the archive do it, and what is
                                  # built from it, held to tests/golden/games.json
-node tests/worker_inproc.mjs     # worker.js in Node (SQLite, in-memory R2): download bytes and each
-                                 # request's D1, R2 and crypto operations, held to tests/golden/worker_*.json
+node tests/worker_inproc.mjs     # worker.js in Node (SQLite, in-memory R2): download bytes, each
+                                 # request's D1, R2 and crypto operations and its CORS/X-Qbtd-* headers,
+                                 # held to tests/golden/worker_*.json
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
@@ -755,12 +756,15 @@ npm run check:bundles            # the Worker bundle (wrangler deploy --dry-run,
                                  # 300 B; and `npm run build:read` rebuilds read.bundle.js byte for byte
 node tests/ui_golden.js          # Chrome, no Worker: the demo hub (Live, cells and their links, Compute
                                  # three ways, each download, the Rebuild body) and the demo and archive
-                                 # pages tab by tab, their static files and import chains (ports 9611-9612)
+                                 # pages tab by tab, their static files and import chains (ports 9611-9612;
+                                 # QBTD_GOLDEN_PORT=<p> moves them to p and p+1, QBTD_CDP_PORT fixes Chrome's)
 
 # local servers for the rest, on a fresh database each run: dev Worker,
 # static pages, and with --proxy tools/count_proxy.mjs in front of the
-# Worker; it prints the env to export (QBTD_BASE, QBTD_PAGES, ...)
-node tools/e2e_stack.mjs --state <new dir> --worker 9613 --pages 9614 [--proxy 9615] [--meter] [--inspector 9618]
+# Worker; it prints the env to export (QBTD_BASE, QBTD_PAGES, ..., INSPECTOR).
+# wrangler's inspector always gets a port in the same range (default: the 9
+# in the Worker port's ten, 9619 here), never its own default 9229
+node tools/e2e_stack.mjs --state <new dir> --worker 9613 --pages 9614 [--proxy 9615] [--meter] [--inspector 9619]
 
 # the browser suite, written out for an A/B: two runs of the same code
 # must match before a comparison with a change means anything
@@ -784,8 +788,15 @@ QBTD_METER_GOLDEN="sim_day SHAPE=mid" SHAPE=mid node tests/sim_day.js
 # interleaved on one machine
 node --expose-gc tests/bench_games.mjs                         # game loading in the pages, against ref_games.mjs
 QBTD_BASELINE=<dir> node --expose-gc tests/cpubench.mjs        # the Worker's routes in Node
-QBTD_BASELINE=<dir> node tests/bench_pages.js                  # page loads on Fast 4G, and their script files
+QBTD_BASELINE=<dir> node tests/bench_pages.js                  # page loads on Fast 4G (cold rows are the gate), and their script files
+# per route under wrangler's profiler, both dev Workers (--meter), taking
+# turns 5 runs each at REPS=100 or more; compare the medians over the runs
+QBTD_BASE=<worker> INSPECTOR=<ws> REPS=100 SHAPE=small node tests/bench_routes.mjs
 ```
+
+The CPU gates are `bench_games`, `cpubench` and the cold rows of
+`bench_pages`; warm page loads (5-12 ms) and single `bench_routes` runs
+vary too much to hold a change to.
 
 `npm test` needs Node 22.13 or later (`live_publish.js` runs `schema.sql`
 on `node:sqlite`). GitHub Actions runs it on each push and pull request

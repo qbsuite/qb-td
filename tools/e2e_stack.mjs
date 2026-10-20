@@ -7,7 +7,7 @@
 // metrics are off.
 //
 //   node tools/e2e_stack.mjs --state <dir> [--worker 9613] [--pages 9614]
-//        [--proxy 9615 [--proxy-log <file>]] [--meter]
+//        [--proxy 9615 [--proxy-log <file>]] [--meter] [--inspector 9619]
 //
 //   --state <dir>   the dev Worker's --persist-to folder; made fresh with
 //                   schema.sql when it has no database yet
@@ -18,7 +18,10 @@
 //                   pages (QBTD_PAGE_BASE=http://127.0.0.1:<port>)
 //   --meter         the dev Worker with METER on (e2e_usage, sim_usage,
 //                   sim_day, e2e_day, bench_routes)
-//   --inspector     the dev Worker's inspector port (bench_routes: INSPECTOR=ws://127.0.0.1:<port>/ws)
+//   --inspector     the dev Worker's inspector port (bench_routes: INSPECTOR=ws://127.0.0.1:<port>/ws);
+//                   always passed to wrangler, so it never opens its own
+//                   default (9229). Default: the 9 in the Worker port's ten
+//                   (--worker 9613 -> 9619, --worker 9621 -> 9629)
 // Prints one line `stack ready …` with the env to export, then waits.
 
 import { spawn, execFileSync } from 'node:child_process';
@@ -36,10 +39,11 @@ if (!state) { console.error('--state <dir> is required (a fresh folder for the l
 const W = Number(opt('worker', 9613));
 const P = Number(opt('pages', 9614));
 const X = opt('proxy') ? Number(opt('proxy')) : null;
-const I = opt('inspector') ? Number(opt('inspector')) : null;
+const I = opt('inspector') ? Number(opt('inspector')) : Math.floor(W / 10) * 10 + 9;
 for (const port of [W, P, X, I].filter(Boolean)) {
   if (port < 9600 || port > 9699) { console.error('ports must be 9600-9699'); process.exit(2); }
 }
+if ([W, P, X].includes(I)) { console.error(`the inspector port ${I} is taken by another server here; pass --inspector <port>`); process.exit(2); }
 const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', NO_UPDATE_NOTIFIER: '1' };
 const statePath = path.resolve(state);
 mkdirSync(statePath, { recursive: true });
@@ -57,7 +61,7 @@ process.on('exit', stop);
 const devArgs = ['wrangler', 'dev', '--local', '--port', String(W), '--ip', '127.0.0.1', '--test-scheduled', '--persist-to', statePath,
   '--var', `ALLOWED_ORIGIN:http://localhost:${P}`, '--show-interactive-dev-session=false'];
 if (flag('meter')) devArgs.push('--var', 'METER:1');
-if (I) devArgs.push('--inspector-port', String(I));
+devArgs.push('--inspector-port', String(I));
 const logFile = path.join(statePath, 'wrangler_dev.log');
 const out = (await import('node:fs')).openSync(logFile, 'a');
 kids.push(spawn('npx', devArgs, { cwd: path.join(ROOT, 'worker'), env, stdio: ['ignore', out, out] }));
@@ -79,7 +83,8 @@ for (;;) {
   await new Promise((r) => setTimeout(r, 300));
 }
 const line = `stack ready pid=${process.pid} QBTD_BASE=http://127.0.0.1:${W} QBTD_PAGES=http://localhost:${P}`
-  + (X ? ` QBTD_PAGE_BASE=http://127.0.0.1:${X}` : '') + ` QBTD_PERSIST=${statePath}` + (fresh ? ' (fresh database)' : '');
+  + (X ? ` QBTD_PAGE_BASE=http://127.0.0.1:${X}` : '') + ` QBTD_PERSIST=${statePath} INSPECTOR=ws://127.0.0.1:${I}/ws`
+  + (fresh ? ' (fresh database)' : '');
 console.log(line);
 writeFileSync(path.join(statePath, 'stack.env'), line + '\n');
 await new Promise(() => {});

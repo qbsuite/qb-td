@@ -30,9 +30,13 @@
 // that renames; the four saves with no base and with the base a hub sends
 // (equal to what is stored); and a cron tick rebuilding a question set's
 // state for a mirror whose roster renames. For an A/B, run this against
-// the baseline's dev Worker and the change's alternately (5 times each at
-// REPS=100): the floor per route within max(5%, 0.05 ms), the ceiling
-// within 10%.
+// the baseline's dev Worker and the change's alternately, 5 runs each at
+// REPS=100 or more (tools/e2e_stack.mjs --meter prints the INSPECTOR to
+// use), and compare each route's median over the 5 runs: the floor within
+// max(5%, 0.05 ms), the ceiling within 10%. One run is not a comparison:
+// on identical code a single SHAPE=small REPS=20 run put the same save at
+// 0.65 ms and 0.40 ms. This is a supporting check; the CPU gates are
+// cpubench.mjs, bench_games.mjs and bench_pages.js's cold rows.
 
 import { d1exec } from './e2e_lib.js';
 import archive from '../app/archive/ug-nats-stanford.js';

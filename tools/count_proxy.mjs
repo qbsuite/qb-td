@@ -2,10 +2,12 @@
 // count_proxy.mjs — a counting proxy between the pages under test and the
 // local dev Worker. Each request is logged with its flow (set by the test),
 // method, route template (secrets, slugs, ids and keys replaced by their
-// kind), status, request and response bytes, and for a preflight the
-// headers it asks for (Access-Control-Request-Headers). What a refactor
-// must keep: the same non-OPTIONS requests per flow, the same preflight
-// header sets, the same GET response bytes.
+// kind), status, request and response bytes, for a preflight the
+// headers it asks for (Access-Control-Request-Headers), and the response's
+// CORS, Vary and X-Qbtd-* headers (hdr; local ports and X-Qbtd-* values
+// taken out). What a refactor must keep: the same non-OPTIONS requests per
+// flow, the same preflight header sets, the same GET response bytes, the
+// same response headers per route.
 //
 //   node tools/count_proxy.mjs --port 9615 --target http://127.0.0.1:9613 [--log file.jsonl]
 //
@@ -50,6 +52,15 @@ export function routeTemplate(method, rawUrl) {
   return method + ' ' + p + (q.length ? '?' + q.join('&') : '');
 }
 
+/** A response's CORS, Vary and X-Qbtd-* headers as one line: names
+    sorted, local ports and X-Qbtd-* values (etags) left out. */
+export function headerLine(h) {
+  return Object.entries(h).map(([k, v]) => [k.toLowerCase(), v]).filter(([k]) => /^(access-control-|x-qbtd-|vary$)/.test(k))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => (k.startsWith('x-qbtd-') ? k : k + ': ' + String(v).replace(/\/\/(localhost|127\.0\.0\.1):\d+/g, '//$1:<port>')))
+    .join(' | ');
+}
+
 let flow = '';
 let log = [];
 // a fresh connection per request: wrangler's CLI calls (d1 execute, r2
@@ -73,7 +84,7 @@ const server = main && createServer((req, res) => {
       r.on('end', () => {
         const buf = Buffer.concat(out);
         const row = { flow, method: req.method, route: routeTemplate(req.method, req.url), status: r.statusCode,
-          reqBytes: body.length, resBytes: buf.length,
+          reqBytes: body.length, resBytes: buf.length, hdr: headerLine(r.headers),
           acrh: req.method === 'OPTIONS' ? String(req.headers['access-control-request-headers'] || '').toLowerCase().split(',').map((s) => s.trim()).filter(Boolean).sort().join(',') : undefined,
           acrm: req.method === 'OPTIONS' ? req.headers['access-control-request-method'] || '' : undefined };
         log.push(row);

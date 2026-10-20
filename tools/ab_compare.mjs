@@ -7,7 +7,9 @@
 // pages posted, the hub's panes, the public stats, and the pages' Worker
 // requests per section and route — through tools/count_proxy.mjs too,
 // where non-OPTIONS counts must match exactly, preflights must ask for the
-// same headers, and GET answers must be the same size.
+// same headers, GET answers must be the same size, and each route's
+// responses must carry the same CORS, Vary and X-Qbtd-* headers (OPTIONS
+// and the rest apart; captures from before the proxy logged them skip it).
 //
 //   node tools/ab_compare.mjs <baseline capture dir> <other capture dir>
 //
@@ -123,7 +125,8 @@ function compareProxy(la, lb) {
     const out = new Map();
     for (const r of log) {
       const k = r.flow + ' | ' + r.route;
-      const x = out.get(k) || { n: 0, opts: new Set(), getBytes: 0, postBytes: 0, status: new Set() };
+      const x = out.get(k) || { n: 0, opts: new Set(), getBytes: 0, postBytes: 0, status: new Set(), hdr: new Set() };
+      if (r.hdr !== undefined) x.hdr.add((r.method === 'OPTIONS' ? 'OPTIONS: ' : '') + r.hdr);
       if (r.method === 'OPTIONS') x.opts.add(r.acrh || '');
       else { x.n++; x.status.add(r.status); }
       if (r.method === 'GET') x.getBytes += r.resBytes;
@@ -134,9 +137,13 @@ function compareProxy(la, lb) {
   };
   const ga = agg(la);
   const gb = agg(lb);
+  const withHdr = (log) => log.some((r) => r.hdr !== undefined);
+  const headers = withHdr(la) && withHdr(lb);
+  if (!headers) console.log('note: one capture has no response headers logged (taken before count_proxy logged them); headers not compared');
+  const none = () => ({ n: 0, opts: new Set(), getBytes: 0, postBytes: 0, status: new Set(), hdr: new Set() });
   for (const k of new Set([...ga.keys(), ...gb.keys()])) {
-    const x = ga.get(k) || { n: 0, opts: new Set(), getBytes: 0, postBytes: 0, status: new Set() };
-    const y = gb.get(k) || { n: 0, opts: new Set(), getBytes: 0, postBytes: 0, status: new Set() };
+    const x = ga.get(k) || none();
+    const y = gb.get(k) || none();
     const [flow, route] = k.split(' | ');
     if (x.n !== y.n && !timed(flow)) say(`proxy ${k}: ${x.n} requests vs ${y.n}`);
     const oa = [...x.opts].sort().join(' / ');
@@ -145,6 +152,9 @@ function compareProxy(la, lb) {
     if (x.n === y.n && !volatile(route) && !timed(flow) && x.getBytes !== y.getBytes) say(`proxy ${k}: GET answers ${x.getBytes} bytes vs ${y.getBytes}`);
     if (x.n === y.n && x.postBytes !== y.postBytes) say(`proxy ${k}: request bodies ${x.postBytes} bytes vs ${y.postBytes}`);
     if ([...x.status].sort().join() !== [...y.status].sort().join()) say(`proxy ${k}: status ${[...x.status]} vs ${[...y.status]}`);
+    const ha = [...x.hdr].sort().join(' / ');
+    const hb = [...y.hdr].sort().join(' / ');
+    if (headers && x.n + x.opts.size && y.n + y.opts.size && ha !== hb) say(`proxy ${k}: response headers [${ha}] vs [${hb}]`);
   }
 }
 

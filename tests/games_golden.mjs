@@ -4,7 +4,8 @@
 // give, and everything built from it — the stat report, its data, both
 // YellowFruit files, buzzpoints and categories per round — must equal
 // tests/golden/games.json. A refactor that moves game loading into a
-// module adds its own function to `candidates` below and must give the same.
+// module adds its own functions to `candidates` below: each fixture goes
+// through them too, and they must give what the reference copies give.
 // Run: node tests/games_golden.mjs (part of npm test).
 // QBTD_UPDATE_GOLDEN=1 rewrites the golden from the current code.
 
@@ -27,16 +28,26 @@ async function test(name, fn) {
   catch (e) { console.error('FAIL', name, '\n   ', e.message); process.exitCode = 1; }
 }
 
+// A moved game loader, run on each fixture beside the reference copies.
+// `pub` takes what pubviewFetchMatches takes ({ entries, files, roster })
+// and resolves to the same shape ({ matches, errors, rawEntries,
+// loadedIds }); everything the page builds from it (report, YellowFruit,
+// buzzpoints, categories) must come out the same too. `archive` takes what
+// archiveParseBundle takes (bundle, roster) and gives { matches, errors }.
+// Either may be left out. For example, once app/engine/games.js exists:
+//   { name: 'games.js', pub: (args) => …readGames…, archive: (bundle, roster) => … }
+const candidates = [];
+
 const parsedRoster = (q) => {
   if (!q) return null;
   try { return parseRoster(q); } catch (e) { return null; }
 };
 
 // The page's loop on a fixture, and what the page reads back from it.
-async function pubRun(fx) {
+async function pubRun(fx, load = pubviewFetchMatches) {
   const entries = structuredClone(fx.entries);
   const roster = parsedRoster(fx.rosterQbj);
-  const got = await pubviewFetchMatches({ entries, files: fx.files, roster });
+  const got = await load({ entries, files: fx.files, roster });
   const names = rosterNameMap(roster);
   const byId = new Map(entries.map((e) => [e.id, e]));
   return { entries, roster, names, byId, ...got };
@@ -99,6 +110,21 @@ for (const fx of fixtures) {
     assert.deepEqual(s.errors, r.errors);
     assert.equal(jsonSha(s.rawEntries), golden[fx.label].pub.rawEntries);
   });
+  for (const cand of candidates) {
+    if (cand.pub) {
+      await test(`${fx.label}: ${cand.name} loads what the public page's loop loads`, async () => {
+        const rc = await pubRun(fx, cand.pub);
+        assert.deepEqual(pubSummary(rc), golden[fx.label].pub);
+        assert.deepEqual(derived(fx, rc), golden[fx.label].derived);
+      });
+    }
+    if (cand.archive) {
+      await test(`${fx.label}: ${cand.name} loads what the archive's loop loads`, () => {
+        const a = cand.archive({ entries: structuredClone(fx.entries) }, parsedRoster(fx.rosterQbj));
+        assert.deepEqual({ matches: jsonSha(a.matches), count: a.matches.length, errors: a.errors }, golden[fx.label].archive);
+      });
+    }
+  }
 }
 
 await test('fixtures cover what the design lists', () => {

@@ -14,8 +14,12 @@
 //     Rebuild, the hub's refresh, the public routes, and cron ticks,
 //     one of them rebuilding a question set's state with a mirror whose
 //     roster renames and one whose roster doesn't
+//   tests/golden/worker_headers.json  the CORS (Access-Control-*), Vary
+//     and X-Qbtd-* headers of each of those responses, so a header added
+//     to one route (or to all of them) shows up. Each distinct set is
+//     listed once under a short hash, and each request names its set.
 // Run: node tests/worker_inproc.mjs (part of npm test; Node 22.5+).
-// QBTD_UPDATE_GOLDEN=1 rewrites both goldens from the current code.
+// QBTD_UPDATE_GOLDEN=1 rewrites the goldens from the current code.
 
 import { workerHarness, opCounts } from './inproc_worker.mjs';
 import { checkGolden, sha } from './golden_lib.mjs';
@@ -25,13 +29,27 @@ const { call, quiet, measured, sql, raw, setRaw, etag } = w;
 const enc = encodeURIComponent;
 const downloads = {};
 const meter = {};
+const headerSets = {};
+const headersOf = {};
 let failures = 0;
+
+// the response headers a browser acts on beyond the body: CORS, Vary, and
+// qb-td's own (X-Qbtd-*), names lowercased, sorted
+const HEADER_RE = /^(access-control-|x-qbtd-|vary$)/;
+function noteHeaders(label, res) {
+  if (!res || !res.headers) return;
+  const kept = Object.fromEntries(Object.entries(res.headers).filter(([k]) => HEADER_RE.test(k)).sort(([a], [b]) => a.localeCompare(b)));
+  const id = sha(JSON.stringify(kept)).slice(0, 8);
+  headerSets[id] = kept;
+  headersOf[label] = id;
+}
 
 // one request: its operation list goes into the meter golden under `label`
 async function op(label, fn) {
   if (meter[label]) throw new Error('two requests labelled ' + label);
   const { res, ops } = await measured(fn);
   meter[label] = { status: res ? res.status : null, ops };
+  noteHeaders(label, res);
   return res;
 }
 // a download: its answer goes into the downloads golden too
@@ -295,13 +313,15 @@ meter['set state: the mirror\'s renames'] = { names: stateBlob && stateBlob.mirr
 
 /* ---------- the goldens ---------- */
 
-const check = (name, value) => {
+const check = (name, value, n = Object.keys(value).length) => {
   const diffs = checkGolden(name, value);
   if (diffs.length) { failures++; console.error('FAIL ' + name + '\n    ' + diffs.join('\n    ')); }
-  else console.log('  ok ' + name + ' (' + Object.keys(value).length + ' requests)');
+  else console.log('  ok ' + name + ' (' + n + ' requests)');
 };
 check('worker_downloads.json', downloads);
 check('worker_meter.json', meter);
+check('worker_headers.json', { sets: Object.fromEntries(Object.entries(headerSets).sort(([a], [b]) => a.localeCompare(b))), requests: headersOf },
+  Object.keys(headersOf).length);
 const tally = {};
 for (const m of Object.values(meter)) for (const [k, n] of Object.entries(opCounts(m.ops || []))) tally[k] = (tally[k] || 0) + n;
 console.log('  (' + Object.keys(meter).length + ' requests metered: ' + JSON.stringify(tally) + ')');
