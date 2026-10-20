@@ -23,7 +23,7 @@ import { existsSync } from 'node:fs';
 import { rosterNameMap, parseRoster } from '../app/engine/qbj.js';
 import { dedupeEntries } from '../app/engine/buzz.js';
 import { archiveFixture, demoFixture, renamedRosterText, ARCHIVE_SLUGS } from './games_fixtures.mjs';
-import { pubviewLoop, pubviewFetchMatches, hubRef } from './ref_games.mjs';
+import { pubviewLoop, pubviewFetchMatches, hubRef, pinnedModaqFiles } from './ref_games.mjs';
 import { pubviewOwnFetchMatches } from './pubview_src.mjs';
 import { jsonSha } from './golden_lib.mjs';
 
@@ -150,7 +150,9 @@ const hubC = await hubCandidate(pub);
 const cacheOf = () => { const c = new Map(); for (const f of files) c.set(f.id + '|' + f.size + '|' + f.created + '|' + f.round, store.get(f.r2_key)); return c; };
 const cRef = cacheOf();
 const cCand = cacheOf();
-const hubCheck = (r) => jsonSha([r.matches, r.raw, r.errors, r.modaqFiles, r.games]);
+// the MODAQ files as the pinned code gave them: since 10/20 each carries
+// its upload's id (ref_games.mjs pinnedModaqFiles)
+const hubCheck = (r) => jsonSha([r.matches, r.raw, r.errors, pinnedModaqFiles(r.modaqFiles), r.games]);
 rows.push(await compare('TD hub, 300 uploads, parse phase [' + hubC.name + ']',
   () => refHub.collectMatches('/a/x', t, buckets, files, () => {}, { cache: cRef }),
   () => hubC.fn('/a/x', t, buckets, files, () => {}, { cache: cCand }), hubCheck));

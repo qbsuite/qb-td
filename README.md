@@ -196,9 +196,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (`<slug>_standings.html`, `_individuals`, `_games`, `_teamdetail`,
   `_playerdetail`, `_rounds`) — unzip and upload the files to the
   hsquizbowl.org tournament database, which wants that prefix, or host
-  the folder anywhere, no YellowFruit in the loop; and a zip of
-  every game's separated files — the match `.qbj` (imports via YellowFruit's
-  MODAQ game-file import) and the MODAQ game file — plus the roster. All
+  the folder anywhere, no YellowFruit in the loop; and a zip of the
+  games the standings count, each as its separated files — the match
+  `.qbj` (imports via YellowFruit's MODAQ game-file import) and the MODAQ
+  game file — plus the roster. All
   are generated client-side in the dashboard. Combined reader uploads are
   never handed out raw: the dashboard's per-file downloads (Worker
   `part=qbj|game`) and the zip both split them into those two real files.
@@ -213,9 +214,15 @@ Part of [qbsuite](https://qbsuite.github.io/).
   Worker serves it is `app/engine/exportfile.js`, which the Worker and
   the hub's per-file links share; the Worker imports only that file, so
   the zip, YellowFruit, report and stats code stay out of its bundle
-  (`npm run check:bundles`). The QBJ bundle keeps the first file under a
-  name, and uploads list newest first, so a re-exported game keeps its
-  latest upload and a reader's file beats one added by hand.
+  (`npm run check:bundles`). The QBJ bundle (`qbjZipFile`) holds the
+  same games as the stats, the .yft and the report, and the same upload
+  of each: `stats.js` `dedupeMatches` over the stages and rounds picked,
+  which keeps the newest upload per round and pair of teams under the
+  roster's renames. A game re-read with its teams the other way round,
+  or fixed by hand later, is in it once. A reader upload saved without
+  its game half gives its `.qbj` alone, as its own download does. Game
+  files added by hand (Add a game) go in as they are; under a name the
+  zip already holds, the reader's file is kept.
 - **Question sets** (`app/set.html`, no account): the editor's side of a
   mirrored tournament. A set's packets, tiebreakers and reader game
   format are uploaded once; each mirror gets an **invite link** the
@@ -744,7 +751,7 @@ node tests/games_golden.mjs      # game loading as the public page and the archi
                                  # built from it, held to tests/golden/games.json
 node tests/hubgames_ref.mjs      # the hub's game loading (app/js/hubgames.js) and its QBJ bundle against
                                  # admin.js's as they were: the same requests, in order and at once, the
-                                 # same games and the same zip
+                                 # same games, and the zip the old code builds from the counted uploads
 node tests/worker_inproc.mjs     # worker.js in Node (SQLite, in-memory R2): download bytes, each
                                  # request's D1, R2 and crypto operations and its CORS/X-Qbtd-* headers,
                                  # held to tests/golden/worker_*.json

@@ -3441,10 +3441,10 @@ function showStats({ a, t, files, settings, got }) {
     try { await buildZip(); closeMenu(); } finally { run.end(); }
   };
   const buildZip = async () => {
-    // Every game as its separated files: match .qbj + MODAQ game file
-    // (hubgames.js qbjZipFile). The game files that went up apart
-    // from their .qbj (Add a game) are read one after another, in upload
-    // order, then the roster.
+    // The games the standings count, each as its separated files: match
+    // .qbj + MODAQ game file (hubgames.js qbjZipFile). The game files that
+    // went up apart from their .qbj (Add a game) are read one after
+    // another, in upload order, then the roster.
     const gameFiles = [];
     for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
       const { round, filename } = f;
@@ -3456,7 +3456,7 @@ function showStats({ a, t, files, settings, got }) {
       try { rosterFile = { json: await ownedJson(pub, a, t.roster_r2_key) }; }
       catch (e) { rosterFile = { error: true }; }
     }
-    const z = qbjZipFile(t.slug, { modaqFiles, raw, gameFiles, roster: rosterFile, names: got.names });
+    const z = qbjZipFile(t.slug, { matches, modaqFiles, raw, gameFiles, roster: rosterFile, names: got.names });
     download(z.name, z.data, z.type);
   };
   $('rebuild').disabled = false;

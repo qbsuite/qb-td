@@ -289,3 +289,13 @@ export function hubZipRef({ pub, a, t, files, got, modaqFiles, raw, inPick, down
   // END
   return buildZip;
 }
+
+/** The MODAQ files collectMatches gave at 0cd19c5, from what it gives
+    now. Since 10/20 each carries its upload's `id`, so the QBJ bundle
+    can hold only the upload the standings count, and a reader upload
+    saved without its game half gives its .qbj too, with `game: null`;
+    the pinned code left that upload out. Everything else is as it was:
+    the same entries, in the same order, with the same keys and bytes. */
+export function pinnedModaqFiles(modaqFiles) {
+  return modaqFiles.filter((x) => x.game !== null).map(({ id, ...x }) => x);
+}

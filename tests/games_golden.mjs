@@ -27,7 +27,7 @@ import { collectMatches } from '../app/js/hubgames.js';
 import { categoryStats } from '../app/engine/cats.js';
 import { effectiveFormat } from '../app/js/read_core.js';
 import { parseBundle } from '../tools/archive.mjs';
-import { pubviewFetchMatches, pubviewLoop, archiveParseBundle, hubRef } from './ref_games.mjs';
+import { pubviewFetchMatches, pubviewLoop, archiveParseBundle, hubRef, pinnedModaqFiles } from './ref_games.mjs';
 import { pubviewOwnFetchMatches } from './pubview_src.mjs';
 import { allFixtures } from './games_fixtures.mjs';
 import { attempt, checkGolden, jsonSha } from './golden_lib.mjs';
@@ -170,9 +170,15 @@ for (const fx of fixtures) {
   await test(fx.label + ': app/js/hubgames.js collectMatches loads what the hub\'s did', async () => {
     const { ref, got } = await hubPerGame(fx);
     assert.ok(got.matches.length > 0);
-    for (const k of ['roster', 'matches', 'raw', 'games', 'modaqFiles', 'errors']) {
+    for (const k of ['roster', 'matches', 'raw', 'games', 'errors']) {
       assert.equal(JSON.stringify(got[k]), JSON.stringify(ref[k]), k);
     }
+    // the MODAQ files as the hub's were, and since 10/20 the reader
+    // uploads here, all saved without their game half, give their .qbj
+    // too, each under its upload's id (ref_games.mjs pinnedModaqFiles)
+    assert.equal(JSON.stringify(pinnedModaqFiles(got.modaqFiles)), JSON.stringify(ref.modaqFiles), 'modaqFiles');
+    assert.deepEqual(got.modaqFiles.map((x) => x.id), got.raw.filter((r) => r.reader).map((r) => r.id), 'one per reader upload read');
+    assert.ok(got.modaqFiles.every((x) => x.game === null && typeof x.qbj === 'string'));
     assert.deepEqual(got.names, ref.names);
   });
   for (const cand of candidates) {

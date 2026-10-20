@@ -42,6 +42,9 @@ Release Notes for 10/19/2026
 - Buzz marks land on the right word when a question uses an encoded space (&nbsp;) or other HTML entities, as in MODAQ.
 - A tiebreaker's name in Replacements shows as text.
 
+[ EXPORTS ]
+- The QBJ bundle holds one set of files per game, the same games the standings count.
+
 [ SETS ]
 - The set page no longer waits on a mirror's Bye Room before showing a round as finished.
 - Packet uploads and removals work for sets with many mirrors.

@@ -1463,6 +1463,8 @@ const menu = async (id) => {
   const wantGame = d.files.filter((g) => g.kind === 'combined').map((g) => modaqName(g, '_Game.json'))
     .concat(d.files.filter((g) => g.kind === 'game').map((g) => `round-${g.round}/${g.filename}`));
   ok('17 exports: the QBJ bundle has every game as a .qbj', wantQbj.every((n) => names.includes(n)), { names, wantQbj });
+  ok('17 exports: one .qbj per game the stats count', names.filter((n) => /^round-\d+\/.*\.qbj$/.test(n)).length === deduped.length,
+    { names, games: deduped.length });
   ok('17 exports: and every MODAQ game file, split out', wantGame.length >= 2 && wantGame.every((n) => names.includes(n)), { names, wantGame });
   ok('17 exports: no combined .qbtd.json in it', !names.some((n) => /\.qbtd\.json$/i.test(n)), names);
   ok('17 exports: everything in round folders, plus the roster', names.every((n) => /^round-\d+\//.test(n) || n === 'roster.qbj'), names);
@@ -2313,7 +2315,9 @@ await flow('24h. games of every shape in one hub');
    game file, a forfeit, a team saved with a trailing space that the roster
    renames, a renamed player, a file that won't parse, and a game from a
    room since deleted. The hub lists, counts and exports them as it always
-   has: each game once in the stats, the zip keeping what it keeps. */
+   has: each game once in the stats. Since 10/20 the QBJ bundle holds the
+   same games: the re-export alone, and the upload with no game half as
+   its .qbj. */
 {
   const SHAPES = ['Alder', 'Birch', 'Cedar', 'Dogwood', 'Elm', 'Fir', 'Gum', 'Hazel'];
   const t = (await call('/api/tournaments', { method: 'POST', json: { name: 'UI E2E Shapes',
@@ -2367,8 +2371,25 @@ await flow('24h. games of every shape in one hub');
   capJson('stats', '24h', { note, out: await js(`document.querySelector('#statsout').innerText`) });
   ok('24h shapes: Compute counts the re-exported game once (8 games)', note === '8 games in these stats', note);
   const zip = await readZip(new Uint8Array((await menu('dlzip')).bytes));
-  ok('24h shapes: the QBJ bundle keeps both exports of the re-exported game', zip.filter((e) => /^round-1\/Round_1_(Alder_Birch|Birch_Alder)\.qbj$/.test(e.name)).length === 2,
-    zip.map((e) => e.name));
+  const zn = zip.map((e) => e.name);
+  // the games the stats count, the newest upload of each: the game re-read
+  // with its teams the other way round is in it once
+  ok('24h shapes: the QBJ bundle holds the re-exported game once, as its newest upload',
+    zn.filter((n) => /^round-1\/Round_1_(Alder_Birch|Birch_Alder)(\.qbj|_Game\.json)$/.test(n)).join()
+      === 'round-1/Round_1_Birch_Alder.qbj,round-1/Round_1_Birch_Alder_Game.json', zn);
+  ok('24h shapes: one .qbj per game the stats count (8)', zn.filter((n) => /^round-\d+\/.*\.qbj$/.test(n)).length === 8, zn);
+  {
+    // a reader upload saved without its game half: its .qbj as its own
+    // download gives it, and no game file, as its download has none
+    const f = (await call(TA)).body.files.find((x) => x.filename === 'Round_1_Cedar_Dogwood.qbtd.json');
+    const own = await fetch(`${BASE}${TA}/file?key=${encodeURIComponent(f.r2_key)}&part=qbj`);
+    const ownGame = await fetch(`${BASE}${TA}/file?key=${encodeURIComponent(f.r2_key)}&part=game`);
+    const inZip = zip.find((e) => e.name === 'round-1/Round_1_Cedar_Dogwood.qbj');
+    const ownText = await own.text();
+    ok('24h shapes: a reader upload without its game half gives its .qbj, as its own download', !!inZip && own.status === 200
+      && new TextDecoder().decode(inZip.data) === ownText && ownGame.status === 404 && !zn.includes('round-1/Round_1_Cedar_Dogwood_Game.json'),
+    { names: zn, status: [own.status, ownGame.status] });
+  }
   for (const id of ['dlyft4', 'dlyft3', 'dlreport']) await menu(id);
   await click('#dlmenu');
   await waitJs(`!document.querySelector('#dlpanel').hidden`, 'the menu');

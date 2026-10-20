@@ -11,11 +11,11 @@ import { readFileSync } from 'node:fs';
 const FILE = new URL('../app/js/admin.js', import.meta.url);
 
 // what showStats has in scope when buildZip runs, handed in by the caller
-const SCOPE = ['pub', 'a', 't', 'files', 'got', 'modaqFiles', 'raw', 'inPick', 'download'];
+const SCOPE = ['pub', 'a', 't', 'files', 'got', 'matches', 'modaqFiles', 'raw', 'inPick', 'download'];
 
-/** buildZip from admin.js, with the same calling shape as ref_games.mjs
-    hubZipRef: ({ pub, a, t, files, got, modaqFiles, raw, inPick,
-    download }) -> buildZip. */
+/** buildZip from admin.js, with the calling shape of ref_games.mjs
+    hubZipRef plus the games picked: ({ pub, a, t, files, got, matches,
+    modaqFiles, raw, inPick, download }) -> buildZip. */
 export async function hubOwnBuildZip() {
   const src = readFileSync(FILE, 'utf8');
   const scope = {};

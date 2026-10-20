@@ -24,6 +24,7 @@ import { uploadQbjName } from '../engine/exportfile.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
 import { buildReport } from '../engine/report.js';
+import { dedupeMatches } from '../engine/stats.js';
 import { makeZip } from '../engine/zip.js';
 import { effectiveFormat } from './read_core.js';
 import { eachLimit } from './limit.js';
@@ -80,7 +81,7 @@ export async function collectMatches(pub, a, t, buckets, files, onFile = () => {
   const matches = [];
   const raw = [];   // qbj halves: the zip download + the served stats bundle
   const games = []; // game halves of combined uploads, for the zip only
-  const modaqFiles = []; // MODAQ's own two files of each reader upload, for the zip
+  const modaqFiles = []; // MODAQ's own files of each reader upload, for the zip
   // the round is in the key: moving a game rewrites its file and copy
   const keyOf = (f) => f.id + '|' + f.size + '|' + f.created + '|' + f.round;
   const copies = rank ? await gameCopies(pub, a, qbjFiles.filter((f) => !(cache && cache.has(keyOf(f))))) : new Map();
@@ -117,20 +118,30 @@ export async function collectMatches(pub, a, t, buckets, files, onFile = () => {
         filename: m.filename,
         text: JSON.stringify(payload),
       });
-      if (f.kind === 'combined' && full.game && typeof full.game === 'object') {
-        // MODAQ's own two files for this game (engine/modaqfile.js), under
-        // the roster's current names
-        const exp = modaqExport(full, m.round, names);
-        // named by its own QBJ's teams, in MODAQ's order
-        let named = m.teams.map((tm) => tm.name);
-        try { named = JSON.parse(exp.qbj).match_teams.map((mt) => mt.team.name); } catch (e) { /* keep the parsed names */ }
-        const fileNames = modaqFilenames(m.round, named);
-        modaqFiles.push({ round: m.round, qbjName: fileNames.qbj, qbj: exp.qbj, gameName: fileNames.game, game: exp.game });
-        games.push({
-          round: m.round,
-          filename: f.filename.replace(/\.qbtd\.json$/i, '_Game.json'),
-          text: JSON.stringify(full.game),
-        });
+      if (f.kind === 'combined') {
+        // the upload itself has a qbj half, a game half or both; its
+        // public copy (rank) is the qbj half alone, and gives no files
+        const half = !!full.game && typeof full.game === 'object';
+        if (half || (full.qbj && typeof full.qbj === 'object')) {
+          // MODAQ's own two files for this game (engine/modaqfile.js),
+          // under the roster's current names, with the upload's id: the
+          // QBJ bundle holds the upload the standings count. One saved
+          // without its game half has no game file, as its own download
+          // has none (exportfile.js storedFileText); its .qbj is MODAQ's.
+          const exp = modaqExport(full, m.round, names);
+          // named by its own QBJ's teams, in MODAQ's order
+          let named = m.teams.map((tm) => tm.name);
+          try { named = JSON.parse(exp.qbj).match_teams.map((mt) => mt.team.name); } catch (e) { /* keep the parsed names */ }
+          const fileNames = modaqFilenames(m.round, named);
+          modaqFiles.push({ id: f.id, round: m.round, qbjName: fileNames.qbj, qbj: exp.qbj, gameName: fileNames.game, game: half ? exp.game : null });
+        }
+        if (half) {
+          games.push({
+            round: m.round,
+            filename: f.filename.replace(/\.qbtd\.json$/i, '_Game.json'),
+            text: JSON.stringify(full.game),
+          });
+        }
       }
     } catch (e) {
       errors.push(f.filename + ': ' + e.message);
@@ -213,11 +224,18 @@ export function rosterFileText(qbj) {
 }
 
 /**
- * The QBJ bundle: every game as its separate files, in a folder per
- * round, plus the roster. From what the hub has read:
+ * The QBJ bundle: the games the standings count, each as its separate
+ * files, in a folder per round, plus the roster. From what the hub has
+ * read:
+ * - matches: the games in the stages and rounds picked (collectMatches);
+ *   of a game uploaded more than once only the upload the standings,
+ *   the .yft and the report count goes in (stats.js dedupeMatches: the
+ *   newest per round and teams, under the roster's renames), so a game
+ *   re-read with its teams the other way round is in it once
  * - modaqFiles: each reader upload's MODAQ .qbj and game file, as its
  *   Backup to JSON dialog writes them (hubgames.js collectMatches),
- *   under the roster's current names
+ *   under the roster's current names; an upload saved without its game
+ *   half gives its .qbj alone, as its own download does
  * - raw: the games' rows from the same call; a .qbj added by hand
  *   (not a reader's) goes in indented as MODAQ writes (2 spaces)
  * - gameFiles: the game files that went up apart from their .qbj (Add a
@@ -226,11 +244,13 @@ export function rosterFileText(qbj) {
  *   { round, filename, error } for one that couldn't be read (left out)
  * - roster: { json } as read, { error }, or null without a roster
  * - names: the roster's renames (rosterNameMap) the game files take
- * Uploads list newest first, so the first file under a name wins: a
- * re-exported game keeps its latest upload (the same name twice would
- * break the zip), and a reader's file beats one added by hand.
+ * A name the zip already holds is not added again (the same name twice
+ * would break the zip): the reader's files come first, then the .qbj
+ * files added by hand, then the game files, so a reader's game file
+ * beats one added by hand under MODAQ's name.
  */
-export function qbjZipFile(slug, { modaqFiles, raw, gameFiles, roster, names }) {
+export function qbjZipFile(slug, { matches, modaqFiles, raw, gameFiles, roster, names }) {
+  const counted = new Set(dedupeMatches(matches).map((m) => m.fileId));
   const seen = new Set();
   const entries = [];
   const add = (round, filename, data) => {
@@ -240,11 +260,12 @@ export function qbjZipFile(slug, { modaqFiles, raw, gameFiles, roster, names }) 
     entries.push({ name, data });
   };
   for (const x of modaqFiles) {
+    if (!counted.has(x.id)) continue;
     if (x.qbj) add(x.round, x.qbjName, x.qbj);
     if (x.game) add(x.round, x.gameName, x.game);
   }
   const indent = (text) => { try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) { return text; } };
-  for (const r of raw.filter((x) => !x.reader)) add(r.round, r.filename, indent(r.text));
+  for (const r of raw.filter((x) => !x.reader && counted.has(x.id))) add(r.round, r.filename, indent(r.text));
   for (const g of gameFiles) {
     if (g.error) continue; // the bundle is still useful without it
     try { add(g.round, g.filename, renameModaqTexts({ qbj: null, game: g.text }, names).game); }
