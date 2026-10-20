@@ -6552,7 +6552,7 @@ test('the same pools again: a double round robin\'s Finals rank on both cycles, 
   assert.deepEqual(finalTeams(led.schedule)[0][0], ['T3', 'T1']);
   assert.deepEqual(led.ties.map((x) => [x.record, x.teams.map((t) => t.name), x.level, x.kept]), [['6–2', ['T3', 'T1'], [['T3', 'T1']], 'table']]);
   assert.equal(filledNote(autoFillSaved(lead, both.files, both.games).schedule.filled[0]),
-    'Round robin 2: T3 and T1 were tied at 6–2 with the same points per 20, so they kept their order in the Round robin 2 table.');
+    'Round robin 2: T3 and T1 were tied at 6–2 with the same points per 20, so they kept their order in the Round robin 2: Total table.');
   const wait = finalsFill(lead, both.games, finalsProgress(lead, both.files).ready, [], { holdTies: true });
   assert.deepEqual([wait.filled, wait.held.map((x) => heldLevel(x).label)], [0, ['Fill in table order']]);
   // an advantaged final, seed order both times: T1 8–0 is two wins clear
@@ -6601,7 +6601,7 @@ test('the same pools again: Copy this phase, then crossover playoffs, seeds on b
   assert.deepEqual(['Pool A', 'Pool B'].map((name) => [1, 2, 3, 4, 5].map((n) => slot(`${n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th'} in ${name}`))), pub);
   assert.deepEqual(filled.ties.map((x) => [x.bracket, x.level, x.kept]), [['Pool A', [['Rice', 'Tufts']], 'standings'], ['Pool B', [['Duke', 'Yale']], 'standings']]);
   assert.equal(filledNote(autoFillSaved(c, day.files, day.games).schedule.filled[1]),
-    'Pool B: Duke and Yale were tied at 6–2 with the same points per 20, so they kept their order in the standings.');
+    'Pool B: Duke and Yale were tied at 6–2 with the same points per 20, so they were placed by name.');
 });
 
 test('the same pools again: the replay after tiered pools counts both meetings and the tier\'s carryover; pools made anew are not a replay', () => {
@@ -6766,7 +6766,7 @@ test('the hub ranks as the public page does: pool-mates level on both counts kee
   const fin = (kept) => ({ bracket: '1st–6th place', record: '4–1', teams: [{ name: 'Duke', place: 1 }, { name: 'Rice', place: 2 }], level: [['Duke', 'Rice']], kept });
   assert.equal(filledNote(fin('table')), '1st–6th place: Duke and Rice were tied at 4–1 with the same points per 20, so they kept their order in the 1st–6th place table.');
   assert.equal(filledNote(fin('pool')), '1st–6th place: Duke and Rice were tied at 4–1 with the same points per 20, so they kept their pool order.');
-  assert.equal(filledNote(fin('standings')), '1st–6th place: Duke and Rice were tied at 4–1 with the same points per 20, so they kept their order in the standings.');
+  assert.equal(filledNote(fin('standings')), '1st–6th place: Duke and Rice were tied at 4–1 with the same points per 20, so they were placed by name.');
   assert.equal(keptOrder({ pool: 'A' }), 'their pool order');
 });
 
@@ -6832,7 +6832,7 @@ test('the hub ranks as the public page does: a tie waiting for the TD says when 
   // standings' with no table of their own
   const fin = (kept) => heldLevel({ bracket: 'Round robin 2', record: '6–2', teams: [{ name: 'T3', place: 1 }, { name: 'T1', place: 2 }], level: [['T3', 'T1']], kept });
   assert.deepEqual(fin('table'), { text: ' They have the same points per 20, so filling now keeps their order in the Round robin 2 table.', label: 'Fill in table order' });
-  assert.deepEqual(fin('standings'), { text: ' They have the same points per 20, so filling now keeps their order in the standings.', label: 'Fill in standings order' });
+  assert.deepEqual(fin('standings'), { text: ' They have the same points per 20, so filling now places them by name.', label: 'Fill by name' });
   assert.deepEqual(fin('pool'), { text: ' They have the same points per 20, so filling now keeps their pool order.', label: 'Fill in pool order' });
 });
 

@@ -181,7 +181,11 @@ function publicOrder(schedule, src, all, rows, settings) {
     for (const pl of sec.pools) {
       // teams with no games aren't ranked here
       const played = pl.teams.filter((x) => x.w + x.l + x.t > 0);
-      if (played.length === mine.size && played.every(same)) return { order: played.map((x) => x.name), kept: prelim ? 'pool' : 'table' };
+      if (played.length === mine.size && played.every(same)) {
+        // the table's name as the public page heads it, for the hub's note
+        const table = sec.pools.length > 1 ? `${pl.name} table in ${sec.name}` : `${sec.name} table`;
+        return { order: played.map((x) => x.name), kept: prelim ? 'pool' : 'table', ...(prelim ? {} : { table }) };
+      }
     }
   }
   return { order: null, kept: 'standings' };
@@ -270,7 +274,7 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
       if (j - i > 1) {
         const x = { bracket: src.name, record: rec(rows[i]),
           teams: rows.slice(i, j).map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, place: i + k + 1 })),
-          level: levelRuns(rows.slice(i, j)).map((run) => run.map((t) => t.name)), kept: pub.kept };
+          level: levelRuns(rows.slice(i, j)).map((run) => run.map((t) => t.name)), kept: pub.kept, ...(pub.table ? { table: pub.table } : {}) };
         if (holdTies && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
       }
       i = j;
@@ -316,7 +320,7 @@ export function fillProgress(schedule, files) {
 // A tie's teams level on points per 20 too, as schedule.filled keeps
 // them for the note: {level: [[names…]]}, with a Finals tie's `kept`
 // (finalsFill), or nothing when none were.
-const levelOf = (x) => (x.level && x.level.length ? { level: x.level, ...(x.kept ? { kept: x.kept } : {}) } : {});
+const levelOf = (x) => (x.level && x.level.length ? { level: x.level, ...(x.kept ? { kept: x.kept } : {}), ...(x.table ? { table: x.table } : {}) } : {});
 
 /**
  * The hub's auto-fill of the saved schedule, on a copy: the pools rank on
@@ -380,13 +384,17 @@ const andList = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', '
 export const keptOf = (x) => (x.pool || x.kept === 'pool' ? 'pool' : x.kept === 'standings' ? 'standings' : 'table');
 export function keptOrder(x) {
   const kept = keptOf(x);
-  return kept === 'pool' ? 'their pool order' : kept === 'standings' ? 'their order in the standings' : `their order in the ${x.bracket} table`;
+  return kept === 'pool' ? 'their pool order' : kept === 'standings' ? 'name order' : `their order in the ${x.table || x.bracket + ' table'}`;
 }
+// "so they kept …" / "so filling now keeps …": with no public table of
+// their own, the order kept is by name, said plainly
+const keptPast = (x) => (keptOf(x) === 'standings' ? 'they were placed by name' : `they kept ${keptOrder(x)}`);
+const keptNow = (x) => (keptOf(x) === 'standings' ? 'filling now places them by name' : `filling now keeps ${keptOrder(x)}`);
 
 /** True when all of a tie's teams were level on points per 20 too. */
 export const allLevel = (x) => !!x.level && x.level.length === 1 && x.level[0].length === x.teams.length;
 
-const KEPT_LABEL = { pool: 'Fill in pool order', table: 'Fill in table order', standings: 'Fill in standings order' };
+const KEPT_LABEL = { pool: 'Fill in pool order', table: 'Fill in table order', standings: 'Fill by name' };
 
 /**
  * What the Live Hub adds to a tie waiting for the TD (autoFill's or
@@ -396,8 +404,8 @@ const KEPT_LABEL = { pool: 'Fill in pool order', table: 'Fill in table order', s
  * does: points per 20, or for teams all level, the order they keep.
  */
 export function heldLevel(x) {
-  if (allLevel(x)) return { text: ` They have the same points per 20, so filling now keeps ${keptOrder(x)}.`, label: KEPT_LABEL[keptOf(x)] };
-  return { text: (x.level || []).map((g) => ` ${andList(g)} also have the same points per 20, so filling now keeps ${keptOrder(x)}.`).join(''),
+  if (allLevel(x)) return { text: ` They have the same points per 20, so ${keptNow(x)}.`, label: KEPT_LABEL[keptOf(x)] };
+  return { text: (x.level || []).map((g) => ` ${andList(g)} also have the same points per 20, so ${keptNow(x)}.`).join(''),
     label: 'Use points per 20' };
 }
 
@@ -411,9 +419,9 @@ export function heldLevel(x) {
 export function filledNote(x) {
   const head = x.pool ? 'Pool ' + x.pool : x.bracket;
   const names = andList(x.teams.map((tm) => tm.name));
-  if (allLevel(x)) return `${head}: ${names} were tied at ${x.record} with the same points per 20, so they kept ${keptOrder(x)}.`;
+  if (allLevel(x)) return `${head}: ${names} were tied at ${x.record} with the same points per 20, so ${keptPast(x)}.`;
   return `${head}: ${names} were tied at ${x.record}, so points per 20 decided their places.`
-    + (x.level || []).map((g) => ` ${andList(g)} also had the same points per 20, so they kept ${keptOrder(x)}.`).join('');
+    + (x.level || []).map((g) => ` ${andList(g)} also had the same points per 20, so ${keptPast(x)}.`).join('');
 }
 
 /** True when the schedule has a finals slot still to fill. */
