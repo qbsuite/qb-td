@@ -226,7 +226,13 @@ const saveSettings = async (withBase) => {
 };
 const saveRuling = async (withBase) => {
   const key = 'r1|q' + (1 + (Object.keys(rulings).length % 20)) + '|' + teamName(0) + '|' + teamName(1);
-  const next = { ...rulings, [key]: { r: (flip = !flip) ? 'upheld' : 'denied', note: '' } };
+  // with its time, as the hub sends a ruling (admin.js saveRuling): left
+  // out, the Worker stamps a new one on each, the map differs from the
+  // stored one throughout, and a save with the stored copy as its base
+  // would be measured on the stale-copy merge rather than the hub's path
+  const ruling = (flip = !flip) ? 'upheld' : 'denied';
+  const prev = rulings[key];
+  const next = { ...rulings, [key]: { r: ruling, note: '', at: prev && prev.r === ruling ? prev.at : Date.now() } };
   const r = await call(A, { method: 'POST', json: { rulings: next, ...(withBase ? { rulings_prev: { [key]: rulings[key] || null } } : {}) } });
   rulings = next;
   return r;
