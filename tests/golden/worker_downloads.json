@@ -1,0 +1,4866 @@
+{
+ "file bare part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file reader part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file reader part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file reader part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file reader part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file legacy part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file legacy part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "3589ba5edb669c776e686f9537ab695f882e9f022e846d4857cba6080773706f"
+ },
+ "file legacy part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file legacy part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file nogame part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file nogame part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "3589ba5edb669c776e686f9537ab695f882e9f022e846d4857cba6080773706f"
+ },
+ "file nogame part=game roster=plain": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 37,
+  "sha256": "b8cce796f717c44361f50431c2461fb72179f9b09d4736dd47693fed7b850023"
+ },
+ "file nogame part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file gamefile part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file errored part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file other part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file stamped part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file wrapped part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file hand-roundMissing part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundMissing part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 5602,
+  "sha256": "672999dc8152d4c655d6c29cff0426ad0f5350c6e786471ec2739e95dfadee46"
+ },
+ "file hand-roundMissing part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundMissing part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundString part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundString part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "92268b5e3f53a23d5ee913615c6d1686a7f3b06c2d6e1949260fd30aff9530a9"
+ },
+ "file hand-roundString part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundString part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundNull part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundNull part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "b5ffd77eed03b219a178eaa8cf9ae0f43d8031c1687c41803c62fb7d633e3cbf"
+ },
+ "file hand-roundNull part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundNull part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundTrue part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-roundTrue part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file hand-roundTrue part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundTrue part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-compact part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-fourSpace part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-crlf part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-noRound part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-notJson part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file bare part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "23f87db8565901aaa0d019cd9cbd91682afb1ac1bc281a99a5a41aef4fd6be86"
+ },
+ "file bare part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file reader part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file reader part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "23f87db8565901aaa0d019cd9cbd91682afb1ac1bc281a99a5a41aef4fd6be86"
+ },
+ "file reader part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file reader part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file legacy part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file legacy part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "74f2ff4c0bbe2215764567fe7d617f66b8c7edaf974de690e21516cc90f391be"
+ },
+ "file legacy part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file legacy part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file nogame part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file nogame part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "74f2ff4c0bbe2215764567fe7d617f66b8c7edaf974de690e21516cc90f391be"
+ },
+ "file nogame part=game roster=team": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 37,
+  "sha256": "b8cce796f717c44361f50431c2461fb72179f9b09d4736dd47693fed7b850023"
+ },
+ "file nogame part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file gamefile part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file gamefile part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file errored part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file other part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file stamped part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "f5ed5ba6279f1a364e17f29a8e949686a6018768102782e9204d069710f5ac2f"
+ },
+ "file stamped part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file wrapped part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 4713,
+  "sha256": "9bae6a79d6fd3f3756f18e62aea7ab95b3ab7753f3720a037f2932fb8ccf4fd5"
+ },
+ "file wrapped part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file hand-roundMissing part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundMissing part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 3806,
+  "sha256": "db2356805fa71b940658a6972d10671009f25e7dfd81285702058ec6382ef192"
+ },
+ "file hand-roundMissing part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file hand-roundMissing part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundString part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundString part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "dea2ce73f133163ae153326e4c41c518ac6020868a9098783c4b508535c108ed"
+ },
+ "file hand-roundString part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file hand-roundString part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundNull part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundNull part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "6eaa1751b0638f566bcee9addc8c349409a9cf48b7c56c17b82cdcd4789de434"
+ },
+ "file hand-roundNull part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file hand-roundNull part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundTrue part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-roundTrue part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "23f87db8565901aaa0d019cd9cbd91682afb1ac1bc281a99a5a41aef4fd6be86"
+ },
+ "file hand-roundTrue part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file hand-roundTrue part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-compact part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "23f87db8565901aaa0d019cd9cbd91682afb1ac1bc281a99a5a41aef4fd6be86"
+ },
+ "file hand-compact part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-fourSpace part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "23f87db8565901aaa0d019cd9cbd91682afb1ac1bc281a99a5a41aef4fd6be86"
+ },
+ "file hand-fourSpace part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-crlf part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "23f87db8565901aaa0d019cd9cbd91682afb1ac1bc281a99a5a41aef4fd6be86"
+ },
+ "file hand-crlf part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-noRound part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3806,
+  "sha256": "db2356805fa71b940658a6972d10671009f25e7dfd81285702058ec6382ef192"
+ },
+ "file hand-noRound part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-notJson part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file bare part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file bare part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file reader part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file reader part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file reader part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file reader part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file legacy part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file legacy part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "8d97fb39ce3bbfab539cee8e9f6ebc74fbbbe6489215853946d76a02072ed342"
+ },
+ "file legacy part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file legacy part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file nogame part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file nogame part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "8d97fb39ce3bbfab539cee8e9f6ebc74fbbbe6489215853946d76a02072ed342"
+ },
+ "file nogame part=game roster=player": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 37,
+  "sha256": "b8cce796f717c44361f50431c2461fb72179f9b09d4736dd47693fed7b850023"
+ },
+ "file nogame part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file gamefile part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file gamefile part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file errored part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file other part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file stamped part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "68b6884d144a535cc8c4d24668a21bafe235cd337d7c3cec17f4ef5f34e914d1"
+ },
+ "file stamped part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file wrapped part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 4705,
+  "sha256": "ba4d5d0d5513816f8e42c9e902ffff851ea3ab26e94746a494fb8b25c60c4810"
+ },
+ "file wrapped part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file hand-roundMissing part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundMissing part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 3798,
+  "sha256": "f7c4445c54b20f4eebaaacd8d22fac2cd33d5336f7fbc9ba7fb1457d384abafe"
+ },
+ "file hand-roundMissing part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundMissing part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundString part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundString part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "25654b54dbe46c60fb1a6b9703dd3a1478187721224d17e8388e2ca1650e1290"
+ },
+ "file hand-roundString part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundString part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundNull part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundNull part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "2d9b1f746732e79277558fb09d878b8dbc16612fa6fdd1fb604aad2a27af6e4d"
+ },
+ "file hand-roundNull part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundNull part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundTrue part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-roundTrue part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-roundTrue part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundTrue part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-compact part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-compact part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-fourSpace part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-fourSpace part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-crlf part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-crlf part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-noRound part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3798,
+  "sha256": "f7c4445c54b20f4eebaaacd8d22fac2cd33d5336f7fbc9ba7fb1457d384abafe"
+ },
+ "file hand-noRound part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-notJson part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file bare part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "b9c17faf8b84274e62e86ee6abfba093cb0c3d70077468b43bcd40b9227bed53"
+ },
+ "file bare part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file reader part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file reader part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "b9c17faf8b84274e62e86ee6abfba093cb0c3d70077468b43bcd40b9227bed53"
+ },
+ "file reader part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file reader part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file legacy part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file legacy part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "d28674d65b9339ef16173891630f407eecd3ed84ec89ffe7118f0a4c413fe921"
+ },
+ "file legacy part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file legacy part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file nogame part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file nogame part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "d28674d65b9339ef16173891630f407eecd3ed84ec89ffe7118f0a4c413fe921"
+ },
+ "file nogame part=game roster=escaped": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 37,
+  "sha256": "b8cce796f717c44361f50431c2461fb72179f9b09d4736dd47693fed7b850023"
+ },
+ "file nogame part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file gamefile part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file gamefile part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file errored part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file other part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file stamped part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "e1aea945f276cda3190505c5a21d1016de0b5e464a5baa3458c7337b2ca20589"
+ },
+ "file stamped part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file wrapped part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 4713,
+  "sha256": "4b631d13ce2b97d8a8da85ae127102c5f4b67b315640eaca4c3435925380bd52"
+ },
+ "file wrapped part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file hand-roundMissing part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundMissing part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 3806,
+  "sha256": "b9e81c83efc688b36eafafda04d4b210eb15144232cece8c4daa472400b078fd"
+ },
+ "file hand-roundMissing part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file hand-roundMissing part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundString part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundString part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "f37b442afba38d6b44188e416a24018215b0bc75b3e71f3ac3e41031b2f510b2"
+ },
+ "file hand-roundString part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file hand-roundString part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundNull part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundNull part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "1ead164747d295a419859ca22488a61742243d632abd41dbe08d9b41a20246eb"
+ },
+ "file hand-roundNull part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file hand-roundNull part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundTrue part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-roundTrue part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "b9c17faf8b84274e62e86ee6abfba093cb0c3d70077468b43bcd40b9227bed53"
+ },
+ "file hand-roundTrue part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file hand-roundTrue part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-compact part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "b9c17faf8b84274e62e86ee6abfba093cb0c3d70077468b43bcd40b9227bed53"
+ },
+ "file hand-compact part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-fourSpace part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "b9c17faf8b84274e62e86ee6abfba093cb0c3d70077468b43bcd40b9227bed53"
+ },
+ "file hand-fourSpace part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-crlf part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "b9c17faf8b84274e62e86ee6abfba093cb0c3d70077468b43bcd40b9227bed53"
+ },
+ "file hand-crlf part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-noRound part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3806,
+  "sha256": "b9e81c83efc688b36eafafda04d4b210eb15144232cece8c4daa472400b078fd"
+ },
+ "file hand-noRound part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-notJson part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file bare part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file reader part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file reader part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file reader part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file reader part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file legacy part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file legacy part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "3589ba5edb669c776e686f9537ab695f882e9f022e846d4857cba6080773706f"
+ },
+ "file legacy part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file legacy part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file nogame part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file nogame part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "3589ba5edb669c776e686f9537ab695f882e9f022e846d4857cba6080773706f"
+ },
+ "file nogame part=game roster=noop": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 37,
+  "sha256": "b8cce796f717c44361f50431c2461fb72179f9b09d4736dd47693fed7b850023"
+ },
+ "file nogame part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file gamefile part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file errored part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file other part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file stamped part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file wrapped part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file hand-roundMissing part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundMissing part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 5602,
+  "sha256": "672999dc8152d4c655d6c29cff0426ad0f5350c6e786471ec2739e95dfadee46"
+ },
+ "file hand-roundMissing part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundMissing part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundString part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundString part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "92268b5e3f53a23d5ee913615c6d1686a7f3b06c2d6e1949260fd30aff9530a9"
+ },
+ "file hand-roundString part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundString part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundNull part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundNull part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "b5ffd77eed03b219a178eaa8cf9ae0f43d8031c1687c41803c62fb7d633e3cbf"
+ },
+ "file hand-roundNull part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundNull part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundTrue part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-roundTrue part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file hand-roundTrue part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundTrue part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-compact part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-fourSpace part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-crlf part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-noRound part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-notJson part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file bare part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file bare part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file reader part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file reader part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file reader part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file reader part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file legacy part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file legacy part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "8d97fb39ce3bbfab539cee8e9f6ebc74fbbbe6489215853946d76a02072ed342"
+ },
+ "file legacy part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file legacy part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file nogame part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file nogame part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "8d97fb39ce3bbfab539cee8e9f6ebc74fbbbe6489215853946d76a02072ed342"
+ },
+ "file nogame part=game roster=escapedKey": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 37,
+  "sha256": "b8cce796f717c44361f50431c2461fb72179f9b09d4736dd47693fed7b850023"
+ },
+ "file nogame part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file gamefile part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file gamefile part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file errored part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file other part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file stamped part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "68b6884d144a535cc8c4d24668a21bafe235cd337d7c3cec17f4ef5f34e914d1"
+ },
+ "file stamped part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file wrapped part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 4705,
+  "sha256": "ba4d5d0d5513816f8e42c9e902ffff851ea3ab26e94746a494fb8b25c60c4810"
+ },
+ "file wrapped part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file hand-roundMissing part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundMissing part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 3798,
+  "sha256": "f7c4445c54b20f4eebaaacd8d22fac2cd33d5336f7fbc9ba7fb1457d384abafe"
+ },
+ "file hand-roundMissing part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundMissing part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundString part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundString part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "25654b54dbe46c60fb1a6b9703dd3a1478187721224d17e8388e2ca1650e1290"
+ },
+ "file hand-roundString part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundString part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundNull part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundNull part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "2d9b1f746732e79277558fb09d878b8dbc16612fa6fdd1fb604aad2a27af6e4d"
+ },
+ "file hand-roundNull part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundNull part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundTrue part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-roundTrue part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-roundTrue part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file hand-roundTrue part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-compact part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-compact part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-fourSpace part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-fourSpace part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-crlf part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "0084fe4ac9b2c96fa26d78a34b7db0482b03795ddcf761c2355eb111a50bfa54"
+ },
+ "file hand-crlf part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-noRound part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3798,
+  "sha256": "f7c4445c54b20f4eebaaacd8d22fac2cd33d5336f7fbc9ba7fb1457d384abafe"
+ },
+ "file hand-noRound part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-notJson part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file bare part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file bare part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"bare.qbj\"; filename*=UTF-8''bare.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file reader part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file reader part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file reader part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file reader part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"reader.qbj\"; filename*=UTF-8''reader.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "2ff9f55dd78dcf18528acdc7e594d7e4996fc09240d0cc98d632598a0b21f6ea"
+ },
+ "file legacy part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file legacy part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "3589ba5edb669c776e686f9537ab695f882e9f022e846d4857cba6080773706f"
+ },
+ "file legacy part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file legacy part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"legacy.qbj\"; filename*=UTF-8''legacy.qbj",
+  "cache": null,
+  "bytes": 2626,
+  "sha256": "5d4a16657779b145afc4d036e879c9e80bdd6f8bbd9a9502a2f3f50c5dcef150"
+ },
+ "file nogame part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file nogame part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "3589ba5edb669c776e686f9537ab695f882e9f022e846d4857cba6080773706f"
+ },
+ "file nogame part=game roster=escapedPlain": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 37,
+  "sha256": "b8cce796f717c44361f50431c2461fb72179f9b09d4736dd47693fed7b850023"
+ },
+ "file nogame part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"nogame.qbj\"; filename*=UTF-8''nogame.qbj",
+  "cache": null,
+  "bytes": 1694,
+  "sha256": "6a78aaa2b43575931e0c6825cf5ee8bdf670cd2f7c4541bca311194ef3d87bfe"
+ },
+ "file gamefile part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file gamefile part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"gamefile.qbj\"; filename*=UTF-8''gamefile.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file errored part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file errored part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"errored.qbj\"; filename*=UTF-8''errored.qbj",
+  "cache": null,
+  "bytes": 7,
+  "sha256": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+ },
+ "file other part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file other part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"other.qbj\"; filename*=UTF-8''other.qbj",
+  "cache": null,
+  "bytes": 5,
+  "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+ },
+ "file stamped part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file stamped part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"stamped.qbj\"; filename*=UTF-8''stamped.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "5669e9b5742ac199f3e82910018fa1f2c353dad838c8ccf812b6e93e021a3a2d"
+ },
+ "file wrapped part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file wrapped part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"wrapped.qbj\"; filename*=UTF-8''wrapped.qbj",
+  "cache": null,
+  "bytes": 1721,
+  "sha256": "699117fdd3556e96f4f0586cd56b30da051870094dd227db6c490503342405ac"
+ },
+ "file hand-roundMissing part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundMissing part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 5602,
+  "sha256": "672999dc8152d4c655d6c29cff0426ad0f5350c6e786471ec2739e95dfadee46"
+ },
+ "file hand-roundMissing part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundMissing part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundMissing.qbj\"; filename*=UTF-8''hand-roundMissing.qbj",
+  "cache": null,
+  "bytes": 10268,
+  "sha256": "332a2a0677a6efca2833cfdf3fa54e8c295255d28611eb8c5e33942242806c88"
+ },
+ "file hand-roundString part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundString part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "92268b5e3f53a23d5ee913615c6d1686a7f3b06c2d6e1949260fd30aff9530a9"
+ },
+ "file hand-roundString part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundString part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundString.qbj\"; filename*=UTF-8''hand-roundString.qbj",
+  "cache": null,
+  "bytes": 10301,
+  "sha256": "3b9898c44122aab3f4812719899f5e17d2e6579b85c760874e5db12e2f3391ae"
+ },
+ "file hand-roundNull part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundNull part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "b5ffd77eed03b219a178eaa8cf9ae0f43d8031c1687c41803c62fb7d633e3cbf"
+ },
+ "file hand-roundNull part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundNull part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundNull.qbj\"; filename*=UTF-8''hand-roundNull.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "d4cb6b374d0856756225ba24fa854bb00de9cbbf2c1337f50f6641ef5d031cb4"
+ },
+ "file hand-roundTrue part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-roundTrue part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "file hand-roundTrue part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file hand-roundTrue part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-roundTrue.qbj\"; filename*=UTF-8''hand-roundTrue.qbj",
+  "cache": null,
+  "bytes": 2629,
+  "sha256": "022fd9ad5f3449c3cb1b5e9379b4a4532341826d502c660ad1ee08aeb1ea3df9"
+ },
+ "file hand-compact part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-compact part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-compact.qbj\"; filename*=UTF-8''hand-compact.qbj",
+  "cache": null,
+  "bytes": 1674,
+  "sha256": "345d764b5a977cdd47515804e338b3cb0e29db531550054d62098fc88a84f7be"
+ },
+ "file hand-fourSpace part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-fourSpace part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-fourSpace.qbj\"; filename*=UTF-8''hand-fourSpace.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file hand-crlf part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-crlf part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-crlf.qbj\"; filename*=UTF-8''hand-crlf.qbj",
+  "cache": null,
+  "bytes": 4008,
+  "sha256": "2432bd83224f5b5c2b9970b3fce5fe72c6b1bec839ba0bdc78759d36484af2bd"
+ },
+ "file hand-noRound part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-noRound part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-noRound.qbj\"; filename*=UTF-8''hand-noRound.qbj",
+  "cache": null,
+  "bytes": 3788,
+  "sha256": "a5f4d45cc21285f382a9811c5ebaee2aa873cf63d68ffe6782084b904f967496"
+ },
+ "file hand-notJson part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file hand-notJson part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"hand-notJson.qbj\"; filename*=UTF-8''hand-notJson.qbj",
+  "cache": null,
+  "bytes": 15,
+  "sha256": "92628a747890d02d1459c6eb45fd13cfa63bbb6d346412cff190297cf9c33d39"
+ },
+ "file reader no dl": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"{rand}-Round_1_Alpha_Beta.qbtd.json\"; filename*=UTF-8''{rand}-Round_1_Alpha_Beta.qbtd.json",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file reader no dl param": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"{rand}-Round_1_Alpha_Beta.qbtd.json\"; filename*=UTF-8''{rand}-Round_1_Alpha_Beta.qbtd.json",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "8d279001aa2cd27d81224e873871fd84923936134d0311949d991f52175dbac4"
+ },
+ "file outside the tournament (403)": {
+  "status": 403,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 19,
+  "sha256": "e3caf7fe8fae2501b1a60d8dfd4c11d57de897dbb40667d04296975575ba4e6d"
+ },
+ "file missing (404)": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "file schedule before one is saved": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "file reader after round move part=- roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=qbj roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "488a8433cf354919ad612dc590d1fd2107a9d34ff8e9baa590ca83c4d3d3de2e"
+ },
+ "file reader after round move part=game roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file reader after round move part=xyz roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=- roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=qbj roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "e814d1665dd2d00d2d455b0c5d8a88941822516e551db66977731f6a43d03d5c"
+ },
+ "file reader after round move part=game roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "9c60fc7200a54d0e79666fbbf7573c09aa843e19dad5ddc2f8c73996e533aa34"
+ },
+ "file reader after round move part=xyz roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=- roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=qbj roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "4cbec3572ba44a14d9120fd609e1d15b50da9e78d61fdfd7efda360faa9e9de3"
+ },
+ "file reader after round move part=game roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file reader after round move part=xyz roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=- roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=qbj roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 3821,
+  "sha256": "4f2a770b39d81498bd19ec28cabafdc92da51f8508653ea9e5ec792c1ce78eee"
+ },
+ "file reader after round move part=game roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 1402,
+  "sha256": "68d507f47e17f36f1b74002a26ac035faea312c25a96e0a7f90b08e5e9d76267"
+ },
+ "file reader after round move part=xyz roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=- roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=qbj roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "488a8433cf354919ad612dc590d1fd2107a9d34ff8e9baa590ca83c4d3d3de2e"
+ },
+ "file reader after round move part=game roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file reader after round move part=xyz roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=- roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=qbj roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 3813,
+  "sha256": "4cbec3572ba44a14d9120fd609e1d15b50da9e78d61fdfd7efda360faa9e9de3"
+ },
+ "file reader after round move part=game roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 1382,
+  "sha256": "f078c6cf99299a4fd1044a25413928ad65666426f770b584b22386edd3f4ea17"
+ },
+ "file reader after round move part=xyz roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=- roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "file reader after round move part=qbj roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 5619,
+  "sha256": "488a8433cf354919ad612dc590d1fd2107a9d34ff8e9baa590ca83c4d3d3de2e"
+ },
+ "file reader after round move part=game roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 1378,
+  "sha256": "4d517b3f31553a8ac27b9eaf007d7d7ac5f333740b5bf1cc87d3843e3cd12702"
+ },
+ "file reader after round move part=xyz roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"moved.qbj\"; filename*=UTF-8''moved.qbj",
+  "cache": null,
+  "bytes": 10359,
+  "sha256": "77ed8f0ff59a0e6eb25ad241db0a61c7040b0a35fa955db388e7de671be6fa89"
+ },
+ "roster download: plain compact": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 260,
+  "sha256": "367c9268cb82312c3981dd3489070cfe1822216d98ae0d978b2ca602afea4aed"
+ },
+ "roster raw: plain compact": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 260,
+  "sha256": "367c9268cb82312c3981dd3489070cfe1822216d98ae0d978b2ca602afea4aed"
+ },
+ "roster download: renames compact": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 793,
+  "sha256": "454a0b2dc1bf366d7a374fed52e02f9a05c1b98065393da6e243ef73abb996b0"
+ },
+ "roster raw: renames compact": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 297,
+  "sha256": "e6b76a66c4cfeae89f6b278b44a8efa0dd7438c9d206e4d7fc95b98ccd860200"
+ },
+ "roster download: plain indented": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 781,
+  "sha256": "a81557c2f7601f619c20646dacb7796f56c7df5ce3c1277d56fdb83d9499d01e"
+ },
+ "roster raw: plain indented": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 781,
+  "sha256": "a81557c2f7601f619c20646dacb7796f56c7df5ce3c1277d56fdb83d9499d01e"
+ },
+ "roster download: renames indented": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 783,
+  "sha256": "ca0266e9e19f95a47821cf29dc4ab4058103eab60cec3eb02e5557bda76eef33"
+ },
+ "roster raw: renames indented": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 866,
+  "sha256": "5d400101faa45b56d1b4c6956a8667c5297d3d54998297dad8351b0327f2e448"
+ },
+ "roster download: renames escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 793,
+  "sha256": "8c3c1ea9b3f162c494bc6de6daf2877bcdb1cee601f1eab60be59225b1249e0d"
+ },
+ "roster raw: renames escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 304,
+  "sha256": "008105663fdd788837ecef194efe9c258b2de35f9e50f3c1b775a3216a7f1d1f"
+ },
+ "roster download: null": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 4,
+  "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+ },
+ "roster raw: null": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 4,
+  "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+ },
+ "roster download: empty list": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 2,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ "roster raw: empty list": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 2,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ "roster download: not json": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 14,
+  "sha256": "619572897666628372b140053f836e7e66de5ef1a69bffcaff1b5f89110bd365"
+ },
+ "roster raw: not json": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 14,
+  "sha256": "619572897666628372b140053f836e7e66de5ef1a69bffcaff1b5f89110bd365"
+ },
+ "roster download: duplicate keys": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 92,
+  "sha256": "6e18a1e520f16dcefa52b5895300573b2d5d22b985bf7e5620a3e3140d346aaf"
+ },
+ "roster raw: duplicate keys": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 92,
+  "sha256": "6e18a1e520f16dcefa52b5895300573b2d5d22b985bf7e5620a3e3140d346aaf"
+ },
+ "roster download: proto key": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 193,
+  "sha256": "5d2fa95077b76e9af7368b6e31f3e335f7c0f1c636a1a8968a8342919dd1e7bb"
+ },
+ "roster raw: proto key": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 118,
+  "sha256": "f0c0247b190f065a03b81ae60aca6c9194f5e3fd18dcde36c867e997bd4a2c67"
+ },
+ "roster part on a game file": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"g.qbj\"; filename*=UTF-8''g.qbj",
+  "cache": null,
+  "bytes": 3803,
+  "sha256": "02f2974365785fac04999f5d3c43cf0e0a26174667f6cf80470fb7ec5b794168"
+ },
+ "roster download after upload": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": null,
+  "bytes": 793,
+  "sha256": "454a0b2dc1bf366d7a374fed52e02f9a05c1b98065393da6e243ef73abb996b0"
+ },
+ "pub qbj upload copy roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "bff063156bfc02257adaf91fe0f21d3a66f0c0131d82af6b959234d27ec9e50d"
+ },
+ "pub qbj reader upload copy roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "e8bbe06595b9a1a19533f21949866cec43dc2df4a31442d9e5b190c61968d1a3"
+ },
+ "pub qbj objects wrapper roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_3_Alpha_Beta.qbj\"; filename*=UTF-8''Round_3_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 4589,
+  "sha256": "89206680aed1d9341510df28bb47e9d4e9f4b6133e9410510a9af5c3e6cbd38e"
+ },
+ "pub qbj rebuild copy roster=plain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_2_Alpha_Beta.qbj\"; filename*=UTF-8''Round_2_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "83db15cd65d4286bad0ed995884cc426dd86c139d8504ee2e4343d340f024ba8"
+ },
+ "pub qbj missing roster=plain": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj error file roster=plain": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj upload copy roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3719,
+  "sha256": "cf80cafed03e4bcc023763aa0c4fee303326d4b447df74cf5ad077ab0d59c83b"
+ },
+ "pub qbj reader upload copy roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3719,
+  "sha256": "b700a266dddad971faeb77f3512829ce580b7ce09d2ee4f7599b88f8f56f5da8"
+ },
+ "pub qbj objects wrapper roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_3_Alpha_Beta.qbj\"; filename*=UTF-8''Round_3_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 4607,
+  "sha256": "1a81d2dfa0b7e06490b4da33c3cf83b829c6413f6e75de7edb188d02d9164450"
+ },
+ "pub qbj rebuild copy roster=team": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_2_Alpha_Beta.qbj\"; filename*=UTF-8''Round_2_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3719,
+  "sha256": "d163ed03cbf65953bde3f815f3fe29659325ab8f3f31fc0c0aeb43cb8809144b"
+ },
+ "pub qbj missing roster=team": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj error file roster=team": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj upload copy roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3711,
+  "sha256": "0df7a11792779e55d22a7c11fa8752e23cad13c7dc6d546b43f774379205664b"
+ },
+ "pub qbj reader upload copy roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3711,
+  "sha256": "e6da85f2d33495eae0b27fd57cbcf620ecabd668fe70a4780f4595043545ae90"
+ },
+ "pub qbj objects wrapper roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_3_Alpha_Beta.qbj\"; filename*=UTF-8''Round_3_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 4599,
+  "sha256": "0e7716b92cbf56ef9b1c9f92c069b3bc719af0e1aa14cf9ceda980a02d36c1c5"
+ },
+ "pub qbj rebuild copy roster=player": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_2_Alpha_Beta.qbj\"; filename*=UTF-8''Round_2_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3711,
+  "sha256": "fe7dc0b670a1c3d3ec4c3581d5136d9851d928ffaefff1b6b952c3fba80f3990"
+ },
+ "pub qbj missing roster=player": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj error file roster=player": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj upload copy roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3719,
+  "sha256": "d0c432fb9a2862713d42a70e14accca73fb8afab8edd1d03d0502ea9b999b98a"
+ },
+ "pub qbj reader upload copy roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3719,
+  "sha256": "8e8b0bd03e431b25d2e95bc00d8e5a1344f7a00d16178c8fe255a932a1dbf6cb"
+ },
+ "pub qbj objects wrapper roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_3_Alpha_Beta.qbj\"; filename*=UTF-8''Round_3_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 4607,
+  "sha256": "9827eca968e090839e111fe6749d97da0a411b12dac0e1aa9d3d910702cdf6b5"
+ },
+ "pub qbj rebuild copy roster=escaped": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_2_Alpha_Beta.qbj\"; filename*=UTF-8''Round_2_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3719,
+  "sha256": "b7145fac249df901ba3c9edac69ea2d8fc58980243491a592dcf9735a6348eeb"
+ },
+ "pub qbj missing roster=escaped": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj error file roster=escaped": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj upload copy roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "bff063156bfc02257adaf91fe0f21d3a66f0c0131d82af6b959234d27ec9e50d"
+ },
+ "pub qbj reader upload copy roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "e8bbe06595b9a1a19533f21949866cec43dc2df4a31442d9e5b190c61968d1a3"
+ },
+ "pub qbj objects wrapper roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_3_Alpha_Beta.qbj\"; filename*=UTF-8''Round_3_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 4589,
+  "sha256": "89206680aed1d9341510df28bb47e9d4e9f4b6133e9410510a9af5c3e6cbd38e"
+ },
+ "pub qbj rebuild copy roster=noop": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_2_Alpha_Beta.qbj\"; filename*=UTF-8''Round_2_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "83db15cd65d4286bad0ed995884cc426dd86c139d8504ee2e4343d340f024ba8"
+ },
+ "pub qbj missing roster=noop": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj error file roster=noop": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj upload copy roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3711,
+  "sha256": "0df7a11792779e55d22a7c11fa8752e23cad13c7dc6d546b43f774379205664b"
+ },
+ "pub qbj reader upload copy roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3711,
+  "sha256": "e6da85f2d33495eae0b27fd57cbcf620ecabd668fe70a4780f4595043545ae90"
+ },
+ "pub qbj objects wrapper roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_3_Alpha_Beta.qbj\"; filename*=UTF-8''Round_3_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 4599,
+  "sha256": "0e7716b92cbf56ef9b1c9f92c069b3bc719af0e1aa14cf9ceda980a02d36c1c5"
+ },
+ "pub qbj rebuild copy roster=escapedKey": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_2_Alpha_Beta.qbj\"; filename*=UTF-8''Round_2_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3711,
+  "sha256": "fe7dc0b670a1c3d3ec4c3581d5136d9851d928ffaefff1b6b952c3fba80f3990"
+ },
+ "pub qbj missing roster=escapedKey": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj error file roster=escapedKey": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj upload copy roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "bff063156bfc02257adaf91fe0f21d3a66f0c0131d82af6b959234d27ec9e50d"
+ },
+ "pub qbj reader upload copy roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_1_Alpha_Beta.qbj\"; filename*=UTF-8''Round_1_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "e8bbe06595b9a1a19533f21949866cec43dc2df4a31442d9e5b190c61968d1a3"
+ },
+ "pub qbj objects wrapper roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_3_Alpha_Beta.qbj\"; filename*=UTF-8''Round_3_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 4589,
+  "sha256": "89206680aed1d9341510df28bb47e9d4e9f4b6133e9410510a9af5c3e6cbd38e"
+ },
+ "pub qbj rebuild copy roster=escapedPlain": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"Round_2_Alpha_Beta.qbj\"; filename*=UTF-8''Round_2_Alpha_Beta.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 3701,
+  "sha256": "83db15cd65d4286bad0ed995884cc426dd86c139d8504ee2e4343d340f024ba8"
+ },
+ "pub qbj missing roster=escapedPlain": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "pub qbj error file roster=escapedPlain": {
+  "status": 404,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 24,
+  "sha256": "01c30cca1526da1ed086f376272f0224bfd52a32c3996531d7feae86981debe9"
+ },
+ "games batch: every game": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 10013,
+  "sha256": "64efa5d0bcaf0d283dc8ebe9efd0b60ab5190de1c678b659c0c7ebb8236d1ff7"
+ },
+ "games batch: missing, flagged, another tournament's, repeated": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 1690,
+  "sha256": "508f3339dd6dd561b02be142d479503bd84138799ec475e63a57939440420d9b"
+ },
+ "games batch: nothing valid": {
+  "status": 400,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 18,
+  "sha256": "4a4711361bb1baf7caf628a7d76d91d9661d4358ac5bc76ee232adbf36c2729c"
+ },
+ "games batch: too many": {
+  "status": 400,
+  "type": "application/json",
+  "disposition": null,
+  "cache": null,
+  "bytes": 27,
+  "sha256": "69142d238aba59d2fdff6bbf09d2f0602ee731daccd2ba35e15cd6b3315ebc3b"
+ },
+ "file schedule raw": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"schedule.json\"; filename*=UTF-8''schedule.json",
+  "cache": null,
+  "bytes": 409,
+  "sha256": "2c3c319ab87ca70bbeeff9faf5f8a5a0bce912b4482d30c586c94b7d074e46d8"
+ },
+ "public roster": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": "attachment; filename=\"roster.qbj\"; filename*=UTF-8''roster.qbj",
+  "cache": "public, max-age=60",
+  "bytes": 260,
+  "sha256": "367c9268cb82312c3981dd3489070cfe1822216d98ae0d978b2ca602afea4aed"
+ },
+ "public schedule": {
+  "status": 200,
+  "type": "application/json",
+  "disposition": null,
+  "cache": "public, max-age=60",
+  "bytes": 493,
+  "sha256": "4809e927e4584c3b3810bcb6018c723ef49e7366b8fbb5a8cf23a1194513ea7c"
+ }
+}

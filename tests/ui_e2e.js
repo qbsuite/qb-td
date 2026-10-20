@@ -8,6 +8,18 @@
 // No dependencies: Chrome (CHROME=… to point elsewhere) is driven over the
 // DevTools protocol with Node's own WebSocket. QBTD_PAGES / QBTD_BASE move
 // the two servers.
+//
+// QBTD_CAPTURE=<dir> also writes out what a refactor must leave as it is
+// (E5), for tools/ab_compare.mjs to set against another run: each download
+// the suite checks, the bodies behind the hub's per-file links (fetched
+// from the local Worker), every body the pages post, the hub's panes, the
+// public stats after a rename, and the pages' Worker requests by route.
+// Run it on a fresh local database (tools/e2e_stack.mjs --state <new dir>)
+// so ids match run to run. QBTD_PAGE_BASE points the pages at another
+// address for the Worker (tools/count_proxy.mjs in front of QBTD_BASE),
+// whose log is written out too. QBTD_LIVE_PORT and QBTD_CDP_PORT fix the
+// ports of the stand-in qb-td-live and of Chrome's DevTools (otherwise any
+// free port).
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,6 +32,8 @@ import { roundRobinRounds, tagBrackets, buildSchedule, renameTeams, hasPlacehold
 import { aggregate, dedupeMatches, standings } from '../app/engine/stats.js';
 import { roundTossupBuzzes } from '../app/engine/buzz.js';
 import { BASE, call, d1exec, testToken, tick, ok, summary } from './e2e_lib.js';
+import { routeTemplate } from '../tools/count_proxy.mjs';
+import { forfeitQbj } from '../app/engine/qbj.js';
 
 const PAGES = process.env.QBTD_PAGES || 'http://localhost:8765';
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -28,10 +42,92 @@ const tmp = mkdtempSync(path.join(tmpdir(), 'qbtd-ui-'));
 const dl = path.join(tmp, 'downloads');
 const fx = path.join(tmp, 'fixtures');
 
+/* ---------- capture (QBTD_CAPTURE) ---------- */
+
+const CAPTURE = process.env.QBTD_CAPTURE || null;
+const PAGE_BASE = process.env.QBTD_PAGE_BASE || BASE;
+if (CAPTURE) { rmSync(CAPTURE, { recursive: true, force: true }); mkdirSync(CAPTURE, { recursive: true }); }
+const capNames = {};       // what differs run to run, for ab_compare to put back
+const capSeen = new Map(); // label -> times used, so a repeated label stays apart
+function cap(kind, label, data) {
+  if (!CAPTURE) return;
+  const base = (kind + '-' + label).replace(/[^\w.@-]+/g, '_');
+  const n = (capSeen.get(base) || 0) + 1;
+  capSeen.set(base, n);
+  writeFileSync(path.join(CAPTURE, base + (n > 1 ? '~' + n : '')), data);
+}
+const capJson = (kind, label, v) => cap(kind, label + '.json', JSON.stringify(v, null, 1));
+// the section the pages' requests are counted under, here and at the proxy
+let curFlow = 'start';
+// (capture) the hub's panes as the TD sees them, once the page has stopped
+// changing: the grid, Live now, the brackets, the rail, the protests and the
+// stats note; then each cell with files opened, its labels, and the bodies
+// behind its download links, fetched from the local Worker
+async function capPanes(label, admin) {
+  if (!CAPTURE) return;
+  let last = null;
+  for (let i = 0, same = 0; i < 100 && same < 4; i++) {
+    await new Promise((r) => setTimeout(r, 75));
+    const now = await js(`(document.getElementById('view') || {}).innerHTML || ''`);
+    same = now === last ? same + 1 : 0;
+    last = now;
+  }
+  const panes = await js(`(() => {
+    const t = (sel) => [...document.querySelectorAll(sel)].map((e) => e.innerText);
+    return {
+      round: t('.biground'),
+      grid: [...document.querySelectorAll('[data-cell]')].map((b) => b.dataset.cell + ' ' + b.className.replace(/\\s+/g, ' ').trim()
+        + ' ' + b.title + ' ' + b.textContent.trim()),
+      live: t('.lrow, .brow'), brackets: t('.bcols'), rail: t('.railblock'), protests: t('#protdrawer'), statsnote: t('#statsnote'),
+    }; })()`);
+  panes.cells = {};
+  const files = ((await call('/a/' + admin)).body.files || []);
+  const cells = [...new Set(files.map((f) => f.bucket_id + ':' + f.round))].sort();
+  for (const cell of cells) {
+    if (!(await exists(`[data-cell="${cell}"]`))) continue;
+    await click(`[data-cell="${cell}"]`);
+    await waitJs(`!!document.querySelector('.cellpanel')`, 'the cell ' + cell);
+    const panel = await js(`(() => { const p = document.querySelector('.cellpanel');
+      return { text: p.innerText, links: [...p.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')) }; })()`);
+    panes.cells[cell] = panel;
+    for (const href of panel.links.filter((h) => h.includes('/file?key='))) {
+      const u = href.startsWith(PAGE_BASE) ? BASE + href.slice(PAGE_BASE.length) : href;
+      const res = await fetch(u);
+      const head = JSON.stringify({ status: res.status, type: res.headers.get('content-type'), disposition: res.headers.get('content-disposition') });
+      cap('file', label + '-' + cell + '-' + (new URL(u).searchParams.get('part') || 'raw') + '-' + new URL(u).searchParams.get('dl'),
+        Buffer.concat([Buffer.from(head + '\n'), Buffer.from(await res.arrayBuffer())]));
+    }
+    await click(`[data-cell="${cell}"]`);
+    await waitJs(`!document.querySelector('.cellpanel')`, 'the cell ' + cell + ' closing');
+  }
+  capJson('hub', label, panes);
+}
+const flowId = () => curFlow.split(/\s/)[0].replace(/\.$/, '');
+// (capture) Worker requests the pages have in flight: a section starts once
+// the last one's have landed, so none is counted under the wrong section
+const inflight = new Map(); // requestId -> url
+// (capture) until the pages' Worker requests have been quiet for 300 ms
+async function settleNet(where) {
+  if (!CAPTURE) return;
+  let quietSince = Date.now();
+  const end = Date.now() + 4000;
+  for (; Date.now() < end;) {
+    if (inflight.size) quietSince = Date.now();
+    else if (Date.now() - quietSince >= 300) break;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  if (Date.now() >= end) console.log('     (capture: still in flight at ' + where + ': ' + [...inflight.values()].join(', ') + ')');
+}
+async function flow(name) {
+  await settleNet(name);
+  curFlow = name;
+  if (PAGE_BASE !== BASE) { try { await fetch(PAGE_BASE + '/__flow?name=' + encodeURIComponent(name), { method: 'POST' }); } catch (e) { /* no proxy */ } }
+}
+
 /* ---------- Chrome over the DevTools protocol ---------- */
 
 const udd = path.join(tmp, 'profile');
-const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${udd}`,
+const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${process.env.QBTD_CDP_PORT || 0}`, `--user-data-dir=${udd}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--hide-scrollbars', 'about:blank'],
 { stdio: 'ignore' });
 const cleanup = () => { try { chrome.kill(); } catch (e) { /* gone */ } };
@@ -47,10 +143,18 @@ const until = async (fn, label, ms = 15000) => {
   }
 };
 
-const portFile = path.join(udd, 'DevToolsActivePort');
-await until(() => existsSync(portFile) && readFileSync(portFile, 'utf8').includes('\n'), 'Chrome to start');
-const [port, wsPath] = readFileSync(portFile, 'utf8').trim().split('\n');
-const ws = new WebSocket(`ws://127.0.0.1:${port}${wsPath}`);
+// a fixed port (QBTD_CDP_PORT) says where to connect on /json/version;
+// any free port is written to the profile's DevToolsActivePort
+let wsUrl;
+if (process.env.QBTD_CDP_PORT) {
+  wsUrl = await until(async () => (await (await fetch(`http://127.0.0.1:${process.env.QBTD_CDP_PORT}/json/version`)).json()).webSocketDebuggerUrl, 'Chrome to start');
+} else {
+  const portFile = path.join(udd, 'DevToolsActivePort');
+  await until(() => existsSync(portFile) && readFileSync(portFile, 'utf8').includes('\n'), 'Chrome to start');
+  const [port, wsPath] = readFileSync(portFile, 'utf8').trim().split('\n');
+  wsUrl = `ws://127.0.0.1:${port}${wsPath}`;
+}
+const ws = new WebSocket(wsUrl);
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
 
 let msgId = 0;
@@ -111,10 +215,36 @@ await S('Runtime.enable');
 await S('DOM.enable');
 // what the pages ask the Worker for: [method, url]
 const netReqs = [];
+// (capture) every Worker request the pages make, by section and route, and
+// every body they send it
+const capReqs = [];
+const capBodies = [];
+const toWorker = (u) => u.startsWith(PAGE_BASE) || u.startsWith(BASE);
+const pagePath = (u) => { try { return new URL(u).pathname; } catch (e) { return u; } };
 listeners.push((m) => {
   if (m.sessionId === sessionId && m.method === 'Network.requestWillBeSent') netReqs.push([m.params.request.method, m.params.request.url]);
+  if (CAPTURE && m.sessionId === sessionId && (m.method === 'Network.loadingFinished' || m.method === 'Network.loadingFailed')) inflight.delete(m.params.requestId);
+  // a new document: what the old one had going is gone with it
+  if (CAPTURE && m.sessionId === sessionId && m.method === 'Page.frameNavigated' && !m.params.frame.parentId) inflight.clear();
+  if (CAPTURE && m.sessionId === sessionId && m.method === 'Network.requestWillBeSent' && toWorker(m.params.request.url)) {
+    const r = m.params.request;
+    if (m.params.type !== 'Preflight' && r.method !== 'OPTIONS') inflight.set(m.params.requestId, r.method + ' ' + r.url);
+    const route = routeTemplate(r.method, r.url.slice((r.url.startsWith(PAGE_BASE) ? PAGE_BASE : BASE).length));
+    capReqs.push({ flow: curFlow, page: pagePath(here), method: r.method, route, type: m.params.type || '' });
+    if (r.method !== 'GET' && r.method !== 'OPTIONS' && (r.postData !== undefined || r.hasPostData)) {
+      capBodies.push({ flow: curFlow, route, body: r.postData !== undefined ? Promise.resolve(r.postData)
+        : S('Network.getRequestPostData', { requestId: m.params.requestId }).then((x) => x.postData, () => '(body not available)') });
+    }
+  }
 });
 await S('Network.enable');
+// (capture) the pages' Math.random seeded alike on each load, so the
+// schedule picker deals the same rounds run to run
+if (CAPTURE) {
+  await S('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { let a = 20261019;
+    Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();` });
+}
 await S('Page.setInterceptFileChooserDialog', { enabled: true });
 await S('Emulation.setFocusEmulationEnabled', { enabled: true });
 await send('Browser.grantPermissions', { origin: new URL(PAGES).origin,
@@ -126,11 +256,15 @@ const phone = () => S('Emulation.setDeviceMetricsOverride', { width: 390, height
 await desktop();
 
 async function goto(url) {
+  // (capture) what the page has started is let finish, so none of it is
+  // counted in one run and cut off by the navigation in another
+  await settleNet('goto ' + url);
   const loaded = once((m) => m.sessionId === sessionId && m.method === 'Page.loadEventFired');
   await S('Page.navigate', { url });
   await loaded;
 }
 const reload = async () => {
+  await settleNet('reload');
   const loaded = once((m) => m.sessionId === sessionId && m.method === 'Page.loadEventFired');
   await S('Page.reload');
   await loaded;
@@ -183,7 +317,9 @@ async function download(sel) {
   const before = new Set(downloads.keys());
   await click(sel);
   const guid = await until(() => [...downloads.keys()].find((g) => !before.has(g) && downloads.get(g).done), 'download from ' + sel);
-  return { name: downloads.get(guid).name, bytes: readFileSync(path.join(dl, guid)) };
+  const got = { name: downloads.get(guid).name, bytes: readFileSync(path.join(dl, guid)) };
+  cap('dl', flowId() + '-' + got.name, got.bytes);
+  return got;
 }
 // a quick check the page shows what it should; a throw from js() fails the check
 async function check(name, fn) {
@@ -255,14 +391,16 @@ function matchFor(round, a, b, flip) {
 }
 const played = []; // {round, bucket, qbj, filename} — every game file that should count
 
+await flow('1. create a tournament');
 /* ---------- 1. create a tournament ---------- */
 
 d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
-await goto(`${PAGES}/index.html?server=${encodeURIComponent(BASE)}`);
-await js(`localStorage.setItem('qbtdServer', ${q(BASE)}); true`);
+await goto(`${PAGES}/index.html?server=${encodeURIComponent(PAGE_BASE)}`);
+await js(`localStorage.setItem('qbtdServer', ${q(PAGE_BASE)}); true`);
 await goto(`${PAGES}/index.html`);
 await waitJs(`!!document.querySelector('#newname')`, 'the new-tournament form');
 const slug = 'ui-e2e-' + Math.random().toString(36).slice(2, 7);
+capNames.slug = slug;
 const NAME = 'UI E2E Open';
 await fill('#newname', 'Café Open @ USC, 2026!');
 ok('1 create: the slug is written from the name as it is typed',
@@ -275,6 +413,7 @@ await click('#newbtn');
 await waitJs(`!document.querySelector('#linkmodal').hidden`, 'the save-this-link modal');
 const adminLinkText = await text('#modallink');
 const secret = (/[?&]a=([a-z0-9]+)/.exec(adminLinkText) || [])[1];
+capNames.admin = secret;
 ok('1 create: the modal shows the admin link', !!secret, adminLinkText);
 await click('#modalcopy');
 await waitJs(`/Copied admin link/.test(document.querySelector('#msg').textContent)`, 'copy confirmation');
@@ -303,6 +442,7 @@ ok('1 create: the Worker has it', d.tournament && d.tournament.slug === slug, d.
 const tid = d.tournament.id;
 const settingsOf = (dd) => JSON.parse(dd.tournament.settings || '{}');
 
+await flow('2. setup steps');
 /* ---------- 2. setup steps ---------- */
 
 await goto(`${PAGES}/index.html?a=${secret}`);
@@ -319,6 +459,7 @@ for (const [step, heading] of [['roster', 'Roster'], ['sched', 'Schedule'], ['pa
       && (document.querySelector('#setupsec h2') || {}).textContent === ${q(heading)}`, step + ' section'));
 }
 
+await flow('3. rooms');
 /* ---------- 3. rooms ---------- */
 
 await fill('#roomn', '6');
@@ -363,6 +504,7 @@ d = await until(async () => { const x = await detail(); return x.buckets.length 
 ok('3 rooms: adding one brings it back to six', d.buckets.length === 6);
 const buckets = d.buckets;
 
+await flow('4. roster');
 /* ---------- 4. roster ---------- */
 
 await click('[data-step="roster"]');
@@ -515,6 +657,7 @@ await goto(`${PAGES}/index.html?a=${secret}`);
 await waitJs(`document.querySelectorAll('.stepbtn').length === 6`, 'the step list again');
 const rosterTeams = parseRoster(roster);
 
+await flow('5. schedule');
 /* ---------- 5. schedule ---------- */
 
 await click('[data-step="sched"]');
@@ -726,6 +869,7 @@ const schedRounds = Math.max(...sched.phases.flatMap((p) => p.rounds.map((r) => 
 const gameIn = (n, room) => sched.phases.flatMap((p) => p.rounds).find((r) => r.round === n).games.find((g) => g.room === room);
 const roomBucket = (room) => buckets.find((b) => b.id === sched.rooms[room].bucket);
 
+await flow('6. packets');
 /* ---------- 6. packets ---------- */
 
 await click('[data-step="packets"]');
@@ -770,6 +914,7 @@ await waitJs(`[...document.querySelectorAll('#setupsec table tr')].filter((tr) =
 const tb = (await call(`${A}/tiebreakers`)).body;
 ok('6 packets: the tiebreaker packet splits into questions, all Unused', tb.tossups.length === 2 && tb.bonuses.length === 1);
 
+await flow('7. MODAQ settings');
 /* ---------- 7. MODAQ settings ---------- */
 
 await click('[data-step="modaq"]');
@@ -791,6 +936,7 @@ await click('#fmtreset');
 d = await until(async () => { const x = await detail(); return !settingsOf(x).formatOverrides && x; }, 'reset saved');
 ok('7 MODAQ: Reset to preset drops them', settingsOf(d).gameFormat === 'acf');
 
+await flow('8. public page');
 /* ---------- 8. public page ---------- */
 
 await click('[data-step="stats"]');
@@ -856,6 +1002,7 @@ await fill('#sheetsmode', 'on', ['change']);
 d = await until(async () => { const x = await detail(); return settingsOf(x).scoresheets === true && x; }, 'scoresheets saved', 20000);
 ok('8 public: scoresheets on, behind the same password', settingsOf(d).buzz.mode === 'password' && !!settingsOf(d).buzz.hash);
 
+await flow('9. start');
 /* ---------- 9. start ---------- */
 
 await waitJs(`!!document.querySelector('#starttour')`, 'Start tournament');
@@ -865,6 +1012,7 @@ ok('9 start: the Worker has it started', !!d.tournament.started && dialogs.some(
 await waitJs(`(document.querySelector('.stepstart') || {}).textContent.includes('Started')`, 'the step list says Started');
 ok('9 start: the step list says Started', true);
 
+await flow('10–11. rooms upload, a reader starts');
 /* ---------- 10–11. rooms upload, a reader starts ---------- */
 
 const gameFiles = (round, room, flip) => {
@@ -961,6 +1109,7 @@ for (let room = 0; room < 6; room++) {
   ok(`10 room upload: ${b.room_name}'s files parse`, mine.every((f) => !f.error), mine.map((f) => f.error));
 }
 
+await flow('12, 15. Live Hub: round 1, advance, set round');
 /* ---------- 12, 15. Live Hub: round 1, advance, set round ---------- */
 
 async function openHub() {
@@ -1056,6 +1205,7 @@ d = await until(async () => { const x = await detail(); return x.tournament.curr
 await waitJs(`document.querySelector('.biground').textContent.includes('Round 1')`, 'hub on round 1');
 ok('15 rounds: Set round goes back', true);
 
+await flow('18. the status notice');
 /* ---------- 18. the status notice ---------- */
 
 await waitJs(`!!document.querySelector('#curround')`, 'set round field');
@@ -1066,6 +1216,7 @@ d = await until(async () => { const x = await detail(); return x.tournament.curr
 ok('18 notice: a confirmation shows', true);
 await check('18 notice: and fades on its own', () => waitJs(`!document.querySelector('#msg').classList.contains('show')`, 'notice gone', 6000));
 
+await flow("18b. the Live Hub's tiebreaker count follows the pool");
 /* ---------- 18b. the Live Hub's tiebreaker count follows the pool ----------
    The hub refetches the pool only when the detail's tb_stamp moves; a
    change made elsewhere must still show on its next refresh. */
@@ -1084,6 +1235,7 @@ await hubRefresh();
 await check('18b tiebreakers: and drops it when it is removed', () =>
   waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Tiebreakers 0/3 used')`, 'count 0/3', 10000));
 
+await flow('12–14. round 2: started, missing, the wrong room, Add a game');
 /* ---------- 12–14. round 2: started, missing, the wrong room, Add a game ---------- */
 
 const r2 = [0, 1, 2, 3, 4, 5].map((room) => gameFiles(2, room, room % 2 === 0));
@@ -1196,6 +1348,7 @@ await waitJs(`document.querySelectorAll('.cellpanel .pfile').length === 2`, 'the
   ok('13 uploads: Delete (confirmed) removes the file', dialogs.some((x) => x.startsWith('Delete this file')));
 }
 
+await flow('18. an error notice stays');
 /* ---------- 18. an error notice stays ---------- */
 
 await click('#addtoggle');
@@ -1208,6 +1361,7 @@ await click('#msg');
 ok('18 notice: and a click dismisses it', !(await js(`document.querySelector('#msg').classList.contains('show')`)));
 await click('#addcancel');
 
+await flow('16. protests');
 /* ---------- 16. protests ---------- */
 
 await openHub();
@@ -1226,6 +1380,7 @@ ok('16 protests: the rail\'s ruling persists with its note', JSON.parse(d.tourna
 await waitJs(`document.querySelector('.liverail').textContent.includes('Nothing open')`, 'nothing open');
 ok('16 protests: then nothing is open', true);
 
+await flow('17. stats + exports');
 /* ---------- 17. stats + exports ---------- */
 
 d = await detail();
@@ -1281,6 +1436,7 @@ const menu = async (id) => {
     return fresh.length === 6 && fresh.every((g) => downloads.get(g).done) && fresh;
   }, 'six report files', 20000);
   const files = got.map((g) => ({ name: downloads.get(g).name, text: readFileSync(path.join(dl, g), 'utf8') }));
+  for (const f of [...files].sort((x, y) => x.name.localeCompare(y.name))) cap('dl', flowId() + '-six-' + f.name, f.text);
   ok('17 exports: the HTML report as six separate files, the same pages as the zip',
     files.every((f) => zipped.some((z) => z.name === f.name && new TextDecoder().decode(z.data) === f.text))
       && new Set(files.map((f) => f.name)).size === 6, files.map((f) => f.name));
@@ -1319,6 +1475,11 @@ await tick();
     { n, want: good.length, rounds: Object.keys(st.rounds) });
 }
 
+if (CAPTURE) {
+  await openHub();
+  await capPanes('17', secret);
+}
+await flow('19–24. the public page');
 /* ---------- 19–24. the public page ---------- */
 
 const pubUrl = `${PAGES}/t.html?t=${slug}`;
@@ -1448,6 +1609,7 @@ await waitJs(`!!document.querySelector('.schedviews')`, 'schedule on a phone');
 ok('24 phone: the schedule view has no sideways page scroll', await js(`document.documentElement.scrollWidth <= window.innerWidth + 1`));
 await desktop();
 
+await flow('5b. the schedule editor at scale');
 /* ---------- 5b. the schedule editor at scale ---------- */
 
 // 48 teams in 4 pools of 12, 24 rooms, 11 prelim rounds + 6 rounds of
@@ -1489,6 +1651,7 @@ await desktop();
   await waitJs(`/Saved/.test(document.querySelector('.sgbar').textContent)`, 'big: discarded');
 }
 
+await flow('12b. brackets that keep their own rounds');
 /* ---------- 12b. brackets that keep their own rounds ---------- */
 
 // Two pools, set up through the Worker: Pool A a round ahead of Pool B, a
@@ -1731,6 +1894,7 @@ async function openHubOf(adminSecret) {
       && (await text('.liverail')).includes(`Round ${R.last} is the last round in the schedule.`) && await exists('#setround'), await text('.liverail'));
 }
 
+await flow('24b. the public state from qb-td-live');
 /* ---------- 24b. the public state from qb-td-live ----------
    A stand-in for the files-only Worker (worker.js "public state on
    qb-td-live"): serves /t/<slug>.json as the real one does (CORS, max-age
@@ -1758,7 +1922,7 @@ async function openHubOf(adminSecret) {
     res.writeHead(200, { ...head, 'Content-Type': 'application/json' });
     res.end(JSON.stringify(fileFor()));
   });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  await new Promise((r) => server.listen(Number(process.env.QBTD_LIVE_PORT || 0), '127.0.0.1', r));
   const LIVE_URL = 'http://127.0.0.1:' + server.address().port;
   const { identifier } = await S('Page.addScriptToEvaluateOnNewDocument', { source:
     `window.__urls = []; const __f = window.fetch; window.fetch = (u, o) => { window.__urls.push(String(u)); return __f(u, o); };` });
@@ -1820,6 +1984,7 @@ async function openHubOf(adminSecret) {
   await new Promise((r) => server.close(r));
 }
 
+await flow('24c. renaming a team and a player after games are in');
 /* ---------- 24c. renaming a team and a player after games are in ----------
    Typing over a saved name renames it: the editor says so, the roster
    keeps the old name, and the games already played count under the new
@@ -1864,6 +2029,15 @@ async function openHubOf(adminSecret) {
     && JSON.stringify(t.formerPlayers) === JSON.stringify({ [newPlayer]: [oldPlayer] }), t);
   ok('24c rename: MODAQ still reads the roster', modaqValid(saved));
   await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+  if (CAPTURE) {
+    // the hub's labels right after this tab's own rename, before any reload
+    await click('[data-view="live"]');
+    await waitJs(`!!document.querySelector('.biground')`, 'the Live Hub after the rename');
+    await capPanes('24c-same-tab', secret);
+    await click('[data-view="setup"]');
+    await waitJs(`!!document.querySelector('[data-step="roster"]')`, 'the step list');
+    await click('[data-step="roster"]');
+  }
   // the Download beside the roster's name: the file as it leaves qb-td
   await waitJs(`!!document.querySelector('#rosterget')`, 'the roster Download');
   const got = await download('#rosterget');
@@ -1896,6 +2070,9 @@ async function openHubOf(adminSecret) {
   // the public page, after the Worker publishes the roster
   await tick();
   await goto(`${PAGES}/t.html?t=${slug}`);
+  // (capture) the first load finishes before the next, so the requests
+  // counted don't depend on where the navigation cut it off
+  if (CAPTURE) await waitJs(`document.querySelector('#out').children.length > 0 && !/Loading/.test(document.querySelector('#msg').textContent)`, 'the public page', 20000);
   await js(`localStorage.qbtdStatsLayout = 'new'; true`);
   await goto(`${PAGES}/t.html?t=${slug}&stats=new#stats`); // a new URL, so a real load
   await waitJs(`document.querySelectorAll('.nstats td').length > 0`, 'the public stats', 20000);
@@ -1903,8 +2080,10 @@ async function openHubOf(adminSecret) {
   const row = await js(`(() => { const a = [...document.querySelectorAll('.nstats a')].find((x) => x.textContent === ${q(newTeam)}); return a ? a.closest('tr').innerText : ''; })()`);
   ok('24c rename: the public stats show the new names only', pub.includes(newTeam) && !pub.split(/\n|\t/).map((x) => x.trim()).includes(oldTeam), row);
   ok('24c rename: with the team\'s whole record', row.split('\t').map((x) => x.trim()).includes(String(before.w)), { row, w: before.w, l: before.l });
+  capJson('dom', '24c-public-stats', { text: pub, table: await js(`[...document.querySelectorAll('.nstats')].map((e) => e.innerHTML)`) });
 }
 
+await flow('24d. recording a forfeit');
 /* ---------- 24d. recording a forfeit ----------
    The TD records one from the hub: it goes up the room's own route, the
    hub lists it as a forfeit, the stats count a win and a loss, and the
@@ -1949,6 +2128,9 @@ async function openHubOf(adminSecret) {
     (await text('#statsout')).includes(`${win} defeats ${lose} by forfeit`));
   await tick();
   await goto(`${PAGES}/t.html?t=${slug}`);
+  // (capture) the first load finishes before the next, so the requests
+  // counted don't depend on where the navigation cut it off
+  if (CAPTURE) await waitJs(`document.querySelector('#out').children.length > 0 && !/Loading/.test(document.querySelector('#msg').textContent)`, 'the public page', 20000);
   await js(`localStorage.qbtdStatsLayout = 'new'; true`);
   await goto(`${PAGES}/t.html?t=${slug}&ff=1#stats`);
   await waitJs(`!!document.querySelector('[data-statssec="games"]')`, 'the public stats', 20000);
@@ -1957,6 +2139,7 @@ async function openHubOf(adminSecret) {
   ok('24d forfeit: the public scoreboard shows the result', (await js('document.body.innerText')).includes(`${win} defeats ${lose} by forfeit`));
 }
 
+await flow('24e. the set editor: settings saves and the question ledger');
 /* ---------- 24e. the set editor: settings saves and the question ledger ----------
    A settings save sends the whole object, so one built from a stale copy
    writes an earlier change back out: the mirror-buzzpoints lock must
@@ -2037,6 +2220,7 @@ async function openHubOf(adminSecret) {
     (await text('.review')).includes('This bonus has no point values, so MODAQ will not load this packet.'));
 }
 
+await flow('24f. Fix buzzes on a game whose file says another round');
 /* ---------- 24f. Fix buzzes on a game whose file says another round ----------
    A game added before uploads took their filed round can say one round
    and be filed under another. The fix goes up under the filed round, so
@@ -2056,6 +2240,7 @@ async function openHubOf(adminSecret) {
   await waitJs(`!document.querySelector('#fixsave').disabled`, 'a swap to save');
   await click('#fixsave');
   const fix = await until(async () => (await detail()).files.find((f) => f.id > orig.id && f.bucket_id === orig.bucket_id && f.round === 3), 'the fix uploaded');
+  if (CAPTURE) cap('file', '24f-fix-stored', Buffer.from(await (await fetch(`${BASE}${A}/file?key=${encodeURIComponent(fix.r2_key)}`)).arrayBuffer()));
   const both = [{ ...(await stored(orig)), fileId: orig.id }, { ...(await stored(fix)), fileId: fix.id }];
   ok('24f fix buzzes: the original and its fix both say the round they are filed under', both.every((m) => m.round === 3), both.map((m) => m.round));
   ok('24f fix buzzes: the stats count the game once', dedupeMatches(both).length === 1 && dedupeMatches(both)[0].fileId === fix.id);
@@ -2064,6 +2249,7 @@ async function openHubOf(adminSecret) {
   await call(`${A}/files/${orig.id}`, { method: 'POST', json: { round: 2 } });
 }
 
+await flow('24g. Edit in MODAQ keeps where questions were replaced');
 /* ---------- 24g. Edit in MODAQ keeps where questions were replaced ----------
    A reader upload carries its question record (read_core readerUpload).
    Edit in MODAQ writes it into the game it hands the reader, so the
@@ -2097,11 +2283,104 @@ async function openHubOf(adminSecret) {
   const old = await opened(without.id);
   ok('24g edit: an upload with none to rebuild opens as before', old && old.round === 1 && old.tb === undefined
     && old.tbLogged === undefined, old);
+  capJson('meta', '24g', { withRecord: meta, without: old });
 }
 
+await flow('24h. games of every shape in one hub');
+/* ---------- 24h. games of every shape in one hub ----------
+   One tournament holding each kind of upload the hub reads its own way: a
+   reader game and its re-export with the teams the other way round, a
+   reader upload with no game half, one from before MODAQ's own files rode
+   along, .qbj files added by hand (compact, and indented with CRLF) with a
+   game file, a forfeit, a team saved with a trailing space that the roster
+   renames, a renamed player, a file that won't parse, and a game from a
+   room since deleted. The hub lists, counts and exports them as it always
+   has: each game once in the stats, the zip keeping what it keeps. */
+{
+  const SHAPES = ['Alder', 'Birch', 'Cedar', 'Dogwood', 'Elm', 'Fir', 'Gum', 'Hazel'];
+  const t = (await call('/api/tournaments', { method: 'POST', json: { name: 'UI E2E Shapes',
+    slug: 'ui-e7-' + Math.random().toString(36).slice(2, 7) } })).body;
+  capNames.shapesSlug = t.slug;
+  capNames.shapesAdmin = t.admin_secret;
+  const TA = '/a/' + t.admin_secret;
+  const rooms = [];
+  for (let k = 0; k < 4; k++) rooms.push((await call(TA + '/buckets', { method: 'POST', json: { room_name: 'Shape Room ' + (k + 1) } })).body);
+  const reg = (name, extra = {}, players = Array.from({ length: PLAYERS }, (_, j) => ({ name: player(name, j) }))) =>
+    ({ name: extra.name || name, teams: [{ name: extra.name || name, players, ...(extra.name ? { _formerNames: [name] } : {}) }] });
+  const rosterOf = (regs) => JSON.stringify({ version: '2.1.1', objects: [{ type: 'Tournament', name: 'UI E2E Shapes', registrations: regs }] });
+  await call(TA + '/roster?name=roster.qbj', { method: 'POST', body: rosterOf(SHAPES.map((n) => reg(n))) });
+  for (const n of [1, 2]) await call(`${TA}/packet?round=${n}&name=P${n}.pdf`, { method: 'POST', body: 'PDF'.repeat(100) });
+  await call(TA + '/start', { method: 'POST' });
+  await call(TA, { method: 'POST', json: { published: true, current_round: 2 } });
+  const up = async (k, round, name, body) =>
+    (await call(`/b/${rooms[k].secret}/upload?round=${round}&name=${encodeURIComponent(name)}`, { method: 'POST', body })).body;
+  const game = { players: [], cycles: [], packet: { tossups: [{ question: 'q', answer: 'a' }], bonuses: [] } };
+  const reader = (qbj, extra = {}) => JSON.stringify({ qbj, game: { game, uiState: {} },
+    modaq: { qbj: JSON.stringify(qbj, null, 4), game: JSON.stringify(game, null, 2) }, ...extra });
+  const shapes = [];
+  shapes.push(await up(0, 1, 'Round_1_Alder_Birch.qbtd.json', reader(matchFor(1, 'Alder', 'Birch', false))));
+  shapes.push(await up(0, 1, 'Round_1_Birch_Alder.qbtd.json', reader(matchFor(1, 'Birch', 'Alder', false))));
+  shapes.push(await up(1, 1, 'Round_1_Cedar_Dogwood.qbtd.json', JSON.stringify({ qbj: matchFor(1, 'Cedar', 'Dogwood', false), game: null })));
+  shapes.push(await up(2, 1, 'Round_1_Elm_Fir.qbtd.json', JSON.stringify({ qbj: matchFor(1, 'Elm', 'Fir', false), game: { game, uiState: {} } })));
+  shapes.push(await up(3, 1, 'Round_1_Gum_Hazel.qbj', JSON.stringify(matchFor(1, 'Gum', 'Hazel', false))));
+  shapes.push(await up(0, 2, 'Round_2_Alder_Cedar.qbj', JSON.stringify(matchFor(2, 'Alder', 'Cedar', false))));
+  shapes.push(await up(0, 2, 'Round_2_Alder_Cedar_Game.json', JSON.stringify(game, null, 2)));
+  shapes.push(await up(1, 2, 'Round_2_Birch_Dogwood.qbj', JSON.stringify(matchFor(2, 'Birch', 'Dogwood', true), null, 2).replace(/\n/g, '\r\n')));
+  shapes.push(await up(2, 2, 'Round_2_Elm_Gum_Forfeit.qbj', JSON.stringify(forfeitQbj(2, 'Elm', 'Gum'))));
+  const spaced = matchFor(2, 'Fir', 'Hazel', false);
+  spaced.match_teams[0].team.name = 'Fir ';
+  shapes.push(await up(3, 2, 'Round_2_Fir_Hazel.qbj', JSON.stringify(spaced)));
+  shapes.push(await up(3, 2, 'Round_2_broken.qbj', '{"match_teams": "no"}'));
+  ok('24h shapes: every upload is taken (one of them with its error)', shapes.length === 11
+    && shapes.filter((x) => x && x.error).length === 1, shapes.map((x) => x && (x.error || x.kind)));
+  // mid-tournament: Fir is Spruce now, and Alder's first player has a new name
+  const alder = Array.from({ length: PLAYERS }, (_, j) => (j ? { name: player('Alder', j) } : { name: 'Alder Renamed', _formerNames: [player('Alder', 0)] }));
+  await call(TA + '/roster?name=roster.qbj', { method: 'POST', body: rosterOf(SHAPES.map((n) => (n === 'Fir' ? reg('Fir', { name: 'Spruce' })
+    : n === 'Alder' ? reg('Alder', {}, alder) : reg(n)))) });
+  // a room deleted after its game came in
+  await call(`${TA}/buckets/${rooms[3].id}`, { method: 'DELETE' });
+
+  await openHubOf(t.admin_secret);
+  await capPanes('24h', t.admin_secret);
+  await openHubOf(t.admin_secret);
+  await click('#calc');
+  await waitJs(`!document.querySelector('#statsec').hidden && document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats of every shape', 30000);
+  const note = await text('#statsnote');
+  capJson('stats', '24h', { note, out: await js(`document.querySelector('#statsout').innerText`) });
+  ok('24h shapes: Compute counts the re-exported game once (8 games)', note === '8 games in these stats', note);
+  const zip = await readZip(new Uint8Array((await menu('dlzip')).bytes));
+  ok('24h shapes: the QBJ bundle keeps both exports of the re-exported game', zip.filter((e) => /^round-1\/Round_1_(Alder_Birch|Birch_Alder)\.qbj$/.test(e.name)).length === 2,
+    zip.map((e) => e.name));
+  for (const id of ['dlyft4', 'dlyft3', 'dlreport']) await menu(id);
+  await click('#dlmenu');
+  await waitJs(`!document.querySelector('#dlpanel').hidden`, 'the menu');
+  await click('#rebuild');
+  await waitJs(`/Stats data rebuilt/.test(document.querySelector('#msg').textContent)`, 'the shapes rebuilt', 20000);
+  await tick();
+  await goto(`${PAGES}/t.html?t=${t.slug}#stats`);
+  await waitJs(`document.querySelectorAll('#out td').length > 0`, 'the shapes public stats', 20000);
+  capJson('dom', '24h-public-stats', { text: await js(`document.getElementById('out').innerText`) });
+}
+
+await flow('25. no page errors anywhere');
 /* ---------- 25. no page errors anywhere ---------- */
 
 ok('25 no uncaught page errors on any page', pageErrors.length === 0, pageErrors);
+
+if (CAPTURE) {
+  // the pages' Worker requests, counted by section, page and route
+  const counts = {};
+  for (const r of capReqs) {
+    const k = [r.flow, r.page, r.route].join(' | ') + (r.type === 'Preflight' ? ' (preflight)' : '');
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  capJson('requests', 'cdp', counts);
+  capJson('requests', 'bodies', await Promise.all(capBodies.map(async (b) => ({ flow: b.flow, route: b.route, body: await b.body }))));
+  if (PAGE_BASE !== BASE) {
+    try { capJson('requests', 'proxy', await (await fetch(PAGE_BASE + '/__log')).json()); } catch (e) { capJson('requests', 'proxy', { error: e.message }); }
+  }
+  capJson('names', 'run', capNames);
+}
 
 ws.close();
 cleanup();

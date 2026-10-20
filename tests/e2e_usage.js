@@ -13,9 +13,21 @@
 //   however many games, with games showing after the next tick and the
 //   tournament row's own fields (name, round) at once
 // - broadcasts are gone, and auto-advance needs no open Live Hub
+//
+// QBTD_METER_GOLDEN=<label> also holds the run's meter totals (queries,
+// rows read and written, R2 classes, rebuild and live invocations) to
+// tests/golden/meter_totals.json (QBTD_UPDATE_GOLDEN=1 writes them); run it
+// on a fresh local database. QBTD_SEND_BASE=1 sends the base a hub sends
+// with each save (settings_base, rulings_prev): the totals must not move.
 
 import { execSync } from 'node:child_process';
 import { BASE, WORKER_DIR, call, d1exec, tick, ok, summary, PERSIST } from './e2e_lib.js';
+import { checkTotals, meterSince } from './golden_lib.mjs';
+
+const SEND_BASE = process.env.QBTD_SEND_BASE === '1';
+const totalsAt = process.env.QBTD_METER_GOLDEN ? await (await fetch(BASE + '/__meter')).json() : null;
+// what a hub sends with a settings save: the text its copy was read as
+const settingsBase = (t) => { let s = {}; try { s = JSON.parse((t && t.settings) || '{}') || {}; } catch (e) { /* {} */ } return JSON.stringify(s); };
 
 async function meter() {
   const res = await fetch(BASE + '/__meter');
@@ -112,13 +124,14 @@ ok('a junk rev gets the full detail', r.status === 200 && Array.isArray(r.body.b
 // Every change the Live Hub shows must move the rev. After each, the rev
 // the hub held must come back as a full detail, and the new rev as
 // unchanged again.
+let lastT = null; // the hub's copy of the tournament row, from its last full detail
 async function moves(label, fn) {
   await fn();
   const got = await call(A + '?rev=' + rev);
   const moved = got.status === 200 && got.body.unchanged !== true && got.body.tournament
     && got.body.tournament.rev !== rev;
   ok('rev moves: ' + label, moved, got.body.unchanged ? 'still unchanged' : got.body);
-  if (moved) rev = got.body.tournament.rev;
+  if (moved) { rev = got.body.tournament.rev; lastT = got.body.tournament; }
 }
 async function stays(label, fn) {
   await fn();
@@ -146,9 +159,11 @@ await moves('file moved to another room', () => call(`${A}/files/${fileId}`, { m
 await moves('file deleted', () => call(`${A}/files/${fileId}`, { method: 'DELETE' }));
 await moves('round set by the TD', () => call(A, { method: 'POST', json: { current_round: 2 } }));
 await moves('renamed', () => call(A, { method: 'POST', json: { name: 'Usage Hub Renamed' } }));
-await moves('settings changed', () => call(A, { method: 'POST', json: { settings: { gameFormat: 'acf' } } }));
+await moves('settings changed', () => call(A, { method: 'POST', json: { settings: { gameFormat: 'acf' },
+  ...(SEND_BASE ? { settings_base: settingsBase(lastT) } : {}) } }));
 await moves('public page switched off', () => call(A, { method: 'POST', json: { published: false } }));
-await moves('protest ruled', () => call(A, { method: 'POST', json: { rulings: { 'r1|q3|Alpha|Beta': { r: 'upheld', note: 'ok' } } } }));
+await moves('protest ruled', () => call(A, { method: 'POST', json: { rulings: { 'r1|q3|Alpha|Beta': { r: 'upheld', note: 'ok' } },
+  ...(SEND_BASE ? { rulings_prev: { 'r1|q3|Alpha|Beta': null } } : {}) } }));
 await moves('tiebreakers uploaded', () => call(A + '/tiebreakers?name=tb.json', { method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ tossups: [{ question: 'tb one', answer: 'Mozart' }] }) }));
@@ -214,7 +229,7 @@ ok('admin detail has no broadcasts', r.body.tournament.announce === undefined, r
   await call(U.A + '/packet?round=1&name=P1.pdf', { method: 'POST', body: 'PDFBYTES' });
   await call(U.A + '/packet?round=2&name=P2.pdf', { method: 'POST', body: 'PDFBYTES' });
   await call(U.A + '/start', { method: 'POST' });
-  await call(U.A, { method: 'POST', json: { settings: { autoAdvance: true } } });
+  await call(U.A, { method: 'POST', json: { settings: { autoAdvance: true }, ...(SEND_BASE ? { settings_base: settingsBase(null) } : {}) } });
   const heldRev = (await call(U.A)).body.tournament.rev;
   // from here on the TD's hub is closed: only rooms talk to the Worker
   await call('/b/' + b1.secret + '/packet?round=1');
@@ -223,6 +238,11 @@ ok('admin detail has no broadcasts', r.body.tournament.announce === undefined, r
   ok('round 2 opened with every room started and no hub open', r.body.current_round === 2, r.body.current_round);
   r = await call(U.A + '?rev=' + heldRev);
   ok('a hub reopening sees the advance', r.body.unchanged !== true && r.body.tournament.current_round === 2, r.body);
+}
+
+if (totalsAt) {
+  const diffs = checkTotals(process.env.QBTD_METER_GOLDEN, meterSince(totalsAt, await (await fetch(BASE + '/__meter')).json()));
+  ok('the run\'s meter totals are the pinned ones (' + process.env.QBTD_METER_GOLDEN + ')', diffs.length === 0, diffs);
 }
 
 summary('usage e2e');

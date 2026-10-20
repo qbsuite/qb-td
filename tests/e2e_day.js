@@ -19,13 +19,21 @@
 // and the rest of what a viewer or TD sees is checked against the inputs:
 // file list and rooms, categories, buzzpoints, room pages, the cron's
 // rebuilds going through the REBUILD binding, a view's D1 cost.
+//
+// E8: the hub's own game loading (collectMatches, tests/ref_games.mjs as it
+// is at 0cd19c5) runs on the same uploads through a Node pub(), and what
+// it gives — matches, raw rows, MODAQ files, errors — must equal
+// tests/golden/e2e_day_collect.json, with file ids by their order.
+// QBTD_UPDATE_GOLDEN=1 rewrites it.
 
 import archive from '../app/archive/ug-nats-stanford.js';
 import { parseMatch, parseRoster, matchPayload } from '../app/engine/qbj.js';
 import { aggregate } from '../app/engine/stats.js';
 import { buildYft } from '../app/engine/yft.js';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
-import { BASE, call, d1exec, tick, ok, summary } from './e2e_lib.js';
+import { BASE, call, d1exec, tick, ok, summary, nodePub } from './e2e_lib.js';
+import { hubRef } from './ref_games.mjs';
+import { checkGolden, jsonSha } from './golden_lib.mjs';
 
 const ROOMS = 4;
 const ROUNDS = 4;
@@ -253,6 +261,25 @@ for (const f of qbjFiles) {
   exportMatches.push(m);
 }
 const exportAgg = aggregate(exportMatches, rosterParsed);
+{
+  // E8: the hub's collectMatches on the same uploads
+  const { collectMatches } = hubRef({ pub: nodePub });
+  const got = await collectMatches(A, detail.tournament, detail.buckets, detail.files);
+  const order = [...new Set(detail.files.map((f) => f.id))].sort((x, y) => x - y);
+  const rank = (id) => order.indexOf(id);
+  const plainMatches = got.matches.map((m) => ({ ...m, fileId: rank(m.fileId) }));
+  const view = {
+    matches: jsonSha(plainMatches), count: got.matches.length, fileIds: got.matches.map((m) => rank(m.fileId)),
+    rooms: got.matches.map((m) => m.room), filenames: got.matches.map((m) => m.filename),
+    raw: jsonSha(got.raw.map((r) => ({ ...r, id: rank(r.id) }))), games: jsonSha(got.games), modaqFiles: jsonSha(got.modaqFiles),
+    errors: got.errors, roster: jsonSha(got.roster), names: got.names,
+  };
+  ok('E8: the hub\'s collectMatches reads the same games the export path does',
+    JSON.stringify(got.matches.map((m) => [m.fileId, m.round, m.teams.map((t) => [t.name, t.points])]))
+      === JSON.stringify(exportMatches.map((m) => [m.fileId, m.round, m.teams.map((t) => [t.name, t.points])])));
+  const diffs = checkGolden('e2e_day_collect.json', view);
+  ok('E8: collectMatches gives the pinned matches, raw rows and MODAQ files', diffs.length === 0, diffs);
+}
 ok('Compute stats (the TD\'s download path) matches the games exactly', same(teamView(exportAgg), teamView(expected)));
 ok('...individuals too', same(playerView(exportAgg), playerView(expected)));
 let yft = null;

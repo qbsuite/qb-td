@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/run_tests.js && node tests/live_publish.js && node tests/snapshot_publish.js",
+    "test": "node tests/run_tests.js && node tests/live_publish.js && node tests/snapshot_publish.js && node tests/games_golden.mjs && node tests/worker_inproc.mjs",
+    "check:bundles": "node tools/bundle_check.mjs",
     "archive": "node tools/archive.mjs",
     "build:read": "node tools/build_read.mjs",
     "yf-parity": "node tools/yf_parity.mjs"

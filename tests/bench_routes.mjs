@@ -23,6 +23,16 @@
 // Absolute numbers are this machine's; production's own percentiles
 // (Cloudflare analytics: p50 1.2 ms, p99 8.7 ms, p99.9 15.3 ms in
 // September 2026) are the reference to scale against.
+//
+// Besides the hot routes it profiles the paths a refactor of game loading
+// and saving moves: a reader upload's split downloads (~120 KB, part=qbj
+// and part=game) and the public per-game QBJ, with and without a roster
+// that renames; the four saves with no base and with the base a hub sends
+// (equal to what is stored); and a cron tick rebuilding a question set's
+// state for a mirror whose roster renames. For an A/B, run this against
+// the baseline's dev Worker and the change's alternately (5 times each at
+// REPS=100): the floor per route within max(5%, 0.05 ms), the ceiling
+// within 10%.
 
 import { d1exec } from './e2e_lib.js';
 import archive from '../app/archive/ug-nats-stanford.js';
@@ -180,6 +190,67 @@ console.log('tournaments played and built; profiling...\n');
 const reexport = (T) => call('/b/' + T.rooms[0].secret + '/upload?round=' + ROUNDS + '&name=R' + ROUNDS + '_0.qbj',
   { method: 'POST', body: matchFor(ROUNDS, ...pairings(ROUNDS)[0]) });
 
+// a reader upload: MODAQ's game with the packet text (~120 KB in all)
+const [ra, rb] = pairings(1)[1];
+const readerQbj = JSON.parse(matchFor(1, ra, rb));
+const readerGame = { players: [ra, rb].flatMap((t) => Array.from({ length: PLAYERS }, (_, p) => ({ name: playerName(t, p), teamName: teamName(t), isStarter: p < 4 }))),
+  packet: { tossups: Array.from({ length: 20 }, (_, i) => ({ question: ('word' + i + ' ').repeat(600), answer: 'a' })), bonuses: [] },
+  cycles: Array.from({ length: 20 }, () => ({ correctBuzz: { marker: { player: { name: playerName(ra, 0), teamName: teamName(ra) }, position: 40, points: 10 } } })) };
+const readerBody = JSON.stringify({ qbj: readerQbj, game: { game: readerGame, uiState: {} },
+  modaq: { qbj: JSON.stringify(readerQbj, null, 4), game: JSON.stringify(readerGame, null, 2) }, protests: [], progress: { at: 20, of: 20 }, tb: { used: [] } });
+const readerUp = (await call('/b/' + rooms[1].secret + '/upload?round=1&name=Round_1_reader.qbtd.json', { method: 'POST', body: readerBody })).body;
+const readerKey = (await call(A)).body.files.find((f) => f.id === readerUp.id).r2_key;
+const rosterOf = (renamed) => JSON.stringify({ objects: [{ type: 'Tournament',
+  registrations: Array.from({ length: TEAMS }, (_, t) => {
+    const name = renamed && t === ra ? teamName(t) + ' Renamed' : teamName(t);
+    return { name, teams: [{ name, ...(name !== teamName(t) ? { _formerNames: [teamName(t)] } : {}),
+      players: Array.from({ length: PLAYERS }, (_, p) => (renamed && t === rb && p === 0
+        ? { name: playerName(t, p) + ' Jr', _formerNames: [playerName(t, p)] } : { name: playerName(t, p) })) }] };
+  }) }] });
+// the saves, as a hub sends them, alternating values so each one writes
+let flip = false;
+let stored = null;             // the settings text this run last stored
+let schedEtag = null;          // what the Worker answered for the schedule and roster, once it answers one
+let rosterEtag = null;
+let rulings = {};
+const sched0 = (await call(A + '/file?key=' + encodeURIComponent(`t/${detail0.tournament.id}/schedule.json`))).body;
+const saveSettings = async (withBase) => {
+  const next = { gameFormat: (flip = !flip) ? 'acf' : 'naqt' };
+  const r = await call(A, { method: 'POST', json: { settings: next, ...(withBase ? { settings_base: JSON.stringify(stored ? JSON.parse(stored) : {}) } : {}) } });
+  stored = JSON.stringify(next);
+  return r;
+};
+const saveRuling = async (withBase) => {
+  const key = 'r1|q' + (1 + (Object.keys(rulings).length % 20)) + '|' + teamName(0) + '|' + teamName(1);
+  const next = { ...rulings, [key]: { r: (flip = !flip) ? 'upheld' : 'denied', note: '' } };
+  const r = await call(A, { method: 'POST', json: { rulings: next, ...(withBase ? { rulings_prev: { [key]: rulings[key] || null } } : {}) } });
+  rulings = next;
+  return r;
+};
+const saveSchedule = async (withBase) => {
+  const r = await call(A + '/schedule', { method: 'POST', json: sched0, headers: withBase && schedEtag ? { 'X-Qbtd-Base': schedEtag } : {} });
+  schedEtag = (r.body && r.body.etag) || null;
+  return r;
+};
+const saveRoster = async (withBase) => {
+  const r = await call(A + '/roster?name=roster.qbj' + (withBase && rosterEtag ? '&base=' + encodeURIComponent(rosterEtag) : ''), { method: 'POST', body: rosterOf(false) });
+  rosterEtag = (r.body && r.body.etag) || null;
+  return r;
+};
+
+// a question set with one mirror whose roster renames: the cron's set-state rebuild
+d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
+const set = (await call('/api/sets', { method: 'POST', json: { name: 'Bench Set', slug: 'bench-set-' + Math.random().toString(36).slice(2, 7) } })).body;
+const inv = (await call(`/s/${set.admin_secret}/mirrors`, { method: 'POST', json: { name: 'Bench Mirror' } })).body;
+const mirror = (await call('/i/' + inv.invite, { method: 'POST', json: { name: 'Bench Mirror', slug: 'bench-mirror-' + Math.random().toString(36).slice(2, 7) } })).body;
+const MA = '/a/' + mirror.admin_secret;
+const mroom = (await call(MA + '/buckets', { method: 'POST', json: { room_name: 'M1' } })).body;
+await call(MA + '/start', { method: 'POST' });
+for (let k = 0; k < 4; k++) await call(`/b/${mroom.secret}/upload?round=1&name=M${k}.qbj`, { method: 'POST', body: matchFor(1, ...pairings(1)[k]) });
+const mirrorDirty = () => call(MA + '/roster?name=roster.qbj', { method: 'POST', body: rosterOf(true) });
+await mirrorDirty();
+for (let i = 0; i < 4; i++) await call('/__scheduled');
+
 /* ---------- routes ---------- */
 const ROUTES = [
   ['viewer page load (GET /pub/:slug)', () => call('/pub/' + slug)],
@@ -197,9 +268,27 @@ const ROUTES = [
   ['TD download: a game\'s QBJ (part=qbj)', () => call(A + '/file?key=' + encodeURIComponent(game0.r2_key) + '&part=qbj&dl=g.qbj')],
   ['public per-game QBJ (GET /pub/:slug/qbj/:id)', () => call('/pub/' + slug + '/qbj/' + game0.id)],
   ['TD games batch (GET /games, a round\'s ids)', () => call(A + '/games?ids=' + gameIds)],
+  ['TD download: a reader upload\'s QBJ (part=qbj, ~120KB upload)', () => call(A + '/file?key=' + encodeURIComponent(readerKey) + '&part=qbj&dl=r.qbj')],
+  ['TD download: a reader upload\'s game (part=game, ~120KB upload)', () => call(A + '/file?key=' + encodeURIComponent(readerKey) + '&part=game&dl=r_Game.json')],
+  ['public per-game QBJ of the reader upload', () => call('/pub/' + slug + '/qbj/' + readerUp.id)],
+  ['save settings, no base', () => saveSettings(false)],
+  ['save settings, base equal to the stored', () => saveSettings(true)],
+  ['save a ruling, no base', () => saveRuling(false)],
+  ['save a ruling, base equal to the stored', () => saveRuling(true)],
+  ['save the schedule, no header', () => saveSchedule(false)],
+  ['save the schedule, matching header', () => saveSchedule(true)],
+  ['save the roster, no base', () => saveRoster(false)],
+  ['save the roster, base equal to the stored', () => saveRoster(true)],
+  // from here on the roster renames a team and a player
+  ['(roster renames from here)', async () => { await call(A + '/roster?name=roster.qbj', { method: 'POST', body: rosterOf(true) }); return null; }, 'once'],
+  ['TD download: a reader upload\'s QBJ (part=qbj), renames', () => call(A + '/file?key=' + encodeURIComponent(readerKey) + '&part=qbj&dl=r.qbj')],
+  ['TD download: a reader upload\'s game (part=game), renames', () => call(A + '/file?key=' + encodeURIComponent(readerKey) + '&part=game&dl=r_Game.json')],
+  ['TD download: a game\'s QBJ (part=qbj), renames', () => call(A + '/file?key=' + encodeURIComponent(game0.r2_key) + '&part=qbj&dl=g.qbj')],
+  ['public per-game QBJ, renames', () => call('/pub/' + slug + '/qbj/' + readerUp.id)],
 ];
 const rows = [];
-for (const [label, fn] of ROUTES) {
+for (const [label, fn, once] of ROUTES) {
+  if (once) { await fn(); continue; }
   await fn(); // warm
   const t = await profiled(async () => { for (let i = 0; i < REPS; i++) await fn(); });
   const per = (x) => +(x / 1000 / REPS).toFixed(2);
@@ -224,6 +313,7 @@ async function cronCase(label, n, prep) {
 const CR = Number(process.env.CRON_REPS || 10);
 await cronCase('cron tick, nothing to do', CR, async () => {});
 await cronCase('cron tick, 1 tournament with a new game', CR, () => reexport(Ts[0]));
+await cronCase('cron tick, a set mirror whose roster renames is dirty', CR, async () => { await mirrorDirty(); });
 if (K >= 2) await cronCase(`cron tick, ${Math.min(K, 4)} tournaments each with a new game`, CR,
   async () => { for (const T of Ts.slice(0, 4)) await reexport(T); });
 console.table(rows);

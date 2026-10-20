@@ -88,6 +88,26 @@ export async function call(path, opts = {}) {
     cors: res.headers.get('access-control-allow-origin') };
 }
 
+// api.js pub() for Node, against the local Worker: the same answers a page
+// gets (parsed JSON, or the raw Response for a blob that isn't JSON) and the
+// same thrown errors, so page modules that take a pub can run here.
+export async function nodePub(path, opts = {}) {
+  if (opts.json !== undefined) {
+    opts = { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) }, body: JSON.stringify(opts.json) };
+    delete opts.json;
+  }
+  const res = await fetchRetry(BASE + path, opts);
+  const failed = (message) => Object.assign(new Error(message), { status: res.status });
+  const ct = res.headers.get('Content-Type') || '';
+  if (!ct.includes('application/json')) {
+    if (!res.ok) throw failed('request failed (' + res.status + ')');
+    return res;
+  }
+  const data = await res.json();
+  if (!res.ok) throw failed(data.error || 'request failed (' + res.status + ')');
+  return data;
+}
+
 // max-age seconds from a Cache-Control header, or null.
 export function maxAge(cc) {
   const m = /max-age=(\d+)/.exec(cc || '');

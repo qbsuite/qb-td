@@ -20,8 +20,19 @@
 //
 // Knobs: TOURNAMENTS (10), ROOMS (8), ROUNDS (7), ROUND_MIN (40),
 // CLIENT (legacy), SCALE (60: the "N tournaments at once" row).
+//
+// For an A/B of two builds: SEED=<n> makes the day's upload times the same
+// run to run (Math.random otherwise); SAVES=1 adds the TD's saves a hub
+// makes (a roster, the schedule saved again each round, a ruling each
+// round, a settings change); QBTD_SEND_BASE=1 sends with each the base a
+// hub sends (settings_base, rulings_prev, X-Qbtd-Base, ?base=) once the
+// Worker hands one back, which must not move the totals.
+// QBTD_METER_GOLDEN=<label> holds the run's meter totals to
+// tests/golden/meter_totals.json (QBTD_UPDATE_GOLDEN=1 writes them); run it
+// on a fresh local database.
 
 import { d1exec, d1row } from './e2e_lib.js';
+import { checkTotals, meterSince } from './golden_lib.mjs';
 
 const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
 const TOURNAMENTS = Number(process.env.TOURNAMENTS || 10);
@@ -31,6 +42,10 @@ const ROUND_MIN = Number(process.env.ROUND_MIN || 40);
 const CLIENT = process.env.CLIENT || 'legacy';
 const SCALE = Number(process.env.SCALE || 60);
 const STEPS = ROUND_MIN * 2;            // 30s steps per round
+const SAVES = process.env.SAVES === '1';
+const SEND_BASE = process.env.QBTD_SEND_BASE === '1';
+let seed = process.env.SEED ? Number(process.env.SEED) : null;
+const random = seed === null ? Math.random : () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
 const TEAMS = ROOMS * 2;
 
 // Free-plan daily limits and Workers Paid monthly inclusions (Cloudflare
@@ -42,6 +57,7 @@ const FREE_ROWS_WRITTEN_DAY = 100000;
 async function meter() {
   return (await fetch(BASE + '/__meter')).json();
 }
+const totalsAt = process.env.QBTD_METER_GOLDEN ? await meter() : null;
 
 // Categories the day's cost is split into.
 const cost = {};
@@ -117,14 +133,43 @@ async function setup(i) {
       byes: [],
     })),
   }], updated: 0 };
-  await call(null, A + '/schedule', { method: 'POST', json: schedule });
+  const sched = await call(null, A + '/schedule', { method: 'POST', json: schedule });
+  let roster = null;
+  if (SAVES) {
+    roster = await call(null, A + '/roster?name=roster.qbj', { method: 'POST', body: JSON.stringify({ objects: [{ type: 'Tournament',
+      registrations: Array.from({ length: TEAMS }, (_, t) => ({ name: teamName(t), teams: [{ name: teamName(t), players: [{ name: teamName(t) + ' P1' }] }] })) }] }) });
+  }
   await call(null, A, { method: 'POST', json: { published: true, current_round: 1 } });
   for (let n = 1; n <= ROUNDS; n++) {
     await call(null, A + '/packet?round=' + n + '&name=Packet' + n + '.pdf', { method: 'POST', body: 'PDF'.repeat(200) });
   }
   // what the Live Hub holds: the rev of its last full detail, and when
   // its next refresh is due
-  return { A, rooms, rev: null, interval: 30, due: 0, quiet: 0 };
+  return { A, rooms, rev: null, interval: 30, due: 0, quiet: 0, schedule,
+    schedEtag: (sched.body && sched.body.etag) || null, rosterEtag: (roster && roster.body && roster.body.etag) || null,
+    settings: null, rulings: {} };
+}
+
+// SAVES: what a TD's hub saves during a round, each as the hub sends it
+async function saves(t, round) {
+  const key = `r${round}|q3|${teamName(0)}|${teamName(1)}`;
+  const rulings = { ...t.rulings, [key]: { r: 'upheld', note: '' } };
+  await call('TD saves', t.A, { method: 'POST', json: { rulings, ...(SEND_BASE ? { rulings_prev: { [key]: t.rulings[key] || null } } : {}) } });
+  t.rulings = rulings;
+  const s = await call('TD saves', t.A + '/schedule', { method: 'POST', json: t.schedule,
+    headers: SEND_BASE && t.schedEtag ? { 'X-Qbtd-Base': t.schedEtag } : {} });
+  t.schedEtag = (s.body && s.body.etag) || null;
+  if (round === 1) {
+    const next = { ...(t.settings || {}), catStats: true };
+    await call('TD saves', t.A, { method: 'POST', json: { settings: next, ...(SEND_BASE ? { settings_base: JSON.stringify(t.settings || {}) } : {}) } });
+    t.settings = next;
+  }
+  if (round === 2) {
+    const r = await call('TD saves', t.A + '/roster?name=roster.qbj' + (SEND_BASE && t.rosterEtag ? '&base=' + encodeURIComponent(t.rosterEtag) : ''),
+      { method: 'POST', body: JSON.stringify({ objects: [{ type: 'Tournament', registrations: Array.from({ length: TEAMS }, (_, i) => ({
+        name: teamName(i), teams: [{ name: teamName(i), players: [{ name: teamName(i) + ' P1' }, { name: teamName(i) + ' P2' }] }] })) }] }) });
+    t.rosterEtag = (r.body && r.body.etag) || null;
+  }
 }
 
 // One Live Hub refresh, the way admin.js liveRefresh does it.
@@ -168,10 +213,11 @@ delete cost['cron tick'];
 let seconds = 0;
 for (let round = 1; round <= ROUNDS; round++) {
   // each room's upload lands at a random step in the round's second half
-  const finish = ts.map((t) => t.rooms.map(() => Math.floor(STEPS / 2 + Math.random() * (STEPS / 2))));
+  const finish = ts.map((t) => t.rooms.map(() => Math.floor(STEPS / 2 + random() * (STEPS / 2))));
   for (const t of ts) {
     await call(null, t.A, { method: 'POST', json: { current_round: round } });
     for (const b of t.rooms) await call('room packet fetch', '/b/' + b.secret + '/packet?round=' + round);
+    if (SAVES) await saves(t, round);
   }
   for (let s = 0; s < STEPS; s++) {
     for (const [ti, t] of ts.entries()) {
@@ -226,4 +272,10 @@ for (const n of [TOURNAMENTS, SCALE]) {
     `${Math.round(req).toLocaleString()} requests (${pct(req, FREE_REQ_DAY)}), ` +
     `${Math.round(rr).toLocaleString()} rows read (${pct(rr, FREE_ROWS_READ_DAY)}), ` +
     `${Math.round(rw).toLocaleString()} rows written (${pct(rw, FREE_ROWS_WRITTEN_DAY)})`);
+}
+if (totalsAt) {
+  const diffs = checkTotals(process.env.QBTD_METER_GOLDEN, meterSince(totalsAt, await meter()));
+  console.log(diffs.length ? 'FAIL meter totals differ from ' + process.env.QBTD_METER_GOLDEN + ':\n  ' + diffs.join('\n  ')
+    : 'meter totals match ' + process.env.QBTD_METER_GOLDEN);
+  if (diffs.length) process.exitCode = 1;
 }

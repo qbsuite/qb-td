@@ -1,0 +1,52 @@
+{
+ "e2e_usage": {
+  "queries": 474,
+  "rows_read": 1094,
+  "rows_written": 374,
+  "r2_class_a": 28,
+  "r2_class_b": 112,
+  "r2_free": 5,
+  "rebuild_invocations": 2,
+  "live_invocations": 0
+ },
+ "sim_usage TOURNAMENTS=3 ROOMS=4 ROUNDS=3 ROUND_MIN=20 SEED=1 SAVES=1 CLIENT=smart": {
+  "queries": 1424,
+  "rows_read": 4149,
+  "rows_written": 873,
+  "r2_class_a": 215,
+  "r2_class_b": 442,
+  "r2_free": 3,
+  "rebuild_invocations": 42,
+  "live_invocations": 0
+ },
+ "sim_day SHAPE=small": {
+  "queries": 2399,
+  "rows_read": 6276,
+  "rows_written": 465,
+  "r2_class_a": 137,
+  "r2_class_b": 1009,
+  "r2_free": 0,
+  "rebuild_invocations": 29,
+  "live_invocations": 0
+ },
+ "sim_usage SEED=1 SAVES=1 CLIENT=smart (default size)": {
+  "queries": 16502,
+  "rows_read": 119278,
+  "rows_written": 9957,
+  "r2_class_a": 2812,
+  "r2_class_b": 6905,
+  "r2_free": 10,
+  "rebuild_invocations": 529,
+  "live_invocations": 0
+ },
+ "sim_day SHAPE=mid": {
+  "queries": 7407,
+  "rows_read": 23787,
+  "rows_written": 1051,
+  "r2_class_a": 313,
+  "r2_class_b": 5140,
+  "r2_free": 0,
+  "rebuild_invocations": 61,
+  "live_invocations": 0
+ }
+}

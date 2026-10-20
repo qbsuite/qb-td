@@ -640,11 +640,15 @@ Known limits:
 ## Tests
 
 ```bash
-npm test                         # the three below, in this order; no Worker, no network
+npm test                         # the five below, in this order; no Worker, no network
 node tests/run_tests.js          # engine: qbj parse, stats, .yft, report, zip, archive
 node tests/live_publish.js       # qb-td-live publisher: deploys, retries, heartbeats, unpublish, hub mark
                                  # (real SQLite from schema.sql via node:sqlite; R2 + Cloudflare API mocked)
 node tests/snapshot_publish.js   # cron tick: round shards + GitHub publisher (D1/R2/GitHub mocked)
+node tests/games_golden.mjs      # game loading as the public page and the archive do it, and what is
+                                 # built from it, held to tests/golden/games.json
+node tests/worker_inproc.mjs     # worker.js in Node (SQLite, in-memory R2): download bytes and each
+                                 # request's D1, R2 and crypto operations, held to tests/golden/worker_*.json
 
 cd worker
 npx wrangler d1 execute qb-td --local --file schema.sql
@@ -734,6 +738,54 @@ node tests/stress_worker.js
 version on `npx` rather than leaving the suite on whatever the global npx
 cache last downloaded. `e2e_worker.js` backdates the tournament row at the
 end, which is also how it exercises the `final` caching path.
+
+### Holding a refactor to what the code does now
+
+The goldens in `tests/golden/` pin what the code gives today: outputs
+byte for byte, the order of keys and rows, error text, which games count,
+the requests the pages make and what each one costs. A change meant to
+keep behaviour must leave all of them as they are. Write them again
+(`QBTD_UPDATE_GOLDEN=1`) only on a commit whose behaviour is the one to
+keep, and say so in its message. `tests/ref_games.mjs` keeps the game
+loading code as it was at 0cd19c5, so a moved copy can be checked against it.
+
+```bash
+npm run check:bundles            # the Worker bundle (wrangler deploy --dry-run, nothing uploaded):
+                                 # zip, yft, yft3, report and stats add 0 bytes, no parseMatch, gzip within
+                                 # 300 B; and `npm run build:read` rebuilds read.bundle.js byte for byte
+node tests/ui_golden.js          # Chrome, no Worker: the demo hub (Live, cells and their links, Compute
+                                 # three ways, each download, the Rebuild body) and the demo and archive
+                                 # pages tab by tab, their static files and import chains (ports 9611-9612)
+
+# local servers for the rest, on a fresh database each run: dev Worker,
+# static pages, and with --proxy tools/count_proxy.mjs in front of the
+# Worker; it prints the env to export (QBTD_BASE, QBTD_PAGES, ...)
+node tools/e2e_stack.mjs --state <new dir> --worker 9613 --pages 9614 [--proxy 9615] [--meter] [--inspector 9618]
+
+# the browser suite, written out for an A/B: two runs of the same code
+# must match before a comparison with a change means anything
+QBTD_CAPTURE=<dir> QBTD_PAGE_BASE=http://127.0.0.1:9615 QBTD_LIVE_PORT=9616 QBTD_CDP_PORT=9617 node tests/ui_e2e.js
+node tools/ab_compare.mjs <baseline capture> <other capture>
+
+node tests/e2e_autofill.js       # also each hub's requests all day, exactly (tests/golden/e2e_autofill_counts.json)
+node tests/e2e_day.js            # (--meter) also the hub's collectMatches (tests/golden/e2e_day_collect.json)
+
+# what a day costs, held to tests/golden/meter_totals.json (--meter, a fresh
+# database for each); QBTD_SEND_BASE=1 sends the base a hub sends with its
+# saves and must give the same totals
+QBTD_METER_GOLDEN=e2e_usage node tests/e2e_usage.js
+QBTD_METER_GOLDEN="sim_usage TOURNAMENTS=3 ROOMS=4 ROUNDS=3 ROUND_MIN=20 SEED=1 SAVES=1 CLIENT=smart" \
+  TOURNAMENTS=3 ROOMS=4 ROUNDS=3 ROUND_MIN=20 SEED=1 SAVES=1 CLIENT=smart node tests/sim_usage.js
+QBTD_METER_GOLDEN="sim_usage SEED=1 SAVES=1 CLIENT=smart (default size)" SEED=1 SAVES=1 CLIENT=smart node tests/sim_usage.js
+QBTD_METER_GOLDEN="sim_day SHAPE=small" SHAPE=small node tests/sim_day.js
+QBTD_METER_GOLDEN="sim_day SHAPE=mid" SHAPE=mid node tests/sim_day.js
+
+# CPU, this checkout against a checkout of the baseline (QBTD_BASELINE),
+# interleaved on one machine
+node --expose-gc tests/bench_games.mjs                         # game loading in the pages, against ref_games.mjs
+QBTD_BASELINE=<dir> node --expose-gc tests/cpubench.mjs        # the Worker's routes in Node
+QBTD_BASELINE=<dir> node tests/bench_pages.js                  # page loads on Fast 4G, and their script files
+```
 
 `npm test` needs Node 22.13 or later (`live_publish.js` runs `schema.sql`
 on `node:sqlite`). GitHub Actions runs it on each push and pull request

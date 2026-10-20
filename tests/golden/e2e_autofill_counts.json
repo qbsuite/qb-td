@@ -1,0 +1,25 @@
+{
+ "hub1": {
+  "gameFileReads": 0,
+  "gamesBatches": 3,
+  "gamesBatchIds": [
+   21,
+   29,
+   29
+  ],
+  "scheduleGets": 5,
+  "schedulePosts": 2,
+  "rosterGets": 6
+ },
+ "hub2": {
+  "gameFileReads": 0,
+  "gamesBatches": 2,
+  "gamesBatchIds": [
+   21,
+   57
+  ],
+  "scheduleGets": 4,
+  "schedulePosts": 2,
+  "rosterGets": 5
+ }
+}

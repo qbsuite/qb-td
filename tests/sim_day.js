@@ -46,8 +46,14 @@
 // Knobs: SHAPE (small|mid|large), ROUND_MIN (40), PHONE_SHARE (0.5),
 // REFRESHER_SHARE (0.1), RECONNECT_PER_HOUR (0.5, laptop viewers, PUSH),
 // LIVE (0).
+//
+// QBTD_METER_GOLDEN=<label> holds the run's meter totals to
+// tests/golden/meter_totals.json (QBTD_UPDATE_GOLDEN=1 writes them); run it
+// on a fresh local database. The day is seeded (SEED), so two builds see the
+// same requests and must cost the same.
 
 import { d1exec, d1row } from './e2e_lib.js';
+import { checkTotals, meterSince } from './golden_lib.mjs';
 
 const BASE = process.env.QBTD_BASE || 'http://127.0.0.1:8799';
 const SHAPES = {
@@ -74,6 +80,7 @@ const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 21474836
 /* ---------- metering ---------- */
 
 const meter = async () => (await fetch(BASE + '/__meter')).json();
+const totalsAt = process.env.QBTD_METER_GOLDEN ? await meter() : null;
 const UNITS = ['rows_read', 'rows_written', 'r2_class_a', 'r2_class_b'];
 const cost = {};
 function charge(cat, before, after) {
@@ -328,3 +335,9 @@ console.log(`\nPUSH (modelled): viewer page loads ${viewerReq} -> ${pushLog.conn
 console.log(JSON.stringify({ shape: SHAPE, hours, totals, viewerReq, live: LIVE ? liveLog : null,
   perCategory: Object.fromEntries(Object.entries(cost).map(([k, c]) => [k, c.requests])), viewerRows: viewerRows.reduce((n, x) => n + x['D1 rows read'], 0),
   push: { ...pushLog, rebuilds }, fresh: fresh.map((f) => [f.listed, f.stats]) }));
+if (totalsAt) {
+  const diffs = checkTotals(process.env.QBTD_METER_GOLDEN, meterSince(totalsAt, await meter()));
+  console.log(diffs.length ? 'FAIL meter totals differ from ' + process.env.QBTD_METER_GOLDEN + ':\n  ' + diffs.join('\n  ')
+    : 'meter totals match ' + process.env.QBTD_METER_GOLDEN);
+  if (diffs.length) process.exitCode = 1;
+}

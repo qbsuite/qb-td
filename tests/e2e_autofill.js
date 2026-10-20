@@ -8,6 +8,12 @@
 // then: node tests/e2e_autofill.js
 // QBTD_SCHEDULE=path.json runs on a saved schedule instead (its teams and
 // pools; rooms are remapped to fresh ones).
+//
+// The requests each hub makes all day are counted exactly (E6) and must
+// equal tests/golden/e2e_autofill_counts.json: game files read one by
+// one, /games batches, schedule reads and saves, roster reads.
+// QBTD_UPDATE_GOLDEN=1 rewrites it. QBTD_CDP_PORT fixes Chrome's DevTools
+// port (any free one otherwise).
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,6 +21,7 @@ import path from 'node:path';
 import { buildSchedule, fillPlaceholders, fillReport, hasPlaceholders, mulberry32, prelimRounds } from '../app/engine/schedule.js';
 import { standings } from '../app/engine/stats.js';
 import { BASE, call, d1exec, tick, ok, summary } from './e2e_lib.js';
+import { checkGolden } from './golden_lib.mjs';
 
 const PAGES = process.env.QBTD_PAGES || 'http://localhost:8765';
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -101,13 +108,19 @@ const asMatch = (g) => ({ round: g.round, tossupsRead: 20, teams: [
 /* ---------- Chrome: two hubs ---------- */
 
 const udd = mkdtempSync(path.join(tmpdir(), 'qbtd-af-'));
-const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${udd}`,
+const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${process.env.QBTD_CDP_PORT || 0}`, `--user-data-dir=${udd}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });
 process.on('exit', () => { try { chrome.kill(); rmSync(udd, { recursive: true, force: true }); } catch (e) { /* gone */ } });
-const pf = path.join(udd, 'DevToolsActivePort');
-await until(async () => existsSync(pf) && readFileSync(pf, 'utf8').includes('\n'), 'Chrome');
-const [port, wsPath] = readFileSync(pf, 'utf8').trim().split('\n');
-const ws = new WebSocket(`ws://127.0.0.1:${port}${wsPath}`);
+let wsUrl;
+if (process.env.QBTD_CDP_PORT) {
+  wsUrl = await until(async () => (await (await fetch(`http://127.0.0.1:${process.env.QBTD_CDP_PORT}/json/version`)).json()).webSocketDebuggerUrl, 'Chrome');
+} else {
+  const pf = path.join(udd, 'DevToolsActivePort');
+  await until(async () => existsSync(pf) && readFileSync(pf, 'utf8').includes('\n'), 'Chrome');
+  const [port, wsPath] = readFileSync(pf, 'utf8').trim().split('\n');
+  wsUrl = `ws://127.0.0.1:${port}${wsPath}`;
+}
+const ws = new WebSocket(wsUrl);
 await new Promise((r) => { ws.onopen = r; });
 let mid = 0;
 const pend = new Map();
@@ -316,6 +329,27 @@ ok('Copy all: one line a room, "Name: link"', lines.length === rooms.length
   && lines.every((l, k) => l.startsWith(sched.rooms[k].name + ': ') && l.includes('read.html?b=' + rooms[k].secret)), lines.slice(0, 2));
 
 ok('no page errors', errs.length === 0, errs);
+
+// E6: what each hub asked the Worker for all day, exactly
+{
+  const keyOf = (u) => decodeURIComponent(new URL(u).searchParams.get('key') || '');
+  const per = (s) => {
+    const mine = reqs.filter(([x]) => x === s);
+    return {
+      gameFileReads: gameFileReqs(s).length,
+      gamesBatches: gameBatchReqs(s).length,
+      gamesBatchIds: gameBatchReqs(s).map(([, , u]) => new URL(u).searchParams.get('ids').split(',').length),
+      scheduleGets: mine.filter(([, m, u]) => m === 'GET' && /\/file\?key=/.test(u) && /schedule\.json$/.test(keyOf(u))).length,
+      schedulePosts: mine.filter(([, m, u]) => m === 'POST' && /\/schedule$/.test(u)).length,
+      rosterGets: mine.filter(([, m, u]) => m === 'GET' && /\/file\?key=/.test(u) && /roster/.test(keyOf(u))).length,
+    };
+  };
+  const counts = process.env.QBTD_SCHEDULE ? null : { hub1: per(h1.s), hub2: per(h2.s) };
+  if (counts) {
+    const diffs = checkGolden('e2e_autofill_counts.json', counts);
+    ok('each hub\'s requests all day are the pinned counts', diffs.length === 0, { diffs, counts });
+  }
+}
 
 // leave the dev Worker's publish queue as we found it (it serves four a tick)
 for (let k = 0; k < 6; k++) await tick();
