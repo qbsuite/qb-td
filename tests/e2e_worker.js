@@ -1599,7 +1599,21 @@ ok('bucket link dead', r.status === 404);
   ok('switching on with every room started opens the next round', r.body.advanced === true && await round() === 2, r.body);
   // the public page's Live now stays on the round being played until a
   // room starts the next one
-  const pubLive = async () => { await tick(); const p = (await call('/pub/' + aslug)).body; return [p.current_round, p.live_round]; };
+  // The cron answers before its rebuild is done (scheduled() hands the
+  // tick to waitUntil), so the read waits for this tournament's rebuild:
+  // pub_built from after the tick began. Another tick every half second,
+  // in case others were ahead of it in the queue.
+  const pubLive = async () => {
+    const t0 = Date.now();
+    for (let i = 0; i < 60; i++) {
+      if (i % 10 === 0) await tick();
+      const t = (await call(AA)).body.tournament;
+      if (t.pub_dirty === 0 && t.pub_built >= t0) break;
+      await new Promise((res) => setTimeout(res, 50));
+    }
+    const p = (await call('/pub/' + aslug)).body;
+    return [p.current_round, p.live_round];
+  };
   ok('public: round 2 open, round 1 still live', JSON.stringify(await pubLive()) === '[2,1]');
 
   // round 2: Room 2 has the bye, so Rooms 1 and 3 are the ones waited on.
