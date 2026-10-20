@@ -47,7 +47,7 @@ Release Notes for 10/19/2026
 
 [ PERFORMANCE ]
 - Game downloads and public page updates use less server time.
-- The reader page starts a game with one request rather than four.
+- The reader page loads a room link with one request rather than four.
 - The Live Hub fetches the tiebreaker pool only when it has changed.
 
 [ MISC ]
