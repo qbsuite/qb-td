@@ -6263,6 +6263,53 @@ test('finished: a one-game final uploaded under the "if needed" round still coun
     .flatMap((ph) => ph.rounds.flatMap((r) => r.matches || [])).length, all.length, 'every game in the YellowFruit file');
 });
 
+// Two pools, Copy this phase, then crossover playoffs reading "1st in
+// Pool A" (their slots filled by finalsFill, so each keeps that place as
+// `from`), then an advantaged final from 1st–4th place. beats(a, b): who
+// wins each game before the final, 300–100.
+function chainedFinal(beats) {
+  const teams = planTeams(10);
+  const P = [planPhase('Prelims 1', { groups: 2 }), planPhase('Prelims 2', { groups: 2, same: true }), planPhase('Playoffs', { sizes: [4, 4, 2], carry: true })];
+  const s = buildPlan(teams, planRooms(5), P, 'snake', 1);
+  addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P, undefined, 'advantaged');
+  tagBrackets(s);
+  const game = (round, w, l) => ({ round, tossupsRead: 20, teams: [{ name: w, points: 300, bonusPoints: 100, players: [] }, { name: l, points: 100, bonusPoints: 50, players: [] }] });
+  const games = [];
+  const files = () => games.map((m, i) => ({ id: i + 1, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
+  let filled = s;
+  for (const p of [0, 1, 2]) {
+    if (p === 2) filled = finalsFill(filled, games, finalsProgress(filled, files()).ready).schedule;
+    for (const r of filled.phases[p].rounds) for (const g of r.games) {
+      const [a, b] = [g.a.team, g.b.team];
+      games.push(beats(a, b) ? game(r.round, a, b) : game(r.round, b, a));
+    }
+  }
+  filled = finalsFill(filled, games, finalsProgress(filled, files()).ready).schedule;
+  return { filled, games, game, fin: filled.phases.find((ph) => ph.kind === 'final') };
+}
+
+test('finished: an advantaged final after Copy this phase and crossover playoffs reads the playoffs\' own teams', () => {
+  const n = (t) => Number(t.slice(1));
+  // T1 wins everything, and T2, T3 and T4 go 1–2 in 1st–4th place
+  // (each beats one of the others): T1 is two wins clear, no final
+  const top = ['T1', 'T2', 'T3', 'T4'];
+  const cycle = { T2: 'T3', T3: 'T4', T4: 'T2' };
+  let x = chainedFinal((a, b) => (top.includes(a) && top.includes(b) && a !== 'T1' && b !== 'T1' ? cycle[a] === b : n(a) < n(b)));
+  assert.ok(!hasPlaceholders(x.filled));
+  assert.ok(x.filled.phases[2].rounds[0].games.every((g) => /^\d+(st|nd|rd|th) in Pool [AB]$/.test(g.a.from)), 'the playoffs filled from the pools\' places');
+  assert.equal(x.fin.rounds[0].games[0].a.team, 'T1');
+  assert.equal(scheduleFinished(x.filled, x.games), true, 'no final needed');
+  // T1 3–0 and T2 2–1: one win clear, so the final is played
+  x = chainedFinal((a, b) => n(a) < n(b));
+  const [r1, r2] = x.fin.rounds.map((r) => r.round);
+  assert.deepEqual([x.fin.rounds[0].games[0].a.team, x.fin.rounds[0].games[0].b.team], ['T1', 'T2']);
+  assert.equal(scheduleFinished(x.filled, x.games), false, 'the first final is still to play');
+  assert.equal(scheduleFinished(x.filled, [...x.games, x.game(r1, 'T1', 'T2')]), true, 'the leader won it: no second game');
+  const lost = [...x.games, x.game(r1, 'T2', 'T1')];
+  assert.equal(scheduleFinished(x.filled, lost), false, 'the leader lost it: the second game decides');
+  assert.equal(scheduleFinished(x.filled, [...lost, x.game(r2, 'T1', 'T2')]), true);
+});
+
 test('finals: the source is the top bracket, its carryover the same as the YellowFruit file\'s', () => {
   const { s, games } = finalsDay(5);
   const src = finalsSources(s);

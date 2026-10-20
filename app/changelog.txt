@@ -29,6 +29,7 @@ Release Notes for 10/19/2026
 
 [ PUBLIC PAGE ]
 - After a TD's Rebuild, a room move or a room rename, the public page shows the corrected games without waiting for new ones.
+- With crossover playoffs after Copy this phase, the tournament shows as finished once no more finals are needed, and stays open while one is.
 
 [ BUZZPOINTS ]
 - Buzz marks land on the right word when a question uses an encoded space (&nbsp;) or other HTML entities, as in MODAQ.

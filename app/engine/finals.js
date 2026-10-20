@@ -103,16 +103,19 @@ function groupsBefore(schedule, p) {
  * Returns [{name, phase, key, places: [n…], teams, games, open, carry,
  *   carried: [{a, b}] (pool-mate pairs whose earlier games count),
  *   prevRounds: [round…]}]. games are the bracket's over each time its
- * pools played (cyclesOf).
+ * pools played (cyclesOf). opts.filled: the slots already filled from a
+ * place (their `from`) read it too, as scheduleFinished needs once the
+ * Finals are filled; the brackets they read keep their own teams.
  */
-export function finalsSources(schedule) {
+export function finalsSources(schedule, opts = {}) {
   if (!schedule || !Array.isArray(schedule.phases)) return [];
   const brackets = schedule.brackets || [];
   const out = new Map();
   schedule.phases.forEach((ph, fp) => {
     for (const r of ph.rounds || []) {
       for (const s of [...(r.games || []).flatMap((g) => [g.a, g.b]), ...(r.byes || [])]) {
-        const m = s && s.label ? FIN_RE.exec(s.label) : null;
+        const place = s && (s.label || (opts.filled ? s.from : null));
+        const m = place ? FIN_RE.exec(place) : null;
         if (!m) continue;
         // the latest bracket of that name before the finals
         const b = brackets.filter((x) => x.name === m[2] && x.phase < fp).sort((x, y) => y.phase - x.phase)[0];
@@ -330,13 +333,12 @@ export function scheduleFinished(schedule, matches) {
   if (!played.size) return false;
   const all = schedule.phases.flatMap((ph) => ph.rounds.map((r) => ({ r, ph })));
   // net wins in the bracket a finals slot reads ("1st in Championship"),
-  // over its games and the ones carried into it, as finalsFill ranks it
-  // (finalsSources reads the slots' labels: a filled slot keeps its label as `from`)
-  const asLabels = JSON.parse(JSON.stringify(schedule));
-  for (const ph of asLabels.phases) for (const r of ph.rounds) for (const g of r.games) {
-    for (const k of ['a', 'b']) if (g[k] && g[k].from && FIN_RE.test(g[k].from)) g[k] = { label: g[k].from };
-  }
-  const sources = new Map(finalsSources(asLabels).map((src) => [src.name, src]));
+  // over its games and the ones carried into it, as finalsFill ranks it.
+  // A filled slot keeps the place it read as `from`. That bracket's own
+  // slots may have been filled from places too (crossover playoffs after
+  // Copy this phase read "1st in Pool A"): they keep their teams, or the
+  // bracket would look unplayed and every "if needed" final needed.
+  const sources = new Map(finalsSources(schedule, { filled: true }).map((src) => [src.name, src]));
   const netWins = (slot) => {
     const m = slot && slot.from ? FIN_RE.exec(slot.from) : null;
     const src = m ? sources.get(m[2]) : null;
