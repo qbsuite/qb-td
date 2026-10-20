@@ -17,18 +17,22 @@
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
 import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
-  carryFormerNames, forfeitQbj, rosterForExport, statedRound } from '../engine/qbj.js';
+  carryFormerNames, forfeitQbj, statedRound } from '../engine/qbj.js';
 import { standings, dedupeMatches } from '../engine/stats.js';
-import { serializeYft } from '../engine/yft.js';
-import { serializeYft3 } from '../engine/yft3.js';
-import { buildReport } from '../engine/report.js';
-import { makeZip } from '../engine/zip.js';
+// engine/exports.js builds the downloads with these four. They are
+// imported here too, where this file used them before, so a cold load
+// asks for them as early as it did: found one module later, report.js
+// held up the hub's first render on a slow link.
+import '../engine/yft.js';
+import '../engine/yft3.js';
+import '../engine/report.js';
+import '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { renameModaqTexts } from '../engine/modaqfile.js';
-import { fileDownloads } from '../engine/exportfile.js';
+import '../engine/modaqfile.js'; // asked for as early as before (see above)
+import { fileDownloads, yftFile, reportPages, reportZipFile, qbjZipFile, rosterFileText } from '../engine/exports.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
@@ -1591,8 +1595,7 @@ function renderRosterEditor(a, t) {
   $('rosterdl').onclick = () => {
     const clean = validated();
     if (!clean) return;
-    download('roster.qbj', JSON.stringify(rosterForExport(buildRosterQbj(t.name, clean, rosterTrack)), null, 2),
-      'application/json');
+    download('roster.qbj', rosterFileText(buildRosterQbj(t.name, clean, rosterTrack)), 'application/json');
   };
   $('rostersave').onclick = async () => {
     const clean = validated();
@@ -3248,12 +3251,12 @@ function showStats({ a, t, files, settings, got }) {
   $('statsnote').textContent = !kept ? `${nGames} in these stats`
     : pickFor(t).finished || stages.length === statStages().length ? `${nGames} in ${kept.length ? roundSpan(kept) : 'no rounds'}`
       : `${nGames} in ${andList(stages)}`;
-  const yft = (name, text) => {
-    try { download(name, text, 'application/json'); closeMenu(); }
+  const yft = (f) => {
+    try { download(f.name, f.data, f.type); closeMenu(); }
     catch (e) { say(e.message, true); }
   };
-  $('dlyft4').onclick = () => yft(t.slug + '-yf4.yft', serializeYft(exportOpts));
-  $('dlyft3').onclick = () => yft(t.slug + '-yf3.yft', serializeYft3(exportOpts));
+  $('dlyft4').onclick = () => yft(yftFile(t.slug, exportOpts, 4));
+  $('dlyft3').onclick = () => yft(yftFile(t.slug, exportOpts, 3));
   // YellowFruit-style six-page HTML report, zipped so the interlinked
   // files land as one folder ready to host. Named <slug>_standings.html
   // etc., as YellowFruit saves them: the hsquizbowl.org tournament
@@ -3261,9 +3264,8 @@ function showStats({ a, t, files, settings, got }) {
   $('dlreport').disabled = false;
   $('dlreport').onclick = () => {
     try {
-      const pages = buildReport({ ...exportOpts, prefix: t.slug });
-      download(t.slug + '-report.zip',
-        makeZip(pages.map((f) => ({ name: f.name, data: f.text }))), 'application/zip');
+      const z = reportZipFile(t.slug, exportOpts);
+      download(z.name, z.data, z.type);
       closeMenu();
     } catch (e) { say(e.message, true); }
   };
@@ -3273,7 +3275,7 @@ function showStats({ a, t, files, settings, got }) {
   $('dlreportfiles').disabled = false;
   $('dlreportfiles').onclick = async () => {
     try {
-      const pages = buildReport({ ...exportOpts, prefix: t.slug });
+      const pages = reportPages(t.slug, exportOpts);
       closeMenu();
       for (const f of pages) {
         download(f.name, f.text, 'text/html');
@@ -3287,40 +3289,23 @@ function showStats({ a, t, files, settings, got }) {
     try { await buildZip(); closeMenu(); } finally { run.end(); }
   };
   const buildZip = async () => {
-    // Every game as its separated files: match .qbj + MODAQ game file.
-    // Files list newest-first, so first-wins dedupe keeps the latest
-    // upload of a re-exported game (same name twice would break the zip).
-    const seen = new Set();
-    const entries = [];
-    const add = (round, filename, data) => {
-      const name = `round-${round}/${filename}`;
-      if (seen.has(name)) return;
-      seen.add(name);
-      entries.push({ name, data });
-    };
-    // a reader upload: MODAQ's own .qbj and _Game.json, as its Backup to
-    // JSON dialog writes them (engine/modaqfile.js), under the roster's
-    // current names
-    for (const x of modaqFiles) {
-      if (x.qbj) add(x.round, x.qbjName, x.qbj);
-      if (x.game) add(x.round, x.gameName, x.game);
-    }
-    // a .qbj the TD added by hand: indented as MODAQ writes (2 spaces)
-    const indent = (text) => { try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) { return text; } };
-    for (const r of raw.filter((x) => !x.reader)) add(r.round, r.filename, indent(r.text));
-    // game files that went up separately from their .qbj (Add a game)
+    // Every game as its separated files: match .qbj + MODAQ game file
+    // (engine/exports.js qbjZipFile). The game files that went up apart
+    // from their .qbj (Add a game) are read one after another, in upload
+    // order, then the roster.
+    const gameFiles = [];
     for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
-      try {
-        const text = JSON.stringify(await ownedJson(pub, a, f.r2_key), null, 2);
-        add(f.round, f.filename, renameModaqTexts({ qbj: null, game: text }, got.names).game);
-      }
-      catch (e) { /* bundle still useful without it */ }
+      const { round, filename } = f;
+      try { gameFiles.push({ round, filename, text: JSON.stringify(await ownedJson(pub, a, f.r2_key), null, 2) }); }
+      catch (e) { gameFiles.push({ round, filename, error: true }); }
     }
+    let rosterFile = null;
     if (t.roster_r2_key) {
-      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(rosterForExport(await ownedJson(pub, a, t.roster_r2_key)), null, 2) }); }
-      catch (e) { /* bundle still useful without it */ }
+      try { rosterFile = { json: await ownedJson(pub, a, t.roster_r2_key) }; }
+      catch (e) { rosterFile = { error: true }; }
     }
-    download(t.slug + '-qbj.zip', makeZip(entries), 'application/zip');
+    const z = qbjZipFile(t.slug, { modaqFiles, raw, gameFiles, roster: rosterFile, names: got.names });
+    download(z.name, z.data, z.type);
   };
   $('rebuild').disabled = false;
   $('rebuild').onclick = async () => {

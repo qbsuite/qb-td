@@ -36,6 +36,8 @@ import { modaqExport, modaqFilenames, qbjTextWithRound, renameModaqTexts } from 
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js';
 import { isGameFile, readGame, readGames, newestOf, rosterNamesFromText } from '../app/engine/games.js';
 import { uploadQbjName, publicQbjName, publicQbjText, storedFileText, rosterExportBody, fileDownloads } from '../app/engine/exportfile.js';
+import * as exportfileMod from '../app/engine/exportfile.js';
+import * as exportsMod from '../app/engine/exports.js';
 
 // MODAQ's actual registration parser (CJS module inside the package) — the
 // roster builder's output must satisfy it, since read.html feeds the
@@ -7956,6 +7958,59 @@ test('exportfile.js: fileDownloads makes the links fileLinks made, file for file
   assert.deepEqual(fileDownloads({ kind: 'combined', error: null, filename: 'Round_1_A_B.qbtd.json', round: 1 }, null),
     [{ params: 'part=qbj&dl=Round_1_A_B.qbj', label: 'qbj' }, { params: 'part=game&dl=Round_1_A_B_Game.json', label: 'game' }]);
   assert.deepEqual(fileDownloads({ kind: 'other', error: null, filename: 'a b.txt', round: 1 }, ['A', 'B']), [{ params: 'dl=a%20b.txt', label: 'Download' }]);
+});
+
+/* ---------- exports.js: the hub's tournament downloads ----------
+   admin.js showStats and the roster editor built these inline at
+   cc92cf4; exports.js is those lines in one place. These hold it to the
+   inline code. tests/hubgames_ref.mjs holds the QBJ bundle, its reads
+   included, to admin.js's buildZip as it was, and tests/ui_golden.js the
+   demo hub's downloads, byte for byte. */
+
+test('exports.js: the YellowFruit files and the report are the ones showStats built, byte for byte', () => {
+  const { yftFile, reportPages, reportZipFile } = exportsMod;
+  const same = (x, y) => assert.ok(Buffer.from(x).equals(Buffer.from(y)));
+  let n = 0;
+  for (const sc of STAGED) {
+    const matches = sc.games.map((g) => parseMatch(g.qbj, { filename: g.filename }));
+    for (const settings of [{}, { gameFormat: 'pace' }, { gameFormat: 'acf', formatOverrides: { regulationTossupCount: 24 } }]) {
+      // admin.js showStats' exportOpts, and what each menu item did with it
+      const exportOpts = { name: sc.name, matches: dedupeMatches(matches), roster: parseRoster(sc.roster),
+        settings: effectiveFormat(settings), schedule: sc.schedule };
+      const slug = sc.key;
+      assert.deepEqual(yftFile(slug, exportOpts, 4), { name: slug + '-yf4.yft', data: serializeYft(exportOpts), type: 'application/json' });
+      assert.deepEqual(yftFile(slug, exportOpts, 3), { name: slug + '-yf3.yft', data: serializeYft3(exportOpts), type: 'application/json' });
+      const pages = buildReport({ ...exportOpts, prefix: slug });
+      assert.deepEqual(reportPages(slug, exportOpts), pages);
+      const z = reportZipFile(slug, exportOpts);
+      assert.deepEqual([z.name, z.type], [slug + '-report.zip', 'application/zip']);
+      same(z.data, makeZip(pages.map((f) => ({ name: f.name, data: f.text }))));
+      n++;
+    }
+  }
+  assert.ok(n >= 21);
+  // the report's prefix stays out of the options the other files are built from
+  const opts = { name: 'T', matches: MARK_MATCHES(), roster: parseRoster(ROSTER) };
+  reportZipFile('t', opts);
+  assert.ok(!('prefix' in opts) && reportPages('t', opts).every((f) => f.name.startsWith('t_')));
+  // with no games, the report says so, as buildReport did
+  assert.throws(() => reportZipFile('t', { name: 'T', matches: [] }), /no games to report/);
+  assert.throws(() => reportPages('t', { name: 'T', matches: [] }), /no games to report/);
+});
+
+test('exports.js: the roster file is the one the roster editor and the bundle wrote', () => {
+  const { rosterFileText } = exportsMod;
+  const qbjs = [buildRosterQbj('T', renamedRoster()), buildRosterQbj('T', renameRoster), renameArchive['/pub/2026terrapinopenatusc/roster'],
+    ...Object.values(TRACKS).map((track) => buildRosterQbj('Open', markedTeams(), track)),
+    { objects: [{ type: 'Tournament', registrations: [{ name: 'A', _formerNames: ['B'], teams: [] }] }] }, {}, [], null, 7, 'x'];
+  for (const q of qbjs) assert.equal(rosterFileText(q), JSON.stringify(rosterForExport(q), null, 2));
+  assert.ok(!rosterFileText(buildRosterQbj('T', renamedRoster())).includes('_formerNames'));
+});
+
+test('exports.js: passes on exportfile.js, so the hub imports its downloads from one place', () => {
+  for (const name of Object.keys(exportfileMod)) assert.equal(exportsMod[name], exportfileMod[name], name);
+  assert.deepEqual(Object.keys(exportsMod).sort(), [...Object.keys(exportfileMod),
+    'yftFile', 'reportPages', 'reportZipFile', 'rosterFileText', 'qbjZipFile'].sort());
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

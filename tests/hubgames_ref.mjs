@@ -23,13 +23,23 @@
 // roster. The hub's other moved pieces (gameFormat, the roster renames
 // the listings use) are checked against the same reference or admin.js
 // as it was.
+// The QBJ bundle download is held the same way: admin.js's buildZip as
+// the file has it now (tests/admin_src.mjs) against the copy pinned in
+// ref_games.mjs (hubZipRef), on what each collectMatches above gave:
+// the same reads in the same order, one at a time, the same D1 and R2
+// operations, and the same zip byte for byte. Its own cases: a re-upload
+// with the teams swapped (both kept), a .qbj added by hand under MODAQ's
+// name for a reader's game (the reader's wins), a '/' in a team name (a
+// folder), and game files that can't be read (left out).
 // Run: node tests/hubgames_ref.mjs (part of npm test; Node 22.5+).
 
 import assert from 'node:assert/strict';
 import { parseRoster, rosterNameMap } from '../app/engine/qbj.js';
 import { fileSummary as uploadedSummary } from '../app/js/protests.js';
 import { collectMatches, gameFormat, createHubNames, ownedJson } from '../app/js/hubgames.js';
-import { hubRef } from './ref_games.mjs';
+import { hubRef, hubZipRef } from './ref_games.mjs';
+import { hubOwnBuildZip } from './admin_src.mjs';
+import { readZip } from '../app/engine/zip.js';
 import { workerHarness } from './inproc_worker.mjs';
 
 let passed = 0;
@@ -110,6 +120,55 @@ async function bothSides(makePub, calls, measure = null) {
   }
   return cand;
 }
+
+/* ---------- the QBJ bundle (admin.js showStats buildZip) ---------- */
+
+const ownBuildZip = await hubOwnBuildZip();
+
+/**
+ * The QBJ bundle as admin.js builds it now and as it was (hubZipRef),
+ * each with its own logging pub (makePub() gives a fresh one), on what
+ * Compute stats left: `got` from collectMatches and `keep`, the rounds
+ * picked (null for all), narrowed as showStats narrows them. Asserts the
+ * same reads in the same order, one at a time, the same D1 and R2
+ * operations when `measure` is given, and the same file byte for byte.
+ * Returns the file, with its entries read back.
+ */
+async function bothZips(makePub, { a, t, files, got, keep = null }, measure = null) {
+  const inPick = (x) => !keep || keep.has(x.round);
+  const modaqFiles = (got.modaqFiles || []).filter(inPick);
+  const raw = got.raw.filter(inPick);
+  const sides = {};
+  for (const side of ['ref', 'cand']) {
+    const rec = logged(makePub());
+    let open = 0;
+    let most = 0;
+    const pub = async (path, opts) => {
+      most = Math.max(most, ++open);
+      try { return await rec.pub(path, opts); } finally { open--; }
+    };
+    const dl = [];
+    const download = (name, data, type) => dl.push({ name, data, type });
+    const ctx = { pub, a, t, files, got, modaqFiles, raw, inPick, download };
+    const buildZip = side === 'ref' ? hubZipRef(ctx) : ownBuildZip(ctx);
+    const ops = measure ? (await measure(buildZip)).ops : (await buildZip(), null);
+    sides[side] = { log: rec.log, most, dl, ops };
+  }
+  const { ref, cand } = sides;
+  assert.deepEqual(cand.log, ref.log, 'the same reads in the same order');
+  assert.ok(cand.most <= 1 && ref.most <= 1, 'one read at a time');
+  assert.deepEqual(cand.ops, ref.ops, 'the same D1 statements and R2 operations');
+  assert.equal(ref.dl.length, 1);
+  assert.equal(cand.dl.length, 1, 'one download');
+  const [r, c] = [ref.dl[0], cand.dl[0]];
+  assert.deepEqual([c.name, c.type], [r.name, r.type], 'the same name and type');
+  assert.ok(c.data instanceof Uint8Array && r.data instanceof Uint8Array);
+  const entries = await readZip(c.data);
+  assert.deepEqual(entries.map((e) => e.name), (await readZip(r.data)).map((e) => e.name), 'the same entries in order');
+  assert.ok(Buffer.from(c.data).equals(Buffer.from(r.data)), 'the same zip, byte for byte');
+  return { ...c, entries, log: cand.log };
+}
+const zipText = (z, name) => { const e = z.entries.find((x) => x.name === name); return e ? new TextDecoder().decode(e.data) : null; };
 
 /* ---------- a stand-in pub: every kind of upload, and every way to fail ---------- */
 
@@ -249,6 +308,17 @@ await test('stand-in: Compute stats, then again on its cache', async () => {
   assert.ok(out.matches.some((m) => m.fileId === files[31].id), 'JSON served as a raw Response');
   assert.ok(out.modaqFiles.length > 0 && out.games.length === out.modaqFiles.length);
   assert.ok(out.matches.every((m, i) => i === 0 || m.fileId < out.matches[i - 1].fileId), 'upload order kept');
+  // the QBJ bundle from it: every round, then rounds 2, 3 and 5 only
+  const tz = { ...t, slug: 'stand-in' };
+  const all = await bothZips(() => standIn(), { ...call({ t: tz }), got: out });
+  const gameReads = files.filter((f) => f.kind === 'game').map(fileRead);
+  assert.deepEqual(all.log, [...gameReads, '/a/x/file?key=' + encodeURIComponent(ROSTER_KEY)], 'each game file, then the roster');
+  assert.equal(all.name, 'stand-in-qbj.zip');
+  assert.ok(all.entries.at(-1).name === 'roster.qbj' && !zipText(all, 'roster.qbj').includes('_formerNames'));
+  assert.ok(all.entries.some((e) => e.name.endsWith('_Game.json') && new TextDecoder().decode(e.data).includes('Alpha Prime')), 'game files renamed');
+  const some = await bothZips(() => standIn(), { ...call({ t: tz }), got: out, keep: new Set([2, 3, 5]) });
+  assert.ok(some.entries.every((e) => e.name === 'roster.qbj' || /^round-[235]\//.test(e.name)) && some.entries.length > 10);
+  assert.deepEqual(some.log.slice(0, -1), files.filter((f) => f.kind === 'game' && [2, 3, 5].includes(f.round)).map(fileRead));
 });
 
 await test('stand-in: the playoff fill (rank), then again on its cache, then after a round move', async () => {
@@ -281,6 +351,70 @@ await test('stand-in: no options, no roster, and a roster that fails', async () 
   assert.equal(failed.runs[0].out.errors[0], 'Roster: request failed (500)');
 });
 
+await test('the QBJ bundle: re-uploads, a name taken twice, a folder in a name, reads that fail', async () => {
+  // newest first, as the hub lists uploads
+  const zstore = new Map();
+  const zfiles = [];
+  let zid = 500;
+  const reader = (round, a, b, extra = {}) => () => ({ qbj: { ...match(round, a, b), ...extra }, game: { game: gameOf(a, b), uiState: {} },
+    modaq: { qbj: JSON.stringify({ ...match(round, a, b), ...extra }, null, 4), game: JSON.stringify(gameOf(a, b), null, 2) }, protests: [] });
+  const up = (kind, round, filename, value) => {
+    const id = zid--;
+    zstore.set('t/9/up/' + id, value);
+    zfiles.push({ id, bucket_id: 1, round, kind, r2_key: 't/9/up/' + id, filename, size: 100, created: 1e12 + id, error: null, summary: null });
+  };
+  up('combined', 1, 'Round_1_Gamma_Beta.qbtd.json', reader(1, 'Gamma', 'Beta'));                 // re-exported, teams swapped
+  up('qbj', 1, 'Round_1_Beta_Gamma.qbj', () => ({ ...match(1, 'Beta', 'Gamma'), notes: 'by hand, newer' })); // MODAQ's name, by hand
+  up('combined', 1, 'Round_1_Beta_Gamma.qbtd.json', reader(1, 'Beta', 'Gamma'));
+  up('game', 1, 'Round_1_Beta_Gamma_Game.json', () => gameOf('Beta', 'Gamma'));                   // MODAQ's game file name, by hand
+  up('qbj', 1, 'Round_1_Beta_Gamma.qbj', () => ({ ...match(1, 'Beta', 'Gamma'), notes: 'by hand, older' }));
+  up('combined', 2, 'Round_2_AB_Beta.qbtd.json', reader(2, 'A/B Club', 'Beta'));                 // a '/' in a team name
+  up('game', 2, 'Round_2_A_B_Game.json', () => { throw new Error('request failed (404)'); });    // can't be read
+  up('game', 3, 'Round_3_Gamma_Alpha_Game.json', () => gameOf('Gamma', 'Alpha'));                 // renamed
+  up('game', 3, 'Round_3_bad_Game.json', () => new Response('{"not json', { headers: { 'Content-Type': 'application/octet-stream' } }));
+  up('game', 3, 'Round_3_text_Game.json', () => new Response(JSON.stringify(gameOf('Beta', 'Alpha')), { headers: { 'Content-Type': 'application/octet-stream' } }));
+  up('qbj', 3, 'Round_3_Gamma_Alpha.qbj', () => ({ ...match(3, 'Gamma', 'Alpha') }));
+  up('combined', 4, 'Round_4_Beta_Alpha.qbtd.json', () => ({ qbj: match(4, 'Beta', 'Alpha'), game: null })); // no game half
+  up('combined', 4, 'Round_4_Alpha_Beta.qbtd.json', () => ({ qbj: match(4), game: { game: gameOf('Alpha', 'Beta'), uiState: {} } })); // no MODAQ texts
+  up('game', 5, 'Round_5_Alpha_Beta_Game.json', () => gameOf('Alpha', 'Beta'));
+  up('other', 5, 'notes.txt', () => new Response('hello', { headers: { 'Content-Type': 'text/plain' } }));
+  const zpub = ({ rosterFails = false } = {}) => async (path) => {
+    const key = new URLSearchParams(path.slice(path.indexOf('?') + 1)).get('key');
+    await turns(key.length % 3);
+    if (key === ROSTER_KEY) { if (rosterFails) throw new Error('request failed (500)'); return structuredClone(rosterQbj); }
+    if (!zstore.has(key)) throw new Error('no such file');
+    return zstore.get(key)();
+  };
+  const tz = { roster_r2_key: ROSTER_KEY, roster_at: 1, settings: '{}', slug: 'zip-cases' };
+  const c = { a: '/a/z', t: tz, buckets: [{ id: 1, room_name: 'Room A' }], files: zfiles };
+  const got = await collectMatches(zpub(), c.a, tz, c.buckets, zfiles);
+  const z = await bothZips(() => zpub(), { ...c, got });
+  const names = z.entries.map((e) => e.name);
+  assert.ok(names.includes('round-1/Round_1_Gamma_Beta.qbj') && names.includes('round-1/Round_1_Beta_Gamma.qbj'), 'both exports of the re-exported game');
+  assert.equal(names.filter((n) => n === 'round-1/Round_1_Beta_Gamma.qbj').length, 1, 'one file under a name');
+  assert.ok(!zipText(z, 'round-1/Round_1_Beta_Gamma.qbj').includes('by hand'), 'the reader\'s file beats the one added by hand');
+  assert.equal(zipText(z, 'round-1/Round_1_Beta_Gamma_Game.json'), JSON.stringify(gameOf('Beta', 'Gamma'), null, 2), 'and its game file');
+  assert.ok(names.includes('round-2/Round_2_A/B Club_Beta.qbj'), 'a \'/\' in a team name makes a folder');
+  assert.ok(!names.some((n) => /Round_2_A_B_Game|Round_3_bad_Game/.test(n)), 'game files that can\'t be read are left out');
+  assert.ok(zipText(z, 'round-3/Round_3_Gamma_Alpha_Game.json').includes('"Alpha Prime"'), 'a game file under the roster\'s names');
+  assert.ok(names.includes('round-3/Round_3_text_Game.json') && names.includes('round-3/Round_3_Gamma_Alpha.qbj'));
+  assert.ok(!names.includes('round-4/Round_4_Beta_Alpha_Game.json') && names.includes('round-4/Round_4_Alpha Prime_Beta_Game.json'),
+    'no game half, no game file; an upload without MODAQ texts still gives both');
+  assert.ok(!names.includes('notes.txt') && names.at(-1) === 'roster.qbj');
+  assert.equal(z.log.length, 6 + 1, 'six game files, then the roster');
+  // the rounds picked, without a roster, and with a roster that fails
+  const picked = await bothZips(() => zpub(), { ...c, got, keep: new Set([1, 3]) });
+  assert.ok(picked.entries.every((e) => e.name === 'roster.qbj' || /^round-[13]\//.test(e.name)));
+  assert.equal(picked.log.length, 4 + 1, 'only the picked rounds\' game files are read');
+  const none = await bothZips(() => zpub(), { ...c, t: { ...tz, roster_r2_key: null }, got });
+  assert.ok(!none.entries.some((e) => e.name === 'roster.qbj') && none.log.length === 6);
+  const failed = await bothZips(() => zpub({ rosterFails: true }), { ...c, got });
+  assert.ok(!failed.entries.some((e) => e.name === 'roster.qbj') && failed.log.length === 7);
+  // no renames: the game files as they were read, 2-space indented
+  const plain = await bothZips(() => zpub(), { ...c, t: { ...tz, roster_r2_key: null }, got: { ...got, names: null } });
+  assert.equal(zipText(plain, 'round-3/Round_3_Gamma_Alpha_Game.json'), JSON.stringify(gameOf('Gamma', 'Alpha'), null, 2));
+});
+
 /* ---------- the demo (demo.js) ---------- */
 
 await test('demo: Compute stats and the playoff fill on the demo, with uploads', async () => {
@@ -306,6 +440,8 @@ await test('demo: Compute stats and the playoff fill on the demo, with uploads',
     const [stats, fill] = cand.runs;
     assert.ok(stats.out.matches.some((m) => m.fileId === 1000) && stats.out.matches.length === fixture.entries.length + 1);
     assert.ok(fill.log.some((p) => p.includes('/games?')), 'the fill asks for copies, which the demo has none of');
+    const z = await bothZips(() => demoPub, { ...c, got: stats.out });
+    assert.ok(z.entries.length > fixture.entries.length && z.entries.some((e) => e.name === 'roster.qbj'));
   } finally { reset(); }
 });
 
@@ -371,6 +507,11 @@ await test('Worker: the same games, requests, D1 statements and R2 reads', async
   assert.ok(out.matches.some((m) => m.teams.some((tm) => tm.name === 'Alpha Prime')), 'renamed');
   assert.ok(out.errors.some((e) => e.startsWith('Round_3_Beta_Alpha.qbtd.json: ')), 'the unreadable upload');
   assert.ok(out.modaqFiles.length >= 2);
+  // the QBJ bundle, its reads metered
+  const z = await bothZips(() => pubOf, { ...c, got: out }, measured);
+  assert.ok(z.entries.some((e) => e.name === 'round-1/Round_1_Alpha_Beta_Game.json') && z.entries.at(-1).name === 'roster.qbj');
+  assert.ok(!zipText(z, 'roster.qbj').includes('_formerNames') && zipText(z, 'round-1/Round_1_Alpha_Beta_Game.json').includes('Alpha Prime'));
+  await bothZips(() => pubOf, { ...c, got: out, keep: new Set([2]) }, measured);
 });
 
 /* ---------- gameFormat and the hub's roster renames ---------- */

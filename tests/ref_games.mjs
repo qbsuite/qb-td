@@ -1,5 +1,6 @@
-// ref_games.mjs — the game-loading code as it stands at 0cd19c5, copied
-// verbatim, for the equivalence tests (tests/games_golden.mjs, e2e_day.js,
+// ref_games.mjs — the game-loading code as it stands at 0cd19c5, and the
+// hub's QBJ bundle built from it, copied verbatim, for the equivalence
+// tests (tests/games_golden.mjs, hubgames_ref.mjs, e2e_day.js,
 // bench_games.mjs) to hold a refactor against. Each copy sits inside a
 // small wrapper that supplies what its page module would (its module
 // state, its fetch helper); the lines between the BEGIN and END marks are
@@ -8,9 +9,10 @@
 // code they were taken from changes on purpose, the goldens change with it
 // and these copies stay as the record of what it was.
 
-import { parseMatch, parseRoster, rosterNameMap, renameMatch, matchPayload } from '../app/engine/qbj.js';
+import { parseMatch, parseRoster, rosterNameMap, renameMatch, matchPayload, rosterForExport } from '../app/engine/qbj.js';
 import { dedupeEntries } from '../app/engine/buzz.js';
-import { modaqExport, modaqFilenames } from '../app/engine/modaqfile.js';
+import { modaqExport, modaqFilenames, renameModaqTexts } from '../app/engine/modaqfile.js';
+import { makeZip } from '../app/engine/zip.js';
 import { effectiveFormat } from '../app/js/read_core.js';
 import { eachLimit } from '../app/js/limit.js';
 
@@ -237,4 +239,53 @@ export function hubRef({ pub, FETCH_AT_ONCE = 6 }) {
   }
   // END
   return { fetchOwnedJson, fetchGameCopies, collectMatches, gameFormat, GAMES_BATCH };
+}
+
+/** The QBJ bundle download as showStats built it, on what Compute stats
+    left in its scope: `got` (collectMatches' answer), `modaqFiles` and
+    `raw` narrowed to the stages and rounds picked, `inPick` (a file's
+    round), the tournament `t`, its `files` and admin path `a`. `pub`
+    answers the reads; `download(name, data, type)` gets the file.
+    Returns buildZip. */
+export function hubZipRef({ pub, a, t, files, got, modaqFiles, raw, inPick, download }) {
+  const { fetchOwnedJson } = hubRef({ pub });
+  // BEGIN app/js/admin.js@0cd19c5:3417-3452
+  const buildZip = async () => {
+    // Every game as its separated files: match .qbj + MODAQ game file.
+    // Files list newest-first, so first-wins dedupe keeps the latest
+    // upload of a re-exported game (same name twice would break the zip).
+    const seen = new Set();
+    const entries = [];
+    const add = (round, filename, data) => {
+      const name = `round-${round}/${filename}`;
+      if (seen.has(name)) return;
+      seen.add(name);
+      entries.push({ name, data });
+    };
+    // a reader upload: MODAQ's own .qbj and _Game.json, as its Backup to
+    // JSON dialog writes them (engine/modaqfile.js), under the roster's
+    // current names
+    for (const x of modaqFiles) {
+      if (x.qbj) add(x.round, x.qbjName, x.qbj);
+      if (x.game) add(x.round, x.gameName, x.game);
+    }
+    // a .qbj the TD added by hand: indented as MODAQ writes (2 spaces)
+    const indent = (text) => { try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) { return text; } };
+    for (const r of raw.filter((x) => !x.reader)) add(r.round, r.filename, indent(r.text));
+    // game files that went up separately from their .qbj (Add a game)
+    for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
+      try {
+        const text = JSON.stringify(await fetchOwnedJson(a, f.r2_key), null, 2);
+        add(f.round, f.filename, renameModaqTexts({ qbj: null, game: text }, got.names).game);
+      }
+      catch (e) { /* bundle still useful without it */ }
+    }
+    if (t.roster_r2_key) {
+      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(rosterForExport(await fetchOwnedJson(a, t.roster_r2_key)), null, 2) }); }
+      catch (e) { /* bundle still useful without it */ }
+    }
+    download(t.slug + '-qbj.zip', makeZip(entries), 'application/zip');
+  };
+  // END
+  return buildZip;
 }

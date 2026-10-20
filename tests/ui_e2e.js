@@ -2049,6 +2049,14 @@ await flow('24c. renaming a team and a player after games are in');
   await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor again');
   ok('24c rename: reopened, the editor shows the former names',
     (await text(`[data-tnote="${ti}"]`)).includes('Formerly ' + oldTeam) && (await text(`[data-pnote="${ti}.${pi}"]`)).includes('Formerly ' + oldPlayer));
+  {
+    // the editor's own Download: the roster as the editor holds it, built in the page
+    const f = await download('#rosterdl');
+    const json = JSON.parse(f.bytes.toString('utf8'));
+    ok('24c rename: the editor\'s Download leaves out the former names too, and MODAQ reads it',
+      f.name === 'roster.qbj' && !f.bytes.toString('utf8').includes('_formerNames') && parseRoster(json).some((x) => x.name === newTeam)
+        && modaqValid(json) && f.bytes.toString('utf8') === JSON.stringify(json, null, 2), f.name);
+  }
 
   // the hub's stats: one row under the new name, with every game it played
   await openHub();
