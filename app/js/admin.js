@@ -16,8 +16,8 @@
 // until setup is complete.
 
 import { API, pub, esc, fmtBytes, download } from './api.js';
-import { parseMatch, parseRoster, matchPayload, buildRosterQbj, rosterTracking, teamMarks,
-  rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, rosterForExport, statedRound } from '../engine/qbj.js';
+import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
+  carryFormerNames, forfeitQbj, rosterForExport, statedRound } from '../engine/qbj.js';
 import { standings, dedupeMatches } from '../engine/stats.js';
 import { serializeYft } from '../engine/yft.js';
 import { serializeYft3 } from '../engine/yft3.js';
@@ -27,7 +27,7 @@ import { renderStats } from './statsview.js';
 import { renderPacketsUi, stagedBlob } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
-import { modaqExport, modaqFilenames, renameModaqTexts } from '../engine/modaqfile.js';
+import { modaqFilenames, renameModaqTexts } from '../engine/modaqfile.js';
 import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
@@ -37,8 +37,8 @@ import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomI
 import { buzzCredentials, sha256Hex } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
-import { eachLimit } from './limit.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
+import { ownedJson, collectMatches, gameFormat, createHubNames } from './hubgames.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -76,8 +76,6 @@ window.qtd = { copy }; // for inline onclick handlers
 const LINKS_KEY = 'qbtdAdminLinks';
 // Games per rebuild request; must not exceed the Worker's MAX_REBUILD.
 const REBUILD_BATCH = 200;
-// Game files read at once by Compute stats and the playoff fill
-const FETCH_AT_ONCE = 6;
 
 function savedLinks() {
   try {
@@ -280,22 +278,10 @@ let tbHeld;             // the detail's tb_stamp that tbPool was fetched under
 // The roster's renames (qbj.js rosterNameMap), so a game uploaded under a
 // team's old name is listed under its new one, as the stats count it.
 // Loaded again whenever the roster is saved, here (key: null) or from
-// another tab (its save time, roster_at, moves).
-const hubNames = { key: null, map: null };
-async function ensureHubNames(a, t) {
-  const key = t.roster_r2_key ? t.roster_r2_key + '@' + (t.roster_at || '') : '';
-  if (hubNames.key === key) return;
-  hubNames.key = key;
-  hubNames.map = null;
-  if (!key) return;
-  try { hubNames.map = rosterNameMap(parseRoster(await fetchOwnedJson(a, t.roster_r2_key))); } catch (e) { /* listed as uploaded */ }
-}
+// another tab (its save time, roster_at, moves): hubgames.js.
+const hubNames = createHubNames();
 // a file's summary (protests.js), its teams under their current names
-function fileSummary(f) {
-  const s = uploadedSummary(f);
-  if (!s || !hubNames.map) return s;
-  return { ...s, teams: s.teams.map((n) => hubNames.map.teams.get(n) || n) };
-}
+function fileSummary(f) { return hubNames.summary(f); }
 
 let rosterOpen = false;
 // structured editor working copy [{name, players, was, flags, orig}]; was:
@@ -374,7 +360,7 @@ async function showDetail(quiet = false, held = null) {
     tbHeld = got.ok ? tbStamp : undefined;
   }
   testToken = await testTokenReq;
-  await ensureHubNames(a, t);
+  await hubNames.ensure(pub, a, t);
   lastDetail = detail;
   render();
   // the header isn't redrawn when the view stays put: its mark is
@@ -1321,7 +1307,7 @@ function renderRosterSec(a, t) {
     if (rosterOpen && rosterTeams === null) {
       if (t.roster_r2_key) {
         try {
-          rosterSaved = parseRoster(await fetchOwnedJson(a, t.roster_r2_key));
+          rosterSaved = parseRoster(await ownedJson(pub, a, t.roster_r2_key));
           rosterTeams = editRoster(rosterSaved);
         } catch (e) { /* unparseable upload: start blank */ }
       }
@@ -1341,7 +1327,7 @@ function renderRosterSec(a, t) {
 async function upRenames(a) {
   const t = lastDetail.tournament;
   if (!t.roster_r2_key || !rosterUpload) return {};
-  try { return rosterRenames(parseRoster(await fetchOwnedJson(a, t.roster_r2_key)), rosterUpload.teams); }
+  try { return rosterRenames(parseRoster(await ownedJson(pub, a, t.roster_r2_key)), rosterUpload.teams); }
   catch (e) { return {}; }
 }
 
@@ -1385,7 +1371,7 @@ function renderUpPreview(a) {
       // adds its old name, so games already played follow it
       let saved = null;
       if (t.roster_r2_key) {
-        try { saved = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)); } catch (e) { /* none to carry */ }
+        try { saved = parseRoster(await ownedJson(pub, a, t.roster_r2_key)); } catch (e) { /* none to carry */ }
       }
       const teams = carryFormerNames(saved, u.teams, renames);
       // Save the roster rebuilt from its parsed teams, not the file as
@@ -1637,7 +1623,7 @@ function renderRosterEditor(a, t) {
 async function followRenames(a, t, renames) {
   if (!Object.keys(renames).length) return 0;
   let saved = null;
-  try { saved = await fetchOwnedJson(a, `t/${t.id}/schedule.json`); } catch (e) { /* none saved */ }
+  try { saved = await ownedJson(pub, a, `t/${t.id}/schedule.json`); } catch (e) { /* none saved */ }
   let n = 0;
   if (saved && saved.phases && renameTeams(saved, renames)) {
     await pub(a + '/schedule', { method: 'POST', json: saved });
@@ -1681,8 +1667,8 @@ async function ensureSched(a, t) {
   const before = sched;
   // both at once: each is a round trip to the Worker
   const [names, got] = await Promise.all([
-    fetchOwnedJson(a, t.roster_r2_key).then((r) => parseRoster(r).map((x) => x.name), () => []),
-    fetchOwnedJson(a, `t/${t.id}/schedule.json`).catch(() => null),
+    ownedJson(pub, a, t.roster_r2_key).then((r) => parseRoster(r).map((x) => x.name), () => []),
+    ownedJson(pub, a, `t/${t.id}/schedule.json`).catch(() => null),
   ]);
   schedTeams = names;
   if (sched === before) sched = got;
@@ -1720,7 +1706,7 @@ function renderSchedule(a, t, buckets, files) {
     save: (s) => pub(a + '/schedule', { method: 'POST', json: s }),
     del: () => pub(a + '/schedule', { method: 'DELETE' }),
     fill: async () => {
-      const { matches, roster } = await collectMatches(a, t, buckets, files, () => {}, { cache: autoCache, rank: true });
+      const { matches, roster } = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true });
       if (!matches.length) return null;
       return fillReport(sched, standings(matches, roster, gameFormat(t)));
     },
@@ -2819,10 +2805,10 @@ function wireFix(box, a, t, buckets, files) {
       render();
       const x = fixOpen;
       try {
-        x.root = await fetchOwnedJson(a, f.r2_key);
+        x.root = await ownedJson(pub, a, f.r2_key);
         const view = buzzFixView(x.root);
         let roster = null;
-        if (t.roster_r2_key) { try { roster = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)); } catch (e) { /* teammates only */ } }
+        if (t.roster_r2_key) { try { roster = parseRoster(await ownedJson(pub, a, t.roster_r2_key)); } catch (e) { /* teammates only */ } }
         x.roster = fixRoster(roster, view);
       } catch (e) { x.root = null; x.err = e.message; }
       x.loading = false;
@@ -3055,120 +3041,8 @@ function renderProtests(rows, open, isOpen) {
 
 /* ---------- stats + export ---------- */
 
-// Blob routes return parsed JSON when stored as JSON (qbj, roster,
-// combined), a raw Response otherwise.
-async function fetchOwnedJson(a, key) {
-  const res = await pub(`${a}/file?key=${encodeURIComponent(key)}`);
-  return res instanceof Response ? JSON.parse(await res.text()) : res;
-}
-
-// The public copies of these games (worker.js adminGames), GAMES_BATCH to
-// a request: id -> its qbj half. One the Worker has no copy of, or a
-// batch that fails, is left out for the caller to read on its own.
-const GAMES_BATCH = 100;
-async function fetchGameCopies(a, files) {
-  const out = new Map();
-  for (let i = 0; i < files.length; i += GAMES_BATCH) {
-    const ids = files.slice(i, i + GAMES_BATCH).map((f) => f.id);
-    try {
-      const got = await pub(`${a}/games?ids=${ids.join(',')}`);
-      for (const g of (got && got.games) || []) {
-        if (g && g.qbj && typeof g.qbj === 'object') out.set(g.id, g.qbj);
-      }
-    } catch (e) { /* read one by one below */ }
-  }
-  return out;
-}
-
-// Every clean game file parsed, plus the roster: shared by Compute stats
-// and the schedule's fill-from-standings.
-// onFile(done, total) after each game file, for the caller's progress.
-// opts.cache keeps what was read across calls; opts.rank says only the
-// standings are wanted, so the games come from their public copies (the
-// qbj half, notes stripped) in a request or two rather than one stored
-// upload, packet text and all, per game. Those leave the zip's MODAQ
-// files out, so Compute stats reads the uploads themselves.
-async function collectMatches(a, t, buckets, files, onFile = () => {}, opts = {}) {
-  const { cache = null, rank = false } = opts;
-  const qbjFiles = files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error);
-  const errors = [];
-  let roster = null;
-  if (t.roster_r2_key) {
-    try { roster = parseRoster(await fetchOwnedJson(a, t.roster_r2_key)); }
-    catch (e) { errors.push('Roster: ' + e.message); }
-  }
-  const names = rosterNameMap(roster);
-  const matches = [];
-  const raw = [];   // qbj halves: the zip download + the served stats bundle
-  const games = []; // game halves of combined uploads, for the zip only
-  const modaqFiles = []; // MODAQ's own two files of each reader upload, for the zip
-  // the round is in the key: moving a game rewrites its file and copy
-  const keyOf = (f) => f.id + '|' + f.size + '|' + f.created + '|' + f.round;
-  const copies = rank ? await fetchGameCopies(a, qbjFiles.filter((f) => !(cache && cache.has(keyOf(f))))) : new Map();
-  // Each file is its own round trip to the Worker (a quarter second or
-  // more), so they're read FETCH_AT_ONCE at a time rather than one after
-  // another, then parsed in upload order so the output doesn't change.
-  // auto-fill keeps the games it has read: a pool finishing later
-  // fetches only its own
-  const got = await eachLimit(qbjFiles, FETCH_AT_ONCE, async (f) => {
-    const ck = keyOf(f);
-    const full = cache && cache.has(ck) ? cache.get(ck)
-      : copies.has(f.id) ? copies.get(f.id) : await fetchOwnedJson(a, f.r2_key);
-    if (cache) cache.set(ck, full);
-    return full;
-  }, onFile);
-  for (const [i, f] of qbjFiles.entries()) {
-    try {
-      // Combined reader uploads contribute only their qbj half downstream
-      // (the game half carries the full packet text; the TO's zip gets it
-      // as the separate MODAQ game file).
-      if (got[i].error) throw got[i].error;
-      const full = got[i].value;
-      // under the roster's current names, should a team or player be renamed
-      const payload = renameMatch(matchPayload(full), names);
-      const m = parseMatch(payload, { filename: f.filename });
-      const room = buckets.find((b) => b.id === f.bucket_id);
-      m.room = room ? room.room_name : '';
-      m.fileId = f.id;
-      // the name this game's .qbj carries in the QBJ bundle, which the
-      // .yft records the way YellowFruit notes an imported file
-      m.filename = f.filename.replace(/\.qbtd\.json$/i, '.qbj');
-      matches.push(m);
-      raw.push({
-        id: f.id, round: m.round, room: m.room, reader: f.kind === 'combined',
-        filename: m.filename,
-        text: JSON.stringify(payload),
-      });
-      if (f.kind === 'combined' && full.game && typeof full.game === 'object') {
-        // MODAQ's own two files for this game (engine/modaqfile.js), under
-        // the roster's current names
-        const exp = modaqExport(full, m.round, names);
-        // named by its own QBJ's teams, in MODAQ's order
-        let named = m.teams.map((tm) => tm.name);
-        try { named = JSON.parse(exp.qbj).match_teams.map((mt) => mt.team.name); } catch (e) { /* keep the parsed names */ }
-        const fileNames = modaqFilenames(m.round, named);
-        modaqFiles.push({ round: m.round, qbjName: fileNames.qbj, qbj: exp.qbj, gameName: fileNames.game, game: exp.game });
-        games.push({
-          round: m.round,
-          filename: f.filename.replace(/\.qbtd\.json$/i, '_Game.json'),
-          text: JSON.stringify(full.game),
-        });
-      }
-    } catch (e) {
-      errors.push(f.filename + ': ' + e.message);
-    }
-  }
-  return { roster, names, matches, raw, games, errors, modaqFiles };
-}
-
-// The tournament's game format: its regulation tossup count is where
-// overtime starts when the hub ranks teams (stats.js standings), as it is
-// on the public page.
-function gameFormat(t) {
-  let settings = {};
-  try { settings = JSON.parse(t.settings) || {}; } catch (e) { /* keep {} */ }
-  return effectiveFormat(settings);
-}
+// The games themselves are read by hubgames.js: collectMatches, shared by
+// Compute stats and the playoff fill below, and ownedJson for one file.
 
 /* ---------- playoff slots fill themselves ----------
    Once a pool's prelim games are all in — told from the upload list the
@@ -3215,9 +3089,9 @@ async function autoFillSlots(force = false) {
   const a = '/a/' + adminSecret;
   try {
     const opts = { cache: autoCache, rank: true };
-    const got = await collectMatches(a, t, buckets, prog.files, () => {}, opts);
+    const got = await collectMatches(pub, a, t, buckets, prog.files, () => {}, opts);
     if (!got.matches.length) return;
-    const saved = await fetchOwnedJson(a, `t/${t.id}/schedule.json`).catch(() => null);
+    const saved = await ownedJson(pub, a, `t/${t.id}/schedule.json`).catch(() => null);
     if (!saved || schedDirty) return;
     // the saved schedule says what is ready and which games that takes;
     // this tab's copy may be older (another tab's save)
@@ -3225,7 +3099,7 @@ async function autoFillSlots(force = false) {
     const read = new Set(got.matches.map((m) => m.fileId));
     const more = want.files.filter((f) => !read.has(f.id));
     if (more.length) {
-      got.matches.push(...(await collectMatches(a, t, buckets, more, () => {}, opts)).matches);
+      got.matches.push(...(await collectMatches(pub, a, t, buckets, more, () => {}, opts)).matches);
       if (schedDirty) return;
     }
     // a game that couldn't be read holds its pool: look again on the next refresh
@@ -3308,7 +3182,7 @@ async function computeStats(a, t, buckets, files, settings) {
   const run = busy($('calc'), { label: 'Computing stats', total: nGames, scope: $('calc').closest('.row') });
   let got;
   try {
-    got = await collectMatches(a, t, buckets, files, (done) => run.step(done), { cache: statsCache });
+    got = await collectMatches(pub, a, t, buckets, files, (done) => run.step(done), { cache: statsCache });
   } finally { run.end(); }
   lastStats = { a, t, buckets, files, settings, got };
   showStats(lastStats);
@@ -3439,13 +3313,13 @@ function showStats({ a, t, files, settings, got }) {
     // game files that went up separately from their .qbj (Add a game)
     for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
       try {
-        const text = JSON.stringify(await fetchOwnedJson(a, f.r2_key), null, 2);
+        const text = JSON.stringify(await ownedJson(pub, a, f.r2_key), null, 2);
         add(f.round, f.filename, renameModaqTexts({ qbj: null, game: text }, got.names).game);
       }
       catch (e) { /* bundle still useful without it */ }
     }
     if (t.roster_r2_key) {
-      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(rosterForExport(await fetchOwnedJson(a, t.roster_r2_key)), null, 2) }); }
+      try { entries.push({ name: 'roster.qbj', data: JSON.stringify(rosterForExport(await ownedJson(pub, a, t.roster_r2_key)), null, 2) }); }
       catch (e) { /* bundle still useful without it */ }
     }
     download(t.slug + '-qbj.zip', makeZip(entries), 'application/zip');
