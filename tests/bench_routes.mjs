@@ -189,6 +189,7 @@ const ROUTES = [
   ['moderator: room state', () => call(S)],
   ['moderator: schedule', () => call(S + '/schedule')],
   ['moderator: roster', () => call(S + '/roster')],
+  ['moderator: room load (/load: the four above in one)', () => call(S + '/load')],
   ['moderator: packet', () => call(S + '/packet?round=1&warm=1')],
   ['moderator: start game', () => call(S + '/start?round=' + ROUNDS, { method: 'POST' })],
   ['moderator: upload game (re-export)', () => reexport(Ts[0])],

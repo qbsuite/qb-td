@@ -3671,12 +3671,20 @@ async function roomPlace(env, b) {
 // and tiebreaker pool, each exactly as its own route gives it — status,
 // type and body — so the page reads them as if it had asked each one.
 // 10/17/2026: ~490 reader loads at four requests each before the packet.
-// The routes only read, so they run side by side.
+// The routes only read, so they run side by side. A part that throws
+// answers what the router's boundary would give its own route, and the
+// other three still go out.
 const ROOM_LOAD = [['', bucketState], ['/schedule', bucketSchedule], ['/roster', bucketRoster], ['/tiebreakers', bucketTiebreakers]];
+const loadPart = async (res) => ({ s: res.status, t: res.headers.get('Content-Type') || '', b: await res.text() });
 async function bucketLoad(env, secret, url) {
   const parts = await Promise.all(ROOM_LOAD.map(async ([sub, answer]) => {
-    const res = await answer(env, secret, url);
-    return JSON.stringify(sub) + ':' + JSON.stringify({ s: res.status, t: res.headers.get('Content-Type') || '', b: await res.text() });
+    let part;
+    try {
+      part = await loadPart(await answer(env, secret, url));
+    } catch (e) {
+      part = await loadPart(routeFailed(env, 'GET', '/b/' + secret + sub, e));
+    }
+    return JSON.stringify(sub) + ':' + JSON.stringify(part);
   }));
   return new Response('{' + parts.join(',') + '}', { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(env) } });
 }
@@ -6102,6 +6110,13 @@ async function route(request, env, ctx, url) {
 
 // A credential in a route's path, kept out of the logs.
 const CRED_PATH = /^\/([absi])\/[a-z0-9]{10,40}/;
+// What a route that threw answers: the error logged without the path's
+// credential, and a JSON 500 with CORS headers, which the page can read.
+// The router's boundary below, and each part of /b/:secret/load.
+function routeFailed(env, method, path, e) {
+  console.error('route failed:', method, path.replace(CRED_PATH, '/$1/…'), (e && e.stack) || e);
+  return err(env, 500, 'Something went wrong on the server. Please try again.');
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -6114,8 +6129,7 @@ export default {
       // unwrap, a corrupt blob) would otherwise reach the page as
       // Cloudflare's own 500, which has no CORS headers, so the page could
       // only report a network failure.
-      console.error('route failed:', request.method, url.pathname.replace(CRED_PATH, '/$1/…'), (e && e.stack) || e);
-      return err(env, 500, 'Something went wrong on the server. Please try again.');
+      return routeFailed(env, request.method, url.pathname, e);
     }
   },
 

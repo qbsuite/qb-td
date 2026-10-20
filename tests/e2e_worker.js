@@ -9,7 +9,7 @@ import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { buzzSettings, buzzToken } from '../app/js/buzzkey.js';
 import { parseMatch } from '../app/engine/qbj.js';
-import { WORKER_DIR, PERSIST, BASE, storedCred, testToken, d1row, d1exec, r2get, r2put, call, maxAge, tick, ok, summary } from './e2e_lib.js';
+import { WORKER_DIR, PERSIST, BASE, storedCred, testToken, d1row, d1exec, r2get, r2put, fetchRetry, call, maxAge, tick, ok, summary } from './e2e_lib.js';
 
 const MATCH = JSON.stringify({
   tossups_read: 20, _round: 1,
@@ -29,11 +29,11 @@ const MATCH = JSON.stringify({
 // of its four parts exactly as that part's own route does: status, type
 // and body, byte for byte — the page reads them as if it had asked each.
 async function roomLoadMatches(label, sec, q = '') {
-  const res = await fetch(`${BASE}/b/${sec}/load${q}`);
+  const res = await fetchRetry(`${BASE}/b/${sec}/load${q}`);
   const got = res.status === 200 ? await res.json() : null;
   const diffs = [];
   for (const sub of ['', '/schedule', '/roster', '/tiebreakers']) {
-    const one = await fetch(`${BASE}/b/${sec}${sub}${q}`);
+    const one = await fetchRetry(`${BASE}/b/${sec}${sub}${q}`);
     const want = { s: one.status, t: one.headers.get('content-type') || '', b: await one.text() };
     const have = got && got[sub];
     if (!have || have.s !== want.s || have.t !== want.t || have.b !== want.b) diffs.push({ sub, have, want });
@@ -1124,6 +1124,26 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   // tiebreakers are question text: ciphertext at rest like the packets
   ok('tiebreaker pool is ciphertext at rest',
     !r2get(`t/${tid}/tiebreakers.json`).includes('Mozart'));
+
+  // One part that throws (here a schedule blob that reads as null) answers
+  // in /load as its own route does under the router's boundary, a JSON 500
+  // the page can read, and the other three parts still come back whole.
+  {
+    const sched = r2get(`t/${tid}/schedule.json`);
+    r2put(`t/${tid}/schedule.json`, 'null');
+    const alone = await call('/b/' + secret + '/schedule');
+    ok('a schedule route that throws answers a JSON 500',
+      alone.status === 500 && alone.body.error === 'Something went wrong on the server. Please try again.' && Boolean(alone.cors),
+      [alone.status, alone.body, alone.cors]);
+    const load = await call('/b/' + secret + '/load');
+    ok('room load with one part throwing: 200, that part a 500, the other three whole',
+      load.status === 200 && load.body['/schedule'].s === 500
+      && ['', '/roster', '/tiebreakers'].every((sub) => load.body[sub].s === 200), [load.status, load.body]);
+    await roomLoadMatches('one part throwing', secret);
+    r2put(`t/${tid}/schedule.json`, sched);
+    const back = await call('/b/' + secret + '/schedule');
+    ok('the schedule route answers again once the blob is whole', back.status === 200, back.status);
+  }
 
   // a reader upload reports which pool questions its game read
   const q = JSON.parse(MATCH);
