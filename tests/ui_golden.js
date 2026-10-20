@@ -77,13 +77,17 @@ await c.S('Page.addScriptToEvaluateOnNewDocument', { source: `
 /* ---------- normalizing what a clock decides ---------- */
 
 const MONTH = '(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)';
+const literal = (s) => new RegExp(s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'g');
+// both local origins come out, so the golden holds on any port pair: the
+// hub's Live view shows the public link (the static server's own URL)
 function norm(html) {
   return String(html)
     .replace(new RegExp(MONTH + ' \\d{1,2}, \\d{1,2}:\\d{2}\\s?(?:AM|PM)', 'g'), '<when>')
     .replace(/\b\d{1,2}:\d{2}\s?(?:AM|PM)\b/g, '<time>')
     .replace(/\b\d+ (?:seconds?|minutes?|hours?|days?|min|h|s) ago\b/g, '<ago>')
     .replace(/blob:[^"' )]+/g, 'blob:<url>')
-    .replace(new RegExp(stub.url.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'g'), '<stub>')
+    .replace(literal(stub.url), '<stub>')
+    .replace(literal(st.url), '<pages>')
     .replace(/%3A%2F%2F127\.0\.0\.1%3A\d+/g, '<stub-enc>');
 }
 const hashed = (html) => ({ sha256: sha(norm(html)).slice(0, 24), chars: norm(html).length });

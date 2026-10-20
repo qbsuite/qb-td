@@ -3,8 +3,8 @@
   "hub demo": {
    "label": "as shipped",
    "live": {
-    "sha256": "df7c800f6393382792608216",
-    "chars": 10313
+    "sha256": "d035626f67ab492867bec105",
+    "chars": 10285
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -458,8 +458,8 @@
   "hub demo after uploads": {
    "label": "after uploads",
    "live": {
-    "sha256": "2ac18dc3e550d03cb4580c01",
-    "chars": 12478
+    "sha256": "a461029b08a77905ae3517b7",
+    "chars": 12450
    },
    "grid": [
     "1:1 umark Game in ✓",
