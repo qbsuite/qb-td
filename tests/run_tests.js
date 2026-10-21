@@ -2894,9 +2894,21 @@ test('archive captures carry the paths the public page reads', () => {
   for (const [slug, data] of captures) {
     assert.ok(data[`/pub/${slug}`], slug + ' has state');
     assert.ok(data[`/pub/${slug}/bundle`], slug + ' has a bundle');
-    // the buzzpoints tab needs packet text, which is never archived
-    assert.equal(data[`/pub/${slug}`].buzz, null, slug + ' has buzzpoints off');
-    assert.ok(!data[`/pub/${slug}/qpacket`], slug + ' must not carry packet text');
+    const st = data[`/pub/${slug}`];
+    assert.ok(!data[`/pub/${slug}/qpacket`], slug + ' must not carry packet text in the capture');
+    if (st.buzz_v !== 'open') {
+      // the buzzpoints tab needs packet text, archived only once its TD released it
+      assert.equal(st.buzz, null, slug + ' has buzzpoints off');
+      assert.ok(!data.__text, slug + ' lists no question text');
+      continue;
+    }
+    // released (no password): each finished round's packet is a file beside the capture
+    const listed = data.__text || {};
+    for (const n of (st.buzz_done || []).filter((r) => (st.packet_rounds || []).includes(r))) {
+      const file = listed[`/pub/${slug}/qpacket?round=${n}`];
+      assert.ok(file && file === `packets/${slug}/r${n}.json`, `${slug} lists round ${n}'s packet`);
+      assert.ok(existsSync(new URL(file, ARCHIVE_DIR)), `${slug} has ${file}`);
+    }
   }
 });
 
@@ -2916,6 +2928,8 @@ test('archive captures carry no question text', () => {
   // Same guard tools/archive.mjs applies before writing, re-run on what
   // actually got committed. `notes` is the one long free-text field a
   // match qbj legitimately has.
+  // (A released tournament's question text lives in its own files,
+  // app/archive/packets/<slug>/, never in the capture itself.)
   for (const [slug, data] of captures) {
     const long = [];
     (function walk(o, path) {
@@ -2944,6 +2958,8 @@ test('archive captures hold the games their state lists, with scoresheets off', 
   // scoresheets wait on buzz_done, which a capture empties: the switch
   // would never open on an archived page
   assert.match(captureProblems({ files: [], scoresheets: true }, bundle).join(), /scoresheets are on/);
+  // ...unless its TD released the questions, which the capture then keeps
+  assert.deepEqual(captureProblems({ files: [], scoresheets: true, buzz_v: 'open' }, bundle), []);
 });
 
 // The static stat report linked beside each archived page must be the

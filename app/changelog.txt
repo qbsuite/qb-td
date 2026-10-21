@@ -56,6 +56,8 @@ Release Notes for 10/19/2026
 
 [ ARCHIVE ]
 - Archived stat reports use each tournament's own tossup count and show standings by stage, matching the archived page.
+- Added ACF Fall @ UIUC and SF Fall 2026 to the archive.
+- An archived tournament whose TD released its questions keeps its buzzpoints and scoresheets.
 
 [ PERFORMANCE ]
 - Game downloads and public page updates use less server time.

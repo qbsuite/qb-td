@@ -1645,6 +1645,14 @@ committed ones, so a change to the report's code fails `npm test` until
 `node tools/archive.mjs rebuild` has been run and its output committed.
 `rebuild` reads nothing but the committed captures.
 
+A tournament whose TD released its questions (Disable password: the public
+page serves buzzpoints and scoresheets to anyone) keeps them in its archive.
+`add` saves each finished round's packet and the tiebreakers it read, as
+the public routes serve them, to `app/archive/packets/<slug>/`, and the
+capture lists those files under `__text`; the archived page fetches one
+only when a viewer opens buzzpoints or a scoresheet. Every other capture
+still carries no question text, which `npm test` checks.
+
 The gate is deliberately outside the Worker. An `archived` column plus an
 owner-only route would mean the first real account in a system whose whole
 auth model is link secrets; here the credential is the Cloudflare login

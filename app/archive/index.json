@@ -1,6 +1,24 @@
 {
   "tournaments": [
     {
+      "slug": "acf-fall-uiuc",
+      "name": "ACF Fall @ UIUC",
+      "date": "2026-10-17",
+      "host": "UIUC",
+      "teams": 22,
+      "rounds": 12,
+      "games": 113
+    },
+    {
+      "slug": "sf2026",
+      "name": "SF Fall 2026",
+      "date": "2026-10-17",
+      "host": "Santa Fe College",
+      "teams": 14,
+      "rounds": 10,
+      "games": 59
+    },
+    {
       "slug": "2026terrapinopenatusc",
       "name": "2026 Terrapin Open at USC",
       "date": "2026-10-03",

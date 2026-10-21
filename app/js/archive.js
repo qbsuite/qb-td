@@ -78,6 +78,18 @@ async function openTournament(entry) {
   // The slug came from the manifest, not from the query string, so the
   // import path below is ours rather than the visitor's.
   const { default: data } = await import(`../archive/${entry.slug}.js`);
+  // Released question text (tools/archive.mjs captureTexts) lives in its
+  // own files: each path resolves to a fetch of its file, on first use.
+  for (const [path, file] of Object.entries(data.__text || {})) {
+    let got = null;
+    Object.defineProperty(data, path, {
+      enumerable: true,
+      get: () => (got ||= fetch(`archive/${file}`).then((r) => {
+        if (!r.ok) throw new Error('not available in this archived copy');
+        return r.json();
+      }).catch((e) => { got = null; throw e; })),
+    });
+  }
   useFrozenData(data);
 
   // From here down it is the public page as it was on the day (minus
