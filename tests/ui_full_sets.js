@@ -1227,7 +1227,8 @@ await section('SET-15 the Versions table', async () => {
   ok('SET-15: one row per version, retired ones included', rows && rows.length === pk.length && rows.length === 14, rows && rows.map((r) => r.pv));
   const cur = rows.filter((r) => r.state === 'Current').map((r) => r.pv);
   ok('SET-15: the newest of each packet reads "Current" in green, the rest "Retired" and muted',
-    cur.join() === '1:4,2:2,3:5,4:1,5:1,6:1' && rows.every((r) => (r.state === 'Current') === (r.green && !r.muted)), rows.map((r) => [r.pv, r.state, r.muted]));
+    cur.join() === '1:4,2:2,3:5,4:1,5:1,6:1' && rows.every((r) => (r.state === 'Current') === (r.green && !r.muted)
+      && (r.state === 'Retired') === r.muted), rows.map((r) => [r.pv, r.state, r.muted]));
   const r11 = vrow(rows, '1:1');
   ok('SET-15: the file is a download link to that version', r11.file === 'Packet 1.json' && r11.dl
     && r11.href === `${BASE}/s/${A.secret}/file?packet=1&v=1`, r11);
@@ -1243,6 +1244,14 @@ await section('SET-15 the Versions table', async () => {
     && vrow(rows, '3:3').parse === `${warnCount} warnings` && vrow(rows, '3:3').parseRed && vrow(rows, '5:1').parse === 'Unreviewed',
   ['1:4', '3:3', '5:1'].map((x) => vrow(rows, x).parse));
   ok('SET-15: every row has a Review button', rows.every((r) => r.review));
+  // one warning is "1 warning", in the slot and in the Parse column
+  d1(`UPDATE set_packets SET warnings = 1 WHERE set_id = ${A.id} AND packet = 6 AND version = 1`);
+  await openSet(A.secret);
+  const one = { slot: ((await slotRows()).find((r) => r.n === 6) || {}).file, parse: vrow(await versionRows(), '6:1').parse };
+  d1(`UPDATE set_packets SET warnings = NULL WHERE set_id = ${A.id} AND packet = 6 AND version = 1`);
+  await openSet(A.secret);
+  ok('SET-12/SET-15: a version with one warning reads "(v1, 1 warning)" in its slot and "1 warning" under Parse',
+    one.slot === 'API6.json (v1, 1 warning)' && one.parse === '1 warning', one);
 });
 
 await section('SET-23/SET-24 parse warnings in the review', async () => {
@@ -1501,6 +1510,9 @@ await section('SET-40 the set\'s buzzpoints password (and SET-41: the lock survi
   await waitMsg(/^Buzzpoints on$/);
   st = await settingsOf(A.secret);
   ok('SET-40: On while a password is stored says "Buzzpoints on" and keeps it', st.buzz.mode === 'password' && st.buzz.hash === cred.hash, st.buzz);
+  const sorted = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]]));
+  ok('SET-40: … whole, with its stretching (salt and iterations) as it was, so the password still works',
+    sorted(st.buzz) === sorted({ ...cred, mode: 'password' }), [Object.keys(cred), Object.keys(st.buzz)]);
 });
 
 await section('SET-42 "Mirrors start with": the reader game format (and SET-41: the lock survives it)', async () => {
@@ -2003,9 +2015,12 @@ await section('Stats tab and s.html: the mirror\'s games; SET-37 hide from stats
   await waitJs(`document.querySelector('#sites').textContent === '1 site' && !!document.querySelector('#view .setout table')`, 'the public set page');
   ok('s.html: the public set page lists the mirror ("1 site")', (await text('#view .setout table')).includes('North mirror'), await text('#view'));
   await openSet(C.secret, 'mirrors');
+  d1(`UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ${north.tid}`);
   await clearMsg();
   await click('[data-hide]');
   await waitMsg(/^Set-wide stats update within a minute$/);
+  const queued = d1(`SELECT pub_dirty FROM tournaments WHERE id = ${north.tid}`)[0].pub_dirty;
+  ok('SET-37: hiding a mirror queues its own public pages for the cron (the set no longer makes its games public)', queued === 1, queued);
   await waitJs(`[...document.querySelectorAll('#setbody tr')].some((tr) => tr.textContent.includes('Hidden from stats'))`, 'the hidden row');
   const h = await mrow('North mirror');
   ok('SET-37: "Hide from stats" says "Set-wide stats update within a minute"; the row is muted with a "Hidden from stats" pill and "Show in stats"',
@@ -2035,20 +2050,36 @@ await section('Stats tab and s.html: the mirror\'s games; SET-37 hide from stats
 
 await section('SET-34 statuses: setup week, Finished; SET-41 what the lock does to a mirror', async () => {
   east = await startMirrorApi(C.secret, 'East mirror', 'sets-ui-east-' + RUN);
+  d1(`UPDATE tournaments SET published = 0 WHERE id = ${east.tid}`); // its director has not made its page public
   await openSet(C.secret, 'mirrors');
   let e = await mrow('East mirror');
   ok('SET-34: a mirror still in its setup week (not yet Started) reads "Running" too (observed)', e.pills[0][0] === 'Running', e);
+  ok('SET-34: a started mirror whose own page is off has its name and slug but no "Page" link',
+    e.link.startsWith(`East mirror ${east.slug}`) && e.page === null, e);
   d1(`UPDATE tournaments SET created = ${Date.now() - 9 * DAY}, started = ${Date.now() - 50 * 3600 * 1000} WHERE id = ${east.tid}`);
   await openSet(C.secret, 'mirrors');
   e = await mrow('East mirror');
   ok('SET-34: once its links have closed it reads "Finished" (not green)', e.pills[0][0] === 'Finished' && !e.pills[0][1], e);
   ok('SET-34: the tab label reads "Mirrors 2/4"', (await text('[data-settab="mirrors"]')) === 'Mirrors 2/4');
-  // the lock as the mirror's director sees it
+  const pks = await packetsOf(C.secret);
+  const live = pks.filter((p) => !p.retired).length;
+  ok('SET-34: with retired versions in the set, the note still counts only the current packets',
+    pks.some((p) => p.retired) && (await text('#setbody')).includes(`with these ${live} packets, the backup questions`),
+    [live, pks.length, (await text('#setbody')).match(/with (these \d+ packets|the set)/)]);
+  await toTab('packets');
+  const runningNote = await js(`[...document.querySelectorAll('#setbody div.muted')].find((x) => x.textContent.includes('Packets are the set')).querySelector('b').textContent`);
+  ok('SET-14: a finished mirror is not counted as running ("1 mirror is running now" with East finished)',
+    runningNote === '1 mirror is running now', runningNote);
+  // the lock as the mirror's director sees it; changing it queues the
+  // started mirrors' public state for the cron
+  const dirty = () => d1(`SELECT id, pub_dirty FROM tournaments WHERE id IN (${north.tid}, ${east.tid}) ORDER BY id`).map((r) => r.pub_dirty);
+  d1(`UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id IN (${north.tid}, ${east.tid})`);
   await toTab('settings');
   await clearMsg();
   await click('#mirrorbuzz');
   await waitMsg(/^Mirror buzzpoints are off$/);
   ok('SET-41: the mirror is told the set has buzzpoints off', (await api('/a/' + north.admin)).tournament.set.lock_buzz === true);
+  ok('SET-41: switching mirror buzzpoints off queues each started mirror\'s public state', dirty().every((n) => n === 1), dirty());
   await open('index.html', { a: north.admin });
   await waitJs(`!!document.querySelector('.hubtab')`, 'the mirror hub');
   await click('[data-view="setup"]');
@@ -2057,22 +2088,31 @@ await section('SET-34 statuses: setup week, Finished; SET-41 what the lock does 
   ok('SET-41: the mirror\'s hub disables its Buzzpoints switch and says the set\'s editors switched buzzpoints off',
     await js(`document.querySelector('#buzzmode').disabled`) && (await text('#view')).includes('have switched buzzpoints off for its mirrors'));
   await openSet(C.secret, 'settings');
+  d1(`UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id IN (${north.tid}, ${east.tid})`);
   await clearMsg();
   await click('#mirrorbuzz');
   await waitMsg(/^Mirrors may run their own buzzpoints$/);
   ok('SET-41: ticking it again says "Mirrors may run their own buzzpoints" and the mirror is free again',
     (await api('/a/' + north.admin)).tournament.set.lock_buzz === false);
+  ok('SET-41: … and queues each started mirror\'s public state again', dirty().every((n) => n === 1), dirty());
+  d1(`UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id IN (${north.tid}, ${east.tid})`);
+  await api('/s/' + C.secret, { method: 'POST', json: { settings: await settingsOf(C.secret) } });
+  ok('SET-41: a settings save that leaves the lock alone queues no mirror', dirty().every((n) => n === 0), dirty());
 });
 
 await section('SET-38 game files that cannot be read', async () => {
   const hand = north.files.find((f) => f.filename === 'Round_1_Gamma_Delta.qbj');
   r2del(hand.r2_key);
+  // a room's upload that is not a game file (kind "other") is no game file either
+  await api(`/b/${northRoom}/upload?round=1&name=${encodeURIComponent('Round 1 notes.txt')}`, { method: 'POST', body: 'scorekeeper notes' });
   await openSet(C.secret, 'mirrors');
   await clearMsg();
   const got = await download(() => click('[data-files]'), 'the game files');
   await waitMsg(/^\d+ files/);
+  const gotNames = (await readZip(new Uint8Array(got.bytes))).map((e) => e.name);
   ok('SET-38: a file that cannot be read is left out and counted: "2 files (1 could not be read)"',
-    (await msgText()) === '2 files (1 could not be read)' && (await readZip(new Uint8Array(got.bytes))).length === 2, await msgText());
+    (await msgText()) === '2 files (1 could not be read)' && gotNames.length === 2, await msgText());
+  ok('SET-38: a room upload that is not a game (a .txt) is not in the zip', !gotNames.some((n) => /notes/.test(n)), gotNames);
   for (const f of north.files.filter((x) => x.filename === 'Round_1_Alpha_Beta.qbtd.json')) r2del(f.r2_key);
   await clearMsg();
   await click('[data-files]');
