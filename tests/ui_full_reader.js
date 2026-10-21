@@ -1362,6 +1362,9 @@ await section('R42', 'Upload to qb-td', async () => {
     && files[0].filename === `Round_3_${a}_${b}.qbtd.json`, files);
   // R46: begun here, so it says how far it got
   ok('R46 progress: {at: 4, of: 20}', JSON.stringify(body.progress) === JSON.stringify({ at: 4, of: 20 }), body.progress);
+  // how far it got is kept with the game on this device, so a resumed game still knows
+  const reached = JSON.parse((await tab.storage())[`qbtdMeta:${G2.secret}:${G2.id}`] || '{}').reached;
+  ok('R46 the furthest question (4) is saved with the game on this device', reached === 4, reached);
   await openHub();
   const cell = `[data-cell="${M.rooms['Room 2'].id}:3"]`;
   ok('R46 the hub marks it in progress: "In progress: on question 4 of 20 at the last upload"',
@@ -2579,6 +2582,70 @@ await section('R45', 'upload errors', async () => {
   d1(`UPDATE tournaments SET created = created - ${8 * 24 * 3600 * 1000} WHERE id = ${N.id}`);
   await openRoom(tab, n1.secret, '', 'msg');
   ok('R04 never started, made over a week ago: "room closed"', (await tab.text('#msg')) === 'room closed' && (await red(tab, '#msg')), await tab.text('#msg'));
+});
+
+/* ---------------------------------------------------------------------- */
+/* pools that keep their own rounds; three teams on a bye; a packet that  */
+/* failed to load (Reader Pools)                                          */
+/* ---------------------------------------------------------------------- */
+
+await section('RP', 'pools with their own rounds, three byes, a packet load that failed', async () => {
+  const P = await tournament('Reader Pools');
+  for (const n of ['Pool Room 1', 'Pool Room 2', 'Pool Bye']) await P.room(n);
+  await P.roster(rosterOf([...TEAMS, 'Eta']));
+  for (const r of [1, 2]) await P.packet(r, `Q${r}.json`, packetOf(r));
+  const prooms = ['Pool Room 1', 'Pool Room 2'].map((n) => ({ name: n, bucket: P.rooms[n].id }));
+  const sv = await P.schedule({ v: 1, rooms: prooms, pools: { A: ['Alpha', 'Beta'], B: ['Gamma', 'Delta'] }, updated: 0, phases: [
+    { name: 'Prelims', rounds: [{ round: 1, games: [{ room: 0, a: { team: 'Alpha' }, b: { team: 'Beta' } }, { room: 1, a: { team: 'Gamma' }, b: { team: 'Delta' } }],
+      byes: [{ team: 'Epsilon' }, { team: 'Zeta' }, { team: 'Eta' }] }] },
+    { name: 'Playoffs', rounds: [{ round: 2, games: [{ room: 0, a: { label: 'A1' }, b: { label: 'B1' } }, { room: 1, a: { label: 'A2' }, b: { label: 'B2' } }], byes: [] }] },
+  ] });
+  ok('RP the schedule saves with brackets keeping their own rounds', sv.status === 200 && sv.body.brackets === true, sv.body);
+  await P.setSettings({ byeRoom: P.rooms['Pool Bye'].id });
+  await P.start();
+  await P.round(1);
+  const p1 = P.rooms['Pool Room 1'].secret;
+  const p2 = P.rooms['Pool Room 2'].secret;
+  // R09: the header names the room's bracket, with its colour
+  await openRoom(tab, p1);
+  ok('RP R09 the header: "<Room> · Round 1 · Pool A", the pool with its colour', (await tab.text('#room')) === 'Pool Room 1 · Round 1 · Pool A'
+    && (await tab.js(`!!document.querySelector('#room .bname i.lane-0')`)), await tab.text('#room'));
+  // R14: the matchup says which bracket it comes from
+  ok('RP R14 "From the schedule · Pool A · Round 1 in Pool Room 1", the pool with its colour', (await tab.text('#schedfrom')) === 'From the schedule · Pool A · Round 1 in Pool Room 1'
+    && (await tab.js(`!!document.querySelector('#schedfrom i.lane-0')`)) && (await tab.text('#mteama')) === 'Alpha' && (await tab.text('#mteamb')) === 'Beta',
+  await tab.text('#schedfrom'));
+  // R24: the panel splits under a heading per phase and bracket; playoff slots read "Pool A 1st"
+  const rows = await tab.js(`[...document.querySelectorAll('#schedrows tr')].map((r) => (r.classList.contains('bhrow') ? '# ' : '')
+    + [...r.cells].map((c) => c.textContent.trim()).join(' | ') + (r.classList.contains('now') ? ' (now)' : ''))`);
+  ok('RP R24 the schedule panel: "Prelims · Pool A", then "Playoffs · 1st–2nd place" with "Pool A 1st v Pool B 1st"', JSON.stringify(rows) === JSON.stringify(
+    ['# Prelims · Pool A', '1 | Alpha v Beta (now)', '# Playoffs · 1st–2nd place', '2 | Pool A 1st v Pool B 1st']), rows);
+  ok('RP R24 each heading carries its bracket\'s colour', JSON.stringify(await tab.js(`[...document.querySelectorAll('#schedrows tr.bhrow i')].map((i) => i.className)`))
+    === JSON.stringify(['lane-0', 'lane-0']));
+  await openRoom(tab, p2);
+  ok('RP R09 R14 the other pool: "Pool B" in the second colour', (await tab.text('#room')) === 'Pool Room 2 · Round 1 · Pool B'
+    && (await tab.text('#schedfrom')) === 'From the schedule · Pool B · Round 1 in Pool Room 2' && (await tab.js(`!!document.querySelector('#schedfrom i.lane-1')`)),
+  [await tab.text('#room'), await tab.text('#schedfrom')]);
+  // RB: three teams on a bye are listed, and the first two fill the pickers
+  await openRoom(tab, P.rooms['Pool Bye'].secret, '&test=bye');
+  ok('RP RB three teams on a bye: "On a bye in round 1: Epsilon, Zeta and Eta."', (await tab.shown('#byelist'))
+    && (await tab.text('#byelist')) === 'On a bye in round 1: Epsilon, Zeta and Eta.', await tab.text('#byelist'));
+  ok('RP RB and the first two are put in the pickers, not locked in', (await tab.shown('#teampickers')) && !(await tab.shown('#schedmatch'))
+    && (await tab.js(`document.querySelector('#teama').value + '/' + document.querySelector('#teamb').value`)) === 'Epsilon/Zeta');
+  // R26: a packet that failed to load is fetched again at the next Start
+  await tab.block(['*/packet*']);
+  try {
+    await openRoom(tab, p1);
+    await tab.click('#start');
+    await tab.waitJs(`document.querySelector('#msg').textContent.length > 0`, 'the packet failure', 8000);
+    ok('RP R26 a packet that will not load: a message in red, Start on again, nothing started', (await red(tab, '#msg'))
+      && !(await tab.js(`document.querySelector('#start').disabled || document.body.classList.contains('reading')`)), await tab.text('#msg'));
+  } finally { await tab.block([]); }
+  const m = tab.mark();
+  await tab.click('#start');
+  const opened = await until(() => tab.js(`document.body.classList.contains('reading') && !!document.querySelector('#modaq .ms-CommandBar')`), 'MODAQ', 15000)
+    .catch(() => false);
+  ok('RP R26 once it loads, Start again fetches it and the game opens', opened && tab.worker(m).includes('GET /b/:s/packet?round=1&warm=1')
+    && (await mq.tossup(tab)).startsWith('1. R1T1 '), { asked: tab.worker(m), msg: await tab.text('#msg') });
 });
 
 /* ---------------------------------------------------------------------- */
