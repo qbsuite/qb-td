@@ -147,8 +147,10 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 .ugrid tr.ugroup td .muted { margin-left: 8px; }
 .ugrid tr.uphase th { padding: 8px 0 2px; font-size: 12px; font-weight: 400; text-align: left; }
 .ugrid tr.uphase th span { display: block; margin: 0 2px; padding: 0 4px 2px; border-bottom: 2px solid var(--line); }
-/* the open cell's files, under its row */
-.ugrid tr.cellpanel td { border-top: none; padding: 4px 0 14px; text-align: left; }
+/* the open cell's files, floating over the grid under its row (placeCellPop) */
+.ugridbox { position: relative; }
+.cellpop { position: absolute; left: 0; z-index: 30; width: min(620px, 100%); }
+.cellpop .pop { box-shadow: 0 10px 32px rgba(0, 0, 0, 0.16); }
 .pop {
   border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--bg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 12px;
@@ -172,16 +174,16 @@ button.umark:hover { background: var(--hover-bg); border: none; }
 .fxtab.on { color: var(--fg); font-weight: 600; border-bottom-color: var(--link); }
 /* inside the uploads grid's own table, so its cell rules are undone here */
 table.fxteam { width: 100%; font-variant-numeric: tabular-nums; }
-.ugrid tr.cellpanel table.fxteam th, .ugrid tr.cellpanel table.fxteam td {
+.cellpanel table.fxteam th, .cellpanel table.fxteam td {
   width: auto; padding: 4px 8px; border-top: none; border-bottom: 1px solid var(--line);
   text-align: right; white-space: nowrap; vertical-align: middle; font-size: 14px; }
-.ugrid tr.cellpanel table.fxteam th { font-size: 12px; color: var(--muted); }
-.ugrid tr.cellpanel table.fxteam th:first-child, .ugrid tr.cellpanel table.fxteam td:first-child { text-align: left; padding-left: 0; }
-.ugrid tr.cellpanel table.fxteam th:first-child { color: var(--fg); font-size: 14px; text-transform: none; letter-spacing: 0; }
-.ugrid tr.cellpanel table.fxteam td:last-child, .ugrid tr.cellpanel table.fxteam th:last-child { width: 1%; padding-right: 0; }
+.cellpanel table.fxteam th { font-size: 12px; color: var(--muted); }
+.cellpanel table.fxteam th:first-child, .cellpanel table.fxteam td:first-child { text-align: left; padding-left: 0; }
+.cellpanel table.fxteam th:first-child { color: var(--fg); font-size: 14px; text-transform: none; letter-spacing: 0; }
+.cellpanel table.fxteam td:last-child, .cellpanel table.fxteam th:last-child { width: 1%; padding-right: 0; }
 .fxteam select { font-size: 13px; padding: 2px 6px; }
 .fxteam tr.chg td { background: var(--chg); }
-.ugrid tr.cellpanel table.fxteam tr.chg td:first-child { box-shadow: inset 3px 0 0 var(--chg-line); padding-left: 8px; }
+.cellpanel table.fxteam tr.chg td:first-child { box-shadow: inset 3px 0 0 var(--chg-line); padding-left: 8px; }
 .fixbuzz .was { color: var(--muted); text-decoration: line-through; font-size: 12px; margin-right: 4px; }
 .fxbuzzes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; font-variant-numeric: tabular-nums; }
 .fxbh { font-size: 12px; font-weight: 600; color: var(--muted); padding: 2px 0; }
@@ -705,3 +707,45 @@ body.aboutpage .wrap { max-width: 820px; }
 #setupsec .byesec { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
 #setupsec .byesec p { font-size: 13px; margin: 6px 0 0; }
 #setupsec .byelink strong { font-size: 16px; }
+
+/* Fix stats: Lineups, the moderator's Starters condensed */
+.lucards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 8px 0 14px; font-size: 13px; }
+.lucard { display: grid; gap: 6px; align-content: start; }
+.luhead { display: flex; justify-content: space-between; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.lustart { display: grid; }
+.lup {
+  display: flex; align-items: center; gap: 8px; text-align: left; font: inherit; color: var(--muted);
+  background: none; border: none; border-radius: 0; padding: 2px 0; cursor: pointer;
+}
+.lup:hover { color: var(--fg); border: none; }
+.lup .box {
+  width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--muted); flex: none;
+  display: grid; place-items: center; font-size: 10px; line-height: 1;
+}
+.lup.on { color: var(--fg); }
+.lup.on .box { background: var(--link); border-color: var(--link); color: var(--bg); }
+.lusubs { display: grid; gap: 2px; padding-top: 4px; border-top: 1px solid var(--line); }
+.lusub { display: flex; gap: 8px; align-items: baseline; }
+.lusub .muted { width: 28px; flex: none; font-variant-numeric: tabular-nums; }
+.lusub .xbtn { margin-left: auto; }
+.luaddwrap { position: relative; }
+/* the Add substitution form floats over the panel, so nothing below moves */
+.luadd {
+  position: absolute; z-index: 6; top: calc(100% + 4px); left: 0; width: max-content;
+  display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 8px 10px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.14);
+}
+.luadd select { font-size: 13px; padding: 2px 4px; max-width: 140px; }
+.lucards > .lucard:nth-child(2) .luadd { left: auto; right: 0; }
+
+/* a game's Download menu, beside Fix stats */
+.fdl { position: relative; }
+.fdl > summary { list-style: none; cursor: pointer; }
+.fdl > summary::-webkit-details-marker { display: none; }
+.fdlpanel {
+  position: absolute; z-index: 8; top: calc(100% + 4px); left: 0; display: grid; gap: 2px; min-width: 110px;
+  padding: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+.fdlpanel a, .fdlpanel button { padding: 3px 8px; border-radius: 5px; text-align: left; }
+.fdlpanel a:hover, .fdlpanel button:hover { background: var(--hover-bg); text-decoration: none; }
+.pprev { align-self: flex-start; }

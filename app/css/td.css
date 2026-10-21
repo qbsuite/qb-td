@@ -399,6 +399,66 @@ details.qd summary .pill { font-size: 11px; margin-left: 6px; }
 .rhelp { font-size: 13px; margin: 0 0 10px; }
 .playerline input:not([type="checkbox"]) { flex: 1; min-width: 160px; }
 /* Roster: the Track switches, and a UG / DII box per team and player */
+/* Roster editor: a sheet, one team a row */
+.rgridwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+table.rgrid { table-layout: fixed; width: 100%; font-size: 13px; background: var(--bg); }
+.rgrid col.rseed { width: 44px; }
+.rgrid col.rteam { width: 150px; }
+.rgrid col.radd, .rgrid col.rdel { width: 30px; }
+.rgrid th, .rgrid td { border: 1px solid var(--line); padding: 0; height: 28px; overflow: hidden; }
+.rgrid tr > :first-child { border-left: 0; }
+.rgrid tr > :last-child { border-right: 0; }
+.rgrid thead th { border-top: 0; }
+.rgrid tbody tr:last-child > * { border-bottom: 0; }
+.rgrid thead th {
+  font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 500;
+  color: var(--muted); background: var(--card); padding: 0 8px; white-space: nowrap;
+}
+.rgrid th.rseed { text-align: center; padding: 0 4px; font-size: 12px; font-weight: 500; color: var(--muted); background: var(--card); }
+.rgrid th.rseed[draggable] { cursor: grab; }
+.rgrid th.radd { text-align: center; }
+.rgrid .rdel { text-align: center; }
+.rgrid .rcell { display: flex; align-items: center; }
+.rgrid td input {
+  flex: 1 1 auto; width: 100%; min-width: 0; border: 0; border-radius: 0; background: transparent;
+  padding: 0 6px; height: 27px; font: inherit; color: inherit; text-overflow: ellipsis;
+}
+.rgrid td input:focus { outline: none; }
+.rgrid td.rteam input { font-weight: 600; }
+.rgrid td:focus-within { outline: 2px solid var(--link); outline-offset: -2px; }
+.rgrid td.rbad { outline: 2px solid var(--bad); outline-offset: -2px; }
+.rgrid td.rnamed { background: var(--chg); }
+.rgrid tr.rdrop th.rseed { box-shadow: inset 0 3px 0 var(--link); }
+.rgrid .rcx { display: inline-flex; gap: 2px; align-items: center; padding-right: 4px; flex: none; }
+.rgrid .rcx:empty { display: none; }
+.rgrid .rcx .ntag { margin-left: 0; }
+.rbtn { border: 0; background: none; padding: 0 3px; color: var(--link); font-size: 14px; line-height: 1; cursor: pointer; }
+.rtag {
+  border: 1px dashed var(--line); background: none; border-radius: 5px; padding: 0 5px;
+  font-size: 10px; font-weight: 700; line-height: 1.45; color: var(--muted); cursor: pointer; display: none; padding: 0 3px;
+}
+.rgrid td:hover .rtag, .rgrid td:focus-within .rtag, .rtag.on { display: inline-block; }
+.rtag.on.ug { border: 1px solid transparent; color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, var(--bg)); }
+.rtag.on.d2 { border: 1px solid transparent; color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, var(--bg)); }
+#rosteredit { position: relative; }
+.rgrid .rpen { display: none; color: var(--muted); }
+.rgrid .rpen:hover { color: var(--link); }
+.rgrid td:hover .rpen, .rgrid td:focus-within .rpen { display: inline-block; }
+.rgrid td input[readonly] { cursor: default; }
+.rpop {
+  position: absolute; z-index: 5; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.14); display: grid; gap: 6px; font-size: 13px;
+}
+.rpop input { width: 180px; }
+.rpophead { color: var(--muted); }
+.rpophead b { color: var(--fg); }
+/* Roster: Paste from sheet */
+.pastecard { margin-top: 8px; display: grid; gap: 8px; }
+.pastecard textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.pastetable { overflow-x: auto; }
+.pastetable td { font-size: 14px; }
+.pastebad { outline: 2px solid var(--bad); outline-offset: -2px; border-radius: 3px; }
+span.pastebad { outline-offset: 1px; }
 .rtrack { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 10px; font-size: 14px; }
 .rmark { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .rmark input, .rtrack input { margin: 0; padding: 0; width: 15px; height: 15px; accent-color: var(--link); }

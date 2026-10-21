@@ -303,3 +303,137 @@ export function applyBuzzFix(root, fix) {
   if (modaqGame) out.modaq.game = JSON.stringify(modaqGame, null, 2);
   return result;
 }
+
+/* ---------- lineups: who was in, from which question ----------
+   A team's lineups are [{from, players}]: from the first question (1)
+   on, each entry the players in from question `from` until the next one,
+   as MODAQ's qbj records them (match_teams[].lineups, first_question).
+   Changing them rewrites the qbj's lineups and each player's
+   tossups_heard (MODAQ counts a player on each question their lineup
+   holds them), and MODAQ's games: who started (isStarter) and, at each
+   change, the team's joins and leaves on that question's cycle, the
+   events MODAQ itself makes when it reads lineups back from a qbj. */
+
+const lineupsOf = (mt) => (pick(mt, 'lineups') || [])
+  .filter((l) => l && Number.isFinite(Number(pick(l, 'first_question', 'firstQuestion'))))
+  .map((l) => ({ from: Number(pick(l, 'first_question', 'firstQuestion')), players: (pick(l, 'players') || []).map(asName).filter(Boolean) }));
+
+/** What the lineup panel shows: the number of questions, and each team's
+    players in the game and lineups (none recorded: all its players from
+    question 1). */
+export function lineupView(root) {
+  const m = matchOf(root);
+  if (!m) throw new Error('No match in this file');
+  return {
+    questions: questionsOf(m).length,
+    teams: teamsOf(m).map((mt) => {
+      const players = namesOf(mt);
+      const lineups = lineupsOf(mt);
+      return { name: asName(pick(mt, 'team')), players, lineups: lineups.length ? lineups : [{ from: 1, players }] };
+    }),
+  };
+}
+
+// the lineups, checked and tidied: in order from question 1, each a
+// change from the one before, players once each
+function lineupPlan(m, team, segs) {
+  const mt = teamNamed(m, team);
+  if (!mt) throw new Error(`${team} is not in this game`);
+  const n = questionsOf(m).length;
+  const others = new Set(teamsOf(m).filter((x) => x !== mt).flatMap(namesOf));
+  const out = [];
+  for (const s of segs || []) {
+    const from = Number(s.from);
+    const players = [...new Set((s.players || []).map((p) => String(p || '').trim()).filter(Boolean))];
+    if (!Number.isInteger(from) || from < 1 || from > Math.max(n, 1)) throw new Error(`${team}: question ${s.from} is not in this game`);
+    for (const p of players) if (others.has(p)) throw new Error(`${p} plays for the other team`);
+    if (out.length && from <= out[out.length - 1].from) throw new Error(`${team}: two changes on question ${from}`);
+    const prev = out[out.length - 1];
+    if (prev && prev.players.length === players.length && prev.players.every((p) => players.includes(p))) continue;
+    out.push({ from, players });
+  }
+  if (!out.length || out[0].from !== 1) throw new Error(`${team}: the lineup has to start on question 1`);
+  return out;
+}
+
+const inAt = (segs, q) => { let at = segs[0]; for (const s of segs) if (s.from <= q) at = s; return at.players; };
+
+function lineupsQbj(m, team, segs) {
+  const mt = teamNamed(m, team);
+  const key = mt.matchPlayers && !mt.match_players ? 'matchPlayers' : 'match_players';
+  const mps = mt[key] || (mt[key] = []);
+  const have = new Set(namesOf(mt));
+  const tp = mt.team && typeof mt.team === 'object' && Array.isArray(mt.team.players) ? mt.team.players : null;
+  for (const name of segs.flatMap((s) => s.players)) {
+    if (have.has(name)) continue;
+    have.add(name);
+    // a roster player the moderator never entered, as MODAQ lists a player
+    const player = { name };
+    mps.push({ player, answer_counts: [], tossups_heard: 0 });
+    if (tp && !tp.some((p) => asName(p) === name)) tp.push(player);
+  }
+  mt.lineups = segs.map((s) => ({ first_question: s.from, players: s.players.map((name) => ({ name })) }));
+  const n = questionsOf(m).length;
+  for (const mp of mps) {
+    const name = asName(pick(mp, 'player'));
+    let heard = 0;
+    for (let q = 1; q <= n; q++) if (inAt(segs, q).includes(name)) heard++;
+    if ('tossupsHeard' in mp && !('tossups_heard' in mp)) mp.tossupsHeard = heard; else mp.tossups_heard = heard;
+  }
+}
+
+const CHANGES = ['playerJoins', 'playerLeaves', 'subs'];
+const eventTeam = (e) => ((e && (e.inPlayer || e.outPlayer)) || {}).teamName;
+
+function lineupsGame(g, team, segs) {
+  const starters = new Set(segs[0].players);
+  const players = Array.isArray(g.players) ? g.players : (g.players = []);
+  for (const name of new Set(segs.flatMap((s) => s.players))) {
+    if (!players.some((p) => p && p.teamName === team && p.name === name)) players.push({ name, teamName: team, isStarter: false });
+  }
+  for (const p of gamePlayers(g)) if (p.teamName === team) p.isStarter = starters.has(p.name);
+  const cycles = list(g.cycles);
+  for (const c of cycles) {
+    if (!c) continue;
+    for (const k of CHANGES) {
+      if (!Array.isArray(c[k])) continue;
+      c[k] = c[k].filter((e) => eventTeam(e) !== team);
+      if (!c[k].length) delete c[k];
+    }
+  }
+  const who = (name) => ({ name, teamName: team, isStarter: starters.has(name) });
+  for (let i = 1; i < segs.length; i++) {
+    const c = cycles[segs[i].from - 1];
+    if (!c) throw new Error(`The saved MODAQ game has no question ${segs[i].from}`);
+    const before = segs[i - 1].players;
+    const now = segs[i].players;
+    const leaves = before.filter((p) => !now.includes(p)).map((p) => ({ outPlayer: who(p) }));
+    const joins = now.filter((p) => !before.includes(p)).map((p) => ({ inPlayer: who(p), isInactive: false }));
+    if (leaves.length) c.playerLeaves = [...(c.playerLeaves || []), ...leaves];
+    if (joins.length) c.playerJoins = [...(c.playerJoins || []), ...joins];
+  }
+}
+
+/** The upload with new lineups for some teams ({team: [{from, players}]}),
+    as a new object (root is untouched). Throws, with a message for the
+    TD, on lineups the file can't take. */
+export function applyLineupFix(root, lineups) {
+  const out = clone(root);
+  const m = matchOf(out);
+  if (!m) throw new Error('No match in this file');
+  const plans = Object.entries(lineups || {}).map(([team, segs]) => [team, lineupPlan(m, team, segs)]);
+  const modaqQbj = out.modaq && typeof out.modaq.qbj === 'string' ? JSON.parse(out.modaq.qbj) : null;
+  const mq = modaqQbj && matchOf(modaqQbj);
+  const games = [];
+  if (out.game && typeof out.game === 'object') games.push(gameOf(out.game));
+  const modaqGame = out.modaq && typeof out.modaq.game === 'string' ? JSON.parse(out.modaq.game) : null;
+  if (modaqGame) games.push(modaqGame);
+  for (const [team, segs] of plans) {
+    lineupsQbj(m, team, segs);
+    if (mq) lineupsQbj(mq, team, segs);
+    for (const g of games) lineupsGame(g, team, segs);
+  }
+  if (mq) out.modaq.qbj = JSON.stringify(modaqQbj, null, 2);
+  if (modaqGame) out.modaq.game = JSON.stringify(modaqGame, null, 2);
+  return out;
+}

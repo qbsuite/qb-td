@@ -33,13 +33,14 @@ import { standings, dedupeMatches } from '../engine/stats.js';
 import '../engine/yft.js';
 import '../engine/yft3.js';
 import '../engine/report.js';
-import '../engine/zip.js';
+import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
+import { parseRosterPaste, pasteProblems, pasteGrid } from '../engine/rosterpaste.js';
 import { renderPacketsUi, stagedBlob, endSentence, tbSplitNote } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import '../engine/modaqfile.js'; // asked for as early as before (see above)
-import { applyBuzzFix, buzzFixView, lineupGaps } from '../engine/buzzfix.js';
+import { applyBuzzFix, buzzFixView, lineupGaps, lineupView, applyLineupFix } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
 import { fillProgress, autoFillSaved, filledNote, heldLevel } from '../engine/finals.js';
@@ -317,6 +318,9 @@ let rosterTrack = { trackUG: false, trackDiv2: false };
 // parsed upload awaiting confirmation; renames and etag: what it renames
 // against the saved roster, and that copy's etag (renderUpPreview)
 let rosterUpload = null;
+// Paste from sheet: { text, layout, teams } while its card is open
+// (renderPasteBox)
+let rosterPaste = null;
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
@@ -1145,8 +1149,11 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
 
 /* ---------- Roster: structured editor, seed order ---------- */
 
-function rosterProblems() {
+// What stops the roster saving, each with the editor cell it's about
+// (t<team> or p<team>.<player>), which the grid outlines.
+function rosterProblemCells() {
   const problems = [];
+  const at = (key) => (msg) => problems.push({ key, msg });
   const seen = new Set();
   // a name another team had: its games would move to whoever takes it
   const earlier = new Map();
@@ -1154,16 +1161,17 @@ function rosterProblems() {
     for (const n of [...formerTeamNames(tm), ...(tm.was && tm.was !== tm.name.trim() ? [tm.was] : [])]) earlier.set(n, tm);
   });
   (rosterTeams || []).forEach((tm, i) => {
+    if (rosterBlankRow(tm)) return; // an empty row of the grid: not a team
     const name = tm.name.trim();
-    if (!name) problems.push('Team ' + (i + 1) + ' has no name');
-    else if (seen.has(name)) problems.push('Duplicate team: ' + name);
+    if (!name) at('t' + i)('Team ' + (i + 1) + ' has no name');
+    else if (seen.has(name)) at('t' + i)('Duplicate team: ' + name);
     seen.add(name);
     const other = earlier.get(name);
     if (name && other && other !== tm) {
-      problems.push(`${name} was the name of ${other.name.trim() || 'another team'}. Please choose another name, so its games stay with it`);
+      at('t' + i)(`${name} was the name of ${other.name.trim() || 'another team'}. Please choose another name, so its games stay with it`);
     }
     if (!tm.players.some((p) => p.trim())) {
-      problems.push((name || 'Team ' + (i + 1)) + ' has no players');
+      at('p' + i + '.0')((name || 'Team ' + (i + 1)) + ' has no players');
     }
     const pseen = new Set();
     const pEarlier = new Map();
@@ -1174,16 +1182,17 @@ function rosterProblems() {
     tm.players.forEach((p, pi) => {
       const pn = p.trim();
       if (!pn) return;
-      if (pseen.has(pn)) problems.push(`Duplicate player on ${name || 'Team ' + (i + 1)}: ${pn}`);
+      if (pseen.has(pn)) at(`p${i}.${pi}`)(`Duplicate player on ${name || 'Team ' + (i + 1)}: ${pn}`);
       pseen.add(pn);
-      const at = pEarlier.get(pn);
-      if (at !== undefined && at !== pi) {
-        problems.push(`${pn} was the name of ${tm.players[at].trim() || 'another player'} on ${name || 'Team ' + (i + 1)}. Please choose another name, so their games stay with them`);
+      const was = pEarlier.get(pn);
+      if (was !== undefined && was !== pi) {
+        at(`p${i}.${pi}`)(`${pn} was the name of ${tm.players[was].trim() || 'another player'} on ${name || 'Team ' + (i + 1)}. Please choose another name, so their games stay with them`);
       }
     });
   });
   return problems;
 }
+const rosterProblems = () => rosterProblemCells().map((x) => x.msg);
 // the names a team or a player had before the saved roster's
 const formerTeamNames = (tm) => tm.formerNames || [];
 const formerPlayerNames = (tm, pi) => (tm.orig[pi] && (tm.formerPlayers || {})[tm.orig[pi]]) || [];
@@ -1227,29 +1236,6 @@ function teamTagsHtml(tm) {
   const m = teamMarks(names, marks, rosterTrack);
   return (m.ug ? '<span class="ntag" title="Every player is UG or DII, and not all are DII">UG</span>' : '')
     + (m.d2 ? '<span class="ntag d2" title="Every player is DII">DII</span>' : '');
-}
-// Under a team or player: a rename since the roster was saved (with Undo,
-// and for a player the choice of a new player instead), or the names it
-// had before, whose games count under its name.
-function teamNote(tm, ti) {
-  const now = tm.name.trim();
-  if (tm.was && now && now !== tm.was) {
-    return `<span>Renamed from <b>${esc(tm.was)}</b>. Its games already played will count under the new name.</span>
-      <button class="linkbtn" data-tundo="${ti}">Undo</button>`;
-  }
-  const f = formerTeamNames(tm).filter((n) => n !== now);
-  return f.length ? `<span class="muted">Formerly ${f.map(esc).join(', ')}</span>` : '';
-}
-function playerNote(tm, ti, pi) {
-  const now = tm.players[pi].trim();
-  const o = tm.orig[pi];
-  if (o && now && now !== o) {
-    return `<span>Renamed from <b>${esc(o)}</b>. Their games already played will count under the new name.</span>
-      <button class="linkbtn" data-pundo="${ti}.${pi}">Undo</button>
-      <button class="linkbtn" data-pnew="${ti}.${pi}">Add ${esc(now)} as a new player instead</button>`;
-  }
-  const f = formerPlayerNames(tm, pi).filter((n) => n !== now);
-  return f.length ? `<span class="muted">Formerly ${f.map(esc).join(', ')}</span>` : '';
 }
 // parseRoster's teams as the editor holds them, and the switches they set
 function editRoster(parsed) {
@@ -1314,6 +1300,7 @@ function renderRosterSec(a, t) {
       <span class="spacer" style="flex:1"></span>
       <button id="pickroster">Upload roster QBJ</button>
       <input id="rfile" type="file" accept=".qbj,.json" hidden>
+      <button id="pasteroster">Paste from sheet</button>
       <button id="editroster">${t.roster_name ? 'Edit roster' : 'Create roster'}</button>
     </div>
     ${DEBUG ? `<div class="row debugrow">
@@ -1323,6 +1310,7 @@ function renderRosterSec(a, t) {
       <label class="row" style="gap:6px"><input type="checkbox" id="dbgtricky"> tricky names</label>
       <button id="dbgroster" class="small">Load</button>
     </div>` : ''}
+    <div id="pastebox"></div>
     <div id="upreview"></div>
     <div id="rosteredit" style="margin-top:12px"></div>`;
   if (DEBUG) {
@@ -1334,6 +1322,10 @@ function renderRosterSec(a, t) {
     };
   }
   $('pickroster').onclick = () => $('rfile').click();
+  $('pasteroster').onclick = () => {
+    rosterPaste = rosterPaste ? null : { text: '', layout: 'rows', teams: [] };
+    renderPasteBox(a, t);
+  };
   $('rfile').onchange = async () => {
     const f = $('rfile').files[0];
     if (!f) return;
@@ -1366,8 +1358,116 @@ function renderRosterSec(a, t) {
     }
     renderRosterEditor(a, t);
   };
+  renderPasteBox(a, t);
   renderUpPreview(a);
   renderRosterEditor(a, t);
+}
+
+const PASTE_LAYOUTS = [['rows', 'Teams in rows'], ['cols', 'Teams in columns'], ['pairs', 'Team and player columns']];
+
+// Paste from sheet: a box for copied cells, then the teams as read, which
+// save as an uploaded roster does (saveUpload: renames matched by players
+// and followed into the schedule) or open in the editor. What would stop
+// the save is outlined in red, with the reason as the cell's tooltip.
+function renderPasteBox(a, t) {
+  const box = $('pastebox');
+  if (!box) return;
+  const p = rosterPaste;
+  if (!p) { box.innerHTML = ''; return; }
+  if (!p.teams.length) {
+    box.innerHTML = `
+      <div class="card pastecard">
+        <div class="row"><b>Paste from sheet</b><span class="spacer" style="flex:1"></span>
+          <button id="pastecancel" class="small">Cancel</button></div>
+        <textarea id="pastetext" rows="4" aria-label="Copied cells"></textarea>
+      </div>`;
+    const ta = $('pastetext');
+    ta.value = p.text;
+    ta.oninput = () => {
+      p.text = ta.value;
+      p.teams = parseRosterPaste(p.text, p.layout).teams;
+      if (p.teams.length) renderPasteBox(a, t);
+    };
+    ta.focus();
+    $('pastecancel').onclick = () => { rosterPaste = null; renderPasteBox(a, t); };
+    return;
+  }
+  const read = parseRosterPaste(p.text, p.layout);
+  p.teams = read.teams;
+  const probs = pasteProblems(p.teams);
+  const blocked = probs.some((x) => x.name || x.players || x.dupPlayers.size);
+  const flag = (on, why) => (on ? ` class="pastebad" title="${esc(why)}"` : '');
+  box.innerHTML = `
+    <div class="card pastecard">
+      <div class="row">
+        <b>Paste from sheet</b>
+        <span class="spacer" style="flex:1"></span>
+        <select id="pastelayout" aria-label="Layout">${PASTE_LAYOUTS.map(([k, label]) =>
+          `<option value="${k}" ${k === read.layout ? 'selected' : ''}>${label}</option>`).join('')}</select>
+      </div>
+      <div class="pastetable"><table>
+        <thead><tr><th>Team</th><th>Players</th></tr></thead>
+        <tbody>${p.teams.map((tm, i) => `<tr>
+          <td${flag(probs[i].name, tm.name ? 'Listed twice' : 'No team name')}><b>${esc(tm.name)}</b></td>
+          <td${flag(probs[i].players, 'No players')}>${tm.players.map((pl) => probs[i].dupPlayers.has(pl)
+            ? `<span class="pastebad" title="Listed twice">${esc(pl)}</span>` : esc(pl)).join(', ')}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <div class="row">
+        <span class="spacer" style="flex:1"></span>
+        <button id="pasteedit">Edit first</button>
+        <button id="pastesave" class="primary" ${blocked ? 'disabled' : ''}>Save</button>
+        <button id="pastecancel">Cancel</button>
+      </div>
+    </div>`;
+  $('pastelayout').onchange = () => { p.layout = $('pastelayout').value; renderPasteBox(a, t); };
+  $('pastecancel').onclick = () => { rosterPaste = null; renderPasteBox(a, t); };
+  $('pastesave').onclick = async () => {
+    if (blocked) return;
+    // the upload's own save, so a paste over a saved roster carries its
+    // renames and former names exactly as an uploaded QBJ does
+    const u = { filename: 'roster.qbj', teams: p.teams.map((tm) => ({ name: tm.name, players: [...tm.players] })),
+      onSaved: () => { if (rosterPaste === p) rosterPaste = null; } };
+    const run = busy($('pastesave'), { label: 'Saving' });
+    rosterUpload = u;
+    await saveUpload(a, u);
+    if (rosterUpload === u) rosterUpload = null; // not saved: the paste stays open
+    run.end();
+  };
+  $('pasteedit').onclick = async () => {
+    const teams = p.teams.map((tm) => ({ name: tm.name, players: [...new Set(tm.players)] }));
+    // against the saved roster, the editor shows what the paste renames
+    // and its save carries the former names
+    let saved = null;
+    let etag = null;
+    if (t.roster_r2_key) {
+      try {
+        const got = await readTagged(a, t.roster_r2_key);
+        saved = parseRoster(got.json);
+        etag = got.etag;
+      } catch (e) { /* unparseable: as a new roster */ }
+    }
+    const renames = saved ? rosterRenames(saved, teams) : {};
+    const back = Object.fromEntries(Object.entries(renames).map(([o, n]) => [n, o]));
+    const byName = new Map((saved || []).map((tm) => [tm.name, tm]));
+    rosterTrack = saved ? rosterTracking(saved) : { trackUG: false, trackDiv2: false };
+    rosterSaved = saved;
+    rosterEtag = etag;
+    rosterTeams = teams.map((tm) => {
+      const was = back[tm.name] || (byName.has(tm.name) ? tm.name : null);
+      const old = was ? byName.get(was) : null;
+      return {
+        name: tm.name, players: [...tm.players], was,
+        flags: tm.players.map((pl) => ({ ...((old && old.marks || {})[pl] || {}) })),
+        orig: tm.players.map((pl) => (old && old.players.includes(pl) ? pl : '')),
+        formerNames: old ? old.formerNames : undefined, formerPlayers: old ? old.formerPlayers : undefined,
+      };
+    });
+    rosterOpen = true;
+    rosterPaste = null;
+    renderPasteBox(a, t);
+    renderRosterEditor(a, t);
+  };
 }
 
 // What an uploaded roster renames, against the saved one ({} if none),
@@ -1471,202 +1571,327 @@ async function saveUpload(a, u) {
     // …and has the new names at once, so a schedule generated before
     // that refetch lands is built from this roster, not the last one
     schedTeams = u.teams.map((tm) => tm.name);
+    if (u.onSaved) u.onSaved();
     say(await savedNote(a, t, renames));
     showDetail();
   } catch (e) { say('Roster: ' + e.message, true); }
 }
 
-function renderRosterEditor(a, t) {
+// The roster editor: a sheet, one team a row in seed order and its
+// players across. Typing changes the working copy and refreshes the cells'
+// marks in place (a re-render would take the focus, and the input's own
+// undo with it); a new team or player column, a paste, a move or a click
+// on a cell's button re-renders and puts the focus back (`focus`: the
+// cell, as {r, c}, c -1 for the team name).
+// the grid's widths (td.css .rgrid col): seed, team, +, × and each player
+// column; five player columns fit the Setup pane, more scroll sideways
+const RGRID_FIXED = 44 + 150 + 30 + 30;
+const RGRID_PLAYER = 110;
+const rosterBlankRow = (tm) => !tm.name.trim() && !tm.players.some((p) => p.trim());
+const newRosterRow = () => ({ name: '', players: [], flags: [], orig: [] });
+// After Start a saved name can't be typed over: ✎ opens its Rename box, so
+// changing it is plainly a rename that its games follow. Before Start there
+// are no games to follow a name, and the grid is a plain sheet.
+let rosterLive = false;
+// the name a cell had in the saved roster ('' for one added here)
+const savedNameAt = (tm, c) => (!tm ? '' : c < 0 ? (tm.was || '') : (tm.orig[c] || ''));
+const nameAt = (tm, c) => (!tm ? '' : c < 0 ? tm.name : (tm.players[c] || ''));
+function setRosterPlayer(tm, ci, v) {
+  while (tm.players.length <= ci) { tm.players.push(''); tm.flags.push({}); tm.orig.push(''); }
+  tm.players[ci] = v;
+}
+function renderRosterEditor(a, t, focus = null) {
   const box = $('rosteredit');
   if (!box) return;
   if (!rosterOpen || rosterTeams === null) { box.innerHTML = ''; return; }
-  const nPlayers = rosterTeams.reduce((n, tm) => n + tm.players.filter((p) => p.trim()).length, 0);
-  const problems = rosterProblems();
-  // a UG and a DII box for a player (data-pmark), each only while the
-  // roster tracks that mark
-  const markBoxes = (at, m) => {
-    const one = (k, label, on) => `<label class="rmark"><input type="checkbox" data-pmark="${at}.${k}" ${on ? 'checked' : ''}>${label}</label>`;
-    const boxes = (rosterTrack.trackUG ? one('ug', 'UG', m.ug) : '') + (rosterTrack.trackDiv2 ? one('d2', 'DII', m.d2) : '');
-    return boxes ? `<span class="rmarks">${boxes}</span>` : '';
-  };
-  // teams are not marked by hand; say how they come to be
+  rosterLive = !!t.started;
+  const ncols = Math.max(5, ...rosterTeams.map((tm) => tm.players.length));
+  const nrows = rosterTeams.length;
+  // teams are not marked by hand: how they come to be, on hover
   const teamRule = rosterTrack.trackUG && rosterTrack.trackDiv2
-    ? 'A team is DII when every player is DII. Otherwise it is UG when every player is UG or DII.'
-    : rosterTrack.trackUG ? 'A team is UG when every player is UG.'
-      : rosterTrack.trackDiv2 ? 'A team is DII when every player is DII.' : '';
+    ? 'A team is DII when all its players are DII. Otherwise it is UG when all are UG or DII.'
+    : rosterTrack.trackUG ? 'A team is UG when all its players are UG.'
+      : rosterTrack.trackDiv2 ? 'A team is DII when all its players are DII.' : '';
+  const locked = (tm, c) => rosterLive && !!savedNameAt(tm, c);
+  const cell = (r, c) => {
+    const tm = rosterTeams[r];
+    const v = nameAt(tm, c);
+    const key = c < 0 ? `t${r}` : `p${r}.${c}`;
+    return `<td data-cell="${key}" class="${c < 0 ? 'rteam' : ''}${savedNameAt(tm, c) ? ' rsaved' : ''}"><div class="rcell">
+      <input data-r="${r}" data-c="${c}" value="${esc(v)}" autocomplete="off" spellcheck="false" ${locked(tm, c) ? 'readonly' : ''}
+        aria-label="${c < 0 ? `Team ${r + 1}` : `Team ${r + 1} player ${c + 1}`}">
+      <span class="rcx"></span></div></td>`;
+  };
   box.innerHTML = `
     <div class="rtrack">
-      <label><input type="checkbox" id="trackug" ${rosterTrack.trackUG ? 'checked' : ''}>Track Undergrad</label>
-      <label><input type="checkbox" id="trackd2" ${rosterTrack.trackDiv2 ? 'checked' : ''}>Track Division II</label>
-      <span class="muted">${teamRule}</span>
+      <label title="${esc(teamRule)}"><input type="checkbox" id="trackug" ${rosterTrack.trackUG ? 'checked' : ''}>Track Undergrad</label>
+      <label title="${esc(teamRule)}"><input type="checkbox" id="trackd2" ${rosterTrack.trackDiv2 ? 'checked' : ''}>Track Division II</label>
     </div>
-    ${rosterSaved ? `<p class="muted rhelp">To correct a name, type over it. That renames the team or player, and
-      their games already played move to the new name. To add someone else, please use + Player.</p>` : ''}
-    ${rosterTeams.map((tm, ti) => `
-    <div class="card">
-      <div class="row">
-        <span class="seedmove">
-          <button class="xbtn" data-seedup="${ti}" tabindex="-1"
-            title="Move up (stronger seed)" ${ti === 0 ? 'disabled' : ''}>&#9650;</button>
-          <button class="xbtn" data-seeddown="${ti}" tabindex="-1"
-            title="Move down (weaker seed)" ${ti === rosterTeams.length - 1 ? 'disabled' : ''}>&#9660;</button>
-        </span>
-        <span class="pill" title="Roster order is seed order">Seed ${ti + 1}</span>
-        <input data-tname="${ti}" value="${esc(tm.name)}" placeholder="Team name" size="24">
-        <span class="muted" data-tcount="${ti}">${tm.players.filter((p) => p.trim()).length} players</span>
-        <span data-ttags="${ti}">${teamTagsHtml(tm)}</span>
-        <span class="spacer" style="flex:1"></span>
-        <button class="small" data-delteam="${ti}" tabindex="-1">Remove team</button>
-      </div>
-      <div class="rnote" data-tnote="${ti}">${teamNote(tm, ti)}</div>
-      ${tm.players.map((p, pi) => `
-      <div class="playerline">
-        <input data-pname="${ti}.${pi}" value="${esc(p)}" placeholder="Player name">
-        ${markBoxes(`${ti}.${pi}`, tm.flags[pi] || {})}
-        <button class="xbtn" data-delplayer="${ti}.${pi}" title="Remove player" tabindex="-1">&times;</button>
-      </div>
-      <div class="rnote" data-pnote="${ti}.${pi}">${playerNote(tm, ti, pi)}</div>`).join('')}
-      <div class="row" style="margin-top:4px">
-        <button class="small" data-addplayer="${ti}" tabindex="-1">+ Player</button>
-      </div>
-    </div>`).join('')}
-    <div class="row" style="margin-top:8px">
-      <button id="addteam">+ Team</button>
-      <span class="muted" id="rostercount">${rosterTeams.length} teams &middot; ${nPlayers} players</span>
-      <span class="muted">&middot; Card order is seed order</span>
-    </div>
-    <div class="bad" id="rosterproblems" style="margin-top:6px">${problems.map(esc).join(' &middot; ')}</div>
-    <div class="row" style="margin-top:8px">
+    <div class="rgridwrap"><table class="rgrid" style="min-width:${RGRID_FIXED + ncols * RGRID_PLAYER}px">
+      <colgroup><col class="rseed"><col class="rteam">${'<col>'.repeat(ncols)}<col class="radd"><col class="rdel"></colgroup>
+      <thead><tr><th class="rseed">Seed</th><th>Team</th>${
+        Array.from({ length: ncols }, (_, c) => `<th>Player ${c + 1}</th>`).join('')}<th class="radd">+</th><th class="rdel"></th></tr></thead>
+      <tbody>${Array.from({ length: nrows + 1 }, (_, r) => `
+        <tr data-row="${r}" class="${r === nrows ? 'rnew' : ''}">
+          <th class="rseed" ${r < nrows ? `draggable="true" data-seed="${r}"` : ''}>${r + 1}</th>
+          ${Array.from({ length: ncols + 2 }, (_, k) => cell(r, k - 1)).join('')}
+          <td class="rdel">${r < nrows ? `<button class="xbtn" data-delteam="${r}" title="Remove team" tabindex="-1">&times;</button>` : ''}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+    <div class="row" style="margin-top:10px">
       <button id="rosterdl">Download roster QBJ</button>
-      <button id="rostersave" class="primary">Save as tournament roster</button>
+      <button id="rostersave" class="primary">Save</button>
     </div>`;
 
-  const rerender = () => renderRosterEditor(a, t);
-  // Typing never re-renders — a re-render would eat the focus mid-entry.
-  // State, the counters, and the problem line update in place instead.
-  const refreshMeta = () => {
-    rosterTeams.forEach((tm, ti) => {
-      const el = box.querySelector(`[data-tcount="${ti}"]`);
-      if (el) el.textContent = tm.players.filter((p) => p.trim()).length + ' players';
-      const tags = box.querySelector(`[data-ttags="${ti}"]`);
-      if (tags) tags.innerHTML = teamTagsHtml(tm);
-      const tn = box.querySelector(`[data-tnote="${ti}"]`);
-      if (tn) tn.innerHTML = teamNote(tm, ti);
-      tm.players.forEach((_, pi) => {
-        const pn = box.querySelector(`[data-pnote="${ti}.${pi}"]`);
-        if (pn) pn.innerHTML = playerNote(tm, ti, pi);
-      });
+  const rerender = (f) => renderRosterEditor(a, t, f);
+  // a cell's marks: renamed (tint, ↺, and for a player, keep both as two
+  // players), a problem (red outline, the reason on hover), former names
+  // on hover, and the UG / DII tags while they are tracked
+  const refresh = () => {
+    const probs = new Map();
+    for (const p of rosterProblemCells()) if (!probs.has(p.key)) probs.set(p.key, p.msg);
+    box.querySelectorAll('td[data-cell]').forEach((td) => {
+      const key = td.dataset.cell;
+      const inp = td.querySelector('input');
+      const r = Number(inp.dataset.r);
+      const c = Number(inp.dataset.c);
+      const tm = rosterTeams[r];
+      let renamed = false;
+      let title = '';
+      let extra = '';
+      if (tm && c < 0) {
+        const now = tm.name.trim();
+        renamed = rosterLive && !!(tm.was && now && now !== tm.was);
+        const former = [...(renamed ? [tm.was] : []), ...formerTeamNames(tm).filter((n) => n !== now)];
+        if (former.length) title = 'Formerly ' + former.join(', ');
+        if (renamed) extra += `<button class="rbtn" data-tundo="${r}" title="Undo rename" tabindex="-1">&#8634;</button>`;
+        if (rosterLive && tm.was) extra += `<button class="rbtn rpen" data-rename="${r}.${c}" title="Rename" tabindex="-1">&#9998;</button>`;
+        extra += teamTagsHtml(tm);
+      } else if (tm) {
+        const now = (tm.players[c] || '').trim();
+        const o = tm.orig[c];
+        renamed = rosterLive && !!(o && now && now !== o);
+        const former = [...(renamed ? [o] : []), ...(o ? formerPlayerNames(tm, c) : []).filter((n) => n !== now)];
+        if (former.length) title = 'Formerly ' + former.join(', ');
+        if (renamed) extra += `<button class="rbtn" data-pundo="${r}.${c}" title="Undo rename" tabindex="-1">&#8634;</button>`;
+        if (rosterLive && o) {
+          extra += `<button class="rbtn rpen" data-rename="${r}.${c}" title="Rename" tabindex="-1">&#9998;</button>
+            <button class="rbtn rpen" data-pclear="${r}.${c}" title="Remove player" tabindex="-1">&times;</button>`;
+        }
+        if (now) {
+          const f = tm.flags[c] || {};
+          const tag = (k, label) => `<button class="rtag ${k}${f[k] ? ' on' : ''}" data-pmark="${r}.${c}.${k}" tabindex="-1">${label}</button>`;
+          extra += (rosterTrack.trackUG ? tag('ug', 'UG') : '') + (rosterTrack.trackDiv2 ? tag('d2', 'DII') : '');
+        }
+      }
+      const bad = probs.get(key);
+      td.classList.toggle('rnamed', renamed);
+      td.classList.toggle('rbad', !!bad);
+      td.title = bad || title;
+      const x = td.querySelector('.rcx');
+      if (x.innerHTML !== extra) x.innerHTML = extra;
     });
-    const total = rosterTeams.reduce((n, tm) => n + tm.players.filter((p) => p.trim()).length, 0);
-    $('rostercount').textContent = rosterTeams.length + ' teams · ' + total + ' players';
-    $('rosterproblems').textContent = rosterProblems().join(' · ');
+    const off = probs.size > 0 || !rosterTeams.some((tm) => !rosterBlankRow(tm));
+    $('rostersave').disabled = off;
+    $('rosterdl').disabled = off;
   };
+  refresh();
+
+  const focusCell = (r, c, caret = 'end') => {
+    const inp = box.querySelector(`input[data-r="${r}"][data-c="${c}"]`);
+    if (!inp) return false;
+    inp.focus();
+    const n = caret === 'start' ? 0 : inp.value.length;
+    inp.setSelectionRange(n, n);
+    return true;
+  };
+  if (focus) focusCell(focus.r, focus.c);
+
+  // the Rename box, under the cell
+  const closePop = () => { const p = box.querySelector('.rpop'); if (p) p.remove(); };
+  const openPop = (r, c, html, wire) => {
+    closePop();
+    const td = box.querySelector(`input[data-r="${r}"][data-c="${c}"]`).closest('td');
+    const pop = document.createElement('div');
+    pop.className = 'rpop';
+    pop.innerHTML = html;
+    const at = td.getBoundingClientRect();
+    const base = box.getBoundingClientRect();
+    pop.style.top = (at.bottom - base.top + 4) + 'px';
+    pop.style.left = Math.max(0, at.left - base.left) + 'px';
+    box.appendChild(pop);
+    wire(pop);
+  };
+  const openRename = (r, c, typed = null) => {
+    const tm = rosterTeams[r];
+    const was = savedNameAt(tm, c);
+    openPop(r, c, `<div class="rpophead">Rename <b>${esc(was)}</b></div>
+      <div class="row"><input id="rpopname" value="${esc(typed === null ? nameAt(tm, c) : typed)}" autocomplete="off" spellcheck="false">
+      <button id="rpopok" class="primary small">Rename</button><button id="rpopno" class="small">Cancel</button></div>`, (pop) => {
+      const inp = pop.querySelector('#rpopname');
+      inp.focus();
+      if (typed === null) inp.select();
+      const ok = () => {
+        const v = inp.value.trim();
+        if (!v) return;
+        if (c < 0) tm.name = v; else tm.players[c] = v;
+        rerender({ r, c });
+      };
+      pop.querySelector('#rpopok').onclick = ok;
+      pop.querySelector('#rpopno').onclick = () => { closePop(); focusCell(r, c); };
+      inp.onkeydown = (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); ok(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); closePop(); focusCell(r, c); }
+      };
+    });
+  };
+  const tbody0 = box.querySelector('tbody');
+  // typing on a saved name, Enter or F2 opens its Rename box
+  {
+    tbody0.addEventListener('keydown', (ev) => {
+      const inp = ev.target.closest('input[data-r][readonly]');
+      if (!inp || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      const r = Number(inp.dataset.r);
+      const c = Number(inp.dataset.c);
+      if (ev.key === 'Enter' || ev.key === 'F2') { ev.preventDefault(); ev.stopImmediatePropagation(); openRename(r, c); }
+      else if (ev.key.length === 1) { ev.preventDefault(); ev.stopImmediatePropagation(); openRename(r, c, ev.key); }
+    }, true);
+  }
+
   $('trackug').onchange = () => { rosterTrack.trackUG = $('trackug').checked; rerender(); };
   $('trackd2').onchange = () => { rosterTrack.trackDiv2 = $('trackd2').checked; rerender(); };
-  box.querySelectorAll('[data-pmark]').forEach((inp) => {
-    const [ti, pi, k] = inp.dataset.pmark.split('.');
-    inp.onchange = () => {
-      const flags = rosterTeams[Number(ti)].flags;
-      flags[Number(pi)] = { ...flags[Number(pi)], [k]: inp.checked };
-      refreshMeta(); // the team's own tags follow
-    };
-  });
-  box.querySelectorAll('[data-tname]').forEach((inp) => {
-    inp.oninput = () => {
-      rosterTeams[Number(inp.dataset.tname)].name = inp.value;
-      refreshMeta();
-    };
-  });
-  box.querySelectorAll('[data-pname]').forEach((inp) => {
-    const [ti, pi] = inp.dataset.pname.split('.').map(Number);
-    inp.oninput = () => { rosterTeams[ti].players[pi] = inp.value; refreshMeta(); };
-    // Tab or Enter on the last field grows the list — hands stay on the keyboard
-    inp.onkeydown = (ev) => {
-      const last = pi === rosterTeams[ti].players.length - 1;
-      if (ev.key === 'Enter' || (ev.key === 'Tab' && !ev.shiftKey && last && inp.value.trim())) {
+
+  const tbody = box.querySelector('tbody');
+  tbody.oninput = (ev) => {
+    const inp = ev.target.closest('input[data-r]');
+    if (!inp) return;
+    closePop();
+    const r = Number(inp.dataset.r);
+    const c = Number(inp.dataset.c);
+    // typing in the empty last row adds a team; in the + column, a player column
+    const grows = r === rosterTeams.length || c === ncols;
+    if (r === rosterTeams.length) rosterTeams.push(newRosterRow());
+    const tm = rosterTeams[r];
+    if (c < 0) tm.name = inp.value; else setRosterPlayer(tm, c, inp.value);
+    if (grows) rerender({ r, c }); else refresh();
+  };
+
+  // Sheet keys: arrows, Enter down (Shift+Enter up), left and right at
+  // the ends of the text; Alt+Up/Down moves the team a seed.
+  tbody.onkeydown = (ev) => {
+    const inp = ev.target.closest('input[data-r]');
+    if (!inp) return;
+    const r = Number(inp.dataset.r);
+    const c = Number(inp.dataset.c);
+    const atStart = inp.selectionStart === 0 && inp.selectionEnd === 0;
+    const atEnd = inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
+    if (ev.altKey && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) {
+      const to = r + (ev.key === 'ArrowUp' ? -1 : 1);
+      if (r < rosterTeams.length && to >= 0 && to < rosterTeams.length) {
         ev.preventDefault();
-        rosterTeams[ti].players[pi] = inp.value;
-        if (last) { rosterTeams[ti].players.push(''); rosterTeams[ti].flags.push({}); rosterTeams[ti].orig.push(''); }
-        rerender();
-        const nxt = box.querySelector(`[data-pname="${ti}.${pi + 1}"]`);
-        if (nxt) nxt.focus();
+        moveTeam(r, to, c);
       }
-    };
-  });
-  box.querySelectorAll('[data-delteam]').forEach((b) => {
-    b.onclick = () => { rosterTeams.splice(Number(b.dataset.delteam), 1); rerender(); };
-  });
-  box.querySelectorAll('[data-delplayer]').forEach((b) => {
-    b.onclick = () => {
-      const [ti, pi] = b.dataset.delplayer.split('.').map(Number);
-      rosterTeams[ti].players.splice(pi, 1);
-      rosterTeams[ti].flags.splice(pi, 1);
-      rosterTeams[ti].orig.splice(pi, 1);
-      rerender();
-    };
-  });
-  box.querySelectorAll('[data-addplayer]').forEach((b) => {
-    b.onclick = () => {
-      const ti = Number(b.dataset.addplayer);
-      rosterTeams[ti].players.push('');
-      rosterTeams[ti].flags.push({});
-      rosterTeams[ti].orig.push('');
-      rerender();
-      const inp = box.querySelector(`[data-pname="${ti}.${rosterTeams[ti].players.length - 1}"]`);
-      if (inp) inp.focus();
-    };
-  });
-  box.querySelectorAll('[data-seedup]').forEach((b) => {
-    b.onclick = () => {
-      const i = Number(b.dataset.seedup);
-      if (i > 0) {
-        [rosterTeams[i - 1], rosterTeams[i]] = [rosterTeams[i], rosterTeams[i - 1]];
-        say((rosterTeams[i - 1].name || 'Team') + ' is now Seed ' + i);
-        rerender();
-      }
-    };
-  });
-  box.querySelectorAll('[data-seeddown]').forEach((b) => {
-    b.onclick = () => {
-      const i = Number(b.dataset.seeddown);
-      if (i < rosterTeams.length - 1) {
-        [rosterTeams[i], rosterTeams[i + 1]] = [rosterTeams[i + 1], rosterTeams[i]];
-        say((rosterTeams[i + 1].name || 'Team') + ' is now Seed ' + (i + 2));
-        rerender();
-      }
-    };
-  });
-  $('addteam').onclick = () => {
-    rosterTeams.push(blankRosterTeam());
-    rerender();
+      return;
+    }
+    let to = null;
+    if (ev.key === 'ArrowUp' || (ev.key === 'Enter' && ev.shiftKey)) to = [r - 1, c];
+    else if (ev.key === 'ArrowDown' || ev.key === 'Enter') to = [r + 1, c];
+    else if (ev.key === 'ArrowLeft' && atStart) to = [r, c - 1];
+    else if (ev.key === 'ArrowRight' && atEnd) to = [r, c + 1];
+    if (to && focusCell(to[0], to[1], ev.key === 'ArrowRight' ? 'start' : 'end')) ev.preventDefault();
   };
-  box.onclick = (ev) => {
-    const b = ev.target.closest('[data-tundo], [data-pundo], [data-pnew]');
+
+  // A block of cells pasted into a cell fills the grid from there, adding
+  // teams and player columns as it needs; a single value pastes as text.
+  tbody.onpaste = (ev) => {
+    const inp = ev.target.closest('input[data-r]');
+    if (!inp) return;
+    const text = (ev.clipboardData && ev.clipboardData.getData('text/plain')) || '';
+    if (!/[\t\n]/.test(text.replace(/\r?\n$/, ''))) return;
+    ev.preventDefault();
+    const r0 = Number(inp.dataset.r);
+    const c0 = Number(inp.dataset.c);
+    pasteGrid(text).forEach((cells, i) => {
+      while (rosterTeams.length <= r0 + i) rosterTeams.push(newRosterRow());
+      const tm = rosterTeams[r0 + i];
+      cells.forEach((v, j) => {
+        const c = c0 + j;
+        if (locked(tm, c)) return; // a saved name changes only by renaming it
+        if (c < 0) tm.name = v; else if (v || c < tm.players.length) setRosterPlayer(tm, c, v);
+      });
+    });
+    rerender({ r: r0, c: c0 });
+  };
+
+  const moveTeam = (from, to, c = -1) => {
+    const [tm] = rosterTeams.splice(from, 1);
+    rosterTeams.splice(to, 0, tm);
+    say((tm.name.trim() || 'Team') + ' is now Seed ' + (to + 1));
+    rerender(c === null ? null : { r: to, c });
+  };
+  // drag a row number onto another row to move the team there
+  let dragFrom = null;
+  tbody.ondragstart = (ev) => {
+    const th = ev.target.closest('[data-seed]');
+    if (!th) return;
+    dragFrom = Number(th.dataset.seed);
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', String(dragFrom));
+  };
+  const rowOf = (ev) => {
+    const tr = ev.target.closest('tr[data-row]');
+    return tr ? Math.min(Number(tr.dataset.row), rosterTeams.length - 1) : null;
+  };
+  tbody.ondragover = (ev) => {
+    if (dragFrom === null) return;
+    ev.preventDefault();
+    const r = rowOf(ev);
+    tbody.querySelectorAll('tr').forEach((tr) => tr.classList.toggle('rdrop', Number(tr.dataset.row) === r && r !== dragFrom));
+  };
+  tbody.ondragend = () => { dragFrom = null; tbody.querySelectorAll('tr.rdrop').forEach((tr) => tr.classList.remove('rdrop')); };
+  tbody.ondrop = (ev) => {
+    if (dragFrom === null) return;
+    ev.preventDefault();
+    const to = rowOf(ev);
+    const from = dragFrom;
+    dragFrom = null;
+    if (to !== null && to !== from) moveTeam(from, to, null); else rerender();
+  };
+
+  tbody.onclick = (ev) => {
+    const b = ev.target.closest('button');
     if (!b) return;
-    if (b.dataset.tundo !== undefined) {
-      const tm = rosterTeams[Number(b.dataset.tundo)];
-      tm.name = tm.was;
-    } else {
-      const [ti, pi] = (b.dataset.pundo || b.dataset.pnew).split('.').map(Number);
-      const tm = rosterTeams[ti];
-      // a new player: the typed name gets its own line, and the saved
-      // player keeps theirs
-      if (b.dataset.pnew !== undefined) {
-        tm.players.splice(pi + 1, 0, tm.players[pi].trim());
-        tm.flags.splice(pi + 1, 0, {});
-        tm.orig.splice(pi + 1, 0, '');
-      }
-      tm.players[pi] = tm.orig[pi];
+    if (b.dataset.delteam !== undefined) {
+      rosterTeams.splice(Number(b.dataset.delteam), 1);
+      rerender();
+    } else if (b.dataset.rename !== undefined) {
+      const [r, c] = b.dataset.rename.split('.').map(Number);
+      openRename(r, c);
+    } else if (b.dataset.pclear !== undefined) {
+      const [r, c] = b.dataset.pclear.split('.').map(Number);
+      const tm = rosterTeams[r];
+      tm.players.splice(c, 1); tm.flags.splice(c, 1); tm.orig.splice(c, 1);
+      rerender();
+    } else if (b.dataset.pmark !== undefined) {
+      const [r, c, k] = b.dataset.pmark.split('.');
+      const flags = rosterTeams[Number(r)].flags;
+      flags[Number(c)] = { ...flags[Number(c)], [k]: !(flags[Number(c)] || {})[k] };
+      refresh();
+    } else if (b.dataset.tundo !== undefined) {
+      const r = Number(b.dataset.tundo);
+      rosterTeams[r].name = rosterTeams[r].was;
+      rerender({ r, c: -1 });
+    } else if (b.dataset.pundo !== undefined) {
+      const [r, c] = b.dataset.pundo.split('.').map(Number);
+      rosterTeams[r].players[c] = rosterTeams[r].orig[c];
+      rerender({ r, c });
     }
-    rerender();
   };
+
   const validated = () => {
-    const problemsNow = rosterProblems();
-    if (problemsNow.length || !rosterTeams.length) {
-      $('rosterproblems').textContent = problemsNow.join(' · ') || 'No teams yet';
-      say('Fix the roster first', true);
-      return null;
-    }
+    rosterTeams = rosterTeams.filter((tm) => !rosterBlankRow(tm));
+    if (rosterProblems().length || !rosterTeams.length) { rerender(); return null; }
     return cleanRosterTeams();
   };
   $('rosterdl').onclick = () => {
@@ -2221,6 +2446,17 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     }
     return html;
   };
+  // the same, as the panel's Download menu: each file, and both as a zip
+  const fileMenu = (f) => {
+    const s = fileSummary(f);
+    const key = encodeURIComponent(f.r2_key);
+    const dls = fileDownloads(f, s ? s.teams : null);
+    const href = (params) => esc(`${API}${a}/file?key=${key}&${params}`);
+    if (dls.length < 2) return dls.map((x) => `<a href="${href(x.params)}" download>${x.label}</a>`).join('');
+    return `<details class="fdl"><summary class="linkbtn">Download &#9662;</summary><div class="fdlpanel">
+      ${dls.map((x) => `<a href="${href(x.params)}" download>${x.label}</a>`).join('')}
+      <button class="linkbtn" data-dlboth="${f.id}">Both</button></div></details>`;
+  };
   const protestMarker = (f) => {
     const ps = pfiles.get(f.id);
     const plural = (n) => `${n} protest${n === 1 ? '' : 's'}`;
@@ -2250,7 +2486,13 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       const k = s ? [...s.teams].sort().join('|') : 'f' + f.id;
       if (!latest.has(k)) latest.set(k, f.id);
     }
-    const rows = fs.map((f) => {
+    // the uploads that count (each game's newest); the rest wait behind
+    // Show previous uploads
+    const counting = new Set(latest.values());
+    if (!counting.size && fs.length) counting.add(fs[0].id);
+    const older = fs.filter((f) => !counting.has(f.id));
+    const shown = cellOpen.prev ? fs : fs.filter((f) => counting.has(f.id));
+    const rows = shown.map((f) => {
       const s = fileSummary(f);
       const k = s ? [...s.teams].sort().join('|') : 'f' + f.id;
       const superseded = good(f) && latest.get(k) !== f.id;
@@ -2272,24 +2514,27 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         ${hint}
         <div class="pmeta muted">${esc(f.filename)} &middot; ${esc(f.kind)} &middot; ${fmtBytes(f.size)}
           ${f.error ? ` &middot; <span class="warntext">${esc(f.error)}</span>` : ''} ${protestMarker(f)}</div>
-        <div class="pacts">${fileLinks(f)}
+        <div class="pacts">
           ${f.kind === 'combined' && !f.error && s
             ? `<button class="linkbtn" data-editfile="${f.id}" title="Reopen this game in MODAQ to correct it">Edit in MODAQ</button>` : ''}
           ${good(f) && s && !isForfeitFile(f)
-            ? `<button class="linkbtn ${fixOpen && fixOpen.fid === f.id ? 'on' : ''}" data-fixbuzz="${f.id}">Fix buzzes</button>` : ''}
+            ? `<button class="linkbtn ${fixOpen && fixOpen.fid === f.id ? 'on' : ''}" data-fixbuzz="${f.id}">Fix stats</button>` : ''}
+          ${fileMenu(f)}
           <span class="spacer" style="flex:1"></span>
           <button class="linkbtn muted" data-delfile="${f.id}">Delete</button></div>
         ${fixOpen && fixOpen.fid === f.id ? fixPanelHtml() : ''}
       </div>`;
     }).join('');
-    return `<tr class="cellpanel"><td colspan="${roundCols.length + 1}"><div class="pop">
+    return `<div class="cellpop cellpanel" id="cellpop"><div class="pop">
       <div class="phead"><b>Round ${n} &middot; ${esc(b.room_name)}</b>
-        ${fs.filter(good).length > 1 ? `<span class="warntext">${fs.filter(good).length} games</span>` : ''}
+        ${latest.size > 1 ? `<span class="warntext">${latest.size} games</span>` : ''}
         <span class="spacer" style="flex:1"></span>
         <button class="linkbtn" data-addfor="${b.id}:${n}">Add a game here</button>
         <button class="linkbtn muted" data-closecell aria-label="Close">Close</button></div>
       ${rows || '<div class="muted" style="padding-top:8px">Nothing uploaded for this round yet.</div>'}
-    </div></td></tr>`;
+      ${older.length ? `<button class="linkbtn muted small pprev" data-prevuploads>${cellOpen.prev
+        ? 'Hide previous uploads' : `Show previous uploads (${older.length})`}</button>` : ''}
+    </div></div>`;
   };
 
   const pfirst = popen[0];
@@ -2365,16 +2610,16 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
               <button id="addcancel" class="linkbtn muted">Cancel</button>
             </div>
           </div>
-          ${buckets.length ? `<div class="tablewrap"><table class="ugrid">
+          ${buckets.length ? `<div class="ugridbox"><div class="tablewrap"><table class="ugrid">
             ${bk ? phaseSpans(bk, roundCols) : ''}
             <tr><th class="uroom">Room</th>${roundCols.map((n) =>
               `<th class="${(bk ? Object.values(bk.st.rounds).includes(n) : n === t.current_round) ? 'now' : ''}">${n}</th>`).join('')}</tr>
             ${gridGroups(bk, buckets).map(({ head, rows }) => (head
               ? `<tr class="ugroup"><td colspan="${roundCols.length + 1}"><i class="lane-${head.color}"></i><b>${esc(head.name)}</b>
                   <span class="muted">this round</span></td></tr>` : '')
-              + rows.map((b) => `<tr><td class="uroom" title="${esc(b.room_name)}">${esc(b.room_name)}</td>${roundCols.map((n) => gridCell(b, n)).join('')}</tr>${
-              cellOpen && cellOpen.bid === b.id ? cellPanel() : ''}`).join('')).join('')}
-          </table></div>
+              + rows.map((b) => `<tr data-urow="${b.id}"><td class="uroom" title="${esc(b.room_name)}">${esc(b.room_name)}</td>${
+                roundCols.map((n) => gridCell(b, n)).join('')}</tr>`).join('')).join('')}
+          </table></div>${cellOpen && buckets.some((b) => b.id === cellOpen.bid) ? cellPanel() : ''}</div>
           <div class="muted legend">&#10003; in &middot;
             <span class="upie" style="--p:40%"></span> in progress &middot; &#9675; started &middot; &ndash; missing &middot; ! can&rsquo;t read &middot;
             <span class="warntext">orange</span>: needs a look</div>`
@@ -2460,6 +2705,23 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     };
   });
   box.querySelectorAll('[data-closecell]').forEach((b) => { b.onclick = () => { cellOpen = null; render(); }; });
+  box.querySelectorAll('[data-prevuploads]').forEach((b) => { b.onclick = () => { cellOpen.prev = !cellOpen.prev; render(); }; });
+  // Download > Both: the game's two files in one zip, named as MODAQ names them
+  box.querySelectorAll('[data-dlboth]').forEach((b) => {
+    b.onclick = async () => {
+      const f = files.find((y) => y.id === Number(b.dataset.dlboth));
+      const s = fileSummary(f);
+      try {
+        const parts = await Promise.all(fileDownloads(f, s ? s.teams : null).map(async ({ params }) => {
+          const res = await fetch(`${API}${a}/file?key=${encodeURIComponent(f.r2_key)}&${params}`);
+          if (!res.ok) throw new Error('could not load the game file (' + res.status + ')');
+          return { name: decodeURIComponent(/(?:^|&)dl=([^&]*)/.exec(params)[1]), data: new Uint8Array(await res.arrayBuffer()) };
+        }));
+        download(f.filename.replace(/\.qbtd\.json$/i, '') + '.zip', makeZip(parts), 'application/zip');
+        b.closest('details').open = false;
+      } catch (e) { say(e.message, true); }
+    };
+  });
   box.querySelectorAll('[data-fillpool]').forEach((b) => {
     b.onclick = () => { autoForce = [...new Set([...autoForce, b.dataset.fillpool])]; autoFillSlots(true); };
   });
@@ -2636,6 +2898,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   box.querySelectorAll('[data-editfile]').forEach((b) => {
     b.onclick = () => editGame(a, buckets, files, Number(b.dataset.editfile));
   });
+  placeCellPop(box);
   wireFix(box, a, t, buckets, files);
   if ($('addgame')) $('addgame').onclick = () => addGame(a, buckets);
   if ($('calc')) $('calc').onclick = () => computeStats(a, t, buckets, files, settings);
@@ -2807,15 +3070,54 @@ async function editGame(a, buckets, files, fileId) {
    and deleting it brings back the original. */
 
 const fixEdits = (x) => [...x.edits].map(([k, to]) => { const [q, j] = k.split(':').map(Number); return { q, j, to }; });
-// the upload's views: as uploaded, with the swaps, and fully fixed
+// the upload's views: as uploaded, with the swaps, with the buzzes fixed
+// (the lineups as they stand there), and fully fixed
 function fixDerived() {
   const x = fixOpen;
-  const out = { base: buzzFixView(x.root), swapped: null, fixed: null, err: '' };
+  const out = { base: buzzFixView(x.root), swapped: null, buzzed: null, fixed: null, err: '' };
   try {
     out.swapped = buzzFixView(applyBuzzFix(x.root, { swaps: x.swaps }));
-    out.fixed = applyBuzzFix(x.root, { swaps: x.swaps, edits: fixEdits(x) });
+    out.buzzed = applyBuzzFix(x.root, { swaps: x.swaps, edits: fixEdits(x) });
+    out.fixed = Object.keys(x.lineups).length ? applyLineupFix(out.buzzed, x.lineups) : out.buzzed;
   } catch (e) { out.err = e.message; }
   return out;
+}
+// A team's lineups as the moderator thinks of them: who started, and each
+// substitution {q, in, out} on question q ('' in: a player leaves; ''
+// out: a player joins), and back.
+function luEvents(segs) {
+  const subs = [];
+  for (let i = 1; i < segs.length; i++) {
+    const before = segs[i - 1].players;
+    const now = segs[i].players;
+    const ins = now.filter((p) => !before.includes(p));
+    const outs = before.filter((p) => !now.includes(p));
+    for (let k = 0; k < Math.max(ins.length, outs.length); k++) subs.push({ q: segs[i].from, in: ins[k] || '', out: outs[k] || '' });
+  }
+  return { starters: [...segs[0].players], subs };
+}
+function luSegs(ev) {
+  let cur = [...ev.starters];
+  const segs = [{ from: 1, players: cur }];
+  const subs = [...ev.subs].sort((p, r) => p.q - r.q);
+  for (const sb of subs) {
+    cur = cur.filter((p) => p !== sb.out);
+    if (sb.in && !cur.includes(sb.in)) cur.push(sb.in);
+    const last = segs[segs.length - 1];
+    if (last.from === sb.q) last.players = cur; else segs.push({ from: sb.q, players: cur });
+  }
+  return segs;
+}
+// who was in on question q
+const luAt = (segs, q) => { let at = segs[0]; for (const sg of segs) if (sg.from <= q) at = sg; return at.players; };
+// a substitution as MODAQ words it
+const luWords = (sb) => (sb.in && sb.out ? `${sb.in} in for ${sb.out}` : sb.in ? `${sb.in} joins` : `${sb.out} leaves`);
+// a team's lineups in the panel: as edited, else as the file has them
+function fixLineups(d, ti) {
+  const x = fixOpen;
+  const v = lineupView(d.buzzed || x.root);
+  const tm = v.teams[ti];
+  return { questions: v.questions, players: tm.players, segs: x.lineups[tm.name] || tm.lineups };
 }
 // edits that no longer change anything after the swaps moved, dropped
 function fixPrune() {
@@ -2841,7 +3143,7 @@ function fixPanelHtml() {
     now = d.fixed ? parseMatch(d.fixed, { filename: x.filename }) : was;
   } catch (e) { return `<div class="fixbuzz warntext">${esc(e.message)}</div>`; }
   const hasAll = !!(d.base.buzzes && d.base.buzzes.length);
-  const tab = hasAll ? x.tab : 'swap';
+  const tab = x.tab === 'all' && !hasAll ? 'swap' : x.tab;
   const values = [...new Set([was, now].flatMap((m) => m.teams.flatMap((tm) => tm.players.flatMap((p) => p.counts.map((c) => c.value)))))]
     .filter((v) => v !== 0).sort((p, q) => q - p);
   const line = (m, ti, name) => {
@@ -2856,7 +3158,8 @@ function fixPanelHtml() {
       const a = line(was, ti, name);
       const b = line(now, ti, name);
       const cell = (va, vb) => `<td class="num">${va !== vb ? `<span class="was">${va}</span>` : ''}${vb}</td>`;
-      const diff = a.pts !== b.pts || values.some((v) => a.n[v] !== b.n[v]);
+      const tuh = (m) => { const p = m.teams[ti].players.find((y) => y.name === name); return p ? p.tossupsHeard : 0; };
+      const diff = a.pts !== b.pts || values.some((v) => a.n[v] !== b.n[v]) || tuh(was) !== tuh(now);
       const pi = tm.players.indexOf(name);
       let ctl = '';
       if (pi >= 0 && tab === 'swap') {
@@ -2871,9 +3174,9 @@ function fixPanelHtml() {
         </select>`;
       }
       return `<tr class="${diff ? 'chg' : ''}"><td>${esc(name)}${pi < 0 ? '<span class="muted small"> from the roster</span>' : ''}</td>
-        ${values.map((v) => cell(a.n[v], b.n[v])).join('')}${cell(a.pts, b.pts)}<td>${ctl}</td></tr>`;
+        ${values.map((v) => cell(a.n[v], b.n[v])).join('')}${cell(a.pts, b.pts)}${cell(tuh(was), tuh(now))}<td>${ctl}</td></tr>`;
     }).join('');
-    return `<table class="fxteam"><tr><th>${esc(tm.name)}</th>${values.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th><th></th></tr>${rows}</table>`;
+    return `<table class="fxteam"><tr><th>${esc(tm.name)}</th>${values.map((v) => `<th class="num">${v}</th>`).join('')}<th class="num">Pts</th><th class="num">TUH</th><th></th></tr>${rows}</table>`;
   };
   // buzzes now on a player who was not in the lineup then
   const before = lineupGaps(x.root);
@@ -2895,12 +3198,44 @@ function fixPanelHtml() {
     const b = buzzFixView(d.fixed).buzzes.find((y) => y.q === q && y.j === j);
     return `${esc(b.player)} was not in the lineup on question ${q + 1}.`;
   });
-  const changed = x.swaps.length || x.edits.size;
+  // the lineups as the moderator's start card shows them, condensed: who
+  // started, then each substitution, and Add substitution
+  const lineupCards = () => `<div class="lucards">${d.base.teams.map((tm0, ti) => {
+    const lu = fixLineups(d, ti);
+    const ev = luEvents(lu.segs);
+    const pool = [...lu.players, ...(x.roster[tm0.name] || []).filter((n) => !lu.players.includes(n))];
+    for (const sg of lu.segs) for (const p of sg.players) if (!pool.includes(p)) pool.push(p);
+    const add = x.luAdd && x.luAdd.ti === ti ? x.luAdd : null;
+    let form = '';
+    if (add) {
+      const on = luAt(lu.segs, add.q);
+      const qs = Array.from({ length: Math.max(lu.questions - 1, 0) }, (_, i) => i + 2);
+      form = `<div class="luadd">
+        <select id="luaq" aria-label="Question">${qs.map((q) => `<option value="${q}" ${q === add.q ? 'selected' : ''}>Q${q}</option>`).join('')}</select>
+        <select id="luain" aria-label="In"><option value="">Nobody</option>${pool.filter((p) => !on.includes(p)).map((p) =>
+          `<option ${p === add.in ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+        <span class="muted">in for</span>
+        <select id="luaout" aria-label="Out"><option value="">Nobody</option>${on.map((p) =>
+          `<option ${p === add.out ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+        <button class="small primary" id="luaok">Add</button><button class="small" id="luano">Cancel</button>
+      </div>`;
+    }
+    return `<div class="lucard"><div class="luhead"><b>${esc(tm0.name)}</b><span class="muted">${ev.starters.length} starting</span></div>
+      <div class="lustart">${pool.map((p) => `<button class="lup ${ev.starters.includes(p) ? 'on' : ''}" data-lustart="${ti}" data-name="${esc(p)}"
+        aria-pressed="${ev.starters.includes(p)}"><span class="box">${ev.starters.includes(p) ? '&#10003;' : ''}</span>${esc(p)}</button>`).join('')}</div>
+      ${ev.subs.length ? `<div class="lusubs">${[...ev.subs].sort((p, r) => p.q - r.q).map((sb) => `<div class="lusub"><span class="muted">Q${sb.q}</span>
+        <span>${esc(luWords(sb))}</span><button class="xbtn" data-lusubdel="${ti}" data-sub="${esc(JSON.stringify(sb))}" title="Remove">&times;</button></div>`).join('')}</div>` : ''}
+      <div class="luaddwrap"><button class="linkbtn small" data-luaddopen="${ti}">Add substitution</button>${form}</div>
+    </div>`;
+  }).join('')}</div>`;
+  const changed = x.swaps.length || x.edits.size || Object.keys(x.lineups).length;
   return `<div class="fixbuzz">
-    ${hasAll ? `<div class="fxtabs" role="tablist">
-      <button role="tab" class="fxtab ${tab === 'swap' ? 'on' : ''}" data-fixtab="swap" aria-selected="${tab === 'swap'}">Swap players</button>
-      <button role="tab" class="fxtab ${tab === 'all' ? 'on' : ''}" data-fixtab="all" aria-selected="${tab === 'all'}">All buzzes</button></div>` : ''}
+    <div class="fxtabs" role="tablist">
+      <button role="tab" class="fxtab ${tab === 'swap' ? 'on' : ''}" data-fixtab="swap" aria-selected="${tab === 'swap'}">Swap player buzzes</button>
+      ${hasAll ? `<button role="tab" class="fxtab ${tab === 'all' ? 'on' : ''}" data-fixtab="all" aria-selected="${tab === 'all'}">All buzzes</button>` : ''}
+      <button role="tab" class="fxtab ${tab === 'lineups' ? 'on' : ''}" data-fixtab="lineups" aria-selected="${tab === 'lineups'}">Lineups</button></div>
     ${tab === 'all' ? allList() : ''}
+    ${tab === 'lineups' ? lineupCards() : ''}
     ${table(0)}${table(1)}
     ${gapNames.length ? `<div class="warntext small">${gapNames.join(' ')}</div>` : ''}
     ${d.err ? `<div class="warntext small">${esc(d.err)}</div>` : ''}
@@ -2923,13 +3258,23 @@ function fixRoster(roster, view) {
   return out;
 }
 
+// The open cell's files float over the grid, just under its room's row,
+// so the rooms below stay where they are.
+function placeCellPop(box) {
+  const pop = box.querySelector('#cellpop');
+  const row = cellOpen && box.querySelector(`tr[data-urow="${cellOpen.bid}"]`);
+  if (!pop || !row) return;
+  const base = pop.parentElement.getBoundingClientRect();
+  pop.style.top = (row.getBoundingClientRect().bottom - base.top + 4) + 'px';
+}
+
 function wireFix(box, a, t, buckets, files) {
   box.querySelectorAll('[data-fixbuzz]').forEach((btn) => {
     btn.onclick = async () => {
       const fid = Number(btn.dataset.fixbuzz);
       if (fixOpen && fixOpen.fid === fid) { fixOpen = null; render(); return; }
       const f = files.find((y) => y.id === fid);
-      fixOpen = { fid, filename: f.filename, tab: 'swap', loading: true, root: null, err: '', roster: {}, swaps: [], edits: new Map() };
+      fixOpen = { fid, filename: f.filename, tab: 'swap', loading: true, root: null, err: '', roster: {}, swaps: [], edits: new Map(), lineups: {}, luAdd: null };
       render();
       const x = fixOpen;
       try {
@@ -2969,13 +3314,68 @@ function wireFix(box, a, t, buckets, files) {
       render();
     };
   });
+  // the lineups: the first change to a team copies its lineups to edit
+  const luEdit = (ti) => {
+    const d = fixDerived();
+    const lu = fixLineups(d, ti);
+    const team = lineupView(d.buzzed || x.root).teams[ti].name;
+    if (!x.lineups[team]) x.lineups[team] = lu.segs.map((sg) => ({ from: sg.from, players: [...sg.players] }));
+    return { segs: x.lineups[team], questions: lu.questions };
+  };
+  // a team's lineups changed as the moderator would: starters, subs
+  const luChange = (ti, fn) => {
+    const { segs } = luEdit(ti);
+    const ev = luEvents(segs);
+    fn(ev);
+    const team = lineupView(fixDerived().buzzed || x.root).teams[ti].name;
+    x.lineups[team] = luSegs(ev);
+    render();
+  };
+  box.querySelectorAll('[data-lustart]').forEach((b) => {
+    b.onclick = () => luChange(Number(b.dataset.lustart), (ev) => {
+      const name = b.dataset.name;
+      ev.starters = ev.starters.includes(name) ? ev.starters.filter((p) => p !== name) : [...ev.starters, name];
+    });
+  });
+  box.querySelectorAll('[data-lusubdel]').forEach((b) => {
+    b.onclick = () => luChange(Number(b.dataset.lusubdel), (ev) => {
+      const sb = JSON.parse(b.dataset.sub);
+      const i = ev.subs.findIndex((y) => y.q === sb.q && y.in === sb.in && y.out === sb.out);
+      if (i >= 0) ev.subs.splice(i, 1);
+    });
+  });
+  box.querySelectorAll('[data-luaddopen]').forEach((b) => {
+    b.onclick = () => {
+      const ti = Number(b.dataset.luaddopen);
+      x.luAdd = x.luAdd && x.luAdd.ti === ti ? null : { ti, q: 2, in: '', out: '' };
+      render();
+    };
+  });
+  if (x.luAdd && $('luaq')) {
+    const keep = () => { x.luAdd.in = $('luain').value; x.luAdd.out = $('luaout').value; };
+    $('luaq').onchange = () => { keep(); x.luAdd.q = Number($('luaq').value); render(); };
+    $('luain').onchange = keep;
+    $('luaout').onchange = keep;
+    $('luano').onclick = () => { x.luAdd = null; render(); };
+    $('luaq').closest('.luadd').onkeydown = (ev) => { if (ev.key === 'Escape') { x.luAdd = null; render(); } };
+    $('luaok').onclick = () => {
+      keep();
+      const { ti, q, in: inn, out } = x.luAdd;
+      if (!inn && !out) return;
+      x.luAdd = null;
+      luChange(ti, (ev) => { ev.subs.push({ q, in: inn, out }); });
+    };
+  }
   if ($('fixsave')) $('fixsave').onclick = async () => {
     const f = files.find((y) => y.id === x.fid);
     const room = f && buckets.find((b) => b.id === f.bucket_id);
     if (!room) { say('This game\'s room is gone, so it cannot be fixed here', true); return; }
     if (notStarted()) { say(START_FIRST, true); return; }
     let fixed;
-    try { fixed = applyBuzzFix(x.root, { swaps: x.swaps, edits: fixEdits(x) }); } catch (e) { say(e.message, true); return; }
+    try {
+      fixed = applyBuzzFix(x.root, { swaps: x.swaps, edits: fixEdits(x) });
+      if (Object.keys(x.lineups).length) fixed = applyLineupFix(fixed, x.lineups);
+    } catch (e) { say(e.message, true); return; }
     // through the room that played it, as Edit in MODAQ's correction goes
     const run = busy($('fixsave'), { label: 'Saving' });
     try {

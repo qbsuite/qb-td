@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
   rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound, matchPayload } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches, standings } from '../app/engine/stats.js';
+import { pasteGrid, parseRosterPaste, pasteProblems } from '../app/engine/rosterpaste.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc, mountReport, reportPlace } from '../app/js/reportframe.js';
@@ -33,7 +34,7 @@ import HDWHITE from '../app/engine/hdwhite.js';
 import { finalsSources, finalsProgress, finalsFill, scheduleFinished, fillProgress, autoFillSaved, filledNote, keptOrder, heldLevel } from '../app/engine/finals.js';
 import { eachLimit } from '../app/js/limit.js';
 import { modaqExport, modaqFilenames, qbjTextWithRound, renameModaqTexts } from '../app/engine/modaqfile.js';
-import { applyBuzzFix, buzzFixView, lineupGaps } from '../app/engine/buzzfix.js';
+import { applyBuzzFix, buzzFixView, lineupGaps, lineupView, applyLineupFix } from '../app/engine/buzzfix.js';
 import { isGameFile, readGame, readGames, newestOf, rosterNamesFromText } from '../app/engine/games.js';
 import { uploadQbjName, publicQbjName, publicQbjText, storedFileText, rosterExportBody, fileDownloads } from '../app/engine/exportfile.js';
 import * as exportfileMod from '../app/engine/exportfile.js';
@@ -202,6 +203,52 @@ test('parseRosterLines rejects junk with line numbers', () => {
   assert.throws(() => parseRosterLines('Alpha:'), /line 1: Alpha has no players/);
   assert.throws(() => parseRosterLines(': Ann'), /line 1: no team name/);
   assert.throws(() => parseRosterLines('A: P1\nA: P2'), /line 2: duplicate team A/);
+});
+
+test('roster paste: one team a row, heading row dropped', () => {
+  const text = 'Team\tPlayer 1\tPlayer 2\tPlayer 3\nChicago A\tMaya\tArjun\tTheo\nIllinois A\tDana\tKenji\t\n';
+  const got = parseRosterPaste(text);
+  assert.equal(got.layout, 'rows');
+  assert.deepEqual(got.teams, [
+    { name: 'Chicago A', players: ['Maya', 'Arjun', 'Theo'] },
+    { name: 'Illinois A', players: ['Dana', 'Kenji'] },
+  ]);
+});
+
+test('roster paste: one team a column', () => {
+  const text = 'Chicago A\tIllinois A\tStanford\tPurdue\nMaya\tDana\tLucia\tGrace\nArjun\tKenji\t\tHamza';
+  assert.equal(parseRosterPaste(text).layout, 'rows'); // the default, whatever the shape
+  const got = parseRosterPaste(text, 'cols');
+  assert.deepEqual(got.teams.map((t) => [t.name, t.players.length]),
+    [['Chicago A', 2], ['Illinois A', 2], ['Stanford', 1], ['Purdue', 2]]);
+  // the same cells read as rows
+  assert.deepEqual(parseRosterPaste(text).teams[0], { name: 'Chicago A', players: ['Illinois A', 'Stanford', 'Purdue'] });
+});
+
+test('roster paste: team and player columns, blank team cells keep the team above', () => {
+  const text = 'Team\tPlayer\nChicago A\tMaya\n\tArjun\nIllinois A\tDana\nChicago A\tTheo';
+  const got = parseRosterPaste(text, 'pairs');
+  assert.deepEqual(got.teams, [
+    { name: 'Chicago A', players: ['Maya', 'Arjun', 'Theo'] },
+    { name: 'Illinois A', players: ['Dana'] },
+  ]);
+});
+
+test('roster paste: quoted cells, CRLF, and quotes inside names', () => {
+  assert.deepEqual(pasteGrid('"St. John\'s ""A"""\t"Smith, Jr."\r\n"Two\nlines"\tx\r\n'),
+    [['St. John\'s "A"', 'Smith, Jr.'], ['Two\nlines', 'x']]);
+  // a quote that doesn't close the cell is text
+  assert.deepEqual(pasteGrid('"Bud" Smith\tLee'), [['"Bud" Smith', 'Lee']]);
+  assert.deepEqual(pasteGrid(''), []);
+  assert.deepEqual(parseRosterPaste('\n\n').teams, []);
+});
+
+test('roster paste: problems are flagged per team', () => {
+  const probs = pasteProblems([
+    { name: 'A', players: ['x', 'x'] }, { name: 'A', players: ['y'] }, { name: '', players: ['z'] }, { name: 'B', players: [] },
+  ]);
+  assert.deepEqual(probs.map((p) => [p.name, p.players, [...p.dupPlayers]]),
+    [[true, false, ['x']], [true, false, []], [true, false, []], [false, true, []]]);
 });
 
 test('buildRosterQbj round-trips through parseRoster', () => {
@@ -7236,7 +7283,7 @@ async function mobxStore(app) {
   return { mem, trunk };
 }
 // a game played out, with `who` deciding whom the moderator credits
-async function playedUpload(who) {
+async function playedUpload(who, lineup = null) {
   const app = new MApp();
   const { mem, trunk } = await mobxStore(app);
   const game = app.game;
@@ -7247,7 +7294,7 @@ async function playedUpload(who) {
   game.setGameFormat(ACFGameFormat);
   game.loadPacket(packet);
   const P = Object.fromEntries([['Ann', 'Alpha', true], ['Bea', 'Alpha', true], ['Cal', 'Alpha', true], ['Dee', 'Alpha', false],
-    ['Bob', 'Beta', true], ['Ben', 'Beta', true]].map(([n, t, s]) => [n, new MPlayer(n, t, s)]));
+    ['Bob', 'Beta', true], ['Ben', 'Beta', true]].map(([n, t, s]) => [n, new MPlayer(n, t, lineup ? lineup.starters.includes(n) : s)]));
   game.addNewPlayers(Object.values(P));
   const p = (ci, name) => P[who(ci, name)];
   const right = (ci, name, position = 3) => {
@@ -7258,7 +7305,7 @@ async function playedUpload(who) {
   right(0, 'Ann'); wrong(1, 'Bea'); right(1, 'Bob', 4); wrong(2, 'Ann'); wrong(2, 'Ben', 2);
   right(3, 'Bea'); right(4, 'Ann', 2); right(5, 'Cal'); wrong(6, 'Bob'); right(6, 'Ann', 5);
   wrong(7, 'Ann', 2); right(7, 'Bea', 2); right(8, 'Ben'); right(9, 'Bea', 1);
-  game.cycles[10].addSwapSubstitution(P.Dee, P.Cal);
+  if (lineup) lineup.changes(game, P); else game.cycles[10].addSwapSubstitution(P.Dee, P.Cal);
   right(10, 'Dee'); right(11, 'Ann'); wrong(12, 'Bea'); right(13, 'Bob'); right(14, 'Bea', 4);
   for (let ci = 15; ci < 20; ci++) right(ci, ci % 2 ? 'Ann' : 'Ben');
   await trunk.persist();
@@ -7383,6 +7430,75 @@ test('Fix buzzes: a buzz moved to someone not in the lineup is flagged', () => {
   assert.equal(lineupGaps(bfFlipped).size, 0);
   const gaps = lineupGaps(applyBuzzFix(bfFlipped, { edits: [{ q: dee.q, j: dee.j, to: 'Cal' }, { q: cal.q, j: cal.j, to: 'Dee' }] }));
   assert.deepEqual([...gaps].sort(), [`${cal.q}:${cal.j}`, `${dee.q}:${dee.j}`].sort());
+});
+
+/* ---------- Fix lineups: who was really in, from which question ----------
+   The moderator recorded Ann, Bea and Cal starting and Dee in for Cal on
+   question 11. Really Dee started in Cal's place, Cal came in for Dee on
+   question 6 and Dee went back in on question 11. The fix turns the first
+   upload's lineups and tossups heard into the second's in each copy, and
+   MODAQ reopens the fixed game to the same lineups. */
+const luTruthSpec = { starters: ['Ann', 'Bea', 'Dee', 'Bob', 'Ben'], changes: (game, P) => {
+  game.cycles[5].addSwapSubstitution(P.Cal, P.Dee);
+  game.cycles[10].addSwapSubstitution(P.Dee, P.Cal);
+} };
+const luRecorded = await playedUpload(asIs);
+const luTruth = await playedUpload(asIs, luTruthSpec);
+const luFix = { Alpha: [{ from: 1, players: ['Ann', 'Bea', 'Dee'] }, { from: 6, players: ['Ann', 'Bea', 'Cal'] }, { from: 11, players: ['Ann', 'Bea', 'Dee'] }] };
+const luFixed = applyLineupFix(luRecorded, luFix);
+const luAgain = await reopened(luFixed);
+const luMatch = (x) => (Array.isArray(x.objects) ? x.objects.find((o) => o.match_teams) : x);
+// each team's lineups (players as sets) and each player's tossups heard
+const luShape = (qbj) => luMatch(qbj).match_teams.map((mt) => ({
+  team: mt.team.name,
+  lineups: mt.lineups.map((l) => [l.first_question, l.players.map((p) => p.name).sort()]),
+  heard: Object.fromEntries(mt.match_players.map((mp) => [mp.player.name, mp.tossups_heard])),
+}));
+
+test('fix lineups: the recorded game differs from the truth', () => {
+  assert.notDeepEqual(luShape(luRecorded.qbj), luShape(luTruth.qbj));
+});
+
+test('fix lineups: the qbj and MODAQ\'s qbj get the true lineups and tossups heard', () => {
+  assert.deepEqual(luShape(luFixed.qbj), luShape(luTruth.qbj));
+  assert.deepEqual(luShape(JSON.parse(luFixed.modaq.qbj)), luShape(JSON.parse(luTruth.modaq.qbj)));
+  // the stats read it the same way: points untouched, tossups heard moved
+  const a = parseMatch(luFixed.qbj);
+  const b = parseMatch(luTruth.qbj);
+  assert.deepEqual(a.teams.map((t) => t.points), b.teams.map((t) => t.points));
+  assert.deepEqual(a.teams.map((t) => t.players.map((p) => [p.name, p.tossupsHeard])), b.teams.map((t) => t.players.map((p) => [p.name, p.tossupsHeard])));
+  // …which the recorded game had otherwise, so the check above has teeth
+  assert.notDeepEqual(parseMatch(luRecorded.qbj).teams[0].players.map((p) => p.tossupsHeard), b.teams[0].players.map((p) => p.tossupsHeard));
+});
+
+test('fix lineups: MODAQ reopens the fixed game to the true lineups', () => {
+  assert.deepEqual(luShape(JSON.parse(luAgain.qbj)), luShape(JSON.parse(luTruth.modaq.qbj)));
+  // and MODAQ's own copy of the game says who started
+  const g = JSON.parse(luFixed.modaq.game);
+  assert.deepEqual(g.players.filter((p) => p.teamName === 'Alpha' && p.isStarter).map((p) => p.name).sort(), ['Ann', 'Bea', 'Dee']);
+  assert.equal(g.cycles[10].subs, undefined); // the recorded swap is gone
+  assert.deepEqual(g.cycles[5].playerJoins.map((e) => e.inPlayer.name), ['Cal']);
+  assert.deepEqual(g.cycles[10].playerJoins.map((e) => e.inPlayer.name), ['Dee']);
+});
+
+test('fix lineups: the view, a roster player added, and lineups it refuses', () => {
+  const v = lineupView(luRecorded);
+  assert.equal(v.questions, 20);
+  assert.deepEqual(v.teams[0].lineups.map((l) => [l.from, [...l.players].sort()]), [[1, ['Ann', 'Bea', 'Cal']], [11, ['Ann', 'Bea', 'Dee']]]);
+  assert.deepEqual(luRecorded, JSON.parse(JSON.stringify(luRecorded))); // untouched by the fix above
+  // Eve, on the roster but never entered, played all game for Cal
+  const eve = applyLineupFix(luRecorded, { Alpha: [{ from: 1, players: ['Ann', 'Bea', 'Eve'] }] });
+  const sh = luShape(eve.qbj)[0];
+  assert.equal(sh.heard.Eve, 20);
+  assert.equal(sh.heard.Cal, 0);
+  assert.ok(JSON.parse(eve.modaq.game).players.some((p) => p.name === 'Eve' && p.teamName === 'Alpha' && p.isStarter));
+  // a change to the same players is no change
+  const same = applyLineupFix(luRecorded, { Alpha: [{ from: 1, players: ['Ann', 'Bea', 'Cal'] }, { from: 4, players: ['Cal', 'Bea', 'Ann'] }] });
+  assert.equal(luShape(same.qbj)[0].lineups.length, 1);
+  assert.throws(() => applyLineupFix(luRecorded, { Alpha: [{ from: 2, players: ['Ann'] }] }), /start on question 1/);
+  assert.throws(() => applyLineupFix(luRecorded, { Alpha: [{ from: 1, players: ['Ann', 'Bob'] }] }), /Bob plays for the other team/);
+  assert.throws(() => applyLineupFix(luRecorded, { Alpha: [{ from: 1, players: ['Ann'] }, { from: 21, players: ['Bea'] }] }), /question 21 is not in this game/);
+  assert.throws(() => applyLineupFix(luRecorded, { Gamma: [{ from: 1, players: ['Ann'] }] }), /Gamma is not in this game/);
 });
 
 /* ---------- a game's round: one stamp, wherever it is written ----------

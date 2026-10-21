@@ -11,6 +11,9 @@ Release Notes for 10/21/2026
 - If another tab saved the schedule or the roster after this tab loaded it, saving asks first. Cancel keeps your edits here, unsaved.
 
 [ SETUP ]
+- Added Paste from sheet for rosters: paste cells from Google Sheets, Excel or Numbers and check the teams before saving.
+- The roster editor is now a compact sheet. Paste a block of cells into it, and drag a seed number to move a team.
+- After Start, saved names change with the ✎ Rename button, so their games follow the new name.
 - The Rooms note now points to the Bye Room link for unofficial scrims, since nothing played there is saved.
 - An uploaded roster now renames a team only when its players match. A new team in a withdrawn team's row starts with no games.
 - The roster Download leaves out the former names qb-td keeps to follow renames.
@@ -21,6 +24,9 @@ Release Notes for 10/21/2026
 - The tiebreaker upload notice uses the singular for one tossup or one bonus.
 
 [ LIVE HUB ]
+- Fix buzzes is now Fix stats, with a Lineups tab to change starters and add or remove substitutions.
+- A game's panel floats over the uploads grid, shows only the upload that counts, and keeps older ones under Show previous uploads.
+- Download sits beside Fix stats and offers the qbj, the game file, or both in one zip.
 - Playoff and Finals slots fill on their own after a team is renamed, also in a hub tab opened before the rename.
 - The Finished rounds only option counts the games of renamed teams.
 - A rename saved in another tab reaches the hub on its next refresh.
