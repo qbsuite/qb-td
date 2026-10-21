@@ -191,7 +191,7 @@ export function renderPacketsUi(box, o) {
           const name = e.name.split('/').pop();
           return { name, data: e.data, guess: guessRound(name) };
         });
-      if (!picked.length) { o.say('No .json or .docx files in the zip', true); return; }
+      if (!picked.length) { run.end(); o.say('No .json or .docx files in the zip', true); return; }
       staged.push(...picked);
       o.say(picked.length + ' packets staged');
       run.end();

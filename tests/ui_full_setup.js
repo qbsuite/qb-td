@@ -1327,11 +1327,10 @@ await runSection('PACKETS', async () => {
   await clearMsg();
   await setFiles('#zipfile', [zip('nothing.zip', [['readme.txt', 'no packets here'], ['__MACOSX/._x.json', 'junk']])]);
   await check('PK-03 zip: a zip with no packets says "No .json or .docx files in the zip"', () => sayIs('No .json or .docx files in the zip', true));
-  // packetsui.js returns before run.end() on that path: the section stays busy
-  ok('PK-03 zip: after a zip with no packets the section stays busy, "Reading zip…" and its buttons off, until the next redraw (reported)',
+  ok('PK-03 zip: after a zip with no packets the section is usable again at once, "Upload packet zip" and its buttons on',
     await js(`(() => { const b = document.querySelector('#pickzip');
-      return b.disabled && b.textContent.trim() === 'Reading zip…' && document.querySelector('#pickfiles').disabled
-        && document.querySelector('#picktb').disabled && document.querySelector('#addslot').disabled; })()`), await text('#pickzip'));
+      return !b.disabled && b.textContent.trim() !== 'Reading zip…' && !document.querySelector('#pickfiles').disabled
+        && !document.querySelector('#picktb').disabled && !document.querySelector('#addslot').disabled; })()`), await text('#pickzip'));
   await openStep('packets');
   await clearMsg();
   await setFiles('#zipfile', [writeFx('broken.zip', 'this is not a zip file at all')]);

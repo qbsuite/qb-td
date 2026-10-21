@@ -891,12 +891,8 @@ await section('SET-07 staging: Upload packet zip / Upload packets / Clear', asyn
     (await msgText()) === 'No .json or .docx files in the zip' && await msgBad() && !(await exists('[data-chip]')), await msgText());
   const stuck = await js(`({ zip: document.querySelector('#pickzip').disabled, label: document.querySelector('#pickzip').textContent,
     files: document.querySelector('#pickfiles').disabled, add: document.querySelector('#addslot').disabled })`);
-  knownBug('SET-07: after a zip with no packets, "Upload packet zip" keeps spinning ("Reading zip…") and Upload packets, Add a packet and the other buttons stay disabled until the tab is redrawn (packetsui.js returns before run.end())',
-    stuck.zip && stuck.label === 'Reading zip…' && stuck.files && stuck.add, stuck);
-  // a redraw (another tab and back) gives the buttons back
-  await toTab('mirrors');
-  await toTab('packets');
-  ok('SET-07: after a redraw the buttons work again', !(await js(`document.querySelector('#pickfiles').disabled`)));
+  ok('SET-07: after a zip with no packets, "Upload packet zip" is usable again at once, and Upload packets and Add a packet are on',
+    !stuck.zip && stuck.label !== 'Reading zip…' && !stuck.files && !stuck.add, stuck);
   await stage([pPacket2]);
   ok('SET-07: "Upload packets" stages loose files the same way: "1 packet staged"', (await msgText()) === '1 packet staged'
     && JSON.stringify(await chips()) === JSON.stringify(['Packet 2.json → Packet 2']), [await msgText(), await chips()]);
