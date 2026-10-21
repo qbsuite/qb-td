@@ -2938,6 +2938,9 @@ async function sectionSpecials(br) {
     const y = await tab.js(`(() => { const box = document.querySelector('#out'); return { text: box.textContent, planted: box.querySelectorAll('img, u, script, b').length, ran: window.__xss || 0 }; })()`);
     return ([...SPECIAL.teams, SPECIAL.phases[0], SPECIAL.pools[0]].every((n) => y.text.includes(n)) && y.planted === 0 && y.ran === 0) || y;
   });
+  // the New click above saved the layout for this origin; the archive
+  // checks below read the Classic report, the layout a new viewer gets
+  await tab.js(`localStorage.removeItem('qbtdStatsLayout'); true`);
   await tab.close();
 
   // archived: the archive page's report, and the static report pages
@@ -3096,10 +3099,10 @@ async function sectionMirror(br) {
   // the mirror rebuilt for any reason (here: its TD saves a setting)
   await saveSettings(T, () => {});
   await settle(T);
-  await check('pub-02 tabs: once the mirror is rebuilt under the lock, the tab is gone and #buzz opens the usual first tab', async () => {
+  await bug('pub-02 tabs: once the mirror is rebuilt under the lock, the tab is gone and #buzz opens the usual first tab', async () => {
     const x = await buzzShown();
-    return (!x[0] && x[1] === 'tab-stats') || x;
-  });
+    return (!x[0] && x[1] === 'tab-stats') || { shown: x[0], open: x[1] };
+  }, 'the cron rebuilds the mirror from TICK_ROW_SELECT (worker.js), which reads no s.settings AS set_settings, so buzzConfig never sees the set\'s lockMirrorBuzz and the rebuilt pubstate.json still has buzz "password"; same at 173a444');
   await must('unlock', call(S, { method: 'POST', json: { settings: {} } }));
   await saveSettings(T, () => {});
   await settle(T);

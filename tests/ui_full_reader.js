@@ -1515,11 +1515,17 @@ await section('R47', 're-exporting replaces the game', async () => {
   const zip = await readZip(new Uint8Array((await downloadFrom(hub, '#dlzip')).bytes));
   const names = zip.map((e) => e.name);
   const entry = (n) => { const e = zip.find((x) => x.name === n); return e ? new TextDecoder().decode(e.data) : null; };
-  // one file per name: an export under a name already there keeps the newest (hubgames.js qbjZipFile)
-  ok('R47 the QBJ bundle keeps the game\'s export under each team order: Round_3_A_B.qbj and Round_3_B_A.qbj',
-    names.includes(`round-3/Round_3_${a}_${b}.qbj`) && names.includes(`round-3/Round_3_${b}_${a}.qbj`), names);
-  ok('R47 under a name used twice, the newest upload\'s file', entry(`round-3/Round_3_${a}_${b}.qbj`) === withProtest.body.modaq.qbj
-    && entry(`round-3/Round_3_${b}_${a}.qbj`) === swapped.body.modaq.qbj);
+  // one set of files per game, the upload the standings count: the newest
+  // per round and pair of teams (hubgames.js qbjZipFile, stats.js
+  // dedupeMatches), named by its own teams in MODAQ's order, so the
+  // re-export with the teams the other way round replaces the first
+  const own = [`round-3/Round_3_${a}_${b}`, `round-3/Round_3_${b}_${a}`];
+  const ofGame = names.filter((n) => own.some((p) => n === p + '.qbj' || n === p + '_Game.json'));
+  ok('R47 the QBJ bundle holds the game once, as its newest upload: Round_3_B_A.qbj and its game file, and no other .qbj',
+    ofGame.join() === `round-3/Round_3_${b}_${a}.qbj,round-3/Round_3_${b}_${a}_Game.json`
+      && names.filter((n) => /^round-\d+\/.*\.qbj$/.test(n)).length === 1, names);
+  ok('R47 its files are the newest upload\'s, byte for byte', entry(`round-3/Round_3_${b}_${a}.qbj`) === swapped.body.modaq.qbj
+    && entry(`round-3/Round_3_${b}_${a}_Game.json`) === swapped.body.modaq.game);
   await hub.click('#dlmenu');
   await hub.waitJs(`!document.querySelector('#dlpanel').hidden`, 'the downloads menu');
   const yft = JSON.parse((await downloadFrom(hub, '#dlyft4')).bytes.toString('utf8'));
