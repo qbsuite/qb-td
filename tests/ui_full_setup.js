@@ -1024,18 +1024,13 @@ await runSection('HUB', async () => {
   const e0 = pageErrors.length;
   await click('[data-view="live"]');
   await waitJs(`!!document.querySelector('#gosetup')`, 'the Live view');
-  // With no rooms the Live view throws while it is wired (admin.js renderLive
-  // sets #autoadv's handler, but the switch is drawn only with rooms), so
-  // nothing wired after it works, the banner's Start tournament included.
+  // With no rooms the Live view is drawn and wired without an error (the
+  // round controls are drawn only with rooms), and its Start tournament asks
   {
-    const known = pageErrors.slice(e0).filter((x) => /renderLive/.test(x) && /setting 'onchange'/.test(x));
-    const n0 = dialogs.length;
-    await click('#livestart');
-    await sleep(600);
-    ok('START-02 live: with no rooms yet, the Live view throws as it is drawn and its Start tournament does nothing (reported)',
-      known.length === 1 && dialogs.length === n0 && !reqCount((r) => r.method === 'POST' && pathOf(r.url) === `${T1.A}/start`), pageErrors.slice(e0));
-    // held apart from the run's own count of page errors, which must stay empty
-    for (const x of known) pageErrors.splice(pageErrors.indexOf(x), 1);
+    const errs = pageErrors.slice(e0).filter((x) => /renderLive/.test(x));
+    const asked = await withDialogs([false], () => click('#livestart'));
+    ok('START-02 live: with no rooms yet, the Live view is drawn without an error and its Start tournament asks the question; Cancel does nothing',
+      errs.length === 0 && /^Start the tournament\?/.test(asked[0] || '') && !reqCount((r) => r.method === 'POST' && pathOf(r.url) === `${T1.A}/start`), [errs, asked]);
   }
   ok('START-02 live: before Start, "Not started" with a Start tournament button', await js(`(() => {
     const b = [...document.querySelectorAll('.banner')].find((x) => x.querySelector('#livestart'));

@@ -2481,15 +2481,15 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       } catch (e) { say(e.message, true); showDetail(); }
     };
   });
-  $('addtoggle').onclick = () => { addOpen = addOpen ? null : { bid: null, round: t.current_round }; render(); };
+  if ($('addtoggle')) $('addtoggle').onclick = () => { addOpen = addOpen ? null : { bid: null, round: t.current_round }; render(); };
   wireForfeit(a, t, buckets, render);
-  $('addcancel').onclick = () => { addOpen = null; render(); };
+  if ($('addcancel')) $('addcancel').onclick = () => { addOpen = null; render(); };
   // Round fills in with the round the picked files say, unless the TD
   // chose one (a grid cell, a room's Upload, or typed in); a round other
   // than the files' is pointed out, since the upload counts under it
   let addRows = [];
   const showAdd = () => { $('addlist').innerHTML = addListHtml(addRows, Number($('addround').value)); };
-  $('addfile').onchange = async () => {
+  if ($('addfile')) $('addfile').onchange = async () => {
     const fs = [...$('addfile').files];
     addRows = fs.map((f) => ({ name: f.name, match: false, round: null }));
     showAdd();
@@ -2500,9 +2500,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     if (said.length === 1 && addOpen && !addOpen.picked) $('addround').value = said[0];
     showAdd();
   };
-  $('addround').oninput = () => { if (addOpen) addOpen.picked = true; showAdd(); };
+  if ($('addround')) $('addround').oninput = () => { if (addOpen) addOpen.picked = true; showAdd(); };
   // Download menu: closed by picking an item, Escape, or a click elsewhere
-  $('dlmenu').onclick = (ev) => {
+  if ($('dlmenu')) $('dlmenu').onclick = (ev) => {
     ev.stopPropagation();
     const open = $('dlpanel').hidden;
     $('dlpanel').hidden = !open;
@@ -2514,7 +2514,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
      ruling made in another tab is kept (saves.js). Nothing goes to the
      room; the moderator applies an upheld ruling in MODAQ and uploads the
      game again. */
-  $('protdrawer').ontoggle = () => { protOpen = $('protdrawer').open; };
+  if ($('protdrawer')) $('protdrawer').ontoggle = () => { protOpen = $('protdrawer').open; };
   box.querySelectorAll('[data-goto]').forEach((el) => {
     el.onclick = () => {
       const d = $(el.dataset.goto);
@@ -2562,8 +2562,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       showDetail();
     } catch (e) { say(e.message, true); }
   };
-  $('setround').onclick = () => goToRound(Number($('curround').value));
-  $('autoadv').onchange = async () => {
+  if ($('setround')) $('setround').onclick = () => goToRound(Number($('curround').value));
+  if ($('autoadv')) $('autoadv').onchange = async () => {
     try {
       const next = { ...settings };
       if ($('autoadv').checked) next.autoAdvance = true;
@@ -2636,8 +2636,8 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     b.onclick = () => editGame(a, buckets, files, Number(b.dataset.editfile));
   });
   wireFix(box, a, t, buckets, files);
-  $('addgame').onclick = () => addGame(a, buckets);
-  $('calc').onclick = () => computeStats(a, t, buckets, files, settings);
+  if ($('addgame')) $('addgame').onclick = () => addGame(a, buckets);
+  if ($('calc')) $('calc').onclick = () => computeStats(a, t, buckets, files, settings);
   wireStatRange(t, files);
 }
 
@@ -3041,6 +3041,7 @@ function wireForfeit(a, t, buckets, render) {
     ffOpen = { bid, round, lose: pair ? pair[0] : '', win: pair ? pair[1] : '' };
   };
   $('fftoggle').onclick = () => {
+  if (!$('fftoggle')) return;
     if (ffOpen) ffOpen = null;
     else prefill(buckets.length ? buckets[0].id : null, t.current_round);
     render();
