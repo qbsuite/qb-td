@@ -1595,6 +1595,10 @@ await section('Settings: New set link (rotation); a page left on the old link', 
   ok('Rotation: OK shows the new link in "Save this link"', !!m && m[1] !== A.secret && link === `${PAGES}/set.html?a=${m[1]}`, link);
   const old = A.secret;
   A.secret = m[1];
+  const early = await storedLinks();
+  ok('Rotation: while "Save this link" is still open, this device already keeps the set under the new link (the old one no longer works)',
+    early.filter((e) => e.slug === A.slug).length === 1 && early.find((e) => e.slug === A.slug).secret === A.secret,
+    early.filter((e) => e.slug === A.slug).map((e) => e.secret === A.secret ? 'new' : 'old'));
   await click('#modalok');
   await waitJs(`location.search === '?a=${A.secret}' && !!document.querySelector('[data-settab]')`, 'the dashboard on the new link');
   ok('Rotation: "Saved it" opens the dashboard on the new link', true);
