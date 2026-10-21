@@ -478,12 +478,12 @@ await flow('2. setup steps');
 
 await goto(`${PAGES}/index.html?a=${secret}`);
 await waitJs(`document.querySelectorAll('.stepbtn').length === 6`, 'the step list');
-ok('2 steps: in order Rooms, Roster, Schedule, Packets + Tiebreakers, MODAQ Settings, Public page',
+ok('2 steps: in order Rooms, Roster, Schedule, Packets + Tiebreakers, MODAQ Settings, Player page',
   JSON.stringify(await js(`[...document.querySelectorAll('.stepbtn')].map((b) => b.dataset.step + ':' + b.querySelector('.slabel').textContent)`))
   === JSON.stringify(['rooms:Rooms', 'roster:Roster', 'sched:Schedule', 'packets:Packets + Tiebreakers',
-    'modaq:MODAQ Settings', 'stats:Public page']));
+    'modaq:MODAQ Settings', 'stats:Player page']));
 for (const [step, heading] of [['roster', 'Roster'], ['sched', 'Schedule'], ['packets', 'Packets'],
-  ['modaq', 'MODAQ settings'], ['stats', 'Public page'], ['rooms', 'Rooms']]) {
+  ['modaq', 'MODAQ settings'], ['stats', 'Player page'], ['rooms', 'Rooms']]) {
   await click(`[data-step="${step}"]`);
   await check(`2 steps: ${step} shows its section`, () => waitJs(
     `document.querySelector('.stepbtn.on') && document.querySelector('.stepbtn.on').dataset.step === ${q(step)}
@@ -1563,7 +1563,7 @@ await click('#dlmenu');
 await waitJs(`!document.querySelector('#dlpanel').hidden`, 'the menu');
 await click('#rebuild');
 await waitJs(`/Stats data rebuilt \\(${good.length} games\\)/.test(document.querySelector('#msg').textContent)`, 'rebuild done', 20000);
-ok('17 exports: Rebuild public stats posts every game', true);
+ok('17 exports: Rebuild player page posts every game', true);
 await tick();
 {
   // the tick returns before its rebuild finishes: wait for the rounds to show

@@ -601,7 +601,7 @@ section('setup', '01 02 03 04 06 07 10 27 28 52: the setup flow, the header and 
   });
   await check('07 setup incomplete: the banner names every step still to do', async () => {
     const b = await bannerTexts(pg);
-    return b[1] === 'Setup incomplete Still to do: Rooms, Roster, Schedule, Packets, MODAQ Settings, Public page Open setup' || b;
+    return b[1] === 'Setup incomplete Still to do: Rooms, Roster, Schedule, Packets, MODAQ Settings, Player page Open setup' || b;
   });
   await check('10 live now: with no rooms, "No rooms yet. Add them under Setup."', async () =>
     (await pg.ntext('.livemain section')).includes('No rooms yet. Add them under Setup.') && !(await pg.exists('.ugrid')));
@@ -640,14 +640,14 @@ section('setup', '01 02 03 04 06 07 10 27 28 52: the setup flow, the header and 
   // the public page's link
   const pubUrl = `${PAGES}/t.html?t=${T.slug}`;
   await pg.click('.hubnav button.linkbtn:not(#rotate)');
-  await check('03 copy public link: the notice says so', async () => { await msgIs(pg, 'Copied public link', false); return true; });
-  await check('03 copy public link: the clipboard holds the public page\'s address', async () => (await pg.js('navigator.clipboard.readText()')) === pubUrl);
+  await check('03 copy player link: the notice says so', async () => { await msgIs(pg, 'Copied player link', false); return true; });
+  await check('03 copy player link: the clipboard holds the public page\'s address', async () => (await pg.js('navigator.clipboard.readText()')) === pubUrl);
   await check('03 open public page: links the same address, in a new tab', () =>
-    pg.js(`(() => { const a = [...document.querySelectorAll('.hubnav a')].find((x) => x.textContent === 'Open public page');
+    pg.js(`(() => { const a = [...document.querySelectorAll('.hubnav a')].find((x) => x.textContent === 'Open player page');
       return !!a && a.href === ${q(pubUrl)} && a.target === '_blank'; })()`));
   {
     const n0 = opened.length;
-    await pg.js(`[...document.querySelectorAll('.hubnav a')].find((x) => x.textContent === 'Open public page').click(); true`);
+    await pg.js(`[...document.querySelectorAll('.hubnav a')].find((x) => x.textContent === 'Open player page').click(); true`);
     await check('03 open public page: clicking it opens the public page in a new tab', async () => {
       const o = await until(() => opened.slice(n0).find((x) => x.url.startsWith(pubUrl)), 'the new tab', 10000);
       await send('Target.closeTarget', { targetId: o.targetId }).catch(() => {});
@@ -1295,7 +1295,7 @@ section('main-uploads', '21 22 23 24 25 26 50: Add a game, moving, deleting and 
   pg.answers.push(false);
   await pg.click(`[data-moveround="${wrong.id}"]`);
   await until(() => pg.dialogs.length > n0, 'the question');
-  await check('23 move round: asks first, in those words', () => pg.dialogs[n0] === 'Move this game from round 2 to round 3? Its stats, buzzpoints and the public page will count it as round 3. Please only do this if the game was filed under the wrong round.' || pg.dialogs[n0]);
+  await check('23 move round: asks first, in those words', () => pg.dialogs[n0] === 'Move this game from round 2 to round 3? Its stats, buzzpoints and the player page will count it as round 3. Please only do this if the game was filed under the wrong round.' || pg.dialogs[n0]);
   await check('23 move round: Cancel keeps it where it is', async () => (await fileRow(T, (f) => f.id === wrong.id)).round === 2);
   await pg.watchTexts(`[data-moveround="${wrong.id}"]`);
   pg.answers.push(true);
@@ -1881,7 +1881,7 @@ section('main-stats', '26 42 43 48: Compute, the Download menu and the QBJ bundl
   });
   await check('43 download menu: on after Compute', () => pg.js(`!document.querySelector('#dlmenu').disabled`));
   await pg.click('#dlmenu');
-  await check('43 download menu: opens, aria-expanded true, five downloads and Rebuild public stats', async () =>
+  await check('43 download menu: opens, aria-expanded true, five downloads and Rebuild player page', async () =>
     (await pg.js(`!document.querySelector('#dlpanel').hidden && document.querySelector('#dlmenu').getAttribute('aria-expanded') === 'true'`))
       && JSON.stringify(await pg.js(`[...document.querySelectorAll('#dlpanel button')].map((b) => b.id)`)) === JSON.stringify(['dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild']));
   // 50: an open menu holds off redraws
@@ -2304,7 +2304,7 @@ section('refresh', '05 09 50: the refresh timing, what holds off a redraw, a fai
   await withLive({ state: 'ok', at: Date.now() }, async () => check('05 mark: just deployed (within 30 s) still reads Updating', async () => (await mark()).startsWith('○Updating') || await mark()));
   await withLive({ state: 'ok', at: Date.now() - 60000 }, async () => check('05 mark: deployed a while ago reads Up to date', async () => (await mark()).startsWith('✓Up to date') || await mark()));
   await withLive({ state: 'failing', since: Date.now() - 120000 }, async () => check('05 mark: deploys failing reads ⚠ Delayed, and says why', async () =>
-    (await mark()) === '⚠Delayed | Publishing to the public page is failing and retrying on its own. Viewers may see older results until it lands.' || await mark()));
+    (await mark()) === '⚠Delayed | Publishing to the player page is failing and retrying on its own. Viewers may see older results until it lands.' || await mark()));
 });
 
 // results for two pools of four (pools2): pool A's Alpha and Delta finish 2–1, Alpha ahead
@@ -2509,7 +2509,7 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
   await pg.waitJs(`!document.querySelector('#dlpanel').hidden`, 'the menu');
   await pg.click('#rebuild');
   await check('49 rebuild: posts every readable upload whatever the pick, and says so', async () => {
-    await msgIs(pg, `Stats data rebuilt (${uploads} games); the public page picks it up within a minute`, false);
+    await msgIs(pg, `Stats data rebuilt (${uploads} games); the player page picks it up within a minute`, false);
     return pg.js(`document.querySelector('#dlpanel').hidden`);
   });
   await pg.click('[data-statph="0"]');

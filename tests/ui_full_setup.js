@@ -628,8 +628,8 @@ await runSection('HOME', async () => {
   const hintNow = () => js(`document.querySelector('#newhint').textContent`);
   await typeInto('#newname', 'Café Open @ USC, 2026!');
   ok('HOME-01 slug: accents fold and other characters become hyphens', (await slugNow()) === 'cafe-open-usc-2026', await slugNow());
-  ok('HOME-02 hint: "Public page: <pages>/t.html?t=<slug>" while the URL name has text',
-    (await hintNow()) === `Public page: ${PAGES}/t.html?t=cafe-open-usc-2026`, await hintNow());
+  ok('HOME-02 hint: "Player page: <pages>/t.html?t=<slug>" while the URL name has text',
+    (await hintNow()) === `Player page: ${PAGES}/t.html?t=cafe-open-usc-2026`, await hintNow());
   await typeInto('#newname', 'aaaaaaaaa bbbbbbbbb ccccccccc ddddddddd eeee');
   ok('HOME-01 slug: at most 40 characters, with no hyphen left at the end',
     (await slugNow()) === 'aaaaaaaaa-bbbbbbbbb-ccccccccc-ddddddddd', await slugNow());
@@ -704,7 +704,7 @@ await runSection('HOME', async () => {
   const forgetSel = `[data-forget="${secret}"]`;
   let asked = await withDialogs([false], () => click(forgetSel));
   ok('HOME-08 remove: asks before removing an open one, and says the tournament is not deleted',
-    asked[0] === 'Remove "Setup Suite Open" from this device?\n\nThe tournament itself is not deleted: its rooms and public page keep working. '
+    asked[0] === 'Remove "Setup Suite Open" from this device?\n\nThe tournament itself is not deleted: its rooms and player page keep working. '
       + 'This device forgets its admin link, so keep a copy if you still need to manage it.', asked[0]);
   ok('HOME-08 remove: Cancel keeps it', await exists(forgetSel) && !(await msgNow()).show);
   await withDialogs([true], () => click(forgetSel));
@@ -1015,16 +1015,16 @@ await runSection('HUB', async () => {
       && h.querySelector('.slug').textContent === ${q(T1.slug)}; })()`), await text('.hubtitle'));
   ok('HUB-02 header: Setup carries a dot while setup is incomplete', await exists('.hubtab[data-view="setup"] .ndot'));
   await click('.hubnav button.linkbtn:not(#rotate)');
-  await sayIs('Copied public link');
-  ok('HUB-02 header: Copy public link copies t.html?t=<slug>', (await clip()) === `${PAGES}/t.html?t=${T1.slug}`, await clip());
-  ok('HUB-02 header: Open public page opens the public page in a new tab',
+  await sayIs('Copied player link');
+  ok('HUB-02 header: Copy player link copies t.html?t=<slug>', (await clip()) === `${PAGES}/t.html?t=${T1.slug}`, await clip());
+  ok('HUB-02 header: Open player page opens the public page in a new tab',
     (await newTab('.hubnav a[target="_blank"]')).startsWith(`${PAGES}/t.html?t=${T1.slug}`));
   ok('HUB-02 header: the public page mark and New admin link are there', await exists('.hubnav #pubmark') && (await text('#rotate')) === 'New admin link');
   // HUB-06 the step list as it starts
   const details = async () => js(`[...document.querySelectorAll('.stepbtn')].map((b) => b.dataset.step + ':' + (b.querySelector('.mark').classList.contains('done') ? '✓' : '○')
     + ':' + b.querySelector('.mark').textContent + ':' + b.querySelector('.sdetail').textContent)`);
   ok('HUB-06 steps: a new tournament: None yet, 0/1 rounds, Not saved, Public, all ○', JSON.stringify(await details()) === JSON.stringify([
-    'rooms:○:○:None yet', 'roster:○:○:None yet', 'sched:○:○:None yet', 'packets:○:○:0/1 rounds', 'modaq:○:○:Not saved', 'stats:○:○:Public']), await details());
+    'rooms:○:○:None yet', 'roster:○:○:None yet', 'sched:○:○:None yet', 'packets:○:○:0/1 rounds', 'modaq:○:○:Not saved', 'stats:○:○:Page on']), await details());
   // HUB-07 / START-02: the Live view's banners
   const e0 = pageErrors.length;
   await click('[data-view="live"]');
@@ -1044,7 +1044,7 @@ await runSection('HUB', async () => {
   ok('HUB-07 live: "Setup incomplete · Still to do: <steps>" with Open setup', await js(`(() => {
     const b = [...document.querySelectorAll('.banner')].find((x) => x.querySelector('#gosetup'));
     return !!b && b.querySelector('.warntext').textContent === 'Setup incomplete'
-      && b.querySelector('.muted').textContent === 'Still to do: Rooms, Roster, Schedule, Packets, MODAQ Settings, Public page'
+      && b.querySelector('.muted').textContent === 'Still to do: Rooms, Roster, Schedule, Packets, MODAQ Settings, Player page'
       && b.querySelector('#gosetup').textContent === 'Open setup'; })()`));
   await click('#gosetup');
   await check('HUB-07 live: Open setup switches to Setup', () => waitJs(`document.querySelector('.hubtab[data-view="setup"]').classList.contains('on')
@@ -1592,11 +1592,11 @@ await runSection('STEP DETAILS', async () => {
   ok('HUB-06 steps: with rooms, roster, schedule, packets and a format: N rooms, Saved, Saved, x/y rounds, the preset', JSON.stringify(await js(`[...document.querySelectorAll('.stepbtn')]
     .map((b) => b.dataset.step + ':' + (b.querySelector('.mark').classList.contains('done') ? '✓' : '○') + ':' + b.querySelector('.sdetail').textContent)`))
     === JSON.stringify([`rooms:✓:${roomsOf(d).length} rooms`, 'roster:✓:Saved', 'sched:✓:Saved', `packets:✓:${d.rounds.length}/${schedRounds} rounds`,
-      'modaq:✓:ACF (no powers)', 'stats:○:Public']), await js(`[...document.querySelectorAll('.sdetail')].map((x) => x.textContent)`));
+      'modaq:✓:ACF (no powers)', 'stats:○:Page on']), await js(`[...document.querySelectorAll('.sdetail')].map((x) => x.textContent)`));
   // the last step: opening it finishes setup, and the page stays on Setup
   await openStep('stats');
   await waitJs(`document.querySelector('[data-step="stats"] .mark').classList.contains('done')`, 'the public page step done');
-  ok('HUB-06 steps: finishing setup on the Public page step keeps the page on Setup, and the Setup dot goes',
+  ok('HUB-06 steps: finishing setup on the Player page step keeps the page on Setup, and the Setup dot goes',
     await js(`document.querySelector('.hubtab[data-view="setup"]').classList.contains('on') && !document.querySelector('.ndot') && !!document.querySelector('#pub')`));
   // Buzzpoints + Scoresheets on, behind a password
   await fill('#buzzmode', 'on', ['change']);
@@ -1607,15 +1607,15 @@ await runSection('STEP DETAILS', async () => {
   await h.next('the password save');
   ok('HUB-10 busy: Set password says "Setting password…"', (await text('#pwset')) === 'Setting password…' && await js(`!!document.querySelector('#pwset .spin')`), await text('#pwset'));
   await h.release();
-  await waitJs(`document.querySelector('[data-step="stats"] .sdetail').textContent === 'Public · Buzzpoints on'`, 'buzzpoints on');
+  await waitJs(`document.querySelector('[data-step="stats"] .sdetail').textContent === 'Page on · Buzzpoints on'`, 'buzzpoints on');
   await waitJs(`!!document.querySelector('#sheetsmode')`, 'the scoresheets switch');
   await fill('#sheetsmode', 'on', ['change']);
-  await check('HUB-06 steps: "Public · Scoresheets on · Buzzpoints on"', () => waitJs(`document.querySelector('[data-step="stats"] .sdetail').textContent === 'Public · Scoresheets on · Buzzpoints on'`, 'both on'));
+  await check('HUB-06 steps: "Page on · Scoresheets on · Buzzpoints on"', () => waitJs(`document.querySelector('[data-step="stats"] .sdetail').textContent === 'Page on · Scoresheets on · Buzzpoints on'`, 'both on'));
   await js(`document.querySelector('#pub').checked = false; document.querySelector('#pub').dispatchEvent(new Event('change')); true`);
   await check('HUB-06 steps: with the page off, "Page off · …"', () => waitJs(`document.querySelector('[data-step="stats"] .sdetail').textContent === 'Page off · Scoresheets on · Buzzpoints on'`, 'page off'));
   await waitJs(`!!document.querySelector('#pub') && !document.querySelector('#pub').checked`, 'redrawn off');
   await js(`document.querySelector('#pub').checked = true; document.querySelector('#pub').dispatchEvent(new Event('change')); true`);
-  await waitJs(`document.querySelector('[data-step="stats"] .sdetail').textContent === 'Public · Scoresheets on · Buzzpoints on'`, 'page on');
+  await waitJs(`document.querySelector('[data-step="stats"] .sdetail').textContent === 'Page on · Scoresheets on · Buzzpoints on'`, 'page on');
   // HUB-01: a tournament with every step done opens on Live
   await openHub(T1);
   await check('HUB-01 load: with every step done, the hub opens on Live', () => waitJs(`document.querySelector('.hubtab[data-view="live"]').classList.contains('on')
@@ -1649,7 +1649,7 @@ await runSection('PUBLIC PAGE MARK', async () => {
   await openHub(T1, 'rooms');
   fake.off();
   ok('HUB-03 mark: while qb-td-live deploys fail it reads Delayed, with a tooltip', (await text('#pubmark')).endsWith('Delayed')
-    && (await js(`document.querySelector('#pubmark').title`)) === 'Publishing to the public page is failing and retrying on its own. Viewers may see older results until it lands.',
+    && (await js(`document.querySelector('#pubmark').title`)) === 'Publishing to the player page is failing and retrying on its own. Viewers may see older results until it lands.',
   await text('#pubmark'));
 });
 
@@ -2061,10 +2061,10 @@ await runSection('HOME RAIL + CLOSED ENTRIES', async () => {
     const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Live now');
     const a = b && [...b.querySelectorAll('a.it')].find((x) => x.textContent.includes('Rail Public Open'));
     return !!a && a.getAttribute('href') === ${q('t.html?t=' + live[0].slug)}; })()`));
-  ok('HOME-09 rail: and names one whose page is off, "public page off", with no link', await js(`(() => {
+  ok('HOME-09 rail: and names one whose page is off, "player page off", with no link', await js(`(() => {
     const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Live now');
     const s = b && [...b.querySelectorAll('.it')].find((x) => x.textContent.includes('Rail Hidden Open'));
-    return !!s && s.tagName === 'SPAN' && s.querySelector('small').textContent === 'public page off'; })()`));
+    return !!s && s.tagName === 'SPAN' && s.querySelector('small').textContent === 'player page off'; })()`));
   {
     const started = (await detail(live[0])).tournament.started;
     const want = await pageDay(started);
@@ -2125,14 +2125,14 @@ await runSection('HOME RAIL + CLOSED ENTRIES', async () => {
   try {
     await home();
     await waitJs(`!!document.querySelector('details[data-fold="yours"] .trow')`, 'the list a week on');
-    ok('HOME-07 closed: a closed tournament shows its name muted with no link, "closed", and a Public page link', await js(`(() => {
+    ok('HOME-07 closed: a closed tournament shows its name muted with no link, "closed", and a Player page link', await js(`(() => {
       const r = [...document.querySelectorAll('details[data-fold="yours"] .trow')].find((x) => x.querySelector('.nm').textContent === ${q(e.name)});
-      const pub = r && [...r.querySelectorAll('a')].find((a) => a.textContent === 'Public page');
+      const pub = r && [...r.querySelectorAll('a')].find((a) => a.textContent === 'Player page');
       return !!r && r.querySelector('.nm').tagName === 'SPAN' && r.querySelector('.nm').classList.contains('muted') && r.querySelector('.st').textContent === 'closed'
         && !!pub && pub.href === ${q(`${PAGES}/t.html?t=${T1.slug}`)}; })()`));
     const asked = await withDialogs([false], () => click(`[data-forget="${e.secret}"]`));
     ok('HOME-08 remove: for a closed one, the question says there is nothing left to manage', asked[0] === `Remove "${e.name}" from this device?\n\n`
-      + 'The tournament itself is not deleted: its rooms and public page keep working. It has closed, so there is nothing left to manage.', asked);
+      + 'The tournament itself is not deleted: its rooms and player page keep working. It has closed, so there is nothing left to manage.', asked);
   } finally {
     await S('Page.removeScriptToEvaluateOnNewDocument', { identifier });
   }

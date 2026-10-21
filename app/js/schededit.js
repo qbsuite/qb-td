@@ -1408,7 +1408,7 @@ function renderEditor(box, env) {
     } catch (e) { run.end(); env.say(e.message, true); }
   };
   q('scheddel').onclick = async () => {
-    if (!confirm('Delete the schedule? Rooms stop preselecting teams and the public page shows no schedule.')) return;
+    if (!confirm('Delete the schedule? Rooms stop preselecting teams and the player page shows no schedule.')) return;
     try {
       await env.del();
       env.setSched(null);

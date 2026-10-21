@@ -168,7 +168,7 @@ function showList() {
             ${live ? `<a class="nm" href="${esc(adminLink(e.secret))}">${esc(e.name)}</a>`
                    : `<span class="nm muted">${esc(e.name)}</span>`}
             <span class="st">${live ? 'open until ' + esc(shortDay(e.closes)) : 'closed'}</span>
-            ${live ? '' : `<a href="${esc(statsLink(e.slug))}">Public page</a>`}
+            ${live ? '' : `<a href="${esc(statsLink(e.slug))}">Player page</a>`}
             <button class="linkbtn muted" data-forget="${esc(e.secret)}" title="Remove from this device's list">Remove</button>
           </div>`;
           }).join('') || `<div class="trow none">None yet. Create one above, or see <a href="about.html#demo">how it works</a> first.</div>`}
@@ -187,7 +187,7 @@ function showList() {
       if (!e) return;
       const open = Date.now() < e.closes;
       if (!confirm(`Remove "${e.name}" from this device?\n\n`
-        + 'The tournament itself is not deleted: its rooms and public page keep working. '
+        + 'The tournament itself is not deleted: its rooms and player page keep working. '
         + (open ? 'This device forgets its admin link, so keep a copy if you still need to manage it.'
           : 'It has closed, so there is nothing left to manage.'))) return;
       forgetLink(e.secret);
@@ -200,7 +200,7 @@ function showList() {
   let ownSlug = false;
   // what the URL name is for: the public page's address, as it will be
   const hint = () => {
-    $('newhint').textContent = $('newslug').value ? 'Public page: ' + statsLink($('newslug').value) : '';
+    $('newhint').textContent = $('newslug').value ? 'Player page: ' + statsLink($('newslug').value) : '';
   };
   $('newname').oninput = () => { if (!ownSlug) $('newslug').value = slugFor($('newname').value); hint(); };
   $('newslug').oninput = () => { ownSlug = $('newslug').value !== ''; hint(); };
@@ -423,7 +423,7 @@ function pubWaiting(t) {
 function pubMarkHtml(t) {
   if (!t.published) return '<span id="pubmark" class="pubstat">Page off</span>';
   if (t.live && t.live.state === 'failing' && !t.pub_dirty) {
-    return '<span id="pubmark" class="pubstat wait" title="Publishing to the public page is failing and retrying on its own. '
+    return '<span id="pubmark" class="pubstat wait" title="Publishing to the player page is failing and retrying on its own. '
       + 'Viewers may see older results until it lands."><span class="mk">&#9888;</span>Delayed</span>';
   }
   return pubWaiting(t)
@@ -469,8 +469,8 @@ function setupSteps(t, buckets, rounds, settings) {
     ['modaq', 'MODAQ Settings', !!settings.gameFormat,
       settings.gameFormat ? (GAME_FORMAT_OPTIONS.find((o) => o.value === formatKey(settings)) || {}).label || 'Saved'
         : 'Not saved'],
-    ['stats', 'Public page', !!settings.statsSeen,
-      (t.published ? 'Public' : 'Page off')
+    ['stats', 'Player page', !!settings.statsSeen,
+      (t.published ? 'Page on' : 'Page off')
         + (settings.scoresheets && (settings.buzz || {}).hash ? ' · Scoresheets on' : '')
         + ((settings.buzz || {}).mode === 'password' ? ' · Buzzpoints on' : '')],
   ];
@@ -517,8 +517,8 @@ function render() {
           missing.length ? ' <span class="ndot" title="Setup incomplete">&bull;</span>' : ''}</button>
         <button class="hubtab ${v === 'live' ? 'on' : ''}" data-view="live">Live</button>
         <span class="spacer" style="flex:1"></span>
-        <button class="linkbtn" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy public link</button>
-        <a href="${esc(statsLink(t.slug))}" target="_blank">Open public page</a>
+        <button class="linkbtn" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'player link')">Copy player link</button>
+        <a href="${esc(statsLink(t.slug))}" target="_blank">Open player page</a>
         ${pubMarkHtml(t)}
         <button id="rotate" class="linkbtn">New admin link</button>
       </nav>
@@ -555,7 +555,7 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
   const box = $('viewbody');
   // the step list is the checklist and the tabs at once: one line per
   // step, its done state and a word on where it stands
-  const LABEL = { packets: 'Packets + Tiebreakers', stats: 'Public page' };
+  const LABEL = { packets: 'Packets + Tiebreakers', stats: 'Player page' };
   box.innerHTML = `
     <div class="setupgrid">
       <aside class="steplist">
@@ -645,7 +645,7 @@ function renderStatsSec(a, t, settings) {
   const canShow = () => hasKey() || open();
   const buzzOn = () => Boolean(settings.buzz && settings.buzz.mode === 'password');
   const sheetsOn = () => settings.scoresheets === true && canShow();
-  const OPEN_WARNING = 'Anyone with the public link will see buzzpoints and scoresheets, and buzzpoints show the '
+  const OPEN_WARNING = 'Anyone with the player link will see buzzpoints and scoresheets, and buzzpoints show the '
     + 'questions of finished rounds. Please only choose this once the question set is clear.';
   const WHAT = { scoresheets: 'scoresheets', buzz: 'buzzpoints' };
 
@@ -679,15 +679,15 @@ function renderStatsSec(a, t, settings) {
 
   const draw = () => {
     box.innerHTML = `
-    <h2>Public page</h2>
+    <h2>Player page</h2>
     <div class="row" style="margin-bottom:6px">
-      <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Public page</label>
+      <label class="row"><input type="checkbox" id="pub" ${t.published ? 'checked' : ''}> Player page</label>
     </div>
     <p class="muted" style="margin:0">Turn on for schedule, semi-live stats, category stats,
       and buzzpoints (if enabled) to be accessible to players.</p>
     <div class="row" style="margin-top:10px">
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
-      <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'public link')">Copy</button>
+      <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'player link')">Copy</button>
     </div>
     <h2>Category stats</h2>
     <div class="row">
@@ -730,7 +730,7 @@ function renderStatsSec(a, t, settings) {
       <p class="muted" style="margin:6px 0 0">Updates buzzpoints when all games during a round finish.</p>
       ${locked ? `<div class="muted" style="font-size:13px;margin-top:6px">The editors of
         <b>${esc(t.set.name)}</b> have switched buzzpoints off for its mirrors while the set is still being
-        played elsewhere, so the public page shows none, whatever is set here.</div>` : ''}
+        played elsewhere, so the player page shows none, whatever is set here.</div>` : ''}
     </div>`;
     wireStats();
   };
@@ -777,7 +777,7 @@ function renderStatsSec(a, t, settings) {
     $('pub').onchange = async () => {
       try {
         await pub(a, { method: 'POST', json: { published: $('pub').checked } });
-        say($('pub').checked ? 'Public page on' : 'Public page off');
+        say($('pub').checked ? 'Player page on' : 'Player page off');
         showDetail();
       } catch (e) { say(e.message, true); }
     };
@@ -818,7 +818,7 @@ function renderStatsSec(a, t, settings) {
         try {
           await saveSettings({ ...settings, statsOpen: true });
           statsUi.want = null; statsUi.changing = false;
-          say('Password disabled: scoresheets and buzzpoints are open to anyone with the public link');
+          say('Password disabled: scoresheets and buzzpoints are open to anyone with the player link');
           showDetail();
         } catch (e) { say(e.message, true); }
       };
@@ -2580,7 +2580,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
                 <button id="dlreport" role="menuitem" class="sep" disabled>HTML report<span class="muted">.zip</span></button>
                 <button id="dlreportfiles" role="menuitem" disabled>HTML report<span class="muted">6 separate files</span></button>
                 <button id="dlzip" role="menuitem" disabled>QBJ bundle<span class="muted">split per game</span></button>
-                <button id="rebuild" role="menuitem" class="sep" disabled>Rebuild public stats</button>
+                <button id="rebuild" role="menuitem" class="sep" disabled>Rebuild player page</button>
               </div>
             </div>
           </div>
@@ -2781,7 +2781,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       if (to === was) return;
       // a game's round decides its stats, its place in the schedule and
       // the public page: ask before moving it
-      if (!confirm(`Move this game from round ${was} to round ${to}? Its stats, buzzpoints and the public page will count it as round ${to}. Please only do this if the game was filed under the wrong round.`)) return;
+      if (!confirm(`Move this game from round ${was} to round ${to}? Its stats, buzzpoints and the player page will count it as round ${to}. Please only do this if the game was filed under the wrong round.`)) return;
       const run = busy(btn, { label: 'Moving' });
       try {
         await pub(a + '/files/' + sel.dataset.fileround, { method: 'POST', json: { round: to } });
@@ -2805,7 +2805,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
    One or the other: By stage (tick the stages to include), or Finished
    rounds only — every round up to the first one still missing a game (a
    round counts once all its games are in). Compute and every download
-   follow; the public page and Rebuild public stats always use every game.
+   follow; the player page and Rebuild player page always use every game.
    The choice lasts the session, per tournament. */
 
 let statPick = null; // {tid, off: [phase index], finished}
@@ -2896,7 +2896,7 @@ function wireStatRange(t, files) {
    re-upload. Nothing new has to store it: stats.js dedupeMatches keys a
    game on its round and team names and keeps the highest file id, so the
    corrected file supersedes the original everywhere — the dashboard, the
-   stat report, the exports and the public page — exactly as a room
+   stat report, the exports and the player page — exactly as a room
    re-uploading its own fixed game already does. The original file stays
    in the uploads list, which is what makes the fix reversible: delete the
    correction and the first upload is live again.
@@ -3778,7 +3778,7 @@ function showStats({ a, t, files, settings, got }) {
         posted += res.entries;
         run.step(i / REBUILD_BATCH + 1);
       }
-      say('Stats data rebuilt (' + posted + ' games); the public page picks it up within a minute');
+      say('Stats data rebuilt (' + posted + ' games); the player page picks it up within a minute');
     } catch (e) { say(e.message, true); }
     run.end();
     closeMenu();

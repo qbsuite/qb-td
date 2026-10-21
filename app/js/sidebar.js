@@ -54,7 +54,7 @@ export async function tournamentLists(now = Date.now()) {
 // name, with its date at the right; a live one that isn't linked says why
 const itemHtml = (t, { dot } = {}) => {
   const body = `<span>${dot ? '<span class="dot"></span>' : ''}${esc(t.name)}${
-    dot && !t.href ? ' <small>public page off</small>' : ''}</span><small>${esc(day(t.at))}</small>`;
+    dot && !t.href ? ' <small>player page off</small>' : ''}</span><small>${esc(day(t.at))}</small>`;
   return t.href ? `<a class="it" href="${esc(t.href)}">${body}</a>` : `<span class="it">${body}</span>`;
 };
 
