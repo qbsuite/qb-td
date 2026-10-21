@@ -7966,7 +7966,8 @@ test('exportfile.js: fileDownloads makes the links fileLinks made, file for file
    engine/exports.js until the hub's cold load asked for one module
    fewer). These hold it to the inline code. tests/hubgames_ref.mjs holds
    the QBJ bundle, its reads included, to admin.js's buildZip as it was,
-   and tests/ui_golden.js the demo hub's downloads, byte for byte. */
+   run on the uploads the standings count, and tests/ui_golden.js the demo
+   hub's downloads, byte for byte. */
 
 test('hubgames.js: the YellowFruit files and the report are the ones showStats built, byte for byte', () => {
   const { yftFile, reportPages, reportZipFile } = hubgamesMod;

@@ -221,8 +221,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   roster's renames. A game re-read with its teams the other way round,
   or fixed by hand later, is in it once. A reader upload saved without
   its game half gives its `.qbj` alone, as its own download does. Game
-  files added by hand (Add a game) go in as they are; under a name the
-  zip already holds, the reader's file is kept.
+  files added by hand (Add a game) go in under the roster's renames,
+  indented as MODAQ writes them; under a name the zip already holds, the
+  reader's file is kept.
 - **Question sets** (`app/set.html`, no account): the editor's side of a
   mirrored tournament. A set's packets, tiebreakers and reader game
   format are uploaded once; each mirror gets an **invite link** the
