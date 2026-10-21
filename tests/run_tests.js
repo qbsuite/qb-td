@@ -6910,6 +6910,57 @@ test('the hub ranks as the public page does: a Finals from the pools keeps a lev
   assert.deepEqual(rrRes.ties.map((x) => [x.level, x.kept]), [[[['Duke', 'Rice', 'Yale']], 'standings']]);
 });
 
+// A single round robin of four whose Finals reads its 1st and 2nd: Ants
+// and Bees go 2–1 with 450 regulation points in 60 regulation tossups
+// each, but Bees won one game on a 21st (overtime) tossup.
+function overtimeLevel() {
+  const four = ['Ants', 'Bees', 'Cats', 'Dogs'];
+  const R = [planPhase('Round robin', { groups: 1 })];
+  const s = buildPlan(four, planRooms(2), R, 'snake', 1);
+  addFinals(s, planGroups(four, R, 'snake', () => 0.5), R, undefined, 'one');
+  tagBrackets(s);
+  // [winner, loser, winner's points, loser's points]; Bees–Cats went to overtime
+  const result = { 'Ants|Dogs': ['Ants', 'Dogs', 200, 100], 'Ants|Cats': ['Cats', 'Ants', 120, 100], 'Ants|Bees': ['Ants', 'Bees', 150, 100],
+    'Bees|Cats': ['Bees', 'Cats', 160, 110], 'Bees|Dogs': ['Bees', 'Dogs', 200, 90], 'Cats|Dogs': ['Dogs', 'Cats', 130, 90] };
+  const side = (name, points, tuh) => {
+    const tens = Math.floor(points / 20);
+    return { name, points, bonusPoints: points - 10 * tens, players: [{ name: name + ' One', tossupsHeard: tuh, counts: [{ value: 10, n: tens }] }] };
+  };
+  const games = s.phases[0].rounds.flatMap((r) => r.games.map((g) => {
+    const [w, l, pw, pl] = result[[g.a.team, g.b.team].sort().join('|')];
+    const ot = w === 'Bees' && l === 'Cats';
+    const n = ot ? 21 : 20;
+    return { round: r.round, tossupsRead: n, teams: [side(w, pw, n), side(l, pl, n)],
+      ...(ot ? { tossupBuzzes: Array.from({ length: 21 }, (_, i) => (i === 20 ? [{ team: 'Bees', value: 10 }] : [])) } : {}) };
+  }));
+  const files = games.map((m, i) => ({ id: i + 1, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
+  return { s, games: games.map((m, i) => ({ ...m, fileId: i + 1 })), files };
+}
+
+test('the hub ranks as the public page does: teams level in regulation, one with an overtime win, fill in the public standings\' order, and the note says so', () => {
+  const { s, games, files } = overtimeLevel();
+  const rd = reportData({ name: 'OT', matches: dedupeMatches(games), roster: null, settings: {}, schedule: s });
+  assert.equal(rd.stageStandings, null);
+  // the public page's one table: level on both counts, Bees listed first
+  // (points per 20 with the overtime in), not by name
+  assert.deepEqual(rd.teams.slice(0, 2).map((t) => [t.name, t.rank, t.pp]), [['Bees', '1=', 150], ['Ants', '1=', 150]]);
+  const res = finalsFill(s, games, finalsProgress(s, files).ready);
+  assert.deepEqual(finalTeams(res.schedule)[0][0], ['Bees', 'Ants']);
+  assert.deepEqual(res.ties.map((x) => [x.record, x.teams.map((t) => t.name), x.level, x.kept]), [['2–1', ['Bees', 'Ants'], [['Bees', 'Ants']], 'overall']]);
+  const saved = autoFillSaved(s, files, games);
+  assert.equal(filledNote(saved.schedule.filled[0]), 'Round robin: Bees and Ants were tied at 2–1 with the same points per 20, so they kept their order in the standings.');
+  // waiting for the TD: the note and the button say the same
+  const held = finalsFill(s, games, finalsProgress(s, files).ready, [], { holdTies: true }).held;
+  assert.deepEqual(held.map((x) => heldLevel(x)), [{ text: ' They have the same points per 20, so filling now keeps their order in the standings.', label: 'Fill in standings order' }]);
+  // without the overtime the standings list them by name, and the note says that
+  const plain = games.map((m) => (m.tossupBuzzes ? { ...m, tossupsRead: 20, tossupBuzzes: undefined,
+    teams: m.teams.map((t) => (t.name === 'Bees' ? { ...t, points: 150, bonusPoints: 80, players: [{ ...t.players[0], tossupsHeard: 20, counts: [{ value: 10, n: 7 }] }] }
+      : { ...t, players: [{ ...t.players[0], tossupsHeard: 20 }] })) } : m));
+  const even = finalsFill(s, plain, finalsProgress(s, files).ready);
+  assert.deepEqual(finalTeams(even.schedule)[0][0], ['Ants', 'Bees']);
+  assert.deepEqual(even.ties.map((x) => x.kept), ['standings']);
+});
+
 // Random days in four shapes whose Finals slots read a bracket's places.
 // Each game has a random winner and ends 300–100, so teams with the same
 // record are level on points per 20 too, and exact ties are common. Each

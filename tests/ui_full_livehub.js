@@ -2541,7 +2541,7 @@ section('finals-held', '38 39: a Finals tie waiting for the TD (a Tiebreakers ro
     JSON.stringify(await noteLines(pg)) === JSON.stringify(['Finals Round robin: Ants and Bees were tied at 2–1 with the same points per 20, so they were placed by name.']) || await noteLines(pg));
 });
 
-section('finals-level-ot', '37 38: teams level on regulation points per 20, one game decided in overtime (a probe; what it finds is noted)', async () => {
+section('finals-level-ot', '37 38: teams level on regulation points per 20, one game decided in overtime', async () => {
   const pg = hub;
   const F = await finalsDay('Finals Level OT');
   const { T } = F;
@@ -2550,14 +2550,15 @@ section('finals-level-ot', '37 38: teams level on regulation points per 20, one 
   for (const g of F.games()) await F.up(g, RES);
   await openLive(pg, T);
   await check('37 finals: teams level on regulation points per 20 still fill the Finals on their own', async () => { await msgIs(pg, 'Filled the Finals from Round robin', false); return true; });
-  const f = await F.savedFinal();
-  const lines = await noteLines(pg);
-  // the note says "placed by name", so Ants (the name first) would be 1st
-  if (lines.some((x) => /so they were placed by name/.test(x)) && f[0].team !== 'Ants') {
-    note(`BUG (Finals fill, teams level on regulation points per 20): the hub's note says "${lines[0].replace(/^Finals /, '')}", but ${f[0].team} is 1st and ${f[1].team} 2nd — `
-      + 'not name order. Among level teams the order falls back to aggregate()\'s, which compares points per 20 with overtime counted (Bees won their game in overtime), '
-      + 'so overtime decides the seeding after all, and the stats table and public standings list them the same way');
-  }
+  // a single round robin has no table of its own on the public page, only
+  // its standings, which list Bees (who won in overtime) ahead of Ants:
+  // the Finals follow that order, and the note says so rather than "by name"
+  await check('37 finals: level teams fill in the public standings\' order, Bees 1st and Ants 2nd', async () => {
+    const f = await F.savedFinal();
+    return (f[0].team === 'Bees' && f[1].team === 'Ants') || f;
+  });
+  await check('38 finals note: "…were tied at 2–1 with the same points per 20, so they kept their order in the standings."', async () =>
+    JSON.stringify(await noteLines(pg)) === JSON.stringify(['Finals Round robin: Bees and Ants were tied at 2–1 with the same points per 20, so they kept their order in the standings.']) || await noteLines(pg));
 });
 
 section('finals-rename', '37: the Finals fill after a team is renamed in another tab, in a hub opened before the rename', async () => {

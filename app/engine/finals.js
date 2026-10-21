@@ -159,9 +159,11 @@ export function finalsSources(schedule, opts = {}) {
 // pool's table (kept 'pool'), a playoff bracket's, or a double round
 // robin's Total (kept 'table'). With none, as for a single round robin or
 // Copy this phase, the public page lists them only in its standings of
-// the whole field, in standings' own order, which ends by name: order
-// null (kept 'standings'). all: the games, as finalsFill has them; rows:
-// the bracket's standings rows here.
+// the whole field (rd.teams), which orders level teams by points per 20
+// with overtime counted, then by name: that order when it shows the
+// bracket's teams over the same games (kept 'overall'), else by name
+// (order null, kept 'standings'). all: the games, as finalsFill has
+// them; rows: the bracket's standings rows here.
 function publicOrder(schedule, src, all, rows, settings) {
   let rd;
   try {
@@ -189,6 +191,8 @@ function publicOrder(schedule, src, all, rows, settings) {
       }
     }
   }
+  const overall = (rd.teams || []).filter((x) => mine.has(x.name));
+  if (overall.length === mine.size && overall.every(same)) return { order: overall.map((x) => x.name), kept: 'overall' };
   return { order: null, kept: 'standings' };
 }
 
@@ -232,7 +236,7 @@ export function finalsProgress(schedule, files) {
  *          kept}], a tie that reaches a finals place, settled by points
  *          per 20; level: [[names…]], its teams level on points per 20
  *          too, which keep the order the public page lists them in, and
- *          kept, which order that is (publicOrder: 'pool', 'table' or
+ *          kept, which order that is (publicOrder: 'pool', 'table', 'overall' or
  *          'standings')
  *   held — the same, waiting for the TD
  */
@@ -263,7 +267,8 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     const ranked = standings(games, null, opts.settings).teams.filter((t) => members.has(t.name));
     const pub = levelRuns(ranked).length ? publicOrder(schedule, src, all, ranked, opts.settings) : { order: null, kept: 'standings' };
     const row = new Map(ranked.map((t) => [t.name, t]));
-    const rows = pub.order ? standingsOrder(pub.order.map((n) => row.get(n))) : ranked;
+    // no public table to follow: level teams by name, as the note says
+    const rows = standingsOrder(pub.order ? pub.order.map((n) => row.get(n)) : [...ranked].sort((x, y) => x.name.localeCompare(y.name)));
     const rec = (t) => t.w + '–' + t.l + (t.t ? '–' + t.t : '');
     const deepest = Math.max(...src.places);
     let hold = false;
@@ -273,9 +278,13 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
       // a tie reaching a finals place: the order decides who plays, or who
       // is the leader
       if (j - i > 1) {
+        const level = levelRuns(rows.slice(i, j)).map((run) => run.map((t) => t.name));
+        // the standings' order, where it is name order anyway, is said as that
+        const byName = level.every((run) => run.join('\n') === [...run].sort((x, y) => x.localeCompare(y)).join('\n'));
+        const kept = pub.kept === 'overall' && byName ? 'standings' : pub.kept;
         const x = { bracket: src.name, record: rec(rows[i]),
           teams: rows.slice(i, j).map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, place: i + k + 1 })),
-          level: levelRuns(rows.slice(i, j)).map((run) => run.map((t) => t.name)), kept: pub.kept, ...(pub.table ? { table: pub.table } : {}) };
+          level, kept, ...(pub.table ? { table: pub.table } : {}) };
         if (holdTies && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
       }
       i = j;
@@ -378,14 +387,16 @@ const andList = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', '
 /**
  * The order a tie's teams level on points per 20 too keep: 'pool' for a
  * pool's tie (autoFill) or a Finals tie from a prelim pool, 'table' for
- * one from another bracket (its table's order), 'standings' with no table
- * of their own (finalsFill `kept`). keptOrder: the same, for the hub's
+ * one from another bracket (its table's order), 'overall' for the public
+ * standings of the whole field where that is not name order, 'standings'
+ * for name order (finalsFill `kept`). keptOrder: the same, for the hub's
  * notes.
  */
-export const keptOf = (x) => (x.pool || x.kept === 'pool' ? 'pool' : x.kept === 'standings' ? 'standings' : 'table');
+export const keptOf = (x) => (x.pool || x.kept === 'pool' ? 'pool' : ['standings', 'overall'].includes(x.kept) ? x.kept : 'table');
 export function keptOrder(x) {
   const kept = keptOf(x);
-  return kept === 'pool' ? 'their pool order' : kept === 'standings' ? 'name order' : `their order in the ${x.table || x.bracket + ' table'}`;
+  return kept === 'pool' ? 'their pool order' : kept === 'standings' ? 'name order' : kept === 'overall' ? 'their order in the standings'
+    : `their order in the ${x.table || x.bracket + ' table'}`;
 }
 // "so they kept …" / "so filling now keeps …": with no public table of
 // their own, the order kept is by name, said plainly
@@ -395,7 +406,7 @@ const keptNow = (x) => (keptOf(x) === 'standings' ? 'filling now places them by 
 /** True when all of a tie's teams were level on points per 20 too. */
 export const allLevel = (x) => !!x.level && x.level.length === 1 && x.level[0].length === x.teams.length;
 
-const KEPT_LABEL = { pool: 'Fill in pool order', table: 'Fill in table order', standings: 'Fill by name' };
+const KEPT_LABEL = { pool: 'Fill in pool order', table: 'Fill in table order', overall: 'Fill in standings order', standings: 'Fill by name' };
 
 /**
  * What the Live Hub adds to a tie waiting for the TD (autoFill's or
