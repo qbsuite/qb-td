@@ -10,7 +10,7 @@
 // ui_golden.js snapshots): the header and its links, the Setup and Live
 // banners, Live now, the uploads grid and its cell panel, moving, deleting
 // and downloading uploads, Add a game, Record a forfeit, Edit in MODAQ
-// (through a real reader round trip), Fix buzzes, protests and rulings,
+// (through a real reader round trip), Fix stats, protests and rulings,
 // advancing rounds, auto-advance, the playoff fill and the Finals fill
 // (with their notes and waiting ties), the stats pick, Compute stats,
 // every download (names with markup in the HTML report among them),
@@ -935,7 +935,14 @@ const panelFiles = (pg) => pg.js(`[...document.querySelectorAll('.cellpanel .pfi
   line: r.querySelector('.pline > span').textContent.replace(/\\s+/g, ' ').trim(), old: r.classList.contains('old'),
   meta: r.querySelector('.pmeta').textContent.replace(/\\s+/g, ' ').trim(),
   hint: (r.querySelector('.warntext:not(.pmeta *)') || {}).textContent ? r.querySelector(':scope > .warntext').textContent.replace(/\\s+/g, ' ').trim() : '',
-  acts: [...r.querySelectorAll('.pacts a, .pacts button')].map((x) => x.textContent.trim()) }))`);
+  acts: [...r.querySelectorAll('.pacts a, .pacts button, .pacts summary')].map((x) => x.textContent.trim()) }))`);
+// the panel's "Show previous uploads (N)" / "Hide previous uploads", or ''
+const prevBtn = (pg) => pg.js(`(document.querySelector('.cellpanel [data-prevuploads]') || {}).textContent || ''`);
+// the older uploads behind Show previous uploads, shown
+const showPrev = async (pg) => {
+  if (/^Show/.test(await prevBtn(pg))) await pg.click('.cellpanel [data-prevuploads]');
+  await pg.waitJs(`/^Hide/.test((document.querySelector('.cellpanel [data-prevuploads]') || {}).textContent || '')`, 'the previous uploads');
+};
 const openCell = async (pg, bid, n) => {
   if (!(await pg.js(`!!document.querySelector('.cellpanel') && !!document.querySelector('[data-cell="${bid}:${n}"].sel')`))) await pg.click(`[data-cell="${bid}:${n}"]`);
   await pg.waitJs(`!!document.querySelector('.cellpanel') && !!document.querySelector('[data-cell="${bid}:${n}"].sel')`, 'the cell ' + bid + ':' + n);
@@ -1023,8 +1030,18 @@ section('main-live', '10 17 18 19 20 53: Live now, the start chips, the uploads 
     const f = await panelFiles(pg);
     return (f.length === 1 && f[0].line === `${p1[0][0]} 120 – 100 ${p1[0][1]}`
       && f[0].meta === `${f11.filename} · combined · ${fmtBytes(f11.size)} 3 protests open`
-      && JSON.stringify(f[0].acts) === JSON.stringify(['qbj', 'game', 'Edit in MODAQ', 'Fix buzzes', 'Delete'])) || f;
+      && JSON.stringify(f[0].acts) === JSON.stringify(['Edit in MODAQ', 'Fix stats', 'Download ▾', 'qbj', 'game', 'Both', 'Delete'])) || f;
   });
+  await check('20 panel: it floats after the grid, in its box, just under its room\'s row', async () => {
+    const p = await pg.js(`(() => { const pop = document.querySelector('#cellpop'); if (!pop) return null; const box = pop.parentElement;
+      const row = document.querySelector('tr[data-urow="${R1.id}"]');
+      return { cls: pop.className, box: box.className, after: pop.previousElementSibling && pop.previousElementSibling.contains(document.querySelector('table.ugrid')),
+        inTable: !!pop.closest('table'), pos: getComputedStyle(pop).position, gap: Math.round(pop.getBoundingClientRect().top - row.getBoundingClientRect().bottom) }; })()`);
+    return (p && p.cls === 'cellpop cellpanel' && p.box === 'ugridbox' && p.after && !p.inTable && p.pos === 'absolute' && p.gap === 4) || p;
+  });
+  await check('20 panel: the two-part upload\'s downloads sit in a closed "Download ▾" menu: qbj, game and Both', () =>
+    pg.js(`(() => { const d = document.querySelector('.cellpanel .pacts details.fdl'); return !!d && !d.open && d.querySelector('summary').textContent.trim() === 'Download ▾'
+      && JSON.stringify([...d.querySelectorAll('.fdlpanel a, .fdlpanel button')].map((x) => x.textContent.trim())) === '["qbj","game","Both"]'; })()`));
   await pg.click('[data-closecell]');
   await check('20 panel: Close closes it', () => pg.waitJs(`!document.querySelector('.cellpanel') && !document.querySelector('.umark.sel')`, 'closed'));
   await pg.click(`[data-cell="${R1.id}:1"]`);
@@ -1129,10 +1146,11 @@ section('main-uploads', '21 22 23 24 25 26 50: Add a game, moving, deleting and 
   await pg.click('#addgame');
   await check('26 add a game: "2 files added to Room 3, round 1"', async () => { await msgIs(pg, '2 files added to Room 3, round 1', false); return true; });
   await check('26 add a game: the button counted the files as they went up', async () => (await pg.seenTexts()).some((x) => /^Uploading… [12] of 2$/.test(x)) || await pg.seenTexts());
-  await check('26 add a game: the panel closes and that cell opens, newest first', async () => {
+  await check('26 add a game: the panel closes and that cell opens on the game, its MODAQ game file beside the match file, nothing behind Show previous uploads', async () => {
     await pg.waitJs(`document.querySelector('#addpanel').hidden && /Round 1 · Room 3/.test((document.querySelector('.cellpanel .phead') || {}).textContent || '')`, 'the cell');
     const f = await panelFiles(pg);
-    return (f.length === 2 && f[0].line === `Round_1_${p1[2][0]}_${p1[2][1]}_Game.json` && f[1].line === `${p1[2][0]} 140 – 60 ${p1[2][1]}`) || f;
+    return (f.length === 2 && f[0].line === `Round_1_${p1[2][0]}_${p1[2][1]}_Game.json` && f[1].line === `${p1[2][0]} 140 – 60 ${p1[2][1]}`
+      && (await prevBtn(pg)) === '') || [f, await prevBtn(pg)];
   });
   await check('26 add a game: the match file went up before its game file, through Room 3', async () => {
     const mine = (await T.detail()).files.filter((f) => f.bucket_id === R3.id && f.round === 1).sort((a, b) => a.id - b.id);
@@ -1201,11 +1219,22 @@ section('main-uploads', '21 22 23 24 25 26 50: Add a game, moving, deleting and 
   const f12b = await T.upload(R2, 1, `Round_1_${p1[1][0]}_${p1[1][1]}.qbtd.json`, readerFile(M.g12b));
   await openLive(pg, T);
   await openCell(pg, R2.id, 1);
-  await check('20 panel: uploads newest first, the older one of the same game "superseded"', async () => {
+  await check('20 panel: only the newest upload of a game shows, the older one behind "Show previous uploads (1)"', async () => {
+    const f = await panelFiles(pg);
+    return (f.length === 1 && f[0].line === `${p1[1][0]} 180 – 80 ${p1[1][1]}` && !f[0].old && (await prevBtn(pg)) === 'Show previous uploads (1)') || [f, await prevBtn(pg)];
+  });
+  await showPrev(pg);
+  await check('20 panel: Show previous uploads lists them newest first, the older one of the same game "superseded", and reads "Hide previous uploads"', async () => {
     const f = await panelFiles(pg);
     return (f.length === 2 && f[0].line === `${p1[1][0]} 180 – 80 ${p1[1][1]}` && !f[0].old
-      && f[1].line === `${p1[1][0]} 60 – 40 ${p1[1][1]} · superseded` && f[1].old) || f;
+      && f[1].line === `${p1[1][0]} 60 – 40 ${p1[1][1]} · superseded` && f[1].old && (await prevBtn(pg)) === 'Hide previous uploads') || [f, await prevBtn(pg)];
   });
+  await pg.click('.cellpanel [data-prevuploads]');
+  await check('20 panel: Hide previous uploads puts them away again', async () => {
+    await pg.waitJs(`/^Show/.test((document.querySelector('.cellpanel [data-prevuploads]') || {}).textContent || '')`, 'hidden again');
+    return (await panelFiles(pg)).length === 1 && (await prevBtn(pg)) === 'Show previous uploads (1)';
+  });
+  await showPrev(pg);
   await check('10 live now: the newest upload counts (no longer in progress)', async () =>
     (await liveRows(pg))[1].game === `${p1[1][0]} 180 – 80 ${p1[1][1]}`);
   let n0 = pg.dialogs.length;
@@ -1292,6 +1321,16 @@ section('main-uploads', '21 22 23 24 25 26 50: Add a game, moving, deleting and 
     await check('25 downloads: its "game" is MODAQ\'s game file, Round_1_<A>_<B>_Game.json', () =>
       (g.name === `Round_1_${p1[0][0]}_${p1[0][1]}_Game.json` && JSON.stringify(JSON.parse(g.bytes.toString('utf8'))) === JSON.stringify(GAME_STORE)) || g.name);
     await check('25 downloads: never the combined upload itself', () => !/qbtd/.test(got.name + g.name) && !('qbj' in JSON.parse(g.bytes.toString('utf8'))));
+    await pg.click('.cellpanel details.fdl summary');
+    await pg.waitJs(`document.querySelector('.cellpanel details.fdl').open`, 'the Download menu');
+    const z = await download(pg, `document.querySelector('.cellpanel [data-dlboth]').click(); true`);
+    const ents = await readZip(new Uint8Array(z.bytes));
+    const ent = (n) => Buffer.from((ents.find((e) => e.name === n) || { data: new Uint8Array() }).data).toString('utf8');
+    await check('25 downloads: Download ▾ > Both is one zip, named after the upload, with the two files under MODAQ\'s names', () =>
+      (z.name === M.f11.filename.replace(/\.qbtd\.json$/, '') + '.zip'
+        && JSON.stringify(ents.map((e) => e.name).sort()) === JSON.stringify([got.name, g.name].sort())
+        && ent(got.name) === got.bytes.toString('utf8') && ent(g.name) === g.bytes.toString('utf8')) || [z.name, ents.map((e) => e.name)]);
+    await check('25 downloads: and the menu closes after', () => pg.waitJs(`!document.querySelector('.cellpanel details.fdl').open`, 'the menu closed'));
   }
   await openCell(pg, R1.id, 2);
   {
@@ -1456,6 +1495,7 @@ section('main-protests', '32 33 34 35: protests in the rail and the drawer, ruli
   await check('33 drawer + rail: nothing open ' + CHG.settings2tabs, async () =>
     (await pg.ntext('#protdrawer > summary .muted')) === 'Nothing open' && /Nothing open/.test(await pg.ntext('.liverail')));
   await openCell(pg, R1.id, 1);
+  await showPrev(pg);
   await check('20 panel: the protest pills: "1 protest · ruled" on the correction, "3 protests · superseded" on the original', async () => {
     const f = await panelFiles(pg);
     return (/1 protest · ruled$/.test(f[0].meta) && /3 protests · superseded$/.test(f[1].meta)) || f.map((x) => x.meta);
@@ -1485,7 +1525,7 @@ section('main-protests', '32 33 34 35: protests in the rail and the drawer, ruli
     JSON.stringify(await railProtest(pg)) === JSON.stringify(['R4 · Room 2 · TU 5', p41[1]]) || await railProtest(pg));
 });
 
-section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the not-started gate', async () => {
+section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the not-started gate', async () => {
   const M = await mainDay();
   const { T, R1, R2, R3, R4, pair, p1 } = M;
   const pg = hub;
@@ -1500,48 +1540,49 @@ section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the n
   await openCell(pg, R1.id, 2);
   await pg.watchTexts('.fixbuzz');
   await pg.click(`[data-fixbuzz="${f21.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix buzzes');
-  await check('30 fix buzzes: "Loading the game…" first', async () => (await pg.seenTexts())[0] === 'Loading the game…' || await pg.seenTexts());
-  await check('30 fix buzzes: Swap players and All buzzes tabs, for a game with buzzes', async () =>
-    JSON.stringify(await pg.js(`[...document.querySelectorAll('[data-fixtab]')].map((b) => b.textContent + (b.classList.contains('on') ? '*' : ''))`)) === '["Swap players*","All buzzes"]');
-  await check('30 fix buzzes: a table per team, counts per value and points', async () => {
+  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
+  await check('30 fix stats: "Loading the game…" first', async () => (await pg.seenTexts())[0] === 'Loading the game…' || await pg.seenTexts());
+  const tabs = () => pg.js(`[...document.querySelectorAll('[data-fixtab]')].map((b) => b.textContent + (b.classList.contains('on') ? '*' : ''))`);
+  await check('30 fix stats: Swap player buzzes, All buzzes and Lineups tabs, for a game with buzzes', async () =>
+    JSON.stringify(await tabs()) === '["Swap player buzzes*","All buzzes","Lineups"]' || await tabs());
+  await check('30 fix stats: a table per team, counts per value, points and tossups heard', async () => {
     const t = await tables();
-    const want = [{ head: [A2, '10', '-5', 'Pts', ''], rows: [['', A2 + ' 1', '1', '1', '5'], ['', A2 + ' 2', '2', '0', '20'], ['', A2 + ' 3', '1', '0', '10']] },
-      { head: [B2, '10', '-5', 'Pts', ''], rows: [['', B2 + ' 1', '1', '0', '10'], ['', B2 + ' 2', '1', '0', '10'], ['', B2 + ' 3', '0', '0', '0']] }];
+    const want = [{ head: [A2, '10', '-5', 'Pts', 'TUH', ''], rows: [['', A2 + ' 1', '1', '1', '5', '20'], ['', A2 + ' 2', '2', '0', '20', '20'], ['', A2 + ' 3', '1', '0', '10', '20']] },
+      { head: [B2, '10', '-5', 'Pts', 'TUH', ''], rows: [['', B2 + ' 1', '1', '0', '10', '20'], ['', B2 + ' 2', '1', '0', '10', '20'], ['', B2 + ' 3', '0', '0', '0', '20']] }];
     return JSON.stringify(t) === JSON.stringify(want) || t;
   });
-  await check('30 fix buzzes: Save correction is off until something changes', async () => !(await saveOn()));
-  await check('30 fix buzzes: a player can swap with a teammate, or with a roster player "Not in this game"', async () => {
+  await check('30 fix stats: Save correction is off until something changes', async () => !(await saveOn()));
+  await check('30 fix stats: a player can swap with a teammate, or with a roster player "Not in this game"', async () => {
     const o = await pg.js(`(() => { const s = document.querySelector('[data-fswap="0:0"]'); return { first: s.options[0].textContent,
       mates: [...s.children].filter((x) => x.tagName === 'OPTION').map((x) => x.value), group: (s.querySelector('optgroup') || {}).label,
       roster: [...s.querySelectorAll('optgroup option')].map((x) => x.value) }; })()`);
     return JSON.stringify(o) === JSON.stringify({ first: 'Swap with', mates: ['', A2 + ' 2', A2 + ' 3'], group: 'Not in this game', roster: [A2 + ' Sub'] }) || o;
   });
   await pg.fill('[data-fswap="0:0"]', A2 + ' 2', ['change']);
-  await check('30 fix buzzes: a teammate swap shows the old counts beside the new, the rows marked', async () => {
+  await check('30 fix stats: a teammate swap shows the old counts beside the new, the rows marked', async () => {
     await pg.waitJs(`!!document.querySelector('.fixbuzz .was')`, 'the swap shown');
     const t = (await tables())[0].rows;
-    return JSON.stringify(t) === JSON.stringify([['*', A2 + ' 1', '1>2', '1>0', '5>20'], ['*', A2 + ' 2', '2>1', '0>1', '20>5'], ['', A2 + ' 3', '1', '0', '10']]) || t;
+    return JSON.stringify(t) === JSON.stringify([['*', A2 + ' 1', '1>2', '1>0', '5>20', '20'], ['*', A2 + ' 2', '2>1', '0>1', '20>5', '20'], ['', A2 + ' 3', '1', '0', '10', '20']]) || t;
   });
-  await check('30 fix buzzes: both players\' lists name the partner, with Undo', async () =>
+  await check('30 fix stats: both players\' lists name the partner, with Undo', async () =>
     JSON.stringify(await pg.js(`['0:0', '0:1'].map((k) => { const s = document.querySelector('[data-fswap="' + k + '"]'); return [s.options[0].textContent, s.value]; })`))
       === JSON.stringify([['Undo', A2 + ' 2'], ['Undo', A2 + ' 1']]));
-  await check('30 fix buzzes: and Save correction is on', () => saveOn());
+  await check('30 fix stats: and Save correction is on', () => saveOn());
   await pg.fill('[data-fswap="0:0"]', A2 + ' 3', ['change']);
-  await check('30 fix buzzes: a player is in one swap at a time (picking again replaces it)', async () => {
+  await check('30 fix stats: a player is in one swap at a time (picking again replaces it)', async () => {
     await pg.waitJs(`document.querySelector('[data-fswap="0:0"]').value === ${q(A2 + ' 3')}`, 'the new swap');
     const t = (await tables())[0].rows;
     return JSON.stringify(t.map((x) => x[0] + x[1])) === JSON.stringify(['*' + A2 + ' 1', A2 + ' 2', '*' + A2 + ' 3']) || t;
   });
-  await check('30 fix buzzes: buzzes moved onto someone not in the lineup are pointed out', async () =>
+  await check('30 fix stats: buzzes moved onto someone not in the lineup are pointed out', async () =>
     (await warn()) === `${A2} 3 was not in the lineup on question 1. ${A2} 3 was not in the lineup on question 4.` || await warn());
   await pg.fill('[data-fswap="0:0"]', '', ['change']);
-  await check('30 fix buzzes: Undo drops the swap: nothing marked, Save off again', async () => {
+  await check('30 fix stats: Undo drops the swap: nothing marked, Save off again', async () => {
     await pg.waitJs(`!document.querySelector('.fixbuzz .was')`, 'undone');
     return !(await saveOn()) && !(await warn()) && !(await pg.exists('.fixbuzz tr.chg'));
   });
   await pg.click('[data-fixtab="all"]');
-  await check('30 fix buzzes: All buzzes lists each buzz, question and player, by team', async () => {
+  await check('30 fix stats: All buzzes lists each buzz, question and player, by team', async () => {
     await pg.waitJs(`!!document.querySelector('.fxbuzzes')`, 'All buzzes');
     const l = await pg.js(`[...document.querySelectorAll('.fxbuzzes > div')].map((d) => [d.querySelector('.fxbh').textContent,
       ...[...d.querySelectorAll('.fxrow')].map((r) => [r.querySelector('.muted').textContent, r.querySelector('select').value, r.querySelector('.num').textContent].join(' '))])`);
@@ -1549,23 +1590,84 @@ section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the n
       [B2, `3 ${B2} 1 10`, `4 ${B2} 2 10`]]) || l;
   });
   await pg.fill('[data-fedit="0:0"]', A2 + ' 3', ['change']);
-  await check('30 fix buzzes: one buzz given to another player: marked, counted, and the lineup warning', async () => {
+  await check('30 fix stats: one buzz given to another player: marked, counted, and the lineup warning', async () => {
     await pg.waitJs(`!!document.querySelector('.fxrow.chg')`, 'the edit');
     const t = (await tables())[0].rows;
-    return (JSON.stringify(t) === JSON.stringify([['*', A2 + ' 1', '1>0', '1', '5>-5'], ['', A2 + ' 2', '2', '0', '20'], ['*', A2 + ' 3', '1>2', '0', '10>20']])
+    return (JSON.stringify(t) === JSON.stringify([['*', A2 + ' 1', '1>0', '1', '5>-5', '20'], ['', A2 + ' 2', '2', '0', '20', '20'], ['*', A2 + ' 3', '1>2', '0', '10>20', '20']])
       && (await warn()) === `${A2} 3 was not in the lineup on question 1.` && await saveOn()) || [t, await warn()];
   });
   await pg.click('[data-fixcancel]');
-  await check('30 fix buzzes: Cancel closes the panel, nothing saved', async () =>
+  await check('30 fix stats: Cancel closes the panel, nothing saved', async () =>
     (await pg.waitJs(`!document.querySelector('.fixbuzz')`, 'closed')) && (await T.detail()).files.filter((f) => f.bucket_id === R1.id && f.round === 2).length === 1);
   await pg.click(`[data-fixbuzz="${f21.id}"]`);
   await pg.waitJs(`!!document.querySelector('[data-fswap]')`, 'open again');
   await pg.click(`[data-fixbuzz="${f21.id}"]`);
-  await check('30 fix buzzes: its button opens and closes the panel', () => pg.waitJs(`!document.querySelector('.fixbuzz')`, 'toggled closed'));
+  await check('30 fix stats: its button opens and closes the panel', () => pg.waitJs(`!document.querySelector('.fixbuzz')`, 'toggled closed'));
+  // Lineups: who started and each substitution, per team, as the
+  // moderator's start card has them (the fixture's file says 20 tossups
+  // heard for everyone; a lineup change counts them from the lineups)
+  const cards = () => pg.js(`[...document.querySelectorAll('.lucards > .lucard')].map((c) => ({
+    head: [...c.querySelectorAll('.luhead > *')].map((x) => x.textContent.trim()).join(' '),
+    on: [...c.querySelectorAll('button.lup')].map((b) => b.dataset.name + (b.classList.contains('on') ? '*' : '')),
+    subs: [...c.querySelectorAll('.lusub')].map((r) => [...r.querySelectorAll('span')].map((x) => x.textContent.trim()).join(' ')) }))`);
+  await pg.click(`[data-fixbuzz="${f21.id}"]`);
+  await pg.waitJs(`!!document.querySelector('[data-fswap]')`, 'open again');
+  await pg.click('[data-fixtab="lineups"]');
+  await check('30 fix stats: Lineups shows each team\'s players, the starters ticked, and its substitutions, as the file has them', async () => {
+    await pg.waitJs(`!!document.querySelector('.lucards')`, 'Lineups');
+    const c = await cards();
+    return (JSON.stringify(c) === JSON.stringify([{ head: `${A2} 2 starting`, on: [A2 + ' 1*', A2 + ' 2*', A2 + ' 3', A2 + ' Sub'], subs: [`Q11 ${A2} 3 joins`] },
+      { head: `${B2} 3 starting`, on: [B2 + ' 1*', B2 + ' 2*', B2 + ' 3*', B2 + ' Sub'], subs: [] }])
+      && !(await pg.exists('[data-fswap]')) && !(await saveOn())) || c;
+  });
+  await pg.click('[data-luaddopen="0"]');
+  await check('30 fix stats: Add substitution opens its form: the question (Q2 on), who comes in and who goes out, each with Nobody', async () => {
+    await pg.waitJs(`!!document.querySelector('.luadd #luaq')`, 'the form');
+    const o = await pg.js(`(() => { const opts = (id) => [...document.querySelector('#' + id).options].map((x) => x.value + '=' + x.textContent);
+      return { q: opts('luaq'), inn: opts('luain'), out: opts('luaout'), btns: [document.querySelector('#luaok').textContent, document.querySelector('#luano').textContent],
+        card: [...document.querySelectorAll('.lucard')].findIndex((c) => c.contains(document.querySelector('.luadd'))) }; })()`);
+    return JSON.stringify(o) === JSON.stringify({ q: Array.from({ length: 19 }, (_, i) => `${i + 2}=Q${i + 2}`),
+      inn: ['=Nobody', `${A2} 3=${A2} 3`, `${A2} Sub=${A2} Sub`], out: ['=Nobody', `${A2} 1=${A2} 1`, `${A2} 2=${A2} 2`], btns: ['Add', 'Cancel'], card: 0 }) || o;
+  });
+  await pg.click('#luano');
+  await check('30 fix stats: its Cancel closes the form, nothing changed', async () =>
+    (await pg.waitJs(`!document.querySelector('.luadd')`, 'the form closed')) && !(await saveOn()) && !(await pg.exists('.fixbuzz tr.chg')));
+  await pg.click('[data-luaddopen="0"]');
+  await pg.waitJs(`!!document.querySelector('#luaq')`, 'the form');
+  await pg.fill('#luaq', '5', ['change']);
+  await pg.waitJs(`document.querySelector('#luaq').value === '5'`, 'Q5');
+  await pg.fill('#luain', A2 + ' Sub', ['change']);
+  await pg.fill('#luaout', A2 + ' 2', ['change']);
+  await pg.click('#luaok');
+  await check('30 fix stats: Add puts the substitution in its place, in MODAQ\'s words, and closes the form', async () => {
+    await pg.waitJs(`!document.querySelector('.luadd') && document.querySelectorAll('.lusub').length === 2`, 'the substitution');
+    const c = await cards();
+    return JSON.stringify(c[0].subs) === JSON.stringify([`Q5 ${A2} Sub in for ${A2} 2`, `Q11 ${A2} 3 joins`]) || c;
+  });
+  await check('30 fix stats: the tables count tossups heard from the new lineups, the roster player added, the rows marked, Save on', async () => {
+    const t = (await tables())[0].rows;
+    return (JSON.stringify(t) === JSON.stringify([['', A2 + ' 1', '1', '1', '5', '20'], ['*', A2 + ' 2', '2', '0', '20', '20>4'],
+      ['*', A2 + ' 3', '1', '0', '10', '20>10'], ['*', A2 + ' Sub from the roster', '0', '0', '0', '0>16']]) && await saveOn()) || t;
+  });
+  await pg.click(`[data-lusubdel="0"][data-sub*='"q":5']`);
+  await check('30 fix stats: × removes a substitution', async () => {
+    await pg.waitJs(`document.querySelectorAll('.lusub').length === 1`, 'one substitution');
+    return JSON.stringify((await cards())[0].subs) === JSON.stringify([`Q11 ${A2} 3 joins`]) || await cards();
+  });
+  await pg.click(`[data-lustart="1"][data-name="${B2} 3"]`);
+  await check('30 fix stats: a starter\'s box takes them out of the starting lineup', async () => {
+    await pg.waitJs(`!document.querySelector('[data-lustart="1"][data-name="${B2} 3"]').classList.contains('on')`, 'unticked');
+    const c = (await cards())[1];
+    const t = (await tables())[1].rows.find((r) => r[1] === B2 + ' 3');
+    return (c.head === `${B2} 2 starting` && JSON.stringify(t) === JSON.stringify(['*', B2 + ' 3', '0', '0', '0', '20>0'])) || [c, t];
+  });
+  await pg.click('[data-fixcancel]');
+  await check('30 fix stats: Cancel drops the lineup changes, nothing saved', async () =>
+    (await pg.waitJs(`!document.querySelector('.fixbuzz')`, 'closed')) && (await T.detail()).files.filter((f) => f.bucket_id === R1.id && f.round === 2).length === 1);
   // a game with no buzzes: no tabs
   const p53 = pair(5, 3);
   const quiet = await T.upload(R4, 5, `Round_5_${p53[0]}_${p53[1]}.qbj`, quickGame(5, p53, gamesOf(p53), [0, 0]));
-  // Edit in MODAQ and Fix buzzes on uploads they can't use
+  // Edit in MODAQ and Fix stats on uploads they can't use
   const p63 = pair(6, 2);
   const lost = await T.upload(R3, 6, `Round_6_${p63[0]}_${p63[1]}.qbtd.json`, readerFile(quickGame(6, p63, gamesOf(p63), [2, 1])));
   const p62 = pair(6, 1);
@@ -1575,14 +1677,14 @@ section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the n
   await openLive(pg, T);
   await openCell(pg, R4.id, 5);
   await pg.click(`[data-fixbuzz="${quiet.id}"]`);
-  await check('30 fix buzzes: a game with no buzzes has no tabs, only its tables', async () => {
+  await check('30 fix stats: a game with no buzzes has no All buzzes tab, only Swap player buzzes and Lineups', async () => {
     await pg.waitJs(`!!document.querySelector('.fixbuzz table.fxteam')`, 'the tables');
-    return !(await pg.exists('[data-fixtab]'));
+    return JSON.stringify(await tabs()) === '["Swap player buzzes*","Lineups"]' || await tabs();
   });
   if (PERSIST) {
     await openCell(pg, R3.id, 6);
     await pg.click(`[data-fixbuzz="${lost.id}"]`);
-    await check('30 fix buzzes: a game that can\'t be loaded says why', async () =>
+    await check('30 fix stats: a game that can\'t be loaded says why', async () =>
       (await pg.waitJs(`(document.querySelector('.fixbuzz.warntext') || {}).textContent || ''`, 'the error')) === 'no such file');
     await pg.click(`.cellpanel [data-editfile="${lost.id}"]`);
     await expectNotice(pg, '29 edit in MODAQ: a stored file that is gone: "could not load the game file (404)"', 'could not load the game file (404)', true);
@@ -1602,12 +1704,12 @@ section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the n
       await expectNotice(pg, '27 edit in MODAQ: before Start, "Start the tournament first…"', 'Start the tournament first: rooms take games only once it has started', true);
       await openCell(pg, R1.id, 2);
       await pg.click(`[data-fixbuzz="${f21.id}"]`);
-      await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix buzzes');
+      await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
       await pg.fill('[data-fswap="0:0"]', A2 + ' 2', ['change']);
       await pg.waitJs(`!document.querySelector('#fixsave').disabled`, 'a change to save');
       await pg.click('#fixsave');
-      await expectNotice(pg, '27 fix buzzes: before Start, Save correction says "Start the tournament first…"', 'Start the tournament first: rooms take games only once it has started', true);
-      await check('27 fix buzzes: and nothing went up', async () => (await T.detail()).files.filter((f) => f.bucket_id === R1.id && f.round === 2).length === 1);
+      await expectNotice(pg, '27 fix stats: before Start, Save correction says "Start the tournament first…"', 'Start the tournament first: rooms take games only once it has started', true);
+      await check('27 fix stats: and nothing went up', async () => (await T.detail()).files.filter((f) => f.bucket_id === R1.id && f.round === 2).length === 1);
     } finally { d1(`UPDATE tournaments SET started = ${was} WHERE id = ${tid}`); }
 
     // 31: Save correction on a game filed under round 3 whose file says round 2 (an upload from before files took their filed round)
@@ -1618,7 +1720,7 @@ section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the n
     const before = await pg.text('#statsnote');
     await openCell(pg, R1.id, 3);
     await pg.click(`[data-fixbuzz="${f21.id}"]`);
-    await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix buzzes');
+    await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
     await pg.fill('[data-fswap="0:0"]', A2 + ' 2', ['change']);
     await pg.waitJs(`!document.querySelector('#fixsave').disabled`, 'a change to save');
     await pg.watchTexts('#fixsave');
@@ -1653,6 +1755,37 @@ section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the n
       const mine = Object.entries(byRound).filter(([, gs]) => gs.some((g) => g.includes(A2) && g.includes(B2))).map(([rd]) => rd);
       return JSON.stringify(mine) === '["3"]' || byRound;
     });
+
+    // 30 31: a substitution saved from Lineups, on the fix that counts now
+    await openCell(pg, R1.id, 3);
+    await pg.click(`[data-fixbuzz="${fix.id}"]`);
+    await pg.waitJs(`!!document.querySelector('[data-fixtab="lineups"]')`, 'Fix stats');
+    await pg.click('[data-fixtab="lineups"]');
+    await pg.click('[data-luaddopen="0"]');
+    await pg.waitJs(`!!document.querySelector('#luaq')`, 'the form');
+    await pg.fill('#luaq', '5', ['change']);
+    await pg.waitJs(`document.querySelector('#luaq').value === '5'`, 'Q5');
+    await pg.fill('#luain', A2 + ' Sub', ['change']);
+    await pg.fill('#luaout', A2 + ' 2', ['change']);
+    await pg.click('#luaok');
+    await pg.waitJs(`!document.querySelector('#fixsave').disabled`, 'a change to save');
+    await pg.click('#fixsave');
+    await check('31 save correction: a lineup change saves as a new upload too', async () => { await msgIs(pg, 'Saved as a new upload. Delete it to undo.', false); return true; });
+    const lu = await until(() => fileRow(T, (f) => f.id > fix.id && f.bucket_id === R1.id && f.filename === f21.filename), 'the lineup fix');
+    const lb = (await T.file(lu)).body;
+    const fb = (await T.file(fix)).body;
+    const la = lb.match_teams[0];
+    await check('31 save correction: its .qbj has the substitution in the team\'s lineups', () => {
+      const got = la.lineups.map((l) => [l.first_question, ...l.players.map((p) => p.name)]);
+      return JSON.stringify(got) === JSON.stringify([[1, A2 + ' 1', A2 + ' 2'], [5, A2 + ' 1', A2 + ' Sub'], [11, A2 + ' 1', A2 + ' Sub', A2 + ' 3']]) || got;
+    });
+    await check('31 save correction: and tossups heard counted from them, the roster player added', () => {
+      const got = Object.fromEntries(la.match_players.map((p) => [p.player.name, p.tossups_heard]));
+      return JSON.stringify(got) === JSON.stringify({ [A2 + ' 1']: 20, [A2 + ' 2']: 4, [A2 + ' 3']: 10, [A2 + ' Sub']: 16 }) || got;
+    });
+    await check('31 save correction: the other team and the buzzes are as they were', () =>
+      (JSON.stringify(lb.match_teams[1]) === JSON.stringify(fb.match_teams[1]) && JSON.stringify(lb.match_questions) === JSON.stringify(fb.match_questions)
+        && scoreOf(lb).join() === scoreOf(fb).join()) || [scoreOf(lb), scoreOf(fb)]);
   }
 });
 
@@ -1719,8 +1852,8 @@ section('main-rename', '51: a team renamed in another tab, in the hub\'s listing
   });
   await openCell(pg, R1.id, 1);
   await pg.click(`.cellpanel [data-fixbuzz="${(M.f11b || M.f11).id}"]`);
-  await check('51 rename: Fix buzzes offers only roster players not in the game, under their new names', async () => {
-    await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix buzzes');
+  await check('51 rename: Fix stats offers only roster players not in the game, under their new names', async () => {
+    await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
     const roster = await pg.js(`[...document.querySelectorAll('[data-fswap="0:0"] optgroup option')].map((x) => x.value)`);
     return JSON.stringify(roster) === JSON.stringify([X + ' Sub']) || roster;
   });
@@ -1994,6 +2127,11 @@ section('edit', '09 29: Edit in MODAQ, through a real reader: the game reopens, 
     JSON.stringify(tuNums(fixBody)) === JSON.stringify(tuNums(origBody)) || [tuNums(fixBody).slice(0, 2), tuNums(origBody).slice(0, 2)]);
   await openLive(pg, T);
   await openCell(pg, room.id, 1);
+  await check('29 edit: in the hub the correction counts, the original behind "Show previous uploads (1)"', async () => {
+    const f = await panelFiles(pg);
+    return (f.length === 1 && !f[0].old && f[0].meta.startsWith(`${fix.filename} · combined`) && (await prevBtn(pg)) === 'Show previous uploads (1)') || [f, await prevBtn(pg)];
+  });
+  await showPrev(pg);
   await check('29 edit: in the hub the original is now "superseded"', async () => {
     const f = await panelFiles(pg);
     return (f.length === 2 && !f[0].old && f[1].old && /superseded$/.test(f[1].line)) || f;
@@ -2006,25 +2144,26 @@ section('edit', '09 29: Edit in MODAQ, through a real reader: the game reopens, 
     return (!f[0].old && f[0].line === 'Ants 10 – 0 Bees') || f;
   });
 
-  // Fix buzzes on the reader's own upload: Ann's tossup was Abe's
+  // Fix stats on the reader's own upload: Ann's tossup was Abe's
   await pg.click(`[data-fixbuzz="${orig.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix buzzes');
+  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
   await pg.fill('[data-fswap="0:0"]', 'Abe', ['change']);
   await pg.waitJs(`!!document.querySelector('#fixsave') && !document.querySelector('#fixsave').disabled`, 'a change to save');
   await pg.click('#fixsave');
-  await check('30 31 fix buzzes on a reader upload: "Saved as a new upload. Delete it to undo."', async () => { await msgIs(pg, 'Saved as a new upload. Delete it to undo.', false); return true; });
+  await check('30 31 fix stats on a reader upload: "Saved as a new upload. Delete it to undo."', async () => { await msgIs(pg, 'Saved as a new upload. Delete it to undo.', false); return true; });
   const fixed = await until(async () => (await T.detail()).files.find((f) => f.kind === 'combined' && f.id > orig.id), 'the fix', 20000);
-  await check('31 fix buzzes on a reader upload: it went up through the room, a newer upload of the same game', () =>
+  await check('31 fix stats on a reader upload: it went up through the room, a newer upload of the same game', () =>
     (fixed.bucket_id === room.id && fixed.round === 1 && fixed.filename === orig.filename) || fixed);
   const [fq, fg] = [(await T.file(fixed, 'qbj')).body, (await T.file(fixed, 'game')).body];
   const gets = (m) => Object.fromEntries(m.match_teams[0].match_players.map((p) => [p.player.name, p.answer_counts.filter((c) => c.answer.value > 0).reduce((n, c) => n + c.number, 0)]));
-  await check('31 fix buzzes on a reader upload: its .qbj gives the tossup to Abe', () => JSON.stringify(gets(fq)) === JSON.stringify({ Ann: 0, Abe: 1 }) || gets(fq));
-  await check('31 fix buzzes on a reader upload: MODAQ\'s game file moves the buzz to Abe too, so Edit in MODAQ agrees', () => {
+  await check('31 fix stats on a reader upload: its .qbj gives the tossup to Abe', () => JSON.stringify(gets(fq)) === JSON.stringify({ Ann: 0, Abe: 1 }) || gets(fq));
+  await check('31 fix stats on a reader upload: MODAQ\'s game file moves the buzz to Abe too, so Edit in MODAQ agrees', () => {
     const cb = JSON.stringify(((fg.cycles || [])[0] || {}).correctBuzz || null);
     return (/"Abe"/.test(cb) && !/"Ann"/.test(cb)) || cb;
   });
   await openCell(pg, room.id, 1);
-  await check('31 fix buzzes on a reader upload: the hub lists the fix first and the original as superseded', async () => {
+  await showPrev(pg);
+  await check('31 fix stats on a reader upload: the hub lists the fix first and the original as superseded', async () => {
     const f = await panelFiles(pg);
     return (f.length === 2 && !f[0].old && f[1].old) || f;
   });
@@ -2697,7 +2836,7 @@ section('report-escape', '10 42 46 47: names with special characters, in the hub
   }
 });
 
-section('room-gone', '21 30 31: a room deleted in another tab while Fix buzzes is open here, and its uploads after', async () => {
+section('room-gone', '21 30 31: a room deleted in another tab while Fix stats is open here, and its uploads after', async () => {
   const pg = hub;
   const T = await newTournament('Room Gone');
   for (const n of ['Room 1', 'Room 2']) await T.addRoom(n);
@@ -2715,7 +2854,7 @@ section('room-gone', '21 30 31: a room deleted in another tab while Fix buzzes i
   await openLive(pg, T);
   await openCell(pg, R2.id, 1);
   await pg.click(`[data-fixbuzz="${f2.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix buzzes');
+  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
   await pg.fill('[data-fswap="0:0"]', players(pairIn(1))[0][1], ['change']);
   await pg.waitJs(`!!document.querySelector('#fixsave') && !document.querySelector('#fixsave').disabled`, 'a change to save');
   // another tab deletes Room 2 meanwhile
@@ -2727,7 +2866,7 @@ section('room-gone', '21 30 31: a room deleted in another tab while Fix buzzes i
     await pg.waitJs(`document.querySelector('#msg').classList.contains('show') && document.querySelector('#msg').classList.contains('bad')`, 'an error');
     const said = await pg.text('#msg');
     if (said !== 'This game\'s room is gone, so it cannot be fixed here') {
-      note(`Fix buzzes, room deleted in another tab: Save correction says "${said}" (the Worker's answer for the dead room link), not "This game's room is gone, so it cannot be fixed here"; that message and Edit in MODAQ's "That game cannot be edited" need a room missing from this tab's own list, which no file the hub shows can have`);
+      note(`Fix stats, room deleted in another tab: Save correction says "${said}" (the Worker's answer for the dead room link), not "This game's room is gone, so it cannot be fixed here"; that message and Edit in MODAQ's "That game cannot be edited" need a room missing from this tab's own list, which no file the hub shows can have`);
     }
     return (await T.detail()).files.length === n0;
   });

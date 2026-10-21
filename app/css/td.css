@@ -452,13 +452,6 @@ table.rgrid { table-layout: fixed; width: 100%; font-size: 13px; background: var
 .rpop input { width: 180px; }
 .rpophead { color: var(--muted); }
 .rpophead b { color: var(--fg); }
-/* Roster: Paste from sheet */
-.pastecard { margin-top: 8px; display: grid; gap: 8px; }
-.pastecard textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.pastetable { overflow-x: auto; }
-.pastetable td { font-size: 14px; }
-.pastebad { outline: 2px solid var(--bad); outline-offset: -2px; border-radius: 3px; }
-span.pastebad { outline-offset: 1px; }
 .rtrack { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 10px; font-size: 14px; }
 .rmark { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .rmark input, .rtrack input { margin: 0; padding: 0; width: 15px; height: 15px; accent-color: var(--link); }
@@ -643,3 +636,5 @@ table.sx th { font-size: 9px; font-weight: 600; text-transform: none; letter-spa
 .sx tfoot td.qs { color: var(--fg); }
 @media (hover: hover) { .sx td[title]:hover { background: var(--hover-bg); } }
 .sxsubs { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+
+.tabnum { font-variant-numeric: tabular-nums; }

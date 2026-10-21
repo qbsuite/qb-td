@@ -308,6 +308,17 @@ const fill = (sel, value, events = ['input', 'change']) => js(`(() => {
   const e = document.querySelector(${q(sel)}); if (!e) throw new Error('nothing matches ' + ${q(sel)});
   e.value = ${q(value)}; for (const t of ${q(events)}) e.dispatchEvent(new Event(t, { bubbles: true }));
   return true; })()`);
+// a key pressed in a field, with its modifiers ({ altKey: true }, …)
+const press = (sel, key, mods = {}) => js(`(() => {
+  const e = document.querySelector(${q(sel)}); if (!e) throw new Error('nothing matches ' + ${q(sel)});
+  e.dispatchEvent(new KeyboardEvent('keydown', { key: ${q(key)}, bubbles: true, cancelable: true, ...${q(mods)} }));
+  return true; })()`);
+// text pasted into a field, as cells copied from a sheet arrive
+const paste = (sel, value) => js(`(() => {
+  const e = document.querySelector(${q(sel)}); if (!e) throw new Error('nothing matches ' + ${q(sel)});
+  const dt = new DataTransfer(); dt.setData('text/plain', ${q(value)});
+  e.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  return true; })()`);
 const text = (sel) => js(`(document.querySelector(${q(sel)}) || {}).textContent || ''`);
 const exists = (sel) => js(`!!document.querySelector(${q(sel)})`);
 async function setFiles(sel, files) {
@@ -331,6 +342,16 @@ async function download(sel) {
   cap('dl', flowId() + '-' + got.name, got.bytes);
   return got;
 }
+// a drag from one element onto another, as the page's drag handlers see it;
+// true when the target took the drop
+const dragOnto = (fromExpr, toExpr) => js(`(() => { const from = ${fromExpr}, to = ${toExpr}; if (!from || !to) throw new Error('drag: nothing there');
+  const dt = new DataTransfer();
+  from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  to.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  const over = to.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  to.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  from.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+  return !over; })()`);
 // a quick check the page shows what it should; a throw from js() fails the check
 async function check(name, fn) {
   let v;
@@ -538,43 +559,94 @@ ok('4 roster: the stored roster is one MODAQ reads (version + a named tournament
 ok('4 roster: it keeps every team and player', roster && JSON.stringify(parseRoster(roster)) === JSON.stringify(parseRoster(badRoster)));
 
 await waitJs(`(document.querySelector('#editroster') || {}).textContent === 'Edit roster'`, 'the saved roster on the page');
+// the roster sheet: a team a row in seed order, its name in column -1 and
+// its players across; the teams it holds (the empty last row is not one)
+const rc = (r, c) => `.rgrid input[data-r="${r}"][data-c="${c}"]`;
+const rosterRows = `document.querySelectorAll('.rgrid [data-delteam]').length`;
+const cellVal = (r, c) => js(`(document.querySelector(${q(rc(r, c))}) || {}).value`);
+const SJ = 'St. John\'s "A"';
 await click('#editroster');
-await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor');
-await click('#addteam');
-await waitJs(`!!document.querySelector('[data-tname="12"]')`, 'a new team card');
-await fill('[data-tname="12"]', 'St. John\'s "A"', ['input']);
-await fill('[data-pname="12.0"]', 'Smith, Jr.', ['input']);
-await fill('[data-pname="12.1"]', 'Ann Lee', ['input']);
-await click('[data-seedup="12"]');
-await waitJs(`document.querySelector('[data-tname="11"]').value === 'St. John\\'s "A"'`, 'moved up a seed');
+await waitJs(`${rosterRows} === 12 && !!document.querySelector(${q(rc(12, -1))})`, 'the roster editor');
+ok('4 roster: the editor is a sheet: Seed, Team, five player columns and +, a row a team in seed order, an empty row last',
+  JSON.stringify(await js(`[...document.querySelectorAll('.rgrid thead th')].map((e) => e.textContent)`))
+    === JSON.stringify(['Seed', 'Team', 'Player 1', 'Player 2', 'Player 3', 'Player 4', 'Player 5', '+', ''])
+  && JSON.stringify(await js(`[...document.querySelectorAll('.rgrid input[data-c="-1"]')].map((e) => e.value)`)) === JSON.stringify([...TEAMS, ''])
+  && await cellVal(3, 4) === player(TEAMS[3], 4) && await text('#rostersave') === 'Save');
+ok('4 roster: before Start a saved name types freely, with no Rename marks',
+  await js(`!document.querySelector('.rgrid input[readonly]') && !document.querySelector('[data-rename], [data-pclear]')`));
+// typing in the empty row adds a team; a block pasted into a cell fills across
+await fill(rc(12, -1), SJ, ['input']);
+await waitJs(`${rosterRows} === 13 && !!document.querySelector(${q(rc(13, -1))})`, 'a new team row');
+await paste(rc(12, 0), 'Smith, Jr.\tDropped\tAnn Lee');
+await waitJs(`document.querySelector(${q(rc(12, 2))}).value === 'Ann Lee'`, 'the pasted players');
+ok('4 roster: a row pasted into a cell fills the cells across', await cellVal(12, 0) === 'Smith, Jr.' && await cellVal(12, 1) === 'Dropped');
+// typing in the + column adds a player column
+await fill(rc(12, 5), 'Sixth', ['input']);
+await waitJs(`!!document.querySelector(${q(rc(12, 6))})`, 'a sixth player column');
+ok('4 roster: typing in the + column adds a player column',
+  await js(`[...document.querySelectorAll('.rgrid thead th')].some((e) => e.textContent === 'Player 6')`));
+// a cleared player cell drops the player on save
+await fill(rc(12, 1), '', ['input']);
+await fill(rc(12, 5), '', ['input']);
+// two rows pasted at the empty row add two teams; × removes them again
+await paste(rc(13, -1), 'Temp A\tA One\nTemp B\tB One\n');
+await waitJs(`${rosterRows} === 15`, 'two pasted teams');
+ok('4 roster: rows pasted into the empty row add teams', await cellVal(13, -1) === 'Temp A' && await cellVal(14, 0) === 'B One');
+await click('[data-delteam="14"]');
+await click('[data-delteam="13"]');
+await waitJs(`${rosterRows} === 13`, 'the pasted teams removed');
+// a problem outlines its cell, says why on hover, and holds Save and Download
+await fill(rc(12, -1), 'Yale', ['input']);
+await waitJs(`document.querySelector('td[data-cell="t12"]').classList.contains('rbad')`, 'the duplicate outlined');
+ok('4 roster: a duplicate team is outlined, says why, and Save and Download wait for it',
+  await js(`document.querySelector('td[data-cell="t12"]').title === 'Duplicate team: Yale'
+    && document.querySelector('#rostersave').disabled && document.querySelector('#rosterdl').disabled`));
+await fill(rc(12, -1), SJ, ['input']);
+await waitJs(`!document.querySelector('.rgrid td.rbad') && !document.querySelector('#rostersave').disabled`, 'the problem gone');
+// seeds: a row's number dragged onto another row, or Alt+Up / Alt+Down
+ok('4 roster: a seed dropped on another row is taken', await dragOnto(`document.querySelector('th.rseed[data-seed="12"]')`,
+  `document.querySelector('.rgrid tr[data-row="10"] td')`));
+await waitJs(`document.querySelector(${q(rc(10, -1))}).value === ${q(SJ)}`, 'moved by drag');
+ok('4 roster: dragging a seed moves the team and says so', (await text('#msg')).includes(SJ + ' is now Seed 11'), await text('#msg'));
+await press(rc(10, 0), 'ArrowDown', { altKey: true });
+await waitJs(`document.querySelector(${q(rc(11, -1))}).value === ${q(SJ)}`, 'moved down a seed');
+ok('4 roster: Alt+Down moves the team a seed down and says so', (await text('#msg')).includes(SJ + ' is now Seed 12')
+  && await cellVal(10, -1) === 'Minnesota' && await cellVal(12, -1) === 'Georgia Tech', await text('#msg'));
 await click('#rostersave');
 roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).length === 13 && r; }, 'edited roster saved');
 {
   const teams = parseRoster(roster);
-  ok('4 roster: the editor saves tricky names intact, in seed order',
-    teams[11].name === 'St. John\'s "A"' && JSON.stringify(teams[11].players) === JSON.stringify(['Smith, Jr.', 'Ann Lee'])
-      && teams[12].name === 'Georgia Tech' && modaqValid(roster), teams.slice(10).map((t) => t.name));
+  ok('4 roster: the editor saves tricky names intact, in seed order, without cleared players',
+    teams[11].name === SJ && JSON.stringify(teams[11].players) === JSON.stringify(['Smith, Jr.', 'Ann Lee'])
+      && teams[12].name === 'Georgia Tech' && modaqValid(roster), teams.slice(10).map((t) => [t.name, t.players]));
 }
-await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+await waitJs(`!document.querySelector('.rgrid')`, 'the editor closed after saving');
 await click('#editroster');
-await waitJs(`!!document.querySelector('[data-delteam="11"]') && document.querySelector('[data-tname="11"]').value === 'St. John\\'s "A"'`, 'editor reopened');
-await click('[data-delteam="11"]');
-await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'team removed');
+await waitJs(`!!document.querySelector('[data-delteam="11"]') && document.querySelector(${q(rc(11, -1))}).value === ${q(SJ)}`, 'editor reopened');
+await press(rc(11, -1), 'ArrowUp', { altKey: true });
+await waitJs(`document.querySelector(${q(rc(10, -1))}).value === ${q(SJ)}`, 'moved up a seed');
+ok('4 roster: Alt+Up moves the team a seed up', await cellVal(11, -1) === 'Minnesota');
+await click('[data-delteam="10"]');
+await waitJs(`${rosterRows} === 12`, 'team removed');
 await click('#rostersave');
 roster = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).length === 12 && r; }, 'roster back to 12');
 ok('4 roster: back to the twelve teams', JSON.stringify(parseRoster(roster).map((t) => t.name)) === JSON.stringify(TEAMS));
 // Undergraduate / Division II marks: nothing without a switch, one kind of
-// box per player per switch, none for a team (its marks follow from its
+// tag per player per switch, none for a team (its marks follow from its
 // players'), and with both switched back off the roster as it was
 {
   const plain = JSON.stringify(roster);
   const count = (sel) => js(`document.querySelectorAll(${q(sel)}).length`);
-  const tickAll = (sel) => js(`(() => { document.querySelectorAll(${q(sel)}).forEach((e) => { if (!e.checked) e.click(); }); return true; })()`);
-  const tags = (ti) => js(`[...document.querySelectorAll('[data-ttags="${ti}"] .ntag')].map((e) => e.textContent).join(',')`);
+  // a player's UG / DII tag is a toggle, on when marked; a team's tags
+  // follow in its name cell
+  const tickAll = (sel) => js(`(() => { for (const k of [...document.querySelectorAll(${q(sel)})].map((e) => e.dataset.pmark)) {
+    const e = document.querySelector('[data-pmark="' + k + '"]'); if (!e.classList.contains('on')) e.click(); } return true; })()`);
+  const isOn = (k) => `document.querySelector('[data-pmark="${k}"]').classList.contains('on')`;
+  const tags = (ti) => js(`[...document.querySelectorAll('td[data-cell="t${ti}"] .ntag')].map((e) => e.textContent).join(',')`);
   const reopen = async () => {
-    await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+    await waitJs(`!document.querySelector('.rgrid')`, 'the editor closed after saving');
     await click('#editroster');
-    await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor again');
+    await waitJs(`${rosterRows} === 12`, 'the roster editor again');
   };
   await reopen();
   ok('4 marks: no UG or DII boxes until a switch is on',
@@ -582,9 +654,10 @@ ok('4 roster: back to the twelve teams', JSON.stringify(parseRoster(roster).map(
       && !(await js(`document.querySelector('#trackug').checked || document.querySelector('#trackd2').checked`)));
   await click('#trackug');
   await waitJs(`document.querySelectorAll('[data-pmark]').length > 0`, 'UG boxes');
-  ok('4 marks: Track Undergrad adds a UG box per player, no DII box, and no box for a team',
-    await count('[data-pmark$=".ug"]') === await count('[data-pname]') && await count('[data-pmark$=".d2"]') === 0
-      && await count('[data-tmark]') === 0 && await count('.card > .row input[type="checkbox"]') === 0);
+  ok('4 marks: Track Undergrad adds a UG tag per player, no DII tag, and no tag to set for a team',
+    await count('[data-pmark$=".ug"]') === await js(`[...document.querySelectorAll('.rgrid input:not([data-c="-1"])')].filter((e) => e.value).length`)
+      && await count('[data-pmark$=".d2"]') === 0 && await count('[data-tmark]') === 0 && await count('td.rteam .rtag') === 0
+      && await count('.rtag.on') === 0);
   await click('[data-pmark="1.0.ug"]');
   ok('4 marks: one UG player does not make a team UG', await tags(1) === '' || await count('[data-pmark^="1."]') === 1, await tags(1));
   await tickAll('[data-pmark^="0."]');
@@ -603,8 +676,7 @@ ok('4 roster: back to the twelve teams', JSON.stringify(parseRoster(roster).map(
   await reopen();
   ok('4 marks: the editor reopens with the switch, the boxes and the team tag as saved',
     await js(`document.querySelector('#trackug').checked && !document.querySelector('#trackd2').checked
-      && document.querySelector('[data-pmark="0.0.ug"]').checked && document.querySelector('[data-pmark="1.0.ug"]').checked
-      && !document.querySelector('[data-pmark="2.0.ug"]').checked`) && await tags(0) === 'UG');
+      && ${isOn('0.0.ug')} && ${isOn('1.0.ug')} && !${isOn('2.0.ug')}`) && await tags(0) === 'UG');
   await click('#trackd2');
   await waitJs(`document.querySelectorAll('[data-pmark$=".d2"]').length > 0`, 'DII boxes');
   await tickAll('[data-pmark^="2."][data-pmark$=".d2"]');
@@ -628,7 +700,26 @@ ok('4 roster: back to the twelve teams', JSON.stringify(parseRoster(roster).map(
   roster = await until(async () => { const r = await storedRoster(); return r && !parseRoster(r).track.trackUG && !parseRoster(r).track.trackDiv2 && r; }, 'plain roster saved');
   ok('4 marks: with both switches off the saved roster is the one from before', JSON.stringify(roster) === plain,
     JSON.stringify(roster).slice(0, 200));
-  await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+  await waitJs(`!document.querySelector('.rgrid')`, 'the editor closed after saving');
+}
+// The whole sheet pasted over the roster, from the first team's name: a
+// team listed twice is outlined and holds Save; without it, the roster
+// saves as it was
+{
+  const sheet = TEAMS.map((tm) => [tm, ...Array.from({ length: PLAYERS }, (_, j) => player(tm, j))].join('\t')).join('\n');
+  const asBefore = JSON.stringify(parseRoster(roster));
+  await click('#editroster');
+  await waitJs(`${rosterRows} === 12`, 'the roster editor');
+  await paste('input[data-r="0"][data-c="-1"]', sheet + '\nYale\tYale Extra');
+  await waitJs(`${rosterRows} === 13`, 'the pasted sheet in the grid');
+  ok('4 paste: a sheet pasted into the grid fills it from that cell, a team listed twice outlined and Save held',
+    await js(`document.querySelector('td[data-cell="t12"]').classList.contains('rbad') && document.querySelector('#rostersave').disabled`));
+  await click('[data-delteam="12"]');
+  await waitJs(`!document.querySelector('#rostersave').disabled`, 'Save free');
+  await click('#rostersave');
+  await waitJs(`!document.querySelector('.rgrid')`, 'the editor closed after saving');
+  roster = await storedRoster();
+  ok('4 paste: saved, the roster is the twelve teams as they were, and MODAQ reads them', JSON.stringify(parseRoster(roster)) === asBefore && modaqValid(roster));
 }
 // the hidden debug roster: absent without ?debug, loads a preset with it
 ok('4 roster: no test-roster loader without ?debug', !(await js(`!!document.querySelector('#dbgroster')`)));
@@ -709,14 +800,6 @@ const slotEl = (p, r, room, side) => `[...document.querySelectorAll('.sgslot[dat
   return x.p === ${p} && x.r === ${r} && x.room === ${room} && x.side === ${q(side)}; })`;
 const cellEl = (p, r, room) => `[...document.querySelectorAll('.sgcell')].find((e) => { const x = JSON.parse(e.dataset.cell); return x.p === ${p} && x.r === ${r} && x.room === ${room}; })`;
 // real DOM drag events with a DataTransfer, the way a mouse drag fires them
-const dragOnto = (fromExpr, toExpr) => js(`(() => { const from = ${fromExpr}, to = ${toExpr}; if (!from || !to) throw new Error('drag: nothing there');
-  const dt = new DataTransfer();
-  from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  to.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  const over = to.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  to.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  from.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
-  return !over; })()`);
 const slotText2 = (p, r, room, side) => js(`(${slotEl(p, r, room, side)}).textContent`);
 const gameAt = (s2, p, r, room) => s2.phases[p].rounds[r].games.find((g) => g.room === room);
 const [t00, t01] = [await slotText2(0, 0, 0, 'a'), await slotText2(0, 0, 1, 'a')];
@@ -1281,6 +1364,8 @@ await waitJs(`document.querySelectorAll('.cellpanel .pfile').length === 2`, 'the
 ok('13 uploads: each file has its own room picker', (await js(`document.querySelectorAll('.cellpanel select[data-movefile]').length`)) === 2);
 ok('13 uploads: the misplaced game says where it was scheduled',
   (await text('.cellpanel')).includes(`Scheduled in ${b3.room_name}.`), await text('.cellpanel'));
+ok('13 uploads: the cell\'s panel floats after the grid, not in a row of it',
+  await js(`!!document.querySelector('.ugridbox > .tablewrap:has(table.ugrid) + #cellpop.cellpop.cellpanel') && !document.querySelector('.ugrid .cellpanel')`));
 d = await detail();
 const stray = d.files.find((f) => f.bucket_id === b4.id && f.round === 2 && f.filename.startsWith(r2[3].base));
 await fill(`select[data-movefile="${stray.id}"]`, String(b3.id), ['change']);
@@ -1352,7 +1437,10 @@ await waitJs(`!document.querySelector('#addpanel').hidden`, 'the Add a game pane
 }
 await waitJs(`document.querySelectorAll('.cellpanel .pfile').length === 2`, 'the new cell open');
 {
+  // the MODAQ game file added with its match file shows beside it, not as an older upload
   const game = d.files.find((y) => y.bucket_id === b5.id && y.round === 2 && y.kind === 'game');
+  ok('13 uploads: the game file added with its match file shows beside it, with nothing behind Show previous uploads',
+    (await exists(`[data-delfile="${game.id}"]`)) && !(await exists('.cellpanel [data-prevuploads]')));
   await click(`[data-delfile="${game.id}"]`);
   d = await until(async () => { const x = await detail(); return !x.files.some((y) => y.id === game.id) && x; }, 'file deleted');
   ok('13 uploads: Delete (confirmed) removes the file', dialogs.some((x) => x.startsWith('Delete this file')));
@@ -2014,33 +2102,63 @@ await flow('24c. renaming a team and a player after games are in');
   await click('[data-step="roster"]');
   await waitJs(`!!document.querySelector('#editroster')`, 'the roster step');
   await click('#editroster');
-  await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor');
-  ok('24c rename: the editor says how renaming works', /To correct a name, type over it/.test(await text('#rosteredit')));
-  const ti = await js(`[...document.querySelectorAll('[data-tname]')].findIndex((e) => e.value === ${q(oldTeam)})`);
-  const pi = await js(`[...document.querySelectorAll('[data-pname^="${ti}."]')].findIndex((e) => e.value === ${q(oldPlayer)})`);
-  await fill(`[data-tname="${ti}"]`, newTeam);
-  await fill(`[data-pname="${ti}.${pi}"]`, newPlayer);
-  ok('24c rename: the team and the player each say what they were renamed from',
-    (await text(`[data-tnote="${ti}"]`)).includes('Renamed from ' + oldTeam)
-      && (await text(`[data-pnote="${ti}.${pi}"]`)).includes('Renamed from ' + oldPlayer)
-      && await exists(`[data-pnew="${ti}.${pi}"]`) && await exists(`[data-tundo="${ti}"]`));
-  // Undo puts the old name back; type it again
+  await waitJs(`${rosterRows} === 12`, 'the roster editor');
+  const ti = await js(`[...document.querySelectorAll('.rgrid input[data-c="-1"]')].findIndex((e) => e.value === ${q(oldTeam)})`);
+  const pi = await js(`[...document.querySelectorAll('.rgrid input[data-r="${ti}"]:not([data-c="-1"])')].findIndex((e) => e.value === ${q(oldPlayer)})`);
+  const tcell = `td[data-cell="t${ti}"]`;
+  const pcell = `td[data-cell="p${ti}.${pi}"]`;
+  // after Start a saved name is not typed over: its Rename box changes it
+  ok('24c rename: after Start the saved names are read-only, each with its Rename button',
+    await js(`document.querySelector(${q(rc(ti, -1))}).readOnly && document.querySelector(${q(rc(ti, pi))}).readOnly
+      && !document.querySelector(${q(rc(12, -1))}).readOnly`)
+      && await exists(`[data-rename="${ti}.-1"]`) && await exists(`[data-rename="${ti}.${pi}"]`) && await exists(`[data-pclear="${ti}.${pi}"]`));
+  const renameTo = async (name) => {
+    await waitJs(`!!document.querySelector('.rpop #rpopname')`, 'the Rename box');
+    await fill('#rpopname', name, ['input']);
+    await click('#rpopok');
+    await waitJs(`!document.querySelector('.rpop')`, 'the Rename box closed');
+  };
+  await click(`[data-rename="${ti}.-1"]`);
+  ok('24c rename: ✎ opens the Rename box on the name', await js(`document.querySelector('#rpopname').value === ${q(oldTeam)}
+    && document.querySelector('#rpopok').textContent === 'Rename'`));
+  await renameTo(newTeam);
+  // a letter typed on a saved name opens its Rename box with that letter
+  await press(rc(ti, pi), 'R');
+  await waitJs(`!!document.querySelector('#rpopname')`, 'the Rename box from typing');
+  ok('24c rename: typing on a saved name opens its Rename box with what was typed', await js(`document.querySelector('#rpopname').value`) === 'R');
+  await click('#rpopno');
+  await waitJs(`!document.querySelector('.rpop') && document.querySelector(${q(rc(ti, pi))}).value === ${q(oldPlayer)}`, 'the Rename box cancelled');
+  await press(rc(ti, pi), 'Enter');
+  await renameTo(newPlayer);
+  ok('24c rename: the team and the player each show they were renamed, and from what',
+    await js(`document.querySelector(${q(tcell)}).classList.contains('rnamed') && document.querySelector(${q(pcell)}).classList.contains('rnamed')`)
+      && (await js(`document.querySelector(${q(tcell)}).title`)).includes('Formerly ' + oldTeam)
+      && (await js(`document.querySelector(${q(pcell)}).title`)).includes('Formerly ' + oldPlayer)
+      && await cellVal(ti, -1) === newTeam && await cellVal(ti, pi) === newPlayer
+      && await exists(`[data-tundo="${ti}"]`) && await exists(`[data-pundo="${ti}.${pi}"]`) && !(await exists('[data-pnew]')));
+  // Undo puts the old name back; rename it again, by F2 this time
   await click(`[data-tundo="${ti}"]`);
-  ok('24c rename: Undo puts the old team name back', await js(`document.querySelector('[data-tname="${ti}"]').value`) === oldTeam);
-  await fill(`[data-tname="${ti}"]`, newTeam);
+  await waitJs(`document.querySelector(${q(rc(ti, -1))}).value === ${q(oldTeam)}`, 'the team name undone');
+  ok('24c rename: Undo puts the old team name back', !(await js(`document.querySelector(${q(tcell)}).classList.contains('rnamed')`)));
+  await press(rc(ti, -1), 'F2');
+  await renameTo(newTeam);
   // another team can't take the old name while its games are this one's
   const other = ti === 0 ? 1 : 0;
-  const otherName = await js(`document.querySelector('[data-tname="${other}"]').value`);
-  await fill(`[data-tname="${other}"]`, oldTeam);
-  ok('24c rename: a freed name is refused for another team', (await text('#rosterproblems')).includes(`${oldTeam} was the name of ${newTeam}`), await text('#rosterproblems'));
-  await fill(`[data-tname="${other}"]`, otherName);
+  const otherName = await cellVal(other, -1);
+  await click(`[data-rename="${other}.-1"]`);
+  await renameTo(oldTeam);
+  ok('24c rename: a freed name is refused for another team',
+    (await js(`document.querySelector('td[data-cell="t${other}"].rbad').title`)).includes(`${oldTeam} was the name of ${newTeam}`)
+      && await js(`document.querySelector('#rostersave').disabled`));
+  await click(`[data-tundo="${other}"]`);
+  await waitJs(`document.querySelector(${q(rc(other, -1))}).value === ${q(otherName)} && !document.querySelector('#rostersave').disabled`, 'the other team as it was');
   await click('#rostersave');
   const saved = await until(async () => { const r = await storedRoster(); return r && parseRoster(r).some((x) => x.name === newTeam) && r; }, 'the renamed roster', 10000);
   const t = parseRoster(saved).find((x) => x.name === newTeam);
   ok('24c rename: the roster keeps the old names', JSON.stringify(t.formerNames) === JSON.stringify([oldTeam])
     && JSON.stringify(t.formerPlayers) === JSON.stringify({ [newPlayer]: [oldPlayer] }), t);
   ok('24c rename: MODAQ still reads the roster', modaqValid(saved));
-  await waitJs(`!document.querySelector('[data-tname]')`, 'the editor closed after saving');
+  await waitJs(`!document.querySelector('.rgrid')`, 'the editor closed after saving');
   if (CAPTURE) {
     // the hub's labels right after this tab's own rename, before any reload
     await click('[data-view="live"]');
@@ -2058,9 +2176,11 @@ await flow('24c. renaming a team and a player after games are in');
     !gotText.includes('_formerNames') && parseRoster(JSON.parse(gotText)).some((x) => x.name === newTeam)
       && modaqValid(JSON.parse(gotText)) && got.name === 'roster.qbj', got.name);
   await click('#editroster');
-  await waitJs(`document.querySelectorAll('[data-tname]').length === 12`, 'the roster editor again');
+  await waitJs(`${rosterRows} === 12`, 'the roster editor again');
   ok('24c rename: reopened, the editor shows the former names',
-    (await text(`[data-tnote="${ti}"]`)).includes('Formerly ' + oldTeam) && (await text(`[data-pnote="${ti}.${pi}"]`)).includes('Formerly ' + oldPlayer));
+    (await js(`document.querySelector(${q(tcell)}).title`)).includes('Formerly ' + oldTeam)
+      && (await js(`document.querySelector(${q(pcell)}).title`)).includes('Formerly ' + oldPlayer)
+      && !(await exists('.rgrid td.rnamed')));
   {
     // the editor's own Download: the roster as the editor holds it, built in the page
     const f = await download('#rosterdl');
@@ -2068,6 +2188,16 @@ await flow('24c. renaming a team and a player after games are in');
     ok('24c rename: the editor\'s Download leaves out the former names too, and MODAQ reads it',
       f.name === 'roster.qbj' && !f.bytes.toString('utf8').includes('_formerNames') && parseRoster(json).some((x) => x.name === newTeam)
         && modaqValid(json) && f.bytes.toString('utf8') === JSON.stringify(json, null, 2), f.name);
+  }
+  {
+    // × on a saved player takes them out of the sheet (left unsaved: the
+    // hub below is a fresh load)
+    const other = ti === 0 ? 1 : 0;
+    const gone = await cellVal(other, 1);
+    await click(`[data-pclear="${other}.1"]`);
+    await waitJs(`document.querySelector(${q(rc(other, PLAYERS - 1))}).value === ''`, 'the player removed');
+    ok('24c rename: × removes a saved player, the rest move up', await cellVal(other, 1) === player(await cellVal(other, -1), 2)
+      && !(await js(`[...document.querySelectorAll('.rgrid input[data-r="${other}"]')].some((e) => e.value === ${q(gone)})`)));
   }
 
   // the hub's stats: one row under the new name, with every game it played
@@ -2241,7 +2371,7 @@ await flow('24e. the set editor: settings saves and the question ledger');
 }
 
 await flow('24f. Fix buzzes on a game whose file says another round');
-/* ---------- 24f. Fix buzzes on a game whose file says another round ----------
+/* ---------- 24f. Fix stats on a game whose file says another round ----------
    A game added before uploads took their filed round can say one round
    and be filed under another. The fix goes up under the filed round, so
    the original takes that round first: the stats keep one game, not two. */
@@ -2252,9 +2382,19 @@ await flow('24f. Fix buzzes on a game whose file says another round');
     { filename: f.filename });
   await openHub();
   await click(`[data-cell="${orig.bucket_id}:3"]`);
-  await waitJs(`!!document.querySelector('[data-fixbuzz="${orig.id}"]')`, 'Fix buzzes on the game');
+  await waitJs(`!!document.querySelector('[data-fixbuzz="${orig.id}"]')`, 'Fix stats on the game');
+  {
+    // (Edit in MODAQ only for a reader upload; a single file's Download is a plain link, not a menu)
+    const acts = await js(`(() => { const acts = document.querySelector('[data-fixbuzz="${orig.id}"]').closest('.pacts');
+      return [...acts.querySelectorAll(':scope > button, :scope > details > summary, :scope > a')].map((e) => e.textContent.trim()).filter((x) => x).join('|'); })()`);
+    ok('24f fix stats: the game\'s actions are Edit in MODAQ, Fix stats, Download, Delete',
+      /^(Edit in MODAQ\|)?Fix stats\|Download( ▾)?\|Delete$/.test(acts), acts);
+  }
   await click(`[data-fixbuzz="${orig.id}"]`);
-  await waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'the Fix buzzes panel');
+  await waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'the Fix stats panel');
+  ok('24f fix stats: tabs for swapping, all buzzes and lineups, and a TUH column per team',
+    /^Swap player buzzes\|(All buzzes\|)?Lineups$/.test(await js(`[...document.querySelectorAll('.fxtabs .fxtab')].map((e) => e.textContent).join('|')`))
+      && await js(`[...document.querySelectorAll('.fxteam')].length === 2 && [...document.querySelectorAll('.fxteam')].every((tb) => [...tb.rows[0].cells].some((c) => c.textContent === 'TUH'))`));
   // the name of a roster player the moderator never entered
   await fill('[data-fswap="0:0"]', await js(`document.querySelector('[data-fswap="0:0"] optgroup option').value`), ['change']);
   await waitJs(`!document.querySelector('#fixsave').disabled`, 'a swap to save');
@@ -2264,6 +2404,17 @@ await flow('24f. Fix buzzes on a game whose file says another round');
   const both = [{ ...(await stored(orig)), fileId: orig.id }, { ...(await stored(fix)), fileId: fix.id }];
   ok('24f fix buzzes: the original and its fix both say the round they are filed under', both.every((m) => m.round === 3), both.map((m) => m.round));
   ok('24f fix buzzes: the stats count the game once', dedupeMatches(both).length === 1 && dedupeMatches(both)[0].fileId === fix.id);
+  // the panel shows the upload that counts; the original waits behind Show previous uploads
+  await openHub();
+  await click(`[data-cell="${orig.bucket_id}:3"]`);
+  await waitJs(`!!document.querySelector('.cellpanel [data-delfile="${fix.id}"]')`, 'the fix in the panel');
+  ok('24f fix stats: the panel shows the fix, and the original only behind Show previous uploads',
+    !(await exists(`.cellpanel [data-delfile="${orig.id}"]`)) && (await text('.cellpanel [data-prevuploads]')).trim() === 'Show previous uploads (1)');
+  await click('.cellpanel [data-prevuploads]');
+  await waitJs(`!!document.querySelector('.cellpanel [data-delfile="${orig.id}"]')`, 'the previous upload');
+  ok('24f fix stats: Show previous uploads lists the original, marked superseded',
+    (await js(`document.querySelector('.cellpanel [data-delfile="${orig.id}"]').closest('.pfile').classList.contains('old')`))
+      && (await text('.cellpanel [data-prevuploads]')).trim() === 'Hide previous uploads');
   // back as it was
   await call(`${A}/files/${fix.id}`, { method: 'DELETE' });
   await call(`${A}/files/${orig.id}`, { method: 'POST', json: { round: 2 } });
@@ -2291,6 +2442,9 @@ await flow('24g. Edit in MODAQ keeps where questions were replaced');
   const opened = async (fileId) => {
     await openHub();
     await click(`[data-cell="${room.id}:1"]`);
+    // the older of the two uploads waits behind Show previous uploads
+    await waitJs(`!!document.querySelector('.cellpanel [data-editfile="${fileId}"], .cellpanel [data-prevuploads]')`, 'the cell panel');
+    if (!(await exists(`.cellpanel [data-editfile="${fileId}"]`))) await click('.cellpanel [data-prevuploads]');
     await waitJs(`!!document.querySelector('.cellpanel [data-editfile="${fileId}"]')`, 'Edit in MODAQ');
     await js(`window.qbtdOpened = []; window.open = (u) => { window.qbtdOpened.push(u); return null; }; true`);
     await click(`.cellpanel [data-editfile="${fileId}"]`);
@@ -2304,6 +2458,28 @@ await flow('24g. Edit in MODAQ keeps where questions were replaced');
   ok('24g edit: an upload with none to rebuild opens as before', old && old.round === 1 && old.tb === undefined
     && old.tbLogged === undefined, old);
   capJson('meta', '24g', { withRecord: meta, without: old });
+  {
+    // a reader upload's Download menu: its qbj, its game, and Both as a zip
+    const menu = await js(`(() => { const b = document.querySelector('.cellpanel [data-dlboth="${without.id}"]'); const m = b && b.closest('details.fdl');
+      return m && { summary: m.querySelector('summary').textContent, items: [...m.querySelectorAll('.fdlpanel a, .fdlpanel button')].map((e) => e.textContent),
+        names: [...m.querySelectorAll('.fdlpanel a')].map((e) => new URL(e.href).searchParams.get('dl')), id: m.querySelector('[data-dlboth]').dataset.dlboth }; })()`);
+    ok('24g edit: Download ▾ offers qbj, game and Both', !!menu && menu.summary === 'Download ▾'
+      && JSON.stringify(menu.items) === JSON.stringify(['qbj', 'game', 'Both']), menu);
+    const acts = await js(`(() => { const p = document.querySelector('.cellpanel [data-delfile="${without.id}"]').closest('.pacts');
+      return [...p.querySelectorAll(':scope > button, :scope > details > summary, :scope > a')].map((e) => e.textContent.trim()).join('|'); })()`);
+    ok('24g edit: a reader upload\'s actions are Edit in MODAQ, Fix stats, Download, Delete',
+      acts === 'Edit in MODAQ|Fix stats|Download ▾|Delete', acts);
+    if (menu) {
+      await js(`document.querySelector('.cellpanel [data-dlboth="${without.id}"]').closest('details').open = true; true`);
+      const z = await download(`.cellpanel [data-dlboth="${menu.id}"]`);
+      const entries = await readZip(new Uint8Array(z.bytes));
+      ok('24g edit: Both downloads one zip of the qbj and the game, under their own names',
+        z.name.endsWith('.zip') && JSON.stringify(entries.map((e) => e.name)) === JSON.stringify(menu.names)
+          && !!parseMatch(JSON.parse(new TextDecoder().decode(entries[0].data)), { filename: entries[0].name })
+          && !!JSON.parse(new TextDecoder().decode(entries[1].data)),
+        [z.name, entries.map((e) => e.name), menu.names]);
+    }
+  }
 }
 
 await flow('24h. games of every shape in one hub');

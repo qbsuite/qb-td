@@ -1787,8 +1787,12 @@ await runSection('START', async () => {
   // START-03
   ok('START-03 rooms: after Start the Test links are gone', !(await js(`[...document.querySelectorAll('.roomtable a')].some((a) => a.textContent === 'Test')`))
     && (await js(`document.querySelectorAll('.roomtable .linkpair a').length`)) === (await js(`document.querySelectorAll('[data-roomrename]').length`)));
-  ok('START-03 rooms: and the note says when room links stop working', (await text('#setupsec p.muted')) === `Room links work until ${await pageLocale(d.tournament.closes)}, when the tournament closes.`,
-    await text('#setupsec p.muted'));
+  // the time left, H:MM:SS, within a few seconds of the tournament's close
+  const leftNote = await text('#setupsec p.muted');
+  const left = /^Room links will stop working in (\d+):(\d\d):(\d\d)\.$/.exec(leftNote);
+  const leftSec = left ? Number(left[1]) * 3600 + Number(left[2]) * 60 + Number(left[3]) : NaN;
+  ok('START-03 rooms: and the note counts down until room links stop working [changed: Under the rooms, a countdown to when room links stop working.]',
+    Math.abs(leftSec - (d.tournament.closes - Date.now()) / 1000) < 10, leftNote);
   // START-01's OK path from the step list, on another tournament
   const TS = await apiTournament('Step Start Open');
   await call(`${TS.A}/buckets`, { method: 'POST', json: { room_name: 'Room 1' } });

@@ -332,16 +332,29 @@ await until(async () => ((await rulingsIn(T2))[k2] || {}).r === 'denied', 'B\'s 
 
 /* ---------- 4. the roster: two editors ---------- */
 
+// the sheet's team rows (its empty last row aside). T2 has started, so a
+// saved name is readonly and is renamed in the Rename box its ✎ opens
+const teamRows = (n) => `document.querySelectorAll('table.rgrid tbody tr[data-row]:not(.rnew)').length === ${n}`;
+const cellSel = (r, c) => `input[data-r="${r}"][data-c="${c}"]`;
+const rename = async (tab, r, c, value) => {
+  await tab.wait(`!!document.querySelector(${JSON.stringify(cellSel(r, c))})?.readOnly`, `a saved name, readonly (${r}.${c})`);
+  await tab.click(`[data-rename="${r}.${c}"]`);
+  await tab.wait(`!!document.querySelector('.rpop #rpopname')`, 'the Rename box');
+  await tab.fill('#rpopname', value, ['input']);
+  await tab.click('#rpopok');
+  await tab.wait(`!document.querySelector('.rpop') && document.querySelector(${JSON.stringify(cellSel(r, c))}).value === ${JSON.stringify(value)}`,
+    'renamed ' + value);
+};
 for (const tab of [A, B]) {
   await tab.view('setup');
   await tab.step('roster', `!!document.querySelector('#editroster')`);
   await tab.click('#editroster');
-  await tab.wait(`document.querySelectorAll('[data-tname]').length === 4`, 'the roster editor');
+  await tab.wait(teamRows(4), 'the roster editor');
 }
-await A.fill('[data-tname="0"]', 'Alpha Prime', ['input']);
+await rename(A, 0, -1, 'Alpha Prime');
 await A.press('#rostersave');
 await until(async () => (await storedRoster(T2))[0].name === 'Alpha Prime', 'A\'s roster');
-await B.fill('[data-pname="1.0"]', 'Beta Newcomer', ['input']);
+await rename(B, 1, 0, 'Beta Newcomer');
 B.answer = false;
 await B.press('#rostersave');
 await B.wait(`document.getElementById('msg').textContent === ${JSON.stringify(ROSTER_KEPT)}`, 'Roster not saved');
@@ -349,7 +362,7 @@ await B.wait(`document.getElementById('msg').textContent === ${JSON.stringify(RO
   const r = await storedRoster(T2);
   ok('4 roster: the second editor is asked', B.dialogs.filter((x) => x === ROSTER_CONFLICT).length === 1, B.dialogs);
   ok('4 roster: Cancel saves nothing and keeps the edits', r[0].name === 'Alpha Prime' && r[1].players[0] === 'Beta P0'
-    && await B.ev(`document.querySelector('[data-pname="1.0"]').value === 'Beta Newcomer'`), r.slice(0, 2));
+    && await B.ev(`document.querySelector('${cellSel(1, 0)}').value === 'Beta Newcomer'`), r.slice(0, 2));
 }
 B.answer = true;
 await B.press('#rostersave');
@@ -378,8 +391,8 @@ await A.open(T2.secret);
 await A.view('setup');
 await A.step('roster', `!!document.querySelector('#editroster')`);
 await A.click('#editroster');
-await A.wait(`document.querySelectorAll('[data-tname]').length === 4`, 'the roster editor again');
-await A.fill('[data-tname="2"]', 'Gamma Ray', ['input']);
+await A.wait(teamRows(4), 'the roster editor again');
+await rename(A, 2, -1, 'Gamma Ray');
 await A.press('#rostersave');
 await until(async () => (await storedRoster(T2))[2].name === 'Gamma Ray', 'A\'s second roster');
 B.answer = true;
@@ -396,8 +409,8 @@ await pick(B);
 await B.wait(`!!document.querySelector('#upconfirm')`, 'the upload preview again');
 await sleep(500);
 await B.click('#editroster');
-await B.wait(`document.querySelectorAll('[data-tname]').length === 5`, 'B\'s editor');
-await B.fill('[data-pname="4.0"]', 'Epsilon Star', ['input']);
+await B.wait(teamRows(5), 'B\'s editor');
+await rename(B, 4, 0, 'Epsilon Star');
 await B.press('#rostersave');
 await until(async () => (await storedRoster(T2))[4].players[0] === 'Epsilon Star', 'B\'s editor save');
 await B.wait(`!!document.querySelector('#upconfirm')`, 'the waiting upload');

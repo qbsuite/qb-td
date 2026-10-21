@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
   rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound, matchPayload } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches, standings } from '../app/engine/stats.js';
-import { pasteGrid, parseRosterPaste, pasteProblems } from '../app/engine/rosterpaste.js';
+import { pasteGrid } from '../app/engine/rosterpaste.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc, mountReport, reportPlace } from '../app/js/reportframe.js';
@@ -205,50 +205,15 @@ test('parseRosterLines rejects junk with line numbers', () => {
   assert.throws(() => parseRosterLines('A: P1\nA: P2'), /line 2: duplicate team A/);
 });
 
-test('roster paste: one team a row, heading row dropped', () => {
-  const text = 'Team\tPlayer 1\tPlayer 2\tPlayer 3\nChicago A\tMaya\tArjun\tTheo\nIllinois A\tDana\tKenji\t\n';
-  const got = parseRosterPaste(text);
-  assert.equal(got.layout, 'rows');
-  assert.deepEqual(got.teams, [
-    { name: 'Chicago A', players: ['Maya', 'Arjun', 'Theo'] },
-    { name: 'Illinois A', players: ['Dana', 'Kenji'] },
-  ]);
-});
-
-test('roster paste: one team a column', () => {
-  const text = 'Chicago A\tIllinois A\tStanford\tPurdue\nMaya\tDana\tLucia\tGrace\nArjun\tKenji\t\tHamza';
-  assert.equal(parseRosterPaste(text).layout, 'rows'); // the default, whatever the shape
-  const got = parseRosterPaste(text, 'cols');
-  assert.deepEqual(got.teams.map((t) => [t.name, t.players.length]),
-    [['Chicago A', 2], ['Illinois A', 2], ['Stanford', 1], ['Purdue', 2]]);
-  // the same cells read as rows
-  assert.deepEqual(parseRosterPaste(text).teams[0], { name: 'Chicago A', players: ['Illinois A', 'Stanford', 'Purdue'] });
-});
-
-test('roster paste: team and player columns, blank team cells keep the team above', () => {
-  const text = 'Team\tPlayer\nChicago A\tMaya\n\tArjun\nIllinois A\tDana\nChicago A\tTheo';
-  const got = parseRosterPaste(text, 'pairs');
-  assert.deepEqual(got.teams, [
-    { name: 'Chicago A', players: ['Maya', 'Arjun', 'Theo'] },
-    { name: 'Illinois A', players: ['Dana'] },
-  ]);
-});
-
 test('roster paste: quoted cells, CRLF, and quotes inside names', () => {
   assert.deepEqual(pasteGrid('"St. John\'s ""A"""\t"Smith, Jr."\r\n"Two\nlines"\tx\r\n'),
     [['St. John\'s "A"', 'Smith, Jr.'], ['Two\nlines', 'x']]);
   // a quote that doesn't close the cell is text
   assert.deepEqual(pasteGrid('"Bud" Smith\tLee'), [['"Bud" Smith', 'Lee']]);
   assert.deepEqual(pasteGrid(''), []);
-  assert.deepEqual(parseRosterPaste('\n\n').teams, []);
-});
-
-test('roster paste: problems are flagged per team', () => {
-  const probs = pasteProblems([
-    { name: 'A', players: ['x', 'x'] }, { name: 'A', players: ['y'] }, { name: '', players: ['z'] }, { name: 'B', players: [] },
-  ]);
-  assert.deepEqual(probs.map((p) => [p.name, p.players, [...p.dupPlayers]]),
-    [[true, false, ['x']], [true, false, []], [true, false, []], [false, true, []]]);
+  assert.deepEqual(pasteGrid('\n\n'), []);
+  // trailing blank cells and rows are dropped, ragged rows padded
+  assert.deepEqual(pasteGrid('A\tB\t\nC\n\n'), [['A', 'B'], ['C', '']]);
 });
 
 test('buildRosterQbj round-trips through parseRoster', () => {

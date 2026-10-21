@@ -35,7 +35,7 @@ import '../engine/yft3.js';
 import '../engine/report.js';
 import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
-import { parseRosterPaste, pasteProblems, pasteGrid } from '../engine/rosterpaste.js';
+import { pasteGrid } from '../engine/rosterpaste.js';
 import { renderPacketsUi, stagedBlob, endSentence, tbSplitNote } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
@@ -318,9 +318,6 @@ let rosterTrack = { trackUG: false, trackDiv2: false };
 // parsed upload awaiting confirmation; renames and etag: what it renames
 // against the saved roster, and that copy's etag (renderUpPreview)
 let rosterUpload = null;
-// Paste from sheet: { text, layout, teams } while its card is open
-// (renderPasteBox)
-let rosterPaste = null;
 
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
@@ -336,6 +333,16 @@ function clockTime(ms) {
 function fmtWhen(ms) {
   return new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
+// Under the rooms after Start: how long the room links have left, counting
+// down each second (H:MM:SS; past a day the hours keep counting)
+function fmtLeft(ms) {
+  const sec = Math.max(0, Math.floor((ms - Date.now()) / 1000));
+  const two = (n) => String(n).padStart(2, '0');
+  return `${Math.floor(sec / 3600)}:${two(Math.floor(sec / 60) % 60)}:${two(sec % 60)}`;
+}
+setInterval(() => {
+  document.querySelectorAll('[data-until]').forEach((el) => { el.textContent = fmtLeft(Number(el.dataset.until)); });
+}, 1000);
 
 /* ---------- data fetch + top-level render ---------- */
 
@@ -919,7 +926,7 @@ function renderRoomsSec(a, t, buckets, files) {
       }).join('')}
     </table></div>
     <p class="muted" style="font-size:13px;margin:6px 0 0">${t.started
-      ? `Room links work until ${esc(new Date(t.closes).toLocaleString())}, when the tournament closes.`
+      ? `Room links will stop working in <span class="tabnum" data-until="${t.closes}">${fmtLeft(t.closes)}</span>.`
       : 'Room links show &ldquo;Tournament hasn&rsquo;t started&rdquo; until you press Start tournament. '
         + 'Test simulates a room for json testing purposes without needing to start the tournament. '
         + 'Games that are exported from test rooms are NOT saved. Please use the Bye Room link for unofficial scrims, since nothing played there is saved.'}</p>`
@@ -1300,7 +1307,6 @@ function renderRosterSec(a, t) {
       <span class="spacer" style="flex:1"></span>
       <button id="pickroster">Upload roster QBJ</button>
       <input id="rfile" type="file" accept=".qbj,.json" hidden>
-      <button id="pasteroster">Paste from sheet</button>
       <button id="editroster">${t.roster_name ? 'Edit roster' : 'Create roster'}</button>
     </div>
     ${DEBUG ? `<div class="row debugrow">
@@ -1310,7 +1316,6 @@ function renderRosterSec(a, t) {
       <label class="row" style="gap:6px"><input type="checkbox" id="dbgtricky"> tricky names</label>
       <button id="dbgroster" class="small">Load</button>
     </div>` : ''}
-    <div id="pastebox"></div>
     <div id="upreview"></div>
     <div id="rosteredit" style="margin-top:12px"></div>`;
   if (DEBUG) {
@@ -1322,10 +1327,6 @@ function renderRosterSec(a, t) {
     };
   }
   $('pickroster').onclick = () => $('rfile').click();
-  $('pasteroster').onclick = () => {
-    rosterPaste = rosterPaste ? null : { text: '', layout: 'rows', teams: [] };
-    renderPasteBox(a, t);
-  };
   $('rfile').onchange = async () => {
     const f = $('rfile').files[0];
     if (!f) return;
@@ -1358,116 +1359,8 @@ function renderRosterSec(a, t) {
     }
     renderRosterEditor(a, t);
   };
-  renderPasteBox(a, t);
   renderUpPreview(a);
   renderRosterEditor(a, t);
-}
-
-const PASTE_LAYOUTS = [['rows', 'Teams in rows'], ['cols', 'Teams in columns'], ['pairs', 'Team and player columns']];
-
-// Paste from sheet: a box for copied cells, then the teams as read, which
-// save as an uploaded roster does (saveUpload: renames matched by players
-// and followed into the schedule) or open in the editor. What would stop
-// the save is outlined in red, with the reason as the cell's tooltip.
-function renderPasteBox(a, t) {
-  const box = $('pastebox');
-  if (!box) return;
-  const p = rosterPaste;
-  if (!p) { box.innerHTML = ''; return; }
-  if (!p.teams.length) {
-    box.innerHTML = `
-      <div class="card pastecard">
-        <div class="row"><b>Paste from sheet</b><span class="spacer" style="flex:1"></span>
-          <button id="pastecancel" class="small">Cancel</button></div>
-        <textarea id="pastetext" rows="4" aria-label="Copied cells"></textarea>
-      </div>`;
-    const ta = $('pastetext');
-    ta.value = p.text;
-    ta.oninput = () => {
-      p.text = ta.value;
-      p.teams = parseRosterPaste(p.text, p.layout).teams;
-      if (p.teams.length) renderPasteBox(a, t);
-    };
-    ta.focus();
-    $('pastecancel').onclick = () => { rosterPaste = null; renderPasteBox(a, t); };
-    return;
-  }
-  const read = parseRosterPaste(p.text, p.layout);
-  p.teams = read.teams;
-  const probs = pasteProblems(p.teams);
-  const blocked = probs.some((x) => x.name || x.players || x.dupPlayers.size);
-  const flag = (on, why) => (on ? ` class="pastebad" title="${esc(why)}"` : '');
-  box.innerHTML = `
-    <div class="card pastecard">
-      <div class="row">
-        <b>Paste from sheet</b>
-        <span class="spacer" style="flex:1"></span>
-        <select id="pastelayout" aria-label="Layout">${PASTE_LAYOUTS.map(([k, label]) =>
-          `<option value="${k}" ${k === read.layout ? 'selected' : ''}>${label}</option>`).join('')}</select>
-      </div>
-      <div class="pastetable"><table>
-        <thead><tr><th>Team</th><th>Players</th></tr></thead>
-        <tbody>${p.teams.map((tm, i) => `<tr>
-          <td${flag(probs[i].name, tm.name ? 'Listed twice' : 'No team name')}><b>${esc(tm.name)}</b></td>
-          <td${flag(probs[i].players, 'No players')}>${tm.players.map((pl) => probs[i].dupPlayers.has(pl)
-            ? `<span class="pastebad" title="Listed twice">${esc(pl)}</span>` : esc(pl)).join(', ')}</td>
-        </tr>`).join('')}</tbody>
-      </table></div>
-      <div class="row">
-        <span class="spacer" style="flex:1"></span>
-        <button id="pasteedit">Edit first</button>
-        <button id="pastesave" class="primary" ${blocked ? 'disabled' : ''}>Save</button>
-        <button id="pastecancel">Cancel</button>
-      </div>
-    </div>`;
-  $('pastelayout').onchange = () => { p.layout = $('pastelayout').value; renderPasteBox(a, t); };
-  $('pastecancel').onclick = () => { rosterPaste = null; renderPasteBox(a, t); };
-  $('pastesave').onclick = async () => {
-    if (blocked) return;
-    // the upload's own save, so a paste over a saved roster carries its
-    // renames and former names exactly as an uploaded QBJ does
-    const u = { filename: 'roster.qbj', teams: p.teams.map((tm) => ({ name: tm.name, players: [...tm.players] })),
-      onSaved: () => { if (rosterPaste === p) rosterPaste = null; } };
-    const run = busy($('pastesave'), { label: 'Saving' });
-    rosterUpload = u;
-    await saveUpload(a, u);
-    if (rosterUpload === u) rosterUpload = null; // not saved: the paste stays open
-    run.end();
-  };
-  $('pasteedit').onclick = async () => {
-    const teams = p.teams.map((tm) => ({ name: tm.name, players: [...new Set(tm.players)] }));
-    // against the saved roster, the editor shows what the paste renames
-    // and its save carries the former names
-    let saved = null;
-    let etag = null;
-    if (t.roster_r2_key) {
-      try {
-        const got = await readTagged(a, t.roster_r2_key);
-        saved = parseRoster(got.json);
-        etag = got.etag;
-      } catch (e) { /* unparseable: as a new roster */ }
-    }
-    const renames = saved ? rosterRenames(saved, teams) : {};
-    const back = Object.fromEntries(Object.entries(renames).map(([o, n]) => [n, o]));
-    const byName = new Map((saved || []).map((tm) => [tm.name, tm]));
-    rosterTrack = saved ? rosterTracking(saved) : { trackUG: false, trackDiv2: false };
-    rosterSaved = saved;
-    rosterEtag = etag;
-    rosterTeams = teams.map((tm) => {
-      const was = back[tm.name] || (byName.has(tm.name) ? tm.name : null);
-      const old = was ? byName.get(was) : null;
-      return {
-        name: tm.name, players: [...tm.players], was,
-        flags: tm.players.map((pl) => ({ ...((old && old.marks || {})[pl] || {}) })),
-        orig: tm.players.map((pl) => (old && old.players.includes(pl) ? pl : '')),
-        formerNames: old ? old.formerNames : undefined, formerPlayers: old ? old.formerPlayers : undefined,
-      };
-    });
-    rosterOpen = true;
-    rosterPaste = null;
-    renderPasteBox(a, t);
-    renderRosterEditor(a, t);
-  };
 }
 
 // What an uploaded roster renames, against the saved one ({} if none),
@@ -1571,7 +1464,6 @@ async function saveUpload(a, u) {
     // …and has the new names at once, so a schedule generated before
     // that refetch lands is built from this roster, not the last one
     schedTeams = u.teams.map((tm) => tm.name);
-    if (u.onSaved) u.onSaved();
     say(await savedNote(a, t, renames));
     showDetail();
   } catch (e) { say('Roster: ' + e.message, true); }
@@ -2490,6 +2382,10 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     // Show previous uploads
     const counting = new Set(latest.values());
     if (!counting.size && fs.length) counting.add(fs[0].id);
+    // a MODAQ _Game.json added with its .qbj goes with the game that counts
+    const base = (f) => f.filename.replace(/(_Game\.json|\.qbj)$/i, '');
+    const keeps = new Set(fs.filter((f) => counting.has(f.id) && f.kind === 'qbj').map(base));
+    for (const f of fs) if (f.kind === 'game' && keeps.has(base(f))) counting.add(f.id);
     const older = fs.filter((f) => !counting.has(f.id));
     const shown = cellOpen.prev ? fs : fs.filter((f) => counting.has(f.id));
     const rows = shown.map((f) => {

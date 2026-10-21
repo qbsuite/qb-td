@@ -11,8 +11,8 @@ Release Notes for 10/21/2026
 - If another tab saved the schedule or the roster after this tab loaded it, saving asks first. Cancel keeps your edits here, unsaved.
 
 [ SETUP ]
-- Added Paste from sheet for rosters: paste cells from Google Sheets, Excel or Numbers and check the teams before saving.
-- The roster editor is now a compact sheet. Paste a block of cells into it, and drag a seed number to move a team.
+- The roster editor is now a compact sheet. Paste cells into it from Google Sheets, Excel or Numbers, and drag a seed number to move a team.
+- After Start, the Rooms step counts down to when room links stop working.
 - After Start, saved names change with the ✎ Rename button, so their games follow the new name.
 - The Rooms note now points to the Bye Room link for unofficial scrims, since nothing played there is saved.
 - An uploaded roster now renames a team only when its players match. A new team in a withdrawn team's row starts with no games.
