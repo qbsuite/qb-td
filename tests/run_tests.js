@@ -6110,6 +6110,11 @@ test('teamInitials: unique within a team', () => {
 
 test('catTag: subcategory initials, else the category\'s short form, else cut to four', () => {
   assert.equal(catTag({ c: 'Fine Arts', s: 'Visual Fine Arts' }).label, 'VFA');
+  // fields named for the ACF split: Painting is visual, Classical Music auditory
+  assert.equal(catTag({ c: 'Fine Arts', s: 'Painting' }).label, 'VFA');
+  assert.equal(catTag({ c: 'Fine Arts', s: 'Classical Music' }).label, 'AFA');
+  assert.equal(catTag({ c: 'Fine Arts', s: 'Other' }).label, 'OFA');
+  assert.equal(catTag({ c: 'Fine Arts', s: 'Painting' }).title, 'Fine Arts · Painting');
   assert.equal(catTag({ c: 'Mythology', s: '' }).label, 'Myth');
   assert.equal(catTag({ c: 'Geography', s: 'Geography' }).family, 'oth');
   assert.equal(catTag({ c: 'Science', s: 'Astronomy' }).label, 'Sci');

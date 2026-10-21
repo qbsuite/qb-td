@@ -36,9 +36,17 @@ const FAMILY = {
 // ("European" under History, "Visual" under Fine Arts, "Other" under
 // Science) or add a detail after a colon ("Other Science: Computer").
 const PARENT_WORD = { Literature: 'Literature', History: 'History', 'Fine Arts': 'Fine Arts', Science: 'Science' };
+// Fine arts packets often name the field rather than the ACF split
+// (ACF Fall 2026: "Painting", "Classical Music"); the scoresheet tags them
+// as the visual or auditory fine arts they are.
+const ARTS_SPLIT = {
+  Painting: 'Visual Fine Arts', Sculpture: 'Visual Fine Arts',
+  'Classical Music': 'Auditory Fine Arts', Opera: 'Auditory Fine Arts',
+};
 function fullSub(c, s) {
   const head = s.split(':')[0].trim();
   for (const x of [s, head, PARENT_WORD[c] ? head + ' ' + PARENT_WORD[c] : '']) if (x && SUB_SHORT[x]) return x;
+  if (c === 'Fine Arts' && ARTS_SPLIT[head]) return ARTS_SPLIT[head];
   return head;
 }
 

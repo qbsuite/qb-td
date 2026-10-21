@@ -44,6 +44,7 @@ Release Notes for 10/19/2026
 
 [ EXPORTS ]
 - The QBJ bundle holds one set of files per game, the same games the standings count.
+- Scoresheets tag painting questions as VFA and classical music questions as AFA, as ACF splits fine arts.
 
 [ SETS ]
 - The set page no longer waits on a mirror's Bye Room before showing a round as finished.
