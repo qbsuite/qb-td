@@ -1,4 +1,4 @@
-Release Notes for 10/19/2026
+Release Notes for 10/21/2026
 
 [ SECURITY ]
 - Team, stage and bracket names with special characters now show as text in the stat report, so they can no longer run as code.
