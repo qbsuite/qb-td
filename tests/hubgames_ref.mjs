@@ -266,7 +266,9 @@ const files = [];
 const BOOM = 'Round_9_boom.qbtd.json';
 for (let i = 0; i < N; i++) {
   const id = 9000 - i; // the hub's list is newest first
-  const round = 1 + (i % 9);
+  // (the reader upload whose export throws, below, is filed under the
+  // round its game names, as uploads have been since 10/19)
+  const round = i === 11 ? 9 : 1 + (i % 9);
   const [a, b] = i % 3 ? ['Alpha', 'Beta'] : ['Gamma', 'Alpha'];
   const kinds = ['combined', 'qbj', 'combined-legacy', 'combined-nogame', 'qbj', 'game', 'other', 'qbj-error', 'combined', 'qbj'];
   let kind = kinds[i % kinds.length];
@@ -305,6 +307,15 @@ const t = { roster_r2_key: ROSTER_KEY, roster_at: 5, settings: '{}' };
 
 // a few microtask turns per request, more for some, so reads finish out
 // of order (deterministically)
+// A game moved or refiled (worker.js) has its file and its public copy
+// rewritten to the round it is filed under: id -> that round.
+const refiled = new Map();
+const stamped = (id, v) => {
+  if (!refiled.has(id) || !v || v instanceof Response) return v;
+  if (v.qbj && typeof v.qbj === 'object') v.qbj._round = refiled.get(id);
+  else if ('_round' in v) v._round = refiled.get(id);
+  return v;
+};
 const turns = async (n) => { for (let k = 0; k < n; k++) await null; };
 function standIn({ rosterFails = false } = {}) {
   return async (path) => {
@@ -318,7 +329,7 @@ function standIn({ rosterFails = false } = {}) {
       const games = [];
       for (const id of ids.filter((x) => x % 7 !== 0)) {
         let v;
-        try { v = store.get('t/1/up/' + id)(); } catch (e) { continue; }
+        try { v = stamped(id, store.get('t/1/up/' + id)()); } catch (e) { continue; }
         if (v instanceof Response) continue;
         games.push({ id, qbj: id % 11 === 0 ? 'not an object' : v && v.qbj && typeof v.qbj === 'object' ? v.qbj : v });
       }
@@ -329,7 +340,7 @@ function standIn({ rosterFails = false } = {}) {
       await turns((key.length * 7) % 5);
       if (key === ROSTER_KEY && rosterFails) throw new Error('request failed (500)');
       if (!store.has(key)) throw new Error('no such file');
-      return store.get(key)();
+      return stamped(Number(key.split('/').pop()), store.get(key)());
     }
     throw new Error('not a route: ' + path);
   };
@@ -403,10 +414,11 @@ await test('stand-in: Compute stats, then again on its cache', async () => {
 await test('stand-in: the playoff fill (rank), then again on its cache, then after a round move', async () => {
   const moved = files.map((f, i) => (i === 8 ? { ...f, round: f.round + 1 } : f));
   const cand = await bothSides(() => standIn(), [
-    call({ opts: (c) => ({ cache: c.get('r') || c.set('r', new Map()).get('r'), rank: true }) }),
+    call({ opts: (c) => { refiled.clear(); return { cache: c.get('r') || c.set('r', new Map()).get('r'), rank: true }; } }),
     call({ opts: (c) => ({ cache: c.get('r'), rank: true }) }),
-    call({ files: moved, opts: (c) => ({ cache: c.get('r'), rank: true }) }),
+    call({ files: moved, opts: (c) => { refiled.set(moved[8].id, moved[8].round); return { cache: c.get('r'), rank: true }; } }),
   ]);
+  refiled.clear();
   const [first, second, third] = cand.runs;
   assert.ok(isRoster(first.log[0]), 'the roster is read first');
   const batches = first.log.filter((p) => p.includes('/games?'));
@@ -420,6 +432,37 @@ await test('stand-in: the playoff fill (rank), then again on its cache, then aft
   assert.deepEqual(third.log.slice(1), ['/a/x/games?ids=' + [files[8], ...failing].map((f) => f.id).join(','), ...failing.map(fileRead)],
     'a moved game is read again');
   assert.ok(first.out.modaqFiles.length < cand.runs[0].out.matches.length);
+});
+
+await test('a game whose file names another round than it is filed under: not kept, so its refile counts once', async () => {
+  // file 2 is filed under round 3 but says round 2 (an upload from before
+  // 10/19); Save correction refiles it in place (same id, size, created
+  // and round) and uploads the fix beside it
+  for (const rank of [false, true]) {
+    const says = new Map([[1, 1], [2, 2]]);
+    const log = [];
+    const pub = async (path) => {
+      log.push(path);
+      const q = new URLSearchParams(path.slice(path.indexOf('?') + 1));
+      if (path.includes('/games?')) return { games: q.get('ids').split(',').map(Number).map((id) => ({ id, qbj: match(says.get(id)) })) };
+      return match(says.get(Number(q.get('key').split('/').pop())));
+    };
+    const fl = [1, 2].map((id) => ({ id, bucket_id: 1, round: id === 2 ? 3 : 1, kind: 'qbj', r2_key: 't/1/up/' + id,
+      filename: `Round_${id}_Alpha_Beta.qbj`, size: 1000, created: 2e12 - id, error: null, summary: null }));
+    const tt = { roster_r2_key: null, settings: '{}' };
+    const cache = new Map();
+    const first = await collectMatches(pub, '/a/x', tt, buckets, fl, () => {}, { cache, rank });
+    assert.deepEqual(first.matches.map((m) => [m.fileId, m.round]), [[1, 1], [2, 2]], `${rank}: read as its file says`);
+    assert.deepEqual([...cache.keys()].map((k) => Number(k.split('|')[0])), [1], `${rank}: only the game in its own round is kept`);
+    says.set(2, 3);
+    log.length = 0;
+    const second = await collectMatches(pub, '/a/x', tt, buckets, fl, () => {}, { cache, rank });
+    assert.deepEqual(second.matches.map((m) => [m.fileId, m.round]), [[1, 1], [2, 3]], `${rank}: after the refile, in the round it is filed under`);
+    assert.deepEqual(log, [rank ? '/a/x/games?ids=2' : '/a/x/file?key=t%2F1%2Fup%2F2'], `${rank}: only the refiled game is read again`);
+    log.length = 0;
+    await collectMatches(pub, '/a/x', tt, buckets, fl, () => {}, { cache, rank });
+    assert.deepEqual(log, [], `${rank}: once it is in its round, it is kept`);
+  }
 });
 
 await test('stand-in: no options, no roster, and a roster that fails', async () => {

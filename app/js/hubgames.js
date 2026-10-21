@@ -109,6 +109,12 @@ export async function collectMatches(pub, a, t, buckets, files, onFile = () => {
       const qbj = matchPayload(full);
       const room = buckets.find((b) => b.id === f.bucket_id);
       const { m, qbj: payload } = readGame(qbj, names, { id: f.id, filename: f.filename, room: room ? room.room_name : '' });
+      // A file whose game names another round than the one it is filed
+      // under (an upload from before 10/19) is refiled in place the
+      // first time it is fixed: its id, size and round can stay as they
+      // were, so it is never kept, and the next call reads it again
+      // rather than count it under its old round beside the fix.
+      if (cache && m.round !== f.round) cache.delete(keyOf(f));
       // the name this game's .qbj carries in the QBJ bundle, which the
       // .yft records the way YellowFruit notes an imported file
       m.filename = uploadQbjName(f.filename);

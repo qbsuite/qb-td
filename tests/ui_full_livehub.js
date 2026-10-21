@@ -1627,11 +1627,15 @@ section('main-fix', '27 29 30 31: Fix buzzes, Edit in MODAQ\'s errors, and the n
     });
     await pg.click('#calc');
     await pg.waitJs(`!document.querySelector('#statsec').hidden && /games in these stats$/.test(document.querySelector('#statsnote').textContent)`, 'stats again', 30000);
-    if ((await pg.text('#statsnote')) !== before) {
-      // Compute keeps what it read per file (id, size, created, round): the
-      // original, restamped in place, is still read as its old round
-      note(`BUG (Compute after Save correction): in the tab that fixed it, Compute counts the refiled game twice ("${before}" before, "${await pg.text('#statsnote')}" after) until the page is reloaded`);
-    }
+    // Compute keeps what it read per file (id, size, created, round), but
+    // never a game whose file named another round: the original,
+    // restamped in place, is read again under the round it is filed in
+    await check('31 save correction: in the tab that fixed it, Compute counts the game once', async () => (await pg.text('#statsnote')) === before || [before, await pg.text('#statsnote')]);
+    await check('31 save correction: in that tab, in the round it is filed under (3)', async () => {
+      const byRound = await statsGames(pg);
+      const mine = Object.entries(byRound).filter(([, gs]) => gs.some((g) => g.includes(A2) && g.includes(B2))).map(([rd]) => rd);
+      return JSON.stringify(mine) === '["3"]' || byRound;
+    });
     await openLive(pg, T);
     await pg.click('#calc');
     await pg.waitJs(`!document.querySelector('#statsec').hidden && /games in these stats$/.test(document.querySelector('#statsnote').textContent)`, 'stats after a reload', 30000);
