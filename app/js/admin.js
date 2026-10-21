@@ -112,9 +112,8 @@ function forgetLink(secret) {
 
 /* ---------- save-this-link modal ---------- */
 
-function showLinkModal(link, closes, onDone) {
+function showLinkModal(link, onDone) {
   $('modallink').textContent = link;
-  $('modalcloses').textContent = new Date(closes).toLocaleString();
   $('linkmodal').hidden = false;
   $('modalcopy').onclick = () => copy(link, 'admin link');
   $('modalok').onclick = () => {
@@ -215,7 +214,7 @@ function showList() {
       run.end();
       saveLink({ secret: out.admin_secret, slug: out.slug, name: out.name,
         closes: out.closes, created: Date.now() });
-      showLinkModal(adminLink(out.admin_secret), out.closes, () => {
+      showLinkModal(adminLink(out.admin_secret), () => {
         location.href = adminLink(out.admin_secret);
       });
     } catch (e) { run.end(); say(e.message, true); }
@@ -270,7 +269,7 @@ async function showInvite() {
       } });
       saveLink({ secret: out.admin_secret, slug: out.slug, name: out.name,
         closes: out.closes, created: Date.now() });
-      showLinkModal(adminLink(out.admin_secret), out.closes, () => {
+      showLinkModal(adminLink(out.admin_secret), () => {
         location.href = adminLink(out.admin_secret);
       });
     } catch (e) {
@@ -541,7 +540,7 @@ function render() {
       saveLink({ secret: out.admin_secret, slug: t.slug, name: t.name,
         closes: t.closes, created: t.created });
       history.replaceState(null, '', 'index.html?a=' + out.admin_secret);
-      showLinkModal(adminLink(out.admin_secret), t.closes, () => location.reload());
+      showLinkModal(adminLink(out.admin_secret), () => location.reload());
     } catch (e) { run.end(); say(e.message, true); }
   };
   if (v === 'setup') renderSetup(a, t, buckets, rounds, files, settings, steps);

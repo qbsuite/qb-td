@@ -787,8 +787,9 @@ section('setup', '01 02 03 04 06 07 10 27 28 52: the setup flow, the header and 
   await check('04 new admin link: the button reads "Making a new link…" while it works', async () => (await pg.seenTexts()).includes('Making a new link…') || await pg.seenTexts());
   await check('04 new admin link: the modal shows the new link', () => (!!newSecret && newSecret !== oldSecret && linkText === `${PAGES}/index.html?a=${newSecret}`) || linkText);
   await check('04 new admin link: the address bar has it too', async () => (await pg.js('location.href')) === `${PAGES}/index.html?a=${newSecret}`);
-  await check('04 new admin link: the modal gives the close time', async () =>
-    (await pg.text('#modalcloses')) === await pg.js(`new Date(${d.tournament.closes}).toLocaleString()`));
+  await check('04 new admin link: the modal says the link works across devices, with OK', async () =>
+    /^This link works across devices\./.test((await pg.text('#linkmodal p')).trim())
+    && (await pg.js(`[...document.querySelectorAll('#linkmodal .modalbtns button')].map((b) => b.textContent).join()`)) === 'OK');
   await pg.click('#modalcopy');
   await check('04 new admin link: Copy link puts it on the clipboard', async () => {
     await msgIs(pg, 'Copied admin link', false);

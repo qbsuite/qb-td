@@ -669,8 +669,15 @@ await runSection('HOME', async () => {
     d.tournament && d.tournament.slug === slug1 && settingsOf(d).autoAdvance === true, d.tournament);
   ok('HOME-05 modal: the setup deadline is creation plus 7 days', d.tournament.closes - d.tournament.created === 7 * DAY,
     [d.tournament.created, d.tournament.closes]);
-  ok('HOME-05 modal: and is shown in local time', (await text('#modalcloses')) === await pageLocale(d.tournament.closes),
-    [await text('#modalcloses'), await pageLocale(d.tournament.closes)]);
+  // the box says what the link is for, with Copy link beside it and OK under it
+  const boxText = (await text('#linkmodal p')).replace(/\s+/g, ' ').trim();
+  ok('HOME-05 modal: says the link works across devices, the seven days, and the 48 hours [changed: The Save this link box is shorter, with Copy link beside the link and an OK button.]',
+    boxText === 'This link works across devices. You will have seven days to set the tournament up and press Start tournament, which will open room links for 48 hours. Export stats and files before they close.', boxText);
+  ok('HOME-05 modal: Copy link sits beside the link, and OK at the bottom', await js(`(() => {
+    const row = document.querySelector('#linkmodal .linkrow');
+    const btns = [...document.querySelectorAll('#linkmodal .modalbtns button')].map((b) => b.textContent + (b.classList.contains('primary') ? '*' : ''));
+    return !!row && row.contains(document.querySelector('#modallink')) && row.contains(document.querySelector('#modalcopy'))
+      && JSON.stringify(btns) === JSON.stringify(['OK*']); })()`));
   ok('HOME-03 create: the tournament joins this device\'s list', await js(`(() => {
     const l = JSON.parse(localStorage.getItem('qbtdAdminLinks') || '[]');
     return l.length === 1 && l[0].secret === ${q(secret)} && l[0].slug === ${q(slug1)} && l[0].name === 'Setup Suite Open'; })()`));
@@ -682,7 +689,7 @@ await runSection('HOME', async () => {
     await click('#modalok');
     await nav;
   }
-  ok('HOME-05 modal: Saved it opens the admin link', here === link, here);
+  ok('HOME-05 modal: OK opens the admin link', here === link, here);
   await waitJs(`!!document.querySelector('.hubtab')`, 'the hub');
 
   // HOME-06: the list
@@ -868,8 +875,8 @@ await runSection('INVITE', async () => {
   ok('INV-01 invite: the Save this link modal shows the new admin link', !!secret && link === `${PAGES}/index.html?a=${secret}`, link);
   {
     const md = await detail(MIRROR);
-    ok('INV-01 invite: the modal shows the mirror\'s setup deadline, in local time', !!md.tournament
-      && (await text('#modalcloses')) === await pageLocale(md.tournament.closes), [await text('#modalcloses'), md.tournament && md.tournament.closes]);
+    ok('INV-01 invite: the modal is the same box, for the mirror\'s new tournament', !!md.tournament
+      && (await text('#linkmodal p')).replace(/\s+/g, ' ').trim() === 'This link works across devices. You will have seven days to set the tournament up and press Start tournament, which will open room links for 48 hours. Export stats and files before they close.');
   }
   ok('INV-01 invite: the mirror joins this device\'s list', await js(`(() => {
     const l = JSON.parse(localStorage.getItem('qbtdAdminLinks') || '[]');
@@ -1702,6 +1709,7 @@ await runSection('TEST LINKS + NEW ADMIN LINK', async () => {
     && document.querySelectorAll('#roundrows [data-round]').length > 0`, 'the bye room'));
 
   // HUB-04: New admin link
+  const T1closes = (await detail(T1)).tournament.closes;
   await openHub(T1, 'rooms');
   const rotates = () => reqCount((r) => r.method === 'POST' && r.url.endsWith('/rotate'));
   let asked = await withDialogs([false], () => click('#rotate'));
@@ -1722,8 +1730,8 @@ await runSection('TEST LINKS + NEW ADMIN LINK', async () => {
   ok('HUB-04 rotate: the Save this link modal shows it', link === `${PAGES}/index.html?a=${fresh}`);
   {
     const rd = await call('/a/' + fresh);
-    ok('HUB-04 rotate: the modal shows the tournament\'s own deadline, unchanged by the new link', rd.status === 200
-      && (await text('#modalcloses')) === await pageLocale(rd.body.tournament.closes), [await text('#modalcloses'), rd.status]);
+    ok('HUB-04 rotate: the new link opens the same tournament, its deadline unchanged', rd.status === 200
+      && rd.body.tournament.closes === T1closes, rd.status);
   }
   {
     const nav = once((m) => m.sessionId === sessionId && m.method === 'Page.loadEventFired', 20000, 'the reload');

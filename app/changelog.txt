@@ -7,6 +7,7 @@ Release Notes for 10/21/2026
 - On qbsuite.github.io, pages always use the qb-td server, even when a shared link names another one.
 
 [ HUB ]
+- The Save this link box is shorter, with Copy link beside the link and an OK button.
 - The public page is now the player page: the Player page step, Copy player link and Open player page.
 - Settings and protest rulings saved in two hub tabs no longer undo each other. The change made in each tab is kept.
 - If another tab saved the schedule or the roster after this tab loaded it, saving asks first. Cancel keeps your edits here, unsaved.

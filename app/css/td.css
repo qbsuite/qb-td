@@ -504,8 +504,12 @@ select.slotsel { padding: 2px 6px; font-size: 13px; max-width: 16ch; }
 }
 .modal .linkbox {
   border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
-  word-break: break-all; margin-bottom: 12px;
+  word-break: break-all;
 }
+.modal .linkrow { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.modal .linkrow .linkbox { flex: 1; min-width: 0; }
+.modal .linkrow button { flex: none; }
+.modal .modalbtns { justify-content: flex-end; margin-top: 12px; }
 @media (max-width: 640px) {
   .wrap { padding: 18px 12px 48px; }
   button, .btn { padding: 10px 16px; }
