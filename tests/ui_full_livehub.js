@@ -1209,11 +1209,15 @@ section('main-uploads', '21 22 23 24 25 26 50: Add a game, moving, deleting and 
   await check('10 live now: the newest upload counts (no longer in progress)', async () =>
     (await liveRows(pg))[1].game === `${p1[1][0]} 180 – 80 ${p1[1][1]}`);
   let n0 = pg.dialogs.length;
+  const r0 = pg.reqs.length; // what the page asks the Worker from the click on: Cancel sends no delete
   pg.answers.push(false);
   await pg.click(`[data-delfile="${f12b.id}"]`);
   await until(() => pg.dialogs.length > n0, 'the question');
+  await sleep(1000);
+  const delAsks = pg.reqs.slice(r0).filter((x) => x.method === 'DELETE' && x.url.includes('/files/'));
   await check('24 delete: asks "Delete this file?", and Cancel keeps it', async () =>
-    pg.dialogs[n0] === 'Delete this file?' && !!(await fileRow(T, (f) => f.id === f12b.id)) && (await panelFiles(pg)).length === 2);
+    (pg.dialogs[n0] === 'Delete this file?' && delAsks.length === 0 && !!(await fileRow(T, (f) => f.id === f12b.id))
+      && (await panelFiles(pg)).length === 2) || { dialog: pg.dialogs[n0], deletes: delAsks.length });
   pg.answers.push(true);
   await pg.click(`[data-delfile="${f12b.id}"]`);
   await check('24 delete: OK removes it, and the earlier upload counts again', async () => {
@@ -1432,6 +1436,10 @@ section('main-protests', '32 33 34 35: protests in the rail and the drawer, ruli
   await soft(pg.waitJs(`/^Saved: /.test(document.querySelector('#msg').textContent)`, 'the note saved'));
   r = await until(async () => { const x = await rulings(); return x[k2] && x[k2].note === 'Second look' && x; }, 'the second note').catch(() => null) || await rulings();
   await check('34 ruling: the failed ruling is not sent with the next save', () => (!r[k3] && r[k2].note === 'Second look' && r[k1].r === 'upheld') || r);
+  // and this tab does not show it as made: once the next save redraws, its row is Open again
+  await check('34 ruling: after the next save, the failed ruling\'s row reads Open again, as the Worker has it', async () =>
+    (await pg.waitJs(`document.querySelector('#protdrawer [data-rule="${k3}"]').value === 'open'`, 'the row back to Open').catch(() => false))
+      || (await drawerRows(pg)).map((x) => x.ruling));
 
   // the corrected game comes in, with the upheld protest in it again
   const fixed = await T.upload(R1, 1, `Round_1_${A}_${B}.qbtd.json`, readerFile(M.g11, { protests: [M.P[0]] }));
@@ -2344,8 +2352,13 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
     return download(pg, `document.querySelector('#${id}').click(); true`);
   };
   {
-    const y4 = JSON.parse((await menuDl('dlyft4')).bytes.toString('utf8')).objects[0];
-    await check('44 yellowfruit 4: follows the pick (12 games)', () => y4.phases.flatMap((p) => p.rounds.flatMap((r) => r.matches)).length === 12);
+    const f4 = await menuDl('dlyft4');
+    await check('44 yellowfruit 4: <slug>-yf4.yft, a YellowFruit 4 file (one JSON object)', () => {
+      const y = JSON.parse(f4.bytes.toString('utf8'));
+      return (f4.name === `${T.slug}-yf4.yft` && Array.isArray(y.objects)) || f4.name;
+    });
+    await check('44 yellowfruit 4: follows the pick (12 games)', () =>
+      JSON.parse(f4.bytes.toString('utf8')).objects[0].phases.flatMap((p) => p.rounds.flatMap((r) => r.matches)).length === 12);
     const y3 = (await menuDl('dlyft3')).bytes.toString('utf8').split('\n').map((l) => JSON.parse(l));
     await check('45 yellowfruit 3: follows the pick (12 games)', () => y3[5].length === 12 || y3[5].length);
     const z = await readZip(new Uint8Array((await menuDl('dlzip')).bytes));
@@ -2652,6 +2665,36 @@ section('report-escape', '10 42 46 47: names with special characters, in the hub
     (six.length === 6 && six.every((f) => f.name.startsWith(T.slug + '_') && pages[f.name.slice(T.slug.length + 1)] === f.bytes.toString('utf8'))) || six.map((f) => f.name));
   await check('47 html report files: no name\'s markup as markup there either ' + CHG.reportEscape, () =>
     !six.some((f) => ['<b>2</b>', '<i>x</i>', '<u>go</u>'].some((x) => f.bytes.toString('utf8').includes(x))) || six.map((f) => f.name));
+
+  // one stage played in two pools: the report heads each pool's table with
+  // the pool's name (a page of its own path in report.js), as text too
+  {
+    const P = await newTournament('Odd Pools');
+    for (const n of ['Room 1', 'Room 2', 'Room 3', 'Room 4']) await P.addRoom(n);
+    await P.roster(ROSTER8);
+    const ps = buildSchedule('pools2', TEAMS8, P.rooms.map((b) => ({ name: b.room_name, bucket: b.id })));
+    const POOLS = { A: 'Pool <i>A</i>', B: 'Pool <s>B</s>' };
+    for (const b of ps.brackets) if (POOLS[b.key]) b.name = POOLS[b.key];
+    const saved = await P.schedule(ps);
+    if (saved.status !== 200) throw new Error('schedule: ' + JSON.stringify(saved.body));
+    await P.packet(1);
+    await P.settings({ gameFormat: 'acf', statsSeen: true });
+    await P.start();
+    for (const g of ps.phases[0].rounds.find((r) => r.round === 1).games) {
+      await P.upload(P.rooms[g.room], 1, `Round_1_${g.a.team}_${g.b.team}.qbj`, poolGame(1, g.a.team, g.b.team));
+    }
+    await openLive(pg, P);
+    await compute(pg);
+    const pz = await menuDownload(pg, 'dlreport');
+    const ppages = Object.fromEntries((await readZip(new Uint8Array(pz.bytes))).map((e) => [e.name.replace(`${P.slug}_`, ''), new TextDecoder().decode(e.data)]));
+    const h3 = ((ppages['standings.html'] || '').match(/<h3>[^]*?<\/h3>/g) || []).map((h) => norm(h.replace(/<\/?h3>|&nbsp;/g, '')));
+    await check('46 html report: pool names with markup head their pools\' tables as text', () =>
+      (h3.includes('Pool &lt;i&gt;A&lt;/i&gt;') && h3.includes('Pool &lt;s&gt;B&lt;/s&gt;')) || h3);
+    await check('46 html report: no page carries a pool name\'s markup as markup', () => {
+      const raw = Object.keys(ppages).filter((k) => ['<i>A</i>', '<s>B</s>'].some((x) => ppages[k].includes(x)));
+      return raw.length === 0 || raw;
+    });
+  }
 });
 
 section('room-gone', '21 30 31: a room deleted in another tab while Fix buzzes is open here, and its uploads after', async () => {
