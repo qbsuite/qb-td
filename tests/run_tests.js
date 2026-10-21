@@ -44,7 +44,7 @@ import * as hubgamesMod from '../app/js/hubgames.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, exportStatus, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -3973,6 +3973,14 @@ test('reader bundle: the event log keeps a replacement\'s throw-outs and names a
 test('reader bundle: the Actions menu carries Replace tossup and Replace bonus', () => {
   const bundle = readFileSync(new URL('../app/js/read.bundle.js', import.meta.url), 'utf8');
   assert.ok(bundle.includes('Replace tossup...') && bundle.includes('Replace bonus...'), 'run npm run build:read');
+});
+
+test('upload errors: MODAQ adds the closing period, so the status a reader hands it has none', () => {
+  assert.equal(exportStatus('Something went wrong on the server. Please try again.'), 'Something went wrong on the server. Please try again');
+  assert.equal(exportStatus('upload cap reached'), 'upload cap reached');
+  assert.equal(exportStatus('Round_1.qbtd.json: no match.. '), 'Round_1.qbtd.json: no match');
+  assert.equal(exportStatus(new Error('x').message), 'x');
+  assert.equal(exportStatus(null), '');
 });
 
 test('upload progress: the furthest question reached rides with a reader upload, and the hub reads it', () => {

@@ -27,7 +27,7 @@ import {
   staleGameKeys, roundRows, normalizeTbPool, tbPanelRows,
   tbRecordAdd, tbAddedIds, tbProtests,
 } from './read_core.js';
-import { gameProgress } from './read_core.js';
+import { gameProgress, exportStatus } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
 import { protestReport } from './protests.js';
 import { Tossup } from 'modaq/src/state/PacketState.js';
@@ -295,13 +295,13 @@ function mountMODAQ(id, meta, isNew) {
       } finally {
         clearTimeout(timer);
       }
-      if (out && out.error) return { isError: true, status: name + ': ' + out.error };
+      if (out && out.error) return { isError: true, status: exportStatus(name + ': ' + out.error) };
       return { isError: false, status: 'uploaded ' + name };
     } catch (e) {
       if (e && e.name === 'AbortError') {
         return { isError: true, status: 'the upload took too long. Please check the connection and upload again' };
       }
-      return { isError: true, status: String((e && e.message) || e) };
+      return { isError: true, status: exportStatus((e && e.message) || e) };
     }
   }
   if (isNew) {

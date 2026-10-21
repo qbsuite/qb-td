@@ -2555,8 +2555,8 @@ await section('R45', 'upload errors', async () => {
   d1(`UPDATE buckets SET wrap = '${'A'.repeat(wrap.length)}' WHERE id = ${c1.id}`);
   try {
     t = await fail();
-    known('R45 a server failure: "Export failed: Something went wrong on the server. Please try again.." (MODAQ adds its own period: two)' + changed('serverFail'),
-      t, 'Export failed: Something went wrong on the server. Please try again..', 'Export failed: Something went wrong on the server. Please try again.');
+    ok('R45 a server failure: "Export failed: Something went wrong on the server. Please try again." (one period, MODAQ\'s)' + changed('serverFail'),
+      t === 'Export failed: Something went wrong on the server. Please try again.', t);
   } finally { d1(`UPDATE buckets SET wrap = '${wrap}' WHERE id = ${c1.id}`); }
   ok('R45 an empty body: "Export failed: empty file."', empty === 'Export failed: empty file.', empty);
   // the tournament closes: 48 hours after Start

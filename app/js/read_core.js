@@ -133,6 +133,14 @@ export function gameProgress(reached, regulation) {
   return Number.isInteger(at) && at >= 1 && Number.isInteger(of) && of >= 1 ? { at: Math.min(at, 999), of: Math.min(of, 999) } : null;
 }
 
+/** The status of a failed upload as MODAQ's Export Error shows it:
+    MODAQ writes "Export failed: <status>." itself, so a status that already
+    ends a sentence (the Worker's own messages do) loses its closing period
+    here rather than show two. */
+export function exportStatus(text) {
+  return String(text == null ? '' : text).replace(/[\s.]+$/, '');
+}
+
 /* ---------- tiebreakers ----------
    The TO's tiebreaker pool (Worker blob, GET /b/:secret/tiebreakers) is
    offered inside MODAQ's Actions -> Add questions dialog (tb_add_dialog.js,
