@@ -925,6 +925,316 @@
    ],
    "foreign": []
   },
+  "archive acf-fall-uiuc": {
+   "header": "ACF Fall @ UIUC",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "bad41e2689561488d51aca4c",
+      "chars": 43386
+     },
+     "schedview=all": {
+      "sha256": "bad41e2689561488d51aca4c",
+      "chars": 43386
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "f516f1259b40b92ae34ac6ab",
+      "chars": 3802124
+     },
+     "layout=classic": {
+      "sha256": "7947564024ce28af81028b5b",
+      "chars": 3802184
+     },
+     "layout=new": {
+      "sha256": "eb1f257d814d6098397088c2",
+      "chars": 10578
+     },
+     "new/standings": {
+      "sha256": "eb1f257d814d6098397088c2",
+      "chars": 10578
+     },
+     "new/individuals": {
+      "sha256": "02cefff7bf3cde7a91782e8a",
+      "chars": 43009
+     },
+     "new/games": {
+      "sha256": "01aba78c01f3b6bfc9a21924",
+      "chars": 1513863
+     },
+     "new/teams": {
+      "sha256": "7fc657d6d4f7c99f03df8701",
+      "chars": 143473
+     },
+     "new/players": {
+      "sha256": "33f79c4f8ea259979957de4c",
+      "chars": 372916
+     },
+     "new/rounds": {
+      "sha256": "5feda40bf3efe6f25284f180",
+      "chars": 4213
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "af2695d5fc5024c11c51f705",
+      "chars": 19398
+     },
+     "catview=cat": {
+      "sha256": "af2695d5fc5024c11c51f705",
+      "chars": 19398
+     },
+     "catview=team": {
+      "sha256": "92c98e52905164c37dab8692",
+      "chars": 6155
+     },
+     "catview=player": {
+      "sha256": "138cf67a97b53649e75b1431",
+      "chars": 6376
+     },
+     "catview=questions": {
+      "sha256": "b93d41a12590b7cbbef49992",
+      "chars": 14433
+     }
+    },
+    "buzz": {
+     "first": {
+      "sha256": "fb81b67f4b2cc2221973ec16",
+      "chars": 73991
+     },
+     "buzzmode=round": {
+      "sha256": "fb81b67f4b2cc2221973ec16",
+      "chars": 73991
+     },
+     "round/1": {
+      "sha256": "39f169cf3fb24d57ff72fc7c",
+      "chars": 134567
+     },
+     "round/2": {
+      "sha256": "e687f37c6d05aa5f344af7bc",
+      "chars": 133938
+     },
+     "round/3": {
+      "sha256": "6191afb2e9875cf553b057c6",
+      "chars": 134811
+     },
+     "round/4": {
+      "sha256": "082f3ece585ad1427b734f96",
+      "chars": 134546
+     },
+     "round/5": {
+      "sha256": "a4c2c6c6b2660d7b718888c6",
+      "chars": 128771
+     },
+     "round/6": {
+      "sha256": "caec035ffd0be13304cc0817",
+      "chars": 134473
+     },
+     "round/7": {
+      "sha256": "45453eecdcbfe636dbac18d0",
+      "chars": 139069
+     },
+     "round/8": {
+      "sha256": "5ed1df46a444a38415879233",
+      "chars": 142147
+     },
+     "round/9": {
+      "sha256": "c832c1a6699555d7d2566e1d",
+      "chars": 142874
+     },
+     "round/10": {
+      "sha256": "2d4e642c98bff86e89a16db2",
+      "chars": 142454
+     },
+     "round/11": {
+      "sha256": "8725ceafb0461519c3236a9b",
+      "chars": 129723
+     },
+     "round/12": {
+      "sha256": "fb81b67f4b2cc2221973ec16",
+      "chars": 73991
+     },
+     "buzzmode=category": {
+      "sha256": "46a3aac038bdd00ea7a03b96",
+      "chars": 305166
+     },
+     "buzzmode=player": {
+      "sha256": "6b7f8218315a3b50fc0b1e10",
+      "chars": 49054
+     },
+     "buzzmode=team": {
+      "sha256": "3819d918673189fc88a379d0",
+      "chars": 404249
+     },
+     "buzzmode=replacements": {
+      "sha256": "278fc2bc780583e38e96ded8",
+      "chars": 3961
+     },
+     "buzzmode=summary": {
+      "sha256": "243083ff453e0bd61ac6cb98",
+      "chars": 19565
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats",
+    "buzz"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/acf-fall-uiuc.js",
+    "/archive/index.json",
+    "/archive/packets/acf-fall-uiuc/r1.json",
+    "/archive/packets/acf-fall-uiuc/r10.json",
+    "/archive/packets/acf-fall-uiuc/r11.json",
+    "/archive/packets/acf-fall-uiuc/r12.json",
+    "/archive/packets/acf-fall-uiuc/r2.json",
+    "/archive/packets/acf-fall-uiuc/r3.json",
+    "/archive/packets/acf-fall-uiuc/r4.json",
+    "/archive/packets/acf-fall-uiuc/r5.json",
+    "/archive/packets/acf-fall-uiuc/r6.json",
+    "/archive/packets/acf-fall-uiuc/r7.json",
+    "/archive/packets/acf-fall-uiuc/r8.json",
+    "/archive/packets/acf-fall-uiuc/r9.json",
+    "/archive/packets/acf-fall-uiuc/tiebreakers.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
+  "archive sf2026": {
+   "header": "SF Fall 2026",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "a9f96cd2c02b3b791013de35",
+      "chars": 24332
+     },
+     "schedview=all": {
+      "sha256": "a9f96cd2c02b3b791013de35",
+      "chars": 24332
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "22d45e1e8b0891a12b918a44",
+      "chars": 949479
+     },
+     "layout=classic": {
+      "sha256": "7c141a514d265b776d16c06f",
+      "chars": 949539
+     },
+     "layout=new": {
+      "sha256": "f039bc3a9a3c1a93ce10c7b0",
+      "chars": 7104
+     },
+     "new/standings": {
+      "sha256": "f039bc3a9a3c1a93ce10c7b0",
+      "chars": 7104
+     },
+     "new/individuals": {
+      "sha256": "cfcbbf7f018f69e3b3e44259",
+      "chars": 26248
+     },
+     "new/games": {
+      "sha256": "a66195488181458268ffc7b8",
+      "chars": 203977
+     },
+     "new/teams": {
+      "sha256": "e4ea1558565d457e5099b473",
+      "chars": 83165
+     },
+     "new/players": {
+      "sha256": "6ab39c22283264ab81f06c89",
+      "chars": 211839
+     },
+     "new/rounds": {
+      "sha256": "d2fc820cec2af45a05061dce",
+      "chars": 4116
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "69a7de5248f8c142c6b113e1",
+      "chars": 13285
+     },
+     "catview=cat": {
+      "sha256": "69a7de5248f8c142c6b113e1",
+      "chars": 13285
+     },
+     "catview=team": {
+      "sha256": "ada233165a2b380ef5054863",
+      "chars": 4803
+     },
+     "catview=player": {
+      "sha256": "03b10a4b11abf89e7e658548",
+      "chars": 4286
+     },
+     "catview=questions": {
+      "sha256": "36318d25498ae3a45b33d9ea",
+      "chars": 16529
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/index.json",
+    "/archive/sf2026.js",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive 2026terrapinopenatusc": {
    "header": "2026 Terrapin Open at USC",
    "tabs": {
