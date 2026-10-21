@@ -15,6 +15,10 @@ Release Notes for 10/19/2026
 - An uploaded roster now renames a team only when its players match. A new team in a withdrawn team's row starts with no games.
 - The roster Download leaves out the former names qb-td keeps to follow renames.
 - Replacing the packet of a round that already has games now asks first.
+- A packet zip with no .json or .docx files says so and no longer leaves the Packets section stuck, on the hub and on set pages.
+- If the Powers in Game format can't be read, a message says how to write them, and nothing is saved.
+- Clearing a room's name puts its saved name back in the field at once.
+- The tiebreaker upload notice uses the singular for one tossup or one bonus.
 
 [ LIVE HUB ]
 - Playoff and Finals slots fill on their own after a team is renamed, also in a hub tab opened before the rename.
@@ -28,6 +32,7 @@ Release Notes for 10/19/2026
 - Teams tied on both winning percentage and points per 20 now fill playoff and Finals slots in the order the public page lists them, instead of always by name.
 - When tied teams also had the same points per 20, the Playoffs and Finals notes say which order they kept, and a waiting tie's button says so too.
 - Edit in MODAQ keeps the question numbers of replaced and added questions, so a corrected game matches the original.
+- The Live tab of a tournament with no rooms yet opens without an error, and Start tournament works there.
 
 [ SCHEDULE ]
 - When the same pools play again, such as a double round robin or Copy this phase, playoff and Finals slots are seeded on all of their games.
@@ -53,6 +58,7 @@ Release Notes for 10/19/2026
 - The parse review says when MODAQ will not load a packet, for example a bonus with no point values.
 - A question ledger or category map that can't be read is left as it is, and the editor says so, instead of being overwritten.
 - Renaming a room updates the room name shown with buzzes on set pages.
+- Locking mirror buzzpoints on a set now reaches the mirrors' public pages, which hide their Buzzpoints tab.
 
 [ ARCHIVE ]
 - Archived stat reports use each tournament's own tossup count and show standings by stage, matching the archived page.

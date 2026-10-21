@@ -5189,9 +5189,13 @@ async function updateSet(request, env, s) {
   }
   if (!sets.length) return err(env, 400, 'nothing to update');
   await env.DB.prepare(`UPDATE sets SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, s.id).run();
-  if (body.published !== undefined) {
-    // The set's flag decides whether its mirrors' blobs belong on GitHub:
-    // queue them all, and the cron publishes or retracts each.
+  // The set's published flag decides whether its mirrors' blobs belong on
+  // GitHub, and its buzzpoints lock decides whether their public state
+  // offers Buzzpoints: when either changes, queue the mirrors so the cron
+  // publishes, retracts or rebuilds each.
+  const lockChanged = body.settings !== undefined
+    && mirrorBuzzLocked(s.settings) !== Boolean(body.settings.lockMirrorBuzz);
+  if (body.published !== undefined || lockChanged) {
     await env.DB.prepare(
       'UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id IN ' +
       '(SELECT tournament_id FROM set_mirrors WHERE set_id = ?1 AND tournament_id IS NOT NULL)'

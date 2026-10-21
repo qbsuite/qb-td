@@ -3092,10 +3092,10 @@ async function sectionMirror(br) {
   });
   await must('lock', call(S, { method: 'POST', json: { settings: { lockMirrorBuzz: true } } }));
   await tick();
-  await bug('pub-02 tabs: once the set locks mirror buzzpoints, the mirror\'s page shows no Buzzpoints tab (and #buzz opens the usual first tab)', async () => {
+  await check('pub-02 tabs: once the set locks mirror buzzpoints, the mirror\'s page shows no Buzzpoints tab (and #buzz opens the usual first tab) [changed: Locking mirror buzzpoints on a set now reaches the mirrors\' public pages, which hide their Buzzpoints tab.]', async () => {
     const x = await buzzShown();
     return (!x[0] && x[1] === 'tab-stats') || { shown: x[0], open: x[1], workerBuzz: (await call('/pub/' + T.slug)).body.buzz };
-  }, 'saving the set\'s settings marks only the set for rebuilding (worker.js updateSet: markSet), so the mirror\'s prebuilt public state (pubstate.json) keeps buzz "password" and its page keeps the Buzzpoints tab until something else rebuilds the mirror; the question text itself is refused (qpacket checks the lock live)');
+  });
   // the mirror rebuilt for any reason (here: its TD saves a setting)
   await saveSettings(T, () => {});
   await settle(T);
