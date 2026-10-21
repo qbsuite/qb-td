@@ -1555,9 +1555,10 @@ await section('SET-42 "Mirrors start with": the reader game format (and SET-41: 
   await settle();
   const said = await msgText();
   const threw = pageErrors.slice(errsBefore).some((e) => /powers: use marker=points/.test(e));
-  knownBug('SET-42: Powers that cannot be read ("garbage") throw in the page and say nothing (formatui.js calls parsePowersText outside its try)',
-    threw && said === '', { said, errors: pageErrors.slice(errsBefore) });
-  pageErrors.splice(errsBefore); // reported above, not counted again at the end
+  const st2 = await settingsOf(A.secret);
+  ok('SET-42: Powers that cannot be read ("garbage") say "powers: use marker=points, like (*)=15" in red, throw nothing and save nothing',
+    !threw && said === 'powers: use marker=points, like (*)=15' && await msgBad() && JSON.stringify(st2) === JSON.stringify(st),
+    { said, errors: pageErrors.slice(errsBefore), st2 });
 });
 
 /* ---------- the set link: New set link, and a stale page ---------- */

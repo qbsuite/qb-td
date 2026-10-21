@@ -74,10 +74,14 @@ export function wireFormat(box, { settings: current, save, say, refresh, onToggl
   $('fmtsave').onclick = () => {
     const p1 = $('fmtpron1').value.trim(), p2 = $('fmtpron2').value.trim();
     if (!!p1 !== !!p2) { say('Pronunciation marks: fill both or neither', true); return; }
+    // Powers that can't be read say why (parsePowersText's message), and
+    // nothing is saved
+    let powers;
+    try { powers = parsePowersText($('fmtpowers').value); } catch (e) { say(e.message, true); return; }
     const want = {
       regulationTossupCount: Number($('fmttossups').value),
       negValue: Number($('fmtneg').value),
-      powers: parsePowersText($('fmtpowers').value),
+      powers,
       minimumOvertimeQuestionCount: Number($('fmtot').value),
       pairTossupsBonuses: $('fmtpaired').checked,
       bonusesBounceBack: $('fmtbounce').checked,
