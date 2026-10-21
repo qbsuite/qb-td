@@ -1156,7 +1156,7 @@ await runSection('ROOMS', async () => {
   await sleep(300);
   ok('ROOMS-04 rename: a blank name is not saved', reqCount((r) => r.method === 'POST' && /\/buckets\/\d+$/.test(pathOf(r.url))) === renames
     && roomsOf(await detail(T1)).find((b) => b.id === r6.id).room_name === 'Room 10' && !(await msgNow()).show);
-  ok('ROOMS-04 rename: the blank field stays blank until the next redraw (reported)', (await js(`document.querySelector('[data-roomrename="${r6.id}"]').value`)) === '');
+  ok('ROOMS-04 rename: the blank field shows the saved name again at once', (await js(`document.querySelector('[data-roomrename="${r6.id}"]').value`)) === 'Room 10');
   await openStep('rooms');
   ok('ROOMS-04 rename: the next redraw shows the saved name again', (await js(`document.querySelector('[data-roomrename="${r6.id}"]').value`)) === 'Room 10');
   // ROOMS-09: Remove asks; Cancel keeps; OK removes, and its link stops reading

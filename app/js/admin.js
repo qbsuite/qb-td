@@ -977,7 +977,8 @@ function renderRoomsSec(a, t, buckets, files) {
   box.querySelectorAll('[data-roomrename]').forEach((inp) => {
     inp.onchange = async () => {
       const name = inp.value.trim();
-      if (!name) { inp.value = ''; return; }
+      // a blank name isn't saved: the field shows the saved one again
+      if (!name) { inp.value = inp.defaultValue; return; }
       try {
         const out = await pub(a + '/buckets/' + inp.dataset.roomrename, {
           method: 'POST', json: { room_name: name } });
