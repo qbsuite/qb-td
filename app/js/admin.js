@@ -35,7 +35,7 @@ import '../engine/yft3.js';
 import '../engine/report.js';
 import '../engine/zip.js';
 import { renderStats } from './statsview.js';
-import { renderPacketsUi, stagedBlob } from './packetsui.js';
+import { renderPacketsUi, stagedBlob, endSentence, tbSplitNote } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import '../engine/modaqfile.js'; // asked for as early as before (see above)
@@ -968,7 +968,7 @@ function renderRoomsSec(a, t, buckets, files) {
       say(n + ' room' + (n === 1 ? '' : 's') + ' created');
     } catch (e) {
       say(made
-        ? `Created ${made} of ${n} rooms. Room ${next + made} failed: ${e.message}. Press ${again} to make the other ${n - made}.`
+        ? `Created ${made} of ${n} rooms. Room ${next + made} failed: ${endSentence(e.message)} Press ${again} to make the other ${n - made}.`
         : e.message, true);
     }
     run.end();
@@ -1093,7 +1093,7 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
       try {
         const out = await pub(`${a}/tiebreakers?name=${encodeURIComponent(name)}`,
           { method: 'POST', body: new Blob([data], { type: 'application/json' }) });
-        say(`${name} split into ${out.added.tossups} tossups + ${out.added.bonuses} bonuses`);
+        say(tbSplitNote(name, out.added));
         return true;
       } catch (e) { say(e.message, true); return false; }
     },
@@ -3041,8 +3041,8 @@ function wireForfeit(a, t, buckets, render) {
     const pair = b && sched ? scheduledGame(b, round) : null;
     ffOpen = { bid, round, lose: pair ? pair[0] : '', win: pair ? pair[1] : '' };
   };
-  $('fftoggle').onclick = () => {
   if (!$('fftoggle')) return;
+  $('fftoggle').onclick = () => {
     if (ffOpen) ffOpen = null;
     else prefill(buckets.length ? buckets[0].id : null, t.current_round);
     render();

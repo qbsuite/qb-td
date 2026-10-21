@@ -20,7 +20,7 @@
 
 import { API, pub, esc, download } from './api.js';
 import { buzzCredentials } from './buzzkey.js';
-import { renderPacketsUi, stagedBlob } from './packetsui.js';
+import { renderPacketsUi, stagedBlob, tbSplitNote } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { mountSetView } from './setview.js';
 import { readPacket } from './buzzview.js';
@@ -336,7 +336,7 @@ function renderPackets() {
       try {
         const out = await pub(`${S}/tiebreakers?name=${encodeURIComponent(name)}`,
           { method: 'POST', body: new Blob([data], { type: 'application/json' }) });
-        say(`${name} split into ${out.added.tossups} tossups + ${out.added.bonuses} bonuses`);
+        say(tbSplitNote(name, out.added));
         return true;
       } catch (e) { say(e.message, true); return false; }
     },

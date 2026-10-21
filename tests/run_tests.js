@@ -7459,7 +7459,21 @@ test('statedRound: the round a picked game file says, as the stats read it', () 
   assert.equal(statedRound({ _round: 0 }, 'x.qbj'), null);
 });
 
-const { replacePrompt } = await import('../app/js/packetsui.js');
+const { replacePrompt, endSentence, tbSplitNote } = await import('../app/js/packetsui.js');
+test('Notices: a message that already ends a sentence gets no second period', () => {
+  assert.equal(endSentence('Something went wrong on the server. Please try again.'), 'Something went wrong on the server. Please try again.');
+  assert.equal(endSentence('no such room'), 'no such room.');
+  assert.equal(endSentence('Is it there?'), 'Is it there?');
+  assert.equal(endSentence('x.json: bad packet; y.json: Please try again. '), 'x.json: bad packet; y.json: Please try again.');
+  // the two partial-failure notices built on it (admin.js Create rooms, packetsui.js Assign by filename)
+  assert.equal(`Room 3 failed: ${endSentence('Please try again.')} Press Create rooms to make the other 2.`,
+    'Room 3 failed: Please try again. Press Create rooms to make the other 2.');
+});
+test('Tiebreakers: the split notice says 1 tossup and 1 bonus in the singular', () => {
+  assert.equal(tbSplitNote('tb.json', { tossups: 1, bonuses: 1 }), 'tb.json split into 1 tossup + 1 bonus');
+  assert.equal(tbSplitNote('tb.json', { tossups: 2, bonuses: 0 }), 'tb.json split into 2 tossups + 0 bonuses');
+  assert.equal(tbSplitNote('tb.json', { tossups: 0, bonuses: 3 }), 'tb.json split into 0 tossups + 3 bonuses');
+});
 test('Replace a packet: a round with games read from its packet asks first; an empty or unplayed round does not', () => {
   assert.equal(replacePrompt({ round: 2, name: 'Round 2 fixed.json', had: true, games: 0 }), null);
   assert.equal(replacePrompt({ round: 2, name: 'Round 2 fixed.json', had: false, games: 3 }), null);

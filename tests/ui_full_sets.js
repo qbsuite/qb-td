@@ -1365,7 +1365,7 @@ await section('SET-30/SET-31 the set\'s backup questions and tiebreakers', async
   await clearMsg();
   await pick('#picktb', [tb1]);
   await waitMsg(/split into/);
-  ok('SET-30: one file says "tb1.json split into 2 tossups + 1 bonuses"', (await msgText()) === 'tb1.json split into 2 tossups + 1 bonuses');
+  ok('SET-30: one file says "tb1.json split into 2 tossups + 1 bonus"', (await msgText()) === 'tb1.json split into 2 tossups + 1 bonus');
   await waitJs(`!!document.querySelector('#tbclear')`, 'the pool table');
   let t = await tbRows();
   ok('SET-31: the table has Question, Kind and Answer, a Remove column, and no Status on a set',
@@ -1394,7 +1394,7 @@ await section('SET-30/SET-31 the set\'s backup questions and tiebreakers', async
   await dragOnto(chipExpr('tb5.json'), `document.querySelector('#tbdrop')`);
   await waitMsg(/^tb5.json split/);
   ok('SET-30: a staged .json chip dropped on "Or drop a staged .json packet chip here" is split the same way',
-    (await msgText()) === 'tb5.json split into 1 tossups + 0 bonuses');
+    (await msgText()) === 'tb5.json split into 1 tossup + 0 bonuses');
   await waitJs(`document.querySelectorAll('[data-tbremove]').length === 7 && !document.querySelector('[data-chip]')`, 'the chip used up');
   ok('SET-30: … and the chip leaves the staging row', true);
   dialogAccept = false;

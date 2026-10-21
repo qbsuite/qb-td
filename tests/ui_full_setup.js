@@ -1498,7 +1498,7 @@ await runSection('PACKETS', async () => {
   await th.next('the tiebreaker upload');
   ok('HUB-10 busy: the tiebreaker upload says "Splitting…"', (await text('#picktb')) === 'Splitting…' && await js(`document.querySelector('#picktb').disabled`));
   await th.release();
-  await sayIs('tb one.json split into 2 tossups + 1 bonuses');
+  await sayIs('tb one.json split into 2 tossups + 1 bonus');
   await waitJs(`[...document.querySelectorAll('#setupsec table tr')].filter((tr) => tr.textContent.includes('Unused')).length === 3`, 'three questions');
   ok('TB-01 upload: the pool lists each question: id, Kind, answer (file), Unused', JSON.stringify(await js(`[...document.querySelectorAll('#setupsec table tr')]
     .filter((tr) => tr.querySelector('td.mono')).map((tr) => [...tr.querySelectorAll('td')].slice(0, 4).map((x) => x.textContent.replace(/\\s+/g, ' ').trim()).join('|'))`))
@@ -1533,7 +1533,7 @@ await runSection('PACKETS', async () => {
   await waitJs(`document.querySelectorAll('.pkstaged .chip').length === 1`, 'the chip');
   await clearMsg();
   await drag('.pkstaged .chip[data-chip="0"]', '#tbdrop');
-  await sayIs('tb chip.json split into 1 tossups + 0 bonuses');
+  await sayIs('tb chip.json split into 1 tossup + 0 bonuses');
   await waitJs(`!document.querySelector('.pkstaged') && document.querySelector('#setupsec').textContent.includes('Chip TB answer 1')`, 'split and unstaged');
   ok('TB-02 drop: a staged .json chip dropped on the target splits into the pool and is unstaged', true);
 
@@ -1920,8 +1920,9 @@ await runSection('ROOM CAP + FAILURES', async () => {
     await fill('#roomn', '4', ['input']);
     await clearMsg();
     await click('#mkrooms');
-    await check('ROOMS-03 failure: "Created 2 of 4 rooms. Room 3 failed: <message>. Press Create rooms to make the other 2." ' + CH.server,
-      () => sayIs(`Created 2 of 4 rooms. Room 3 failed: ${SERVER_FAIL}. Press Create rooms to make the other 2.`, true));
+    // the Worker's message ends its own sentence: no second period after it
+    await check('ROOMS-03 failure: "Created 2 of 4 rooms. Room 3 failed: <message> Press Create rooms to make the other 2.", one period after the message ' + CH.server,
+      () => sayIs(`Created 2 of 4 rooms. Room 3 failed: ${SERVER_FAIL} Press Create rooms to make the other 2.`, true));
     ok('HUB-09 notice: a Worker failure reads "Something went wrong on the server. Please try again." in red ' + CH.server,
       (await msgNow()).bad && (await msgNow()).text.includes(SERVER_FAIL));
     await waitJs(`document.querySelectorAll('[data-roomrename]').length === 2`, 'the two made');

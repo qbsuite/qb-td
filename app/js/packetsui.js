@@ -17,6 +17,20 @@ import { busy } from './busy.js';
 
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many || one + 's');
 
+/** `text` ending a sentence in a notice: a period added unless it already
+    ends with one (the Worker's messages often do), so a notice never
+    reads "…try again.." */
+export function endSentence(text) {
+  const s = String(text).trimEnd();
+  return /[.!?]$/.test(s) ? s : s + '.';
+}
+
+/** The notice for a tiebreaker file split into questions (the Worker's
+    `added`): "<name> split into 1 tossup + 2 bonuses". */
+export function tbSplitNote(name, added) {
+  return `${name} split into ${plural(added.tossups, 'tossup')} + ${plural(added.bonuses, 'bonus', 'bonuses')}`;
+}
+
 // the row buttons' symbols, drawn in the text colour
 const svg = (d) => `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICON = {
@@ -335,7 +349,7 @@ export function renderPacketsUi(box, o) {
       }
       run.end();
       staged.splice(0, staged.length, ...remaining);
-      if (failed.length) o.say(`Uploaded ${placed} of ${plan.length}. ${failed.join('; ')}. The rest are still staged: press Assign by filename to try again.`, true);
+      if (failed.length) o.say(`Uploaded ${placed} of ${plan.length}. ${endSentence(failed.join('; '))} The rest are still staged: press Assign by filename to try again.`, true);
       else o.say(placed + ' assigned' + (remaining.length ? ', ' + remaining.length + ' left to drag' : ''));
       o.refresh();
     };
