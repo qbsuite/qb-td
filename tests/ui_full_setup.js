@@ -866,6 +866,11 @@ await runSection('INVITE', async () => {
   const secret = (/[?&]a=([a-z0-9]+)/.exec(link) || [])[1];
   MIRROR = { name: 'Suite Mirror Open', slug: invRow.slug, secret, A: '/a/' + secret };
   ok('INV-01 invite: the Save this link modal shows the new admin link', !!secret && link === `${PAGES}/index.html?a=${secret}`, link);
+  {
+    const md = await detail(MIRROR);
+    ok('INV-01 invite: the modal shows the mirror\'s setup deadline, in local time', !!md.tournament
+      && (await text('#modalcloses')) === await pageLocale(md.tournament.closes), [await text('#modalcloses'), md.tournament && md.tournament.closes]);
+  }
   ok('INV-01 invite: the mirror joins this device\'s list', await js(`(() => {
     const l = JSON.parse(localStorage.getItem('qbtdAdminLinks') || '[]');
     return l.length === ${before + 1} && l[0].secret === ${q(secret)} && l[0].name === 'Suite Mirror Open'; })()`));
@@ -1453,6 +1458,10 @@ await runSection('PACKETS', async () => {
     const v = document.querySelector('.pkview');
     return v.getAttribute('role') === 'dialog' && v.querySelector('.pkviewname').textContent === 'Round 1 · Round 1.json'
       && !!v.querySelector('a[download]') && !!v.querySelector('[data-close]'); })()`));
+  ok('PK-10 preview: its Download is the round\'s own download link, under the packet\'s name', await js(`(() => {
+    const h = document.querySelector('.pkview a[download]').getAttribute('href');
+    return h === document.querySelector('.pktable tr[data-round="1"] a[download]').getAttribute('href')
+      && h.includes('&dl=' + encodeURIComponent('Round 1.json')); })()`));
   ok('PK-10 preview: the packet title and "20 tossups, 20 bonuses"', (await text('.pkview .pktitle')) === 'Round 1.json' && (await text('.pkview .pkcounts')) === '20 tossups, 20 bonuses');
   {
     const want = JSON.parse(PK[1]);
@@ -1522,13 +1531,16 @@ await runSection('PACKETS', async () => {
   await clearMsg();
   await setFiles('#tbfile', [writeFx('tb two.json', tbJson('Two', 1)), writeFx('tb three.json', tbJson('Three', 1))]);
   await sayIs('2 files were added to the pool.');
-  ok('TB-01 upload: several files go one after another, in order', (await js(`[...document.querySelectorAll('#setupsec table td.mono')].map((x) => x.textContent).join(',')`)) === 'TU1,TU2,TU3,TU4,B1');
+  // the notice comes before the pool is drawn again: wait for the list
+  await check('TB-01 upload: several files go one after another, in order', () => waitJs(`[...document.querySelectorAll('#setupsec table td.mono')].map((x) => x.textContent).join(',') === 'TU1,TU2,TU3,TU4,B1'`, 'the pool in order'));
   await clearMsg();
   await setFiles('#tbfile', [writeFx('tb four.json', tbJson('Four', 1)), writeFx('tb bad.json', '{ not json'), writeFx('tb notes.txt', 'plain')]);
   await check('TB-01 upload: with some unreadable, "k of N files were added. These could not be read: …"',
     () => sayIs('1 of 3 files were added. These could not be read: tb bad.json, tb notes.txt.', true));
 
-  // TB-02: a staged .json chip dropped on the tiebreaker target
+  // TB-02: a staged .json chip dropped on the tiebreaker target (once the
+  // pool is drawn again after the last upload: that redraw replaces the file inputs)
+  await waitJs(`document.querySelector('#setupsec').textContent.includes('Four TB answer 1') && !!document.querySelector('#pfiles')`, 'the pool after the last upload');
   await setFiles('#pfiles', [writeFx('tb chip.json', tbJson('Chip', 1))]);
   await waitJs(`document.querySelectorAll('.pkstaged .chip').length === 1`, 'the chip');
   await clearMsg();
@@ -1708,6 +1720,11 @@ await runSection('TEST LINKS + NEW ADMIN LINK', async () => {
   ok('HUB-04 rotate: this device\'s list has the new link instead of the old', await js(`(() => { const l = JSON.parse(localStorage.getItem('qbtdAdminLinks') || '[]');
     return l.some((e) => e.secret === ${q(fresh)} && e.slug === ${q(T1.slug)}) && !l.some((e) => e.secret === ${q(T1.secret)}); })()`));
   ok('HUB-04 rotate: the Save this link modal shows it', link === `${PAGES}/index.html?a=${fresh}`);
+  {
+    const rd = await call('/a/' + fresh);
+    ok('HUB-04 rotate: the modal shows the tournament\'s own deadline, unchanged by the new link', rd.status === 200
+      && (await text('#modalcloses')) === await pageLocale(rd.body.tournament.closes), [await text('#modalcloses'), rd.status]);
+  }
   {
     const nav = once((m) => m.sessionId === sessionId && m.method === 'Page.loadEventFired', 20000, 'the reload');
     await click('#modalok');
@@ -2044,7 +2061,24 @@ await runSection('HOME RAIL + CLOSED ENTRIES', async () => {
     const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Live now');
     const s = b && [...b.querySelectorAll('.it')].find((x) => x.textContent.includes('Rail Hidden Open'));
     return !!s && s.tagName === 'SPAN' && s.querySelector('small').textContent === 'public page off'; })()`));
+  {
+    const started = (await detail(live[0])).tournament.started;
+    const want = await pageDay(started);
+    ok('HOME-09 rail: "Live now" counts its entries and dates each by its start', await js(`(() => {
+      const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Live now');
+      const a = b && [...b.querySelectorAll('a.it')].find((x) => x.textContent.includes('Rail Public Open'));
+      return !!a && b.querySelector('.railhead .muted').textContent === String(b.querySelectorAll('.it').length)
+        && (a.querySelector(':scope > small') || {}).textContent === ${q(want)}; })()`), want);
+  }
   const index = JSON.parse(readFileSync(path.join(APP, 'archive', 'index.json'), 'utf8'));
+  ok('HOME-09 rail: "Past tournaments" newest first, each with its day', await js(`(() => {
+    const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Past tournaments');
+    const day = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+    const want = ${q([...index.tournaments, ...(index.named || [])].map((t) => ({ n: t.name, d: t.date })))}
+      .sort((x, y) => day(y.d) - day(x.d))
+      .map((t) => t.n + '|' + day(t.d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    const got = b ? [...b.querySelectorAll('.it')].map((x) => (x.querySelector(':scope > span') || {}).textContent + '|' + (x.querySelector(':scope > small') || {}).textContent) : [];
+    return JSON.stringify(got) === JSON.stringify(want); })()`));
   ok('HOME-09 rail: "Past tournaments" from the archive, with an All link, one year: no year labels', await js(`(() => {
     const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Past tournaments');
     if (!b) return false;
