@@ -146,7 +146,7 @@ export async function allFixtures() {
   const v = await variantFixture();
   out.push(v.plain, v.renamed, v.noRoster);
   // an archive with its teams renamed: the renaming path at full size
-  const terp = await archiveFixture(ARCHIVE_SLUGS[0]);
+  const terp = await archiveFixture('2026terrapinopenatusc'); // fixed, so new archives don't move it
   const regs = terp.rosterQbj.objects[0].registrations;
   const ren = Object.fromEntries(regs.slice(0, 3).map((r) => [r.teams[0].name, r.teams[0].name + ' (renamed)']));
   const p0 = regs[3].teams[0];
