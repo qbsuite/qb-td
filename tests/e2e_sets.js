@@ -472,9 +472,22 @@ ok('state sees the mirror\'s page go public', r.body.mirrors[0].page === true);
   ok('the mirror\'s dashboard is told', r.body.tournament.set.lock_buzz === true, r.body.tournament.set);
   const still = await text(`${q}?packet=1&v=1`, { Authorization: 'Buzz ' + tok });
   ok('the set\'s own buzzpoints are unaffected', still.status === 200);
+  // the cron's rebuild of the mirror (its TD saves a setting) writes the
+  // prebuilt public state under the lock too
+  const mtid = d1row(`SELECT id FROM tournaments WHERE slug = '${mirrorSlug}'`).id;
+  const builtBuzz = () => JSON.parse(r2get(`t/${mtid}/pubstate.json`).toString()).buzz;
+  const kept2 = JSON.parse((await call(A)).body.tournament.settings || '{}');
+  await call(A, { method: 'POST', json: { settings: kept2 } });
+  await tick();
+  ok('a locked mirror\'s rebuilt public state has no buzzpoints', builtBuzz() === null, builtBuzz());
+  r = await call('/pub/' + mirrorSlug);
+  ok('… and its page shows none after the rebuild', r.status === 200 && r.body.buzz === null, r.body.buzz);
   await call(S, { method: 'POST', json: { settings: { gameFormat: 'acf', buzz: cred } } });
   const unlocked = await text(`/pub/${mirrorSlug}/qpacket?round=1`, { Authorization: 'Buzz ' + mtok });
   ok('unlocking restores them', unlocked.status === 200, unlocked.status);
+  await call(A, { method: 'POST', json: { settings: kept2 } });
+  await tick();
+  ok('an unlocked mirror\'s rebuilt public state has its buzzpoints again', Boolean(builtBuzz()), builtBuzz());
 }
 
 /* ---------- a tournament that already exists joins the set ---------- */

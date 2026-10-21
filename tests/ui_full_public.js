@@ -3099,10 +3099,10 @@ async function sectionMirror(br) {
   // the mirror rebuilt for any reason (here: its TD saves a setting)
   await saveSettings(T, () => {});
   await settle(T);
-  await bug('pub-02 tabs: once the mirror is rebuilt under the lock, the tab is gone and #buzz opens the usual first tab', async () => {
+  await check('pub-02 tabs: once the mirror is rebuilt under the lock, the tab is gone and #buzz opens the usual first tab', async () => {
     const x = await buzzShown();
     return (!x[0] && x[1] === 'tab-stats') || { shown: x[0], open: x[1] };
-  }, 'the cron rebuilds the mirror from TICK_ROW_SELECT (worker.js), which reads no s.settings AS set_settings, so buzzConfig never sees the set\'s lockMirrorBuzz and the rebuilt pubstate.json still has buzz "password"; same at 173a444');
+  });
   await must('unlock', call(S, { method: 'POST', json: { settings: {} } }));
   await saveSettings(T, () => {});
   await settle(T);

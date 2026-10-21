@@ -1223,8 +1223,11 @@ async function tickDirty(env) {
 
 // A tournament row as the cron works on it. set_published: the set's page
 // shows this mirror — the set is public and the editor has not hidden the
-// mirror from it.
-const TICK_ROW_SELECT = 'SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t ' +
+// mirror from it. set_settings: the set's own settings, as
+// getPublishedTournament reads them, so buzzConfig sees a set's
+// lockMirrorBuzz when the prebuilt public state is written.
+const TICK_ROW_SELECT = 'SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published, s.settings AS set_settings ' +
+  'FROM tournaments t ' +
   'LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id ';
 
 /* The CPU-heavy half of a tick — a tournament's round shards and its

@@ -8108,7 +8108,7 @@
  "cron tick: the tournament is dirty": {
   "status": null,
   "ops": [
-   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
+   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published, s.settings AS set_settings FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
    "d1 run UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ?1",
    "d1 run UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ?1",
    "d1 all SELECT id, bucket_id, round, filename, CASE WHEN json_valid(summary) THEN COALESCE(json_extract(summary, '$.progress.at') < json_extract(summary, '$.progress.of'), 0) ELSE 0 END AS unfinished FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL ORDER BY round, id",
@@ -8155,7 +8155,7 @@
  "cron tick: nothing to do": {
   "status": null,
   "ops": [
-   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
+   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published, s.settings AS set_settings FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
    "d1 all SELECT id, slug, name, published, started, dir_entry FROM tournaments WHERE pub_dirty = 1 AND published = 0 AND pub_snapshot IS NULL AND set_id IS NULL ORDER BY pub_dirty_at LIMIT 4",
    "d1 all SELECT id FROM sets WHERE state_dirty = 1 ORDER BY id LIMIT 8"
   ]
@@ -8193,7 +8193,7 @@
  "cron tick: a set mirror is dirty, its roster renames nothing": {
   "status": null,
   "ops": [
-   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
+   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published, s.settings AS set_settings FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
    "d1 run UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ?1",
    "d1 run UPDATE set_mirrors SET state_dirty = 1 WHERE tournament_id = ?1",
    "d1 run UPDATE sets SET state_dirty = 1 WHERE id = ?1",
@@ -8228,7 +8228,7 @@
  "cron tick: a set mirror is dirty, its roster renames a team": {
   "status": null,
   "ops": [
-   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
+   "d1 all SELECT t.*, (s.published = 1 AND m.hidden = 0) AS set_published, s.settings AS set_settings FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id LEFT JOIN set_mirrors m ON m.tournament_id = t.id WHERE t.pub_dirty = 1 AND (t.published = 1 OR t.pub_snapshot IS NOT NULL OR t.set_id IS NOT NULL) ORDER BY t.pub_dirty_at, t.created LIMIT 4",
    "d1 run UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ?1",
    "d1 run UPDATE set_mirrors SET state_dirty = 1 WHERE tournament_id = ?1",
    "d1 run UPDATE sets SET state_dirty = 1 WHERE id = ?1",
