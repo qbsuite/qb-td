@@ -206,12 +206,14 @@ function startProxy() {
 
 // A stand-in for qb-td-live, for ?live=<url> on a local origin: it holds
 // no files (404 to everything) and logs what it was asked.
+// liveStatus: what it answers (404, or 500 for a failing qb-td-live).
 const liveLog = [];
+let liveStatus = 404;
 function startLiveFiles() {
   return listen(createServer((req, res) => {
     liveLog.push({ at: Date.now(), path: new URL(req.url, 'http://x').pathname });
-    res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
-    res.end('no such file');
+    res.writeHead(liveStatus, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+    res.end(liveStatus === 404 ? 'no such file' : 'live is down');
   }), PORT.live);
 }
 
@@ -997,6 +999,18 @@ async function sectionMain(br) {
   });
   await tab.click('[data-schedview="all"]');
   await tab.wait(`!!document.querySelector('table.sched')`, 'All rounds');
+  await check('sch-01 views: the pick is remembered (qbtdSchedView), and a reload opens on it', async () => {
+    const kept = await tab.js(`localStorage.getItem('qbtdSchedView')`);
+    await tab.reload();
+    await tab.wait(`!!document.querySelector('.tab.active') && window.__qt.msgs.some((m) => m.t !== 'Loading')`, 'the page again', 20000);
+    const x = await tab.wait(`(() => { const on = document.querySelector('[data-schedview].on'); return on && [on.dataset.schedview, !!document.querySelector('table.sched'), !!document.querySelector('.nowgrid')]; })()`, 'a schedule view');
+    return (kept === 'all' && q(x) === q(['all', true, false])) || { kept, x };
+  });
+  // back on All rounds whatever that found, so the checks below test their own feature
+  if (!(await tab.js(`!!document.querySelector('table.sched')`))) {
+    await tab.click('[data-schedview="all"]');
+    await tab.wait(`!!document.querySelector('table.sched')`, 'All rounds');
+  }
   const allHeads = () => tab.js(`[...document.querySelectorAll('table.sched')].map((t) => [...t.querySelector('tr').children].map((c) => c.textContent))`);
   await check('sch-03 All rounds: a heading for each phase', async () => q(await tab.texts('#schedout .rhead')) === q(['Prelims', 'Playoffs']) || tab.texts('#schedout .rhead'));
   await check('sch-03 All rounds: a column for each room the phase uses, and Bye when it has byes', async () => {
@@ -1073,7 +1087,10 @@ async function sectionMain(br) {
   await tab.pressAt(640, 10);
   await check('sch-04 cut names: a click elsewhere hides it', async () => (await tip()).hidden === true || tip());
   await tab.S('Emulation.setDeviceMetricsOverride', { width: 1280, height: 360, deviceScaleFactor: 1, mobile: false });
-  await tab.press('table.sched .cut');
+  // shown by focus with the mouse parked off every name, so nothing but the
+  // scroll can hide it (a pointer over the name would send a mouseout)
+  await tab.S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+  await tab.js(`document.querySelector('table.sched .cut').focus({ preventScroll: true }), true`);
   await tab.wait(`!document.querySelector('.nametip').hidden`, 'the label again');
   const y0 = await tab.js('window.scrollY');
   await tab.js(`window.scrollBy(0, window.scrollY > 40 ? -40 : 40), true`);
@@ -2575,6 +2592,33 @@ async function sectionOrigin(br) {
     const mine = proxyLog.slice(mark).filter((x) => x.path === '/pub/' + T.slug).map((x) => x.search);
     return (q(files) === q([`/t/${T.slug}.json`]) && q(mine) === q(['?fb=404']) && (await lt.text('#tname')) === T.name) || { files, mine };
   });
+  // a state file that fails (500): the server, told why (?fb=err), and the
+  // tab skips the file on its next loads (?fb=latched), asking it nothing
+  liveStatus = 500;
+  const liveUrlPage = `${PAGES}/t.html?t=${T.slug}&server=${encodeURIComponent(PROXY)}&live=${encodeURIComponent(liveUrl)}`;
+  try {
+    const l1 = liveLog.length;
+    mark = proxyLog.length;
+    await lt.goto(liveUrlPage);
+    await landed(lt);
+    await check('pub-09 other origins: a failing state file (500) falls back to the named server (?fb=err)', async () => {
+      const files = liveLog.slice(l1).map((x) => x.path);
+      const mine = proxyLog.slice(mark).filter((x) => x.path === '/pub/' + T.slug).map((x) => x.search);
+      return (q(files) === q([`/t/${T.slug}.json`]) && q(mine) === q(['?fb=err']) && (await lt.text('#tname')) === T.name) || { files, mine };
+    });
+    const l2 = liveLog.length;
+    mark = proxyLog.length;
+    await lt.reload();
+    await landed(lt);
+    await check('pub-09 other origins: after that failure the tab skips the state file on its next load (?fb=latched)', async () => {
+      const files = liveLog.slice(l2).map((x) => x.path);
+      const mine = proxyLog.slice(mark).filter((x) => x.path === '/pub/' + T.slug).map((x) => x.search);
+      return (files.length === 0 && q(mine) === q(['?fb=latched']) && (await lt.text('#tname')) === T.name) || { files, mine };
+    });
+  } finally {
+    liveStatus = 404;
+    await lt.js('sessionStorage.clear(), true').catch(() => {});
+  }
   await lt.close();
 }
 
