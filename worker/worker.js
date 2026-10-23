@@ -1377,7 +1377,9 @@ async function tickTournaments(env) {
    the name and when it started and closes (the page drops it once it has
    closed; the hourly sweep then takes it out of the file). The slug — the
    link — is only there while the TD has the public page on; with it off
-   the tournament is listed by name alone.
+   the tournament is listed by name alone. A URL name starting
+   DIR_HIDE_PREFIX is never listed: the operator's test runs on
+   production (qbtd-soak) use it so they stay out of the list.
 
    Cost. tournaments.dir_entry holds each tournament's entry as last
    computed (NULL: not listed). The tick already knows a published
@@ -1397,6 +1399,7 @@ const DIR_KEY = 'directory.json';
 const DIR_LIVE_KEY = 'directory.live';
 const DIR_LIVE_PATH = '/directory.json';
 const DIR_LIVE_ROOMS = 2;
+const DIR_HIDE_PREFIX = 'qbtd-sim-';
 const DIR_MAX = 200;
 const DIR_EMPTY = '{"v":1,"t":[]}';
 
@@ -1413,7 +1416,7 @@ async function dirCountsOf(env, tid) {
 
 // A tournament's line in the directory, or null when it isn't listed.
 function dirEntry(t, counts) {
-  if (!t.started || counts.rooms < DIR_LIVE_ROOMS) return null;
+  if (!t.started || counts.rooms < DIR_LIVE_ROOMS || String(t.slug).startsWith(DIR_HIDE_PREFIX)) return null;
   return JSON.stringify({ n: t.name, s: t.published ? t.slug : null, d: t.started, c: t.started + RUN_TTL });
 }
 

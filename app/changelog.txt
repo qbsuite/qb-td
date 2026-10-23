@@ -1,3 +1,8 @@
+Release Notes for 10/23/2026
+
+[ MISC ]
+- qb-td's own test runs no longer show up in the home page's list of running tournaments.
+
 Release Notes for 10/21/2026
 
 [ SECURITY ]

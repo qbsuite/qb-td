@@ -32,8 +32,7 @@ async function directory() {
   return { status: res.status, cache: res.headers.get('cache-control'), body: await res.json(), text: '' };
 }
 const entryOf = (dir, name) => dir.body.t.find((e) => e.n === name);
-async function make(name, rooms) {
-  const slug = 'dir-' + rnd();
+async function make(name, rooms, slug = 'dir-' + rnd()) {
   const r = await call('/api/tournaments', { method: 'POST', json: { name, slug } });
   const A = '/a/' + r.body.admin_secret;
   const secrets = [];
@@ -78,6 +77,17 @@ ok('two rooms reporting lists it', Boolean(e), d.body);
 ok('with its link, the public page being on', e && e.s === a.slug, e);
 const row = d1row(`SELECT started FROM tournaments WHERE id = ${a.id}`);
 ok('and when it started and closes', e && e.d === row.started && e.c === row.started + 48 * 3600 * 1000, e);
+
+/* ----- the operator's production test runs: never listed ----- */
+
+const nameS = 'Dir Sim ' + rnd();
+const sim = await make(nameS, 2, 'qbtd-sim-' + rnd());
+await call(sim.A + '/start', { method: 'POST' });
+await upload(sim.rooms[0], 1);
+await upload(sim.rooms[1], 1);
+await tick();
+ok('a qbtd-sim- URL name is not listed, though two rooms have uploaded', !entryOf(await directory(), nameS));
+ok('and its row holds no entry', d1row(`SELECT dir_entry FROM tournaments WHERE id = ${sim.id}`).dir_entry === null);
 
 /* ----- what a change costs: only a moved entry rewrites anything ----- */
 
