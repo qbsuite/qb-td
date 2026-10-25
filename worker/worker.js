@@ -2334,7 +2334,7 @@ async function getTournament(env, t, ctx) {
   // the current parser (version in R2 custom metadata): backfill once,
   // off the response path
   const staleCats = !catsHead || (catsHead.customMetadata || {}).v !== CATMAP_VERSION;
-  if (staleCats && ctx && rounds.results.some((r) => /\.json$/i.test(r.packet_name))) {
+  if (staleCats && ctx && rounds.results.some((r) => /\.(json|docx)$/i.test(r.packet_name))) {
     ctx.waitUntil(rebuildCatmap(env, t));
   }
   // Room secrets go back to the TO in the clear — they ARE the room
@@ -2984,6 +2984,35 @@ export function packetCategories(body, filename) {
   return t.some(Boolean) || b.some(Boolean) ? { t, b } : null;
 }
 
+// A .docx round's categories: the packet goes through YAPP, the parser
+// the reader loads .docx packets with (read_main.js loadPacket), so each
+// tossup and bonus keeps the place MODAQ reads it in, and YAPP's
+// metadata (the packet's <Category, Subcategory> tags) is read as a JSON
+// packet's would be. A JSON packet is read directly. Answers the map,
+// null when the packet has no categories, or throws when YAPP can't be
+// reached, so a backfill knows to try again.
+// YAPP takes about three requests in a burst, then answers 429 with
+// Retry-After: 1 (measured 10/24/2026), so a 429 waits and tries again,
+// and rebuildCatmap spaces its rounds out (YAPP_GAP_MS).
+const YAPP_URL = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
+const YAPP_TIMEOUT_MS = 20000;
+const YAPP_TRIES = 4;
+const YAPP_GAP_MS = 400;
+export async function packetCategoriesOf(env, body, filename) {
+  if (!/\.docx$/i.test(filename)) return packetCategories(body, filename);
+  let res;
+  for (let i = 1; ; i++) {
+    res = await fetch(env.YAPP_URL || YAPP_URL, { method: 'POST', body, signal: AbortSignal.timeout(YAPP_TIMEOUT_MS) });
+    if (res.status !== 429 || i >= YAPP_TRIES) break;
+    await res.arrayBuffer().catch(() => {});
+    const wait = Math.min(5, Number(res.headers.get('retry-after')) || 1);
+    await new Promise((r) => setTimeout(r, wait * 1000 + 100));
+  }
+  if (!res.ok) throw new Error('YAPP ' + res.status);
+  const text = await res.text();
+  return packetCategories(new TextEncoder().encode(text), 'yapp.json');
+}
+
 // Parser generation, stamped into R2 custom metadata on every catmap
 // write. Bump it when categoryFromMetadata learns new formats: maps
 // written by an older parser then read as stale and the dashboard load
@@ -2992,7 +3021,8 @@ export function packetCategories(body, filename) {
 // '3': bonuses carry their e/m/h difficulty marks.
 // '4': Beliefs is a category; unrecognized tags are kept (`u`).
 // '5': bare "Narratives" / "Practices" are Beliefs; slash-joined writers.
-const CATMAP_VERSION = '5';
+// '6': .docx packets too, through YAPP (packetCategoriesOf).
+const CATMAP_VERSION = '6';
 
 // The "checked, nothing found" map rebuildCatmap leaves. It is the only
 // empty map ever stored (the other writers add a round or delete the
@@ -3013,17 +3043,26 @@ async function rebuildCatmap(env, t) {
     'SELECT number, packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1'
   ).bind(tid).all();
   const map = { rounds: {} };
+  let failed = false;
   for (const row of results) {
-    if (!/\.json$/i.test(row.packet_name)) continue;
+    if (!/\.(json|docx)$/i.test(row.packet_name)) continue;
     const obj = await env.DATA.get(row.packet_r2_key);
     if (!obj) continue;
-    const cats = packetCategories(
-      await readBlob(obj, await blobKey(t, row.packet_r2_key)), row.packet_name);
+    let cats = null;
+    if (/\.docx$/i.test(row.packet_name)) await new Promise((r) => setTimeout(r, YAPP_GAP_MS));
+    try {
+      cats = await packetCategoriesOf(env,
+        await readBlob(obj, await blobKey(t, row.packet_r2_key)), row.packet_name);
+    } catch (e) {
+      console.log('catmap round', row.number, 'of tournament', tid, e.message);
+      failed = true;
+    }
     if (cats) map.rounds[String(row.number)] = cats;
   }
+  // a round YAPP couldn't read keeps the map stale, so the next load tries again
   await env.DATA.put(`t/${tid}/catmap.json`, JSON.stringify(map), {
     httpMetadata: { contentType: 'application/json' },
-    customMetadata: { v: CATMAP_VERSION },
+    customMetadata: { v: failed ? 'retry' : CATMAP_VERSION },
   });
   await markPub(env, tid);
 }
@@ -3092,7 +3131,9 @@ async function uploadPacket(request, url, env, t) {
     'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
     'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4'
   ).bind(id, round, key, name).run();
-  await updateCatmap(env, id, round, packetCategories(body, name));
+  let cats = null;
+  try { cats = await packetCategoriesOf(env, body, name); } catch (e) { console.log('catmap upload:', e.message); }
+  await updateCatmap(env, id, round, cats);
   await markPub(env, id); // packet_rounds rides the published state
   // every room may already have started the current round, waiting only
   // on this packet (auto-advance)
