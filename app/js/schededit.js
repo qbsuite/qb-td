@@ -244,17 +244,33 @@ function phasesFor({ k, cycles = 1, byes = false, sizes = null, parallelTop = fa
   return out;
 }
 
+// Formats read as hdwhite words them ("Two brackets of seven into playoff
+// brackets of six and eight"); qb-td's own few are written the same way.
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const word = (n) => WORDS[n] || String(n);
+const listOf = (xs) => (xs.length < 3 ? xs.join(' and ') : xs.slice(0, -1).join(', ') + ', and ' + xs.at(-1));
+const bracketsText = (rows, playoff) => (new Set(rows).size === 1
+  ? `${word(rows.length)} ${playoff ? 'playoff ' : ''}brackets of ${word(rows[0])}`
+  : `${playoff ? 'playoff ' : ''}brackets of ${listOf(rows.map(playoff ? word : String))}`);
+const hdText = (rows, sizes) => {
+  const t = `${bracketsText(rows, false)} into ${bracketsText(sizes, true)}`;
+  return t[0].toUpperCase() + t.slice(1);
+};
+
 // The Format menu for t teams: [{key, label, phases, rooms}]
 const formatCache = new Map();
 function formatList(t) {
   if (formatCache.has(t)) return formatCache.get(t);
   const raw = [];
-  for (const f of HDWHITE[t] || []) raw.push({ key: 'hd' + f.key, phases: phasesFor({ ...f, carry: !f.repeat }) });
+  for (const f of HDWHITE[t] || []) raw.push({ key: 'hd' + f.key, text: f.text, phases: phasesFor({ ...f, carry: !f.repeat }) });
   // engine formats added on purpose after the first version (git log):
   // triple and quadruple round robins (649d459), and two places a pool
   // (c6e1736, for 22 teams: 6/6/6/4) from pools of at least 5
   for (const f of allFormats(t)) {
-    if (/^rr[34]$/.test(f.key)) { raw.push({ key: f.key, phases: phasesFor({ k: 1, cycles: Number(f.key[2]) }) }); continue; }
+    if (/^rr[34]$/.test(f.key)) {
+      raw.push({ key: f.key, text: f.key === 'rr3' ? 'Triple round-robin' : 'Quadruple round-robin', phases: phasesFor({ k: 1, cycles: Number(f.key[2]) }) });
+      continue;
+    }
     const m = /^pools(\d)x2$/.exec(f.key);
     if (!m) continue;
     const k = Number(m[1]);
@@ -264,7 +280,7 @@ function formatList(t) {
     const at = (place) => rows.filter((x) => x >= place).length;
     const sizes = [];
     for (let pl = 1; pl <= deepest; pl += 2) sizes.push(at(pl) + (pl + 1 <= deepest ? at(pl + 1) : 0));
-    raw.push({ key: f.key, phases: phasesFor({ k, sizes }) });
+    raw.push({ key: f.key, text: hdText(rows, sizes), phases: phasesFor({ k, sizes }) });
   }
   // build each once: its rounds and rooms, and who plays whom (to drop duplicates)
   const out = [];
@@ -295,7 +311,7 @@ function formatList(t) {
       }
       label = `${pre} → ${sizesOf(g[g.length - 1])}${notes.length ? ', ' + notes.join(', ') : ''}`;
     }
-    out.push({ key: x.key, label: `${label} · ${s.phases.reduce((n, p) => n + p.rounds.length, 0)} rounds`, phases: x.phases,
+    out.push({ key: x.key, label: `${x.text || label} · ${s.phases.reduce((n, p) => n + p.rounds.length, 0)} rounds`, phases: x.phases,
       rooms: Math.max(...s.phases.flatMap((p) => p.rounds.map((r) => r.games.length))) });
   }
   formatCache.set(t, out);
