@@ -42,12 +42,12 @@ async function until(fn, ms = 8000) {
 }
 
 // a tournament: two rooms, packets for rounds 1 and 2, a password, started
-async function make(password) {
+async function make(password, rounds = 2) {
   const slug = 'bzf-' + rnd();
   let r = await call('/api/tournaments', { method: 'POST', json: { name: 'Buzz Files ' + slug, slug } });
   const T = { slug, id: r.body.id, A: '/a/' + r.body.admin_secret, rooms: [] };
   for (const n of ['Room 1', 'Room 2']) T.rooms.push((await call(T.A + '/buckets', { method: 'POST', json: { room_name: n } })).body.secret);
-  for (const n of [1, 2]) await call(`${T.A}/packet?round=${n}&name=P${n}.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: PACKET(n) });
+  for (let n = 1; n <= rounds; n++) await call(`${T.A}/packet?round=${n}&name=P${n}.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: PACKET(n) });
   const cred = await buzzCredentials(password);
   T.token = cred.token;
   r = await call(T.A, { method: 'POST', json: { published: true, buzz_token: cred.token, settings: { gameFormat: 'acf', buzz: cred.settings } } });
@@ -109,5 +109,40 @@ await tick(); await tick();
 st = (await call('/pub/' + O.slug)).body;
 ok('No password: the state lists the file and carries the key', st.buzz === 'open' && st.buzz_files && st.buzz_files['1'] && typeof st.buzz_key === 'string', { buzz: st.buzz, files: st.buzz_files, key: !!st.buzz_key });
 ok('which opens it', st.buzz_key && (await open(st.buzz_key, r2get(`t/${O.id}/buzzpub/1.bin`))) === PACKET(1));
+
+/* ----- a new password: the hub has every finished round made at once ----- */
+const M = await make('buzzfile-many', 8);
+for (let n = 1; n <= 8; n++) {
+  await call(M.A, { method: 'POST', json: { current_round: n } });
+  await upload(M, 0, n); await upload(M, 1, n);
+}
+ok('eight finished rounds, eight files', Object.keys(pubOf(M.id)).length === 8, Object.keys(pubOf(M.id)));
+const cred3 = await buzzCredentials('buzzfile-many-2');
+await call(M.A, { method: 'POST', json: { buzz_token: cred3.token, settings: { gameFormat: 'acf', buzz: cred3.settings } } });
+ok('a new password drops them', row(M.id).buzz_pub === null);
+let r = await call(M.A + '/buzzfiles', { method: 'POST' });
+ok('the hub\'s first call makes six and says two are left', r.status === 200 && r.body.made === 6 && r.body.left === 2, r.body);
+r = await call(M.A + '/buzzfiles', { method: 'POST' });
+ok('its second makes the rest', r.body.made === 2 && r.body.left === 0 && Object.keys(pubOf(M.id)).length === 8, r.body);
+r = await call(M.A + '/buzzfiles', { method: 'POST' });
+ok('then there is nothing to do', r.body.made === 0 && r.body.left === 0, r.body);
+u = await unlock(M.slug, cred3.token);
+ok('and they open with the new password\'s key', (await open(u.body.key, r2get(`t/${M.id}/buzzpub/8.bin`))) === PACKET(8));
+r = await call('/a/not-a-real-admin-secret/buzzfiles', { method: 'POST' });
+ok('only the admin link can ask', r.status === 404 || r.status === 401, r.status);
+
+/* ----- No password, then a password again: a new key ----- */
+const openKey = st.buzz_key;
+const settingsO = JSON.parse(d1row(`SELECT settings FROM tournaments WHERE id = ${O.id}`).settings);
+delete settingsO.statsOpen;
+await call(O.A, { method: 'POST', json: { settings: settingsO } });
+ok('back to a password: the key that was public is dropped', row(O.id).buzz_key_enc === null && row(O.id).buzz_pub === null, row(O.id));
+await call(O.A + '/buzzfiles', { method: 'POST' });
+let opened = true;
+try { await open(openKey, r2get(`t/${O.id}/buzzpub/1.bin`)); } catch (e) { opened = false; }
+ok('and the new file does not open with it', !opened);
+await tick();
+st = (await call('/pub/' + O.slug)).body;
+ok('the state no longer carries a key', st.buzz_key === undefined && st.buzz === 'password', { buzz: st.buzz, key: !!st.buzz_key });
 
 summary('buzzpoints files e2e');

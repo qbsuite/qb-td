@@ -754,6 +754,15 @@ function renderStatsSec(a, t, settings) {
   // Worker only ever sees what comes back (buzzkey.js). The derived token
   // rides along once so the Worker can wrap the content key for the gated
   // packet route — it is not stored on either side.
+  // A new key or buzzpoints just switched on: finished rounds' files are
+  // made now, in the background, a few rounds a call (worker.js
+  // remakeBuzzFiles), so viewers read them for free from the start.
+  const remakeBuzzFiles = async () => {
+    for (let i = 0; i < 20; i++) {
+      const out = await pub(a + '/buzzfiles', { method: 'POST' }).catch(() => null);
+      if (!out || !out.made || !out.left) return;
+    }
+  };
   const setPassword = async () => {
     const pw = $('statspw').value;
     if (!pw) { say('Enter a password', true); return; }
@@ -766,6 +775,7 @@ function renderStatsSec(a, t, settings) {
         if (statsUi.want === 'scoresheets') next.scoresheets = true;
         await saveSettings(next, { buzz_token: cred.token });
       } finally { run.end(); }
+      remakeBuzzFiles();
       say(statsUi.want ? `Password set, ${WHAT[statsUi.want]} on` : 'Password changed');
       statsUi.want = null; statsUi.changing = false; statsUi.typed = '';
       showDetail();
@@ -791,13 +801,14 @@ function renderStatsSec(a, t, settings) {
       } catch (e) { say(e.message, true); }
     };
     // On without a password: back to Off, and ask for one
-    const toggle = (which, sel, apply) => async () => {
+    const toggle = (which, sel, apply, after) => async () => {
       const on = Boolean(sel.value);
       if (on && !canShow()) { statsUi.want = which; statsUi.changing = false; draw(); $('statspw').focus(); return; }
       try {
         const next = { ...settings };
         apply(next, on);
         await saveSettings(next);
+        if (after) after(on);
         say(`${WHAT[which][0].toUpperCase() + WHAT[which].slice(1)} ${on ? 'on' : 'off'}`);
         showDetail();
       } catch (e) { say(e.message, true); }
@@ -809,7 +820,7 @@ function renderStatsSec(a, t, settings) {
     // demote a stretched password to the legacy scheme.
     $('buzzmode').onchange = toggle('buzz', $('buzzmode'), (next, on) => {
       next.buzz = { ...settings.buzz, mode: on ? 'password' : 'off' };
-    });
+    }, (on) => { if (on) remakeBuzzFiles(); });
     // no password, once the set is clear: asks first, with the warning
     if ($('pwopen')) {
       $('pwopen').onclick = async () => {
@@ -833,6 +844,7 @@ function renderStatsSec(a, t, settings) {
             if (next.buzz) next.buzz = { ...next.buzz, mode: 'off' };
           }
           await saveSettings(next);
+          if (hasKey()) remakeBuzzFiles();
           say(hasKey() ? 'Password enabled' : 'Password enabled: scoresheets and buzzpoints are off until you set one');
           showDetail();
         } catch (e) { say(e.message, true); }

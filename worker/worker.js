@@ -2538,6 +2538,8 @@ async function updateTournament(request, env, t) {
         { httpMetadata: { contentType: 'application/json' } });
     } else if (body.settings.statsOpen !== true) {
       await env.DATA.delete(OPEN_KEY(t.id));
+      // back to a password: the buzzpoints key was public while open
+      if (statsOpen(t)) sets.push('buzz_key_enc = NULL', 'buzz_pub = NULL');
     }
   }
   // broadcasts were retired (9/28/2026); a dashboard still open from
@@ -2637,6 +2639,8 @@ async function updateGuarded(env, t, body, sets, binds) {
       if (token && t.ckey && hasKey) {
         s.push('buzz_wrap = ?'); b.push(wrap || (wrap = await wrapKey(token, 'buzz', t.ckey)));
         s.push('buzz_key_enc = NULL', 'buzz_pub = NULL'); // a new password, a new buzzpoints key
+      } else if (settings.statsOpen !== true && statsOpen({ settings: row.settings })) {
+        s.push('buzz_key_enc = NULL', 'buzz_pub = NULL'); // back to a password: the key was public while open
       }
       if (attempt === 1) await openKey(settings);
       if (sBase !== undefined) { cas.push('settings = ?'); casBinds.push(row.settings); }
@@ -4850,6 +4854,21 @@ async function dropBuzzRounds(env, tid, rounds) {
   }
 }
 
+// POST /a/:secret/buzzfiles — finished rounds' files under the current
+// buzzpoints key, a few rounds a call (BUZZ_PUBLISH_MAX keeps one call's
+// R2 and D1 calls well inside a request's limits). The hub calls it after
+// a new password or buzzpoints switched on, until nothing is left, so
+// viewers read every finished round for free from the start.
+async function remakeBuzzFiles(env, t) {
+  if (!t.ckey) return err(env, 409, 'no key for this tournament');
+  const full = await buzzRow(env, t.id);
+  if (!full || !buzzConfig(full)) return json(env, { made: 0, left: 0 });
+  const done = await buzzDoneRounds(env, full);
+  const made = await publishBuzzRounds(env, full, t.ckey, done);
+  const now = buzzPubOf(await buzzRow(env, t.id));
+  return json(env, { made, left: done.filter((n) => !now[String(n)]).length });
+}
+
 // Packet text for the buzzpoints tab: publish-gated, buzz-gated, and —
 // same question-security rule as the moderator route — played rounds
 // only, where played means every room has turned the round in.
@@ -6616,6 +6635,7 @@ async function route(request, env, ctx, url) {
     }
     if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
     if (sub === '/packets/move' && method === 'POST') return movePacket(request, env, t);
+    if (sub === '/buzzfiles' && method === 'POST') return remakeBuzzFiles(env, t);
     if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
     if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
     if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);

@@ -7750,7 +7750,7 @@
    "crypto deriveKey",
    "crypto decrypt",
    "r2 delete t/1/open-key.json",
-   "d1 run UPDATE tournaments SET settings = ? WHERE id = ?",
+   "d1 run UPDATE tournaments SET settings = ?, buzz_key_enc = NULL, buzz_pub = NULL WHERE id = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
  },
@@ -7779,7 +7779,7 @@
    "crypto deriveKey",
    "crypto decrypt",
    "r2 delete t/1/open-key.json",
-   "d1 run UPDATE tournaments SET settings = ? WHERE id = ? AND settings = ?",
+   "d1 run UPDATE tournaments SET settings = ?, buzz_key_enc = NULL, buzz_pub = NULL WHERE id = ? AND settings = ?",
    "d1 run UPDATE tournaments SET pub_dirty = 1, pub_dirty_at = COALESCE(pub_dirty_at, ?2) WHERE id = ?1"
   ]
  },
