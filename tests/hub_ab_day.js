@@ -29,6 +29,15 @@
 //
 //   node tests/hub_ab_day.js
 //
+// QBTD_PROD=1 runs it on production instead: the hub after is the live
+// pages (qbsuite.github.io), the hub before is served here and talks to
+// the production Worker from a Chrome without web security (the Worker
+// answers the real pages' origin only). The tournament is a qbtd-sim-
+// one, never listed, never published; its packets are synthetic text of
+// the real ones' size; no link secret is printed (its admin secret goes
+// to QBTD_ADMIN_FILE, default ../qbtd-soak/hub_ab_prod.admin). No cron
+// ticks: production's own run.
+//
 // Ports: QBTD_PORT_BASE (9681): the Worker, +1 the pages, +8 the Worker's
 // inspector. Needs Chrome (CHROME=<path> to move it).
 
@@ -45,7 +54,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BEFORE = process.env.QBTD_BEFORE || '0c43911';
 // what the batching changed on the pages; everything else is shared
 const BEFORE_FILES = ['app/js/admin.js', 'app/js/hubgames.js', 'app/js/demo.js'];
+const PROD = !!process.env.QBTD_PROD;
+const PROD_WORKER = 'https://qb-td.denisliu10.workers.dev';
+const PROD_PAGES = 'https://qbsuite.github.io/qb-td/app';
 const PORT0 = Number(process.env.QBTD_PORT_BASE || 9681);
+// link secrets out of anything printed
+const hide = (x) => String(x).replace(/\/([abis])\/[A-Za-z0-9_-]{8,}/g, '/$1/…').replace(/([?&](a|b)=)[A-Za-z0-9_-]{8,}/g, '$1…');
 const PORT = { worker: PORT0, pages: PORT0 + 1, inspector: PORT0 + 8 };
 const SLUG = 'acf-fall-uiuc';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,19 +93,21 @@ for (const f of BEFORE_FILES) {
   writeFileSync(path.join(pagesRoot, 'before', f.slice('app/'.length)), execFileSync('git', ['show', `${BEFORE}:${f}`], { cwd: ROOT }));
 }
 
-const state = path.join(tmp, 'state');
-mkdirSync(state);
-const wdir = path.join(ROOT, 'worker');
-execFileSync('npx', ['wrangler', 'd1', 'execute', 'qb-td', '--local', '--file', 'schema.sql', '--persist-to', state], { cwd: wdir, env: wenv, stdio: 'ignore' });
 const PAGES = `http://127.0.0.1:${PORT.pages}`;
-const BASE = `http://127.0.0.1:${PORT.worker}`;
-const wlog = openSync(path.join(tmp, 'wrangler_dev.log'), 'a');
-kids.push(spawn('npx', ['wrangler', 'dev', '--local', '--port', String(PORT.worker), '--ip', '127.0.0.1', '--test-scheduled',
-  '--persist-to', state, '--var', `ALLOWED_ORIGIN:${PAGES}`, '--show-interactive-dev-session=false',
-  '--inspector-port', String(PORT.inspector)], { cwd: wdir, env: wenv, stdio: ['ignore', wlog, wlog], detached: true }));
+const BASE = PROD ? PROD_WORKER : `http://127.0.0.1:${PORT.worker}`;
+if (!PROD) {
+  const state = path.join(tmp, 'state');
+  mkdirSync(state);
+  const wdir = path.join(ROOT, 'worker');
+  execFileSync('npx', ['wrangler', 'd1', 'execute', 'qb-td', '--local', '--file', 'schema.sql', '--persist-to', state], { cwd: wdir, env: wenv, stdio: 'ignore' });
+  const wlog = openSync(path.join(tmp, 'wrangler_dev.log'), 'a');
+  kids.push(spawn('npx', ['wrangler', 'dev', '--local', '--port', String(PORT.worker), '--ip', '127.0.0.1', '--test-scheduled',
+    '--persist-to', state, '--var', `ALLOWED_ORIGIN:${PAGES}`, '--show-interactive-dev-session=false',
+    '--inspector-port', String(PORT.inspector)], { cwd: wdir, env: wenv, stdio: ['ignore', wlog, wlog], detached: true }));
+}
 pages = await staticServer(pagesRoot, PORT.pages);
-await until(async () => (await fetch(BASE + '/')).ok, 'the Worker to come up (see ' + path.join(tmp, 'wrangler_dev.log') + ')', 120000);
-console.log(`hub before: ${BEFORE} (${BEFORE_FILES.join(', ')}); hub after: this checkout\nWorker ${BASE}, pages ${PAGES}, scratch ${tmp}`);
+await until(async () => (await fetch(BASE + '/')).status < 500, 'the Worker to answer (see ' + path.join(tmp, 'wrangler_dev.log') + ')', 120000);
+console.log(`hub before: ${BEFORE} (${BEFORE_FILES.join(', ')}), served here; hub after: ${PROD ? PROD_PAGES : 'this checkout'}\nWorker ${BASE}, scratch ${tmp}`);
 
 async function call(p, opts = {}) {
   const headers = { ...(opts.headers || {}) };
@@ -99,10 +115,10 @@ async function call(p, opts = {}) {
   const res = await fetch(BASE + p, { ...opts, headers });
   const ct = res.headers.get('content-type') || '';
   const body = ct.includes('json') ? await res.json() : await res.text();
-  if (!res.ok) throw new Error(`${opts.method || 'GET'} ${p.replace(/\/[ab]\/\w+/, '/…')}: ${res.status} ${JSON.stringify(body).slice(0, 200)}`);
+  if (!res.ok) throw new Error(`${opts.method || 'GET'} ${hide(p)}: ${res.status} ${JSON.stringify(body).slice(0, 200)}`);
   return body;
 }
-const tick = async () => { const r = await fetch(BASE + '/__scheduled'); await r.text(); };
+const tick = async () => { if (PROD) return; const r = await fetch(BASE + '/__scheduled'); await r.text(); };
 
 /* ---------- the tournament, from its archive ---------- */
 
@@ -110,9 +126,24 @@ const fx = await archiveFixture(SLUG);
 const packets = {};
 for (let n = 1; n <= 13; n++) {
   try { packets[n] = JSON.parse(readFileSync(path.join(ROOT, 'app/archive/packets', SLUG, `r${n}.json`), 'utf8')); } catch (e) { /* none */ }
+  // on production, text of the same size that says nothing
+  if (PROD && packets[n]) {
+    const fill = (str, label) => (label + ' ' + 'lorem ipsum dolor sit amet '.repeat(Math.ceil(String(str || '').length / 27))).slice(0, Math.max(String(str || '').length, label.length));
+    packets[n] = {
+      tossups: packets[n].tossups.map((t, i) => ({ ...t, question: fill(t.question, `Synthetic round ${n} tossup ${i + 1}.`), answer: fill(t.answer, `answer ${i + 1}`) })),
+      bonuses: (packets[n].bonuses || []).map((b, i) => ({ ...b, leadin: fill(b.leadin, `Synthetic bonus ${i + 1}.`),
+        parts: (b.parts || []).map((x, k) => fill(x, `Part ${k + 1}.`)), answers: (b.answers || []).map((x, k) => fill(x, `answer ${k + 1}`)) })),
+    };
+  }
 }
-const T = await call('/api/tournaments', { method: 'POST', json: { name: fx.name, slug: SLUG } });
+const slug = PROD ? `qbtd-sim-1026-hub-${Math.random().toString(36).slice(2, 6)}` : SLUG;
+const T = await call('/api/tournaments', { method: 'POST', json: { name: PROD ? 'Hub batching check (sim)' : fx.name, slug } });
 const A = '/a/' + T.admin_secret;
+if (PROD) {
+  const f = process.env.QBTD_ADMIN_FILE || path.join(ROOT, '..', 'qbtd-soak', 'hub_ab_prod.admin');
+  writeFileSync(f, JSON.stringify({ slug, admin_secret: T.admin_secret, at: new Date().toISOString() }) + '\n', { flag: 'a' });
+  console.log(`tournament ${slug} (admin secret in ${path.basename(f)})`);
+}
 await call(A, { method: 'POST', json: { settings: fx.format } });
 const roomNames = [...new Set(fx.schedule.rooms.map((r) => r.name).concat(fx.entries.map((e) => e.room)))];
 const rooms = {};
@@ -148,7 +179,7 @@ function unfill(s, from) {
 let schedNow = placeholders(fx.schedule);
 await call(A + '/schedule', { method: 'POST', json: schedNow });
 await call(A + '/start', { method: 'POST' });
-await call(A, { method: 'POST', json: { published: true, current_round: 1 } });
+await call(A, { method: 'POST', json: { published: !PROD, current_round: 1 } });
 
 const readerBody = (qbj, round) => {
   const teamNames = qbj.match_teams.map((mt) => mt.team.name);
@@ -197,18 +228,19 @@ const HOOK = `(() => {
 })();`;
 
 async function laptop(which) {
-  const c = await openChrome();
+  const c = await openChrome(PROD && which === 'before' ? ['--disable-web-security'] : []);
   await c.S('Page.addScriptToEvaluateOnNewDocument', { source: HOOK });
   c.which = which;
   c.lastAt = {};
   c.bytes = async (at) => Buffer.from(await c.js(`(() => { const u = new Uint8Array(window.__blobs[${at}]); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); })()`), 'base64');
   c.workerAsks = () => c.requests.filter((r) => r.url.startsWith(BASE) && r.method !== 'OPTIONS');
   c.open = async () => {
-    await c.goto(`${PAGES}/${which}/index.html?a=${T.admin_secret}&server=${encodeURIComponent(BASE)}`);
+    await c.goto(PROD && which === 'after' ? `${PROD_PAGES}/index.html?a=${T.admin_secret}`
+      : `${PAGES}/${which}/index.html?a=${T.admin_secret}&server=${encodeURIComponent(BASE)}`);
     await c.waitJs(`!!document.querySelector('.hubtab')`, which + ': the hub', 60000);
     if (!(await c.js(`!!document.querySelector('.biground')`))) await c.click('[data-view="live"]');
     await c.waitJs(`!!document.querySelector('#calc')`, which + ': the Live Hub', 60000).catch(async (e) => {
-      throw new Error(e.message + ' — page: ' + (await c.js('document.body.innerHTML')).slice(0, 600) + ' | errors: ' + c.errors.join(' | ') + ' | requests: ' + c.requests.slice(-8).map((r) => r.method + ' ' + r.url).join(' ; '));
+      throw new Error(hide(e.message + ' — page: ' + (await c.js('document.body.innerText')).slice(0, 300) + ' | errors: ' + c.errors.join(' | ') + ' | requests: ' + c.requests.slice(-8).map((r) => r.method + ' ' + r.url).join(' ; ')));
     });
     await c.settle();
   };
@@ -286,7 +318,7 @@ const same = (label, r) => {
 };
 // the entries two zips of the last downloads differ in
 async function zipDiff(id) {
-  for (const c of [before, after]) if (c.failures.length) console.log(`     ${c.which} tab, requests that failed: ${JSON.stringify(c.failures.slice(-4))}`);
+  for (const c of [before, after]) if (c.failures.length) console.log(hide(`     ${c.which} tab, requests that failed: ${JSON.stringify(c.failures.slice(-4))}`));
   const [zb, za] = [await readZip(new Uint8Array(await before.bytes(before.lastAt[id]))), await readZip(new Uint8Array(await after.bytes(after.lastAt[id])))];
   const text = (e) => (typeof e.data === 'string' ? e.data : Buffer.from(e.data).toString('utf8'));
   const mb = new Map(zb.map((e) => [e.name, text(e)]));
@@ -433,7 +465,7 @@ ok('after a reload: the same stats as before it (after tab)', cold.after.html ==
 await checkpoint('pressed again, nothing new');
 
 const errs = [...before.errors.map((e) => 'before: ' + e), ...after.errors.map((e) => 'after: ' + e)];
-ok('no page errors', !errs.length, errs.join(' | ').slice(0, 600));
+ok('no page errors', !errs.length, hide(errs.join(' | ').slice(0, 600)));
 
 console.log('\nWorker requests per action (each tab):');
 console.table(counts.map((r) => ({ action: r.label, before: r.before ?? '', after: r.after ?? '' })));

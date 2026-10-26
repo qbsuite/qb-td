@@ -21,14 +21,14 @@ export const until = async (fn, label, ms = 20000) => {
   }
 };
 
-/** Chrome, headless, on a fresh profile; one tab. */
-export async function openChrome() {
+/** Chrome, headless, on a fresh profile; one tab. `args`: more Chrome flags. */
+export async function openChrome(args = []) {
   const udd = mkdtempSync(path.join(tmpdir(), 'qbtd-cdp-'));
   const fixed = process.env.QBTD_CDP_PORT || null;
   const proc = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${fixed || 0}`, `--user-data-dir=${udd}`,
     '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--hide-scrollbars',
     '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-features=Translate,OptimizationHints,MediaRouter',
-    'about:blank'], { stdio: 'ignore' });
+    ...args, 'about:blank'], { stdio: 'ignore' });
   const close = () => { try { proc.kill(); } catch (e) { /* gone */ } try { rmSync(udd, { recursive: true, force: true }); } catch (e) { /* busy */ } };
   process.on('exit', close);
   // a fixed port (QBTD_CDP_PORT) says where to connect on /json/version
