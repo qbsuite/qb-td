@@ -1,5 +1,15 @@
 Release Notes for 10/26/2026
 
+[ HUB ]
+- Player page link and status share a box.
+- New admin link moved to the ⋯ menu.
+
+[ SETUP ]
+- Copy, open and remove are now symbols.
+- Copy all moved under the reader links.
+- Undo and Redo are now symbols.
+- Player page off hides its link.
+
 [ PERFORMANCE ]
 - Compute stats, the QBJ bundle and Rebuild read games in batches instead of one request per game.
 

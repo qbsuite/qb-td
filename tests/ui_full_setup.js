@@ -1021,12 +1021,14 @@ await runSection('HUB', async () => {
       && h.querySelector('span.muted:not(.slug)').textContent.replace(/\\s+/g, ' ').trim() === ${q('Not started · setup open until ' + when)}
       && h.querySelector('.slug').textContent === ${q(T1.slug)}; })()`), await text('.hubtitle'));
   ok('HUB-02 header: Setup carries a dot while setup is incomplete', await exists('.hubtab[data-view="setup"] .ndot'));
-  await click('.hubnav button.linkbtn:not(#rotate)');
+  await click('.pubbox button.ico');
   await sayIs('Copied player link');
   ok('HUB-02 header: Copy player link copies t.html?t=<slug>', (await clip()) === `${PAGES}/t.html?t=${T1.slug}`, await clip());
   ok('HUB-02 header: Open player page opens the public page in a new tab',
-    (await newTab('.hubnav a[target="_blank"]')).startsWith(`${PAGES}/t.html?t=${T1.slug}`));
-  ok('HUB-02 header: the public page mark and New admin link are there', await exists('.hubnav #pubmark') && (await text('#rotate')) === 'New admin link');
+    (await newTab('.pubbox a[target="_blank"]')).startsWith(`${PAGES}/t.html?t=${T1.slug}`));
+  ok('HUB-02 header: the player page box holds the mark, Copy and Open; New admin link is in the More menu', await exists('.pubbox #pubmark')
+    && (await js(`document.querySelector('.pubbox button.ico').title`)) === 'Copy player link'
+    && (await js(`document.querySelector('.pubbox a.ico').title`)) === 'Open player page' && (await text('#rotate')) === 'New admin link');
   // HUB-06 the step list as it starts
   const details = async () => js(`[...document.querySelectorAll('.stepbtn')].map((b) => b.dataset.step + ':' + (b.querySelector('.mark').classList.contains('done') ? '✓' : '○')
     + ':' + b.querySelector('.mark').textContent + ':' + b.querySelector('.sdetail').textContent)`);
@@ -1107,8 +1109,8 @@ await runSection('ROOMS', async () => {
   const byeLink = `${PAGES}/read.html?b=${BYE.secret}&test=bye`;
   ok('ROOMS-12 bye: below the table, "Bye Room" with Copy and Open, and its note', await js(`(() => {
     const s = document.querySelector('.byesec'); const a = s.querySelector('a');
-    return s.querySelector('strong').textContent === 'Bye Room' && s.querySelector('#copybye').textContent === 'Copy'
-      && a.textContent === 'Open' && a.href === ${q(byeLink)} && a.target === '_blank'
+    return s.querySelector('strong').textContent === 'Bye Room' && s.querySelector('#copybye').title === 'Copy Bye Room link'
+      && a.title === 'Open Bye Room' && a.href === ${q(byeLink)} && a.target === '_blank'
       && s.querySelector('p.muted').textContent === 'Bye Room can be used by several readers at once and does not export or save results.'; })()`));
   await click('#copybye');
   await sayIs('Copied Bye Room link');

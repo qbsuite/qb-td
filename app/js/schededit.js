@@ -10,6 +10,7 @@
 // module owns only the editor's view state, reached through `env`.
 
 import { esc } from './api.js';
+import { ICON as ICONS, named } from './icons.js';
 import { busy } from './busy.js';
 import {
   allFormats, poolSizes, validateSchedule, slotText, insertRound, removeRound,
@@ -1127,8 +1128,8 @@ function renderEditor(box, env) {
       <button id="schedaddround" class="small">Add round</button>
       <button id="schedaddphase" class="small">Add phase</button>
       ${s.pools && hasPlaceholders(s) ? '<button id="schedfill" class="small">Fill playoff slots from standings</button>' : ''}
-      <button id="schedundo" class="small" ${ui.past.length ? '' : 'disabled'}>Undo</button>
-      <button id="schedredo" class="small" ${ui.future.length ? '' : 'disabled'}>Redo</button>
+      <button id="schedundo" class="small icosm" ${named('Undo')} ${ui.past.length ? '' : 'disabled'}>${ICONS.undo}</button>
+      <button id="schedredo" class="small icosm" ${named('Redo')} ${ui.future.length ? '' : 'disabled'}>${ICONS.redo}</button>
       <button id="scheddiscard" class="small" ${unsaved ? '' : 'disabled'}>Discard</button>
       <button id="schedsave" class="primary" ${unsaved ? '' : 'disabled'}>Save schedule</button>
       <button id="scheddel" class="small sgdel">Delete</button>

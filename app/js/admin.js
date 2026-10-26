@@ -49,6 +49,7 @@ import { bracketModel, bracketRounds, bracketInfo, maxRound, phaseOfRound, roomI
 import { buzzCredentials, sha256Hex } from './buzzkey.js';
 import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
+import { ICON, named } from './icons.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
 import { ownedJson, collectMatches, gameFormat, createHubNames,
   fileDownloads, yftFile, reportPages, reportZipFile, qbjZipFile, rosterFileText, fetchUploads, cacheKey, isUpload } from './hubgames.js';
@@ -345,6 +346,15 @@ setInterval(() => {
 
 /* ---------- data fetch + top-level render ---------- */
 
+// The header is drawn again with each render: its page-wide listeners go
+// with the header they belong to.
+let navCtl = null;
+function navAbort() {
+  if (navCtl) navCtl.abort();
+  navCtl = new AbortController();
+  return navCtl.signal;
+}
+
 // `quiet`: a background refresh — a failed fetch keeps what's on screen
 // instead of replacing it with the error (a dropped connection, say).
 // `held`: the rev of the detail on screen. The Worker answers {unchanged}
@@ -426,8 +436,17 @@ function pubMarkHtml(t) {
       + 'Viewers may see older results until it lands."><span class="mk">&#9888;</span>Delayed</span>';
   }
   return pubWaiting(t)
-    ? '<span id="pubmark" class="pubstat wait" title="Viewers see this change within a couple of minutes"><span class="mk">&#9675;</span>Updating</span>'
-    : '<span id="pubmark" class="pubstat" title="Viewers see your latest changes"><span class="mk">&#10003;</span>Up to date</span>';
+    ? '<span id="pubmark" class="pubstat wait" title="Viewers see this change within a couple of minutes"><i class="dot"></i>Updating</span>'
+    : '<span id="pubmark" class="pubstat" title="Viewers see your latest changes"><i class="dot"></i>Up to date</span>';
+}
+// The player page's box in the tabs row: its name, the mark, and its link
+// to copy or open. Off, only the mark: there is nothing to share yet.
+function pubBoxHtml(t) {
+  if (!t.published) return pubMarkHtml(t);
+  const link = esc(statsLink(t.slug));
+  return `<span class="pubname">Player page</span>${pubMarkHtml(t)}
+    <button class="ico" onclick="qtd.copy('${link}', 'player link')" ${named('Copy player link')}>${ICON.copy}</button>
+    <a class="ico" href="${link}" target="_blank" ${named('Open player page')}>${ICON.open}</a>`;
 }
 // a refresh's pub_dirty / pub_built / live onto the detail on screen, and the mark
 function notePub(x) {
@@ -516,10 +535,12 @@ function render() {
           missing.length ? ' <span class="ndot" title="Setup incomplete">&bull;</span>' : ''}</button>
         <button class="hubtab ${v === 'live' ? 'on' : ''}" data-view="live">Live</button>
         <span class="spacer" style="flex:1"></span>
-        <button class="linkbtn" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'player link')">Copy player link</button>
-        <a href="${esc(statsLink(t.slug))}" target="_blank">Open player page</a>
-        ${pubMarkHtml(t)}
-        <button id="rotate" class="linkbtn">New admin link</button>
+        <span class="pubbox">${pubBoxHtml(t)}</span>
+        <span class="navsep"></span>
+        <details class="navmore">
+          <summary class="ico muted" ${named('More')}>${ICON.more}</summary>
+          <div class="navpanel"><button id="rotate" class="linkbtn">New admin link</button></div>
+        </details>
       </nav>
       ${t.set ? `<div class="muted" style="font-size:13px;margin-top:6px">Mirror of <b>${esc(t.set.name)}</b>${
         t.set.published ? ` &middot; <a href="${esc(setLink(t.set.slug))}" target="_blank">set page</a>` : ''}</div>` : ''}
@@ -531,6 +552,10 @@ function render() {
       curView = b.dataset.view; render();
     };
   });
+  // the More menu closes on a click elsewhere or Escape, as menus do
+  const more = view.querySelector('.navmore');
+  document.addEventListener('click', (ev) => { if (more.open && !more.contains(ev.target)) more.open = false; }, { capture: true, once: false, signal: navAbort() });
+  more.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { more.open = false; more.querySelector('summary').focus(); } });
   $('rotate').onclick = async () => {
     if (!confirm('Mint a new admin link? The current link stops working.')) return;
     const run = busy($('rotate'), { label: 'Making a new link' });
@@ -684,10 +709,10 @@ function renderStatsSec(a, t, settings) {
     </div>
     <p class="muted" style="margin:0">Turn on for schedule, semi-live stats, category stats,
       and buzzpoints (if enabled) to be accessible to players.</p>
-    <div class="row" style="margin-top:10px">
+    ${t.published ? `<div class="row" style="margin-top:10px">
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
-      <button class="small" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'player link')">Copy</button>
-    </div>
+      <button class="ico" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'player link')" ${named('Copy player link')}>${ICON.copy}</button>
+    </div>` : ''}
     <h2>Category stats</h2>
     <div class="row">
       <label class="row">Category stats
@@ -921,20 +946,21 @@ function renderRoomsSec(a, t, buckets, files) {
   box.innerHTML = `
     <h2>Rooms</h2>
     ${buckets.length ? `<div class="tablewrap"><table class="roomtable">
-      <tr><th>Name</th><th>Reader link <button class="linkbtn" id="copyrooms">Copy all</button></th><th class="num">Files</th><th></th></tr>
+      <tr><th>Name</th><th>Reader link</th><th class="num">Files</th><th></th></tr>
       ${buckets.map((b) => {
         // names go into a JS string inside an attribute: escape for both
         const js = (s) => esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
         const link = readLink(b.secret);
         return `<tr>
           <td><input class="inlinename" data-roomrename="${b.id}" value="${esc(b.room_name)}" aria-label="Room name"></td>
-          <td class="linkpair"><button class="linkbtn" onclick="qtd.copy('${js(link)}', '${js(b.room_name)} reader link')">Copy</button>
-            <a class="muted" href="${esc(link)}" target="_blank">Open</a>${t.started || !testToken ? ''
+          <td class="linkpair"><button class="ico" onclick="qtd.copy('${js(link)}', '${js(b.room_name)} reader link')" ${named('Copy reader link')}>${ICON.copy}</button>
+            <a class="ico muted" href="${esc(link)}" target="_blank" ${named('Open reader link')}>${ICON.open}</a>${t.started || !testToken ? ''
               : `<a href="${esc(testLink(b.secret))}" target="_blank">Test</a>`}</td>
           <td class="num muted">${files.filter((f) => f.bucket_id === b.id).length}</td>
-          <td class="num"><button class="linkbtn muted" data-delbucket="${b.id}">Remove</button></td>
+          <td class="num"><button class="ico muted" data-delbucket="${b.id}" ${named('Remove room')}>${ICON.trash}</button></td>
         </tr>`;
       }).join('')}
+      <tfoot><tr><td></td><td class="linkpair"><button class="linkbtn copyall" id="copyrooms" ${named('Copy all reader links')}>${ICON.copy}<span>Copy all</span></button></td><td></td><td></td></tr></tfoot>
     </table></div>
     <p class="muted" style="font-size:13px;margin:6px 0 0">${t.started
       ? `Room links will stop working in <span class="tabnum" data-until="${t.closes}">${fmtLeft(t.closes)}</span>.`
@@ -950,8 +976,8 @@ function renderRoomsSec(a, t, buckets, files) {
     </div>
     ${bye ? `<div class="byesec">
       <div class="row byelink"><strong>Bye Room</strong>
-        <button class="linkbtn" id="copybye">Copy</button>
-        <a class="muted" href="${esc(byeLink(bye.secret))}" target="_blank">Open</a></div>
+        <button class="ico" id="copybye" ${named('Copy Bye Room link')}>${ICON.copy}</button>
+        <a class="ico muted" href="${esc(byeLink(bye.secret))}" target="_blank" ${named('Open Bye Room')}>${ICON.open}</a></div>
       <p class="muted">Bye Room can be used by several readers at once and does not export or save results.</p>
     </div>` : ''}`;
   if ($('copybye')) $('copybye').onclick = () => copy(byeLink(bye.secret), 'Bye Room link');
@@ -1313,7 +1339,7 @@ function renderRosterSec(a, t) {
     <div class="row">
       ${t.roster_name
         ? `<span>${esc(t.roster_name)}</span>
-           <a id="rosterget" href="${esc(`${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}&part=roster`)}" download>Download</a>`
+           <a id="rosterget" href="${esc(`${API}${a}/file?key=${encodeURIComponent(t.roster_r2_key)}&dl=${encodeURIComponent(t.roster_name)}&part=roster`)}" download class="ico" ${named('Download roster')}>${ICON.download}</a>`
         : '<span class="muted">None yet</span>'}
       <span class="spacer" style="flex:1"></span>
       <button id="pickroster">Upload roster QBJ</button>

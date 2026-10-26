@@ -30,12 +30,49 @@ body.hubpage .wrap { max-width: 1180px; padding: 22px 32px 64px; }
   border-bottom: 1px solid var(--line); font-size: 14px;
 }
 .hubnav .linkbtn, .hubnav a { padding-bottom: 12px; }
-.hubnav .pubstat {
-  display: inline-flex; align-items: center; gap: 5px; margin-left: -14px; padding-bottom: 12px;
+/* the player page's box, a divider, then the More menu (New admin link)
+   in the corner */
+.hubnav .pubbox {
+  display: inline-flex; align-items: center; gap: 2px; margin-bottom: 6px;
+  padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: 8px;
+}
+.hubnav .pubbox > .pubstat:only-child { margin: 4px 6px 4px 0; }
+.hubnav .pubbox .pubname { color: var(--fg); margin-right: 8px; }
+.hubnav .pubbox .pubstat { margin: 0 6px 0 0; }
+.hubnav .pubbox a.ico { padding: 0; }
+.hubnav .navsep { width: 1px; height: 18px; background: var(--line); align-self: flex-end; margin: 0 -10px 12px; }
+.navmore { position: relative; margin-bottom: 7px; }
+.navmore > summary { list-style: none; }
+.navmore > summary::-webkit-details-marker { display: none; }
+.navmore[open] > summary { background: var(--hover-bg); color: var(--fg); }
+.navpanel {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 170px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+.navpanel button { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 6px; color: var(--fg); white-space: nowrap; }
+.navpanel button:hover { background: var(--hover-bg); }
+/* whether players see the latest changes yet: a dot and a word */
+.pubstat {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 8px;
   font-size: 13px; color: var(--muted); white-space: nowrap;
 }
-.hubnav .pubstat .mk { font-weight: 700; width: 12px; text-align: center; }
-.hubnav .pubstat.wait { color: var(--warn); }
+.pubstat .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.pubstat.wait { color: var(--warn); }
+.pubstat.wait .dot { background: var(--warn); }
+.pubstat .mk { font-weight: 700; width: 12px; text-align: center; }
+/* a symbol in place of a word (icons.js): its name is its title */
+.ico {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  padding: 0; border: none; border-radius: 6px; background: none; color: var(--link); cursor: pointer; vertical-align: middle;
+}
+.ico:hover { background: var(--hover-bg); border: none; }
+.ico.muted { color: var(--muted); }
+.ico.muted:hover { color: var(--fg); }
+.ico:disabled { color: var(--muted); opacity: .5; cursor: default; background: none; }
+.icosm { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; }
+.roomtable .copyall { display: inline-flex; align-items: center; gap: 6px; }
+.roomtable tfoot td { border-bottom: none; padding-top: 8px; }
 .hubtab {
   font: inherit; font-size: 15px; color: var(--muted); background: none; border: none;
   border-radius: 0; padding: 0 0 10px; cursor: pointer;
@@ -295,7 +332,9 @@ table.fxteam { width: 100%; font-variant-numeric: tabular-nums; }
 }
 .roomtable input.inlinename:focus { border-bottom-color: var(--link); }
 .roomtable td.linkpair { white-space: nowrap; }
-.roomtable td.linkpair a { margin-left: 10px; }
+.roomtable td.linkpair > * { vertical-align: middle; }
+.roomtable td.linkpair a { margin-left: 4px; }
+.roomtable td.linkpair a:not(.ico) { margin-left: 10px; }
 
 @media (max-width: 900px) {
   .livegrid, .setupgrid { grid-template-columns: minmax(0, 1fr); gap: 28px; }

@@ -338,7 +338,7 @@ async function openPage() {
   await S('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
   await S('Emulation.setFocusEmulationEnabled', { enabled: true });
   // every document: the local Worker, never qb-td-live, whatever the URL says
-  await S('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('qbtdServer', ${q(BASE)});
+    await S('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('qbtdServer', ${q(BASE)});
     localStorage.setItem('qbtdLive', 'off'); } catch (e) {}` });
   const withServer = (url) => {
     if (!url.startsWith(PAGES) || /[?&]server=/.test(url)) return url;
@@ -639,15 +639,15 @@ section('setup', '01 02 03 04 06 07 10 27 28 52: the setup flow, the header and 
 
   // the public page's link
   const pubUrl = `${PAGES}/t.html?t=${T.slug}`;
-  await pg.click('.hubnav button.linkbtn:not(#rotate)');
+  await pg.click('.pubbox button.ico');
   await check('03 copy player link: the notice says so', async () => { await msgIs(pg, 'Copied player link', false); return true; });
   await check('03 copy player link: the clipboard holds the public page\'s address', async () => (await pg.js('navigator.clipboard.readText()')) === pubUrl);
   await check('03 open public page: links the same address, in a new tab', () =>
-    pg.js(`(() => { const a = [...document.querySelectorAll('.hubnav a')].find((x) => x.textContent === 'Open player page');
+    pg.js(`(() => { const a = document.querySelector('.pubbox a[title="Open player page"]');
       return !!a && a.href === ${q(pubUrl)} && a.target === '_blank'; })()`));
   {
     const n0 = opened.length;
-    await pg.js(`[...document.querySelectorAll('.hubnav a')].find((x) => x.textContent === 'Open player page').click(); true`);
+    await pg.js(`document.querySelector('.pubbox a[title="Open player page"]').click(); true`);
     await check('03 open public page: clicking it opens the public page in a new tab', async () => {
       const o = await until(() => opened.slice(n0).find((x) => x.url.startsWith(pubUrl)), 'the new tab', 10000);
       await send('Target.closeTarget', { targetId: o.targetId }).catch(() => {});
@@ -2293,7 +2293,7 @@ section('refresh', '05 09 50: the refresh timing, what holds off a redraw, a fai
     await call(T.A, { method: 'POST', json: { published: true } });
     await pg.refresh();
     await check('05 mark: turned on, it reads Updating, "Viewers see this change within a couple of minutes"', () =>
-      pg.waitJs(`(() => { const m = document.querySelector('#pubmark'); return m && m.textContent.trim() === '○Updating' && m.title === 'Viewers see this change within a couple of minutes'; })()`, 'Updating'));
+      pg.waitJs(`(() => { const m = document.querySelector('#pubmark'); return m && m.textContent.trim() === 'Updating' && m.title === 'Viewers see this change within a couple of minutes'; })()`, 'Updating'));
     const n5 = revAsks().length;
     asks = await until(() => { const x = revAsks().slice(n5); return x.length >= 7 && x; }, 'checks while Updating', 15000);
     await check('05 mark: while it reads Updating the hub checks at least once a minute (never 120 s)', () => gapsOf(asks).slice(2).every((g) => g <= 600 + 300) || gapsOf(asks));
@@ -2301,7 +2301,7 @@ section('refresh', '05 09 50: the refresh timing, what holds off a redraw, a fai
     await untilTicked(async () => (await T.detail()).tournament.pub_dirty === 0, 'the rebuild');
     d1(`UPDATE tournaments SET pub_built = ${Date.now() - 120000} WHERE id = ${tid}`);
     await check('05 mark: once rebuilt (and viewers\' copies old), it turns to Up to date on its own, no reload, no redraw', async () => {
-      await pg.waitJs(`(() => { const m = document.querySelector('#pubmark'); return m && m.textContent.trim() === '✓Up to date' && m.title === 'Viewers see your latest changes'; })()`, 'Up to date', 10000);
+      await pg.waitJs(`(() => { const m = document.querySelector('#pubmark'); return m && m.textContent.trim() === 'Up to date' && m.title === 'Viewers see your latest changes'; })()`, 'Up to date', 10000);
       return viewKept(pg);
     });
     // the Setup view: nothing redrawn; only the mark, and only checked while it reads Updating
@@ -2330,9 +2330,9 @@ section('refresh', '05 09 50: the refresh timing, what holds off a redraw, a fai
     act: (text) => { const j = JSON.parse(text); if (j.tournament) { j.tournament.live = live; j.tournament.pub_dirty = 0; } else if (j.unchanged) { j.live = live; j.pub_dirty = 0; } return JSON.stringify(j); } }],
   async () => { await openLive(pg, T); return fn(); });
   const mark = () => pg.js(`(() => { const m = document.querySelector('#pubmark'); return m.textContent.trim() + ' | ' + m.title; })()`);
-  await withLive({ state: 'pending' }, async () => check('05 mark: a qb-td-live deploy pending reads Updating', async () => (await mark()).startsWith('○Updating') || await mark()));
-  await withLive({ state: 'ok', at: Date.now() }, async () => check('05 mark: just deployed (within 30 s) still reads Updating', async () => (await mark()).startsWith('○Updating') || await mark()));
-  await withLive({ state: 'ok', at: Date.now() - 60000 }, async () => check('05 mark: deployed a while ago reads Up to date', async () => (await mark()).startsWith('✓Up to date') || await mark()));
+  await withLive({ state: 'pending' }, async () => check('05 mark: a qb-td-live deploy pending reads Updating', async () => (await mark()).startsWith('Updating') || await mark()));
+  await withLive({ state: 'ok', at: Date.now() }, async () => check('05 mark: just deployed (within 30 s) still reads Updating', async () => (await mark()).startsWith('Updating') || await mark()));
+  await withLive({ state: 'ok', at: Date.now() - 60000 }, async () => check('05 mark: deployed a while ago reads Up to date', async () => (await mark()).startsWith('Up to date') || await mark()));
   await withLive({ state: 'failing', since: Date.now() - 120000 }, async () => check('05 mark: deploys failing reads ⚠ Delayed, and says why', async () =>
     (await mark()) === '⚠Delayed | Publishing to the player page is failing and retrying on its own. Viewers may see older results until it lands.' || await mark()));
 });
