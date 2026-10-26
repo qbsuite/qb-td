@@ -785,6 +785,11 @@ function renderCreator(box, env) {
       env.setDirty(false);
       ui.baseline = { obj: s, json: JSON.stringify(s) };
       env.say('Schedule saved');
+      // playoff slots whose pools have finished fill at once, as they do on their own
+      if (env.refill) {
+        await env.refill();
+        ui.baseline = { obj: env.sched(), json: JSON.stringify(env.sched()) };
+      }
     } catch (e) {
       env.setDirty(true);
       env.say('Not saved: ' + e.message, true);

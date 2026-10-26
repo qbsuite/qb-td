@@ -1,5 +1,10 @@
 Release Notes for 10/25/2026
 
+[ SCHEDULE ]
+- Change format… is now Regenerate…, which can redo one phase.
+- Formats use hdwhite's names.
+- Regenerated playoffs fill in again.
+
 [ PUBLIC PAGE ]
 - Stats links land mid-screen.
 - Back returns to where you were.

@@ -1945,6 +1945,8 @@ function renderSchedule(a, t, buckets, files) {
       if (!matches.length) return null;
       return fillReport(sched, standings(matches, roster, gameFormat(t)));
     },
+    // fill the slots Generate just saved, as the hub would on its own
+    refill: () => autoFillSlots(true, true),
     say,
     refresh: () => render(),
   });
@@ -3488,9 +3490,11 @@ let autoWait = { held: [], odd: [], finals: [] }; // what waits for the TD, for 
 let autoForce = [];           // pools (and 'F:' + a finals bracket) the TD said to fill anyway
 const autoCache = new Map();  // games already read (public copies), shared with Fill
 
-async function autoFillSlots(force = false) {
+// inEditor: the schedule editor asks, right after Generate saved new
+// placeholders (a phase regenerated after its pools finished)
+async function autoFillSlots(force = false, inEditor = false) {
   if (autoBusy || !lastDetail || !sched || schedDirty || !hasPlaceholders(sched)) return;
-  if (shownView === 'setup' && setupTab === 'sched') return; // the editor holds this schedule
+  if (!inEditor && shownView === 'setup' && setupTab === 'sched') return; // the editor holds this schedule
   const { tournament: t, buckets } = lastDetail;
   if (!t.started) return;
   // the uploads under the teams' current names: a roster save renames the
@@ -3572,7 +3576,7 @@ async function autoFillSlots(force = false) {
       sched = saved;
       schedEtag = etag;
     }
-    if (shownView === 'live') render();
+    if (shownView === 'live' && !inEditor) render();
   } catch (e) {
     autoSig = null; // try again on the next refresh
   } finally { autoBusy = false; }
