@@ -15,7 +15,7 @@ import {
   allFormats, poolSizes, validateSchedule, slotText, insertRound, removeRound,
   addRound, swapCells, removeRoomCol, hasPlaceholders, fillPlaceholders,
   tagBrackets, bracketRooms, phaseLanes, scheduleChecks, renameTeams, removeTeam,
-  poolOf, tradePools, tradesLocked,
+  poolOf, tradePools, tradesLocked, regenPart,
 } from '../engine/schedule.js';
 import { buildPlan, planPreview, planGroups, rebracketChecks, addFinals, handOk } from '../engine/plan.js';
 import HDWHITE from '../engine/hdwhite.js';
@@ -42,6 +42,7 @@ const ui = {
   byeW: null,            // the Byes column, likewise
   opts: { seed: 1 + Math.floor(Math.random() * 9999) }, // the picker's seed (rounds are always shuffled)
   plan: null,            // the picker's plan (plan.js phases); null: from the schedule, or the default
+  regen: 'all',          // what Generate replaces: 'all' or 'p<phase>'
   addPhase: false,       // the editor's Add phase form is open
   fillCheck: null,       // fillReport() with something to look at before filling
 };
@@ -401,11 +402,23 @@ function handCards(hand, seedOf) {
   </div>`).join('')}</div>`;
 }
 
+// What the picker can regenerate in a saved schedule: all of it, or one phase.
+const regenParts = (sched) => [['all', 'Whole schedule'], ...sched.phases.map((ph, p) => [`p${p}`, ph.name])];
+const regenTarget = (v) => {
+  const m = /^p(\d+)$/.exec(v);
+  return m ? { phase: Number(m[1]) } : null;
+};
+
 function renderCreator(box, env) {
   if (fullBtn()) fullBtn().hidden = true; // nothing to fill the screen with yet
   const t = env.teams.length;
   const n = env.buckets.length;
-  const back = env.sched() ? `<div class="sgnotice">Picking a new format replaces the schedule when you press Generate.
+  const parts = env.sched() ? regenParts(env.sched()) : [];
+  if (!parts.some(([v]) => v === ui.regen)) ui.regen = 'all';
+  // regenerating one phase: only its settings show
+  const only = env.sched() ? regenTarget(ui.regen) : null;
+  const what = ui.regen === 'all' ? 'the schedule' : parts.find(([v]) => v === ui.regen)[1];
+  const back = env.sched() ? `<div class="sgnotice">Picking a new format replaces ${esc(what)} when you press Generate.
       <button id="schedback" class="small">Keep the current schedule</button></div>` : '';
   const wireBack = () => { const b = box.querySelector('#schedback'); if (b) b.onclick = () => { ui.creator = false; env.refresh(); }; };
   if (t < 2 || !n) {
@@ -519,7 +532,7 @@ function renderCreator(box, env) {
 
   const canCopy = (p) => P[p].kind === 'pools' && groupsBy[p].some((g) => g.members.length > 1);
   const headOf = (p) => `<h3 class="pksec"><input class="pkname" data-name="${p}" size="${Math.max(6, P[p].name.length + 1)}" value="${esc(P[p].name)}" aria-label="Phase name"> ${nr(p)}
-    <span class="pktools">${canCopy(p) ? `<button class="linkbtn" data-copy="${p}">Copy this phase</button>` : ''}${p > 0 ? `<button class="linkbtn" data-del="${p}">Remove</button>` : ''}</span></h3>`;
+    <span class="pktools">${only ? '' : `${canCopy(p) ? `<button class="linkbtn" data-copy="${p}">Copy this phase</button>` : ''}${p > 0 ? `<button class="linkbtn" data-del="${p}">Remove</button>` : ''}`}</span></h3>`;
   const canAdd = P[P.length - 1].kind === 'pools' && groupsBy[P.length - 1].some((g) => g.members.length > 1);
   // Finals: 1st against 2nd of the top pool (or the two top pools' winners)
   const finals = (() => {
@@ -540,16 +553,21 @@ function renderCreator(box, env) {
   const extra = [fin ? (fin === 1 ? 'a final' : '2 for finals') : ''].filter(Boolean);
   const optOf = (f) => `<option value="${esc(f.key)}" ${f.key === plan.fmt ? 'selected' : ''}${f.rooms > n ? ' disabled' : ''}>${esc(f.label)}${f.rooms > n ? ` (needs ${f.rooms} rooms)` : ''}</option>`;
 
+  const shown = (p) => !only || only.phase === p;
   box.innerHTML = `${back}
     <div class="pkpick">
       <div class="pkgrid">
+        ${parts.length ? `<span class="pkl">Regenerate</span><span><select data-regen aria-label="Regenerate">${parts.map(([v, l]) =>
+          `<option value="${esc(v)}" ${v === ui.regen ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></span>` : ''}
         <span class="pkl">Rooms</span><span class="pkrow"><span>${n} rooms for ${t} teams</span><span class="muted">from the Rooms step</span></span>
-        <span class="pkl">Format</span><span><select data-fmt>${formatList(t).map(optOf).join('')}<option value="custom" ${plan.fmt === 'custom' ? 'selected' : ''}>Custom</option></select></span>
+        ${only ? '' : `<span class="pkl">Format</span><span><select data-fmt>${formatList(t).map(optOf).join('')}<option value="custom" ${plan.fmt === 'custom' ? 'selected' : ''}>Custom</option></select></span>`}
       </div>
-      ${P.map((_, p) => headOf(p) + (p === 0 ? first() : later(p))).join('')}
-      ${canAdd ? '<div><button class="linkbtn pkadd" data-add>Add another phase</button></div>' : ''}
-      ${finalsBox}
-      <div class="sgpreview pktotalbox">${pv.ok
+      ${P.map((_, p) => (shown(p) ? headOf(p) + (p === 0 ? first() : later(p)) : '')).join('')}
+      ${canAdd && !only ? '<div><button class="linkbtn pkadd" data-add>Add another phase</button></div>' : ''}
+      ${only ? '' : finalsBox}
+      <div class="sgpreview pktotalbox">${pv.ok && only
+        ? `<span class="pktotal"><b>${pv.rounds[only.phase] || 0} rounds</b></span>`
+        : pv.ok
         ? `<span class="pktotal"><b>${total} rounds</b>${extra.length ? ` <span>plus ${always ? '' : 'up to '}${extra.join(' and ')}</span>` : ''}</span><span class="muted">${esc(pv.text.split(' · ').slice(1).join(' · '))}</span>`
         : `<span class="pkwarn"><span>${esc(pv.text)}</span></span>`}</div>
       <div class="row pkfoot"><button id="schedgen" class="primary" ${pv.ok ? '' : 'disabled'}>Generate</button>
@@ -718,9 +736,11 @@ function renderCreator(box, env) {
   });
   const reroll = box.querySelector('#optreroll');
   reroll.onclick = () => { ui.opts.seed = 1 + Math.floor(Math.random() * 9999); again(); };
+  const rg = box.querySelector('[data-regen]');
+  if (rg) rg.onchange = () => { ui.regen = rg.value; again(); };
   box.querySelector('#schedgen').onclick = async () => {
     const label = plan.fmt === 'custom' ? 'custom format' : (formatList(t).find((f) => f.key === plan.fmt) || {}).label;
-    if (env.sched() && !confirm(`Replace the current schedule with ${plan.fmt === 'custom' ? 'a custom format' : label}?`)) return;
+    if (env.sched() && !confirm(`Replace ${ui.regen === 'all' ? 'the current schedule' : what} with ${plan.fmt === 'custom' ? 'a custom format' : label}?`)) return;
     let s;
     try {
       s = buildPlan(env.teams, roomList(env, n), withTies(plan), plan.seeding, ui.opts.seed);
@@ -730,7 +750,15 @@ function renderCreator(box, env) {
       const saved = JSON.parse(JSON.stringify(plan));
       delete saved.teams;
       s.options = { seed: ui.opts.seed, plan: saved };
+      // one phase: spliced into the saved schedule, the rest kept
+      const part = env.sched() && regenTarget(ui.regen);
+      if (part) {
+        const cur = JSON.parse(JSON.stringify(env.sched()));
+        tagBrackets(cur);
+        s = { ...regenPart(cur, s, part), options: s.options };
+      }
     } catch (e) { env.say(e.message, true); return; }
+    ui.regen = 'all';
     // a generated schedule goes live right away — Save is for edits after
     const run = busy(box.querySelector('#schedgen'), { label: 'Generating' });
     env.setSched(s);
@@ -1051,7 +1079,7 @@ function renderEditor(box, env) {
     <button id="schedexit" class="iconbtn sgexit" title="Exit full screen (Esc)" aria-label="Exit full screen">${ICON_EXIT}</button>` : ''}
     <div class="sghead">
       <span class="muted">${env.teams.length} teams · ${s.rooms.length} rooms · ${nRounds} rounds${fmtName ? ' · ' + esc(fmtName) : ''}</span>
-      <button id="schedregen" class="linkbtn">Change format…</button>
+      <button id="schedregen" class="linkbtn">Regenerate…</button>
       <span class="spacer" style="flex:1"></span>
       <div class="views sgviews">
         ${[['grid', 'Grid'], ['teams', 'By team'], ['brackets', 'Brackets']].map(([k, l]) =>
@@ -1419,13 +1447,16 @@ function renderEditor(box, env) {
       env.refresh();
     } catch (e) { env.say(e.message, true); }
   };
-  q('schedregen').onclick = () => {
+  // the format picker, replacing the whole schedule unless a part is picked there
+  const openPicker = (regen) => {
     if (env.dirty() && !confirm('You have unsaved edits. Pick a new format anyway? (Nothing changes until you press Generate.)')) return;
     ui.creator = true;
     ui.plan = null; // the picker starts from the schedule's plan, or the default
+    ui.regen = regen;
     if (s.options && s.options.seed) ui.opts.seed = s.options.seed;
     renderCreator(box, env);
   };
+  q('schedregen').onclick = () => openPicker('all');
 }
 
 /* ---------- Add phase (a finals phase after the last one) ---------- */

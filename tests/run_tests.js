@@ -14,7 +14,7 @@ import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc, mountReport, reportPlace } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
 import { parseDocxQuestions } from '../app/engine/docxq.js';
-import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, finishedThrough, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked, summaryTeams, namedFiles } from '../app/engine/schedule.js';
+import { roundRobinRounds, crossRounds, assignRooms, allFormats, formatsFor, buildSchedule, slotAt, setSlot, swapSlots, moveGame, addRound, removeRound, validateSchedule, roomIndexForBucket, roomRounds, gameForRoom, flatRounds, roundIntake, roundRooms, insertRound, swapCells, addRoomCol, removeRoomCol, hasPlaceholders, poolStandings, fillPlaceholders, fillReport, prelimProgress, prelimRounds, autoFill, slotText, tagBrackets, bracketRooms, phaseLanes, scheduleChecks, mulberry32, finishedThrough, renameTeams, rosterRenames, removeTeam, poolOf, tradePools, tradesLocked, summaryTeams, namedFiles, regenPart } from '../app/engine/schedule.js';
 import { createHash as schedHash } from 'node:crypto';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance, advanceAll, advanceBracket, slotLabel, liveLayout, bracketRooms as bkRooms } from '../app/engine/brackets.js';
 import { serializeYft } from '../app/engine/yft.js';
@@ -8192,3 +8192,21 @@ test('hubgames.js: passes on exportfile.js, so the hub imports its downloads fro
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
+
+test('regenPart: one phase from a fresh schedule, the rest kept', () => {
+  const T = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((x) => 'T' + x);
+  const R = [0, 1, 2, 3].map((i) => ({ name: 'Room ' + (i + 1), bucket: i + 1 }));
+  const cur = buildSchedule('pools2', T, R, { seed: 1 });
+  tagBrackets(cur);
+  const sig = (sc, p) => JSON.stringify(sc.phases[p].rounds.map((r) => r.games.map((g) => [g.room, slotText(g.a), slotText(g.b)])));
+  // fresh playoffs with one more round
+  const fresh = JSON.parse(JSON.stringify(cur));
+  fresh.phases[1].rounds.push(JSON.parse(JSON.stringify(fresh.phases[1].rounds[0])));
+  const out = regenPart(cur, fresh, { phase: 1 });
+  assert.equal(sig(out, 0), sig(cur, 0), 'prelims kept');
+  assert.equal(sig(out, 1), sig(fresh, 1), 'the fresh playoffs taken');
+  assert.deepEqual(out.phases.flatMap((p) => p.rounds.map((r) => r.round)), [1, 2, 3, 4, 5, 6], 'renumbered');
+  assert.equal(cur.phases[1].rounds.length, 2, 'cur untouched');
+  assert.deepEqual(out.brackets.map((b) => b.key), cur.brackets.map((b) => b.key), 'the brackets list kept');
+  assert.throws(() => regenPart(cur, { phases: [fresh.phases[0]] }, { phase: 1 }), /not in this format/);
+});

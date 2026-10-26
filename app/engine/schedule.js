@@ -842,6 +842,22 @@ export function renumber(schedule) {
   for (const ph of schedule.phases) for (const r of ph.rounds) r.round = n++;
 }
 
+/**
+ * The schedule `cur` with one phase taken from `fresh` (a schedule the
+ * format picker just generated); everything else in `cur` stays as it is.
+ * Rounds are renumbered. Throws when `fresh` has no such phase.
+ */
+export function regenPart(cur, fresh, part) {
+  const out = JSON.parse(JSON.stringify(cur));
+  const p = part.phase;
+  if (!out.phases[p] || !fresh.phases[p]) throw new Error('That phase is not in this format.');
+  out.phases[p] = JSON.parse(JSON.stringify(fresh.phases[p]));
+  if (p === 0 && fresh.pools) out.pools = JSON.parse(JSON.stringify(fresh.pools));
+  out.brackets = [...(out.brackets || []).filter((b) => b.phase !== p), ...JSON.parse(JSON.stringify((fresh.brackets || []).filter((b) => b.phase === p)))];
+  renumber(out);
+  return out;
+}
+
 /** Append an empty round (null slots in every room) to a phase. */
 export function addRound(schedule, phaseIndex) {
   const games = schedule.rooms.map((_, i) => ({ room: i, a: null, b: null }));
