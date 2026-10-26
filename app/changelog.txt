@@ -1,5 +1,9 @@
 Release Notes for 10/25/2026
 
+[ BUZZPOINTS ]
+- Buzzpoints and scoresheets ask for the password once per device.
+- A wrong password right after a right one is now refused.
+
 [ SCHEDULE ]
 - Change format… is now Regenerate…, which can redo one phase.
 - Formats use hdwhite's names.
