@@ -11,6 +11,8 @@
 // the browser. The frame and the page talk only by postMessage (height,
 // place, back).
 
+import { comfortY } from './place.js';
+
 const FILES = ['standings', 'individuals', 'games', 'teamdetail', 'playerdetail', 'rounds'];
 
 function bodyOf(html) {
@@ -70,6 +72,7 @@ export function reportSrcdoc(pages, { start = null } = {}) {
     var startAt = ${scriptJson(start || null)};
     var marked = null; // {el, box, back}: undone on the next click
     var trail = [];    // {page, link, el}: each link followed to another page, and what was marked there
+    var nav = '';      // how the next page shown was reached, for the page's scroll memory: push, back or reset
     function pageOf(hash) {
       return files.filter(function (f) { return hash === f + '-top' || hash.indexOf(f + '-') === 0; })[0] || files[0];
     }
@@ -111,6 +114,7 @@ export function reportSrcdoc(pages, { start = null } = {}) {
           var to = trail.pop();
           if (to.page === 'outside') { parent.postMessage({ qbtdReport: 'back' }, '*'); return; }
           unmark();
+          nav = 'back';
           show(to.page + '-top', false, to.link, to.el);
         });
         start.appendChild(back);
@@ -127,8 +131,14 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       var el = link || (hash ? document.getElementById(hash) : null);
       if (go) mark(el, pg);
       else if (remark) mark(remark, pg);
-      var y = el ? el.getBoundingClientRect().top : 0;
-      parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight, y: y, go: !!(go || link) }, '*');
+      // what the page brings into view: the marked section when it is the
+      // one shown (a followed link, or the place the report opened at),
+      // else the element itself (Back's link); a page's top as is
+      var shown = marked && marked.box && (go || marked.el === el) ? marked.box : el;
+      var r = shown ? shown.getBoundingClientRect() : null;
+      parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight,
+        y: r ? r.top : 0, h: r ? r.height : 0, top: !el || /-top$/.test(el.id || ''), go: !!(go || link), nav: nav }, '*');
+      nav = '';
       tellPlace();
     }
     function tellPlace() {
@@ -151,8 +161,8 @@ export function reportSrcdoc(pages, { start = null } = {}) {
       if (!a || a.classList.contains('qt-back')) return;
       e.preventDefault();
       var hash = a.getAttribute('href').slice(1);
-      if (/-top$/.test(hash)) trail = [];
-      else if (pageOf(hash) !== pageOf(current)) trail.push({ page: pageOf(current), link: a, el: marked && marked.el });
+      if (/-top$/.test(hash)) { trail = []; nav = 'reset'; }
+      else if (pageOf(hash) !== pageOf(current)) { trail.push({ page: pageOf(current), link: a, el: marked && marked.el }); nav = 'push'; }
       show(hash, true);
     });
     // Sandboxed, the frame is laid out in a process of its own and can get
@@ -252,6 +262,7 @@ export function mountReport(box, pages, opts = {}) {
     + ' style="width:100%;border:0;min-height:60vh;background:transparent"></iframe>';
   const frame = box.querySelector('iframe');
   frame.srcdoc = reportSrcdoc(pages, opts);
+  const ys = []; // where the page was scrolled before each link the frame followed to another page
   const onMessage = (e) => {
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'back' && opts.onBack) opts.onBack();
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'place') {
@@ -260,10 +271,15 @@ export function mountReport(box, pages, opts = {}) {
     }
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'height') {
       frame.style.height = Math.max(400, e.data.height + 16) + 'px';
-      // a followed link: bring its target (or the page's top) into view
+      // a followed link: bring its target into view a little above the
+      // middle (place.js), or the page's top to the top
+      if (e.data.nav === 'reset') ys.length = 0;
+      // Back: where the reader was before following the link
+      if (e.data.nav === 'back' && ys.length) { window.scrollTo(0, ys.pop()); return; }
       if (e.data.go) {
+        if (e.data.nav === 'push') ys.push(window.scrollY);
         const y = frame.getBoundingClientRect().top + window.scrollY + (Number(e.data.y) || 0);
-        window.scrollTo(0, Math.max(0, y - 8));
+        window.scrollTo(0, e.data.top ? Math.max(0, y - 8) : comfortY(y, Number(e.data.h) || 0));
       }
     }
   };

@@ -3038,7 +3038,7 @@ function fixPanelHtml() {
     now = d.fixed ? parseMatch(d.fixed, { filename: x.filename }) : was;
   } catch (e) { return `<div class="fixbuzz warntext">${esc(e.message)}</div>`; }
   const hasAll = !!(d.base.buzzes && d.base.buzzes.length);
-  const tab = x.tab === 'all' && !hasAll ? 'swap' : x.tab;
+  const tab = x.tab === 'all' && !hasAll ? 'lineups' : x.tab;
   const values = [...new Set([was, now].flatMap((m) => m.teams.flatMap((tm) => tm.players.flatMap((p) => p.counts.map((c) => c.value)))))]
     .filter((v) => v !== 0).sort((p, q) => q - p);
   const line = (m, ti, name) => {
@@ -3126,9 +3126,9 @@ function fixPanelHtml() {
   const changed = x.swaps.length || x.edits.size || Object.keys(x.lineups).length;
   return `<div class="fixbuzz">
     <div class="fxtabs" role="tablist">
+      <button role="tab" class="fxtab ${tab === 'lineups' ? 'on' : ''}" data-fixtab="lineups" aria-selected="${tab === 'lineups'}">Lineups</button>
       <button role="tab" class="fxtab ${tab === 'swap' ? 'on' : ''}" data-fixtab="swap" aria-selected="${tab === 'swap'}">Swap player buzzes</button>
-      ${hasAll ? `<button role="tab" class="fxtab ${tab === 'all' ? 'on' : ''}" data-fixtab="all" aria-selected="${tab === 'all'}">All buzzes</button>` : ''}
-      <button role="tab" class="fxtab ${tab === 'lineups' ? 'on' : ''}" data-fixtab="lineups" aria-selected="${tab === 'lineups'}">Lineups</button></div>
+      ${hasAll ? `<button role="tab" class="fxtab ${tab === 'all' ? 'on' : ''}" data-fixtab="all" aria-selected="${tab === 'all'}">All buzzes</button>` : ''}</div>
     ${tab === 'all' ? allList() : ''}
     ${tab === 'lineups' ? lineupCards() : ''}
     ${table(0)}${table(1)}
@@ -3169,7 +3169,7 @@ function wireFix(box, a, t, buckets, files) {
       const fid = Number(btn.dataset.fixbuzz);
       if (fixOpen && fixOpen.fid === fid) { fixOpen = null; render(); return; }
       const f = files.find((y) => y.id === fid);
-      fixOpen = { fid, filename: f.filename, tab: 'swap', loading: true, root: null, err: '', roster: {}, swaps: [], edits: new Map(), lineups: {}, luAdd: null };
+      fixOpen = { fid, filename: f.filename, tab: 'lineups', loading: true, root: null, err: '', roster: {}, swaps: [], edits: new Map(), lineups: {}, luAdd: null };
       render();
       const x = fixOpen;
       try {

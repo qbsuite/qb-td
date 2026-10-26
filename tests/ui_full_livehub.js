@@ -1541,11 +1541,13 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
   await openCell(pg, R1.id, 2);
   await pg.watchTexts('.fixbuzz');
   await pg.click(`[data-fixbuzz="${f21.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
+  await pg.waitJs(`!!document.querySelector('.lucards')`, 'Fix stats');
   await check('30 fix stats: "Loading the game…" first', async () => (await pg.seenTexts())[0] === 'Loading the game…' || await pg.seenTexts());
   const tabs = () => pg.js(`[...document.querySelectorAll('[data-fixtab]')].map((b) => b.textContent + (b.classList.contains('on') ? '*' : ''))`);
-  await check('30 fix stats: Swap player buzzes, All buzzes and Lineups tabs, for a game with buzzes', async () =>
-    JSON.stringify(await tabs()) === '["Swap player buzzes*","All buzzes","Lineups"]' || await tabs());
+  await check('30 fix stats: opens on Lineups, then Swap player buzzes and All buzzes, for a game with buzzes', async () =>
+    JSON.stringify(await tabs()) === '["Lineups*","Swap player buzzes","All buzzes"]' || await tabs());
+  await pg.click('[data-fixtab="swap"]');
+  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
   await check('30 fix stats: a table per team, counts per value, points and tossups heard', async () => {
     const t = await tables();
     const want = [{ head: [A2, '10', '-5', 'Pts', 'TUH', ''], rows: [['', A2 + ' 1', '1', '1', '5', '20'], ['', A2 + ' 2', '2', '0', '20', '20'], ['', A2 + ' 3', '1', '0', '10', '20']] },
@@ -1601,7 +1603,7 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
   await check('30 fix stats: Cancel closes the panel, nothing saved', async () =>
     (await pg.waitJs(`!document.querySelector('.fixbuzz')`, 'closed')) && (await T.detail()).files.filter((f) => f.bucket_id === R1.id && f.round === 2).length === 1);
   await pg.click(`[data-fixbuzz="${f21.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap]')`, 'open again');
+  await pg.waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'open again'); await pg.click('[data-fixtab="swap"]'); await pg.waitJs(`!!document.querySelector('[data-fswap]')`, 'open again');
   await pg.click(`[data-fixbuzz="${f21.id}"]`);
   await check('30 fix stats: its button opens and closes the panel', () => pg.waitJs(`!document.querySelector('.fixbuzz')`, 'toggled closed'));
   // Lineups: who started and each substitution, per team, as the
@@ -1612,7 +1614,7 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
     on: [...c.querySelectorAll('button.lup')].map((b) => b.dataset.name + (b.classList.contains('on') ? '*' : '')),
     subs: [...c.querySelectorAll('.lusub')].map((r) => [...r.querySelectorAll('span')].map((x) => x.textContent.trim()).join(' ')) }))`);
   await pg.click(`[data-fixbuzz="${f21.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap]')`, 'open again');
+  await pg.waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'open again'); await pg.click('[data-fixtab="swap"]'); await pg.waitJs(`!!document.querySelector('[data-fswap]')`, 'open again');
   await pg.click('[data-fixtab="lineups"]');
   await check('30 fix stats: Lineups shows each team\'s players, the starters ticked, and its substitutions, as the file has them', async () => {
     await pg.waitJs(`!!document.querySelector('.lucards')`, 'Lineups');
@@ -1680,7 +1682,7 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
   await pg.click(`[data-fixbuzz="${quiet.id}"]`);
   await check('30 fix stats: a game with no buzzes has no All buzzes tab, only Swap player buzzes and Lineups', async () => {
     await pg.waitJs(`!!document.querySelector('.fixbuzz table.fxteam')`, 'the tables');
-    return JSON.stringify(await tabs()) === '["Swap player buzzes*","Lineups"]' || await tabs();
+    return JSON.stringify(await tabs()) === '["Lineups*","Swap player buzzes"]' || await tabs();
   });
   if (PERSIST) {
     await openCell(pg, R3.id, 6);
@@ -1705,7 +1707,7 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
       await expectNotice(pg, '27 edit in MODAQ: before Start, "Start the tournament first…"', 'Start the tournament first: rooms take games only once it has started', true);
       await openCell(pg, R1.id, 2);
       await pg.click(`[data-fixbuzz="${f21.id}"]`);
-      await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
+      await pg.waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'Fix stats'); await pg.click('[data-fixtab="swap"]'); await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
       await pg.fill('[data-fswap="0:0"]', A2 + ' 2', ['change']);
       await pg.waitJs(`!document.querySelector('#fixsave').disabled`, 'a change to save');
       await pg.click('#fixsave');
@@ -1721,7 +1723,7 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
     const before = await pg.text('#statsnote');
     await openCell(pg, R1.id, 3);
     await pg.click(`[data-fixbuzz="${f21.id}"]`);
-    await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
+    await pg.waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'Fix stats'); await pg.click('[data-fixtab="swap"]'); await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
     await pg.fill('[data-fswap="0:0"]', A2 + ' 2', ['change']);
     await pg.waitJs(`!document.querySelector('#fixsave').disabled`, 'a change to save');
     await pg.watchTexts('#fixsave');
@@ -1854,7 +1856,7 @@ section('main-rename', '51: a team renamed in another tab, in the hub\'s listing
   await openCell(pg, R1.id, 1);
   await pg.click(`.cellpanel [data-fixbuzz="${(M.f11b || M.f11).id}"]`);
   await check('51 rename: Fix stats offers only roster players not in the game, under their new names', async () => {
-    await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
+    await pg.waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'Fix stats'); await pg.click('[data-fixtab="swap"]'); await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
     const roster = await pg.js(`[...document.querySelectorAll('[data-fswap="0:0"] optgroup option')].map((x) => x.value)`);
     return JSON.stringify(roster) === JSON.stringify([X + ' Sub']) || roster;
   });
@@ -2147,7 +2149,7 @@ section('edit', '09 29: Edit in MODAQ, through a real reader: the game reopens, 
 
   // Fix stats on the reader's own upload: Ann's tossup was Abe's
   await pg.click(`[data-fixbuzz="${orig.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
+  await pg.waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'Fix stats'); await pg.click('[data-fixtab="swap"]'); await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
   await pg.fill('[data-fswap="0:0"]', 'Abe', ['change']);
   await pg.waitJs(`!!document.querySelector('#fixsave') && !document.querySelector('#fixsave').disabled`, 'a change to save');
   await pg.click('#fixsave');
@@ -2855,7 +2857,7 @@ section('room-gone', '21 30 31: a room deleted in another tab while Fix stats is
   await openLive(pg, T);
   await openCell(pg, R2.id, 1);
   await pg.click(`[data-fixbuzz="${f2.id}"]`);
-  await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
+  await pg.waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'Fix stats'); await pg.click('[data-fixtab="swap"]'); await pg.waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'Fix stats');
   await pg.fill('[data-fswap="0:0"]', players(pairIn(1))[0][1], ['change']);
   await pg.waitJs(`!!document.querySelector('#fixsave') && !document.querySelector('#fixsave').disabled`, 'a change to save');
   // another tab deletes Room 2 meanwhile

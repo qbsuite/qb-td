@@ -54,6 +54,13 @@ import { buildRosterQbj, forfeitQbj } from '../app/engine/qbj.js';
 import { buildPlan, addFinals, planGroups } from '../app/engine/plan.js';
 import { finalsFill, finalsProgress } from '../app/engine/finals.js';
 
+// where place.js puts what a link lands on: its middle 40% down the window,
+// or its top 12% down when it is taller; a page that can't scroll that far
+// (at its top or bottom) is let off
+const comfy = (tab, top, h) => tab.js(`(() => { const vh = innerHeight; const want = Math.max(vh * 0.12, vh * 0.4 - ${h} / 2);
+  const stuck = scrollY < 2 || scrollY + vh >= document.documentElement.scrollHeight - 2;
+  return Math.abs(${top} - want) < 40 || (stuck && ${top} > -20 && ${top} < vh); })()`);
+
 /* ---------- configuration ---------- */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1368,9 +1375,9 @@ async function sectionMain(br) {
   });
   await check('st-05 classic links: the page is scrolled to the marked team', async () => {
     const y = await tab.js(`(() => { const f = document.querySelector('iframe.report').getBoundingClientRect(); return f.top; })()`);
-    const at = await tab.fjs(`document.querySelector('.qt-mark').getBoundingClientRect().top`);
-    const top = y + at;
-    return (top > -20 && top < 200) || { frameTop: y, markTop: at };
+    const at = await tab.fjs(`(() => { const r = document.querySelector('.qt-mark').getBoundingClientRect(); return { top: r.top, h: r.height }; })()`);
+    const top = y + at.top;
+    return (await comfy(tab, top, at.h)) || { frameTop: y, mark: at };
   });
   const pLink = await tab.fjs(`document.querySelector('.qt-mark a[href^="#playerdetail-"]').textContent`);
   await tab.fclick('.qt-mark a[href^="#playerdetail-"]');
@@ -1517,10 +1524,10 @@ async function sectionMain(br) {
   await tab.click('#newstats a[data-go^="teams|"]:not(.x)');
   const newMark = () => tab.js(`(() => { const m = document.querySelector('.nsec.nmark'); return m && { sec: (document.querySelector('[data-statssec].on') || {}).textContent,
     head: m.querySelector('.nhead span').textContent, back: (m.querySelector('a.nback') || {}).textContent || null, top: Math.round(m.getBoundingClientRect().top),
-    marks: document.querySelectorAll('.nmark').length }; })()`);
+    h: Math.round(m.getBoundingClientRect().height), marks: document.querySelectorAll('.nmark').length }; })()`);
   await check('st-13 new links: a team link opens Teams at the team, marked, scrolled to, with "← Back to Standings"', async () => {
     const x = await newMark();
-    return (x && x.sec === 'Teams' && x.head === 'Alder' && x.back === '← Back to Standings' && x.top >= -2 && x.top < 120 && x.marks === 1) || x;
+    return (x && x.sec === 'Teams' && x.head === 'Alder' && x.back === '← Back to Standings' && await comfy(tab, x.top, x.h) && x.marks === 1) || x;
   });
   const npLink = await tab.text('.nsec.nmark a[data-go^="players|"]');
   await tab.click('.nsec.nmark a[data-go^="players|"]');
@@ -1543,8 +1550,8 @@ async function sectionMain(br) {
   await tab.S('Emulation.setDeviceMetricsOverride', { width: 1280, height: 500, deviceScaleFactor: 1, mobile: false });
   await tab.click('.njump a.chip:nth-child(2)');
   await check('st-13 new links: a Round chip scrolls to the round', async () => {
-    const top = await tab.js(`Math.round(document.getElementById('nr-2').getBoundingClientRect().top)`);
-    return (top >= -2 && top < 60) || top;
+    const r = await tab.js(`(() => { const r = document.getElementById('nr-2').getBoundingClientRect(); return { top: Math.round(r.top), h: Math.round(r.height) }; })()`);
+    return (await comfy(tab, r.top, r.h)) || r;
   });
   await tab.view('desktop');
   await tab.js('window.scrollTo(0, 0), true');
@@ -1774,10 +1781,10 @@ async function sectionMain(br) {
   await tab.click(scoreSel(sgOf(4, 'Cedar', 'Dogwood')));
   await check('sch-06 score link: in New it lands on the game in Scoreboard, marked, with "← Back to Schedule"', async () => {
     const x = await tab.wait(`(() => { const m = document.querySelector('.nsec.nmark'); return m && { sec: (document.querySelector('[data-statssec].on') || {}).textContent,
-      head: m.querySelector('.nhead span').textContent, back: (m.querySelector('a.nback') || {}).textContent, top: m.getBoundingClientRect().top }; })()`, 'the marked game');
-    const bottom = await tab.js(`window.scrollY + innerHeight >= document.documentElement.scrollHeight - 2 && window.scrollY > 0`);
+      head: m.querySelector('.nhead span').textContent, back: (m.querySelector('a.nback') || {}).textContent, top: m.getBoundingClientRect().top,
+      h: m.getBoundingClientRect().height }; })()`, 'the marked game');
     return (x.sec === 'Scoreboard' && x.head === `Cedar ${g42.exp[0].points}, Dogwood ${g42.exp[1].points}` && x.back === '← Back to Schedule'
-      && x.top >= -2 && (x.top < 120 || bottom)) || { x, bottom };
+      && await comfy(tab, x.top, x.h)) || x;
   });
   await tab.click('a.nback');
   await check('sch-06 score link: and its Back returns to the Schedule', async () => (await tab.js(`document.querySelector('.tab.active').id`)) === 'tab-schedule' || tab.js(`document.querySelector('.tab.active').id`));

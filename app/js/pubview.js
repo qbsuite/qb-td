@@ -18,6 +18,7 @@ import { readGames } from '../engine/games.js';
 import { dedupeMatches } from '../engine/stats.js';
 import { buildReport, reportData } from '../engine/report.js';
 import { mountReport, reportPlace } from './reportframe.js';
+import { comfortScroll } from './place.js';
 import { slotText } from '../engine/schedule.js';
 import { scheduleFinished } from '../engine/finals.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes, sideRounds } from '../engine/buzz.js';
@@ -1615,7 +1616,7 @@ function renderNewStats(box) {
         ` <a href="#" class="nback" data-back="1">← Back to ${esc(label || 'the last page')}</a>`);
     }
   }
-  if (opened && el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - 8));
+  if (opened && el) comfortScroll(el);
   if (pendingPlace) {
     const at = pendingPlace.anchor && [...box.querySelectorAll('[data-at]')].find((x) => x.dataset.at === pendingPlace.anchor);
     if (at && pendingPlace.marked && at.classList.contains('nsec')) at.classList.add('nmark'); // its bar, carried over
@@ -1639,8 +1640,7 @@ function renderNewStats(box) {
     statsSec = sec;
     newMark = id;
     render();
-    const target = document.getElementById(id);
-    if (target) window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - 8));
+    comfortScroll(document.getElementById(id));
   };
 }
 
