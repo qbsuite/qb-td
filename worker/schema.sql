@@ -91,7 +91,13 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- the list of tournaments running here, as JSON, exactly as last
   -- computed; NULL while it isn't listed. Rewritten only when the line changes.
   -- Existing databases get it from migrate-directory.sql.
-  dir_entry TEXT
+  dir_entry TEXT,
+  -- Buzzpoints packets as static files (worker.js): the buzzpoints key,
+  -- encrypted under the content key, and the finished rounds published
+  -- under it ({round: {h, s, live}}). Existing databases get these from
+  -- migrate-buzzpub.sql.
+  buzz_key_enc TEXT,
+  buzz_pub TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tournaments_created ON tournaments(created);
 

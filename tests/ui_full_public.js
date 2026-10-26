@@ -1935,16 +1935,15 @@ async function sectionMain(br) {
   await tab.js('sessionStorage.clear(); true');
   await openPub(tab, T.slug, { hash: '#buzz' });
   {
-    const seen = proxyLog.length;
     await tab.fill('#buzzpw', 'wrong-again');
     await tab.click('#buzzgo');
     await tab.wait(`window.__qt.msgs.some((m) => m.t !== 'Checking password' && m.t !== 'Loading' && m.at > ${Date.now() - 50})`, 'the answer').catch(() => {});
     await tab.wait(`!!document.querySelector('[data-buzzmode]') || document.querySelector('#msg').textContent === 'Bad password'`, 'locked or not');
-    await bug('bz-01 password: a wrong password is refused even right after a right one in the same browser', async () => {
+    // the password is checked by /unlock, never answered from a cached packet
+    await check('bz-01 password: a wrong password is refused even right after a right one in the same browser', async () => {
       const x = [await tab.text('#msg'), await tab.exists('[data-buzzmode]'), await tab.js(`sessionStorage.getItem('qbtdBuzzKey:${T.slug}')`)];
-      const probes = proxyLog.slice(seen).filter((y) => y.path.endsWith('/qpacket')).length;
-      return (x[0] === 'Bad password' && !x[1] && x[2] === null) || { msg: x[0], unlocked: x[1], stored: !!x[2], qpacketRequestsSeenByTheServer: probes };
-    }, 'the page proves a password by fetching a finished round\'s packet, which the Worker serves "Cache-Control: private, max-age=60" with no "Vary: Authorization"; for a minute after a right password the browser answers a wrong one\'s probe from its cache, so the wrong key is stored and the page reads unlocked (Scoresheets On, Buzzpoints views), until a packet it has not cached is refused');
+      return (x[0] === 'Bad password' && !x[1] && x[2] === null) || { msg: x[0], unlocked: x[1], stored: !!x[2] };
+    });
   }
 
   // st-17 / st-18 / st-19: the Scoresheets switch, behind the same password

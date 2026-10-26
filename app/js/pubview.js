@@ -62,6 +62,11 @@ let catSub2Sel = '';       // the third level: a split under an RMPSS category
 let catPlayerSel = null;   // {team, player}
 const buzzPackets = {};    // round -> Promise<normalized packet>
 const BUZZ_KEY = 'qbtdBuzzKey:' + slug;
+// The buzzpoints key /pub/:slug/unlock hands out (worker.js "buzzpoints
+// packets as static files"), kept on this device until the password moves
+// (buzz_v): it opens finished rounds' packets on qb-td-live, so browsing
+// them costs the Worker nothing.
+const BUZZ_READ_KEY = 'qbtdBuzzRead:' + slug;
 
 function say(text, bad = false) {
   $('msg').textContent = text || '';
@@ -613,11 +618,51 @@ function fetchBuzzTiebreakers() {
 function fetchBuzzPacket(round) {
   if (!buzzPackets[round]) {
     buzzPackets[round] = (async () => {
-      return readPacket(await pub('/pub/' + slug + '/qpacket?round=' + round,
+      return (await staticBuzzPacket(round)) || readPacket(await pub('/pub/' + slug + '/qpacket?round=' + round,
         { headers: buzzAuthHeaders() }), 'round ' + round);
     })().catch((e) => { delete buzzPackets[round]; throw e; });
   }
   return buzzPackets[round];
+}
+
+// The buzzpoints key: in the state with No password, else this device's
+// copy for the current password, else (unlocked before there was one) one
+// /unlock to get it.
+function storedReadKey() {
+  if (state.buzz_key) return state.buzz_key;
+  try {
+    const x = JSON.parse(localStorage.getItem(BUZZ_READ_KEY));
+    return x && x.v === state.buzz_v && typeof x.k === 'string' ? x.k : null;
+  } catch (e) { return null; }
+}
+function keepReadKey(k) {
+  try { localStorage.setItem(BUZZ_READ_KEY, JSON.stringify({ v: state.buzz_v, k })); } catch (e) { /* private window */ }
+}
+let readKeyAsked = null;
+async function buzzReadKey() {
+  const k = storedReadKey();
+  if (k || !buzzStored() || usingStaticData()) return k;
+  if (!readKeyAsked) {
+    readKeyAsked = pub('/pub/' + slug + '/unlock', { headers: buzzAuthHeaders() })
+      .then((out) => { if (out && out.key) keepReadKey(out.key); return storedReadKey(); }, () => null);
+  }
+  return readKeyAsked;
+}
+// A finished round's packet from its file on qb-td-live, or null to read
+// it through the Worker (no file yet, no key, or a file that won't open).
+async function staticBuzzPacket(round) {
+  const h = state.buzz_files && state.buzz_files[round];
+  if (!h || !LIVE || usingStaticData()) return null;
+  try {
+    const k = await buzzReadKey();
+    if (!k) return null;
+    const res = await fetch(`${LIVE}/q/${encodeURIComponent(slug)}/${round}-${h}.bin`);
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(k), (c) => c.charCodeAt(0)), 'AES-GCM', false, ['decrypt']);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.subarray(0, 12) }, key, bytes.subarray(12));
+    return await readPacket(new Response(plain), 'round ' + round);
+  } catch (e) { return null; }
 }
 
 async function tryBuzzKey(pw) {
@@ -631,13 +676,14 @@ async function tryBuzzKey(pw) {
     tok = await buzzToken(pw, state.buzz_kdf);
   } catch (e) { say('Could not check the password', true); return; }
   sessionStorage.setItem(BUZZ_KEY, JSON.stringify({ tok, v: state.buzz_v }));
-  // A finished round's packet proves the password; without one (no
-  // packets, or scoresheets alone) the Worker's unlock route does.
+  // The unlock route proves the password and, with buzzpoints on, hands
+  // out the key that opens finished rounds on qb-td-live. A frozen
+  // archive has no Worker: a finished round's packet proves it there.
   const probe = (state.buzz_done || []).filter((n) =>
     (state.packet_rounds || []).includes(n))[0];
-  const check = probe !== undefined ? () => fetchBuzzPacket(probe)
-    : !usingStaticData() ? () => pub('/pub/' + slug + '/unlock', { headers: buzzAuthHeaders() })
-      : null;
+  const check = !usingStaticData()
+    ? () => pub('/pub/' + slug + '/unlock', { headers: buzzAuthHeaders() }).then((out) => { if (out && out.key) keepReadKey(out.key); })
+    : probe !== undefined ? () => fetchBuzzPacket(probe) : null;
   if (check) {
     try { await check(); }
     catch (e) {

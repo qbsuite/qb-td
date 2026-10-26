@@ -1254,6 +1254,14 @@ export const Rebuild = {
 };
 
 async function rebuildInline(env, t) {
+  // No password (statsOpen): finished rounds' buzzpoints files, with the
+  // key the TD left for the Worker (openContentKey)
+  if (t.published && statsOpen(t) && buzzConfig(t)) {
+    try {
+      const ckey = await openContentKey(env, t);
+      if (ckey) await publishBuzzRounds(env, t, ckey, await buzzDoneRounds(env, t));
+    } catch (e) { console.log('buzzpoints files:', e.message); }
+  }
   const { manifest, rows } = await materialize(env, t);
   // /pub/:slug serves this instead of re-deriving it per view
   if (t.published) await putPubState(env, t, { rows, manifest });
@@ -1546,6 +1554,8 @@ const LIVE_RETRY_MS = 5 * 60 * 1000;
 // its subrequests, well inside the Free plan's 50.
 const LIVE_MAX_PER_RUN = 10;
 const LIVE_BACKFILL_PER_RUN = 5;
+// buzzpoints files one deploy reads from R2 for the first time (the rest wait a tick)
+const LIVE_BUZZ_PER_RUN = 8;
 // A failure stamped this long ago is a real one, not a deploy in flight
 // (the stamp goes on before each deploy; see livePublish).
 const LIVE_FAILING_AFTER_MS = 60 * 1000;
@@ -1553,7 +1563,8 @@ const LIVE_API_TIMEOUT_MS = 20000;
 const LIVE_COMPAT_DATE = '2026-07-01';
 // The page on qbsuite.github.io reads these cross-origin. Travels as the
 // assets config's _headers text, not as a file.
-const LIVE_HEADERS = '/*\n  Access-Control-Allow-Origin: *\n';
+// buzzpoints files are named by their hash, so they never change
+const LIVE_HEADERS = '/*\n  Access-Control-Allow-Origin: *\n/q/*\n  Cache-Control: public, max-age=31536000, immutable\n';
 // Always in the manifest, so a deploy with no published tournament still
 // has a file, and a probe for "is qb-td-live up" has something to fetch.
 const LIVE_HEALTH = JSON.stringify({ service: 'qb-td public state' }) + '\n';
@@ -1618,9 +1629,12 @@ async function liveBody(env, t, now) {
 async function liveAsset(text, ext) {
   const bytes = new TextEncoder().encode(text);
   const b64 = b64bytes(bytes);
+  return { hash: await liveB64Hash(b64, ext), size: bytes.byteLength, b64 };
+}
+// Cloudflare's asset hash: SHA-256 of the base64 body and its extension
+async function liveB64Hash(b64, ext) {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(b64 + ext));
-  const hash = [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
-  return { hash, size: bytes.byteLength, b64 };
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
 const liveHash = async (text, ext) => (await liveAsset(text, ext)).hash;
 
@@ -1752,10 +1766,16 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
 
     let deployed = null;
     let dropped = []; // lost files this run can't rebuild: re-added by backfill
+    const buzzLost = new Set(); // buzzpoints files Cloudflare no longer holds: sent again
+    let buzzNew = [];           // {id, n, h}: buzzpoints files this deploy carries for the first time
     for (let attempt = 0; attempt < 2 && !deployed; attempt++) {
+      // the files already live, and (for their buzzpoints files) the ones
+      // this deploy ships for the first time
       const { results: live } = await env.DB.prepare(
-        'SELECT id, slug, published, live_hash, live_size FROM tournaments WHERE live_hash IS NOT NULL'
-      ).all();
+        'SELECT t.id, t.slug, t.published, t.live_hash, t.live_size, t.settings, t.buzz_pub, s.settings AS set_settings ' +
+        'FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id ' +
+        'WHERE t.live_hash IS NOT NULL OR t.id IN (SELECT value FROM json_each(?1))'
+      ).bind(JSON.stringify([...built].filter(([, b]) => !b.remove).map(([id]) => id))).all();
       const manifest = { '/health.json': { hash: health.hash, size: health.size } };
       if (dir) manifest[DIR_LIVE_PATH] = { hash: dir.hash, size: dir.size };
       const files = []; // what this deploy ships, for the live_hash write
@@ -1764,7 +1784,7 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
         // unpublishing is the TD's privacy switch, so it can't hinge on the
         // one write in updateTournament having landed.
         if (!r.published && !built.has(r.id)) built.set(r.id, { slug: r.slug, remove: true });
-        if (built.has(r.id) || dropped.includes(r.id)) continue;
+        if (built.has(r.id) || dropped.includes(r.id) || !r.live_hash) continue;
         manifest[livePath(r.slug)] = { hash: r.live_hash, size: r.live_size };
         files.push({ id: r.id, h: r.live_hash, s: r.live_size, at: null });
       }
@@ -1773,15 +1793,41 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
         manifest[livePath(b.slug)] = { hash: b.hash, size: b.size };
         files.push({ id, h: b.hash, s: b.size, at: b.at, ...(isRider(b) ? { was: b.was } : {}) });
       }
+      // finished rounds' buzzpoints files (buzzpoints packets as static
+      // files), for published tournaments with buzzpoints on: those a
+      // deploy already carried, by hash; new ones read from R2, a few a run
+      buzzNew = [];
+      for (const r of live) {
+        if (!r.published || dropped.includes(r.id) || (built.get(r.id) || {}).remove || !buzzConfig(r)) continue;
+        for (const [n, e] of Object.entries(buzzPubOf(r))) {
+          if (!e || !e.h) continue;
+          const path = buzzFilePath(r.slug, n, e.h);
+          if (e.live && !buzzLost.has(e.h)) { manifest[path] = { hash: e.h, size: e.s }; continue; }
+          if (buzzNew.length >= LIVE_BUZZ_PER_RUN) continue;
+          if (!b64s.has(e.h)) {
+            const obj = await env.DATA.get(BUZZ_FILE_KEY(r.id, n));
+            if (!obj) continue;
+            const b64 = b64bytes(new Uint8Array(await obj.arrayBuffer()));
+            if (await liveB64Hash(b64, 'bin') !== e.h) continue; // made again since: the next run has it
+            b64s.set(e.h, b64);
+          }
+          manifest[path] = { hash: e.h, size: e.s };
+          buzzNew.push({ id: r.id, n, h: e.h });
+        }
+      }
       const res = await deployLive(env, manifest, b64s);
       if (res.ok) { deployed = files; break; }
+      // a buzzpoints file Cloudflare lost is read from R2 and sent again
+      const buzzHashes = new Set(live.flatMap((r) => Object.values(buzzPubOf(r)).map((e) => e && e.h)));
+      const lostBuzz = res.missing.filter((h) => buzzHashes.has(h) && !buzzLost.has(h));
+      lostBuzz.forEach((h) => buzzLost.add(h));
       // Cloudflare no longer holds a file an earlier deploy shipped (the
       // Worker was deleted and recreated): rebuild as many as one run may
       // and send everything again. The rest leave this deploy and their
       // rows forget it (live_hash/want NULL), so backfill brings them back
       // a few per tick instead of one run blowing its subrequests.
       const lost = live.filter((r) => res.missing.includes(r.live_hash) && !built.has(r.id)).map((r) => r.id);
-      if (!lost.length || attempt === 1) throw new Error('deploy wanted files this run cannot build: ' + res.missing.length);
+      if ((!lost.length && !lostBuzz.length) || attempt === 1) throw new Error('deploy wanted files this run cannot build: ' + res.missing.length);
       // Also dropped: a lost file whose tournament can't be rebuilt (its
       // pubstate is gone) — asking again would fail every deploy for good.
       const room = Math.max(0, LIVE_MAX_PER_RUN - built.size);
@@ -1814,6 +1860,12 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
       "FROM json_each(?1) AS j WHERE tournaments.id = j.value ->> 'id' " +
       "AND (tournaments.live_hash IS NOT (j.value ->> 'h') OR j.value ->> 'at' IS NOT NULL)"
     ).bind(JSON.stringify(deployed)).run();
+    // buzzpoints files now on qb-td-live, unless made again meanwhile
+    for (const x of buzzNew) {
+      await env.DB.prepare(
+        `UPDATE tournaments SET buzz_pub = json_set(buzz_pub, '$."' || ?2 || '".live', 1) WHERE id = ?1 AND json_extract(buzz_pub, '$."' || ?2 || '".h') = ?3`
+      ).bind(x.id, String(x.n), x.h).run();
+    }
     const removed = [...built].filter(([, b]) => b.remove).map(([id]) => id);
     if (removed.length) {
       await env.DB.prepare(
@@ -2474,6 +2526,8 @@ async function updateTournament(request, env, t) {
       && t.ckey && hasKey) {
       sets.push('buzz_wrap = ?');
       binds.push(await wrapKey(body.buzz_token, 'buzz', t.ckey));
+      // a new password: viewers who had the old one can't read new rounds
+      sets.push('buzz_key_enc = NULL', 'buzz_pub = NULL');
     }
     // No password (statsOpen): the TD's own request — which holds the
     // content key — leaves the Worker a copy it can open for viewers'
@@ -2582,6 +2636,7 @@ async function updateGuarded(env, t, body, sets, binds) {
       s.push('settings = ?'); b.push(text);
       if (token && t.ckey && hasKey) {
         s.push('buzz_wrap = ?'); b.push(wrap || (wrap = await wrapKey(token, 'buzz', t.ckey)));
+        s.push('buzz_key_enc = NULL', 'buzz_pub = NULL'); // a new password, a new buzzpoints key
       }
       if (attempt === 1) await openKey(settings);
       if (sBase !== undefined) { cas.push('settings = ?'); casBinds.push(row.settings); }
@@ -3134,6 +3189,7 @@ async function uploadPacket(request, url, env, t) {
   let cats = null;
   try { cats = await packetCategoriesOf(env, body, name); } catch (e) { console.log('catmap upload:', e.message); }
   await updateCatmap(env, id, round, cats);
+  await dropBuzzRounds(env, id, [round]);
   await markPub(env, id); // packet_rounds rides the published state
   // every room may already have started the current round, waiting only
   // on this packet (auto-advance)
@@ -3170,6 +3226,7 @@ async function movePacket(request, env, t) {
     env.DB.prepare('DELETE FROM rounds WHERE tournament_id = ?1 AND number = ?2').bind(t.id, from),
   ]);
   await swapCatmap(env, t.id, from, to);
+  await dropBuzzRounds(env, t.id, [from, to]);
   await markPub(env, t.id);
   // as an upload does: rooms may be waiting on this round's packet
   if (to === t.current_round + 1
@@ -4129,6 +4186,14 @@ async function bucketUpload(request, url, env, secret) {
   if (tbReport) {
     await logTbUses(env, b, b.room_name, round, tbReport.teams, tbReport.used);
   }
+  // the upload that finishes a round makes its buzzpoints file (buzzpoints
+  // packets as static files); never at the upload's expense
+  if (!error && b.ckey && /"buzz"|"statsOpen"/.test(b.settings || '')) {
+    try {
+      const t = await buzzRow(env, b.tournament_id);
+      if (t && buzzConfig(t) && await roundDone(env, t, round)) await publishBuzzRounds(env, t, b.ckey, [round]);
+    } catch (e) { console.log('buzzpoints file:', e.message); }
+  }
   return json(env, { id: fileId, filename, round, kind, error });
 }
 
@@ -4685,6 +4750,106 @@ async function gatedPacket(request, env, obj, key, name, wrap, holderOf, open = 
   return res;
 }
 
+/* ---------- buzzpoints packets as static files ----------
+   Browsing buzzpoints used to cost a Worker request per finished round per
+   page load (each round's packet, decrypted on request): on 10/24/2026 two
+   tournaments' players doubled the day's requests after the last round.
+   Now a finished round's packet, encrypted under the tournament's
+   buzzpoints key, rides the qb-td-live deploy as
+   /q/<slug>/<round>-<hash>.bin, which a viewer's browser reads for free.
+
+   The buzzpoints key is not the content key (that one also opens room
+   links and unfinished packets): a random key per tournament, stored only
+   encrypted under the content key (buzz_key_enc). A viewer gets it from
+   /pub/:slug/unlock, once per device, after the same password check and
+   attempt limit as before, so it is never published and nobody can try
+   passwords offline. With No password (statsOpen) the public state
+   carries it.
+
+   A file is made where the content key is at hand: the upload that
+   finishes a round, an unlock, and for No password the cron
+   (openContentKey). buzz_pub lists them ({round: {h, s, live}}; live once
+   a deploy carried it). A new password, or a round's packet replaced or
+   moved, drops the key or the round, and they are made again. Rounds not
+   yet a file are read through /pub/:slug/qpacket as before. */
+const BUZZ_FILE_KEY = (tid, round) => `t/${tid}/buzzpub/${round}.bin`;
+const buzzFilePath = (slug, round, h) => `/q/${slug}/${round}-${h}.bin`;
+const BUZZ_PUBLISH_MAX = 6; // rounds one request publishes
+const buzzPubOf = (t) => { try { return JSON.parse((t && t.buzz_pub) || '{}') || {}; } catch (e) { return {}; } };
+
+// The full row the buzzpoints files need (buzzConfig's set_settings too).
+async function buzzRow(env, tid) {
+  const { results } = await env.DB.prepare(
+    'SELECT t.*, s.settings AS set_settings FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id WHERE t.id = ?1'
+  ).bind(tid).all();
+  return results[0] || null;
+}
+
+// The buzzpoints key (raw bytes), made on first use. Two requests making
+// one at once: the first write wins and both use it.
+async function buzzReadKey(env, t, ckey) {
+  if (t.buzz_key_enc) {
+    try { return b64ToBytes(await decField(ckey, t.buzz_key_enc)); } catch (e) { /* not this content key's: make one */ }
+  }
+  const enc = await encField(ckey, b64bytes(crypto.getRandomValues(new Uint8Array(32))));
+  await env.DB.prepare('UPDATE tournaments SET buzz_key_enc = ?2, buzz_pub = NULL WHERE id = ?1 AND buzz_key_enc IS ?3')
+    .bind(t.id, enc, t.buzz_key_enc ?? null).run();
+  const { results } = await env.DB.prepare('SELECT buzz_key_enc, buzz_pub FROM tournaments WHERE id = ?1').bind(t.id).all();
+  t.buzz_key_enc = results[0].buzz_key_enc;
+  t.buzz_pub = results[0].buzz_pub;
+  return b64ToBytes(await decField(ckey, t.buzz_key_enc));
+}
+
+// Finished rounds, as the public state's buzz_done counts them.
+async function buzzDoneRounds(env, t) {
+  const [files, buckets, packets, schedObj] = await Promise.all([
+    env.DB.prepare(`SELECT bucket_id, round, ${UNFINISHED_SQL} AS unfinished FROM files WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL`).bind(t.id).all(),
+    env.DB.prepare('SELECT id FROM buckets WHERE tournament_id = ?1').bind(t.id).all(),
+    env.DB.prepare('SELECT number FROM rounds WHERE tournament_id = ?1').bind(t.id).all(),
+    env.DATA.get(`t/${t.id}/schedule.json`),
+  ]);
+  const sched = schedObj ? await schedObj.json().catch(() => null) : null;
+  return doneRounds(files.results, playingRooms(buckets.results, t.settings).length, sched, packets.results.map((r) => r.number))
+    .filter((n) => n <= t.current_round);
+}
+
+// Make the files for `rounds` that aren't files yet (at most
+// BUZZ_PUBLISH_MAX), with the content key `ckey`. Answers how many.
+async function publishBuzzRounds(env, t, ckey, rounds) {
+  if (!ckey || !buzzConfig(t)) return 0;
+  const bkey = await contentKey(await buzzReadKey(env, t, ckey));
+  const have = buzzPubOf(t);
+  const todo = [...new Set(rounds)].filter((n) => !have[String(n)]).slice(0, BUZZ_PUBLISH_MAX);
+  if (!todo.length) return 0;
+  const { results } = await env.DB.prepare(
+    `SELECT number, packet_r2_key FROM rounds WHERE tournament_id = ?1 AND number IN (${todo.map((_, i) => '?' + (i + 2)).join(', ')})`
+  ).bind(t.id, ...todo).all();
+  let made = 0;
+  for (const row of results) {
+    const obj = await env.DATA.get(row.packet_r2_key);
+    if (!obj) continue;
+    const plain = await readBlob(obj, await blobKey({ ckey, set_key_enc: t.set_key_enc }, row.packet_r2_key));
+    const body = await aesEncrypt(bkey, new Uint8Array(plain));
+    const entry = { h: await liveB64Hash(b64bytes(body), 'bin'), s: body.byteLength, live: 0 };
+    await env.DATA.put(BUZZ_FILE_KEY(t.id, row.number), body, { httpMetadata: { contentType: 'application/octet-stream' } });
+    // only under the key it was made with: a password set meanwhile dropped it
+    await env.DB.prepare(
+      `UPDATE tournaments SET buzz_pub = json_set(COALESCE(buzz_pub, '{}'), '$."' || ?2 || '"', json(?3)) WHERE id = ?1 AND buzz_key_enc IS ?4`
+    ).bind(t.id, String(row.number), JSON.stringify(entry), t.buzz_key_enc).run();
+    made++;
+  }
+  if (made) await markPub(env, t.id);
+  return made;
+}
+
+// A round's packet changed: its file goes, and is made again from the new one.
+async function dropBuzzRounds(env, tid, rounds) {
+  for (const n of rounds) {
+    await env.DB.prepare(`UPDATE tournaments SET buzz_pub = json_remove(buzz_pub, '$."' || ?2 || '"') WHERE id = ?1 AND buzz_pub IS NOT NULL`)
+      .bind(tid, String(n)).run();
+  }
+}
+
 // Packet text for the buzzpoints tab: publish-gated, buzz-gated, and —
 // same question-security rule as the moderator route — played rounds
 // only, where played means every room has turned the round in.
@@ -4715,7 +4880,7 @@ async function pubQPacket(request, url, env, slug) {
 // here when unlocking, so a tournament with scoresheets on but no packets
 // (nothing for the qpacket probe to fetch) still turns a wrong password
 // away. Rate-limited like the other gated routes.
-async function pubUnlock(request, env, slug) {
+async function pubUnlock(request, env, slug, ctx) {
   const entry = await buzzEntry(request, env, slug);
   if (entry.res) return entry.res;
   const { t } = entry;
@@ -4723,7 +4888,19 @@ async function pubUnlock(request, env, slug) {
   if (!key) return err(env, 404, 'not found');
   const denied = await buzzGate(request, env, key);
   if (denied) return denied;
-  return json(env, { ok: true });
+  // buzzpoints on: the buzzpoints key, through the content key the
+  // password's token opens (buzz_wrap); finished rounds not yet files
+  // are made after the answer
+  const b = buzzConfig(t);
+  if (!b || b.open || !t.buzz_wrap) return json(env, { ok: true });
+  let ckey;
+  try { ckey = await unwrapKey((request.headers.get('Authorization') || '').slice(5), 'buzz', t.buzz_wrap); }
+  catch (e) { return json(env, { ok: true }); }
+  const bkey = await buzzReadKey(env, t, ckey);
+  const work = buzzDoneRounds(env, t).then((done) => publishBuzzRounds(env, t, ckey, done))
+    .catch((e) => console.log('buzzpoints files:', e.message));
+  if (ctx) ctx.waitUntil(work); else await work;
+  return json(env, { ok: true, key: b64bytes(bkey) });
 }
 
 // Text of every tiebreaker the tournament read (TB_READ_KEY), for the
@@ -4788,6 +4965,21 @@ async function pubStateBody(env, t, pub, loaded = null) {
     buzzDone = doneRounds(rows, playingRooms(buckets.results, t.settings).length, sched,
       packetRounds.results.map((r) => r.number));
   }
+  // finished rounds' packets as static files on qb-td-live (buzzpoints
+  // packets as static files): round -> hash. With No password the key
+  // rides along; otherwise a viewer gets it from /pub/:slug/unlock.
+  const buzzFiles = {};
+  let buzzKey = null;
+  if (buzz) {
+    const pubd = buzzPubOf(t);
+    for (const n of buzzDone) if (pubd[String(n)]) buzzFiles[n] = pubd[String(n)].h;
+    if (buzz.open && t.buzz_key_enc && Object.keys(buzzFiles).length) {
+      try {
+        const ckey = await openContentKey(env, t);
+        if (ckey) buzzKey = await decField(ckey, t.buzz_key_enc);
+      } catch (e) { /* the page reads packets through the Worker */ }
+    }
+  }
   return {
     name: t.name,
     current_round: t.current_round,
@@ -4806,6 +4998,8 @@ async function pubStateBody(env, t, pub, loaded = null) {
     buzz_kdf: buzzKdf(key),
     buzz_v: buzzV,
     buzz_done: buzzDone,
+    buzz_files: buzzFiles,
+    ...(buzzKey ? { buzz_key: buzzKey } : {}),
     packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
     // categories tab: refetch the (text-free) category map when this moves
     cats: catsStamp,
@@ -6339,7 +6533,7 @@ async function route(request, env, ctx, url) {
   if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/schedule$/)) && method === 'GET') return pubSchedule(env, m[1]);
   if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qpacket$/)) && method === 'GET') return pubQPacket(request, url, env, m[1]);
   if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qtiebreakers$/)) && method === 'GET') return pubQTiebreakers(request, url, env, m[1]);
-  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/unlock$/)) && method === 'GET') return pubUnlock(request, env, m[1]);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/unlock$/)) && method === 'GET') return pubUnlock(request, env, m[1], ctx);
   if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubCats(env, m[1]);
 
   // Public set routes — gated by the set's own publish flag inside.

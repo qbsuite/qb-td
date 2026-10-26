@@ -756,5 +756,60 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
   ok('sweep: then no redeploy while unchanged', puts() === 1, w.cf.calls);
 }
 
+// Buzzpoints packets as static files: finished rounds' files ride the
+// deploy for published tournaments with buzzpoints on; a new one is read
+// from R2 and uploaded once, then rides by hash; one Cloudflare lost is
+// sent again; buzzpoints off ships none.
+{
+  clock = realNow();
+  const w = world();
+  const hashOf = async (text) => {
+    const b64 = Buffer.from(text, 'utf8').toString('base64');
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(b64 + 'bin'));
+    return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('').slice(0, 32);
+  };
+  const on = JSON.stringify({ buzz: { mode: 'password', salt: 's', hash: 'h' } });
+  const a = w.add({ settings: on });
+  const off = w.add({ settings: '{}' });
+  const f1 = 'encrypted round one';
+  const f2 = 'encrypted round two';
+  const h1 = await hashOf(f1);
+  const h2 = await hashOf(f2);
+  w.DATA.objects[`t/${a}/buzzpub/1.bin`] = { text: f1, at: clock };
+  w.DATA.objects[`t/${a}/buzzpub/2.bin`] = { text: f2, at: clock };
+  w.DATA.objects[`t/${off}/buzzpub/1.bin`] = { text: f1 + ' off', at: clock };
+  const setPub = (id, obj) => w.DB.raw.prepare('UPDATE tournaments SET buzz_pub = ? WHERE id = ?').run(JSON.stringify(obj), id);
+  setPub(a, { 1: { h: h1, s: f1.length, live: 0 } });
+  setPub(off, { 1: { h: await hashOf(f1 + ' off'), s: 10, live: 0 } });
+  await w.tick();
+  const paths = () => Object.keys(w.cf.deployed || {}).filter((p) => p.startsWith('/q/')).sort();
+  ok('buzz files: a finished round\'s file is on qb-td-live under the tournament\'s slug',
+    JSON.stringify(paths()) === JSON.stringify([`/q/tour-${a}/1-${h1}.bin`]) && w.cf.deployed[`/q/tour-${a}/1-${h1}.bin`] === f1, paths());
+  ok('buzz files: buzzpoints off ships none', !paths().some((p) => p.includes(`tour-${off}/`)));
+  ok('buzz files: marked live once deployed', JSON.parse(w.row(a).buzz_pub)['1'].live === 1, w.row(a).buzz_pub);
+  ok('buzz files: they last a year (named by hash)', w.cf.metadata.assets.config._headers.includes('/q/*\n  Cache-Control: public, max-age=31536000, immutable'));
+
+  // a second round: only it is uploaded; the first rides by hash
+  setPub(a, { 1: { h: h1, s: f1.length, live: 1 }, 2: { h: h2, s: f2.length, live: 0 } });
+  w.DB.raw.prepare('UPDATE tournaments SET name = ? WHERE id = ?').run('Renamed', a);
+  w.cf.uploads.length = 0;
+  await LivePublish.fetch(new Request('https://live/?ids=' + a), w.env);
+  ok('buzz files: a new round is uploaded, the deployed one rides by hash',
+    JSON.stringify(paths()) === JSON.stringify([`/q/tour-${a}/1-${h1}.bin`, `/q/tour-${a}/2-${h2}.bin`].sort())
+    && w.cf.uploads.flat().includes(h2) && !w.cf.uploads.flat().includes(h1), { paths: paths(), uploads: w.cf.uploads });
+  ok('buzz files: both marked live', Object.values(JSON.parse(w.row(a).buzz_pub)).every((e) => e.live === 1));
+
+  // Cloudflare lost them (the Worker recreated): read from R2 and sent again
+  for (const h of [h1, h2]) delete w.cf.store[h];
+  w.DB.raw.prepare('UPDATE tournaments SET name = ? WHERE id = ?').run('Renamed again', a);
+  await LivePublish.fetch(new Request('https://live/?ids=' + a), w.env);
+  ok('buzz files: lost ones are sent again', w.cf.deployed[`/q/tour-${a}/1-${h1}.bin`] === f1 && w.cf.deployed[`/q/tour-${a}/2-${h2}.bin`] === f2, paths());
+
+  // buzzpoints switched off: the files leave qb-td-live
+  w.DB.raw.prepare('UPDATE tournaments SET settings = ?, name = ? WHERE id = ?').run('{}', 'Off now', a);
+  await LivePublish.fetch(new Request('https://live/?ids=' + a), w.env);
+  ok('buzz files: buzzpoints off takes them down', paths().length === 0, paths());
+}
+
 Date.now = realNow;
 print(passed + ' tests passed');

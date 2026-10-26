@@ -784,6 +784,7 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-liveprotests.sql  # protests before upload
 #   npx wrangler d1 execute qb-td --local --file migrate-alertmsg.sql      # the alerts' wrap-up
 #   npx wrangler d1 execute qb-td --local --file migrate-directory.sql     # the directory
+#   npx wrangler d1 execute qb-td --local --file migrate-buzzpub.sql       # buzzpoints packets as files
 #   npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-rev.sql           # the Live Hub rev
 # --test-scheduled is required: the cron builds the round shards the
@@ -971,6 +972,9 @@ first.
    and one from before the directory needs
    `npx wrangler d1 execute qb-td --remote --file migrate-directory.sql`
    BEFORE the Worker (the tick reads and writes `tournaments.dir_entry`),
+   and one from before buzzpoints packets became files needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-buzzpub.sql`
+   BEFORE the Worker (the qb-td-live deploy reads `tournaments.buzz_pub`),
    then `schema.sql` again for its two indexes,
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
