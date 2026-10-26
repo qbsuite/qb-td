@@ -3384,6 +3384,77 @@ async function adminGames(url, env, t) {
   });
 }
 
+// GET /a/:secret/uploads?ids=1,2,… — up to MAX_UPLOADS_BATCH stored game
+// uploads (.qbj, reader .qbtd.json, MODAQ game file) as they were
+// uploaded, decrypted: {"files":[{"id","body"} | {"id","text"}],
+// "missing":[ids]}. What the hub's QBJ bundle and Rebuild read, one
+// request per game before. A .qbj or reader upload was parsed when it
+// came in (uploadFile: one that wasn't JSON has an error and is never
+// asked for), so its bytes go out as they are, with no parse or decode
+// here; a game file added by hand never was, so it comes as text
+// (`text`) for the hub to parse. A reader upload carries its packet text
+// (~140 KB), so a batch is kept to ten, and is streamed: one upload is
+// read while the one before goes out, so a batch holds two in memory,
+// not ten and their copies. An id that isn't this tournament's game
+// upload, or whose blob is gone or no longer an object, is missing: the
+// hub reads it on its own, and shows why. A read that fails mid-stream
+// cuts the answer short; the hub then reads that batch one by one.
+const MAX_UPLOADS_BATCH = 10;
+async function adminUploads(url, env, t) {
+  const ids = [...new Set(String(url.searchParams.get('ids') || '').split(',')
+    .map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return err(env, 400, 'no ids');
+  if (ids.length > MAX_UPLOADS_BATCH) return err(env, 400, 'at most ' + MAX_UPLOADS_BATCH + ' ids');
+  const { results } = await env.DB.prepare(
+    `SELECT id, kind, r2_key FROM files WHERE tournament_id = ?1 AND error IS NULL AND kind IN ('qbj', 'combined', 'game') AND id IN (${ids.map((_, i) => '?' + (i + 2)).join(',')})`
+  ).bind(t.id, ...ids).all();
+  const rows = new Map(results.map((r) => [r.id, r]));
+  const enc = new TextEncoder();
+  // one upload's part of the answer, as chunks, or null when it is missing
+  const part = async (id) => {
+    const row = rows.get(id);
+    if (!row || !row.r2_key.startsWith(`t/${t.id}/`)) return null;
+    const obj = await env.DATA.get(row.r2_key);
+    if (!obj) return null;
+    const bytes = new Uint8Array(await readBlob(obj, await blobKey(t, row.r2_key)));
+    if (row.kind === 'game') return [enc.encode(`{"id":${id},"text":${JSON.stringify(new TextDecoder().decode(bytes))}}`)];
+    // the object itself, without a byte-order mark or the whitespace
+    // around it: bytes that no longer read as an object (a blob rewritten
+    // since) would break the whole batch
+    const space = (b) => b === 0x20 || b === 0x0a || b === 0x0d || b === 0x09;
+    let a = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
+    let z = bytes.length - 1;
+    while (a <= z && space(bytes[a])) a++;
+    while (z >= a && space(bytes[z])) z--;
+    if (bytes[a] !== 0x7b || bytes[z] !== 0x7d) return null; // { … }
+    return [enc.encode(`{"id":${id},"body":`), bytes.subarray(a, z + 1), enc.encode('}')];
+  };
+  const { readable, writable } = new TransformStream();
+  const out = writable.getWriter();
+  (async () => {
+    const missing = [];
+    let sent = 0;
+    try {
+      await out.write(enc.encode('{"files":['));
+      let next = part(ids[0]).catch(() => null);
+      for (let i = 0; i < ids.length; i++) {
+        const got = await next;
+        next = i + 1 < ids.length ? part(ids[i + 1]).catch(() => null) : null;
+        if (!got) { missing.push(ids[i]); continue; }
+        if (sent++) await out.write(enc.encode(','));
+        for (const c of got) await out.write(c);
+      }
+      await out.write(enc.encode(`],"missing":${JSON.stringify(missing)}}`));
+      await out.close();
+    } catch (e) {
+      await out.abort(e).catch(() => {});
+    }
+  })();
+  return new Response(readable, {
+    status: 200, headers: { ...corsHeaders(env), 'Content-Type': 'application/json' },
+  });
+}
+
 // A stored blob as a download, decrypted with `rawKey`. part=qbj|game
 // splits a combined reader upload (.qbtd.json = {qbj, game}) into the
 // file consumers actually use; on a bare .qbj or game file it is that
@@ -6641,6 +6712,7 @@ async function route(request, env, ctx, url) {
     if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
     if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
     if (sub === '/games' && method === 'GET') return adminGames(url, env, t);
+    if (sub === '/uploads' && method === 'GET') return adminUploads(url, env, t);
     if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
     if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'POST') return moveFile(request, env, t, Number(mm[1]));
     if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);

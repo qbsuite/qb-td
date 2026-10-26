@@ -45,7 +45,7 @@
 import assert from 'node:assert/strict';
 import { parseRoster, rosterNameMap } from '../app/engine/qbj.js';
 import { fileSummary as uploadedSummary } from '../app/js/protests.js';
-import { collectMatches, gameFormat, createHubNames, ownedJson } from '../app/js/hubgames.js';
+import { collectMatches, gameFormat, createHubNames, ownedJson, fetchUploads, cacheKey } from '../app/js/hubgames.js';
 import { hubRef, hubZipRef, pinnedModaqFiles } from './ref_games.mjs';
 import { hubOwnBuildZip } from './admin_src.mjs';
 import { readZip } from '../app/engine/zip.js';
@@ -692,6 +692,70 @@ await test('Worker: the same games, requests, D1 statements and R2 reads', async
   assert.ok(z.entries.some((e) => e.name === 'round-1/Round_1_Alpha_Beta_Game.json') && z.entries.at(-1).name === 'roster.qbj');
   assert.ok(!zipText(z, 'roster.qbj').includes('_formerNames') && zipText(z, 'round-1/Round_1_Alpha_Beta_Game.json').includes('Alpha Prime'));
   await bothZips(() => pubOf, { ...c, got: out, keep: new Set([2]) }, measured);
+
+  // The QBJ bundle and Rebuild read the uploads ten to a request
+  // (fetchUploads) into the cache collectMatches reads first: the same
+  // games as reading each on its own, one /uploads request per ten
+  // uploads and none of them read alone but the one whose bytes broke.
+  const gameFiles = d.files.filter((f) => ['qbj', 'combined', 'game'].includes(f.kind) && !f.error);
+  for (const n of [gameFiles.length, 3]) {
+    const some = gameFiles.slice(0, n);
+    const rec = logged(pubOf);
+    const cache = new Map();
+    const steps = [];
+    assert.equal(await fetchUploads(rec.pub, A, some, cache, (done, total) => steps.push([done, total])), some.length);
+    // the roster as the hub already read it (hubNames rosterFor): not read again
+    const rosterJson = await ownedJson(pubOf, A, d.tournament.roster_r2_key);
+    const batched = await collectMatches(rec.pub, A, d.tournament, d.buckets, some, () => {}, { cache, roster: { json: rosterJson } });
+    const alone = await collectMatches(pubOf, A, d.tournament, d.buckets, some);
+    assert.ok(!rec.log.some((x) => x.includes('roster')), `${n} uploads: the roster given is not read again`);
+    assert.deepEqual(batched.names, alone.names);
+    assert.deepEqual(outputOf(batched), outputOf(alone), `${n} uploads: the same games, raw rows, MODAQ files and errors`);
+    assert.deepEqual(batched.modaqFiles, alone.modaqFiles);
+    const asks = rec.log.filter((x) => x.includes('/uploads?'));
+    assert.equal(asks.length, Math.ceil(some.length / 10), `${n} uploads: ten to a request`);
+    const alonePaths = rec.log.filter((x) => x.includes('/file?'));
+    const broken = some.filter((f) => f.id === gone.id);
+    assert.equal(alonePaths.length, broken.length, `${n} uploads: only the broken one is read on its own`);
+    assert.equal(steps.at(-1)[0], some.length);
+    // a game file added by hand comes as its own text, parsed as it was
+    for (const f of some.filter((x) => x.kind === 'game')) {
+      assert.deepEqual(cache.get(cacheKey(f)), await ownedJson(pubOf, A, f.r2_key));
+    }
+    // a second read fetches nothing
+    const rec2 = logged(pubOf);
+    assert.equal(await fetchUploads(rec2.pub, A, some, cache), broken.length);
+  }
+  // the route itself: at most ten, only this tournament's game uploads
+  const many = await w.call(`${A}/uploads?ids=${Array.from({ length: 11 }, (_, i) => i + 1).join(',')}`);
+  assert.equal(many.status, 400);
+  const other = (await quiet(() => w.call('/api/tournaments', { method: 'POST', json: { name: 'Other', slug: 'hub-games-other' } }))).body;
+  const notGame = d.files.find((f) => f.kind === 'other');
+  const errored = d.files.find((f) => f.error);
+  const got = JSON.parse((await w.call(`/a/${other.admin_secret}/uploads?ids=${gameFiles[0].id}`)).text);
+  assert.deepEqual(got, { files: [], missing: [gameFiles[0].id] }, "another tournament's link reads none of this one's uploads");
+  const mine = JSON.parse((await w.call(`${A}/uploads?ids=${[notGame.id, errored.id].join(',')}`)).text);
+  assert.deepEqual(mine, { files: [], missing: [notGame.id, errored.id] }, 'no file that is not a clean game upload');
+});
+
+await test('createHubNames rosterFor: the roster it read, only while it is the one the tournament names', async () => {
+  const json = { version: '2.1.1', objects: [{ type: 'Tournament', name: 'T', registrations: [{ name: 'A', teams: [{ name: 'A', players: [{ name: 'Ann' }] }] }] }] };
+  let reads = 0;
+  let fail = false;
+  const pubR = async () => { reads++; if (fail) throw new Error('down'); return json; };
+  const h = createHubNames();
+  const t = { roster_r2_key: 't/1/roster.qbj', roster_at: 1 };
+  assert.equal(h.rosterFor(t), null, 'nothing read yet');
+  await h.ensure(pubR, '/a/x', t);
+  assert.deepEqual(h.rosterFor(t), { json });
+  assert.equal(h.rosterFor({ ...t, roster_at: 2 }), null, 'saved since (another tab)');
+  h.key = null; // the hub's own save
+  assert.equal(h.rosterFor(t), null, 'saved here');
+  fail = true;
+  await h.ensure(pubR, '/a/x', { ...t, roster_at: 3 });
+  assert.equal(h.rosterFor({ ...t, roster_at: 3 }), null, 'a read that failed: the caller reads it');
+  assert.equal(h.rosterFor({}), null, 'no roster');
+  assert.equal(reads, 2);
 });
 
 /* ---------- gameFormat and the hub's roster renames ---------- */

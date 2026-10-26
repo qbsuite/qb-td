@@ -60,21 +60,61 @@ export async function gameCopies(pub, a, files) {
   return out;
 }
 
+// What a read is kept under in a collectMatches cache: the round is in
+// the key, as moving a game rewrites its file and copy
+export const cacheKey = (f) => f.id + '|' + f.size + '|' + f.created + '|' + f.round;
+
+// The stored uploads themselves (worker.js adminUploads), UPLOADS_BATCH
+// to a request, one request after another, into `cache` as
+// collectMatches keeps them, so its call after this reads none of them.
+// One at a time: each answer is ~1.5 MB of reader uploads, and three
+// in flight at once from a browser broke the local Worker (hub_ab_day.js)
+// where the same three from Node never did; fifteen in a row for a
+// 150-game day take about as long as the reads they replace. One the
+// Worker leaves out, a game file that isn't JSON, or a batch that fails
+// is left for collectMatches to read on its own (and say why).
+// onDone(done, total) as uploads land, for the caller's progress.
+const UPLOADS_BATCH = 10;
+// what fetchUploads reads: the game uploads and the game files added by hand
+export const isUpload = (f) => (isGameFile(f) || f.kind === 'game') && !f.error;
+export async function fetchUploads(pub, a, files, cache, onDone = () => {}) {
+  const want = files.filter((f) => isUpload(f) && !cache.has(cacheKey(f)));
+  const byId = new Map(want.map((f) => [f.id, f]));
+  let done = 0;
+  for (let i = 0; i < want.length; i += UPLOADS_BATCH) {
+    const batch = want.slice(i, i + UPLOADS_BATCH);
+    try {
+      const got = await pub(`${a}/uploads?ids=${batch.map((f) => f.id).join(',')}`);
+      for (const x of (got && got.files) || []) {
+        const f = byId.get(x && x.id);
+        if (!f) continue;
+        let body = x.body;
+        if (body === undefined) { try { body = JSON.parse(x.text); } catch (e) { continue; } }
+        if (body && typeof body === 'object') cache.set(cacheKey(f), body);
+      }
+    } catch (e) { /* read one by one by collectMatches */ }
+    done += batch.length;
+    onDone(done, want.length);
+  }
+  return want.length;
+}
+
 // Every clean game file parsed, plus the roster: shared by Compute stats
 // and the schedule's fill-from-standings.
 // onFile(done, total) after each game file, for the caller's progress.
-// opts.cache keeps what was read across calls; opts.rank says only the
+// opts.roster ({ json }, the roster as the hub already read it: hubNames
+// rosterFor) saves reading it again; opts.cache keeps what was read across calls; opts.rank says only the
 // standings are wanted, so the games come from their public copies (the
 // qbj half, notes stripped) in a request or two rather than one stored
 // upload, packet text and all, per game. Those leave the zip's MODAQ
 // files out, so Compute stats reads the uploads themselves.
 export async function collectMatches(pub, a, t, buckets, files, onFile = () => {}, opts = {}) {
-  const { cache = null, rank = false } = opts;
+  const { cache = null, rank = false, roster: given = null } = opts;
   const qbjFiles = files.filter(isGameFile);
   const errors = [];
   let roster = null;
   if (t.roster_r2_key) {
-    try { roster = parseRoster(await ownedJson(pub, a, t.roster_r2_key)); }
+    try { roster = parseRoster(given ? given.json : await ownedJson(pub, a, t.roster_r2_key)); }
     catch (e) { errors.push('Roster: ' + e.message); }
   }
   const names = rosterNameMap(roster);
@@ -82,8 +122,7 @@ export async function collectMatches(pub, a, t, buckets, files, onFile = () => {
   const raw = [];   // qbj halves: the zip download + the served stats bundle
   const games = []; // game halves of combined uploads, for the zip only
   const modaqFiles = []; // MODAQ's own files of each reader upload, for the zip
-  // the round is in the key: moving a game rewrites its file and copy
-  const keyOf = (f) => f.id + '|' + f.size + '|' + f.created + '|' + f.round;
+  const keyOf = cacheKey;
   const copies = rank ? await gameCopies(pub, a, qbjFiles.filter((f) => !(cache && cache.has(keyOf(f))))) : new Map();
   // Each file is its own round trip to the Worker (a quarter second or
   // more), so they're read FETCH_AT_ONCE at a time rather than one after
@@ -170,18 +209,33 @@ export function gameFormat(t) {
 // The hub holds one of these. ensure() loads them again whenever the
 // roster is saved, from the hub (which sets key to null) or from another
 // tab (its save time, roster_at, moves). key and map are the object's
-// own: the hub reads map and clears key directly.
+// own: the hub reads map and clears key directly. The roster read is kept
+// too (json), so Compute stats, the playoff fill and the QBJ bundle take
+// it from here rather than read it again (rosterFor).
 export function createHubNames() {
+  const keyOf = (t) => (t.roster_r2_key ? t.roster_r2_key + '@' + (t.roster_at || '') : '');
   const hubNames = {
     key: null,
     map: null,
+    json: null,
     async ensure(pub, a, t) {
-      const key = t.roster_r2_key ? t.roster_r2_key + '@' + (t.roster_at || '') : '';
+      const key = keyOf(t);
       if (hubNames.key === key) return;
       hubNames.key = key;
       hubNames.map = null;
+      hubNames.json = null;
       if (!key) return;
-      try { hubNames.map = rosterNameMap(parseRoster(await ownedJson(pub, a, t.roster_r2_key))); } catch (e) { /* listed as uploaded */ }
+      try {
+        const json = await ownedJson(pub, a, t.roster_r2_key);
+        hubNames.map = rosterNameMap(parseRoster(json));
+        hubNames.json = json;
+      } catch (e) { /* listed as uploaded */ }
+    },
+    // { json }: the roster `t` names, as read here, or null when this
+    // hasn't read that one (a save since, or a read that failed: the
+    // caller reads it, and says why it couldn't)
+    rosterFor(t) {
+      return hubNames.json && hubNames.key && hubNames.key === keyOf(t) ? { json: hubNames.json } : null;
     },
     // a file's summary (protests.js), its teams under their current names
     summary(f) {

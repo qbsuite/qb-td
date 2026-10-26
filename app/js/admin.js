@@ -51,7 +51,7 @@ import { exampleSheetHtml } from './sheetview.js';
 import { busy } from './busy.js';
 import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as uploadedSummary } from './protests.js';
 import { ownedJson, collectMatches, gameFormat, createHubNames,
-  fileDownloads, yftFile, reportPages, reportZipFile, qbjZipFile, rosterFileText } from './hubgames.js';
+  fileDownloads, yftFile, reportPages, reportZipFile, qbjZipFile, rosterFileText, fetchUploads, cacheKey, isUpload } from './hubgames.js';
 import { isGameFile, newestOf } from '../engine/games.js';
 import { readTagged, settingsBody, rulingsBody, postSchedule, postRoster, FORMAT_KEYS,
   SCHED_CONFLICT, SCHED_KEPT, ROSTER_CONFLICT, ROSTER_KEPT } from './saves.js';
@@ -1953,7 +1953,7 @@ function renderSchedule(a, t, buckets, files) {
     save: (s) => saveSchedule(a, s),
     del: () => pub(a + '/schedule', { method: 'DELETE' }).then((out) => { schedEtag = null; return out; }),
     fill: async () => {
-      const { matches, roster } = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true });
+      const { matches, roster } = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true, roster: hubNames.rosterFor(t) });
       if (!matches.length) return null;
       return fillReport(sched, standings(matches, roster, gameFormat(t)));
     },
@@ -3528,7 +3528,7 @@ async function autoFillSlots(force = false, inEditor = false) {
   autoBusy = true;
   const a = '/a/' + adminSecret;
   try {
-    const opts = { cache: autoCache, rank: true };
+    const opts = { cache: autoCache, rank: true, roster: hubNames.rosterFor(t) };
     const got = await collectMatches(pub, a, t, buckets, prog.files, () => {}, opts);
     if (!got.matches.length) return;
     let saved = null;
@@ -3643,20 +3643,34 @@ async function computeStats(a, t, buckets, files, settings) {
   const out = $('statsout');
   out.innerHTML = '';
   $('statsec').hidden = false;
-  // counts the games it fetches, one request each
-  const nGames = files.filter(isGameFile).length;
-  const run = busy($('calc'), { label: 'Computing stats', total: nGames, scope: $('calc').closest('.row') });
+  // The games' public copies, a hundred to a request, as the playoff
+  // fill reads them (and with its cache: a game either has read is not
+  // read again). The stored uploads, packet text and all, are read only
+  // by the downloads that need them: the QBJ bundle and Rebuild.
+  const run = busy($('calc'), { label: 'Computing stats', scope: $('calc').closest('.row') });
   let got;
   try {
-    got = await collectMatches(pub, a, t, buckets, files, (done) => run.step(done), { cache: statsCache });
+    got = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true, roster: hubNames.rosterFor(t) });
   } finally { run.end(); }
   lastStats = { a, t, buckets, files, settings, got };
   showStats(lastStats);
 }
 
 let lastStats = null; // the games Compute fetched, so a new pick needs no refetch
-// every upload Compute has read in this tab: pressing it again reads only new ones
-const statsCache = new Map();
+// every stored upload the QBJ bundle and Rebuild have read in this tab:
+// either reads only new ones the next time
+const uploadCache = new Map();
+// The stored uploads themselves, for the downloads that need more than
+// the public copies give: MODAQ's game files, and the originals Rebuild
+// remakes the public copies from. Ten to a request (hubgames.js
+// fetchUploads), then parsed as collectMatches does, which reads on its
+// own only what a batch left out. onDone(done) as uploads land.
+async function readUploads({ a, t, buckets }, files, onDone) {
+  await fetchUploads(pub, a, files, uploadCache, onDone);
+  return collectMatches(pub, a, t, buckets, files, () => {}, { cache: uploadCache, roster: hubNames.rosterFor(t) });
+}
+// how many of these a read would fetch: the busy button's count
+const toRead = (files) => files.filter((f) => isUpload(f) && !uploadCache.has(cacheKey(f))).length;
 function showStats({ a, t, files, settings, got }) {
   const out = $('statsout');
   if (!out) return;
@@ -3665,10 +3679,6 @@ function showStats({ a, t, files, settings, got }) {
   const inPick = (x) => !keepRounds || keepRounds.has(x.round);
   const { roster, errors } = got;
   const matches = got.matches.filter(inPick);
-  const raw = got.raw.filter(inPick);
-  const games = got.games.filter(inPick);
-  const modaqFiles = (got.modaqFiles || []).filter(inPick);
-  const allRaw = got.raw;
   out.innerHTML = '';
 
   if (!got.matches.length) {
@@ -3750,34 +3760,52 @@ function showStats({ a, t, files, settings, got }) {
   };
   $('dlzip').disabled = false;
   $('dlzip').onclick = async () => {
-    const run = busy($('dlzip'), { label: 'Building zip', scope: $('dlzip').closest('.row') });
-    try { await buildZip(); closeMenu(); } finally { run.end(); }
+    // only the uploads it holds: the one the standings count of each game
+    // picked (not one it replaced), and the game files added by hand
+    const counted = new Set(dedupeMatches(matches).map((m) => m.fileId));
+    const zipFiles = files.filter((f) => counted.has(f.id) || (f.kind === 'game' && inPick(f)));
+    const run = busy($('dlzip'), { label: 'Building zip', total: toRead(zipFiles), scope: $('dlzip').closest('.row') });
+    try {
+      const up = await readUploads(lastStats, zipFiles, (done) => run.step(done));
+      await buildZip({
+        matches: up.matches.filter(inPick), modaqFiles: up.modaqFiles.filter(inPick), raw: up.raw.filter(inPick), names: up.names,
+        read: (f) => uploadCache.get(cacheKey(f)), roster: hubNames.rosterFor(t),
+      });
+      closeMenu();
+    } finally { run.end(); }
   };
-  const buildZip = async () => {
+  const buildZip = async ({ matches, modaqFiles, raw, names, read = () => undefined, roster = null }) => {
     // The games the standings count, each as its separated files: match
-    // .qbj + MODAQ game file (hubgames.js qbjZipFile). The game files that
-    // went up apart from their .qbj (Add a game) are read one after
-    // another, in upload order, then the roster.
+    // .qbj + MODAQ game file (hubgames.js qbjZipFile), from the stored
+    // uploads (readUploads). The game files that went up apart from their
+    // .qbj (Add a game), in upload order, as `read` has them, or read one
+    // after another; then the roster, as the hub read it (`roster`) or
+    // read here.
     const gameFiles = [];
     for (const f of files.filter((x) => x.kind === 'game' && inPick(x))) {
       const { round, filename } = f;
-      try { gameFiles.push({ round, filename, text: JSON.stringify(await ownedJson(pub, a, f.r2_key), null, 2) }); }
+      try { gameFiles.push({ round, filename, text: JSON.stringify(read(f) ?? await ownedJson(pub, a, f.r2_key), null, 2) }); }
       catch (e) { gameFiles.push({ round, filename, error: true }); }
     }
     let rosterFile = null;
-    if (t.roster_r2_key) {
+    if (t.roster_r2_key && roster) rosterFile = roster;
+    else if (t.roster_r2_key) {
       try { rosterFile = { json: await ownedJson(pub, a, t.roster_r2_key) }; }
       catch (e) { rosterFile = { error: true }; }
     }
-    const z = qbjZipFile(t.slug, { matches, modaqFiles, raw, gameFiles, roster: rosterFile, names: got.names });
+    const z = qbjZipFile(t.slug, { matches, modaqFiles, raw, gameFiles, roster: rosterFile, names });
     download(z.name, z.data, z.type);
   };
   $('rebuild').disabled = false;
   $('rebuild').onclick = async () => {
-    // the public stats always hold every game, whatever the pick
-    const batches = Math.ceil(allRaw.length / REBUILD_BATCH);
-    const run = busy($('rebuild'), { label: 'Rebuilding', total: batches, scope: $('rebuild').closest('.row') });
+    // from the stored uploads, not the public copies it remakes; the
+    // public stats always hold every game, whatever the pick
+    let run = busy($('rebuild'), { label: 'Reading games', total: toRead(files), scope: $('rebuild').closest('.row') });
     try {
+      const allRaw = (await readUploads(lastStats, files, (done) => run.step(done))).raw;
+      run.end();
+      const batches = Math.ceil(allRaw.length / REBUILD_BATCH);
+      run = busy($('rebuild'), { label: 'Rebuilding', total: batches, scope: $('rebuild').closest('.row') });
       const entries = allRaw.map((r) => ({
         id: r.id, round: r.round, room: r.room, filename: r.filename,
         qbj: JSON.parse(r.text),

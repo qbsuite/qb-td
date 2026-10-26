@@ -8188,7 +8188,7 @@ test('hubgames.js: passes on exportfile.js, so the hub imports its downloads fro
   for (const name of Object.keys(exportfileMod)) assert.equal(hubgamesMod[name], exportfileMod[name], name);
   assert.deepEqual(Object.keys(hubgamesMod).sort(), [...Object.keys(exportfileMod),
     'yftFile', 'reportPages', 'reportZipFile', 'rosterFileText', 'qbjZipFile',
-    'ownedJson', 'gameCopies', 'collectMatches', 'gameFormat', 'createHubNames'].sort());
+    'ownedJson', 'gameCopies', 'cacheKey', 'isUpload', 'fetchUploads', 'collectMatches', 'gameFormat', 'createHubNames'].sort());
 });
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));

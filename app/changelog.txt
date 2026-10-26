@@ -1,3 +1,8 @@
+Release Notes for 10/26/2026
+
+[ PERFORMANCE ]
+- Compute stats, the QBJ bundle and Rebuild read games in batches instead of one request per game.
+
 Release Notes for 10/25/2026
 
 [ BUZZPOINTS ]

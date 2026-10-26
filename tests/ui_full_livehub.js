@@ -1873,10 +1873,22 @@ section('main-stats', '26 42 43 48: Compute, the Download menu and the QBJ bundl
   await check('42 stats: before Compute, "N games ready"', async () => (await pg.text('#statsnote')) === `${nReady} games ready` || await pg.text('#statsnote'));
   await check('43 download menu: off before Compute', () => pg.js(`document.querySelector('#dlmenu').disabled`));
   await pg.watchTexts('#calc');
+  const c0 = pg.reqs.length;
   await pg.click('#calc');
   await pg.waitJs(`!document.querySelector('#statsec').hidden && /games in these stats$/.test(document.querySelector('#statsnote').textContent)`, 'stats', 30000);
-  await check('42 stats: Compute counts the games it reads, "Computing stats… n of N"', async () =>
-    (await pg.seenTexts()).some((x) => new RegExp(`^Computing stats… \\d+ of ${nReady}$`).test(x)) || await pg.seenTexts());
+  await check('42 stats: Compute reads "Computing stats…"', async () =>
+    (await pg.seenTexts()).includes('Computing stats…') || await pg.seenTexts());
+  // the games' public copies, a hundred to a request; the stored uploads
+  // only for the QBJ bundle and Rebuild
+  const statAsks = pg.reqs.slice(c0).filter((r) => r.method === 'GET' && r.url.startsWith(BASE + T.A + '/'))
+    .map((r) => new URL(r.url)).filter((u) => u.pathname.endsWith('/games')
+      || (u.pathname.endsWith('/file') && u.searchParams.get('key') !== d.tournament.roster_r2_key));
+  await check('42 stats: Compute reads the public copies in one request, no stored upload', () =>
+    (statAsks.length <= 1 && statAsks.every((u) => u.pathname.endsWith('/games'))) || statAsks.map((u) => u.pathname + u.search));
+  // the roster the hub read for its listings, not read again
+  const rosterAsks = (from) => pg.reqs.slice(from).filter((r) => r.method === 'GET' && r.url.startsWith(BASE + T.A + '/file')
+    && new URL(r.url).searchParams.get('key') === d.tournament.roster_r2_key);
+  await check('42 stats: Compute doesn\'t read the roster again', () => rosterAsks(c0).length === 0 || rosterAsks(c0).map((r) => r.url));
   await check('26 add a game: a game added under round 5 whose file says round 1 is counted in round 5 ' + CHG.filedRound, async () => {
     const byRound = await statsGames(pg);
     const [a, b] = M.pair(5, 1);
@@ -1909,11 +1921,26 @@ section('main-stats', '26 42 43 48: Compute, the Download menu and the QBJ bundl
   await pg.click('#dlmenu');
   await pg.waitJs(`!document.querySelector('#dlpanel').hidden`, 'the menu');
   await pg.watchTexts('#dlzip');
+  const z0 = pg.reqs.length;
   const z = await download(pg, `document.querySelector('#dlzip').click(); true`);
   const entries = await readZip(new Uint8Array(z.bytes));
   const names = entries.map((e) => e.name);
-  await check('48 qbj bundle: <slug>-qbj.zip, its button reading "Building zip…" meanwhile', async () =>
-    (z.name === `${T.slug}-qbj.zip` && (await pg.seenTexts()).includes('Building zip…')) || [z.name, await pg.seenTexts()]);
+  const zipAsks = pg.reqs.slice(z0).filter((r) => r.method === 'GET' && r.url.startsWith(BASE + T.A + '/')).map((r) => new URL(r.url));
+  // the uploads it holds: the one counted per game, and the game files added by hand
+  const nZip = new Set(d.files.filter((f) => f.kind === 'game' && !f.error).map((f) => f.id)).size
+    + (await pg.js(`document.querySelector('#statsnote').textContent`)).match(/^(\d+) games/).map(Number)[1];
+  await check('48 qbj bundle: <slug>-qbj.zip, its button counting the uploads it reads, "Building zip… n of N"', async () =>
+    (z.name === `${T.slug}-qbj.zip` && (await pg.seenTexts()).some((x) => new RegExp(`^Building zip… \\d+ of ${nZip}$`).test(x))) || [z.name, nZip, await pg.seenTexts()]);
+  await check('48 qbj bundle: doesn\'t read the roster again', () => rosterAsks(z0).length === 0 || rosterAsks(z0).map((r) => r.url));
+  // read on their own, as the batch leaves them out: the round 9 game file
+  // that isn't JSON, and (with PERSIST) the upload whose blob is gone
+  const unreadable = /[/-](Round_9_extra_Game\.json|gone-file\.qbtd\.json)$/;
+  await check('48 qbj bundle: reads the uploads ten to a request, none on its own but those that can\'t be read', () => {
+    const batches = zipAsks.filter((u) => u.pathname.endsWith('/uploads'));
+    const alone = zipAsks.filter((u) => u.pathname.endsWith('/file') && u.searchParams.get('key') !== d.tournament.roster_r2_key);
+    return (batches.length === Math.ceil(nZip / 10) && alone.every((u) => unreadable.test(u.searchParams.get('key'))))
+      || zipAsks.map((u) => u.pathname + u.search);
+  });
   await check('48 qbj bundle: a folder per round, and roster.qbj', () => (names.every((n) => /^round-\d+\//.test(n) || n === 'roster.qbj') && names.includes('roster.qbj')) || names);
   await check('48 qbj bundle: a game file that can\'t be read is left out, and the bundle still comes', () => !names.some((n) => n.startsWith('round-9/')) || names);
   await check('48 qbj bundle: no combined reader upload in it', () => !names.some((n) => /\.qbtd\.json$/.test(n)) || names);

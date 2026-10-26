@@ -824,6 +824,13 @@ node tests/sim_usage.js
 # with categories, buzzpoints, room pages and the rebuild binding checked
 node tests/e2e_day.js
 
+# the TD hub's stats and downloads, before and after the 10/25 batching,
+# side by side: ACF Fall @ UIUC replayed from its archive on a local
+# Worker it starts itself, two hubs open all day (the old one from
+# QBTD_BEFORE, default 0c43911), every stats table, download, Rebuild
+# body and playoff fill held equal byte for byte, requests counted
+node tests/hub_ab_day.js
+
 # capacity and CPU, with a behaviour model the project owner set (moderators
 # and TDs on laptops; viewers half phones, 90% checking once a round, 10%
 # refreshing every 1-2 min late in each round):

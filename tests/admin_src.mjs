@@ -11,7 +11,8 @@ import { readFileSync } from 'node:fs';
 const FILE = new URL('../app/js/admin.js', import.meta.url);
 
 // what showStats has in scope when buildZip runs, handed in by the caller
-const SCOPE = ['pub', 'a', 't', 'files', 'got', 'matches', 'modaqFiles', 'raw', 'inPick', 'download'];
+// with the games it zips (matches, modaqFiles, raw, and got for its names)
+const SCOPE = ['pub', 'a', 't', 'files', 'inPick', 'download'];
 
 /** buildZip from admin.js, with the calling shape of ref_games.mjs
     hubZipRef plus the games picked: ({ pub, a, t, files, got, matches,
@@ -27,10 +28,15 @@ export async function hubOwnBuildZip() {
       if (!SCOPE.includes(as)) scope[as] = mod[name];
     }
   }
-  const start = src.indexOf('\n  const buildZip = async () => {\n');
+  const start = src.indexOf('\n  const buildZip = async ({ matches, modaqFiles, raw, names, read = () => undefined, roster = null }) => {\n');
   const end = start < 0 ? -1 : src.indexOf('\n  };\n', start);
   if (end < 0) throw new Error('admin.js: const buildZip not found');
   const names = Object.keys(scope);
   const factory = new Function(...SCOPE, ...names, `${src.slice(start + 1, end + 5)}\n  return buildZip;`);
-  return (ctx) => factory(...SCOPE.map((k) => ctx[k]), ...names.map((n) => scope[n]));
+  // the games it zips are its arguments: the stored uploads the click read
+  // (with no `read`, each game file added by hand is read on its own)
+  return (ctx) => {
+    const buildZip = factory(...SCOPE.map((k) => ctx[k]), ...names.map((n) => scope[n]));
+    return () => buildZip({ matches: ctx.matches, modaqFiles: ctx.modaqFiles, raw: ctx.raw, names: ctx.got.names });
+  };
 }

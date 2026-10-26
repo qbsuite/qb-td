@@ -386,6 +386,19 @@ export async function demoPub(path, opts = {}) {
       return adminUpdate(body);
     }
     if (rest === '/file') return adminFile(query.get('key'));
+    // the games' public copies, as worker.js adminGames serves them
+    if (rest === '/games') {
+      const ids = (query.get('ids') || '').split(',').map(Number);
+      const games = allEntries().filter((e) => ids.includes(e.id))
+        .map((e) => ({ id: e.id, round: e.round, room: e.room, filename: e.filename, qbj: e.qbj }));
+      return { games, missing: ids.filter((id) => !games.some((g) => g.id === id)) };
+    }
+    // the stored uploads, as worker.js adminUploads serves them
+    if (rest === '/uploads') {
+      const ids = (query.get('ids') || '').split(',').map(Number);
+      const files = allEntries().filter((e) => ids.includes(e.id)).map((e) => ({ id: e.id, body: e.qbj }));
+      return { files, missing: ids.filter((id) => !files.some((f) => f.id === id)) };
+    }
     if (rest === '/bundle' && method === 'POST') {           // always materialized here
       let body = null;
       try { body = JSON.parse(opts.body); } catch (e) { /* count nothing */ }

@@ -69,13 +69,20 @@ export async function openChrome() {
   });
   const errors = [];
   const requests = [];
+  const failures = []; // requests the browser gave up on, and why (net::ERR_…, CORS)
   listeners.push((m) => {
     if (m.sessionId !== sessionId) return;
     if (m.method === 'Runtime.exceptionThrown') {
       const d = m.params.exceptionDetails;
       errors.push((d.exception && d.exception.description) || d.text);
     } else if (m.method === 'Network.requestWillBeSent') {
-      requests.push({ method: m.params.request.method, url: m.params.request.url, type: m.params.type || '' });
+      requests.push({ id: m.params.requestId, method: m.params.request.method, url: m.params.request.url, type: m.params.type || '', headers: m.params.request.headers });
+    } else if (m.method === 'Network.responseReceived') {
+      const r = requests.find((x) => x.id === m.params.requestId);
+      if (r) r.status = m.params.response.status;
+    } else if (m.method === 'Network.loadingFailed') {
+      const r = requests.find((x) => x.id === m.params.requestId);
+      failures.push({ url: r ? r.url : '', status: r ? r.status : undefined, error: m.params.errorText, blocked: m.params.blockedReason || m.params.corsErrorStatus?.corsError || '' });
     } else if (m.method === 'Page.javascriptDialogOpening') {
       errors.push('dialog: ' + m.params.message);
       S('Page.handleJavaScriptDialog', { accept: false });
@@ -100,7 +107,7 @@ export async function openChrome() {
   const q = (s) => JSON.stringify(s);
   const waitJs = (expr, label, ms) => until(() => js(expr), label, ms);
   const click = (sel) => js(`(() => { const e = document.querySelector(${q(sel)}); if (!e) throw new Error('nothing matches ' + ${q(sel)}); e.click(); return true; })()`);
-  return { send, S, js, goto, waitJs, click, errors, requests, close, sessionId };
+  return { send, S, js, goto, waitJs, click, errors, requests, failures, close, sessionId };
 }
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',

@@ -55,6 +55,9 @@ async function setup(root) {
   const key = sql('SELECT r2_key FROM files WHERE id=?', up.id)[0].r2_key;
   for (let i = 0; i < 99; i++) await quiet(() => call('/b/' + room.secret + '/upload?round=1&name=R1_' + i + '.qbj', { method: 'POST', body: JSON.stringify(match(1)) }));
   const ids = sql('SELECT id FROM files').map((r) => r.id).slice(0, 100).join(',');
+  // ten reader uploads, packet text and all, for the QBJ bundle's batch read
+  const readerIds = [up.id];
+  for (let i = 0; i < 9; i++) readerIds.push((await quiet(() => call('/b/' + room.secret + '/upload?round=1&name=Round_1_R' + i + '.qbtd.json', { method: 'POST', body: readerBody }))).body.id);
   await quiet(() => w.tick());
   const sched = { v: 1, rooms: [{ name: 'Room 1', bucket: room.id }], phases: [{ name: 'Prelims', rounds: [1, 2, 3].map((n) => ({ round: n,
     games: [{ room: 0, a: { team: 'Alpha' }, b: { team: 'Beta' } }], byes: [] })) }], updated: 0 };
@@ -82,6 +85,7 @@ async function setup(root) {
     'admin part=game, no renames': () => call(`${A}/file?key=${enc(key)}&part=game&dl=x.json`),
     'pub qbj, no renames': () => call(`/pub/cpu-bench/qbj/${up.id}`),
     'admin games?ids= (100 ids)': () => call(`${A}/games?ids=${ids}`),
+    'admin uploads?ids= (10 reader uploads)': () => call(`${A}/uploads?ids=${readerIds.join(',')}`),
     'roster download (part=roster), no renames': () => call(`${A}/file?key=${enc(`t/${t.id}/roster.qbj`)}&part=roster&dl=r.qbj`),
     'settings save, no base': () => call(A, { method: 'POST', json: { settings: { gameFormat: (flip = !flip) ? 'acf' : 'naqt' } } }),
     'settings save, equal base': () => { const b = JSON.stringify(JSON.parse(settingsNow())); return call(A, { method: 'POST', json: { settings: { gameFormat: (flip = !flip) ? 'acf' : 'naqt' }, settings_base: b } }); },
