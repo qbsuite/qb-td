@@ -2017,7 +2017,7 @@ async function hook(env, method, id, payload) {
 // Markdown link in the text.
 export function alertBody({ kind, name, status, link, more = [], buttons = [] }) {
   const isUrl = (v) => /^https?:\/\//.test(String(v || ''));
-  const all = [...(isUrl(link) ? [{ label: 'Player page', url: link }] : []), ...buttons];
+  const all = [...(isUrl(link) ? [{ label: 'Player page', url: link, emoji: '🌐' }] : []), ...buttons];
   const fit = all.filter((b) => b.url.length <= 512);
   const lines = [
     'Status: ' + status,
@@ -2032,8 +2032,12 @@ export function alertBody({ kind, name, status, link, more = [], buttons = [] })
       description: lines.filter(Boolean).join('\n'),
       timestamp: new Date().toISOString(),
     }],
-    // style 5: a link button
-    components: fit.length ? [{ type: 1, components: fit.map((b) => ({ type: 2, style: 5, label: b.label, url: b.url })) }] : [],
+    // style 5: a link button. A webhook's are always gray (the colored
+    // styles are interactive, which takes a Discord application), so each
+    // carries an emoji to stand out
+    components: fit.length ? [{ type: 1, components: fit.map((b) => ({
+      type: 2, style: 5, label: b.label, url: b.url, ...(b.emoji ? { emoji: { name: b.emoji } } : {}),
+    })) }] : [],
   };
 }
 
@@ -2133,7 +2137,7 @@ async function alertWrapUps(env) {
         [count(n.rooms, 'room'), count(n.games, 'game'), count(n.rounds, 'round')].join(', '),
         t.published && n.games && !archiveUrl(env, t) ? 'To archive: `node tools/archive.mjs add ' + t.slug + '`' : null,
       ],
-      buttons: t.published && n.games && archiveUrl(env, t) ? [{ label: 'Archive it', url: archiveUrl(env, t) }] : [],
+      buttons: t.published && n.games && archiveUrl(env, t) ? [{ label: 'Archive it', url: archiveUrl(env, t), emoji: '📦' }] : [],
     });
   }
 }

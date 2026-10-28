@@ -1241,7 +1241,9 @@ the title, a `Status:` line, and a **Player page** button — which follows it:
 
 The buttons are Discord link buttons, which a plain webhook may send when
 the post asks for them (`with_components=true`); they only open a URL, so
-no Discord application is involved.
+no Discord application is involved. That also keeps them gray — the
+colored styles are interactive — so each carries an emoji (🌐 Player page,
+📦 Archive it) to stand out.
 
 "Created" and "started" are different news — most rows are somebody
 typing `asdf` to see what the thing does — so each step is posted afresh

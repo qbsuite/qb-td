@@ -2992,11 +2992,11 @@ test('the Finished alert\'s archive link is a pre-filled issue, with ARCHIVE_REP
 test('alert messages: links are buttons, a slug is text, a long URL a Markdown link', () => {
   const page = 'https://qbsuite.github.io/qb-td/app/t.html?t=x';
   const b = alertBody({ kind: 'finished', name: 'X', status: 'Finished', link: page,
-    more: ['2 rooms'], buttons: [{ label: 'Archive it', url: 'https://github.com/a/b/issues/new?title=X' }] });
+    more: ['2 rooms'], buttons: [{ label: 'Archive it', url: 'https://github.com/a/b/issues/new?title=X', emoji: '📦' }] });
   assert.equal(b.embeds[0].description, 'Status: Finished\n2 rooms');
   assert.deepEqual(b.components, [{ type: 1, components: [
-    { type: 2, style: 5, label: 'Player page', url: page },
-    { type: 2, style: 5, label: 'Archive it', url: 'https://github.com/a/b/issues/new?title=X' },
+    { type: 2, style: 5, label: 'Player page', url: page, emoji: { name: '🌐' } },
+    { type: 2, style: 5, label: 'Archive it', url: 'https://github.com/a/b/issues/new?title=X', emoji: { name: '📦' } },
   ] }]);
   // a set's slug, before there is a page to link
   const set = alertBody({ kind: 'created', name: 'S', status: 'New set', link: '`s-1`' });
