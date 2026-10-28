@@ -925,6 +925,89 @@
    ],
    "foreign": []
   },
+  "archive qbtd-sim-archive-0zlr": {
+   "header": "Archive flow test (ignore)",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "59a5930406cef5a210a080df",
+      "chars": 36
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "14223ef3e42b4a07ab3be9db",
+      "chars": 57382
+     },
+     "layout=classic": {
+      "sha256": "c2bff6d3e1b2fa51c5e23ccf",
+      "chars": 57442
+     },
+     "layout=new": {
+      "sha256": "2bf918e2333f5e8ffd0f5767",
+      "chars": 2764
+     },
+     "new/standings": {
+      "sha256": "2bf918e2333f5e8ffd0f5767",
+      "chars": 2764
+     },
+     "new/individuals": {
+      "sha256": "0bc15e5730d2b539ca29f715",
+      "chars": 3105
+     },
+     "new/games": {
+      "sha256": "93c962bb4d9924006f685685",
+      "chars": 5298
+     },
+     "new/teams": {
+      "sha256": "2d71b3d048fcbf9807ffe740",
+      "chars": 8942
+     },
+     "new/players": {
+      "sha256": "7dbcd786bc5fd6b8fa9e7334",
+      "chars": 5853
+     },
+     "new/rounds": {
+      "sha256": "08cdd12f959d3911c9d096de",
+      "chars": 1757
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/index.json",
+    "/archive/qbtd-sim-archive-0zlr.js",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive 2026-penn-bowl-at-stanford": {
    "header": "2026 Penn Bowl at Stanford",
    "tabs": {

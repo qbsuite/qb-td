@@ -1,6 +1,15 @@
 {
   "tournaments": [
     {
+      "slug": "qbtd-sim-archive-0zlr",
+      "name": "Archive flow test (ignore)",
+      "date": "2026-10-26",
+      "host": "",
+      "teams": 4,
+      "rounds": 1,
+      "games": 2
+    },
+    {
       "slug": "2026-penn-bowl-at-stanford",
       "name": "2026 Penn Bowl at Stanford",
       "date": "2026-10-24",
