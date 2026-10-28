@@ -2975,21 +2975,38 @@ test('archive captures carry no question text', () => {
 
 const { captureReport, captureProblems } = await import('../tools/archive.mjs');
 
-const { archiveLine } = await import('../worker/worker.js');
+const { archiveUrl, alertBody } = await import('../worker/worker.js');
 
-test('the Finished alert links to an archive issue, or gives the command', () => {
+test('the Finished alert\'s archive link is a pre-filled issue, with ARCHIVE_REPO set', () => {
   const t = { slug: 'socal-penn-bowl', name: 'SoCal Penn Bowl (UCSD)', started: Date.UTC(2026, 9, 24, 15) };
-  assert.equal(archiveLine({}, t), 'To archive: `node tools/archive.mjs add socal-penn-bowl`');
-  assert.equal(archiveLine({ ARCHIVE_REPO: 'not a repo' }, t), 'To archive: `node tools/archive.mjs add socal-penn-bowl`');
-  const line = archiveLine({ ARCHIVE_REPO: 'qbsuite/qb-td' }, t);
-  const m = /^\[Archive it\]\(([^()\s]+)\)$/.exec(line);
-  assert.ok(m, line);
-  const u = new URL(m[1]);
+  assert.equal(archiveUrl({}, t), null);
+  assert.equal(archiveUrl({ ARCHIVE_REPO: 'not a repo' }, t), null);
+  const u = new URL(archiveUrl({ ARCHIVE_REPO: 'qbsuite/qb-td' }, t));
   assert.equal(u.origin + u.pathname, 'https://github.com/qbsuite/qb-td/issues/new');
   assert.equal(u.searchParams.get('title'), 'Archive SoCal Penn Bowl (UCSD)');
   // the lines .github/workflows/archive.yml reads, the date the day it started
   const body = u.searchParams.get('body').split('\n');
   assert.deepEqual(body.slice(0, 3), ['slug: socal-penn-bowl', 'date: 2026-10-24', 'host: ']);
+});
+
+test('alert messages: links are buttons, a slug is text, a long URL a Markdown link', () => {
+  const page = 'https://qbsuite.github.io/qb-td/app/t.html?t=x';
+  const b = alertBody({ kind: 'finished', name: 'X', status: 'Finished', link: page,
+    more: ['2 rooms'], buttons: [{ label: 'Archive it', url: 'https://github.com/a/b/issues/new?title=X' }] });
+  assert.equal(b.embeds[0].description, 'Status: Finished\n2 rooms');
+  assert.deepEqual(b.components, [{ type: 1, components: [
+    { type: 2, style: 5, label: 'Player page', url: page },
+    { type: 2, style: 5, label: 'Archive it', url: 'https://github.com/a/b/issues/new?title=X' },
+  ] }]);
+  // a set's slug, before there is a page to link
+  const set = alertBody({ kind: 'created', name: 'S', status: 'New set', link: '`s-1`' });
+  assert.equal(set.embeds[0].description, 'Status: New set\n`s-1`');
+  assert.deepEqual(set.components, []);
+  // Discord refuses the whole message for one button URL over 512 characters
+  const long = 'https://github.com/a/b/issues/new?title=' + 'x'.repeat(500) + '(y)';
+  const l = alertBody({ kind: 'finished', name: 'X', status: 'Finished', link: page, buttons: [{ label: 'Archive it', url: long }] });
+  assert.equal(l.components[0].components.length, 1);
+  assert.ok(l.embeds[0].description.endsWith('[Archive it](' + long.replace('(y)', '%28y%29') + ')'), l.embeds[0].description);
 });
 
 test('archive captures hold the games their state lists, with scoresheets off', () => {

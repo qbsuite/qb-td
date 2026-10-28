@@ -119,6 +119,7 @@ async function quiet(ms = 1500) {
   return log.length === before;
 }
 const embed = (id) => (channel.get(id) && channel.get(id).embeds && channel.get(id).embeds[0]) || {};
+const buttonUrls = (id) => ((channel.get(id) && channel.get(id).components) || []).flatMap((r) => r.components.map((c) => c.url));
 const status = (id) => String(embed(id).description || '').split('\n')[0];
 const titles = () => [...channel.keys()].map((id) => embed(id).title + ' / ' + status(id));
 const posts = () => log.filter((c) => c.method === 'POST').length;
@@ -162,9 +163,10 @@ ok('creation posts one message', (await until(() => channel.size === 1)) && post
 const created = [...channel.keys()][0];
 ok('its title is the tournament name', embed(created).title === 'Alert E2E', titles());
 ok('then its status', status(created) === 'Status: New tournament', embed(created));
-ok('then the public page link, on its own line',
-  embed(created).description.split('\n')[1].endsWith('/t.html?t=' + slug), embed(created));
-ok('the post asked for the message back', log[0].url.includes('wait=true'), log[0].url);
+ok('then a button to the public page',
+  buttonUrls(created)[0].endsWith('/t.html?t=' + slug), channel.get(created));
+ok('the post asked for the message back, and to keep its buttons',
+  log[0].url.includes('wait=true') && log[0].url.includes('with_components=true'), log[0].url);
 ok('the message id is remembered', await until(() => msgOf(tid) === created), msgOf(tid));
 
 /* ----- rooms ----- */
@@ -188,8 +190,8 @@ ok('the channel still has one message for it',
 const startedMsg = [...channel.keys()][0];
 ok('it says the tournament started',
   embed(startedMsg).title === 'Alert E2E' && status(startedMsg) === 'Status: Started', titles());
-ok('with the public page link under it',
-  embed(startedMsg).description.split('\n')[1].endsWith('/t.html?t=' + slug), embed(startedMsg));
+ok('with the public page button under it',
+  buttonUrls(startedMsg)[0].endsWith('/t.html?t=' + slug), channel.get(startedMsg));
 ok('the new message id is remembered', await until(() => msgOf(tid) === startedMsg), msgOf(tid));
 r = await call(A + '/start', { method: 'POST' });
 ok('a second start is refused and does not alert', r.status === 409 && (await quiet()), [r.status, log.length]);
@@ -226,7 +228,7 @@ ok('it counts rooms, games and rounds',
   embed(done).description.includes('2 rooms, 2 games, 1 round'), embed(done).description);
 ok('it says how to archive it',
   embed(done).description.includes('node tools/archive.mjs add ' + slug)
-    || embed(done).description.includes(encodeURIComponent('slug: ' + slug)), embed(done).description);
+    || buttonUrls(done).some((u) => u.includes(encodeURIComponent('slug: ' + slug))), channel.get(done));
 ok('the tournament is marked wrapped',
   d1row(`SELECT wrapped FROM tournaments WHERE id = ${tid}`).wrapped === 1);
 await hourly();

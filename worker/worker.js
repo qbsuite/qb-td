@@ -1990,6 +1990,8 @@ async function hook(env, method, id, payload) {
     const u = new URL(env.DISCORD_WEBHOOK.trim());
     if (id) u.pathname += '/messages/' + id;
     else u.searchParams.set('wait', 'true'); // answer with the message, for its id
+    // a plain webhook may send link buttons, but only when it says so
+    if (payload) u.searchParams.set('with_components', 'true');
     const res = await fetch(u, {
       method,
       headers: payload ? { 'Content-Type': 'application/json' } : {},
@@ -2007,15 +2009,33 @@ async function hook(env, method, id, payload) {
 }
 
 // What a message looks like: the tournament's (or set's) name as the
-// title, then "Status: ...", then its link, then anything more to say.
-const alertBody = ({ kind, name, status, link, more = [] }) => ({
-  embeds: [{
-    title: name,
-    color: ALERT_COLOR[kind] || ALERT_COLOR.created,
-    description: ['Status: ' + status, link, ...more].filter(Boolean).join('\n'),
-    timestamp: new Date().toISOString(),
-  }],
-});
+// title, then "Status: ...", then anything more to say, and under it a row
+// of link buttons: the public page ("Player page", when `link` is one)
+// and `buttons`. A `link` that is no URL (a slug in backticks) is a line
+// of text instead. Discord refuses a button whose URL is over 512
+// characters, and the whole message with it, so a longer one is a
+// Markdown link in the text.
+export function alertBody({ kind, name, status, link, more = [], buttons = [] }) {
+  const isUrl = (v) => /^https?:\/\//.test(String(v || ''));
+  const all = [...(isUrl(link) ? [{ label: 'Player page', url: link }] : []), ...buttons];
+  const fit = all.filter((b) => b.url.length <= 512);
+  const lines = [
+    'Status: ' + status,
+    isUrl(link) ? null : link,
+    ...more,
+    ...all.filter((b) => b.url.length > 512).map((b) => '[' + b.label + '](' + b.url.replace(/[()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()) + ')'),
+  ];
+  return {
+    embeds: [{
+      title: name,
+      color: ALERT_COLOR[kind] || ALERT_COLOR.created,
+      description: lines.filter(Boolean).join('\n'),
+      timestamp: new Date().toISOString(),
+    }],
+    // style 5: a link button
+    components: fit.length ? [{ type: 1, components: fit.map((b) => ({ type: 2, style: 5, label: b.label, url: b.url })) }] : [],
+  };
+}
 
 // Post, and answer the new message's id (a Discord snowflake) or null.
 async function postAlert(env, alert) {
@@ -2111,20 +2131,22 @@ async function alertWrapUps(env) {
       link: t.published ? publicLink(env, t.slug) : '`' + t.slug + '` (public page off)',
       more: [
         [count(n.rooms, 'room'), count(n.games, 'game'), count(n.rounds, 'round')].join(', '),
-        t.published && n.games ? archiveLine(env, t) : null,
+        t.published && n.games && !archiveUrl(env, t) ? 'To archive: `node tools/archive.mjs add ' + t.slug + '`' : null,
       ],
+      buttons: t.published && n.games && archiveUrl(env, t) ? [{ label: 'Archive it', url: archiveUrl(env, t) }] : [],
     });
   }
 }
 
-// How to archive a finished tournament. With ARCHIVE_REPO set, a link to a
-// new issue on that repo with everything filled in but the host: submitting
-// it is the approval, and .github/workflows/archive.yml does the rest. The
+// Where to archive a finished tournament: with ARCHIVE_REPO set, a new
+// issue on that repo with everything filled in but the host. Submitting it
+// is the approval, and .github/workflows/archive.yml does the rest. The
 // workflow checks the issue's author can push to the repo, so the gate is
-// still push access. Without it, the archive tool's command.
-export function archiveLine(env, t) {
+// still push access. Unset, null, and the alert gives the archive tool's
+// command.
+export function archiveUrl(env, t) {
   const repo = (env.ARCHIVE_REPO || '').trim();
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return 'To archive: `node tools/archive.mjs add ' + t.slug + '`';
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return null;
   const body = [
     'slug: ' + t.slug,
     'date: ' + new Date(t.started).toISOString().slice(0, 10),
@@ -2132,13 +2154,13 @@ export function archiveLine(env, t) {
     '',
     'Fill in the host if you know it, then submit to archive this tournament.',
   ].join('\n');
-  // parentheses too, which encodeURIComponent leaves: one in a name like
-  // "Penn Bowl (Stanford)" would end the Markdown link early
-  const enc = (v) => encodeURIComponent(v).replace(/[()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
-  const url = 'https://github.com/' + repo + '/issues/new?title='
-    + enc('Archive ' + t.name) + '&body=' + enc(body);
-  return '[Archive it](' + url + ')';
+  return 'https://github.com/' + repo + '/issues/new?title='
+    + linkEnc('Archive ' + t.name) + '&body=' + linkEnc(body);
 }
+
+// encodeURIComponent, and parentheses too, which it leaves: one in a name
+// like "Penn Bowl (Stanford)" would end a Markdown link early
+const linkEnc = (v) => encodeURIComponent(v).replace(/[()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 
 /* The weekly usage digest: one message every Monday (DIGEST_CRON) with
    the last seven full UTC days of what can hit a Free-plan limit — Worker

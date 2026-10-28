@@ -1,6 +1,6 @@
 # Archive a tournament from an issue. The Discord "Finished" alert links to
 # a new issue here with the slug and date filled in (worker.js
-# archiveLine); submitting it is the approval. This runs `archive.mjs add`,
+# archiveUrl); submitting it is the approval. This runs `archive.mjs add`,
 # gives the archive its golden entries and a changelog line, runs npm test,
 # pushes to main, and closes the issue with what it did. Anything that
 # fails leaves the issue open with the reason.

@@ -1227,7 +1227,7 @@ index, that finds nothing.
 A Discord ping when someone puts your instance to use, so a tournament
 running on it isn't something you find out about days later from the
 analytics. A tournament has **one message** in the channel — its name as
-the title, a `Status:` line, then its link — which follows it:
+the title, a `Status:` line, and a **Player page** button — which follows it:
 
 - **New** — a tournament, or a set's mirror started from an invite, was
   created. Title, slug, and a link to the public page. (A new question
@@ -1235,9 +1235,13 @@ the title, a `Status:` line, then its link — which follows it:
 - **Started** — the TD pressed Start tournament: setup is over and the
   48-hour clock is running.
 - **Finished** — its links have closed: rooms, games and rounds, and,
-  when there is something to archive, an **Archive it** link (see
+  when there is something to archive, an **Archive it** button (see
   "Archiving a tournament"), or the `tools/archive.mjs add` command with
   `ARCHIVE_REPO` unset.
+
+The buttons are Discord link buttons, which a plain webhook may send when
+the post asks for them (`with_components=true`); they only open a URL, so
+no Discord application is involved.
 
 "Created" and "started" are different news — most rows are somebody
 typing `asdf` to see what the thing does — so each step is posted afresh
@@ -1643,7 +1647,7 @@ node tools/archive_goldens.mjs <slug>          # a new archive's golden entries,
 ```
 
 **From Discord.** With `ARCHIVE_REPO` set (`wrangler.toml`), a
-Finished alert's **Archive it** link opens a new issue on that repo, its
+Finished alert's **Archive it** button opens a new issue on that repo, its
 title and body filled in: the slug, the date the tournament started, and
 an empty `host:` line to fill or leave. Submitting it is the approval.
 `.github/workflows/archive.yml` checks that the issue's author can push to
