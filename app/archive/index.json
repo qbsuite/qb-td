@@ -1,6 +1,15 @@
 {
   "tournaments": [
     {
+      "slug": "qbtd-sim-1025-bz-lk3q",
+      "name": "qb-td sim 10-25 buzz files (ignore)",
+      "date": "2026-10-26",
+      "host": "Test",
+      "teams": 4,
+      "rounds": 1,
+      "games": 2
+    },
+    {
       "slug": "2026-penn-bowl-at-stanford",
       "name": "2026 Penn Bowl at Stanford",
       "date": "2026-10-24",

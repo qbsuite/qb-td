@@ -1,4 +1,59 @@
 {
+ "archive:qbtd-sim-1025-bz-lk3q": {
+  "pub": {
+   "matches": "13025714088456da19cfab32",
+   "count": 2,
+   "errors": [],
+   "fileIds": [
+    1191,
+    1192
+   ],
+   "rawEntries": "a4e53440e621c490acd51f81",
+   "rawEntryIds": [
+    1191,
+    1192
+   ],
+   "rawRooms": [
+    "Room 1",
+    "Room 2"
+   ],
+   "entryRooms": [
+    "Room 1",
+    "Room 2"
+   ],
+   "loadedIds": [
+    1191,
+    1192
+   ],
+   "sameObjects": true
+  },
+  "archive": {
+   "matches": "13025714088456da19cfab32",
+   "count": 2,
+   "errors": []
+  },
+  "derived": {
+   "report": {
+    "standings.html": "8e7c6a4a96e8f4832c1ab85c",
+    "individuals.html": "22927e895309fb040d29602c",
+    "games.html": "7b60a112956078caed883fb3",
+    "teamdetail.html": "9c4eaf2ffcbe2154e8af7e41",
+    "playerdetail.html": "18d58b1a5ae14ad980730106",
+    "rounds.html": "08374191a3877610bf1c0e36"
+   },
+   "reportData": "00eeba96cfa9c5feff9842a8",
+   "yft4": "b9b718758e14d3eddebc76f3",
+   "yft3": "93349cb23cb7246a43fb96c6",
+   "tossupBuzzes": {
+    "1": "4f53cda18c2baa0c0354bb5f"
+   },
+   "buzzSummary": {
+    "1": "4f53cda18c2baa0c0354bb5f",
+    "all": "4f53cda18c2baa0c0354bb5f"
+   },
+   "categories": null
+  }
+ },
  "archive:2026-penn-bowl-at-stanford": {
   "pub": {
    "matches": "5f247da6ea4ee4386a2eab4d",
