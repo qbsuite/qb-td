@@ -2111,10 +2111,33 @@ async function alertWrapUps(env) {
       link: t.published ? publicLink(env, t.slug) : '`' + t.slug + '` (public page off)',
       more: [
         [count(n.rooms, 'room'), count(n.games, 'game'), count(n.rounds, 'round')].join(', '),
-        t.published && n.games ? 'To archive: `node tools/archive.mjs add ' + t.slug + '`' : null,
+        t.published && n.games ? archiveLine(env, t) : null,
       ],
     });
   }
+}
+
+// How to archive a finished tournament. With ARCHIVE_REPO set, a link to a
+// new issue on that repo with everything filled in but the host: submitting
+// it is the approval, and .github/workflows/archive.yml does the rest. The
+// workflow checks the issue's author can push to the repo, so the gate is
+// still push access. Without it, the archive tool's command.
+export function archiveLine(env, t) {
+  const repo = (env.ARCHIVE_REPO || '').trim();
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return 'To archive: `node tools/archive.mjs add ' + t.slug + '`';
+  const body = [
+    'slug: ' + t.slug,
+    'date: ' + new Date(t.started).toISOString().slice(0, 10),
+    'host: ',
+    '',
+    'Fill in the host if you know it, then submit to archive this tournament.',
+  ].join('\n');
+  // parentheses too, which encodeURIComponent leaves: one in a name like
+  // "Penn Bowl (Stanford)" would end the Markdown link early
+  const enc = (v) => encodeURIComponent(v).replace(/[()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  const url = 'https://github.com/' + repo + '/issues/new?title='
+    + enc('Archive ' + t.name) + '&body=' + enc(body);
+  return '[Archive it](' + url + ')';
 }
 
 /* The weekly usage digest: one message every Monday (DIGEST_CRON) with

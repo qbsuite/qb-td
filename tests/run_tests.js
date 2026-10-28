@@ -1743,6 +1743,23 @@ test('roundRooms: who plays a round, by bucket link then room name; the rest hav
 
 const { parseChangelog } = await import('../app/js/changelog.js');
 const changelogText = (await import('node:fs')).readFileSync(new URL('../app/changelog.txt', import.meta.url), 'utf8');
+const { addLine } = await import('../tools/changelog_add.mjs');
+test('changelog_add puts a line in today\'s release, its section, or a new one', () => {
+  const day = new Date(2026, 9, 28);
+  const old = 'Release Notes for 10/27/2026\n\n[ HUB ]\n- One.\n';
+  const fresh = addLine(old, 'ARCHIVE', 'Added X.', day);
+  assert.equal(fresh, 'Release Notes for 10/28/2026\n\n[ ARCHIVE ]\n- Added X.\n\n' + old);
+  // same day, same section: after its last line
+  assert.equal(addLine(fresh, 'ARCHIVE', 'Added Y.', day),
+    'Release Notes for 10/28/2026\n\n[ ARCHIVE ]\n- Added X.\n- Added Y.\n\n' + old);
+  // same day, another section: a new one at the end of the release
+  assert.equal(addLine(fresh, 'STATS', 'Z.', day),
+    'Release Notes for 10/28/2026\n\n[ ARCHIVE ]\n- Added X.\n\n[ STATS ]\n- Z.\n\n' + old);
+  for (const t of [fresh, addLine(fresh, 'STATS', 'Z.', day), addLine(changelogText, 'ARCHIVE', 'Added X.', day)]) {
+    assert.ok(parseChangelog(t).length >= 1);
+  }
+});
+
 test('changelog.txt parses: newest first, every release has changes, every line short', () => {
   const releases = parseChangelog(changelogText);
   assert.ok(releases.length > 0);
@@ -2957,6 +2974,23 @@ test('archive captures carry no question text', () => {
 });
 
 const { captureReport, captureProblems } = await import('../tools/archive.mjs');
+
+const { archiveLine } = await import('../worker/worker.js');
+
+test('the Finished alert links to an archive issue, or gives the command', () => {
+  const t = { slug: 'socal-penn-bowl', name: 'SoCal Penn Bowl (UCSD)', started: Date.UTC(2026, 9, 24, 15) };
+  assert.equal(archiveLine({}, t), 'To archive: `node tools/archive.mjs add socal-penn-bowl`');
+  assert.equal(archiveLine({ ARCHIVE_REPO: 'not a repo' }, t), 'To archive: `node tools/archive.mjs add socal-penn-bowl`');
+  const line = archiveLine({ ARCHIVE_REPO: 'qbsuite/qb-td' }, t);
+  const m = /^\[Archive it\]\(([^()\s]+)\)$/.exec(line);
+  assert.ok(m, line);
+  const u = new URL(m[1]);
+  assert.equal(u.origin + u.pathname, 'https://github.com/qbsuite/qb-td/issues/new');
+  assert.equal(u.searchParams.get('title'), 'Archive SoCal Penn Bowl (UCSD)');
+  // the lines .github/workflows/archive.yml reads, the date the day it started
+  const body = u.searchParams.get('body').split('\n');
+  assert.deepEqual(body.slice(0, 3), ['slug: socal-penn-bowl', 'date: 2026-10-24', 'host: ']);
+});
 
 test('archive captures hold the games their state lists, with scoresheets off', () => {
   // the same check tools/archive.mjs add warns with before a commit

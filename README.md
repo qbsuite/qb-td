@@ -1234,8 +1234,10 @@ the title, a `Status:` line, then its link — which follows it:
   set gets a plain message of its own.)
 - **Started** — the TD pressed Start tournament: setup is over and the
   48-hour clock is running.
-- **Finished** — its links have closed: rooms, games and rounds, and the
-  `tools/archive.mjs add` command when there is something to archive.
+- **Finished** — its links have closed: rooms, games and rounds, and,
+  when there is something to archive, an **Archive it** link (see
+  "Archiving a tournament"), or the `tools/archive.mjs add` command with
+  `ARCHIVE_REPO` unset.
 
 "Created" and "started" are different news — most rows are somebody
 typing `asdf` to see what the thing does — so each step is posted afresh
@@ -1637,7 +1639,19 @@ node tools/archive.mjs add <slug> --date 2026-07-25 --host "Stanford"
 node tools/archive.mjs refresh <slug>          # recapture after a late correction
 node tools/archive.mjs rebuild [<slug>]        # report pages again from the committed capture, offline
 node tools/archive.mjs remove <slug>           # un-approve
+node tools/archive_goldens.mjs <slug>          # a new archive's golden entries, before the commit
 ```
+
+**From Discord.** With `ARCHIVE_REPO` set (`wrangler.toml`), a
+Finished alert's **Archive it** link opens a new issue on that repo, its
+title and body filled in: the slug, the date the tournament started, and
+an empty `host:` line to fill or leave. Submitting it is the approval.
+`.github/workflows/archive.yml` checks that the issue's author can push to
+the repo (anyone else's issue is closed untouched), runs `add`, gives the
+new archive its golden entries (`tools/archive_goldens.mjs`) and a
+changelog line (`tools/changelog_add.mjs`), runs `npm test`, pushes to
+`main`, and closes the issue with what it captured. Anything that fails
+leaves the issue open with a link to the log; reopen it to try again.
 
 `add` reads the public routes, writes the frozen capture
 (`app/archive/<slug>.js`), generates the six report pages

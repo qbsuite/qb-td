@@ -1,0 +1,133 @@
+# Archive a tournament from an issue. The Discord "Finished" alert links to
+# a new issue here with the slug and date filled in (worker.js
+# archiveLine); submitting it is the approval. This runs `archive.mjs add`,
+# gives the archive its golden entries and a changelog line, runs npm test,
+# pushes to main, and closes the issue with what it did. Anything that
+# fails leaves the issue open with the reason.
+#
+# The gate is still push access: an issue from anyone who can't push to
+# this repo is closed untouched. Reopening an issue tries it again.
+name: archive
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: write
+  issues: write
+  # a push made with this run's token may not start a Pages build itself
+  pages: write
+
+# one archive at a time, so two pushes to main never race
+concurrency:
+  group: archive
+
+jobs:
+  archive:
+    if: startsWith(github.event.issue.title, 'Archive ')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE: ${{ github.event.issue.number }}
+      # the day a changelog line is dated by
+      TZ: America/Chicago
+    steps:
+      - name: Only someone who can push
+        id: gate
+        env:
+          AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          perm=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$AUTHOR/permission" --jq .permission || echo none)
+          case "$perm" in
+            admin|maintain|write) ;;
+            *) gh issue close "$ISSUE" -R "$GITHUB_REPOSITORY" -c "Only someone who can push to this repo can archive a tournament."
+               exit 1 ;;
+          esac
+
+      - name: Read the issue
+        id: req
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          field() { printf '%s\n' "$BODY" | tr -d '\r' | sed -n "s/^$1:[[:space:]]*//p" | head -1 | sed 's/[[:space:]]*$//'; }
+          slug=$(field slug); date=$(field date); host=$(field host)
+          if ! printf '%s' "$slug" | grep -Eq '^[a-z0-9][a-z0-9-]{2,39}$'; then
+            gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" -b "No valid \`slug:\` line in the issue body."; exit 1
+          fi
+          if [ -n "$date" ] && ! printf '%s' "$date" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" -b "\`date:\` must be YYYY-MM-DD."; exit 1
+          fi
+          {
+            echo "slug=$slug"; echo "date=$date"
+            # one line, no shell or markdown surprises in a commit message
+            echo "host=$(printf '%s' "$host" | tr -cd '[:alnum:] .,&@()'"'"'-' | cut -c1-80)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Capture it
+        id: add
+        env:
+          SLUG: ${{ steps.req.outputs.slug }}
+          DATE: ${{ steps.req.outputs.date }}
+          HOST: ${{ steps.req.outputs.host }}
+        run: |
+          set -o pipefail
+          args=(add "$SLUG")
+          if [ -n "$DATE" ]; then args+=(--date "$DATE"); fi
+          if [ -n "$HOST" ]; then args+=(--host "$HOST"); fi
+          node tools/archive.mjs "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/add.txt"
+          name=$(node -e 'const t=require("./app/archive/index.json").tournaments.find(t=>t.slug===process.argv[1]);console.log(t.name)' "$SLUG")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      # Ubuntu 24.04 keeps Chrome's sandbox from starting; the UI golden
+      # needs headless Chrome
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Golden entries and changelog
+        env:
+          SLUG: ${{ steps.req.outputs.slug }}
+          NAME: ${{ steps.add.outputs.name }}
+        run: |
+          CHROME=$(command -v google-chrome) node tools/archive_goldens.mjs "$SLUG"
+          node tools/changelog_add.mjs ARCHIVE "Added $NAME."
+
+      - run: npm test
+
+      - name: Commit and push
+        env:
+          SLUG: ${{ steps.req.outputs.slug }}
+          NAME: ${{ steps.add.outputs.name }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add app/archive app/changelog.txt tests/golden
+          git commit -q -F - <<EOF
+          Archive: $NAME
+
+          Approved by @$AUTHOR in #$ISSUE.
+          EOF
+          git push -q origin HEAD:main
+          gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" >/dev/null || echo "Pages build not requested"
+          {
+            echo "Archived as $(git rev-parse --short HEAD). It shows on the archive page once Pages deploys."
+            echo
+            echo '```'
+            grep -v -i -E 'wrangler|unsafe' "$RUNNER_TEMP/add.txt" | sed '/^[[:space:]]*$/d'
+            echo '```'
+          } > "$RUNNER_TEMP/done.md"
+          gh issue close "$ISSUE" -R "$GITHUB_REPOSITORY" -c "$(cat "$RUNNER_TEMP/done.md")"
+
+      - name: Say why it failed
+        # the first two steps say why themselves
+        if: failure() && steps.req.outcome == 'success'
+        run: |
+          gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" \
+            -b "Archiving failed; nothing was pushed. Log: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID — fix it and reopen this issue to try again."

@@ -224,8 +224,9 @@ ok('it says the tournament finished',
   embed(done).title === 'Alert E2E' && status(done) === 'Status: Finished', titles());
 ok('it counts rooms, games and rounds',
   embed(done).description.includes('2 rooms, 2 games, 1 round'), embed(done).description);
-ok('it gives the archive command',
-  embed(done).description.includes('node tools/archive.mjs add ' + slug), embed(done).description);
+ok('it says how to archive it',
+  embed(done).description.includes('node tools/archive.mjs add ' + slug)
+    || embed(done).description.includes(encodeURIComponent('slug: ' + slug)), embed(done).description);
 ok('the tournament is marked wrapped',
   d1row(`SELECT wrapped FROM tournaments WHERE id = ${tid}`).wrapped === 1);
 await hourly();
