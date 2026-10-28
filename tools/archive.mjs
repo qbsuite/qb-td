@@ -136,11 +136,12 @@ export function captureProblems(state, bundle) {
       + 'refresh once the cron has caught up');
   }
   // scoresheets wait on buzz_done, which a capture empties: the archived
-  // page would show a Scoresheets switch that never opens. A tournament
-  // whose TD released the questions (buzz_v 'open') keeps them, text and all.
+  // page would show a Scoresheets switch that never opens. capture()
+  // switches them off unless the TD released the questions (buzz_v
+  // 'open'), so this only catches a capture written before it did.
   if (state.scoresheets && state.buzz_v !== 'open') {
     problems.push('scoresheets are on, and an archived page can never open them; '
-      + 'turn Scoresheets off in the hub, then refresh');
+      + 'refresh the capture');
   }
   return problems;
 }
@@ -167,18 +168,21 @@ async function capture(api, slug) {
     state.roster ? getOptional(api, `/pub/${slug}/roster`) : null,
   ]);
 
-  // The buzzpoints tab reads packet text through a password-gated route.
-  // That can't be archived and shouldn't be, so switch the tab off rather
-  // than leave it rendering empty questions — unless the TD released the
-  // questions (Disable password: buzz_v 'open'), in which case the text
-  // the public page already serves to anyone is kept (captureTexts).
+  // The buzzpoints tab and scoresheets read packet text through a
+  // password-gated route. That can't be archived and shouldn't be, so
+  // switch both off rather than leave them rendering empty questions —
+  // unless the TD released the questions (Disable password: buzz_v
+  // 'open'), in which case the text the public page already serves to
+  // anyone is kept (captureTexts).
   // The GitHub snapshot pointer (pub) is dropped as well: the capture IS
   // the complete data, and the snapshot repo may prune old slugs — the
   // page also guards against this (usingStaticData), belt and braces.
   const open = state.buzz_v === 'open';
   const data = {
     [`/pub/${slug}`]: {
-      ...state, ...(open ? {} : { buzz: null, buzz_v: null, buzz_done: [], packet_rounds: [] }), pub: null,
+      ...state,
+      ...(open ? {} : { buzz: null, buzz_v: null, buzz_done: [], packet_rounds: [], scoresheets: false }),
+      pub: null,
       // No `rounds`: the capture holds every game in one bundle, which is
       // what the page falls back to when nothing advertises shards.
       rounds: undefined,

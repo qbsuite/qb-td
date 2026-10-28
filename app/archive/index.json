@@ -1,6 +1,24 @@
 {
   "tournaments": [
     {
+      "slug": "2026-penn-bowl-at-stanford",
+      "name": "2026 Penn Bowl at Stanford",
+      "date": "2026-10-24",
+      "host": "Stanford",
+      "teams": 6,
+      "rounds": 10,
+      "games": 30
+    },
+    {
+      "slug": "socal-penn-bowl",
+      "name": "SoCal Penn Bowl",
+      "date": "2026-10-24",
+      "host": "",
+      "teams": 6,
+      "rounds": 10,
+      "games": 30
+    },
+    {
       "slug": "acf-fall-uiuc",
       "name": "ACF Fall @ UIUC",
       "date": "2026-10-17",

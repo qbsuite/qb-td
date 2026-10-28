@@ -1662,7 +1662,9 @@ page serves buzzpoints and scoresheets to anyone) keeps them in its archive.
 the public routes serve them, to `app/archive/packets/<slug>/`, and the
 capture lists those files under `__text`; the archived page fetches one
 only when a viewer opens buzzpoints or a scoresheet. Every other capture
-still carries no question text, which `npm test` checks.
+still carries no question text, which `npm test` checks, and has its
+buzzpoints and scoresheets switched off, since an archived page could
+never open them.
 
 The gate is deliberately outside the Worker. An `archived` column plus an
 owner-only route would mean the first real account in a system whose whole
@@ -1677,8 +1679,7 @@ downloads, and `archive.html` imports only the one capture being viewed.
 since that would mean packet text leaking into a file about to be
 committed and served forever. It warns, and still writes, when the round
 shards lack a game the public state lists (refresh once the cron has
-caught up) or when scoresheets are on (an archived page can never open
-them). `run_tests.js` re-runs all of these checks on what actually got
+caught up). `run_tests.js` re-runs all of these checks on what actually got
 committed, along with manifest-to-capture agreement.
 
 ## YellowFruit fidelity

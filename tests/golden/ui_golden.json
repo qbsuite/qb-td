@@ -925,6 +925,226 @@
    ],
    "foreign": []
   },
+  "archive 2026-penn-bowl-at-stanford": {
+   "header": "2026 Penn Bowl at Stanford",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "ff10b1d7f379b0f061f38af1",
+      "chars": 11675
+     },
+     "schedview=all": {
+      "sha256": "ff10b1d7f379b0f061f38af1",
+      "chars": 11675
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "6ff37b6d33541e9e541c7074",
+      "chars": 464733
+     },
+     "layout=classic": {
+      "sha256": "f360d530aff1b9350d566425",
+      "chars": 464793
+     },
+     "layout=new": {
+      "sha256": "b0689e873283e4b266e0d57a",
+      "chars": 6858
+     },
+     "new/standings": {
+      "sha256": "b0689e873283e4b266e0d57a",
+      "chars": 6858
+     },
+     "new/individuals": {
+      "sha256": "b06c3e18ce067954d7f41c00",
+      "chars": 11310
+     },
+     "new/games": {
+      "sha256": "29a98a37a6e6cf5e00f2199b",
+      "chars": 51191
+     },
+     "new/teams": {
+      "sha256": "2c5fc595d937c086833ffc89",
+      "chars": 27344
+     },
+     "new/players": {
+      "sha256": "95069c5110e8617e5c62d468",
+      "chars": 57726
+     },
+     "new/rounds": {
+      "sha256": "22662c0939ad1cbb7fa4540c",
+      "chars": 2979
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "11a08c52cc530ae46c6cc4ed",
+      "chars": 6750
+     },
+     "catview=cat": {
+      "sha256": "11a08c52cc530ae46c6cc4ed",
+      "chars": 6750
+     },
+     "catview=team": {
+      "sha256": "958f4dc9bfcc334f6b0ab00d",
+      "chars": 2992
+     },
+     "catview=player": {
+      "sha256": "c60b568c4a71b90b2a059c64",
+      "chars": 3697
+     },
+     "catview=questions": {
+      "sha256": "4f9b81f82475ee7bc0478894",
+      "chars": 14209
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/2026-penn-bowl-at-stanford.js",
+    "/archive/index.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
+  "archive socal-penn-bowl": {
+   "header": "SoCal Penn Bowl",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "93df973fbd93bd11505582be",
+      "chars": 19840
+     },
+     "schedview=all": {
+      "sha256": "93df973fbd93bd11505582be",
+      "chars": 19840
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "5c1f5d3d61bc9884e823bddc",
+      "chars": 526556
+     },
+     "layout=classic": {
+      "sha256": "94837b6350cbd43c04d5d3b7",
+      "chars": 526616
+     },
+     "layout=new": {
+      "sha256": "cd34faa55a528ec97b00c771",
+      "chars": 3988
+     },
+     "new/standings": {
+      "sha256": "cd34faa55a528ec97b00c771",
+      "chars": 3988
+     },
+     "new/individuals": {
+      "sha256": "cf658c494812995ae333d190",
+      "chars": 14273
+     },
+     "new/games": {
+      "sha256": "38604739d6b0ae1a2cb8dc1c",
+      "chars": 113198
+     },
+     "new/teams": {
+      "sha256": "b0154735fa4af26d7d783a19",
+      "chars": 42335
+     },
+     "new/players": {
+      "sha256": "20a8e333e904dcb8f351d5cc",
+      "chars": 119772
+     },
+     "new/rounds": {
+      "sha256": "9931463b6fbe93f44ee513da",
+      "chars": 4138
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "7d6d40199f5b61027f724903",
+      "chars": 8111
+     },
+     "catview=cat": {
+      "sha256": "7d6d40199f5b61027f724903",
+      "chars": 8111
+     },
+     "catview=team": {
+      "sha256": "5b2cb3650e7d57a17851bcbe",
+      "chars": 3101
+     },
+     "catview=player": {
+      "sha256": "7bf04794228ed8b3cd3753da",
+      "chars": 4081
+     },
+     "catview=questions": {
+      "sha256": "cfda47863e1aecd715efb295",
+      "chars": 14199
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/index.json",
+    "/archive/socal-penn-bowl.js",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive acf-fall-uiuc": {
    "header": "ACF Fall @ UIUC",
    "tabs": {
