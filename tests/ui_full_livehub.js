@@ -756,7 +756,7 @@ section('setup', '01 02 03 04 06 07 10 27 28 52: the setup flow, the header and 
   await pg.click('#livestart');
   await until(() => pg.dialogs.length > asked, 'the Start question');
   await check('06 start: the question says when every link stops working', () =>
-    /^Start the tournament\?\n\nRoom links start serving packets and taking games\. Your admin link and every room link stop working 48 hours from now, at .+\.$/
+    /^Start the tournament\?\n\nRoom links start serving packets and taking games\. Your admin link and every room link stop working 72 hours from now, at .+\.$/
       .test(pg.dialogs[asked]) || pg.dialogs[asked]);
   await check('06 start: Cancel starts nothing', async () => !(await T.detail()).tournament.started && (await pg.exists('#livestart')));
   pg.answers.push(true);
@@ -819,10 +819,10 @@ section('setup', '01 02 03 04 06 07 10 27 28 52: the setup flow, the header and 
 
   if (PERSIST) {
     // 52: a closed tournament
-    d1(`UPDATE tournaments SET started = ${Date.now() - 49 * 3600 * 1000} WHERE id = ${d.tournament.id}`);
+    d1(`UPDATE tournaments SET started = ${Date.now() - 73 * 3600 * 1000} WHERE id = ${d.tournament.id}`);
     await pg.goto(T.hub());
-    await check('52 closed: a tournament past its 48 hours says so, with only All tournaments', async () => {
-      await msgIs(pg, 'Tournament closed (links stop working 48 hours after Start, or 7 days after creation if it never started)', true);
+    await check('52 closed: a tournament past its 72 hours says so, with only All tournaments', async () => {
+      await msgIs(pg, 'Tournament closed (links stop working 72 hours after Start, or 7 days after creation if it never started)', true);
       return (await pg.js(`[...document.querySelectorAll('#view a')].map((a) => a.textContent).join('|')`)) === 'All tournaments';
     });
     await dismiss(pg);

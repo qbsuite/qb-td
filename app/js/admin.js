@@ -1,12 +1,12 @@
 // admin.js — the TO dashboard (index.html). No login: the admin link
-// (index.html?a=<secret>, minted at creation, expires 48h later) is the
+// (index.html?a=<secret>, minted at creation, expires 72h later) is the
 // only credential. Tournaments this device created or opened are
 // remembered in localStorage so the list view survives a closed tab —
 // but the link itself is the source of truth.
 //
 // A third way in: index.html?i=<invite>. A question set's editor mints
 // one invite per mirror (set.html); opening it here shows what it is and
-// starts it — which creates an ordinary tournament, 48h clock and all,
+// starts it — which creates an ordinary tournament, 72h clock and all,
 // with the set's rounds already in place (showInvite).
 //
 // The dashboard is two views. Tournament Setup is the before-the-day
@@ -225,7 +225,7 @@ function showList() {
 /* ---------- starting a mirror from an invite ----------
    The invite is not the tournament: nothing exists until the TD creates
    it here, and then it is an ordinary tournament — a week of setup, and
-   48 hours from the moment its TD presses Start. */
+   72 hours from the moment its TD presses Start. */
 
 async function showInvite() {
   let inv;
@@ -253,7 +253,7 @@ async function showInvite() {
         game files (MODAQ&rsquo;s included), is shared with the set&rsquo;s editors for set-wide stats.</div>
     </div>
     <p style="margin:12px 0"><b>Creating the tournament gives you a week to set it up.</b>
-      The 48-hour clock only starts when you press <b>Start tournament</b> in its setup, on the day;
+      The 72-hour clock only starts when you press <b>Start tournament</b> in its setup, on the day;
       until then room links show &ldquo;Tournament hasn&rsquo;t started&rdquo;. This invite can be used once.
       Already made your tournament? Don&rsquo;t create a second one: open it, and paste this page&rsquo;s link
       under Tournament Setup &rarr; Packets &rarr; Join a set.</p>
@@ -369,7 +369,7 @@ async function showDetail(quiet = false, held = null) {
   } catch (e) {
     if (quiet && e.message !== 'tournament closed') return;
     if (e.message === 'tournament closed') {
-      say('Tournament closed (links stop working 48 hours after Start, or 7 days after creation if it never started)', true);
+      say('Tournament closed (links stop working 72 hours after Start, or 7 days after creation if it never started)', true);
     } else say(e.message, true);
     view.innerHTML = `<div class="row"><a href="index.html">All tournaments</a></div>`;
     return;
@@ -494,11 +494,11 @@ function setupSteps(t, buckets, rounds, settings) {
   ];
 }
 
-// Start: rooms begin serving packets, and every link closes 48 hours on.
+// Start: rooms begin serving packets, and every link closes 72 hours on.
 async function startTournament(a, t, btn) {
-  const closes = new Date(Date.now() + 48 * 3600 * 1000).toLocaleString();
+  const closes = new Date(Date.now() + 72 * 3600 * 1000).toLocaleString();
   if (!confirm('Start the tournament?\n\nRoom links start serving packets and taking games. '
-    + `Your admin link and every room link stop working 48 hours from now, at ${closes}.`)) return;
+    + `Your admin link and every room link stop working 72 hours from now, at ${closes}.`)) return;
   const run = btn ? busy(btn, { label: 'Starting' }) : null;
   try {
     const out = await pub(a + '/start', { method: 'POST' });
@@ -592,7 +592,7 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
           ${t.started
             ? `<div><b>Started</b></div><div class="muted" style="font-size:13px">Links close ${esc(fmtWhen(t.closes))}</div>`
             : `<button id="starttour" class="primary">Start tournament</button>
-               <div class="muted" style="font-size:12px">Room links open for 48 hours from Start.</div>`}
+               <div class="muted" style="font-size:12px">Room links open for 72 hours from Start.</div>`}
         </div>
       </aside>
       <div id="setupsec"></div>

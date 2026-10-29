@@ -15,7 +15,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   works for a **week of setup** from creation; when the TD presses
   **Start tournament** (the last item of the setup checklist, or the
   "Not started" banner on the Live Hub, behind a confirmation), it and
-  every room link work for **48 hours from then** — replacing whatever
+  every room link work for **72 hours from then** — replacing whatever
   the week had left, earlier or later — and until then room links show
   "Tournament hasn't started" and serve nothing. (Setup's Rooms step has
   a **Test** link per room for the TD: the room link plus a test token,
@@ -229,7 +229,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   format are uploaded once; each mirror gets an **invite link** the
   editor can send weeks ahead, and the TD who opens it
   (`index.html?i=<invite>`) creates an ordinary tournament — a week of
-  setup, and 48 hours from its own Start on the day — with the
+  setup, and 72 hours from its own Start on the day — with the
   packets, the backup questions and the format already in place (or
   pastes it into a tournament they already made). Which round reads
   which packet stays the TD's choice. The games every mirror collects
@@ -260,7 +260,7 @@ have already made (Tournament Setup → Packets → Join a set, which fills
 the rounds still empty and leaves their own packets alone). Editors can
 line mirrors up as early as they like, and the question-security story
 of a running tournament (room links serve nothing before Start, and
-every link is dead 48 h after it) is exactly what it was. An invite can start the mirror and therefore read the packets,
+every link is dead 72 h after it) is exactly what it was. An invite can start the mirror and therefore read the packets,
 so it should travel the way the packets themselves would; the set
 dashboard shows which invites are still unused, and revokes them.
 
@@ -404,7 +404,7 @@ dashboard shows which invites are still unused, and revokes them.
   link secrets: 20 chars from a 31-char alphabet (~99 bits) via
   `crypto.getRandomValues`; wrong secrets 404 uniformly. Tournament
   creation is open, rate-limited per IP.
-- **Links die 48 hours after Start** (`closesAt` in `worker.js`), or a
+- **Links die 72 hours after Start** (`closesAt` in `worker.js`), or a
   week after creation if the tournament is never started. The admin link
   then answers 410 "tournament closed" and every room link "room closed":
   rooms share the tournament's deadline instead of keeping their own. A
@@ -509,7 +509,7 @@ dashboard shows which invites are still unused, and revokes them.
   and the 2 MB MODAQ bundle is a static asset on GitHub Pages, off
   Cloudflare entirely.
 - **Finished tournaments stop costing anything.** Every write path — the
-  admin link and every room — closes at the same moment (48 h after
+  admin link and every room — closes at the same moment (72 h after
   Start, or a week after creation without one), so nothing can change
   after it (`closesAt` in `worker.js`) — the data is provably frozen,
   with no cron to say so. Past that point
@@ -555,7 +555,7 @@ dashboard shows which invites are still unused, and revokes them.
   shared with the hub, turns MODAQ's game state into the protest list
   the upload carries and builds the hub's Protests drawer from it).
 - `worker/` — Cloudflare Worker (D1 metadata + R2 blobs). Auth model:
-  admin link secret for the TO API (a week of setup, 48h from Start), bucket secret for
+  admin link secret for the TO API (a week of setup, 72h from Start), bucket secret for
   moderator routes, publish flag gating all public reads. No auth secrets
   to provision; the one secret a deploy must set is `OPEN_KEY_SECRET`
   (see "Buzzpoints password").
@@ -1175,7 +1175,8 @@ instance now and, under them, the ones that have run on it.
 **Live now** is automatic, and decided by use, never by a tournament
 merely existing — so the rows people make to see what the thing does stay
 out. A tournament is listed once it has started and two rooms have each
-uploaded a game, and drops off when its links close. It is linked while
+uploaded a game, and drops off 48 hours after Start (`LIVE_LIST_TTL`),
+a day before its links close. It is linked while
 its TD has the public page on; with it off it is still listed, by name
 only, in grey. That is a choice this instance makes for every TD:
 switching the public page off hides the results, not the fact that the
@@ -1236,7 +1237,7 @@ the title, a `Status:` line, and a **Player page** button — which follows it:
   created. Title, slug, and a link to the public page. (A new question
   set gets a plain message of its own.)
 - **Started** — the TD pressed Start tournament: setup is over and the
-  48-hour clock is running.
+  72-hour clock is running.
 - **Finished** — its links have closed: rooms, games and rounds, and,
   when there is something to archive, an **Archive it** button (see
   "Archiving a tournament"), or the `tools/archive.mjs add` command with

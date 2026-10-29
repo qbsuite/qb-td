@@ -171,7 +171,7 @@ const A = '/a/' + r.body.admin_secret;
 const tid = r.body.id;
 // ...and its rooms serve nothing until its TD presses Start
 r = await call(A + '/start', { method: 'POST' });
-ok('start the mirror tournament', r.status === 200 && r.body.closes === r.body.started + 48 * 3600 * 1000, r.body);
+ok('start the mirror tournament', r.status === 200 && r.body.closes === r.body.started + 72 * 3600 * 1000, r.body);
 const mirrorStarted = r.body.started;
 // a mirror starts public like any tournament; this one's TD turns its page off
 ok('a mirror starts public', (await call(A)).body.tournament.published === 1);
@@ -418,7 +418,7 @@ ok('retired versions are kept, flagged',
   r.body.packets.filter((x) => x.packet === 2).length === 3
   && r.body.packets.filter((x) => x.packet === 2).every((x) => x.retired === 1), r.body.packets);
 ok('editor sees how long each mirror can still change',
-  r.body.mirrors[0].tournament.final === mirrorStarted + 48 * 3600 * 1000
+  r.body.mirrors[0].tournament.final === mirrorStarted + 72 * 3600 * 1000
   && r.body.mirrors[0].tournament.started === mirrorStarted, r.body.mirrors[0].tournament);
 await tick();
 r = await call(S + '/state');

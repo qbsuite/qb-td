@@ -150,7 +150,7 @@ function bucketState(room) {
     tournament: fixture.name,
     room: roomName,
     current_round: currentRound(),
-    closes: Date.now() + 48 * 3600 * 1000,
+    closes: Date.now() + 72 * 3600 * 1000,
     packet: packetRounds().includes(currentRound())
       ? { number: currentRound(), packet_name: packetName(currentRound()) } : null,
     packets: packetRounds().map((n) => ({ number: n, packet_name: packetName(n) })),
@@ -272,7 +272,7 @@ function adminDetail() {
       roster_name: 'roster.qbj',
       created,
       started: created, // the demo is always mid-tournament
-      closes: created + 48 * 3600 * 1000,
+      closes: created + 72 * 3600 * 1000,
     },
     buckets: Object.entries(SECRETS).map(([secret, i]) => ({
       id: i + 1, room_name: fixture.rooms[i], secret, created,

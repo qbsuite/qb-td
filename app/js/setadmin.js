@@ -10,7 +10,7 @@
 // question the set has held (qmatch.js), so buzzpoints follow a question
 // through rewording and repacketizing — and the editor is told what the
 // upload changed. Mirrors is one row per site: an invite link to send
-// its TD until they use it (starting a tournament on the usual 48h
+// its TD until they use it (starting a tournament on the usual 72h
 // clock, or joining one they already made), then the tournament's
 // progress and its game files. Stats is setview.js — the same
 // view the public set page shows, read through the set link, so it works
@@ -655,7 +655,7 @@ function renderMirrors() {
     </div>
     <div class="muted" style="font-size:13px;margin-top:6px">
       Send the invite link to the mirror&rsquo;s director whenever you like: nothing exists until they
-      press Start, which creates their tournament on qb-td&rsquo;s usual 48-hour clock with
+      press Start, which creates their tournament on qb-td&rsquo;s usual 72-hour clock with
       ${rounds ? `these ${rounds} packets` : 'the set&rsquo;s packets'}, the backup questions and the game format
       in place — or, if they have already made their tournament, they paste the invite into it to join the set.
       An invite is used once, and can be revoked until then. Anyone holding one can start a mirror and read

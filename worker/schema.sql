@@ -3,7 +3,7 @@
 
 -- No accounts: the unguessable admin_secret in the TO's link is the only
 -- credential. It works for a week of setup from creation, and stops
--- working 48h after the TD presses Start (worker.js SETUP_TTL, RUN_TTL,
+-- working 72h after the TD presses Start (worker.js SETUP_TTL, RUN_TTL,
 -- closesAt).
 --
 -- Question-text encryption (worker.js "question text encryption"): rows
@@ -150,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_files_bucket ON files(bucket_id);
 
 -- Question sets (worker.js "question sets"): a set editor uploads the
 -- packets once and hands each mirror's TD an invite; starting the invite
--- creates an ordinary 48h tournament whose rounds point at the set's
+-- creates an ordinary 72h tournament whose rounds point at the set's
 -- packets. Same credential idiom as tournaments — admin_secret holds the
 -- hash, admin_wrap the set's content key wrapped under the link secret —
 -- but the link lives a year (SET_TTL), because a set is mirrored for a

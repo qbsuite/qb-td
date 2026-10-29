@@ -51,7 +51,7 @@ d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
 const slug = 'e2e-' + Math.random().toString(36).slice(2, 8);
 r = await call('/api/tournaments', { method: 'POST', json: { name: 'E2E Open', slug } });
 ok('create tournament', r.status === 200 && r.body.id > 0 && r.body.admin_secret.length >= 10, r.body);
-// a week of setup; the 48h only starts when the TD presses Start
+// a week of setup; the 72h only starts when the TD presses Start
 ok('creation reports a week of setup',
   r.body.closes > Date.now() + (7 * 24 - 1) * 3600 * 1000 && r.body.closes < Date.now() + (7 * 24 + 1) * 3600 * 1000,
   r.body.closes);
@@ -177,16 +177,16 @@ r = await call(A);
 ok('detail before Start: not started, a week of setup',
   !r.body.tournament.started && r.body.tournament.closes > Date.now() + 6 * 24 * 3600 * 1000, r.body.tournament);
 
-// Start: every link now closes 48h from here, replacing the setup clock
+// Start: every link now closes 72h from here, replacing the setup clock
 r = await call(A + '/start', { method: 'POST' });
 ok('start the tournament', r.status === 200 && r.body.started > 0
-  && r.body.closes === r.body.started + 48 * 3600 * 1000, r.body);
+  && r.body.closes === r.body.started + 72 * 3600 * 1000, r.body);
 const startedAt = r.body.started;
 r = await call(A + '/start', { method: 'POST' });
 ok('starting twice is refused', r.status === 409, r.body);
 r = await call(A);
-ok('detail after Start: closes 48h from Start',
-  r.body.tournament.started === startedAt && r.body.tournament.closes === startedAt + 48 * 3600 * 1000,
+ok('detail after Start: closes 72h from Start',
+  r.body.tournament.started === startedAt && r.body.tournament.closes === startedAt + 72 * 3600 * 1000,
   r.body.tournament);
 
 // The bye room (settings.byeRoom): the one room kept for reading to teams
@@ -1252,7 +1252,7 @@ ok('a view was enough to get it rebuilt', Object.keys(r.body.rounds).length > 0,
   ok('replacements shut while the tournament runs', res.status === 403
     && (await res.json()).error === 'tournament not closed yet');
   const startedAt = d1row(`SELECT started FROM tournaments WHERE slug = '${slug}'`).started;
-  d1exec(`UPDATE tournaments SET started = ${Date.now() - 49 * 3600 * 1000} WHERE slug = '${slug}'`);
+  d1exec(`UPDATE tournaments SET started = ${Date.now() - 73 * 3600 * 1000} WHERE slug = '${slug}'`);
   res = await qtb();
   const read = res.status === 200 ? await res.json() : null;
   ok('replacements open once closed, read questions only',
@@ -1536,8 +1536,8 @@ ok('new admin link works', r.status === 200 && r.body.tournament.slug === slug);
 
 // bucket state carries lifetime info: the tournament's own deadline
 r = await call('/b/' + secret);
-ok('bucket closes with the tournament, 48h from Start',
-  r.body.closes === startedAt + 48 * 3600 * 1000, r.body.closes);
+ok('bucket closes with the tournament, 72h from Start',
+  r.body.closes === startedAt + 72 * 3600 * 1000, r.body.closes);
 ok('bucket upload count', r.body.upload_count === 7, r.body.upload_count);
 r = await call(`${A}/buckets/1/reopen`, { method: 'POST' });
 ok('rooms no longer reopen on their own clock', r.status === 404, r.status);
@@ -1643,9 +1643,9 @@ r = await call(A + '/buckets', { method: 'POST', json: { room_name: 'Room 9' } }
 const lateRoom = r.body.secret;
 ok('room made after Start works at once', (await call('/b/' + lateRoom)).status === 200);
 
-// 48h after Start everything closes together: the admin link and every
+// 72h after Start everything closes together: the admin link and every
 // room — rooms no longer keep a clock of their own
-d1exec(`UPDATE tournaments SET started = ${Date.now() - 49 * 3600 * 1000} WHERE slug = '${slug}'`);
+d1exec(`UPDATE tournaments SET started = ${Date.now() - 73 * 3600 * 1000} WHERE slug = '${slug}'`);
 r = await call(A);
 ok('expired admin link 410', r.status === 410 && r.body.error === 'tournament closed', r);
 r = await call(A + '/rotate', { method: 'POST' });
@@ -1684,14 +1684,14 @@ ok('final round shards cache for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.ca
   ok('never started: closed after a week of setup', (await call(idle.A2)).status === 410);
   // started on day 4: closes on day 6, days before setup would have ended
   const early = await make('early');
-  d1exec(`UPDATE tournaments SET created = ${now - 4 * day}, started = ${now - 49 * 3600 * 1000} WHERE slug = '${early.sl}'`);
-  ok('started on day 4: closed 48h later despite setup time left', (await call(early.A2)).status === 410);
-  // started at the end of setup: runs 48h past the week
+  d1exec(`UPDATE tournaments SET created = ${now - 4 * day}, started = ${now - 73 * 3600 * 1000} WHERE slug = '${early.sl}'`);
+  ok('started on day 4: closed 72h later despite setup time left', (await call(early.A2)).status === 410);
+  // started at the end of setup: runs 72h past the week
   const late = await make('late');
   d1exec(`UPDATE tournaments SET created = ${now - 8 * day}, started = ${now - 3600 * 1000} WHERE slug = '${late.sl}'`);
   r = await call(late.A2);
-  ok('started late in setup: open 48h from Start, past the week',
-    r.status === 200 && r.body.tournament.closes === now - 3600 * 1000 + 48 * 3600 * 1000, r.body);
+  ok('started late in setup: open 72h from Start, past the week',
+    r.status === 200 && r.body.tournament.closes === now - 3600 * 1000 + 72 * 3600 * 1000, r.body);
 }
 
 summary('e2e');

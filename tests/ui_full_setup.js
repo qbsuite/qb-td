@@ -671,8 +671,8 @@ await runSection('HOME', async () => {
     [d.tournament.created, d.tournament.closes]);
   // the box says what the link is for, with Copy link beside it and OK under it
   const boxText = (await text('#linkmodal p')).replace(/\s+/g, ' ').trim();
-  ok('HOME-05 modal: says the link works across devices, the seven days, and the 48 hours [changed: The Save this link box is shorter, with Copy link beside the link and an OK button.]',
-    boxText === 'This link works across devices. You will have seven days to set the tournament up and press Start tournament, which will open room links for 48 hours. Export stats and files before they close.', boxText);
+  ok('HOME-05 modal: says the link works across devices, the seven days, and the 72 hours [changed: The Save this link box is shorter, with Copy link beside the link and an OK button.]',
+    boxText === 'This link works across devices. You will have seven days to set the tournament up and press Start tournament, which will open room links for 72 hours. Export stats and files before they close.', boxText);
   ok('HOME-05 modal: Copy link sits beside the link, and OK at the bottom', await js(`(() => {
     const row = document.querySelector('#linkmodal .linkrow');
     const btns = [...document.querySelectorAll('#linkmodal .modalbtns button')].map((b) => b.textContent + (b.classList.contains('primary') ? '*' : ''));
@@ -840,8 +840,8 @@ await runSection('INVITE', async () => {
   {
     const t = await text('#view');
     ok('INV-01 invite: the packet count and what comes with it', t.includes('2 packets, the set’s backup questions and the reader’s game format come with it'), t);
-    ok('INV-01 invite: explains the week of setup, the 48 hours, and that it works once',
-      t.includes('Creating the tournament gives you a week to set it up.') && t.includes('The 48-hour clock only starts when you press Start tournament')
+    ok('INV-01 invite: explains the week of setup, the 72 hours, and that it works once',
+      t.includes('Creating the tournament gives you a week to set it up.') && t.includes('The 72-hour clock only starts when you press Start tournament')
         && t.includes('This invite can be used once.'), t);
   }
   ok('INV-01 invite: Name and URL name come filled in', (await js(`document.querySelector('#invname').value`)) === 'Suite Mirror'
@@ -876,7 +876,7 @@ await runSection('INVITE', async () => {
   {
     const md = await detail(MIRROR);
     ok('INV-01 invite: the modal is the same box, for the mirror\'s new tournament', !!md.tournament
-      && (await text('#linkmodal p')).replace(/\s+/g, ' ').trim() === 'This link works across devices. You will have seven days to set the tournament up and press Start tournament, which will open room links for 48 hours. Export stats and files before they close.');
+      && (await text('#linkmodal p')).replace(/\s+/g, ' ').trim() === 'This link works across devices. You will have seven days to set the tournament up and press Start tournament, which will open room links for 72 hours. Export stats and files before they close.');
   }
   ok('INV-01 invite: the mirror joins this device\'s list', await js(`(() => {
     const l = JSON.parse(localStorage.getItem('qbtdAdminLinks') || '[]');
@@ -1768,10 +1768,10 @@ await runSection('START', async () => {
   const startPosts = () => reqCount((r) => r.method === 'POST' && pathOf(r.url) === `${T1.A}/start`);
   const t0 = Date.now();
   let asked = await withDialogs([false], () => click('#starttour'));
-  const m = /^Start the tournament\?\n\nRoom links start serving packets and taking games\. Your admin link and every room link stop working 48 hours from now, at (.+)\.$/.exec(asked[0] || '');
+  const m = /^Start the tournament\?\n\nRoom links start serving packets and taking games\. Your admin link and every room link stop working 72 hours from now, at (.+)\.$/.exec(asked[0] || '');
   const at = m ? await js(`Date.parse(${q(m[1])})`) : NaN;
-  ok('START-01 start: the question says links start serving packets and close 48 hours from now, at <time>',
-    !!m && Math.abs(at - (t0 + 48 * 3600 * 1000)) < 5 * 60 * 1000, asked[0]);
+  ok('START-01 start: the question says links start serving packets and close 72 hours from now, at <time>',
+    !!m && Math.abs(at - (t0 + 72 * 3600 * 1000)) < 5 * 60 * 1000, asked[0]);
   ok('START-01 start: Cancel does nothing', startPosts() === 0 && !(await detail(T1)).tournament.started && await exists('#starttour'));
   // START-02 from the Live banner
   await click('[data-view="live"]');
@@ -1966,7 +1966,7 @@ await runSection('ROOM CAP + FAILURES', async () => {
 /* ================= HUB-01 closed tournaments and bad links ================= */
 
 await runSection('CLOSED + BAD LINKS', async () => {
-  const closedText = 'Tournament closed (links stop working 48 hours after Start, or 7 days after creation if it never started)';
+  const closedText = 'Tournament closed (links stop working 72 hours after Start, or 7 days after creation if it never started)';
   const TC = await apiTournament('Closed Setup Open');
   d1(`UPDATE tournaments SET created = created - ${8 * DAY} WHERE slug = '${TC.slug}'`);
   await goto(adminUrl(TC.secret));
@@ -1974,9 +1974,9 @@ await runSection('CLOSED + BAD LINKS', async () => {
   ok('HUB-01 load: with an All tournaments link', await js(`[...document.querySelectorAll('#view a')].some((a) => a.textContent === 'All tournaments' && a.getAttribute('href') === 'index.html')`));
   const TR = await apiTournament('Closed Run Open');
   await call(`${TR.A}/start`, { method: 'POST' });
-  d1(`UPDATE tournaments SET started = started - ${49 * 3600 * 1000} WHERE slug = '${TR.slug}'`);
+  d1(`UPDATE tournaments SET started = started - ${73 * 3600 * 1000} WHERE slug = '${TR.slug}'`);
   await goto(adminUrl(TR.secret));
-  await check('HUB-01 load: 48 hours after Start: the same "Tournament closed (…)"', () => sayIs(closedText, true));
+  await check('HUB-01 load: 72 hours after Start: the same "Tournament closed (…)"', () => sayIs(closedText, true));
   await goto(adminUrl('abcdefghjkmnpqrstuvw'));
   await check('HUB-01 load: a bad link shows the Worker\'s "bad link"', () => sayIs('bad link', true));
   ok('HUB-01 load: with an All tournaments link (bad link)', await js(`[...document.querySelectorAll('#view a')].some((a) => a.textContent === 'All tournaments')`));

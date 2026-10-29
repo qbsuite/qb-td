@@ -1,3 +1,8 @@
+Release Notes for 10/29/2026
+
+[ HUB ]
+- Links stay open 72 hours after Start, up from 48, so stats can be fixed the next day.
+
 Release Notes for 10/28/2026
 
 [ ARCHIVE ]

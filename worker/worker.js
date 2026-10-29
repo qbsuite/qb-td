@@ -5,7 +5,7 @@
 // keyed by unguessable link secrets:
 //   /a/*    — the TO's admin API. The admin_secret minted at tournament
 //             creation is the only credential; it works for a week of
-//             setup, and 48h once the TD starts the tournament (closesAt).
+//             setup, and 72h once the TD starts the tournament (closesAt).
 //             Creation itself (POST /api/tournaments) is open,
 //             rate-limited per IP.
 //   /b/*    — the moderator bucket API. The bucket secret in the URL is
@@ -51,7 +51,10 @@ import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, follo
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
 
 const SETUP_TTL = 7 * 24 * 3600 * 1000;
-const RUN_TTL = 48 * 3600 * 1000;
+const RUN_TTL = 72 * 3600 * 1000;
+// How long a started tournament shows under "Live now" (the directory):
+// the event itself, not the extra day its links stay open for fixes.
+const LIVE_LIST_TTL = 48 * 3600 * 1000;
 // The latest any tournament can still be open: started at the last
 // moment of setup. Queries for "tournaments that might be open" use it.
 const MAX_LIFE = SETUP_TTL + RUN_TTL;
@@ -89,7 +92,7 @@ const MAX_RULING_NOTE = 300;
 const MAX_RULINGS_JSON = 64 * 1024;
 // A set is mirrored for a season, not played in a day: its editor link
 // lives a year. What it guards is the packets and the power to mint
-// mirrors; every mirror it starts still runs on the 48h clocks above.
+// mirrors; every mirror it starts still runs on the 72h clocks above.
 const SET_TTL = 365 * 24 * 3600 * 1000;
 const SET_CREATE_PER_IP_DAY = 5;
 const SET_CREATE_GLOBAL_DAY = 50;
@@ -1382,8 +1385,9 @@ async function tickTournaments(env) {
    A tournament is listed by use, not by merely existing, so a row
    somebody made to see what the thing does never shows: it has started,
    and DIR_LIVE_ROOMS rooms have each uploaded a game. An entry carries
-   the name and when it started and closes (the page drops it once it has
-   closed; the hourly sweep then takes it out of the file). The slug — the
+   the name, when it started, and when it leaves the list, LIVE_LIST_TTL
+   after Start (the page drops it then; the hourly sweep then takes it
+   out of the file). The slug — the
    link — is only there while the TD has the public page on; with it off
    the tournament is listed by name alone. A URL name starting
    DIR_HIDE_PREFIX is never listed: the operator's test runs on
@@ -1398,7 +1402,7 @@ async function tickTournaments(env) {
    entry actually changes — the threshold crossed, a rename, the public
    page switched — which is a handful of times in a tournament's life. An
    hourly sweep rebuilds the file regardless (one read of the listed rows)
-   so a tournament that closed, a row deleted by hand or a deploy that
+   so a tournament whose time on the list ran out, a row deleted by hand or a deploy that
    failed cannot leave it wrong for long. Apply migrate-directory.sql
    first. */
 
@@ -1425,7 +1429,7 @@ async function dirCountsOf(env, tid) {
 // A tournament's line in the directory, or null when it isn't listed.
 function dirEntry(t, counts) {
   if (!t.started || counts.rooms < DIR_LIVE_ROOMS || String(t.slug).startsWith(DIR_HIDE_PREFIX)) return null;
-  return JSON.stringify({ n: t.name, s: t.published ? t.slug : null, d: t.started, c: t.started + RUN_TTL });
+  return JSON.stringify({ n: t.name, s: t.published ? t.slug : null, d: t.started, c: t.started + LIVE_LIST_TTL });
 }
 
 // Record t's entry if it moved; true when it did (the file is then stale).
@@ -1436,14 +1440,14 @@ async function dirNote(env, t, counts) {
   return true;
 }
 
-// Rebuild directory.json from the listed rows that are still open.
+// Rebuild directory.json from the listed rows still inside LIVE_LIST_TTL.
 // Answers { changed, text }; R2 is only written when the text differs
 // from what is there.
 async function dirBuild(env) {
   const { results } = await env.DB.prepare(
     'SELECT dir_entry FROM tournaments WHERE dir_entry IS NOT NULL AND started > ?1 ' +
     `ORDER BY started DESC, id DESC LIMIT ${DIR_MAX}`
-  ).bind(Date.now() - RUN_TTL).all();
+  ).bind(Date.now() - LIVE_LIST_TTL).all();
   const text = '{"v":1,"t":[' + results.map((r) => r.dir_entry).join(',') + ']}';
   const cur = await env.DATA.get(DIR_KEY);
   if (cur ? (await cur.text()) === text : text === DIR_EMPTY) return { changed: false, text };
@@ -5361,7 +5365,7 @@ async function pubRoster(env, slug) {
    season. Nothing else changes clocks: an invite is NOT a tournament. It
    is a one-time, revocable credential the editor can mint weeks ahead.
    The TD either starts it when the event is close — which creates an
-   ordinary tournament on the ordinary clocks (a week of setup, 48h from
+   ordinary tournament on the ordinary clocks (a week of setup, 72h from
    Start — closesAt), its rounds and reader game format already filled in — or
    uses it to join a tournament they have already made (joinSet).
 
@@ -6128,7 +6132,7 @@ async function fillMirrorCatmap(env, setId, tid, fill) {
 }
 
 // POST /i/:secret {name, slug} — start the mirror: an ordinary tournament
-// (the 48h clocks start now), prefilled from the set.
+// (the 72h clocks start now), prefilled from the set.
 async function startInvite(request, env, secret, ctx) {
   let body;
   try { body = await request.json(); } catch (e) { return err(env, 400, 'bad json'); }

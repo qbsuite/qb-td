@@ -216,8 +216,8 @@ ok('uploads do not alert', await quiet(), log.length);
 await hourly();
 ok('a running tournament is not wrapped up', await quiet(), titles());
 
-// its 48 hours ran out an hour ago
-d1exec(`UPDATE tournaments SET started = ${Date.now() - 2 * DAY - 3600 * 1000} WHERE id = ${tid}`);
+// its 72 hours ran out an hour ago
+d1exec(`UPDATE tournaments SET started = ${Date.now() - 3 * DAY - 3600 * 1000} WHERE id = ${tid}`);
 await hourly();
 ok('the wrap-up posts a new message', await until(() => posts() === 3), log.map((c) => c.method));
 ok('and it is again the only one', await until(() => channel.size === 1 && !channel.has(startedMsg)), [...channel.keys()]);
@@ -327,7 +327,7 @@ r = await call(A2 + '/buckets', { method: 'POST', json: { room_name: 'Room 1' } 
 r = await call(`/b/${r.body.secret}/upload?round=1&name=Round_1_Alpha_Beta.qbj`,
   { method: 'POST', body: MATCH });
 ok('upload survives a dead webhook', r.status === 200 && r.body.error === null, r.body);
-d1exec(`UPDATE tournaments SET started = ${Date.now() - 2 * DAY - 3600 * 1000} WHERE id = ${tid2}`);
+d1exec(`UPDATE tournaments SET started = ${Date.now() - 3 * DAY - 3600 * 1000} WHERE id = ${tid2}`);
 await hourly();
 ok('the hourly run survives a dead webhook',
   await until(() => d1row(`SELECT wrapped FROM tournaments WHERE id = ${tid2}`).wrapped === 1));

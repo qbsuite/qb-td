@@ -2060,7 +2060,7 @@ await section('SET-34 statuses: setup week, Finished; SET-41 what the lock does 
   ok('SET-34: a mirror still in its setup week (not yet Started) reads "Running" too (observed)', e.pills[0][0] === 'Running', e);
   ok('SET-34: a started mirror whose own page is off has its name and slug but no "Page" link',
     e.link.startsWith(`East mirror ${east.slug}`) && e.page === null, e);
-  d1(`UPDATE tournaments SET created = ${Date.now() - 9 * DAY}, started = ${Date.now() - 50 * 3600 * 1000} WHERE id = ${east.tid}`);
+  d1(`UPDATE tournaments SET created = ${Date.now() - 9 * DAY}, started = ${Date.now() - 74 * 3600 * 1000} WHERE id = ${east.tid}`);
   await openSet(C.secret, 'mirrors');
   e = await mrow('East mirror');
   ok('SET-34: once its links have closed it reads "Finished" (not green)', e.pills[0][0] === 'Finished' && !e.pills[0][1], e);

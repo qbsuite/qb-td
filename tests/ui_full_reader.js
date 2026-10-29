@@ -2562,8 +2562,8 @@ await section('R45', 'upload errors', async () => {
       t === 'Export failed: Something went wrong on the server. Please try again.', t);
   } finally { d1(`UPDATE buckets SET wrap = '${wrap}' WHERE id = ${c1.id}`); }
   ok('R45 an empty body: "Export failed: empty file."', empty === 'Export failed: empty file.', empty);
-  // the tournament closes: 48 hours after Start
-  d1(`UPDATE tournaments SET started = started - ${49 * 3600 * 1000} WHERE id = ${C.id}`);
+  // the tournament closes: 72 hours after Start
+  d1(`UPDATE tournaments SET started = started - ${73 * 3600 * 1000} WHERE id = ${C.id}`);
   t = await fail();
   ok('R45 the room closed: "Export failed: room closed."', t === 'Export failed: room closed.', t);
   ok('R43 after a failure the uploading note is gone', !(await tab.exists('.uploading')));
