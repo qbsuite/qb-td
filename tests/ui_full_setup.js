@@ -2085,22 +2085,41 @@ await runSection('HOME RAIL + CLOSED ENTRIES', async () => {
         && (a.querySelector(':scope > small') || {}).textContent === ${q(want)}; })()`), want);
   }
   const index = JSON.parse(readFileSync(path.join(APP, 'archive', 'index.json'), 'utf8'));
-  ok('HOME-09 rail: "Past tournaments" newest first, each with its day', await js(`(() => {
+  // a set with more than one site is one entry, at its newest site's day
+  const setSites = (n) => index.tournaments.filter((t) => t.set === n);
+  const railWant = [];
+  for (const t of [...index.tournaments, ...(index.named || [])]) {
+    if (t.set && setSites(t.set).length > 1) {
+      if (railWant.some((w) => w.n === t.set)) continue;
+      railWant.push({ n: t.set, d: setSites(t.set).map((x) => x.date).sort().pop(), k: setSites(t.set).length + ' sites' });
+    } else railWant.push({ n: t.name, d: t.date });
+  }
+  ok('HOME-09 rail: "Past tournaments" newest first, each with its day, a set as one entry with its count', await js(`(() => {
     const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Past tournaments');
     const day = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
-    const want = ${q([...index.tournaments, ...(index.named || [])].map((t) => ({ n: t.name, d: t.date })))}
+    const want = ${q(railWant)}
       .sort((x, y) => day(y.d) - day(x.d))
-      .map((t) => t.n + '|' + day(t.d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-    const got = b ? [...b.querySelectorAll('.it')].map((x) => (x.querySelector(':scope > span') || {}).textContent + '|' + (x.querySelector(':scope > small') || {}).textContent) : [];
+      .map((t) => t.n + '|' + (t.k || day(t.d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })));
+    const got = b ? [...b.querySelectorAll('.tlist > .it, .tlist > .itset > .sethead')].map((x) => (x.querySelector(':scope > span') || {}).textContent + '|' + (x.querySelector(':scope > small') || {}).textContent) : [];
     return JSON.stringify(got) === JSON.stringify(want); })()`));
-  ok('HOME-09 rail: "Past tournaments" from the archive, with an All link, one year: no year labels', await js(`(() => {
+  ok('HOME-09 rail: "Past tournaments" from the archive, every archived one linked (a set\'s by site), no All link, one year: no year labels', await js(`(() => {
     const b = [...document.querySelectorAll('#tside .railblock')].find((x) => x.querySelector('.railhead b').textContent === 'Past tournaments');
     if (!b) return false;
-    const all = b.querySelector('.railhead a');
-    const links = [...b.querySelectorAll('a.it')].map((a) => a.getAttribute('href'));
-    return all.textContent === 'All' && all.getAttribute('href') === 'archive.html' && !b.querySelector('.yr')
+    const links = [...b.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    return !b.querySelector('.railhead a') && !b.querySelector('.yr')
       && ${q(index.tournaments.map((t) => 'archive.html?t=' + t.slug))}.every((h) => links.includes(h))
       && ${q((index.named || []).map((t) => t.name))}.every((n) => [...b.querySelectorAll('span.it')].some((s) => s.textContent.includes(n))); })()`));
+  ok('HOME-09 rail: a set\'s sites newest first under its name (same day: by name), one line each with its day', await js(`(() => {
+    const sets = ${q([...new Set(index.tournaments.filter((t) => t.set && setSites(t.set).length > 1).map((t) => t.set))]
+      .map((n) => [n, setSites(n).sort((a, b) => b.date.localeCompare(a.date)
+        || (a.site || a.host || a.name).localeCompare(b.site || b.host || b.name)).map((t) => t.site || t.host || t.name)]))};
+    const days = ${q(Object.fromEntries(index.tournaments.filter((t) => t.set).map((t) => [t.site || t.host || t.name, t.date])))};
+    const day = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
+    const rows = [...document.querySelectorAll('#tside .itset')];
+    return rows.length === sets.length && sets.every(([n, sites]) => rows.some((r) =>
+      r.querySelector('.sethead > span').textContent === n
+      && JSON.stringify([...r.querySelectorAll('.sites a.it')].map((a) => a.querySelector('span').textContent + '|' + a.querySelector('small').textContent))
+        === JSON.stringify(sites.map((x) => x + '|' + day(days[x]))))); })()`));
   // more than one year: a label above each
   const twoYears = answer((r) => r.method === 'GET' && r.url === `${PAGES}/archive/index.json`, () => ({ status: 200,
     body: JSON.stringify({ ...index, named: [...(index.named || []), { name: 'Old Fall Open', date: '2025-10-04' }] }) }));

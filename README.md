@@ -238,8 +238,9 @@ Part of [qbsuite](https://qbsuite.github.io/).
   editor's dashboard always, and on a **public set page**
   (`app/s.html?s=<slug>`) once the editor switches it on. See "Question
   sets" below.
-- **Archive** (`app/archive.html`): a curated list of past tournaments, and
-  with `?t=<slug>` any one of them. An archived tournament runs the real
+- **Archive** (`app/archive.html?t=<slug>`): any one past tournament. The
+  list is the home page's rail, where a set's sites (`--set`) share one
+  entry. An archived tournament runs the real
   `pubview.js` against a committed capture of its `/pub` responses
   (`app/archive/<slug>.js`) instead of the Worker, so the schedule, stats,
   and categories tabs work with no server and no tournament of your own,
@@ -1184,7 +1185,9 @@ tournament is being held here.
 (`tools/archive.mjs`, "Archiving a tournament"): the tournaments you
 approved with `add`, each linked to its frozen capture, and the ones you
 approved with `name` — listed by name and date, nothing to open, for a
-tournament whose TD keeps the public page off:
+tournament whose TD keeps the public page off. Tournaments archived with
+the same `--set "<name>"` show on the rail as one entry with a link per
+site (`--site "<label>"`, default the host):
 
 ```bash
 node tools/archive.mjs name "2026 Quartz" --date 2026-09-19

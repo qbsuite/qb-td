@@ -704,6 +704,12 @@ details.fold > summary h2 { flex: 1; }
 .tlist .it small { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .tlist .yr { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .tlist .yr:first-child { margin-top: 0; }
+.tlist .sethead { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.tlist .sethead small { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.tlist .itset .sites {
+  display: flex; flex-direction: column; gap: 5px; margin: 5px 0 2px 3px;
+  padding-left: 11px; border-left: 2px solid var(--line);
+}
 .tlist .dot { display: inline-block; width: 8px; height: 8px; border-radius: 99px; background: var(--ok); margin-right: 8px; }
 @media (max-width: 760px) {
   .homegrid { grid-template-columns: minmax(0, 1fr); gap: 28px; }

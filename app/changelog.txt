@@ -3,6 +3,8 @@ Release Notes for 10/28/2026
 [ ARCHIVE ]
 - Added 2026 Penn Bowl at Stanford and SoCal Penn Bowl.
 - Archived tournaments that kept their password no longer show scoresheets.
+- Past tournaments from one set share one sidebar entry, its sites listed under it.
+- Removed the all-tournaments page; the sidebar lists them.
 
 Release Notes for 10/26/2026
 

@@ -7,7 +7,9 @@
       "host": "Stanford",
       "teams": 6,
       "rounds": 10,
-      "games": 30
+      "games": 30,
+      "set": "2026 Penn Bowl",
+      "site": "Stanford"
     },
     {
       "slug": "socal-penn-bowl",
@@ -16,7 +18,9 @@
       "host": "UCSD",
       "teams": 6,
       "rounds": 10,
-      "games": 30
+      "games": 30,
+      "set": "2026 Penn Bowl",
+      "site": "UCSD"
     },
     {
       "slug": "acf-fall-uiuc",
@@ -52,7 +56,9 @@
       "host": "",
       "teams": 4,
       "rounds": 10,
-      "games": 20
+      "games": 20,
+      "set": "2026 Penn Bowl",
+      "site": "Playtest"
     },
     {
       "slug": "ug-nats-stanford",

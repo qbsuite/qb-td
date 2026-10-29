@@ -13,11 +13,16 @@
 //
 //   node tools/archive.mjs list
 //   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "..."] [--name "..."]
+//                                     [--set "..."] [--site "..."]
 //   node tools/archive.mjs refresh <slug>
 //   node tools/archive.mjs rebuild [<slug>]
 //   node tools/archive.mjs remove <slug>
 //   node tools/archive.mjs name "<name>" --date YYYY-MM-DD
 //   node tools/archive.mjs unname "<name>"
+//
+// --set names the question set a tournament used, so the archive page
+// shows that set's sites together; --site is its short label there
+// (default: the host). Both stick across a refresh; --set "" clears it.
 //
 // `rebuild` regenerates the report pages from the committed capture and
 // reads nothing from any backend: for a change to the report itself. With
@@ -308,7 +313,9 @@ async function cmdList(opts) {
   const ready = rows.filter((r) => r.published && !archived.has(r.slug));
   console.log(`\n${rows.length} tournaments, ${archived.size} archived, ${ready.length} published and not archived`);
   if (ready.length) console.log('approve one with: node tools/archive.mjs add ' + ready[0].slug);
-  if (opts.date || opts.host || opts.name) console.log('(--date, --host and --name apply to add/refresh, not list)');
+  if (opts.date || opts.host || opts.name || opts.set != null || opts.site != null) {
+    console.log('(--date, --host, --name, --set and --site apply to add/refresh, not list)');
+  }
 }
 
 async function cmdAdd(slug, opts, { refresh = false } = {}) {
@@ -354,6 +361,12 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
     rounds: Math.max(...games.map((m) => m.round)),
     games: games.length,
   };
+  // the set and site stick across a refresh; an empty one is left out
+  const set = opts.set != null ? opts.set : (existing && existing.set) || '';
+  const site = opts.site != null ? opts.site : (existing && existing.site) || '';
+  if (existing) { delete existing.set; delete existing.site; }
+  if (set) entry.set = set;
+  if (set && site) entry.site = site;
   if (existing) Object.assign(existing, entry);
   else index.tournaments.push(entry);
   writeIndex(index);
@@ -428,6 +441,8 @@ function parseArgs(argv) {
     else if (a === '--date') opts.date = argv[++i];
     else if (a === '--host') opts.host = argv[++i];
     else if (a === '--name') opts.name = argv[++i];
+    else if (a === '--set') opts.set = argv[++i];
+    else if (a === '--site') opts.site = argv[++i];
     else if (a.startsWith('--')) throw new Error('unknown flag ' + a);
     else rest.push(a);
   }
@@ -437,6 +452,7 @@ function parseArgs(argv) {
 const USAGE = `usage:
   node tools/archive.mjs list
   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "Stanford"] [--name "Title"]
+                                    [--set "2026 Penn Bowl"] [--site "Stanford"]
   node tools/archive.mjs refresh <slug>
   node tools/archive.mjs rebuild [<slug>]
   node tools/archive.mjs remove <slug>
