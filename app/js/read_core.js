@@ -888,6 +888,16 @@ export function effectiveFormat(settings) {
   return out;
 }
 
+/** effectiveFormat with the tournament's tiebreak (settings.tiebreak,
+    one of stats.js TIEBREAKS; none is points per 20), for what ranks
+    teams: the standings, the fills, the public page. Never MODAQ's: it
+    has no such field. */
+const TIEBREAK_KEYS = ['ppg', 'ppb', 'h2h', 'h2h-ppg', 'h2h-ppb'];
+export function rankFormat(settings) {
+  const f = effectiveFormat(settings);
+  return settings && TIEBREAK_KEYS.includes(settings.tiebreak) ? { ...f, tiebreak: settings.tiebreak } : f;
+}
+
 /** The gameFormat prop for MODAQ, or undefined for MODAQ's own default.
     Accepts the settings object (or, legacy, a bare preset key). With no
     overrides a preset resolves to MODAQ's own object when GameFormats is

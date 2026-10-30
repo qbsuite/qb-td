@@ -16,7 +16,7 @@
 // teams the generator seeded into each pool, so placeholders can later
 // be filled from standings (fillPlaceholders).
 
-import { standingsOrder, winPct, levelRuns } from './stats.js';
+import { standingsOrder, winPct, levelRuns, headToHead, statOf } from './stats.js';
 
 function slotEq(a, b) {
   if (!a || !b) return false;
@@ -957,15 +957,16 @@ export function hasPlaceholders(schedule) {
  * is ranked as its table on the public page ranks it (standingsOrder):
  * winning percentage, then points per tossup, and teams level on both in
  * pool (seed) order, as that table lists them. Teams with no games yet
- * come last, in pool order.
+ * come last, in pool order. rule: the TD's tiebreak (stats.js
+ * standingsOrder), or null for YF's order.
  */
-export function poolStandings(pools, teams) {
+export function poolStandings(pools, teams, rule = null) {
   const row = new Map(teams.map((t) => [t.name, t]));
   const played = (n) => row.has(n) && row.get(n).w + row.get(n).l + (row.get(n).t || 0) > 0;
   const out = {};
   for (const [letter, members] of Object.entries(pools || {})) {
     const ranked = members.filter(played).map((n) => row.get(n));
-    out[letter] = [...standingsOrder(ranked).map((t) => t.name), ...members.filter((n) => !played(n))];
+    out[letter] = [...standingsOrder(ranked, rule).map((t) => t.name), ...members.filter((n) => !played(n))];
   }
   return out;
 }
@@ -988,7 +989,11 @@ export function poolStandings(pools, teams) {
  *             them to different playoff brackets: [{pool, record,
  *             teams: [{name, pp20tuh, bracket}], level}], in finish
  *             order; level: [[names…]], its teams level on points per 20
- *             too, which keep their pool order
+ *             too, which keep their pool order. With the TD's tiebreak
+ *             (agg.rule) not YF's: stat, the figure that broke it
+ *             (stats.js statOf; each team's as `val`), and with
+ *             head-to-head, h2h: {records, decided} (stats.js
+ *             headToHead), level then meaning level on that too
  *   compared — places compared across pools whose teams have the same
  *             winning percentage: [{place, teams: [{name, pool, pp20tuh,
  *             record}], level}], level as for ties, its teams in pool order
@@ -1007,7 +1012,11 @@ export function prelimRounds(schedule) {
 }
 
 export function fillReport(schedule, agg) {
-  const ranks = poolStandings(schedule.pools, agg.teams);
+  const rule = agg.rule || null;
+  const ranks = poolStandings(schedule.pools, agg.teams, rule);
+  // the TD's figure, where it isn't points per 20: its name and each team's
+  const val = (t) => Math.round(statOf(t, rule.stat) * 100) / 100;
+  const figure = (t) => (rule && rule.stat !== 'pp20' ? { val: val(t) } : {});
   const pair = (round, x, y) => round + '\n' + [x, y].sort().join('\n');
   const prelim = prelimRounds(schedule);
   const prelimSet = new Set(prelim.map((r) => r.round));
@@ -1047,17 +1056,25 @@ export function fillReport(schedule, agg) {
       let j = i + 1;
       while (j < list.length && rec(list[j]) !== null && rec(list[j]) === rec(list[i])) j++;
       if (j - i > 1) {
-        const teams = list.slice(i, j).map((name, k) => ({ name, pp20tuh: row.get(name).pp20tuh, bracket: bracketOf.get(pool + (i + k + 1)) || null }));
-        const level = levelRuns(list.slice(i, j).map((n) => row.get(n))).map((run) => run.map((x) => x.name));
-        if (new Set(teams.map((x) => x.bracket)).size > 1) ties.push({ pool, record: rec(list[i]), teams, level });
+        const teams = list.slice(i, j).map((name, k) => ({ name, pp20tuh: row.get(name).pp20tuh, ...figure(row.get(name)),
+          bracket: bracketOf.get(pool + (i + k + 1)) || null }));
+        const rows = list.slice(i, j).map((n) => row.get(n));
+        const level = levelRuns(rows, rule).map((run) => run.map((x) => x.name));
+        const hh = rule && rule.h2h ? headToHead(rows, rule.h2h) : null;
+        if (new Set(teams.map((x) => x.bracket)).size > 1) {
+          ties.push({ pool, record: rec(list[i]), teams, level, ...(rule ? { stat: rule.stat } : {}),
+            ...(hh ? { h2h: { records: hh.records, decided: hh.decided } } : {}) });
+        }
       }
       i = j;
     }
   }
   // A place compared across pools: its teams by winning percentage, then
-  // points per 20 tossups heard (the pools may differ in size), level
-  // teams in pool order. A tie in winning percentage is listed with how
-  // points per 20 broke it, or which of its teams it couldn't (level).
+  // points per 20 tossups heard (the pools may differ in size), or the
+  // TD's figure (never head-to-head: they haven't met), level teams in
+  // pool order. A tie in winning percentage is listed with how the figure
+  // broke it, or which of its teams it couldn't (level).
+  const across = rule ? { stat: rule.stat, h2h: null } : null;
   const compared = [];
   const places = new Set();
   for (const ph of schedule.phases) for (const r of ph.rounds) {
@@ -1069,13 +1086,14 @@ export function fillReport(schedule, agg) {
   const poolLists = Object.entries(ranks);
   for (const place of [...places].sort((a, b) => a - b)) {
     const teams = standingsOrder(poolLists.map(([pool, list]) => ({ pool, name: list[place - 1] }))
-      .filter((x) => x.name && row.has(x.name)).map((x) => ({ ...x, ...row.get(x.name) })));
+      .filter((x) => x.name && row.has(x.name)).map((x) => ({ ...x, ...row.get(x.name) })), across);
     ranks['#' + place] = teams.map((x) => x.name);
     for (let i = 0; i < teams.length;) {
       let j = i + 1;
       while (j < teams.length && winPct(teams[j]) === winPct(teams[i])) j++;
-      if (j - i > 1) compared.push({ place, teams: teams.slice(i, j).map((x) => ({ name: x.name, pool: x.pool, pp20tuh: x.pp20tuh,
-        record: x.w + '–' + x.l + (x.t ? '–' + x.t : '') })), level: levelRuns(teams.slice(i, j)).map((run) => run.map((x) => x.name)) });
+      if (j - i > 1) compared.push({ place, teams: teams.slice(i, j).map((x) => ({ name: x.name, pool: x.pool, pp20tuh: x.pp20tuh, ...figure(x),
+        record: x.w + '–' + x.l + (x.t ? '–' + x.t : '') })), level: levelRuns(teams.slice(i, j), across).map((run) => run.map((x) => x.name)),
+        ...(across ? { stat: across.stat } : {}) });
       i = j;
     }
   }

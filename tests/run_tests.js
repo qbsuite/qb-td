@@ -7,7 +7,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
   rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound, matchPayload } from '../app/engine/qbj.js';
-import { aggregate, dedupeMatches, standings } from '../app/engine/stats.js';
+import { aggregate, dedupeMatches, standings, headToHead, levelRuns, standingsOrder, tiebreakOf, ruleOf } from '../app/engine/stats.js';
+import { rankFormat } from '../app/js/read_core.js';
 import { pasteGrid } from '../app/engine/rosterpaste.js';
 import { buildYft, yfStages } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
@@ -8241,6 +8242,164 @@ test('hubgames.js: passes on exportfile.js, so the hub imports its downloads fro
     'yftFile', 'reportPages', 'reportZipFile', 'rosterFileText', 'qbjZipFile',
     'ownedJson', 'gameCopies', 'cacheKey', 'isUpload', 'fetchUploads', 'collectMatches', 'gameFormat', 'createHubNames'].sort());
 });
+
+/* ---------- head-to-head tiebreak (settings.tiebreak 'h2h') ---------- */
+
+{
+  const row = (name, pp) => ({ name, w: 2, l: 2, t: 0, regPoints: pp, regTuh: 20 });
+  const beat = (w, l) => ({ teams: [{ name: w, points: 300 }, { name: l, points: 100 }] });
+  const ABC = [row('A', 300), row('B', 200), row('C', 100)];
+  const names = (h) => h.rows.map((t) => t.name).join('');
+
+  test('headToHead: decides a tie when every pair met evenly, else leaves points per 20', () => {
+    let h = headToHead(ABC, [beat('C', 'A'), beat('C', 'B'), beat('B', 'A')]);
+    assert.equal(names(h), 'CBA');
+    assert.equal(h.decided, 'all');
+    assert.deepEqual(h.records, { A: '0–2', B: '1–1', C: '2–0' });
+    h = headToHead(ABC, [beat('A', 'B'), beat('B', 'C'), beat('C', 'A')]);
+    assert.equal(names(h), 'ABC', 'a cycle keeps points per 20');
+    assert.equal(h.decided, 'none');
+    assert.ok(h.records, 'even, but it counted');
+    h = headToHead(ABC, [beat('B', 'A'), beat('C', 'B')]);
+    assert.equal(names(h), 'ABC', 'A and C never met');
+    assert.equal(h.records, null);
+    h = headToHead(ABC, [beat('C', 'A'), beat('C', 'B'), beat('B', 'A'), beat('B', 'A')]);
+    assert.equal(h.records, null, 'A and B met twice, the others once');
+  });
+
+  test('headToHead: runs again on the teams still level, and a draw counts half', () => {
+    // double round robin: C sweeps, A and B split
+    const drr = [beat('C', 'A'), beat('C', 'B'), beat('C', 'A'), beat('C', 'B'), beat('A', 'B'), beat('B', 'A')];
+    let h = headToHead(ABC, drr);
+    assert.equal(names(h), 'CAB');
+    assert.equal(h.decided, 'some');
+    // four tied: D and C 2–1 (C beat D), B and A 1–2 (A beat B)
+    const four = [row('A', 400), row('B', 300), row('C', 200), row('D', 100)];
+    h = headToHead(four, [beat('C', 'D'), beat('D', 'A'), beat('D', 'B'), beat('C', 'A'), beat('B', 'C'), beat('A', 'B')]);
+    assert.equal(names(h), 'CDAB');
+    assert.equal(h.decided, 'all');
+    const draw = { teams: [{ name: 'A', points: 200 }, { name: 'B', points: 200 }] };
+    h = headToHead(ABC, [draw, beat('C', 'A'), beat('B', 'C')]);
+    assert.equal(names(h), 'BCA');
+    assert.deepEqual(h.records, { A: '0–1–1', B: '1–0–1', C: '1–1' });
+  });
+
+  test('standingsOrder / levelRuns: head-to-head only between teams with the same winning percentage', () => {
+    const X = { name: 'X', w: 3, l: 1, t: 0, regPoints: 100, regTuh: 20 };
+    const games = [beat('B', 'A'), beat('A', 'X')];
+    assert.deepEqual(standingsOrder([X, row('A', 300), row('B', 200)], { stat: 'pp20', h2h: games }).map((t) => t.name), ['X', 'B', 'A']);
+    assert.deepEqual(standingsOrder([X, row('A', 300), row('B', 200)]).map((t) => t.name), ['X', 'A', 'B'], 'off: YF order');
+    const same = [row('A', 200), row('B', 200), row('C', 200)];
+    const sweep = [beat('C', 'A'), beat('C', 'B'), beat('A', 'B')];
+    assert.deepEqual(levelRuns(standingsOrder(same, { stat: 'pp20', h2h: sweep }), { stat: 'pp20', h2h: sweep }), [], 'head-to-head separated them all');
+    assert.deepEqual(levelRuns(same).map((r) => r.map((t) => t.name)), [['A', 'B', 'C']]);
+  });
+
+  test('tiebreak: points per game or per bonus break a tie in record, with or without head-to-head first', () => {
+    // A: more per tossup; B: more per game (fewer tossups a game); C: more per bonus
+    const A = { name: 'A', w: 2, l: 2, t: 0, regPoints: 1000, regTuh: 60, points: 1000, gp: 4, bonusPoints: 300, bonusesHeard: 30 };
+    const B = { name: 'B', w: 2, l: 2, t: 0, regPoints: 1100, regTuh: 80, points: 1100, gp: 4, bonusPoints: 300, bonusesHeard: 30 };
+    const C = { name: 'C', w: 2, l: 2, t: 0, regPoints: 900, regTuh: 80, points: 900, gp: 4, bonusPoints: 400, bonusesHeard: 20 };
+    const by = (v, games = []) => standingsOrder([A, B, C], ruleOf(tiebreakOf({ tiebreak: v }), games)).map((t) => t.name).join('');
+    assert.equal(by('pp20'), 'ABC');
+    assert.equal(by(undefined), 'ABC', 'none set: points per 20');
+    assert.equal(by('ppg'), 'BAC');
+    assert.equal(by('ppb'), 'CAB');
+    // a full round robin among them: C beat both, B beat A
+    const rr = [beat('C', 'A'), beat('C', 'B'), beat('B', 'A')];
+    assert.equal(by('h2h-ppg', rr), 'CBA');
+    // a cycle: head-to-head even, so the figure decides
+    const cyc = [beat('A', 'B'), beat('B', 'C'), beat('C', 'A')];
+    assert.equal(by('h2h-ppb', cyc), 'CAB');
+    assert.equal(by('h2h-ppg', cyc), 'BAC');
+    assert.deepEqual(tiebreakOf({ tiebreak: 'bogus' }), { stat: 'pp20', h2h: false });
+  });
+
+  test('rankFormat: the ranking rule rides on the game format, never into MODAQ\'s', () => {
+    assert.equal(rankFormat({ gameFormat: 'acf', tiebreak: 'h2h' }).tiebreak, 'h2h');
+    assert.equal(rankFormat({ gameFormat: 'acf' }).tiebreak, undefined);
+    assert.equal(rankFormat({ gameFormat: 'acf', tiebreak: 'h2h-ppb' }).tiebreak, 'h2h-ppb');
+    assert.equal(rankFormat({ gameFormat: 'acf', tiebreak: 'nope' }).tiebreak, undefined);
+    assert.equal(effectiveFormat({ gameFormat: 'acf', tiebreak: 'h2h' }).tiebreak, undefined);
+    assert.equal(rankFormat({ gameFormat: 'acf', tiebreak: 'h2h' }).regulationTossupCount, effectiveFormat({ gameFormat: 'acf' }).regulationTossupCount);
+  });
+
+  // Pools of six: Te and Th tie at 2–3 across the Championship line; Th
+  // beat Te, Te has far more points per 20
+  const poolDay = () => {
+    const T = 'abcdefghijkl'.split('').map((c) => 'T' + c);
+    const s = buildSchedule('pools2', T, [0, 1, 2, 3, 4, 5].map((i) => ({ name: 'Room ' + (i + 1), bucket: i + 1 })), { seed: 1 });
+    assert.deepEqual(s.pools.A, ['Ta', 'Td', 'Te', 'Th', 'Ti', 'Tl']);
+    const beats = new Set(['Ta>Td', 'Ta>Te', 'Ta>Th', 'Ta>Ti', 'Ta>Tl', 'Td>Te', 'Td>Th', 'Td>Ti', 'Td>Tl',
+      'Th>Te', 'Th>Ti', 'Tl>Th', 'Te>Ti', 'Te>Tl', 'Ti>Tl']);
+    const B = s.pools.B;
+    const won = (a, b) => (s.pools.A.includes(a) ? beats.has(a + '>' + b) : B.indexOf(a) < B.indexOf(b));
+    const pts = (me, opp, w) => (me === 'Te' ? (w ? 400 : opp === 'Th' ? 300 : 240) : me === 'Th' && opp === 'Te' ? 305 : w ? 250 : 50);
+    const side = (name, points) => ({ name, points, bonusPoints: 0, players: [] });
+    const matches = [], files = [];
+    for (const r of prelimRounds(s)) for (const g of r.games) {
+      const [a, b] = [g.a.team, g.b.team];
+      const pa = pts(a, b, won(a, b)), pb = pts(b, a, won(b, a));
+      const id = matches.length + 1;
+      matches.push({ round: r.round, tossupsRead: 20, fileId: id, teams: [side(a, pa), side(b, pb)] });
+      files.push({ id, kind: 'combined', round: r.round, error: null, summary: JSON.stringify({ teams: [a, b], score: [pa, pb] }) });
+    }
+    return { s, matches, files };
+  };
+  const a3 = (sc) => sc.phases[1].rounds[0].games.find((g) => g.a.from === 'A3').a.team;
+
+  test('head-to-head: the pool fill, its note and the public pool table go by it', () => {
+    const { s, matches, files } = poolDay();
+    const off = autoFillSaved(s, files, matches, null, [], rankFormat({ gameFormat: 'acf' }));
+    assert.equal(a3(off.schedule), 'Te', 'points per 20: Te 3rd');
+    assert.equal(filledNote(off.schedule.filled[0]), 'Pool A: Te and Th were tied at 2–3, so points per 20 decided their places.');
+    const fmt = rankFormat({ gameFormat: 'acf', tiebreak: 'h2h' });
+    const on = autoFillSaved(s, files, matches, null, [], fmt);
+    assert.equal(a3(on.schedule), 'Th', 'head-to-head: Th 3rd');
+    assert.equal(filledNote(on.schedule.filled[0]), 'Pool A: Th and Te were tied at 2–3. Head-to-head (Th 1–0, Te 0–1) decided their places.');
+    const ppg = autoFillSaved(s, files, matches, null, [], rankFormat({ gameFormat: 'acf', tiebreak: 'ppg' }));
+    assert.equal(a3(ppg.schedule), 'Te', 'points per game: Te scores more a game');
+    assert.equal(filledNote(ppg.schedule.filled[0]), 'Pool A: Te and Th were tied at 2–3, so points per game decided their places.');
+    // waiting for the TD (a Tiebreakers phase): the button says what filling does
+    const held = autoFill(s, standings(matches, null, fmt), ['A', 'B'], [], { holdTies: true }).held[0];
+    assert.equal(heldLevel(held).label, 'Use head-to-head');
+    const pool = (settings) => reportData({ name: 'x', matches, roster: null, settings, schedule: s }).stageStandings
+      .flatMap((sec) => sec.pools).find((pl) => pl.teams.some((t) => t.name === 'Ta')).teams.map((t) => t.name);
+    assert.deepEqual(pool(fmt), ['Ta', 'Td', 'Th', 'Te', 'Ti', 'Tl']);
+    assert.deepEqual(pool(effectiveFormat({ gameFormat: 'acf' })), ['Ta', 'Td', 'Te', 'Th', 'Ti', 'Tl']);
+  });
+
+  test('head-to-head: the Finals fill takes the team that won the game between them', () => {
+    const teams = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
+    const P = [planPhase('Round robin')];
+    const s = buildPlan(teams, planRooms(3), P, 'snake', 1);
+    addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P, 'pp20', 'one');
+    tagBrackets(s);
+    // T2 and T3 3–2 behind T1; T3 beat T2, T2 has more points per 20
+    const beats = new Set(['T1>T2', 'T1>T3', 'T1>T4', 'T1>T5', 'T1>T6', 'T3>T2', 'T2>T4', 'T2>T5', 'T2>T6', 'T4>T3', 'T3>T5', 'T3>T6', 'T4>T5', 'T6>T4', 'T5>T6']);
+    const pts = (me, opp, w) => (me === 'T2' ? (w ? 400 : opp === 'T3' ? 300 : 240) : me === 'T3' && opp === 'T2' ? 305 : w ? 250 : 50);
+    const side = (name, points) => ({ name, points, bonusPoints: 0, players: [] });
+    const matches = [], files = [];
+    for (const r of s.phases[0].rounds) for (const g of r.games) {
+      const [a, b] = [g.a.team, g.b.team];
+      const pa = pts(a, b, beats.has(a + '>' + b)), pb = pts(b, a, beats.has(b + '>' + a));
+      const id = matches.length + 1;
+      matches.push({ round: r.round, tossupsRead: 20, fileId: id, teams: [side(a, pa), side(b, pb)] });
+      files.push({ id, kind: 'combined', round: r.round, error: null, summary: JSON.stringify({ teams: [a, b], score: [pa, pb] }) });
+    }
+    const second = (settings) => {
+      const res = autoFillSaved(s, files, matches, null, [], settings);
+      return [res.schedule.phases.find((ph) => ph.kind === 'final').rounds[0].games[0].b.team, filledNote(res.schedule.filled[0])];
+    };
+    assert.deepEqual(second(rankFormat({ gameFormat: 'acf' })), ['T2', 'Round robin: T2 and T3 were tied at 3–2, so points per 20 decided their places.']);
+    assert.deepEqual(second(rankFormat({ gameFormat: 'acf', tiebreak: 'h2h' })),
+      ['T3', 'Round robin: T3 and T2 were tied at 3–2. Head-to-head (T3 1–0, T2 0–1) decided their places.']);
+    // the public standings: head-to-head separated them, so they no longer share 2nd
+    const ranks = (settings) => reportData({ name: 'x', matches, roster: null, settings, schedule: s }).teams.map((t) => t.rank + ' ' + t.name);
+    assert.deepEqual(ranks(rankFormat({ gameFormat: 'acf' })).slice(0, 3), ['1 T1', '2= T2', '2= T3']);
+    assert.deepEqual(ranks(rankFormat({ gameFormat: 'acf', tiebreak: 'h2h' })).slice(0, 3), ['1 T1', '2 T3', '3 T2']);
+  });
+}
 
 console.log(passed + ' tests passed' + (process.exitCode ? ' (with failures)' : ''));
 

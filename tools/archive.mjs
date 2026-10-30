@@ -44,7 +44,7 @@ import { parseRoster, rosterNameMap } from '../app/engine/qbj.js';
 import { readGames } from '../app/engine/games.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { buildReport } from '../app/engine/report.js';
-import { effectiveFormat } from '../app/js/read_core.js';
+import { rankFormat } from '../app/js/read_core.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ARCHIVE = join(ROOT, 'app', 'archive');
@@ -247,7 +247,7 @@ export function captureReport(slug, data) {
   if (!matches.length) throw new Error('no parseable games; nothing to archive');
   const opts = {
     name: state.name, matches: dedupeMatches(matches), roster,
-    settings: effectiveFormat(state.format), schedule: data[`/pub/${slug}/schedule`] || null,
+    settings: rankFormat(state.format), schedule: data[`/pub/${slug}/schedule`] || null,
   };
   return { opts, errors, pages: buildReport(opts) };
 }

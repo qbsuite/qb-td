@@ -28,7 +28,7 @@ import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBrea
 import { buzzToken } from './buzzkey.js';
 import { buildScoresheet } from '../engine/scoresheet.js';
 import { sheetHtml } from './sheetview.js';
-import { effectiveFormat } from './read_core.js';
+import { effectiveFormat, rankFormat } from './read_core.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
@@ -1610,7 +1610,7 @@ window.addEventListener('resize', () => {
 
 function renderNewStats(box) {
   // the schedule too, so standings go by stage and pool as Classic's do
-  const settings = effectiveFormat(state.format);
+  const settings = rankFormat(state.format);
   const all = reportData({ name: state.name, matches: dedupeMatches(matches), roster, settings, schedule });
   // Prelims / Playoffs / Combined: a stage's pages count its own games
   // (its standings, as Classic's, also those carried into it); Combined is
@@ -1690,7 +1690,7 @@ function renderNewStats(box) {
   };
 }
 
-const statsOpts = () => ({ name: state.name, matches: dedupeMatches(matches), roster, settings: effectiveFormat(state.format), schedule });
+const statsOpts = () => ({ name: state.name, matches: dedupeMatches(matches), roster, settings: rankFormat(state.format), schedule });
 
 function renderStatsTab(box) {
   // a redraw (new games on Refresh, a new password) keeps the Classic

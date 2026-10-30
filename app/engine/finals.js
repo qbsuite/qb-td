@@ -14,7 +14,7 @@
 // Tiebreakers phase. Teams level on points per 20 too keep the order the
 // public page lists them in (publicOrder).
 
-import { standings, standingsOrder, levelRuns, dedupeMatches } from './stats.js';
+import { standings, standingsOrder, levelRuns, dedupeMatches, headToHead, statOf } from './stats.js';
 import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
 import { reportData } from './report.js';
 import { isGameFile } from './games.js';
@@ -237,7 +237,8 @@ export function finalsProgress(schedule, files) {
  *          per 20; level: [[names…]], its teams level on points per 20
  *          too, which keep the order the public page lists them in, and
  *          kept, which order that is (publicOrder: 'pool', 'table', 'overall' or
- *          'standings')
+ *          'standings'); with the TD's tiebreak, stat and h2h as
+ *          schedule.js fillReport's ties have them
  *   held — the same, waiting for the TD
  */
 export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
@@ -264,11 +265,14 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     // ranked as the public page ranks the bracket's table (stats.js
     // standings), teams level on both in the order it lists them
     // (publicOrder); with no such teams, nothing to look up
-    const ranked = standings(games, null, opts.settings).teams.filter((t) => members.has(t.name));
-    const pub = levelRuns(ranked).length ? publicOrder(schedule, src, all, ranked, opts.settings) : { order: null, kept: 'standings' };
+    const agg = standings(games, null, opts.settings);
+    // the TD's tiebreak, head-to-head over the games the bracket ranks on
+    const rule = agg.rule || null;
+    const ranked = agg.teams.filter((t) => members.has(t.name));
+    const pub = levelRuns(ranked, rule).length ? publicOrder(schedule, src, all, ranked, opts.settings) : { order: null, kept: 'standings' };
     const row = new Map(ranked.map((t) => [t.name, t]));
     // no public table to follow: level teams by name, as the note says
-    const rows = standingsOrder(pub.order ? pub.order.map((n) => row.get(n)) : [...ranked].sort((x, y) => x.name.localeCompare(y.name)));
+    const rows = standingsOrder(pub.order ? pub.order.map((n) => row.get(n)) : [...ranked].sort((x, y) => x.name.localeCompare(y.name)), rule);
     const rec = (t) => t.w + '–' + t.l + (t.t ? '–' + t.t : '');
     const deepest = Math.max(...src.places);
     let hold = false;
@@ -278,13 +282,16 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
       // a tie reaching a finals place: the order decides who plays, or who
       // is the leader
       if (j - i > 1) {
-        const level = levelRuns(rows.slice(i, j)).map((run) => run.map((t) => t.name));
+        const level = levelRuns(rows.slice(i, j), rule).map((run) => run.map((t) => t.name));
+        const hh = rule && rule.h2h ? headToHead(rows.slice(i, j), rule.h2h) : null;
+        const fig = (t) => (rule && rule.stat !== 'pp20' ? { val: Math.round(statOf(t, rule.stat) * 100) / 100 } : {});
         // the standings' order, where it is name order anyway, is said as that
         const byName = level.every((run) => run.join('\n') === [...run].sort((x, y) => x.localeCompare(y)).join('\n'));
         const kept = pub.kept === 'overall' && byName ? 'standings' : pub.kept;
         const x = { bracket: src.name, record: rec(rows[i]),
-          teams: rows.slice(i, j).map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, place: i + k + 1 })),
-          level, kept, ...(pub.table ? { table: pub.table } : {}) };
+          teams: rows.slice(i, j).map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, ...fig(t), place: i + k + 1 })),
+          level, kept, ...(pub.table ? { table: pub.table } : {}),
+          ...(rule ? { stat: rule.stat } : {}), ...(hh ? { h2h: { records: hh.records, decided: hh.decided } } : {}) };
         if (holdTies && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
       }
       i = j;
@@ -329,8 +336,13 @@ export function fillProgress(schedule, files) {
 
 // A tie's teams level on points per 20 too, as schedule.filled keeps
 // them for the note: {level: [[names…]]}, with a Finals tie's `kept`
-// (finalsFill), or nothing when none were.
-const levelOf = (x) => (x.level && x.level.length ? { level: x.level, ...(x.kept ? { kept: x.kept } : {}), ...(x.table ? { table: x.table } : {}) } : {});
+// (finalsFill), or nothing when none were; and its head-to-head (h2h)
+// when the ranking went by it.
+const levelOf = (x) => ({
+  ...(x.level && x.level.length ? { level: x.level, ...(x.kept ? { kept: x.kept } : {}), ...(x.table ? { table: x.table } : {}) } : {}),
+  ...(x.stat ? { stat: x.stat } : {}),
+  ...(x.h2h ? { h2h: x.h2h } : {}),
+});
 
 /**
  * The hub's auto-fill of the saved schedule, on a copy: the pools rank on
@@ -403,6 +415,11 @@ export function keptOrder(x) {
 const keptPast = (x) => (keptOf(x) === 'standings' ? 'they were placed by name' : `they kept ${keptOrder(x)}`);
 const keptNow = (x) => (keptOf(x) === 'standings' ? 'filling now places them by name' : `filling now keeps ${keptOrder(x)}`);
 
+// The figure a tie went by (x.stat: the TD's tiebreak), for the notes
+const FIG = { pp20: 'points per 20', ppg: 'points per game', ppb: 'points per bonus' };
+const fig = (x) => FIG[x.stat] || FIG.pp20;
+const Fig = (x) => fig(x)[0].toUpperCase() + fig(x).slice(1);
+
 /** True when all of a tie's teams were level on points per 20 too. */
 export const allLevel = (x) => !!x.level && x.level.length === 1 && x.level[0].length === x.teams.length;
 
@@ -416,24 +433,56 @@ const KEPT_LABEL = { pool: 'Fill in pool order', table: 'Fill in table order', o
  * does: points per 20, or for teams all level, the order they keep.
  */
 export function heldLevel(x) {
-  if (allLevel(x)) return { text: ` They have the same points per 20, so ${keptNow(x)}.`, label: KEPT_LABEL[keptOf(x)] };
-  return { text: (x.level || []).map((g) => ` ${andList(g)} also have the same points per 20, so ${keptNow(x)}.`).join(''),
-    label: 'Use points per 20' };
+  const hh = h2hSaid(x, false);
+  if (allLevel(x)) return { text: `${hh} They have the same ${fig(x)}, so ${keptNow(x)}.`, label: KEPT_LABEL[keptOf(x)] };
+  return { text: hh + (x.level || []).map((g) => ` ${andList(g)} also have the same ${fig(x)}, so ${keptNow(x)}.`).join(''),
+    label: x.h2h && x.h2h.decided !== 'none' ? 'Use head-to-head' : `Use ${fig(x)}` };
+}
+
+// Their records against each other, for a note: "Stanford 2–0, Yale 0–2"
+const h2hRecords = (x) => Object.entries(x.h2h.records || {}).map(([n, r]) => `${n} ${r}`).join(', ');
+
+/**
+ * What a tie's head-to-head (x.h2h: schedule.js fillReport, finalsFill)
+ * did, as a sentence the tie's own one leads into, starting with a space:
+ * '' when the ranking doesn't go by head-to-head. past: for a filled
+ * tie's note, else for one waiting for the TD.
+ */
+export function h2hSaid(x, past) {
+  const h = x.h2h;
+  if (!h) return '';
+  if (!h.records) {
+    return past ? ' They had not all played each other the same number of times, so head-to-head did not count.'
+      : ' They have not all played each other the same number of times, so head-to-head does not count.';
+  }
+  const recs = h2hRecords(x);
+  if (h.decided === 'none') return past ? ` They were even head-to-head (${recs}).` : ` They are even head-to-head (${recs}).`;
+  if (h.decided === 'all') return past ? ` Head-to-head (${recs}) decided their places.` : ` Head-to-head (${recs}) decides their places.`;
+  return past ? ` Head-to-head (${recs}) decided some of their places, ${fig(x)} the rest.`
+    : ` Head-to-head (${recs}) decides some of their places, ${fig(x)} the rest.`;
 }
 
 /**
  * The Live Hub's note for a tie points per 20 settled (a schedule.filled
  * entry), as plain text: headed by its pool ("Pool A") or its finals
- * source bracket. Teams level on points per 20 too (`level`) kept the
+ * source bracket. With head-to-head on (x.h2h), what head-to-head did
+ * first (h2hSaid). Teams level on points per 20 too (`level`) kept the
  * order the public page lists them in (keptOrder), so the note says so
  * rather than that points per 20 decided.
  */
 export function filledNote(x) {
   const head = x.pool ? 'Pool ' + x.pool : x.bracket;
   const names = andList(x.teams.map((tm) => tm.name));
-  if (allLevel(x)) return `${head}: ${names} were tied at ${x.record} with the same points per 20, so ${keptPast(x)}.`;
-  return `${head}: ${names} were tied at ${x.record}, so points per 20 decided their places.`
-    + (x.level || []).map((g) => ` ${andList(g)} also had the same points per 20, so ${keptPast(x)}.`).join('');
+  const level = (x.level || []).map((g) => ` ${andList(g)} also had the same ${fig(x)}, so ${keptPast(x)}.`).join('');
+  // head-to-head on: what it did, and points per 20 only where it was left to
+  if (x.h2h) {
+    if (allLevel(x)) return `${head}: ${names} were tied at ${x.record}.${h2hSaid(x, true)} They had the same ${fig(x)}, so ${keptPast(x)}.`;
+    if (x.h2h.decided === 'all') return `${head}: ${names} were tied at ${x.record}.${h2hSaid(x, true)}`;
+    return `${head}: ${names} were tied at ${x.record}.${h2hSaid(x, true)}`
+      + (x.h2h.decided === 'none' ? ` ${Fig(x)} decided their places.` : '') + level;
+  }
+  if (allLevel(x)) return `${head}: ${names} were tied at ${x.record} with the same ${fig(x)}, so ${keptPast(x)}.`;
+  return `${head}: ${names} were tied at ${x.record}, so ${fig(x)} decided their places.` + level;
 }
 
 /** True when the schedule has a finals slot still to fill. */

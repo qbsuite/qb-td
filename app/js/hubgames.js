@@ -26,7 +26,7 @@ import { serializeYft3 } from '../engine/yft3.js';
 import { buildReport } from '../engine/report.js';
 import { dedupeMatches } from '../engine/stats.js';
 import { makeZip } from '../engine/zip.js';
-import { effectiveFormat } from './read_core.js';
+import { rankFormat } from './read_core.js';
 import { eachLimit } from './limit.js';
 import { fileSummary } from './protests.js';
 
@@ -197,11 +197,11 @@ export async function collectMatches(pub, a, t, buckets, files, onFile = () => {
 
 // The tournament's game format: its regulation tossup count is where
 // overtime starts when the hub ranks teams (stats.js standings), as it is
-// on the public page.
+// on the public page, with its ranking rule (read_core.js rankFormat).
 export function gameFormat(t) {
   let settings = {};
   try { settings = JSON.parse(t.settings) || {}; } catch (e) { /* keep {} */ }
-  return effectiveFormat(settings);
+  return rankFormat(settings);
 }
 
 // The roster's renames (qbj.js rosterNameMap), so a game uploaded under a

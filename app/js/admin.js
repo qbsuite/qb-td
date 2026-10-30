@@ -38,7 +38,7 @@ import { renderStats } from './statsview.js';
 import { pasteGrid } from '../engine/rosterpaste.js';
 import { renderPacketsUi, stagedBlob, endSentence, tbSplitNote } from './packetsui.js';
 import { formatHtml, wireFormat } from './formatui.js';
-import { effectiveFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
+import { rankFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import '../engine/modaqfile.js'; // asked for as early as before (see above)
 import { applyBuzzFix, buzzFixView, lineupGaps, lineupView, applyLineupFix } from '../engine/buzzfix.js';
 import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
@@ -668,6 +668,10 @@ function renderStatsSec(a, t, settings) {
   const open = () => settings.statsOpen === true;
   const canShow = () => hasKey() || open();
   const buzzOn = () => Boolean(settings.buzz && settings.buzz.mode === 'password');
+// Setup -> Stats, Break ties in standings by: [value, label]
+const TIEBREAK_MENU = [['pp20', 'Points per 20 (default)'], ['ppg', 'Points per game'], ['ppb', 'Points per bonus'],
+  ['h2h', 'Head-to-head, then PP20'], ['h2h-ppg', 'Head-to-head, then PPG'], ['h2h-ppb', 'Head-to-head, then PPB']];
+
   const sheetsOn = () => settings.scoresheets === true && canShow();
   const OPEN_WARNING = 'Anyone with the player link will see buzzpoints and scoresheets, and buzzpoints show the '
     + 'questions of finished rounds. Please only choose this once the question set is clear.';
@@ -738,6 +742,12 @@ function renderStatsSec(a, t, settings) {
       </div>
       <p class="muted" style="margin:6px 0 0">Shows a scoresheet for each game when all games during a round finish.</p>
       <div id="sheetsex" class="sheetex" ${statsUi.showExample ? '' : 'hidden'}>
+    <div class="row" style="margin-top:10px">
+      <label class="row">Break ties in standings by
+        <select id="tiebreak">${TIEBREAK_MENU.map(([v, l]) =>
+          `<option value="${v}" ${(settings.tiebreak || 'pp20') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      </label>
+    </div>
         <p>A scoresheet lists the tossups of a game in order. It shows who buzzed and for how many points, which
           bonus parts each team got, the category, and the score after each tossup. A hatched column means that
           player was out of the game. Here is a short example.</p>
@@ -850,6 +860,18 @@ function renderStatsSec(a, t, settings) {
     if ($('pwopen')) {
       $('pwopen').onclick = async () => {
         if (!confirm('Disable the password for scoresheets and buzzpoints?\n\n' + OPEN_WARNING)) return;
+    // how ties in record rank (stats.js tiebreakOf); points per 20 is
+    // stored as no setting
+    $('tiebreak').onchange = async () => {
+      const v = $('tiebreak').value;
+      try {
+        const next = { ...settings };
+        if (v === 'pp20') delete next.tiebreak; else next.tiebreak = v;
+        await saveSettings(next);
+        say('Tiebreak saved');
+        showDetail();
+      } catch (e) { say(e.message, true); }
+    };
         try {
           await saveSettings({ ...settings, statsOpen: true });
           statsUi.want = null; statsUi.changing = false;
@@ -3721,7 +3743,7 @@ function showStats({ a, t, files, settings, got }) {
   }
 
   // ranked and figured as the public page does it (overtime out)
-  renderStats(out, standings(matches, roster, effectiveFormat(settings)), errors);
+  renderStats(out, standings(matches, roster, rankFormat(settings)), errors);
 
   // The tournament's own rules reach every export: the .yft's scoring
   // rules, the overtime split, and the stat report's rate-stat scaling all
@@ -3734,7 +3756,7 @@ function showStats({ a, t, files, settings, got }) {
   // round robin, or a schedule not filled in yet, stays one stage.
   const exportOpts = {
     name: t.name, matches: dedupeMatches(matches), roster,
-    settings: effectiveFormat(settings), schedule: sched,
+    settings: rankFormat(settings), schedule: sched,
   };
   // The two YellowFruits share an extension and nothing else, and neither
   // says so when handed the other's file: YellowFruit 4 refuses a file

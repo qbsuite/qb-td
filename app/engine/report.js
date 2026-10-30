@@ -14,7 +14,7 @@
 // YellowFruit saves a report to disk and what the hsquizbowl.org tournament
 // database expects to be handed; the bare names are YF's in-app preview.
 
-import { aggregate, regulationFigures, standingsOrder, winPct, pptuh, teamGets } from './stats.js';
+import { aggregate, regulationFigures, standingsOrder, winPct, pptuh, teamGets, tiebreakOf, ruleOf, statOf, h2hTiers } from './stats.js';
 import { rosterTracking, resultOf } from './qbj.js';
 import { answerTypes, importOrder, matchId, schoolAndLetter, PHASE_NAME, yfStages, buildYft,
   REGULATION_TOSSUPS } from './yft.js';
@@ -99,14 +99,18 @@ const fmtPpb = (pts, heard) => (heard ? (pts / heard).toFixed(2) : MDASH);
    shared with the hub, which seeds playoffs by them. */
 
 // YF rank strings: teams tied on win % share "N=" (N = rank of the first
-// team in the tied run); otherwise the 1-based position.
-function rankTeams(sorted) {
+// team in the tied run); otherwise the 1-based position. rule: the TD's
+// tiebreak (stats.js standingsOrder): with head-to-head, teams it
+// separated rank apart.
+function rankTeams(sorted, rule = null) {
   const ranks = [];
+  const tier = rule && rule.h2h ? h2hTiers(sorted, rule.h2h) : null;
   let prevPct = 2;
   let prevRank = 0;
   sorted.forEach((t, i) => {
     const pct = winPct(t);
-    const tied = pct === prevPct || (Number.isNaN(pct) && Number.isNaN(prevPct));
+    const tied = (pct === prevPct || (Number.isNaN(pct) && Number.isNaN(prevPct)))
+      && (!tier || tier.get(t.name) === tier.get(sorted[i - 1].name));
     if (tied) {
       ranks[i] = `${prevRank}=`;
       ranks[i - 1] = `${prevRank}=`;
@@ -300,7 +304,7 @@ function playersOf(m, games) {
 // Each team's (by name) figures over some games, as the standings show them
 function tally(games, names) {
   const out = new Map(names.map((n) => [n, { name: n, w: 0, l: 0, t: 0, counts: {}, regTuh: 0, regPoints: 0, tuh: 0,
-    bonusPoints: 0, bonusesHeard: 0 }]));
+    bonusPoints: 0, bonusesHeard: 0, gp: 0, points: 0 }]));
   for (const g of games) {
     for (const [mt, opp] of [[g.teams[0], g.teams[1]], [g.teams[1], g.teams[0]]]) {
       const t = out.get(mt.name);
@@ -312,6 +316,8 @@ function tally(games, names) {
       t.regTuh += g.tossupsRead - g.overtime.tossups;
       t.regPoints += mt.regPoints;
       t.tuh += g.tossupsRead;
+      t.gp++;
+      t.points += mt.points; // for a points-per-game tiebreak (stats.js statOf)
       t.bonusPoints += mt.bonusPoints;
       t.bonusesHeard += mt.bonusesHeard;
     }
@@ -337,8 +343,12 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
   // points, TUH and bonuses heard), as the hub's standings take it too
   regulationFigures(agg, matches, rules);
 
-  const teams = standingsOrder(agg.teams);
-  const teamRanks = rankTeams(teams);
+  // the TD's tiebreak (stats.js tiebreakOf), head-to-head over the games
+  // each table counts
+  const tb = tiebreakOf(rules);
+  const rule = ruleOf(tb, agg.games);
+  const teams = standingsOrder(agg.teams, rule);
+  const teamRanks = rankTeams(teams, rule);
   // The stages the .yft gives YF (yft.js yfStages), from the schedule. With
   // one stage played, its name heads the pages and each of its pools is
   // ranked apart, in the pool's own team order for ties, as YF does.
@@ -349,8 +359,8 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
   const phaseName = stage ? stage.name : PHASE_NAME;
   const byName = new Map(agg.teams.map((t) => [t.name, t]));
   const pools = stage && stage.pools.length > 1 ? stage.pools.map((pl) => {
-    const sorted = standingsOrder(pl.teams.map((n) => byName.get(n)).filter(Boolean));
-    return { name: pl.name, teams: sorted, ranks: rankTeams(sorted) };
+    const sorted = standingsOrder(pl.teams.map((n) => byName.get(n)).filter(Boolean), rule);
+    return { name: pl.name, teams: sorted, ranks: rankTeams(sorted, rule) };
   }) : null;
   // With two or more stages played, the stages as the .yft writes them
   // (stagesOf below): each page then goes stage by stage as YF's does.
@@ -419,7 +429,7 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
 
   return {
     name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks, phaseName, pools, stages, schedule,
-    games, rounds, perTeam, hasPowers, hasNegs, regTossups, trackUG, trackDiv2,
+    games, rounds, perTeam, hasPowers, hasNegs, regTossups, trackUG, trackDiv2, tb,
   };
 }
 
@@ -540,8 +550,9 @@ function stageSections(m) {
     const games = [...gamesOf(st), ...extra];
     return st.pools.map((pl) => {
       const stats = tally(games, pl.teams);
-      const teams = standingsOrder(pl.teams.map((n) => stats.get(n)));
-      return { pl, teams, ranks: rankTeams(teams) };
+      const rule = ruleOf(m.tb, games);
+      const teams = standingsOrder(pl.teams.map((n) => stats.get(n)), rule);
+      return { pl, teams, ranks: rankTeams(teams, rule) };
     });
   };
   const out = [];
@@ -587,7 +598,7 @@ function finalPlacings(m) {
     const rest = [];
     for (const { teams } of tables) teams.forEach((t, i) => { if (!seen.has(t.name)) rest.push({ t, place: i }); });
     const num = (x) => (Number.isNaN(x) ? -1 : x);
-    rest.sort((a, b) => a.place - b.place || num(winPct(b.t)) - num(winPct(a.t)) || num(pptuh(b.t)) - num(pptuh(a.t)));
+    rest.sort((a, b) => a.place - b.place || num(winPct(b.t)) - num(winPct(a.t)) || num(statOf(b.t, m.tb.stat)) - num(statOf(a.t, m.tb.stat)));
     for (const x of rest) { seen.add(x.t.name); out.push({ name: x.t.name, tie: null }); }
   });
   // the finals: the winner of the last final played first, the other second

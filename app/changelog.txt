@@ -1,3 +1,8 @@
+Release Notes for 10/30/2026
+
+[ STATS ]
+- Break ties by PP20, PPG, PPB, or head-to-head first.
+
 Release Notes for 10/29/2026
 
 [ HUB ]

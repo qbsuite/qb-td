@@ -4697,6 +4697,8 @@ function pubFormat(t) {
     if (s.formatOverrides && typeof s.formatOverrides === 'object') {
       out.formatOverrides = s.formatOverrides;
     }
+    // how ties in record are ranked (read_core.js rankFormat)
+    if (['ppg', 'ppb', 'h2h', 'h2h-ppg', 'h2h-ppb'].includes(s.tiebreak)) out.tiebreak = s.tiebreak;
     return out;
   } catch (e) { return {}; }
 }
