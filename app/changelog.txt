@@ -1,3 +1,11 @@
+Release Notes for 10/31/2026
+
+[ CATEGORIES ]
+- By Player lists players under their teams, with a search box to find a name.
+
+[ BUZZPOINTS ]
+- By Player now uses the same list, in place of the team menu and player chips.
+
 Release Notes for 10/30/2026
 
 [ STATS ]

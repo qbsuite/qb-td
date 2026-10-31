@@ -729,6 +729,109 @@ function wire(box, attr, pick) {
     el.onclick = (e) => { e.preventDefault(); pick(el.dataset[attr]); render(); };
   });
 }
+// A player list: a button showing the picked player, which opens the
+// list with a search box on top. The list runs team by team, each team's
+// players under its name; typing narrows it to names (or teams) holding
+// every word typed, accents and case aside. The search box takes the
+// focus only on a mouse or trackpad: on a phone that would bring up the
+// keyboard over the list. items [{name, team}], sorted by team; `cur` is
+// the picked index.
+const foldName = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const pickLabel = (p) => `${p.name} (${p.team})`;
+function pickerHtml(id, items, cur) {
+  return `<div class="pick"><button type="button" id="${id}" class="pickbtn" aria-haspopup="listbox"
+    aria-expanded="false">${esc(items[cur] ? pickLabel(items[cur]) : '')}</button><div class="pickpanel" hidden>
+    <input type="search" id="${id}-q" role="combobox" aria-expanded="false" aria-controls="${id}-list"
+      aria-autocomplete="list" autocomplete="off" spellcheck="false" aria-label="Search players" placeholder="Search">
+    <ul id="${id}-list" class="picklist" role="listbox"></ul></div></div>`;
+}
+function wirePicker(id, items, cur, pick) {
+  const btn = $(id);
+  const input = $(id + '-q');
+  const list = $(id + '-list');
+  const panel = list.parentElement;
+  const keys = items.map((p) => foldName(pickLabel(p)));
+  let shown = [];
+  let at = -1;
+  const opts = () => [...list.querySelectorAll('[role="option"]')];
+  const mark = (i) => {
+    at = i;
+    opts().forEach((li, j) => li.classList.toggle('on', j === at));
+    const li = opts()[at];
+    if (li) {
+      input.setAttribute('aria-activedescendant', li.id);
+      li.scrollIntoView({ block: 'nearest' });
+    } else input.removeAttribute('aria-activedescendant');
+  };
+  // a tap or click outside the open list closes it
+  const outside = (e) => { if (!panel.contains(e.target) && e.target !== btn) close(); };
+  const open = (q) => {
+    const words = foldName(q).split(/\s+/).filter(Boolean);
+    shown = items.map((_, i) => i).filter((i) => words.every((w) => keys[i].includes(w)));
+    const teams = [];
+    shown.forEach((i, j) => {
+      const t = teams[teams.length - 1];
+      if (t && t.team === items[i].team) t.rows.push([i, j]);
+      else teams.push({ team: items[i].team, rows: [[i, j]] });
+    });
+    list.innerHTML = teams.length ? teams.map((t) =>
+      `<li role="group" aria-label="${esc(t.team)}"><div class="pickteam" aria-hidden="true">${esc(t.team)}</div><ul role="presentation">${
+        t.rows.map(([i, j]) => `<li id="${id}-o${j}" role="option" aria-selected="${i === cur}">${esc(items[i].name)}</li>`).join('')}</ul></li>`).join('')
+      : '<li class="muted none">No matches</li>';
+    if (panel.hidden) {
+      panel.hidden = false;
+      document.addEventListener('pointerdown', outside, true);
+    }
+    input.setAttribute('aria-expanded', 'true');
+    btn.setAttribute('aria-expanded', 'true');
+    mark(shown.length ? Math.max(0, words.length ? 0 : shown.indexOf(cur)) : -1);
+  };
+  function close() {
+    panel.hidden = true;
+    document.removeEventListener('pointerdown', outside, true);
+    input.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+    input.value = '';
+  }
+  const choose = (j) => {
+    if (shown[j] === undefined) return;
+    close();
+    if (shown[j] === cur) { btn.blur(); return; }
+    pick(items[shown[j]]);
+    render();
+  };
+  btn.onclick = () => {
+    if (!panel.hidden) { close(); return; }
+    open('');
+    if (matchMedia('(pointer: fine)').matches) input.focus();
+  };
+  btn.onkeydown = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(''); input.focus(); }
+  };
+  panel.parentElement.addEventListener('focusout', (e) => {
+    if (!panel.hidden && !panel.parentElement.contains(e.relatedTarget)) close();
+  });
+  input.oninput = () => open(input.value);
+  input.onkeydown = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (shown.length) mark((at + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      choose(at);
+    } else if (e.key === 'Escape') {
+      close();
+      btn.focus();
+    }
+  };
+  // mousedown, not click: the focus stays put until the pick lands
+  list.onmousedown = (e) => {
+    e.preventDefault();
+    const li = e.target.closest('[role="option"]');
+    if (li) choose(opts().indexOf(li));
+  };
+}
 // Category chips, then the picked category's subcategories under them,
 // then the picked subcategory's own split (RMPSS → Beliefs → Narratives).
 // `items` are [{cat, sub, sub2}] with a count each (`n`); a subcategory
@@ -846,26 +949,33 @@ async function renderBuzzSide(box, rounds, byPlayer) {
   const teams = [...new Set(rows.map((p) => p.team))].sort((a, b) => a.localeCompare(b));
   if (!teams.length) { box.innerHTML = '<div class="muted">No buzzes yet</div>'; return; }
   if (!teams.includes(buzzTeam)) { buzzTeam = teams[0]; buzzPlayer = ''; }
-  const players = rows.filter((p) => p.team === buzzTeam).map((p) => p.player)
-    .sort((a, b) => a.localeCompare(b));
-  if (byPlayer && !players.includes(buzzPlayer)) buzzPlayer = players[0];
+  // every player who buzzed, by team; By Player picks one of them
+  const players = rows.map((p) => ({ name: p.player, team: p.team }))
+    .sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name));
+  let cur = players.findIndex((p) => p.team === buzzTeam && p.name === buzzPlayer);
+  if (byPlayer && cur < 0) {
+    cur = Math.max(0, players.findIndex((p) => p.team === buzzTeam));
+    buzzPlayer = players[cur].name;
+  }
   const at = { mode: buzzMode, team: buzzTeam, player: byPlayer ? buzzPlayer : '' };
   const side = sideRounds(rawEntries, rounds, at.team, at.player);
   // a dropdown, not chips: a big field's teams would wrap to rows of them
   box.innerHTML = `
-    <div style="margin-bottom:10px">
+    <div style="margin-bottom:10px">${byPlayer ? pickerHtml('buzzplayersel', players, cur) : `
       <select id="buzzteamsel" aria-label="Team">
         ${teams.map((t, i) => `<option value="${i}" ${t === buzzTeam ? 'selected' : ''}>${esc(t)}</option>`).join('')}
-      </select>
+      </select>`}
     </div>
-    ${byPlayer ? `<div class="chipstack">${chipsHtml(players.map((p) => ({ v: p, label: p })), buzzPlayer, 'buzzplayer')}</div>` : ''}
     <div id="buzzsideout"><div class="muted">Loading packets</div></div>`;
-  $('buzzteamsel').onchange = () => {
-    buzzTeam = teams[Number($('buzzteamsel').value)];
-    buzzPlayer = '';
-    render();
-  };
-  wire(box, 'buzzplayer', (v) => { buzzPlayer = v; });
+  if (byPlayer) {
+    wirePicker('buzzplayersel', players, cur, (p) => { buzzTeam = p.team; buzzPlayer = p.name; });
+  } else {
+    $('buzzteamsel').onchange = () => {
+      buzzTeam = teams[Number($('buzzteamsel').value)];
+      buzzPlayer = '';
+      render();
+    };
+  }
   const packets = new Map();
   for (const [n, p] of await Promise.all(side.map(async ({ round: n }) => [n, await buzzPacketOrNull(n)]))) {
     if (p === false) return;
@@ -1007,15 +1117,12 @@ function renderByPlayer(box, rows) {
     || !players.some((p) => p.team === catPlayerSel.team && p.player === catPlayerSel.player)) {
     catPlayerSel = players[0];
   }
+  const items = players.map((p) => ({ name: p.player, team: p.team }));
+  const cur = players.findIndex((p) => p.team === catPlayerSel.team && p.player === catPlayerSel.player);
   const bd = catBreakdown(rows, catPlayerSel.team, catPlayerSel.player);
   const pw = showPowers(bd.map((b) => b.line));
   box.innerHTML = `
-    <div style="margin-bottom:10px">
-      <select id="catplayersel">
-        ${players.map((p, i) => `<option value="${i}" ${p.team === catPlayerSel.team
-          && p.player === catPlayerSel.player ? 'selected' : ''}>${esc(p.player)} (${esc(p.team)})</option>`).join('')}
-      </select>
-    </div>
+    <div style="margin-bottom:10px">${pickerHtml('catplayersel', items, cur)}</div>
     <div class="tablewrap"><table>
       <tr><th>Category</th>${catHead(pw)}</tr>
       ${bd.map(({ cat, line, subs }) =>
@@ -1026,10 +1133,7 @@ function renderByPlayer(box, rows) {
             `<tr class="muted"><td style="padding-left:48px">${esc(x)}</td>${lineCells(l2, pw)}</tr>`).join('')).join('')
       ).join('')}
     </table></div>`;
-  $('catplayersel').onchange = () => {
-    catPlayerSel = players[Number($('catplayersel').value)];
-    render();
-  };
+  wirePicker('catplayersel', items, cur, (p) => { catPlayerSel = players[items.indexOf(p)]; });
 }
 
 // How each category's questions played: tossups the way the buzzpoints

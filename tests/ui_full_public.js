@@ -1672,20 +1672,40 @@ async function sectionMain(br) {
       && /^iBonus difficulty not available for 24 of 48 bonuses, ranked by conversion rate\.$/.test(x[1] || '')) || x;
   });
   await tab.click('[data-catview="player"]');
-  await check('cat-05 by player: the dropdown lists each "Player (Team)", by team', async () => {
-    const x = await tab.texts('#catplayersel option');
-    return (x[0] === `${ROSTER.Alder[0]} (Alder)` && x.every((o) => /\(.+\)$/.test(o)) && x.some((o) => o === `${ROSTER.Dogwood[2]} (Dogwood)`)) || x;
+  // the open list, team by team: [team, [its players]]
+  const pickList = (id) => tab.js(`[...document.querySelectorAll('#${id}-list [role="group"]')].map((g) =>
+    [g.querySelector('.pickteam').textContent, [...g.querySelectorAll('[role="option"]')].map((o) => o.textContent)])`);
+  await check('cat-05 by player: the button shows the first player and opens to each team\'s players under its name, the search box focused', async () => {
+    const v = await tab.text('#catplayersel');
+    await tab.click('#catplayersel');
+    const f = await tab.js(`document.activeElement.id`);
+    const x = await pickList('catplayersel');
+    const dog = x.find((g) => g[0] === 'Dogwood');
+    return (v === `${ROSTER.Alder[0]} (Alder)` && x[0][0] === 'Alder' && x[0][1][0] === ROSTER.Alder[0]
+      && dog && dog[1].includes(ROSTER.Dogwood[2]) && q(x.map((g) => g[0])) === q([...x.map((g) => g[0])].sort()) && f === 'catplayersel-q') || { v, f, x };
   });
-  {
-    const opt = await tab.js(`[...document.querySelectorAll('#catplayersel option')].findIndex((o) => o.textContent === ${q(ROSTER.Alder[2] + ' (Alder)')})`);
-    await tab.select('#catplayersel', String(opt));
-  }
+  await check('cat-05 by player: typing narrows the list to the players holding every word, any case', async () => {
+    await tab.fill('#catplayersel-q', ROSTER.Alder[2].toUpperCase().split(' ').reverse().join(' '));
+    const x = await pickList('catplayersel');
+    return q(x) === q([['Alder', [ROSTER.Alder[2]]]]) || x;
+  });
+  await tab.key('#catplayersel-q', 'Enter');
   await check('cat-05 by player: one player\'s lines per category, its subcategories and splits indented', async () => {
     const x = await tab.js(`[...document.querySelectorAll('#catbody table tr')].slice(1).map((tr) => [tr.children[0].textContent, tr.children[0].style.paddingLeft || '', tr.children[tr.children.length - 1].textContent])`);
     // Cy Alder gets tossups 4, 9, 14 and 19 of rounds 2 and 3: Economics, Psychology, Religion, Economics
     const has = (row) => x.some((y) => q(y) === q(row));
     return (has(['RMPSS', '', '80']) && has(['Social Science', '28px', '60']) && has(['Economics', '48px', '40']) && has(['Psychology', '48px', '20']) && has(['Religion', '28px', '20'])) || x;
   });
+
+  await tab.view('phone');
+  await tab.S('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await check('cat-05 by player: on a touch screen the list opens with the search box unfocused, so no keyboard comes up', async () => {
+    await tab.click('#catplayersel');
+    const x = await tab.js(`[document.activeElement.id, !document.querySelector('.pickpanel').hidden, matchMedia('(pointer: fine)').matches]`);
+    await tab.click('#catplayersel');
+    return q(x) === q(['', true, false]) || x;
+  });
+  await tab.S('Emulation.setTouchEmulationEnabled', { enabled: false });
 
   /* --- phone --- */
   await tab.view('phone');
@@ -1901,22 +1921,31 @@ async function sectionMain(br) {
       while (n && !n.classList.contains('rhead')) { if (n.matches('details.qd')) labels.push(n.querySelector('.roundcell').textContent.trim()); n = n.nextElementSibling; }
       return { round: h.textContent.trim(), labels }; }); })()`, 'the side view');
   await tab.click('[data-buzzmode="player"]');
-  await check('bz-04 by player: a team list, the team\'s players who buzzed, and the first one\'s own buzzes round by round', async () => {
-    const teams = await tab.texts('#buzzteamsel option');
-    const players = await tab.js(`[...document.querySelectorAll('#out [data-buzzplayer]')].map((c) => [c.textContent, c.classList.contains('on')])`);
+  await check('bz-04 by player: a list of the players who buzzed, by team, and the first one\'s own buzzes round by round', async () => {
+    const v = await tab.text('#buzzplayersel');
+    await tab.click('#buzzplayersel');
+    const players = await pickList('buzzplayersel');
+    await tab.click('#buzzplayersel');
     const x = await sideOut();
     const lines = await tab.js(`[...document.querySelectorAll('#buzzsideout details.qd:not(.bonus) .buzzlist > div')].map((e) => e.textContent.replace(/\\s+/g, ' ').trim())`);
     const want = [{ round: 'Round 2', labels: sideWant(g21, 'Alder', ROSTER.Alder[0]) }, { round: 'Round 3', labels: sideWant(g31, 'Alder', ROSTER.Alder[0]) }];
-    return (q(teams) === q(['Alder', 'Cedar', 'Dogwood', 'Elm', 'Fir', UIUC]) && q(players) === q(ROSTER.Alder.slice(0, 4).map((p, i) => [p, i === 0]))
-      && q(x) === q(want) && lines.length === want.flatMap((w) => w.labels).length && lines.every((l) => l.includes(`${ROSTER.Alder[0]} (Alder)`))) || { teams, players, x, want, lines };
+    return (v === `${ROSTER.Alder[0]} (Alder)` && q(players[0]) === q(['Alder', ROSTER.Alder.slice(0, 4)])
+      && q(players.map((g) => g[0])) === q(['Alder', 'Cedar', 'Dogwood', 'Elm', 'Fir', UIUC])
+      && q(x) === q(want) && lines.length === want.flatMap((w) => w.labels).length && lines.every((l) => l.includes(`${ROSTER.Alder[0]} (Alder)`))) || { v, players, x, want, lines };
   });
-  await tab.click(`[data-buzzplayer="${ROSTER.Alder[2]}"]`);
-  await check('bz-04 by player: another player\'s chip shows that player\'s buzzes instead', async () => {
+  await tab.click('#buzzplayersel');
+  await tab.fill('#buzzplayersel-q', ROSTER.Alder[2].toLowerCase());
+  await tab.press('#buzzplayersel-list [role="option"]');
+  await check('bz-04 by player: picking another player from the list shows that player\'s buzzes instead', async () => {
     const x = await sideOut();
     const want = [{ round: 'Round 2', labels: sideWant(g21, 'Alder', ROSTER.Alder[2]) }, { round: 'Round 3', labels: sideWant(g31, 'Alder', ROSTER.Alder[2]) }];
     return q(x) === q(want) || { x, want };
   });
   await tab.click('[data-buzzmode="team"]');
+  await check('bz-04 by team: a team list, on the team of the player picked last', async () => {
+    const x = await tab.js(`[[...document.querySelectorAll('#buzzteamsel option')].map((o) => o.textContent.trim()), document.querySelector('#buzzteamsel').selectedOptions[0].textContent.trim()]`);
+    return (q(x[0]) === q(['Alder', 'Cedar', 'Dogwood', 'Elm', 'Fir', UIUC]) && x[1] === 'Alder') || x;
+  });
   await check('bz-04 by team: the team\'s tossups and the bonuses it heard, round by round, every line its own', async () => {
     const x = await sideOut();
     const lines = await tab.js(`[[...document.querySelectorAll('#buzzsideout details.qd:not(.bonus) .buzzlist > div')].map((e) => e.textContent.replace(/\\s+/g, ' ').trim()),

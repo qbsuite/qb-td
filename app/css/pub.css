@@ -219,3 +219,33 @@ details.qd .qdmeta.track { line-height: 20px; }
 .sw.locked .swtrack { opacity: .6; }
 @media (prefers-reduced-motion: reduce) { .sw .swtrack, .sw .swknob { transition: none; } }
 .sxwait { font-size: 13px; margin: 8px 0 0; }
+
+/* a player list: a button, and the list with its search box under it
+   (pubview.js pickerHtml) */
+.pick { position: relative; display: inline-block; width: min(100%, 38ch); }
+.pickbtn {
+  width: 100%; text-align: left; color: var(--fg); padding: 6px 30px 6px 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pickbtn:hover { border-color: var(--line); }
+.pickbtn:focus-visible, .pickbtn[aria-expanded="true"] { outline: none; border-color: var(--link); }
+.pick::after {
+  content: ""; position: absolute; right: 12px; top: 50%; width: 6px; height: 6px;
+  margin-top: -5px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg); pointer-events: none;
+}
+.pickpanel {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); padding: 6px;
+}
+.pickpanel input { width: 100%; }
+.picklist { list-style: none; max-height: min(320px, 55vh); overflow-y: auto; margin-top: 4px; }
+.picklist ul { list-style: none; }
+.picklist .pickteam { padding: 6px 8px 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.picklist li[role="group"] + li[role="group"] .pickteam { margin-top: 4px; border-top: 1px solid var(--line); padding-top: 8px; }
+.picklist [role="option"], .picklist .none { padding: 4px 8px 4px 22px; border-radius: 6px; cursor: pointer; }
+.picklist .none { padding-left: 8px; cursor: default; }
+.picklist [role="option"].on { background: var(--sel); }
+.picklist [role="option"][aria-selected="true"] { font-weight: 600; }
+@media (max-width: 640px) { .pick { width: 100%; } }
