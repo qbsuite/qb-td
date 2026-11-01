@@ -84,6 +84,7 @@ const CH = {
   renameRoom: '[ SCHEDULE ] Renaming a room renames its line on the saved schedule, also when the room was matched by name.',
   editNumbers: '[ LIVE HUB ] Edit in MODAQ keeps the question numbers of replaced and added questions, so a corrected game matches the original.',
   testLinks: '[ SECURITY ] Room Test links no longer contain the admin link\'s secret.',
+  keptParse: '[ PERFORMANCE ] A .docx packet is sent to the packet parser once, when it is uploaded, rather than each time it is opened.',
 };
 const changed = (key) => ` [changed: ${CH[key]}]`;
 
@@ -764,8 +765,8 @@ await section('RT', 'the TD\'s Test link before Start', async () => {
   // a test reads every round with a packet, not only those reached
   ok('RT every round with a packet is listed', JSON.stringify((await roundButtons(tab)).map((b) => b.n)) === JSON.stringify(['1', '2', '3', '4']), await roundButtons(tab));
   const asked = tab.worker(m);
-  ok('RT one /load with &test=, then the packet with &test=' + changed('oneRequest'),
-    asked.length === 2 && /^GET \/b\/:s\/load\?test=[0-9a-f]{64}$/.test(asked[0]) && /^GET \/b\/:s\/packet\?round=1&warm=1&test=[0-9a-f]{64}$/.test(asked[1]), asked);
+  ok('RT one /load with &test=, then the packet with &test=' + changed('oneRequest') + changed('keptParse'),
+    asked.length === 2 && /^GET \/b\/:s\/load\?test=[0-9a-f]{64}$/.test(asked[0]) && /^GET \/b\/:s\/packet\?round=1&warm=1&parsed=1&test=[0-9a-f]{64}$/.test(asked[1]), asked);
   ok('RT the Test link has no admin secret in it' + changed('testLinks'), !(await tab.js('location.href')).includes(M.admin));
   // a test game: no start sent, kept apart, nothing uploaded
   const m2 = tab.mark();
@@ -816,13 +817,13 @@ await openRoom(watch, room('Room 1'));
 
 await section('R06', 'one request for the room (/b/:secret/load)', async () => {
   const asked = watch.worker(0);
-  ok('R06 a room link: GET /load, then GET /packet?round=3&warm=1, nothing else' + changed('oneRequest'),
-    JSON.stringify(asked) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=3&warm=1']), asked);
+  ok('R06 a room link: GET /load, then GET /packet?round=3&warm=1&parsed=1, nothing else' + changed('oneRequest') + changed('keptParse'),
+    JSON.stringify(asked) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=3&warm=1&parsed=1']), asked);
   const m = tab.mark();
   await openRoom(tab, room('Bye Room'), '&test=bye');
   const bye = tab.worker(m);
-  ok('R06 a Bye Room link: the same, with &test=bye' + changed('oneRequest'),
-    JSON.stringify(bye) === JSON.stringify(['GET /b/:s/load?test=bye', 'GET /b/:s/packet?round=3&warm=1&test=bye']), bye);
+  ok('R06 a Bye Room link: the same, with &test=bye' + changed('oneRequest') + changed('keptParse'),
+    JSON.stringify(bye) === JSON.stringify(['GET /b/:s/load?test=bye', 'GET /b/:s/packet?round=3&warm=1&parsed=1&test=bye']), bye);
 });
 
 await section('R07', 'when /load fails, each part is fetched on its own', async () => {
@@ -836,8 +837,8 @@ await section('R07', 'when /load fails, each part is fetched on its own', async 
   let m = tab.mark();
   try { await openRoom(tab, S3); } finally { await tab.block([]); }
   let got = tab.worker(m);
-  ok('R07 /load blocked: the room, schedule, roster and pool are each fetched once, then the packet', once(got, parts)
-    && got.includes('GET /b/:s/packet?round=3&warm=1'), got);
+  ok('R07 /load blocked: the room, schedule, roster and pool are each fetched once, then the packet' + changed('keptParse'), once(got, parts)
+    && got.includes('GET /b/:s/packet?round=3&warm=1&parsed=1'), got);
   ok('R07 /load blocked: the page looks the same (matchup, starters, panels, no roster error)', (await roomView(tab)) === want,
     { want, got: await roomView(tab) });
   // a part whose status is not an integer
@@ -877,8 +878,8 @@ await section('R05', 'a server failure on load', async () => {
         && !(await tab.js(`document.querySelector('#tbpanel').hidden`)));
     ok('R05 one /load part failing: no scheduled matchup and no schedule panel, with nothing said', (await tab.text('#msg')) === ''
       && (await tab.js(`document.querySelector('#schedmatch').hidden && document.querySelector('#schedpanel').hidden && !document.querySelector('#teampickers').hidden`)));
-    ok('R05 one /load part failing: no part is fetched again' + changed('oneRequest'),
-      JSON.stringify(tab.worker(m)) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=3&warm=1']), tab.worker(m));
+    ok('R05 one /load part failing: no part is fetched again' + changed('oneRequest') + changed('keptParse'),
+      JSON.stringify(tab.worker(m)) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=3&warm=1&parsed=1']), tab.worker(m));
     const load = await call(`/b/${room('Room 3')}/load`);
     ok('R05 Worker: that part is a JSON 500, the other three 200' + changed('serverFail'), load.status === 200 && load.body['/schedule'].s === 500
       && JSON.parse(load.body['/schedule'].b).error === 'Something went wrong on the server. Please try again.'
@@ -1673,7 +1674,7 @@ await section('R11', 'played rounds stay selectable; future rounds locked', asyn
     && (await tab.text('#mteama')) === g.a && (await tab.text('#mteamb')) === g.b);
   const m = tab.mark();
   await startGame(tab);
-  ok('R11 Start reads that round\'s packet (a room running behind)', tab.worker(m).includes('GET /b/:s/packet?round=2&warm=1') && (await mq.tossup(tab)).startsWith('1. R2T1 ')
+  ok('R11 Start reads that round\'s packet (a room running behind)' + changed('keptParse'), tab.worker(m).includes('GET /b/:s/packet?round=2&warm=1&parsed=1') && (await mq.tossup(tab)).startsWith('1. R2T1 ')
     && tab.worker(m).includes('POST /b/:s/start?round=2'), tab.worker(m));
   ok('R11 the header says round 2', (await tab.text('#room')) === 'Room 5 · Round 2');
   ok('R11 the Worker records the start on round 2', ((await M.detail()).starts || []).some((x) => x.bucket_id === M.rooms['Room 5'].id && x.round === 2));
@@ -2410,7 +2411,7 @@ await section('R19b', 'no schedule, no tiebreaker pool', async () => {
   const load = await call(`/b/${AUX2}/load`);
   ok('R19 R25 Worker: /schedule 404 "no schedule", /tiebreakers 404 "no tiebreakers"', load.body['/schedule'].s === 404 && load.body['/tiebreakers'].s === 404,
     [load.body['/schedule'], load.body['/tiebreakers']]);
-  ok('R19 nothing fetched again on its own' + changed('oneRequest'), JSON.stringify(tab.worker(m)) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=2&warm=1']), tab.worker(m));
+  ok('R19 nothing fetched again on its own' + changed('oneRequest') + changed('keptParse'), JSON.stringify(tab.worker(m)) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=2&warm=1&parsed=1']), tab.worker(m));
 });
 
 await section('R37b', 'Add questions and Replace with no pool', async () => {
@@ -2644,7 +2645,7 @@ await section('RP', 'pools with their own rounds, three byes, a packet load that
   await tab.click('#start');
   const opened = await until(() => tab.js(`document.body.classList.contains('reading') && !!document.querySelector('#modaq .ms-CommandBar')`), 'MODAQ', 15000)
     .catch(() => false);
-  ok('RP R26 once it loads, Start again fetches it and the game opens', opened && tab.worker(m).includes('GET /b/:s/packet?round=1&warm=1')
+  ok('RP R26 once it loads, Start again fetches it and the game opens' + changed('keptParse'), opened && tab.worker(m).includes('GET /b/:s/packet?round=1&warm=1&parsed=1')
     && (await mq.tossup(tab)).startsWith('1. R1T1 '), { asked: tab.worker(m), msg: await tab.text('#msg') });
 });
 
@@ -2654,8 +2655,8 @@ await section('RZ', 'after the run', async () => {
   const wait = 31000 - (Date.now() - watchFrom);
   if (wait > 0) await sleep(wait);
   const asked = watch.worker(0);
-  ok('R06 the room link opened at the start has asked for nothing since its load (31 s and more): no part fetched on its own' + changed('oneRequest'),
-    JSON.stringify(asked) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=3&warm=1']), asked);
+  ok('R06 the room link opened at the start has asked for nothing since its load (31 s and more): no part fetched on its own' + changed('oneRequest') + changed('keptParse'),
+    JSON.stringify(asked) === JSON.stringify(['GET /b/:s/load', 'GET /b/:s/packet?round=3&warm=1&parsed=1']), asked);
   const all = tabs.flatMap((t) => t.reqs.map((r) => r.url));
   const prod = all.filter((u) => /qbsuite\.github\.io|workers\.dev|githubusercontent|quizbowlreader|api\.github\.com|api\.cloudflare\.com/.test(u));
   ok('no page asked for production, GitHub, Cloudflare or the .docx parser', prod.length === 0, prod);

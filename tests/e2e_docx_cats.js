@@ -8,7 +8,7 @@
 // Synthetic packets only.
 import { execSync } from 'node:child_process';
 import { makeZip } from '../app/engine/zip.js';
-import { BASE, call, ok, summary } from './e2e_lib.js';
+import { BASE, PERSIST, call, ok, summary } from './e2e_lib.js';
 
 const enc = (s) => new TextEncoder().encode(s);
 const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -53,8 +53,27 @@ ok('with subcategories where the tag names one', !!r1 && r1.t[1].s === 'Biology'
 ok('a second .docx round joins the map', (await put(T, 2, packet())) === 200 && !!(await cats(T)).body.rounds['2']);
 ok('a .docx with no tags adds nothing', (await put(T, 3, packet(false))) === 200 && !(await cats(T)).body.rounds['3']);
 
+/* ----- the parse is kept: the reader gets it, the download the file ----- */
+const room = (await call(T.A + '/buckets', { method: 'POST', json: { room_name: 'Room 1' } })).body.secret;
+await call(T.A + '/start', { method: 'POST' });
+const asJson = await fetch(`${BASE}/b/${room}/packet?round=1&warm=1&parsed=1`);
+const parsed = await asJson.json().catch(() => null);
+ok('the reader gets YAPP\'s parse as JSON', asJson.status === 200 && /^application\/json/.test(asJson.headers.get('content-type'))
+  && parsed && parsed.tossups.length === 3 && parsed.bonuses.length === 2, { status: asJson.status, type: asJson.headers.get('content-type') });
+ok('with the packet\'s own text', parsed && /Sim tossup 2 text/.test(parsed.tossups[1].question), parsed && parsed.tossups[1]);
+const file = await fetch(`${BASE}/b/${room}/packet?round=1&warm=1`);
+const bytes = new Uint8Array(await file.arrayBuffer());
+ok('the download is the .docx as uploaded', file.status === 200 && bytes.length === packet().length && bytes[0] === 0x50 && bytes[1] === 0x4b, bytes.length);
+// a YAPP_COUNT url (a counting proxy in front of YAPP) shows the calls
+if (process.env.QBTD_YAPP_COUNT) {
+  const count = async () => (await (await fetch(process.env.QBTD_YAPP_COUNT)).json()).count;
+  const before = await count();
+  for (let i = 0; i < 3; i++) await fetch(`${BASE}/b/${room}/packet?round=2&warm=1&parsed=1`).then((r) => r.arrayBuffer());
+  ok('three more reader loads send YAPP nothing', (await count()) === before, { before, after: await count() });
+}
+
 /* ----- the backfill: a tournament whose map went missing ----- */
-execSync(`npx wrangler r2 object delete qb-td-data/t/${T.id}/catmap.json --local`, { cwd: new URL('../worker', import.meta.url).pathname, stdio: 'ignore' });
+execSync(`npx wrangler r2 object delete qb-td-data/t/${T.id}/catmap.json --local${PERSIST}`, { cwd: new URL('../worker', import.meta.url).pathname, stdio: 'ignore' });
 ok('with its map gone the tab has nothing', (await cats(T)).status === 404);
 await call(T.A);
 let back = null;

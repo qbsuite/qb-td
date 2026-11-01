@@ -208,8 +208,9 @@ let reviewing = null;  // {packet, v} while the review panel is open
 // YAPP — the same path the buzzpoints tab reads packets by.
 const parsePacket = (bytes, label) => readPacket(new Response(bytes), label);
 
+// A stored version's questions: a .docx comes as the Worker's kept parse
 async function fetchPacketBytes(packet, v) {
-  const res = await fetch(`${API}${S}/file?packet=${packet}&v=${v}`);
+  const res = await fetch(`${API}${S}/file?packet=${packet}&v=${v}&parsed=1`);
   if (!res.ok) throw new Error('could not read the packet');
   return res.arrayBuffer();
 }
@@ -305,12 +306,17 @@ function renderPackets() {
     })),
     setSlots: (n) => saveSettings({ ...settingsOf(detail.set), rounds: n }),
     uploadPacket: async (st, packet) => {
-      // read the questions first: a packet that cannot be read is still
-      // uploaded, but it is said up front that it will stand alone
-      let parsed = null;
-      try { parsed = await parsePacket(st.data, st.name); } catch (e) { /* reported below */ }
+      // a packet that cannot be read is still uploaded, but it is said up
+      // front that it will stand alone; a .docx is read from the parse the
+      // upload kept, so YAPP sees it once
       const out = await pub(`${S}/packet?packet=${packet}&name=${encodeURIComponent(st.name)}`,
         { method: 'POST', body: stagedBlob(st) });
+      let parsed = null;
+      try {
+        parsed = /\.docx$/i.test(st.name)
+          ? await parsePacket(await fetchPacketBytes(packet, out.version), st.name)
+          : await parsePacket(st.data, st.name);
+      } catch (e) { /* reported below */ }
       const sent = out.mirrors
         ? ` Sent to ${out.mirrors} running mirror${out.mirrors === 1 ? '' : 's'} that had not opened it.` : '';
       if (!parsed) {
@@ -738,7 +744,7 @@ const statsSource = {
   state: () => pub(S + '/state', { cache: 'no-cache' }),
   rounds: (mirrorId, q) => pub(`${S}/rounds?m=${mirrorId}&n=${q}`),
   cats: () => pub(S + '/cats', { cache: 'no-cache' }),
-  packet: async (packet, v) => readPacket(await pub(`${S}/file?packet=${packet}&v=${v}`), 'packet ' + packet),
+  packet: async (packet, v) => readPacket(await pub(`${S}/file?packet=${packet}&v=${v}&parsed=1`), 'packet ' + packet),
   mirrorLink: (m) => (m.page ? mirrorPageLink(m.slug) : ''),
 };
 

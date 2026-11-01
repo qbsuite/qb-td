@@ -136,10 +136,14 @@ Part of [qbsuite](https://qbsuite.github.io/).
   device's in-progress games. The page never polls. Any number of moderators can share one
   link (game state is per-device), and stats + the `.yft` count only
   the latest upload per round + team pair — a re-export corrects a
-  game instead of double-counting it. `.json` packets load directly; `.docx`
-  packets are parsed in the mod's browser by the public YAPP service
-  (the same one MODAQ's demo uses — docx question text transits
-  quizbowlreader.com).
+  game instead of double-counting it. `.json` packets load directly; a
+  `.docx` packet is parsed once, by the Worker at upload, through the
+  public YAPP service (the same one MODAQ's demo uses — docx question text
+  transits quizbowlreader.com). YAPP's JSON is kept beside the packet in
+  R2, encrypted like it, and is what the reader, the hub's preview,
+  buzzpoints and a set's editor read; the `.docx` stays for downloads.
+  Only when YAPP can't be reached does a browser send the `.docx` to YAPP
+  itself, as before.
 - **Public tournament page** (`app/t.html?t=<slug>`; `stats.html`
   redirects): schedule + stats + buzzpoints tabs. The schedule tab
   renders the grid with played games' scores filled in from the

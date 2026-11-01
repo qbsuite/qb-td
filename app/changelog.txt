@@ -1,3 +1,8 @@
+Release Notes for 11/1/2026
+
+[ PERFORMANCE ]
+- A .docx packet is sent to the packet parser once, when it is uploaded, rather than each time it is opened.
+
 Release Notes for 10/31/2026
 
 [ CATEGORIES ]

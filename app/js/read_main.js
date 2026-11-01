@@ -14,8 +14,10 @@
 // it changes (watchProtests), so the TD sees a protest when it's lodged.
 // Nothing polls the network.
 //
-// docx packets are parsed in the browser by the same YAPP service MODAQ's
-// own demo uses (CORS *); JSON packets load directly.
+// docx packets come parsed: the Worker keeps YAPP's parse of each one
+// (worker.js "YAPP's parse, kept"). Only when it couldn't reach YAPP does
+// the browser send the .docx to YAPP itself (CORS *); JSON packets load
+// directly.
 
 import React from 'react';
 import ReactDOM from 'react-dom';
@@ -108,8 +110,10 @@ function fetchPacket(round, name) {
 
 async function loadPacket(round, name) {
   // warm=1: fetching isn't starting — the Worker counts a room as having
-  // started a round (auto-advance) from the Start button's own signal
-  const res = await pub(tq('/b/' + secret + '/packet?round=' + round + '&warm=1'));
+  // started a round (auto-advance) from the Start button's own signal.
+  // parsed=1: a .docx comes as the parse the Worker keeps of it, so YAPP
+  // isn't asked again; the .docx itself only when YAPP couldn't be reached
+  const res = await pub(tq('/b/' + secret + '/packet?round=' + round + '&warm=1&parsed=1'));
   // pub() returns parsed JSON when the blob was stored with a JSON content
   // type, and the raw Response otherwise.
   let parsed;

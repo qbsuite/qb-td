@@ -2438,7 +2438,9 @@ async function getTournament(env, t, ctx) {
   // packets from before category extraction existed — or from before
   // the current parser (version in R2 custom metadata): backfill once,
   // off the response path
-  const staleCats = !catsHead || (catsHead.customMetadata || {}).v !== CATMAP_VERSION;
+  const catsMeta = (catsHead && catsHead.customMetadata) || {};
+  const staleCats = !catsHead || (catsMeta.v !== CATMAP_VERSION
+    && !(catsMeta.v === 'retry' && Date.now() - Number(catsMeta.at) < CATMAP_RETRY_MS));
   if (staleCats && ctx && rounds.results.some((r) => /\.(json|docx)$/i.test(r.packet_name))) {
     ctx.waitUntil(rebuildCatmap(env, t));
   }
@@ -3096,33 +3098,109 @@ export function packetCategories(body, filename) {
   return t.some(Boolean) || b.some(Boolean) ? { t, b } : null;
 }
 
-// A .docx round's categories: the packet goes through YAPP, the parser
-// the reader loads .docx packets with (read_main.js loadPacket), so each
-// tossup and bonus keeps the place MODAQ reads it in, and YAPP's
-// metadata (the packet's <Category, Subcategory> tags) is read as a JSON
-// packet's would be. A JSON packet is read directly. Answers the map,
-// null when the packet has no categories, or throws when YAPP can't be
-// reached, so a backfill knows to try again.
-// YAPP takes about three requests in a burst, then answers 429 with
-// Retry-After: 1 (measured 10/24/2026), so a 429 waits and tries again,
-// and rebuildCatmap spaces its rounds out (YAPP_GAP_MS).
+/* ---------- .docx packets: YAPP's parse, kept ----------
+   A .docx packet is read through YAPP, the public parser MODAQ's own demo
+   uses. It used to be read again by every reader, viewer and backfill
+   that needed its questions, each one a call to YAPP. Now the first parse
+   is kept: YAPP's JSON goes into R2 beside the packet (parsed/ for
+   packet/, encrypted the same way), stamped with the etag of the file it
+   was made from, and every route that hands out the questions hands out
+   that JSON. The upload makes it, so YAPP sees a packet once; a packet
+   from before (or one YAPP couldn't be reached for) gets it the first
+   time anything asks. A file YAPP refuses (a 4xx: not a packet it can
+   read) is remembered as refused under the same etag and not sent again.
+   The .docx itself stays as it was, for the downloads.
+   YAPP takes about three requests in a burst, then answers 429 with
+   Retry-After: 1 (measured 10/24/2026), so a 429 waits and tries again
+   (a viewer opening every round at once still ends with every parse
+   kept), and rebuildCatmap spaces its rounds out (YAPP_GAP_MS). Any
+   other failure is not retried: the caller falls back as described. */
 const YAPP_URL = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 const YAPP_TIMEOUT_MS = 20000;
 const YAPP_TRIES = 4;
 const YAPP_GAP_MS = 400;
-export async function packetCategoriesOf(env, body, filename) {
-  if (!/\.docx$/i.test(filename)) return packetCategories(body, filename);
+const isDocx = (name) => /\.docx$/i.test(String(name));
+const parsedKeyOf = (key) => String(key).replace(/^([ts]\/[^/]+\/)packet\//, '$1parsed/');
+
+// One YAPP parse of `body`: {text} (its JSON), or {status} — the HTTP
+// status, 0 when YAPP couldn't be reached.
+async function yappParse(env, body, tries) {
   let res;
-  for (let i = 1; ; i++) {
-    res = await fetch(env.YAPP_URL || YAPP_URL, { method: 'POST', body, signal: AbortSignal.timeout(YAPP_TIMEOUT_MS) });
-    if (res.status !== 429 || i >= YAPP_TRIES) break;
-    await res.arrayBuffer().catch(() => {});
-    const wait = Math.min(5, Number(res.headers.get('retry-after')) || 1);
-    await new Promise((r) => setTimeout(r, wait * 1000 + 100));
+  try {
+    for (let i = 1; ; i++) {
+      res = await fetch(env.YAPP_URL || YAPP_URL, { method: 'POST', body, signal: AbortSignal.timeout(YAPP_TIMEOUT_MS) });
+      if (res.status !== 429 || i >= tries) break;
+      await res.arrayBuffer().catch(() => {});
+      const wait = Math.min(5, Number(res.headers.get('retry-after')) || 1);
+      await new Promise((r) => setTimeout(r, wait * 1000 + 100));
+    }
+    if (!res.ok) { await res.arrayBuffer().catch(() => {}); return { status: res.status }; }
+    return { text: await res.text() };
+  } catch (e) {
+    return { status: 0 };
   }
-  if (!res.ok) throw new Error('YAPP ' + res.status);
-  const text = await res.text();
-  return packetCategories(new TextEncoder().encode(text), 'yapp.json');
+}
+const yappRefused = (status) => status >= 400 && status < 500 && status !== 429;
+
+// The kept parse of the .docx packet at `key`, whose stored copy has
+// `etag`: {text} (YAPP's JSON), {failed: status} when YAPP refused this
+// copy, or null when there is none to give — not a .docx, or YAPP not
+// reached this time. Without a kept parse YAPP is asked (`tries` times on
+// a 429), with `plain` (the packet's bytes) when the caller has them
+// and the stored copy otherwise; make: false only looks.
+async function parsedPacket(env, key, etag, rawKey, { plain = null, tries = YAPP_TRIES, make = true } = {}) {
+  if (!isDocx(key) || !etag) return null;
+  const pkey = parsedKeyOf(key);
+  const kept = await env.DATA.get(pkey);
+  const meta = (kept && kept.customMetadata) || {};
+  if (kept && meta.src === etag) {
+    if (meta.fail) return { failed: Number(meta.fail) };
+    return { text: new TextDecoder().decode(await readBlob(kept, rawKey)) };
+  }
+  if (!make) return null;
+  let body = plain;
+  if (!body) {
+    const obj = await env.DATA.get(key);
+    if (!obj || obj.etag !== etag) return null; // replaced meanwhile: the new copy's to parse
+    body = await readBlob(obj, rawKey);
+  }
+  const out = await yappParse(env, body, tries);
+  if (out.text !== undefined) {
+    await putBlob(env, pkey, out.text, 'application/json', rawKey, { customMetadata: { src: etag } });
+    return { text: out.text };
+  }
+  if (yappRefused(out.status)) {
+    await putBlob(env, pkey, '', 'application/json', rawKey, { customMetadata: { src: etag, fail: String(out.status) } });
+    return { failed: out.status };
+  }
+  return null;
+}
+
+// A packet's questions as the routes that read them answer: YAPP's JSON
+// for a .docx (made here if need be), 422 for one YAPP refused, and the
+// stored file itself otherwise — a JSON packet, or a .docx YAPP couldn't
+// be reached for, which the browser then sends to YAPP as it always has.
+async function packetQuestionsResponse(env, obj, key, rawKey, filename) {
+  const parsed = await parsedPacket(env, key, obj.etag, rawKey);
+  if (parsed && parsed.text !== undefined) {
+    return new Response(parsed.text, { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(env) } });
+  }
+  if (parsed && parsed.failed) return err(env, 422, 'the packet parser could not read this packet (' + parsed.failed + ')');
+  return blobResponseDec(env, obj, rawKey, filename);
+}
+
+// A packet's categories, from its bytes (`plain`) for a JSON packet and
+// from its kept parse for a .docx, so each tossup and bonus keeps the
+// place MODAQ reads it in, and YAPP's metadata (the packet's <Category,
+// Subcategory> tags) is read as a JSON packet's would be. Answers the
+// map, null when the packet has no categories (or YAPP refused it), or
+// throws when YAPP can't be reached, so a backfill knows to try again.
+async function packetCategoriesOf(env, key, etag, rawKey, name, plain, tries = YAPP_TRIES) {
+  if (!isDocx(name)) return packetCategories(plain || await readBlob(await env.DATA.get(key), rawKey), name);
+  const parsed = await parsedPacket(env, key, etag, rawKey, { plain, tries });
+  if (!parsed) throw new Error('YAPP unreachable');
+  if (parsed.failed) return null;
+  return packetCategories(new TextEncoder().encode(parsed.text), 'yapp.json');
 }
 
 // Parser generation, stamped into R2 custom metadata on every catmap
@@ -3135,6 +3213,7 @@ export async function packetCategoriesOf(env, body, filename) {
 // '5': bare "Narratives" / "Practices" are Beliefs; slash-joined writers.
 // '6': .docx packets too, through YAPP (packetCategoriesOf).
 const CATMAP_VERSION = '6';
+const CATMAP_RETRY_MS = 10 * 60 * 1000;
 
 // The "checked, nothing found" map rebuildCatmap leaves. It is the only
 // empty map ever stored (the other writers add a round or delete the
@@ -3158,23 +3237,35 @@ async function rebuildCatmap(env, t) {
   let failed = false;
   for (const row of results) {
     if (!/\.(json|docx)$/i.test(row.packet_name)) continue;
-    const obj = await env.DATA.get(row.packet_r2_key);
-    if (!obj) continue;
+    const key = row.packet_r2_key;
     let cats = null;
-    if (/\.docx$/i.test(row.packet_name)) await new Promise((r) => setTimeout(r, YAPP_GAP_MS));
-    try {
-      cats = await packetCategoriesOf(env,
-        await readBlob(obj, await blobKey(t, row.packet_r2_key)), row.packet_name);
-    } catch (e) {
-      console.log('catmap round', row.number, 'of tournament', tid, e.message);
-      failed = true;
+    if (isDocx(row.packet_name)) {
+      // the kept parse when there is one; YAPP, spaced out, when not
+      const head = await env.DATA.head(key);
+      if (!head) continue;
+      const rawKey = await blobKey(t, key);
+      let parsed = await parsedPacket(env, key, head.etag, rawKey, { make: false });
+      if (!parsed) {
+        await new Promise((r) => setTimeout(r, YAPP_GAP_MS));
+        parsed = await parsedPacket(env, key, head.etag, rawKey, { tries: YAPP_TRIES });
+      }
+      if (!parsed) {
+        console.log('catmap round', row.number, 'of tournament', tid, 'YAPP unreachable');
+        failed = true;
+      } else if (parsed.text !== undefined) cats = packetCategories(new TextEncoder().encode(parsed.text), 'yapp.json');
+    } else {
+      const obj = await env.DATA.get(key);
+      if (!obj) continue;
+      cats = packetCategories(await readBlob(obj, await blobKey(t, key)), row.packet_name);
     }
     if (cats) map.rounds[String(row.number)] = cats;
   }
-  // a round YAPP couldn't read keeps the map stale, so the next load tries again
+  // a round YAPP couldn't be reached for keeps the map stale, so a later
+  // load tries again — that round only, the others' parses being kept,
+  // and not before CATMAP_RETRY_MS (a refused packet is not retried)
   await env.DATA.put(`t/${tid}/catmap.json`, JSON.stringify(map), {
     httpMetadata: { contentType: 'application/json' },
-    customMetadata: { v: failed ? 'retry' : CATMAP_VERSION },
+    customMetadata: failed ? { v: 'retry', at: String(Date.now()) } : { v: CATMAP_VERSION },
   });
   await markPub(env, tid);
 }
@@ -3237,14 +3328,15 @@ async function uploadPacket(request, url, env, t) {
 
   const key = `t/${id}/packet/${round}/${filename}`;
   // encrypted at rest; category extraction below reads the plaintext body
-  await putBlob(env, key, body,
+  // (and for a .docx keeps YAPP's parse of it, for every later reader)
+  const stored = await putBlob(env, key, body,
     request.headers.get('Content-Type') || 'application/octet-stream', t.ckey);
   await env.DB.prepare(
     'INSERT INTO rounds (tournament_id, number, packet_r2_key, packet_name) VALUES (?1, ?2, ?3, ?4) ' +
     'ON CONFLICT(tournament_id, number) DO UPDATE SET packet_r2_key = ?3, packet_name = ?4'
   ).bind(id, round, key, name).run();
   let cats = null;
-  try { cats = await packetCategoriesOf(env, body, name); } catch (e) { console.log('catmap upload:', e.message); }
+  try { cats = await packetCategoriesOf(env, key, stored.etag, t.ckey, name, body); } catch (e) { console.log('catmap upload:', e.message); }
   await updateCatmap(env, id, round, cats);
   await dropBuzzRounds(env, id, [round]);
   await markPub(env, id); // packet_rounds rides the published state
@@ -3371,6 +3463,10 @@ async function adminDownload(url, env, t) {
   const obj = await env.DATA.get(key);
   if (!obj) return err(env, 404, 'no such file');
   const dl = url.searchParams.get('dl') || key.split('/').pop();
+  // parsed=1 on a packet: its questions (the hub's preview), not the file
+  if (url.searchParams.get('parsed') === '1' && /^[ts]\/[^/]+\/packet\//.test(key)) {
+    return packetQuestionsResponse(env, obj, key, await blobKey(t, key), dl);
+  }
   const part = url.searchParams.get('part');
   if (part === 'roster' && key === t.roster_r2_key) return rosterExportResponse(env, obj, await blobKey(t, key), dl);
   const res = await storedFileResponse(env, obj, await blobKey(t, key), dl, part,
@@ -4356,7 +4452,12 @@ async function bucketPacket(env, secret, url) {
   // really starts (bucketStartRound); any other fetch is a room taking the
   // packet to read — the uploads page's download link.
   if (url.searchParams.get('warm') !== '1' && !test) await noteRoomStart(env, b, round, place);
-  return blobResponseDec(env, obj, await blobKey(b, results[0].packet_r2_key), results[0].packet_name);
+  // the reader asks for the questions (parsed=1); the download link, the file
+  const rawKey = await blobKey(b, results[0].packet_r2_key);
+  if (url.searchParams.get('parsed') === '1') {
+    return packetQuestionsResponse(env, obj, results[0].packet_r2_key, rawKey, results[0].packet_name);
+  }
+  return blobResponseDec(env, obj, rawKey, results[0].packet_name);
 }
 
 // POST /b/:secret/start?round=n — the reader started a game on round n.
@@ -4875,8 +4976,9 @@ async function gatedPacket(request, env, obj, key, name, wrap, holderOf, open = 
       return err(env, 409, 'packets locked — set the buzzpoints password again');
     }
   }
-  const res = await blobResponseDec(env, obj, rawKey, name);
-  res.headers.set('Cache-Control', 'private, max-age=60');
+  // only ever read for its questions: a .docx as YAPP's kept parse
+  const res = await packetQuestionsResponse(env, obj, key, rawKey, name);
+  if (res.ok) res.headers.set('Cache-Control', 'private, max-age=60');
   return res;
 }
 
@@ -4945,22 +5047,55 @@ async function buzzDoneRounds(env, t) {
 
 // Make the files for `rounds` that aren't files yet (at most
 // BUZZ_PUBLISH_MAX), with the content key `ckey`. Answers how many.
+// A file holds the questions as JSON (p): a JSON packet as it is, a .docx
+// as YAPP's kept parse, so a viewer's browser has nothing to send to YAPP.
+// A .docx YAPP couldn't be reached for goes up as the file (d: when),
+// and is made again from its parse after BUZZ_PARSE_RETRY_MS; one YAPP
+// refused stays the file (x). A file from before these marks is made
+// again when its packet is a .docx, and only marked when it is JSON.
+const BUZZ_PARSE_RETRY_MS = 30 * 60 * 1000;
 async function publishBuzzRounds(env, t, ckey, rounds) {
   if (!ckey || !buzzConfig(t)) return 0;
   const bkey = await contentKey(await buzzReadKey(env, t, ckey));
   const have = buzzPubOf(t);
-  const todo = [...new Set(rounds)].filter((n) => !have[String(n)]).slice(0, BUZZ_PUBLISH_MAX);
+  const now = Date.now();
+  const wanted = (e) => !e || (!e.p && !e.x && !(e.d && now - e.d < BUZZ_PARSE_RETRY_MS));
+  const todo = [...new Set(rounds)].filter((n) => wanted(have[String(n)])).slice(0, BUZZ_PUBLISH_MAX);
   if (!todo.length) return 0;
   const { results } = await env.DB.prepare(
-    `SELECT number, packet_r2_key FROM rounds WHERE tournament_id = ?1 AND number IN (${todo.map((_, i) => '?' + (i + 2)).join(', ')})`
+    `SELECT number, packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number IN (${todo.map((_, i) => '?' + (i + 2)).join(', ')})`
   ).bind(t.id, ...todo).all();
+  // one mark on an entry, for a file that stays as it is
+  const mark = (n, field, value) => env.DB.prepare(
+    `UPDATE tournaments SET buzz_pub = json_set(buzz_pub, '$."' || ?2 || '".' || ?3, ?4) WHERE id = ?1 AND buzz_key_enc IS ?5`
+  ).bind(t.id, String(n), field, value, t.buzz_key_enc).run();
   let made = 0;
   for (const row of results) {
-    const obj = await env.DATA.get(row.packet_r2_key);
-    if (!obj) continue;
-    const plain = await readBlob(obj, await blobKey({ ckey, set_key_enc: t.set_key_enc }, row.packet_r2_key));
-    const body = await aesEncrypt(bkey, new Uint8Array(plain));
-    const entry = { h: await liveB64Hash(b64bytes(body), 'bin'), s: body.byteLength, live: 0 };
+    const old = have[String(row.number)];
+    const docx = isDocx(row.packet_name);
+    // a JSON packet's file from before the marks already holds JSON
+    if (old && !docx) { await mark(row.number, 'p', 1); continue; }
+    const holder = { ckey, set_key_enc: t.set_key_enc };
+    const rawKey = await blobKey(holder, row.packet_r2_key);
+    let parsed = null;
+    if (docx) {
+      const head = await env.DATA.head(row.packet_r2_key);
+      if (!head) continue;
+      parsed = await parsedPacket(env, row.packet_r2_key, head.etag, rawKey);
+    }
+    const json = Boolean(parsed && parsed.text !== undefined);
+    // the file up there is already the .docx this would put up
+    if (old && docx && !json) { await mark(row.number, parsed ? 'x' : 'd', parsed ? 1 : now); continue; }
+    let plain;
+    if (json) plain = new TextEncoder().encode(parsed.text);
+    else {
+      const obj = await env.DATA.get(row.packet_r2_key);
+      if (!obj) continue;
+      plain = new Uint8Array(await readBlob(obj, rawKey));
+    }
+    const body = await aesEncrypt(bkey, plain);
+    const entry = { h: await liveB64Hash(b64bytes(body), 'bin'), s: body.byteLength, live: 0,
+      ...(!docx || json ? { p: 1 } : parsed ? { x: 1 } : { d: now }) };
     await env.DATA.put(BUZZ_FILE_KEY(t.id, row.number), body, { httpMetadata: { contentType: 'application/octet-stream' } });
     // only under the key it was made with: a password set meanwhile dropped it
     await env.DB.prepare(
@@ -5742,7 +5877,7 @@ async function uploadSetPacket(request, url, env, s) {
 
   // the token keeps two racing uploads of one packet from sharing a blob
   const key = `${setPacketPrefix(s.id)}${packet}/v${version}-${randToken(6)}/${filename}`;
-  await putBlob(env, key, body,
+  const stored = await putBlob(env, key, body,
     request.headers.get('Content-Type') || 'application/octet-stream', s.ckey);
   try {
     await env.DB.batch([
@@ -5757,6 +5892,8 @@ async function uploadSetPacket(request, url, env, s) {
   }
   const cats = packetCategories(body, name);
   if (cats) await updateSetCatmap(env, s.id, packet, version, cats);
+  // a .docx: YAPP's parse, kept for the editor's review and every mirror
+  if (isDocx(name)) await parsedPacket(env, key, stored.etag, s.ckey, { plain: body, tries: YAPP_TRIES });
 
   const open = await mirrorsOpenFor(env, s.id, packet, offer);
   // (an upsert's SELECT needs a WHERE, or SQLite reads ON as a join's)
@@ -5851,6 +5988,8 @@ async function setPacketFile(url, env, s) {
   const row = await setPacketRow(env, s.id, url);
   const obj = row ? await env.DATA.get(row.r2_key) : null;
   if (!obj) return err(env, 404, 'no such packet');
+  // parsed=1: the questions (the review, the editor's buzzpoints); else the file
+  if (url.searchParams.get('parsed') === '1') return packetQuestionsResponse(env, obj, row.r2_key, s.ckey, row.name);
   return blobResponseDec(env, obj, s.ckey, row.name);
 }
 

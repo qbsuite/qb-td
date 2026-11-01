@@ -458,8 +458,8 @@ export function renderPacketsUi(box, o) {
 
 /* ---------- packet preview ----------
    The packet as a document: each tossup followed by its bonus, page by
-   page, read through the same parser the reader uses (a .docx goes
-   through YAPP). */
+   page, read through the same parser the reader uses (a .docx as the
+   Worker's kept YAPP parse of it). */
 async function openPreview(r, noun, say) {
   const view = document.createElement('div');
   view.className = 'pkview';
@@ -479,8 +479,9 @@ async function openPreview(r, noun, say) {
   document.body.append(view);
   const page = view.querySelector('.pkpage');
   try {
-    // the download link, without its download name
-    const res = await fetch(r.href.replace(/&dl=[^&]*/, ''));
+    // the download link, without its download name, for the questions
+    // (a .docx as the Worker's kept parse of it)
+    const res = await fetch(r.href.replace(/&dl=[^&]*/, '') + '&parsed=1');
     if (!res.ok) throw new Error('could not load the packet (' + res.status + ')');
     page.outerHTML = packetPagesHtml(await readPacket(res, r.name), r.name);
   } catch (e) {
