@@ -283,7 +283,11 @@ function blobEnc(r2obj) {
 
 // R2 put that encrypts when the tournament has a content key. `opts`
 // may carry onlyIf (conditional writes keep working — the etag guards
-// the ciphertext exactly as it would the plaintext) and customMetadata.
+// the ciphertext exactly as it would the plaintext), customMetadata, and
+// gzip: compress before encrypting (gz: '1'; readBlob undoes it). Only an
+// encrypted blob is compressed — a plain one is streamed as stored
+// (blobResponse). A room's upload is ~140 KB of JSON carrying its packet
+// twice and stores at about a quarter of that (measured 11/1/2026).
 async function putBlob(env, key, body, contentType, rawKey, opts = {}) {
   if (!rawKey) {
     return env.DATA.put(key, body, {
@@ -292,12 +296,15 @@ async function putBlob(env, key, body, contentType, rawKey, opts = {}) {
       onlyIf: opts.onlyIf,
     });
   }
-  return env.DATA.put(key, await aesEncrypt(await contentKey(rawKey), typeof body === 'string' ? enc8(body) : new Uint8Array(body)), {
+  let bytes = typeof body === 'string' ? enc8(body) : new Uint8Array(body);
+  if (opts.gzip) bytes = new Uint8Array(await streamBytes(bytes, new CompressionStream('gzip')));
+  return env.DATA.put(key, await aesEncrypt(await contentKey(rawKey), bytes), {
     httpMetadata: { contentType: 'application/octet-stream' },
-    customMetadata: { ...(opts.customMetadata || {}), enc: '1', ct: contentType },
+    customMetadata: { ...(opts.customMetadata || {}), enc: '1', ct: contentType, ...(opts.gzip ? { gz: '1' } : {}) },
     onlyIf: opts.onlyIf,
   });
 }
+const streamBytes = (bytes, through) => new Response(new Blob([bytes]).stream().pipeThrough(through)).arrayBuffer();
 
 // The blob's plaintext bytes, whichever way it is stored. An encrypted
 // blob with no key available is a caller bug (the routes that reach one
@@ -305,7 +312,8 @@ async function putBlob(env, key, body, contentType, rawKey, opts = {}) {
 async function readBlob(r2obj, rawKey) {
   const buf = await r2obj.arrayBuffer();
   if (!blobEnc(r2obj)) return buf;
-  return aesDecrypt(await contentKey(rawKey), buf);
+  const plain = await aesDecrypt(await contentKey(rawKey), buf);
+  return (r2obj.customMetadata || {}).gz === '1' ? streamBytes(plain, new DecompressionStream('gzip')) : plain;
 }
 
 // The key that opens one blob for one credential holder — a tournament
@@ -2170,6 +2178,73 @@ export function archiveUrl(env, t) {
 // like "Penn Bowl (Stanford)" would end a Markdown link early
 const linkEnc = (v) => encodeURIComponent(v).replace(/[()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 
+/* Room uploads, cleared once links close. After close nothing reads a
+   room's uploads but a set's editors (downloadMirrorFiles): every /a/ and
+   /b/ route answers 410, and the public page, stats, protests and which
+   rounds are done come from the files rows and each game's public copy
+   (pub/), never from the upload itself. So the hourly cron frees their
+   space in two steps and keeps every row and public copy: at close, each
+   upload a newer one from the same room, round and two teams replaced (a
+   correction, a re-export); PRUNE_AFTER later, the rest. A set's mirror
+   keeps its newest uploads while the set's link lasts, for that download.
+   A row whose upload is gone carries files.gone and leaves the editors'
+   list. tournaments.uploads_pruned: 1 after the first step, 2 after the
+   second. Needs migrate-prune.sql. */
+const PRUNE_AFTER = 7 * 24 * 3600 * 1000;
+const PRUNE_PER_RUN = 8;
+
+async function pruneUploads(env, now = Date.now()) {
+  const closes = `(CASE WHEN t.started IS NULL THEN t.created + ${SETUP_TTL} ELSE t.started + ${RUN_TTL} END)`;
+  const all = `(${closes} + ${PRUNE_AFTER} <= ?1 AND NOT (s.id IS NOT NULL AND s.created + ${SET_TTL} > ?1))`;
+  const { results } = await env.DB.prepare(
+    `SELECT t.id, ${all} AS clear_all FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id ` +
+    `WHERE ${closes} <= ?1 AND (t.uploads_pruned IS NULL OR (t.uploads_pruned = 1 AND ${all})) ` +
+    `ORDER BY t.id LIMIT ${PRUNE_PER_RUN}`
+  ).bind(now).all();
+  for (const t of results) {
+    try {
+      const { results: files } = await env.DB.prepare(
+        'SELECT id, bucket_id, round, kind, r2_key, error, summary FROM files WHERE tournament_id = ?1 AND gone IS NULL'
+      ).bind(t.id).all();
+      // only this tournament's upload blobs, whatever a row says
+      const doomed = (t.clear_all ? files : replacedUploads(files))
+        .filter((f) => f.r2_key.startsWith(`t/${t.id}/bucket/`));
+      // R2 deletes up to 1000 keys a call
+      for (let i = 0; i < doomed.length; i += 1000) {
+        await env.DATA.delete(doomed.slice(i, i + 1000).map((f) => f.r2_key));
+      }
+      await env.DB.batch([
+        env.DB.prepare('UPDATE files SET gone = 1 WHERE id IN (SELECT value FROM json_each(?1))')
+          .bind(JSON.stringify(doomed.map((f) => f.id))),
+        env.DB.prepare('UPDATE tournaments SET uploads_pruned = ?2 WHERE id = ?1').bind(t.id, t.clear_all ? 2 : 1),
+      ]);
+    } catch (e) {
+      console.log('upload prune for', t.id, e.message);
+    }
+  }
+}
+
+// The uploads a newer one replaced: a valid match with the same room,
+// round and two teams (as its summary recorded them) and a lower id.
+// Narrower than the public page's own pick (engine/stats.js
+// dedupeMatches: round and teams after the roster's renames, any room),
+// so a room's second game in a round is never one; a copy another room
+// uploaded waits for the second step.
+function replacedUploads(files) {
+  const newest = new Map();
+  const keyed = [];
+  for (const f of files) {
+    if ((f.kind !== 'qbj' && f.kind !== 'combined') || f.error) continue;
+    let teams = null;
+    try { teams = JSON.parse(f.summary || 'null').teams; } catch (e) { /* no summary: kept */ }
+    if (!Array.isArray(teams) || teams.length !== 2 || !teams.every((n) => typeof n === 'string' && n)) continue;
+    const k = JSON.stringify([f.bucket_id, f.round, ...[...teams].sort()]);
+    keyed.push([k, f]);
+    if (!(newest.get(k) > f.id)) newest.set(k, f.id);
+  }
+  return keyed.filter(([k, f]) => f.id < newest.get(k)).map(([, f]) => f);
+}
+
 /* The weekly usage digest: one message every Monday (DIGEST_CRON) with
    the last seven full UTC days of what can hit a Free-plan limit — Worker
    requests, D1 rows read and written, R2 storage and operations — so a
@@ -3726,7 +3801,7 @@ async function moveFileRound(env, t, fileId, round) {
     const filed = filedText(root, text, round);
     if (!filed) return there(400, 'no match in this file');
     if (filed.text !== text) {
-      await putBlob(env, f.r2_key, filed.text, 'application/json', rawKey);
+      await putBlob(env, f.r2_key, filed.text, 'application/json', rawKey, { gzip: true });
       stamped = true;
     }
     const pobj = await env.DATA.get(pubGameKey(t.id, fileId));
@@ -3791,7 +3866,7 @@ async function saveModaqFiles(env, t, fileId, modaq) {
   try { root = JSON.parse(new TextDecoder().decode(await readBlob(obj, rawKey))); } catch (e) { return err(env, 400, 'stored file unreadable'); }
   if (!root || typeof root !== 'object' || !root.qbj) return err(env, 400, 'not a reader upload');
   root.modaq = { qbj: modaq.qbj, game: modaq.game };
-  await putBlob(env, f.r2_key, JSON.stringify(root), 'application/json', rawKey);
+  await putBlob(env, f.r2_key, JSON.stringify(root), 'application/json', rawKey, { gzip: true });
   return json(env, { ok: true });
 }
 
@@ -4391,7 +4466,7 @@ async function bucketUpload(request, url, env, secret) {
   // packet text. The extracted qbj half (text-free) goes to this game's
   // public blob below in plaintext — that is the only public copy.
   const key = `t/${b.tournament_id}/bucket/${b.id}/${randToken(8)}-${filename}`;
-  await putBlob(env, key, stored, 'application/json', b.ckey);
+  await putBlob(env, key, stored, 'application/json', b.ckey, { gzip: true });
   const out = await env.DB.prepare(
     'INSERT INTO files (tournament_id, bucket_id, round, kind, r2_key, filename, size, error, created, summary) ' +
     'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)'
@@ -6450,7 +6525,7 @@ async function setMirrorFiles(env, s, url) {
   if (!(await mirrorKeyFor(env, s, tid))) return err(env, 404, 'no such mirror');
   const { results } = await env.DB.prepare(
     'SELECT f.id, f.round, f.kind, f.filename, f.size, f.error, f.created, b.room_name AS room ' +
-    'FROM files f LEFT JOIN buckets b ON b.id = f.bucket_id WHERE f.tournament_id = ?1 ORDER BY f.round, f.id'
+    'FROM files f LEFT JOIN buckets b ON b.id = f.bucket_id WHERE f.tournament_id = ?1 AND f.gone IS NULL ORDER BY f.round, f.id'
   ).bind(tid).all();
   return json(env, { files: results });
 }
@@ -6950,6 +7025,7 @@ export default {
     if (event.cron === ALERT_CRON) {
       ctx.waitUntil(dirSweep(metered(env)).catch((e) => console.log('directory sweep:', e.message)));
       ctx.waitUntil(alertWrapUps(env));
+      ctx.waitUntil(pruneUploads(metered(env)).catch((e) => console.log('upload prune:', e.message)));
       return;
     }
     if (event.cron === DIGEST_CRON) { ctx.waitUntil(alertDigest(env)); return; }

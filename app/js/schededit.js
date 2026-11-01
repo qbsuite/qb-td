@@ -223,7 +223,7 @@ export function renderSchedStep(box, env) {
 
 const MODES = [['rotate', 'Teams rotate through rooms evenly'], ['keep', 'Teams stay in one room where possible'],
   ['shuffle', 'Teams get random rooms each round']];
-const TYPES = [['brackets', 'Pools'], ['same', 'The same pools again'], ['single', 'Single elimination'], ['double', 'Double elimination']];
+const TYPES = [['brackets', 'Pools'], ['same', 'Repeat previous phases'], ['single', 'Single elimination'], ['double', 'Double elimination']];
 const REPEAT = ['', 'double', 'triple', 'quadruple', 'quintuple', 'sextuple'];
 const ORDN = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
 const phase = (name, o = {}) => ({ name, kind: 'pools', groups: 1, top: 0, per: 1, pools: 1, cross: false, same: false, meets: 1,

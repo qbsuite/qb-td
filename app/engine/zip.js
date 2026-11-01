@@ -104,9 +104,11 @@ async function inflateRaw(raw) {
  * data-descriptor entries work), skips directory entries, supports store
  * and deflate. No zip64 — fine for packet zips.
  * @param bytes Uint8Array of the whole zip
+ * @param want optional name -> boolean: entries it turns down are listed
+ *   with data null, not inflated
  * @returns Promise<[{name, data: Uint8Array}]>
  */
-export async function readZip(bytes) {
+export async function readZip(bytes, want = null) {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let eocd = -1;
   // EOCD is at the end, pushed back by an optional comment (<= 64K)
@@ -133,7 +135,8 @@ export async function readZip(bytes) {
     const start = localOff + 30
       + dv.getUint16(localOff + 26, true) + dv.getUint16(localOff + 28, true);
     const raw = bytes.subarray(start, start + csize);
-    if (method === 0) out.push({ name, data: raw });
+    if (want && !want(name)) out.push({ name, data: null });
+    else if (method === 0) out.push({ name, data: raw });
     else if (method === 8) out.push({ name, data: await inflateRaw(raw) });
     else throw new Error(name + ': unsupported zip compression method ' + method);
   }

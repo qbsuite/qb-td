@@ -87,6 +87,9 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- been claimed. Existing databases get them from migrate-alertmsg.sql.
   alert_msg TEXT,
   wrapped INTEGER NOT NULL DEFAULT 0,
+  -- How far the room uploads were cleared after close (worker.js
+  -- pruneUploads): 1 the replaced ones, 2 all. From migrate-prune.sql.
+  uploads_pruned INTEGER,
   -- The directory (worker.js "the directory"): this tournament's line in
   -- the list of tournaments running here, as JSON, exactly as last
   -- computed; NULL while it isn't listed. Rewritten only when the line changes.
@@ -143,7 +146,11 @@ CREATE TABLE IF NOT EXISTS files (
   -- JSON {teams, score, protests} for a valid match (worker.js
   -- matchSummary): what the hub's Protests drawer reads. Never public.
   -- Existing databases get it from migrate-protests.sql.
-  summary TEXT
+  summary TEXT,
+  -- 1 once the upload's blob was cleared after close (worker.js
+  -- pruneUploads); the row and the game's public copy stay.
+  -- Existing databases get it from migrate-prune.sql.
+  gone INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_files_tournament ON files(tournament_id);
 CREATE INDEX IF NOT EXISTS idx_files_bucket ON files(bucket_id);

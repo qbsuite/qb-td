@@ -3,6 +3,12 @@ Release Notes for 11/1/2026
 [ PERFORMANCE ]
 - A .docx packet is sent to the packet parser once, when it is uploaded, rather than each time it is opened.
 
+[ SCHEDULE ]
+- "The same pools again" is now "Repeat previous phases".
+
+[ MISC ]
+- Uploaded game files are deleted a week after links close. The public page keeps every game.
+
 Release Notes for 10/31/2026
 
 [ CATEGORIES ]
