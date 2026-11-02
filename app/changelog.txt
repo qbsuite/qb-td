@@ -8,6 +8,9 @@ Release Notes for 11/2/2026
 [ ARCHIVE ]
 - Added 2026 KS Tournament.
 
+[ PUBLIC PAGE ]
+- A game a room uploaded twice no longer shows as "just in" forever when the first upload was cut off partway.
+
 Release Notes for 11/1/2026
 
 [ PERFORMANCE ]

@@ -679,6 +679,22 @@ function splitStamp(v) {
   return { ids: id + ':' + n, gen: gen ? ':' + gen : '' };
 }
 
+// Uploads with no public copy that a newer one replaced: same room, round
+// and file name, a higher id, and that one's copy there. A room that resent
+// a game can leave the first like this: the reader's upload gives up after
+// UPLOAD_WAIT_MS and says to send it again, and a request that drops
+// between its files row and its public copy (bucketUpload) stops there.
+// The public page counts only the newest anyway (stats.js dedupeMatches),
+// so the public state leaves these out of its file list (pubStateBody),
+// rather than have the page say a game is "just in" forever. A game with
+// no newer copy stays listed: that is a real gap.
+export function replacedMissing(rows, missing) {
+  const key = (f) => JSON.stringify([f.bucket_id, f.round, f.filename]);
+  const newest = new Map();
+  for (const f of rows) if (!missing.has(f.id) && !(newest.get(key(f)) > f.id)) newest.set(key(f), f.id);
+  return rows.filter((f) => missing.has(f.id) && newest.get(key(f)) > f.id).map((f) => f.id);
+}
+
 function manifestVersion(manifest) {
   let lastId = 0;
   let count = 0;
@@ -753,6 +769,7 @@ async function materialize(env, t) {
   const gen = forced ? ':' + manifest.at.toString(36) : '';
   const changed = [];
   const removed = [];
+  const missing = new Set(); // rows whose public copy this tick couldn't find
   let legacy;             // undefined = not looked for yet, null = none
   let backfill = PUB_BACKFILL_PER_TICK;
 
@@ -793,6 +810,7 @@ async function materialize(env, t) {
         }
       }
 
+      fs.forEach((f, i) => { if (!entries[i]) missing.add(f.id); });
       const keptIds = fs.filter((f, i) => entries[i]).map((f) => f.id);
       const kept = entries.filter(Boolean);
       if (kept.length < fs.length) {
@@ -819,6 +837,12 @@ async function materialize(env, t) {
       manifest.rounds[n] = stamp;
       changed.push(n);
     }
+
+    // A round whose shard lacks a game never matches its rows' stamp, so
+    // it is re-read above whenever the tournament rebuilds: `missing`
+    // covers every round.
+    const dropped = replacedMissing(rows, missing);
+    if (dropped.length) manifest.dropped = dropped;
 
     for (const n of Object.keys(prev.rounds)) {
       if (manifest.rounds[n] === undefined) {
@@ -5383,7 +5407,8 @@ async function pubStateBody(env, t, pub, loaded = null) {
     // fetches its blobs SHA-pinned from raw.githubusercontent.com instead
     // of the /pub blob routes, falling back here when absent/stale.
     pub,
-    files: rows.map((f) => ({
+    // less the replaced uploads with no public copy (replacedMissing)
+    files: rows.filter((f) => !(manifest.dropped || []).includes(f.id)).map((f) => ({
       id: f.id, round: f.round, filename: f.filename, room: rooms[f.bucket_id] || null,
     })),
     // Every write path has expired: nothing here can move again, so the
