@@ -5,6 +5,9 @@ Release Notes for 11/2/2026
 - A row of round numbers under it shows which packets moderators can open.
 - Auto-advance has a "?" that explains when it releases the next packet.
 
+[ ARCHIVE ]
+- Added 2026 KS Tournament.
+
 Release Notes for 11/1/2026
 
 [ PERFORMANCE ]

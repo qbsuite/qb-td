@@ -1,6 +1,15 @@
 {
   "tournaments": [
     {
+      "slug": "2026-korrayshelton",
+      "name": "2026 KS Tournament",
+      "date": "2026-10-30",
+      "host": "",
+      "teams": 12,
+      "rounds": 11,
+      "games": 66
+    },
+    {
       "slug": "2026-penn-bowl-at-stanford",
       "name": "2026 Penn Bowl at Stanford",
       "date": "2026-10-24",

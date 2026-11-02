@@ -925,6 +925,93 @@
    ],
    "foreign": []
   },
+  "archive 2026-korrayshelton": {
+   "header": "2026 KS Tournament",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "bbc1c5935856be2f14eeeba1",
+      "chars": 23660
+     },
+     "schedview=all": {
+      "sha256": "bbc1c5935856be2f14eeeba1",
+      "chars": 23660
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "605d73bb7b8704576bbe8d11",
+      "chars": 886902
+     },
+     "layout=classic": {
+      "sha256": "309910629e8db27925a46420",
+      "chars": 886962
+     },
+     "layout=new": {
+      "sha256": "c5d906aa1545966802e9cabe",
+      "chars": 5883
+     },
+     "new/standings": {
+      "sha256": "c5d906aa1545966802e9cabe",
+      "chars": 5883
+     },
+     "new/individuals": {
+      "sha256": "93eefec0f285525339b20c4d",
+      "chars": 23622
+     },
+     "new/games": {
+      "sha256": "205d2e485ab405d107d534ac",
+      "chars": 221724
+     },
+     "new/teams": {
+      "sha256": "ecfa9af7334c9bee67c44f46",
+      "chars": 84545
+     },
+     "new/players": {
+      "sha256": "1505789eadb43dcdc829705b",
+      "chars": 223979
+     },
+     "new/rounds": {
+      "sha256": "8fcd1344e3f8242de5a04d22",
+      "chars": 4088
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/2026-korrayshelton.js",
+    "/archive/index.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive 2026-penn-bowl-at-stanford": {
    "header": "2026 Penn Bowl at Stanford",
    "tabs": {
