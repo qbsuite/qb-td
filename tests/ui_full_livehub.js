@@ -373,6 +373,9 @@ async function openPage() {
     for (const t of ${q(events)}) e.dispatchEvent(new Event(t, { bubbles: true })); return true; })()`);
   pg.text = (sel) => pg.js(`(document.querySelector(${q(sel)}) || {}).textContent || ''`);
   pg.ntext = async (sel) => norm(await pg.text(sel));
+  // the Auto-advance label without its "?" tooltip's text
+  pg.railToggle = async () => norm(await pg.js(`(() => { const e = document.querySelector('.railtoggle'); if (!e) return '';
+    const c = e.cloneNode(true); c.querySelectorAll('.advtip').forEach((x) => x.remove()); return c.textContent; })()`));
   pg.exists = (sel) => pg.js(`!!document.querySelector(${q(sel)})`);
   pg.msg = () => pg.js(`(() => { const m = document.querySelector('#msg'); return m ? { text: m.textContent, show: m.classList.contains('show'), bad: m.classList.contains('bad') } : null; })()`);
   pg.setFiles = async (sel, files) => {
@@ -982,7 +985,7 @@ section('main-live', '10 17 18 19 20 53: Live now, the start chips, the uploads 
       ['Room 4', '', 'Not started'], ['Annex · bye', 'bye', 'No game this round']]) || chips;
   });
   await check('17 auto-advance: the rail says "Auto-advance 3/4 started", the bye not counted', async () =>
-    (await pg.ntext('.railtoggle')) === 'Auto-advance 3/4 started' || await pg.ntext('.railtoggle'));
+    (await pg.railToggle()) === 'Auto-advance 3/4 started' || await pg.railToggle());
 
   // 19: the grid
   await check('19 grid: a column per round up to the last uploaded (9), the live round highlighted', async () => {
@@ -1164,7 +1167,7 @@ section('main-uploads', '21 22 23 24 25 26 50: Add a game, moving, deleting and 
   }
   await check('50 refresh: the change waiting all along shows once the panel is closed (4/4 started)', async () => {
     await pg.waitJs(`!document.querySelector('#viewbody').dataset.mark`, 'a redraw');
-    return (await pg.ntext('.railtoggle')) === 'Auto-advance 4/4 started' || await pg.ntext('.railtoggle');
+    return (await pg.railToggle()) === 'Auto-advance 4/4 started' || await pg.railToggle();
   });
   await check('10 live now: Room 3 is in, and the header counts it', async () =>
     (await pg.ntext('.livemain section .sechead')) === 'Live now 2/4 in · 1 in progress' && (await liveRows(pg))[2].mark === '✓' || await pg.ntext('.livemain section .sechead'));
@@ -1399,7 +1402,7 @@ section('main-protests', '32 33 34 35: protests in the rail and the drawer, ruli
   await check('33 drawer: opens by itself while a protest is open', () => pg.js(`document.querySelector('#protdrawer').open`));
   await check('33 drawer: the summary names the newest open one, and that it can flip the result', async () =>
     (await pg.ntext('#protdrawer > summary .muted')) === `3 open · R1 Room 1: ${B} protests TU 3 · can flip the result` || await pg.ntext('#protdrawer > summary .muted'));
-  await check('32 rail: "Protests 3" and an All button', async () => (await pg.ntext('.liverail .railhead')) === 'Protests 3 All' || await pg.ntext('.liverail .railhead'));
+  await check('32 rail: "Protests 3" and an All button', async () => (await pg.ntext('.liverail .railblock:not(:first-child) .railhead')) === 'Protests 3 All' || await pg.ntext('.liverail .railblock:not(:first-child) .railhead'));
   await check('32 rail: the newest open protest, its team\'s answer, and "Can flip" in orange with the score if upheld', async () =>
     JSON.stringify(await railProtest(pg)) === JSON.stringify(['R1 · Room 1 · TU 3', `${B}: treaty of utrecht`, `!Can flip · ${A} 120 – 125 ${B} if upheld`]) || await railProtest(pg));
   let rows = await drawerRows(pg);
@@ -1462,7 +1465,7 @@ section('main-protests', '32 33 34 35: protests in the rail and the drawer, ruli
   await check('34 ruling: a note saved with an unchanged ruling keeps the ruling\'s time', () => (r[k1].note === 'Checked the answer line' && r[k1].at === at1) || r[k1]);
   await bumpAndRefresh(pg, T);
   await check('32 rail: after a refresh the other tab\'s ruling shows too: one open, P3 ' + CHG.settings2tabs, async () =>
-    (await pg.ntext('.liverail .railhead')) === 'Protests 1 All' && (await railProtest(pg))[0] === 'R1 · Room 1 · TU 9' || [await pg.ntext('.liverail .railhead'), await railProtest(pg)]);
+    (await pg.ntext('.liverail .railblock:not(:first-child) .railhead')) === 'Protests 1 All' && (await railProtest(pg))[0] === 'R1 · Room 1 · TU 9' || [await pg.ntext('.liverail .railblock:not(:first-child) .railhead'), await railProtest(pg)]);
 
   // a save that fails: the error shows, and this tab's copy goes back
   await withRules(pg, [{ stage: 'Request', times: 1, test: (m, u) => m === 'POST' && u === BASE + T.A,
@@ -1975,8 +1978,20 @@ section('rounds', '08 12 15 16 17 32 33: the round line, Advance, Set round, aut
     /None logged/.test(await pg.ntext('.liverail')) && (await pg.ntext('#protdrawer > summary .muted')) === 'None logged'
       && !(await pg.js(`document.querySelector('#protdrawer').open`))
       && (await pg.js(`document.querySelector('#protdrawer .inner').textContent.replace(/\\s+/g, ' ').trim()`)) === 'Protests show up here as soon as a moderator logs them in MODAQ, with the score swing an upheld ruling would produce.');
-  await check('12 advance: "Advance to round 2", no warning (its packet is in)', async () =>
-    (await pg.ntext('#advround')) === 'Advance to round 2' && !/No packet/.test(await pg.ntext('.liverail .railblock')));
+  await check('12 advance: "Release packet 2" under "Moderator packets", no warning (its packet is in)', async () =>
+    (await pg.ntext('#advround')) === 'Release packet 2' && (await pg.ntext('.liverail .railblock .railhead')) === 'Moderator packets'
+      && !/No packet/.test(await pg.ntext('.liverail .railblock')));
+  await check('12 advance: a chip per round, round 1 dark (moderators can open it)', async () => {
+    const c = await pg.js(`[...document.querySelectorAll('.pkchips span')].map((x) => x.textContent + (x.classList.contains('on') ? '*' : ''))`);
+    return JSON.stringify(c) === JSON.stringify(['1*', '2', '3']) || c;
+  });
+  await check('12 auto-advance: its "?" holds the tooltip, and clicking it leaves the switch alone', async () => {
+    const before = await pg.js(`document.querySelector('#autoadv').checked`);
+    await pg.click('[data-tipbtn]');
+    const r = [await pg.js(`document.querySelector('#autoadv').checked`) === before,
+      await pg.ntext('.advtip'), await pg.js(`getComputedStyle(document.querySelector('.advtip')).display`)];
+    return (r[0] && r[1] === 'Auto-advance releases packet x+1 to the moderators once all rooms have started a game in round x.' && r[2] === 'block') || r;
+  });
   await pg.click('#advround');
   await check('12 advance: it opens round 2, says "Round 2", and the hub shows it', async () => {
     await msgIs(pg, 'Round 2', false);
@@ -1984,7 +1999,7 @@ section('rounds', '08 12 15 16 17 32 33: the round line, Advance, Set round, aut
     return (await cur()) === 2;
   });
   await check('12 advance: with no packet for the next round, "No packet for round 3 yet"', async () =>
-    (await pg.ntext('#advround')) === 'Advance to round 3' && (await pg.js(`[...document.querySelectorAll('.liverail .warntext')].map((x) => x.textContent.trim())`)).includes('No packet for round 3 yet'));
+    (await pg.ntext('#advround')) === 'Release packet 3' && (await pg.js(`[...document.querySelectorAll('.liverail .warntext')].map((x) => x.textContent.trim())`)).includes('No packet for round 3 yet'));
   await pg.fill('#curround', '3', ['input']);
   await pg.click('#setround');
   await pg.waitJs(`/Round 3/.test(document.querySelector('.biground').textContent)`, 'round 3');
@@ -2271,7 +2286,7 @@ section('refresh', '05 09 50: the refresh timing, what holds off a redraw, a fai
     await pg.refresh();
     await check('50 refresh: once it loses the focus, the waiting change shows', async () => {
       await pg.waitJs(`!document.querySelector('#viewbody').dataset.mark`, 'the redraw');
-      return (await pg.ntext('.railtoggle')) === 'Auto-advance 2/2 started' || await pg.ntext('.railtoggle');
+      return (await pg.railToggle()) === 'Auto-advance 2/2 started' || await pg.railToggle();
     });
     // a check that fails leaves the screen as it was, with no error
     await dismiss(pg);
@@ -2382,8 +2397,8 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
   await dismiss(pg);
   await pg.click('#autoadv');
   await msgIs(pg, 'Rounds open automatically', false);
-  await check('17 auto-advance with brackets: "Brackets will advance to the next round once each room has started the current round."', () =>
-    pg.waitJs(`/Brackets will advance to the next round once each room has started the current round\\./.test(document.querySelector('.liverail').textContent)`, 'the note'));
+  await check('17 auto-advance with brackets: the "?" tooltip speaks of pools', () =>
+    pg.waitJs(`(document.querySelector('.advtip') || {}).textContent === 'Auto-advance releases packet x+1 to the moderators in a pool once all rooms in that pool have started a game in round x.'`, 'the tooltip'));
   await dismiss(pg);
   await pg.click('#autoadv');
   await msgIs(pg, 'Rounds open when you advance them', false);
@@ -2407,16 +2422,16 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
   });
   await check('17 brackets rail: "Auto-advance 2/4 started", and each pool\'s line', async () => {
     const lines = await pg.js(`[...document.querySelectorAll('.bline')].map((l) => l.textContent.replace(/\\s+/g, ' ').trim() + ' | ' + ((l.querySelector('[data-advbracket]') || {}).title || ''))`);
-    return ((await pg.ntext('.railtoggle')) === 'Auto-advance 2/4 started'
-      && JSON.stringify(lines) === JSON.stringify(['Pool A rd 1 2/2 started Advance | Open round 2 for Pool A', 'Pool B rd 1 0/2 started Advance | Open round 2 for Pool B'])) || [await pg.ntext('.railtoggle'), lines];
+    return ((await pg.railToggle()) === 'Auto-advance 2/4 started'
+      && JSON.stringify(lines) === JSON.stringify(['Pool A rd 1 2/2 started Release | Release packet 2 to Pool A', 'Pool B rd 1 0/2 started Release | Release packet 2 to Pool B'])) || [await pg.railToggle(), lines];
   });
   // Advance all, twice: to the last round of the prelims
   await pg.watchTexts('#advall');
   await dismiss(pg);
   await pg.click('#advall');
-  await check('13 advance all: "Advancing…" while it works, then "Round 2"', async () => {
+  await check('13 advance all: "Releasing…" while it works, then "Round 2"', async () => {
     await msgIs(pg, 'Round 2', false);
-    return (await pg.seenTexts()).includes('Advancing…') || await pg.seenTexts();
+    return (await pg.seenTexts()).includes('Releasing…') || await pg.seenTexts();
   });
   await pg.waitJs(`/round 2 of 3/.test(document.querySelector('.roundline').textContent)`, 'round 2');
   await dismiss(pg);
@@ -2428,7 +2443,7 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
     return JSON.stringify(l) === JSON.stringify([[false, 'last'], [false, 'last']]) || l;
   });
   await check('13 advance all: crossing into the next phase, "Opens Playoffs for every bracket."', async () =>
-    (await pg.ntext('#advall')) === 'Advance all to round 4' && (await pg.ntext('.liverail .railblock')).includes('Opens Playoffs for every bracket.') || await pg.ntext('.liverail .railblock'));
+    (await pg.ntext('#advall')) === 'Release packet 4' && (await pg.ntext('.liverail .railblock')).includes('Opens Playoffs for every bracket.') || await pg.ntext('.liverail .railblock'));
   await check('13 advance all: "No packet for round 4 yet"', async () =>
     (await pg.js(`[...document.querySelectorAll('.liverail .warntext')].map((x) => x.textContent.trim())`)).includes('No packet for round 4 yet'));
 
@@ -2496,8 +2511,8 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
   await dismiss(pg);
   await pg.click('#advall');
   await msgIs(pg, 'Round 5', false);
-  await check('15 last round with brackets: a grayed "Advance all", and "Round 5 is the last round in the schedule."', () =>
-    pg.waitJs(`(() => { const b = document.querySelector('.liverail button.advance'); return b && b.disabled && b.textContent.trim() === 'Advance all' && !document.querySelector('#advall')
+  await check('15 last round with brackets: a grayed "Release", and "Round 5 is the last round in the schedule."', () =>
+    pg.waitJs(`(() => { const b = document.querySelector('.liverail button.advance'); return b && b.disabled && b.textContent.trim() === 'Release' && !document.querySelector('#advall')
       && /Round 5 is the last round in the schedule\\./.test(document.querySelector('.liverail').textContent); })()`, 'grayed'));
 
   // 41: which games the stats use

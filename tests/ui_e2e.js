@@ -1287,7 +1287,7 @@ ok('12 live: and off again', true);
 
 // two pools keep their own rounds: the button advances every pool
 await waitJs(`!!document.querySelector('#advall')`, 'Advance');
-ok('15 rounds: the button reads Advance all to round 2', (await text('#advall')).trim() === 'Advance all to round 2', await text('#advall'));
+ok('15 rounds: the button reads Release packet 2', (await text('#advall')).trim() === 'Release packet 2', await text('#advall'));
 await click('#advall');
 d = await until(async () => { const x = await detail(); return x.tournament.current_round === 2 && x; }, 'advanced');
 await waitJs(`document.querySelector('.biground').textContent.includes('Round 2')`, 'hub on round 2');
@@ -1830,10 +1830,10 @@ async function openHubOf(adminSecret) {
   const rail = (await text('.railtoggle')).replace(/\s+/g, ' ');
   ok(`12b brackets: auto-advance says ${startedNow}/6 started`, rail.includes(`${startedNow}/6 started`), rail);
   const lines = await js(`[...document.querySelectorAll('.bline')].map((l) => l.textContent.replace(/\\s+/g, ' ').trim())`);
-  ok('12b brackets: the rail lists each pool, its round and its own Advance',
-    lines.length === 2 && lines[0].startsWith('Pool A rd 3') && lines[1].startsWith('Pool B rd 2') && lines.every((l) => l.endsWith('Advance')), lines);
-  ok('12b brackets: Advance all to round 4, and who catches up',
-    (await text('#advall')).trim() === 'Advance all to round 4' && (await text('.liverail')).includes('Pool B catches up to round 4 too.'));
+  ok('12b brackets: the rail lists each pool, its round and its own Release',
+    lines.length === 2 && lines[0].startsWith('Pool A rd 3') && lines[1].startsWith('Pool B rd 2') && lines.every((l) => l.endsWith('Release')), lines);
+  ok('12b brackets: Release packet 4, and who catches up',
+    (await text('#advall')).trim() === 'Release packet 4' && (await text('.liverail')).includes('Pool B catches up to round 4 too.'));
   ok('12b brackets: the uploads grid names the phases over the rounds',
     JSON.stringify(await js(`[...document.querySelectorAll('.ugrid tr.uphase th span')].map((e) => e.textContent)`)) === JSON.stringify(['Prelims', 'Playoffs']));
   ok('12b brackets: and groups its rooms by pool',
@@ -1976,8 +1976,8 @@ async function openHubOf(adminSecret) {
   await openHubOf(R.t.admin_secret);
   ok('12b round robin: Live now is the plain list, no headings',
     (await js(`document.querySelectorAll('.bcols, .bgroup, .brow').length`)) === 0 && (await js(`document.querySelectorAll('.lrow').length`)) === 6);
-  ok('12b round robin: no phase line, the usual Advance',
-    !/round \d+ of \d+/.test(await text('.roundline')) && (await text('#advround')).trim() === 'Advance to round 3'
+  ok('12b round robin: no phase line, the usual Release',
+    !/round \d+ of \d+/.test(await text('.roundline')) && (await text('#advround')).trim() === 'Release packet 3'
       && !(await exists('.bline')) && !(await exists('.ugrid tr.ugroup')) && !(await exists('.ugrid tr.uphase')));
   await goto(`${PAGES}/read.html?b=${R.rooms[0].secret}`);
   await waitJs(`!document.querySelector('#schedpanel').hidden`, 'the round robin reader');

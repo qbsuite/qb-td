@@ -1,3 +1,10 @@
+Release Notes for 11/2/2026
+
+[ LIVE HUB ]
+- "Advance to round N" is now "Release packet N", under a "Moderator packets" heading. With pools, each pool's Advance is now Release.
+- A row of round numbers under it shows which packets moderators can open.
+- Auto-advance has a "?" that explains when it releases the next packet.
+
 Release Notes for 11/1/2026
 
 [ PERFORMANCE ]

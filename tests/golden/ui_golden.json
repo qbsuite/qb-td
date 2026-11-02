@@ -3,8 +3,8 @@
   "hub demo": {
    "label": "as shipped",
    "live": {
-    "sha256": "d035626f67ab492867bec105",
-    "chars": 10285
+    "sha256": "b67db821c9e209705a72394e",
+    "chars": 12764
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -22,8 +22,8 @@
     "2:6 umark Game in ✓",
     "2:7 umark Game in ✓"
    ],
-   "liveNow": "Live now\n1/2 in\nRoom A\nStanford v Berkeley\nUpload\n–\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t–\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\nNone logged\nAdvance to round 8\nSet round\nSet\nAuto-advance 0/2 started\nRoom A\nRoom B\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nCompute\nDownload ▾\n13 games ready",
-   "rail": "Advance to round 8\nSet round\nSet\n--\nAuto-advance 0/2 started\nRoom A\nRoom B\n--\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nCompute\nDownload ▾\n13 games ready",
+   "liveNow": "Live now\n1/2 in\nRoom A\nStanford v Berkeley\nUpload\n–\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t–\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\nNone logged\nModerator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\nAuto-advance\n 0/2 started\nRoom A\nRoom B\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nCompute\nDownload ▾\n13 games ready",
+   "rail": "Moderator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\n--\nAuto-advance\n 0/2 started\nRoom A\nRoom B\n--\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nCompute\nDownload ▾\n13 games ready",
    "cells": {
     "1:1": {
      "panel": "Stanford 300 – 140 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_Stanford_Berkeley.qbj · qbj · 9.0 KB\nDownload\nFix buzzes\nDelete",
@@ -458,8 +458,8 @@
   "hub demo after uploads": {
    "label": "after uploads",
    "live": {
-    "sha256": "a461029b08a77905ae3517b7",
-    "chars": 12450
+    "sha256": "2b7c4153f7679848989a899c",
+    "chars": 14929
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -477,8 +477,8 @@
     "2:6 umark Game in ✓",
     "2:7 umark Game in ✓"
    ],
-   "liveNow": "Live now\n2/2 in\nRoom A\nBerkeley 295 – 235 Stanford protest\nqbj\ngame\nEdit\n✓\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n2\n\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\n1 open · R7 Room A: Berkeley protests TU 3\nRound\tRoom\tQuestion\tProtest\tScore\tRuling\n7\tRoom A\nBerkeley v Stanford\tTU 3\tBerkeley\nclose enough\n\tBerkeley 295\nStanford 235\n\nSwing unknown: uploaded as a bare qbj, so the buzz position is missing\n\t\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nAdvance to round 8\nSet round\nSet\nAuto-advance 0/2 started\nRoom A\nRoom B\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nCompute\nDownload ▾\n15 games ready",
-   "rail": "Advance to round 8\nSet round\nSet\n--\nAuto-advance 0/2 started\nRoom A\nRoom B\n--\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nCompute\nDownload ▾\n15 games ready",
+   "liveNow": "Live now\n2/2 in\nRoom A\nBerkeley 295 – 235 Stanford protest\nqbj\ngame\nEdit\n✓\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n2\n\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\n1 open · R7 Room A: Berkeley protests TU 3\nRound\tRoom\tQuestion\tProtest\tScore\tRuling\n7\tRoom A\nBerkeley v Stanford\tTU 3\tBerkeley\nclose enough\n\tBerkeley 295\nStanford 235\n\nSwing unknown: uploaded as a bare qbj, so the buzz position is missing\n\t\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nModerator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\nAuto-advance\n 0/2 started\nRoom A\nRoom B\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nCompute\nDownload ▾\n15 games ready",
+   "rail": "Moderator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\n--\nAuto-advance\n 0/2 started\nRoom A\nRoom B\n--\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nCompute\nDownload ▾\n15 games ready",
    "cells": {
     "1:1": {
      "panel": "Stanford 300 – 140 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_Stanford_Berkeley.qbj · qbj · 9.0 KB\nDownload\nFix buzzes\nDelete",

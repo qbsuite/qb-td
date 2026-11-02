@@ -261,6 +261,21 @@ table.fxteam { width: 100%; font-variant-numeric: tabular-nums; }
 .railtoggle input { width: 18px; height: 18px; margin: 0; }
 .railhead { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; }
 .railhead b { font-size: 15px; }
+/* Moderator packets: a chip per round, dark when moderators can open it */
+.pkchips { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 3px; }
+.pkchips span { height: 22px; display: inline-grid; place-items: center; border-radius: 6px;
+  font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.pkchips span.on { background: var(--fg); color: var(--bg); box-shadow: none; font-weight: 600; }
+.pkchips span.on.some { background: color-mix(in srgb, var(--fg) 45%, var(--bg)); }
+/* Auto-advance's "?" and its tooltip */
+.railtoggle .advhelp { width: 22px; height: 22px; margin: -3px 0 0 4px; }
+.tipwrap { position: relative; display: inline-block; }
+.advtip { display: none; position: absolute; z-index: 20; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  width: 260px; padding: 8px 11px; border-radius: 8px; background: var(--fg); color: var(--bg);
+  font-size: 12.5px; font-weight: 400; line-height: 1.45; white-space: normal; box-shadow: 0 4px 16px rgba(0,0,0,.18); pointer-events: none; }
+.advtip::before { content: ''; position: absolute; top: -5px; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top: 0; border-bottom-color: var(--fg); }
+.tipwrap:hover .advtip, .tipwrap:focus-within .advtip { display: block; }
+@media (max-width: 600px) { .advtip { left: auto; right: -120px; transform: none; } .advtip::before { left: auto; right: 125px; } }
 .startlist { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
 .sroom { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .sroom .dot { width: 8px; height: 8px; border-radius: 99px; flex: none; box-shadow: inset 0 0 0 1.5px var(--muted); }

@@ -2274,21 +2274,37 @@ function advNote(bk) {
   return `${list} catch${behind.length === 1 ? 'es' : ''} up to round ${bk.advTo} too.`;
 }
 
+// Auto-advance's "?": its tooltip shows on hover or focus, over the rail
+// (nothing moves). With brackets it speaks of pools.
+function autoHelp(pools) {
+  const text = pools
+    ? 'Auto-advance releases packet x+1 to the moderators in a pool once all rooms in that pool have started a game in round x.'
+    : 'Auto-advance releases packet x+1 to the moderators once all rooms have started a game in round x.';
+  return `<span class="tipwrap"><button type="button" class="ico muted advhelp" data-tipbtn
+    aria-label="How Auto-advance works" aria-describedby="advtip">${ICON.help}</button><span class="advtip" role="tooltip" id="advtip">${text}</span></span>`;
+}
+
+// Moderator packets: a chip per round, dark for the packets moderators can
+// open. With brackets, a round only some brackets have reached is lighter.
+function packetChips(total, open, low) {
+  return `<div class="pkchips" style="--n:${Math.min(total, 14)}">${Array.from({ length: total }, (_, i) => i + 1).map((n) =>
+    `<span class="${n <= open ? 'on' : ''} ${n <= open && n > low ? 'some' : ''}" title="Round ${n}">${n}</span>`).join('')}</div>`;
+}
+
 // Auto-advance with brackets: each bracket's round and starts, and its
 // own Advance. No mode to pick: brackets always move on their own.
 function autoBracketsHtml(bk, settings) {
   const rows = bk.rooms.filter((r) => r.key);
   const nStarted = rows.filter((r) => r.started).length;
   return `<div class="railblock">
-    <label class="railtoggle"><span><b>Auto-advance</b> <span class="muted">${nStarted}/${rows.length} started</span></span>
+    <label class="railtoggle"><span><b>Auto-advance</b>${autoHelp(true)} <span class="muted">${nStarted}/${rows.length} started</span></span>
       <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''}></label>
-    ${settings.autoAdvance ? '<div class="muted small">Brackets will advance to the next round once each room has started the current round.</div>' : ''}
     <div class="blist">${bk.groups.map((g) => `<div class="bline" data-bline="${esc(g.key)}">
       <i class="lane-${g.color}"></i>
       <span>${esc(g.name)} <span class="${g.round < bk.top ? 'warntext' : 'muted'}">rd ${g.round}</span></span>
       <span class="muted">${g.nStarted}/${g.rows.length} started</span>
       ${g.round < bk.ph.last
-        ? `<button class="linkbtn" data-advbracket="${esc(g.key)}" title="Open round ${g.round + 1} for ${esc(g.name)}">Advance</button>`
+        ? `<button class="linkbtn" data-advbracket="${esc(g.key)}" title="Release packet ${g.round + 1} to ${esc(g.name)}">Release</button>`
         : '<span class="muted small" title="Last round of this phase">last</span>'}
     </div>`).join('')}</div>
   </div>`;
@@ -2592,21 +2608,23 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
 
       <aside class="liverail">
         <div class="railblock">
+          <div class="railhead"><b>Moderator packets</b></div>
           ${pastSched(bk ? bk.advTo : t.current_round + 1)
-          ? `<button class="primary advance" disabled>${bk ? 'Advance all' : 'Advance'}</button>
+          ? `<button class="primary advance" disabled>Release</button>
           <div class="muted small">Round ${schedRoundCount()} is the last round in the schedule.</div>`
-          : bk ? `<button id="advall" class="primary advance">Advance all to round ${bk.advTo}</button>
+          : bk ? `<button id="advall" class="primary advance">Release packet ${bk.advTo}</button>
           ${advNote(bk) ? `<div class="muted small">${advNote(bk)}</div>` : ''}
           ${rounds.some((r) => r.number === bk.advTo) || !rounds.length ? '' : `<div class="warntext small">No packet for round ${bk.advTo} yet</div>`}`
-          : `<button id="advround" class="primary advance">Advance to round ${t.current_round + 1}</button>
+          : `<button id="advround" class="primary advance">Release packet ${t.current_round + 1}</button>
           ${nextHasPacket || !rounds.length ? '' : `<div class="warntext small">No packet for round ${t.current_round + 1} yet</div>`}`}
+          ${packetChips(totalRounds, topRound, bk ? Math.min(...Object.values(bk.st.rounds)) : topRound)}
           <label class="setround">Set round
             <input id="curround" type="number" min="1" max="999" value="${bk ? bk.top : t.current_round}" aria-label="Round">
             <button id="setround" class="linkbtn">Set</button></label>
         </div>
         ${buckets.length && bk ? autoBracketsHtml(bk, settings) : buckets.length ? `
         <div class="railblock">
-          <label class="railtoggle"><span><b>Auto-advance</b> <span class="muted">${nStarted}/${playing.length} started</span></span>
+          <label class="railtoggle"><span><b>Auto-advance</b>${autoHelp(false)} <span class="muted">${nStarted}/${playing.length} started</span></span>
             <input type="checkbox" id="autoadv" ${settings.autoAdvance ? 'checked' : ''}></label>
           ${settings.autoAdvance && playing.length && nStarted === playing.length && !nextHasPacket
             ? `<div class="muted small">Round ${t.current_round + 1} opens as soon as its packet is uploaded.</div>` : ''}
@@ -2783,6 +2801,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     } catch (e) { say(e.message, true); }
   };
   if ($('setround')) $('setround').onclick = () => goToRound(Number($('curround').value));
+  box.querySelectorAll('[data-tipbtn]').forEach((b) => { b.onclick = (e) => { e.preventDefault(); b.focus(); }; });
   if ($('autoadv')) $('autoadv').onchange = async () => {
     try {
       const next = { ...settings };
@@ -2799,7 +2818,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
   // brackets: all of them, or one
   const advance = async (which, btn) => {
-    const run = busy(btn, { label: 'Advancing' });
+    const run = busy(btn, { label: 'Releasing' });
     try {
       const out = await pub(a, { method: 'POST', json: { advance: which } });
       uploadsOpen = null;
