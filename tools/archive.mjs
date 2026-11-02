@@ -151,6 +151,22 @@ export function captureProblems(state, bundle) {
   return problems;
 }
 
+// Listed uploads the shards lack that a newer upload replaced: same room,
+// round and file name, a higher id, and that one in the shards. A room
+// that resent a game (the reader's upload gave up and the moderator sent
+// it again) can leave the first copy listed with no public copy behind
+// it; the public page counts only the newest anyway (stats.js
+// dedupeMatches), so the capture drops the first rather than show it as
+// "just in" forever. Anything else the shards lack still fails
+// captureProblems.
+export function replacedMissing(files, entries) {
+  const have = new Set(entries.map((e) => e.id));
+  const key = (f) => JSON.stringify([f.round, f.room, f.filename]);
+  const newest = new Map();
+  for (const e of entries) if (!(newest.get(key(e)) > e.id)) newest.set(key(e), e.id);
+  return files.filter((f) => !have.has(f.id) && newest.get(key(f)) > f.id).map((f) => f.id);
+}
+
 // Every game, from the live per-round shards. A capture is frozen and
 // tiny by tournament standards, so it keeps the whole-tournament shape
 // the archived page reads (`rounds` is dropped below) rather than
@@ -183,9 +199,11 @@ async function capture(api, slug) {
   // the complete data, and the snapshot repo may prune old slugs — the
   // page also guards against this (usingStaticData), belt and braces.
   const open = state.buzz_v === 'open';
+  const dropped = replacedMissing(state.files || [], bundle.entries);
   const data = {
     [`/pub/${slug}`]: {
       ...state,
+      files: (state.files || []).filter((f) => !dropped.includes(f.id)),
       ...(open ? {} : { buzz: null, buzz_v: null, buzz_done: [], packet_rounds: [], scoresheets: false }),
       pub: null,
       // No `rounds`: the capture holds every game in one bundle, which is
@@ -198,7 +216,7 @@ async function capture(api, slug) {
   if (cats) data[`/pub/${slug}/cats`] = cats;
   if (roster) data[`/pub/${slug}/roster`] = roster;
 
-  return { state, data, texts: open ? await captureTexts(api, slug, state) : null };
+  return { state, data, dropped, texts: open ? await captureTexts(api, slug, state) : null };
 }
 
 // A released tournament's question text: each finished round's packet and
@@ -327,7 +345,11 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
   if (!existing && refresh) throw new Error(`${slug} is not archived yet; use \`add\``);
 
   console.log(`reading ${slug} from ${opts.api} ...`);
-  const { state, data, texts } = await capture(opts.api, slug);
+  const { state, data, dropped, texts } = await capture(opts.api, slug);
+  if (dropped.length) {
+    console.log(`  left out ${dropped.length} upload(s) a newer copy of the same game replaced, `
+      + `with no public copy of their own (file id ${dropped.join(', ')})`);
+  }
 
   // The archive's own title for it: --name, else the one it was archived
   // under (a refresh must not undo a rename), else what its TD called it.

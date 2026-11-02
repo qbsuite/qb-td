@@ -2974,7 +2974,7 @@ test('archive captures carry no question text', () => {
   }
 });
 
-const { captureReport, captureProblems } = await import('../tools/archive.mjs');
+const { captureReport, captureProblems, replacedMissing } = await import('../tools/archive.mjs');
 
 const { archiveUrl, alertBody } = await import('../worker/worker.js');
 
@@ -3024,6 +3024,20 @@ test('archive captures hold the games their state lists, with scoresheets off', 
   assert.match(captureProblems({ files: [], scoresheets: true }, bundle).join(), /scoresheets are on/);
   // ...unless its TD released the questions, which the capture then keeps
   assert.deepEqual(captureProblems({ files: [], scoresheets: true, buzz_v: 'open' }, bundle), []);
+});
+
+test('archive captures leave out a resent game\'s first copy when the shards lack it', () => {
+  const f = (id, room = '101', filename = 'Round_5_A_B.qbtd.json', round = 5) => ({ id, round, room, filename });
+  // the first copy missing, the resent one in the shards: left out
+  assert.deepEqual(replacedMissing([f(1443), f(1444)], [f(1444)]), [1443]);
+  // both in the shards: nothing to leave out
+  assert.deepEqual(replacedMissing([f(1443), f(1444)], [f(1443), f(1444)]), []);
+  // the newest copy missing is a real gap, still reported
+  assert.deepEqual(replacedMissing([f(1443), f(1444)], [f(1443)]), []);
+  // another room's, round's or file's game is no replacement
+  assert.deepEqual(replacedMissing([f(1), f(2, '102')], [f(2, '102')]), []);
+  assert.deepEqual(replacedMissing([f(1), f(2, '101', 'Round_5_A_B.qbtd.json', 6)], [f(2, '101', 'Round_5_A_B.qbtd.json', 6)]), []);
+  assert.deepEqual(replacedMissing([f(1), f(2, '101', 'Round_5_C_D.qbtd.json')], [f(2, '101', 'Round_5_C_D.qbtd.json')]), []);
 });
 
 // The static stat report linked beside each archived page must be the
