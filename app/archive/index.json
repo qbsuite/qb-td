@@ -4,10 +4,12 @@
       "slug": "2026-penn-bowl-queens",
       "name": "2026 Penn Bowl @ Queen's",
       "date": "2026-10-31",
-      "host": "",
+      "host": "Queen's",
       "teams": 12,
       "rounds": 12,
-      "games": 67
+      "games": 67,
+      "set": "2026 Penn Bowl",
+      "site": "Queen's"
     },
     {
       "slug": "2026-korrayshelton",
