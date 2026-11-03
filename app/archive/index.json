@@ -1,6 +1,15 @@
 {
   "tournaments": [
     {
+      "slug": "2026-penn-bowl-queens",
+      "name": "2026 Penn Bowl @ Queen's",
+      "date": "2026-10-31",
+      "host": "",
+      "teams": 12,
+      "rounds": 12,
+      "games": 67
+    },
+    {
       "slug": "2026-korrayshelton",
       "name": "2026 KS Tournament",
       "date": "2026-10-30",
