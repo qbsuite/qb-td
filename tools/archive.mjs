@@ -15,6 +15,7 @@
 //   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "..."] [--name "..."]
 //                                     [--set "..."] [--site "..."]
 //   node tools/archive.mjs refresh <slug>
+//   node tools/archive.mjs edit <slug> [--date ...] [--host ...] [--name ...] [--set ...] [--site ...]
 //   node tools/archive.mjs rebuild [<slug>]
 //   node tools/archive.mjs remove <slug>
 //   node tools/archive.mjs name "<name>" --date YYYY-MM-DD
@@ -23,6 +24,11 @@
 // --set names the question set a tournament used, so the archive page
 // shows that set's sites together; --site is its short label there
 // (default: the host). Both stick across a refresh; --set "" clears it.
+//
+// `edit` changes only what the archive says about one: its name, date,
+// host, set and site. Nothing is recaptured and no backend is read — for
+// joining an archived tournament to a set after the fact (the archive
+// issue does this when its slug is already archived).
 //
 // `rebuild` regenerates the report pages from the committed capture and
 // reads nothing from any backend: for a change to the report itself. With
@@ -407,6 +413,27 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
     : '\ncommit the result to approve it.');
 }
 
+function cmdEdit(slug, opts) {
+  const index = readIndex();
+  const t = index.tournaments.find((x) => x.slug === slug);
+  if (!t) throw new Error(`${slug} is not archived; use \`add\``);
+  if (opts.date != null && !/^\d{4}-\d{2}-\d{2}$/.test(opts.date)) throw new Error('--date must be YYYY-MM-DD');
+  if (opts.name) t.name = opts.name;
+  if (opts.date) t.date = opts.date;
+  if (opts.host != null) t.host = opts.host;
+  // the set and site as add writes them: last, and an empty one left out
+  const set = opts.set != null ? opts.set : t.set || '';
+  const site = opts.site != null ? opts.site : t.site || '';
+  delete t.set;
+  delete t.site;
+  if (set) t.set = set;
+  if (set && site) t.site = site;
+  writeIndex(index);
+  console.log(`edited ${slug}: ${[t.name, t.date, t.host && 'host ' + t.host, t.set && 'set ' + t.set,
+    t.site && 'site ' + t.site].filter(Boolean).join(', ')}`);
+  console.log('\ncommit the result to approve it.');
+}
+
 // The report pages again, from the committed captures alone: the capture
 // is the archived data, so a change to how the report is built never
 // needs the backend (which may no longer hold the tournament).
@@ -476,6 +503,7 @@ const USAGE = `usage:
   node tools/archive.mjs add <slug> [--date YYYY-MM-DD] [--host "Stanford"] [--name "Title"]
                                     [--set "2026 Penn Bowl"] [--site "Stanford"]
   node tools/archive.mjs refresh <slug>
+  node tools/archive.mjs edit <slug> [--date YYYY-MM-DD] [--host "..."] [--name "..."] [--set "..."] [--site "..."]
   node tools/archive.mjs rebuild [<slug>]
   node tools/archive.mjs remove <slug>
   node tools/archive.mjs name "<name>" --date YYYY-MM-DD
@@ -497,6 +525,7 @@ if (isMain) {
     else if (cmd === 'list') await cmdList(opts);
     else if (cmd === 'add') await cmdAdd(slug, opts);
     else if (cmd === 'refresh') await cmdAdd(slug, opts, { refresh: true });
+    else if (cmd === 'edit') cmdEdit(slug, opts);
     else if (cmd === 'rebuild') await cmdRebuild(slug);
     else if (cmd === 'remove') cmdRemove(slug);
     else throw new Error(USAGE);

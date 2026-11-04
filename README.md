@@ -1661,6 +1661,8 @@ node tools/archive.mjs list                    # published tournaments, and whic
 node tools/archive.mjs add <slug> --date 2026-07-25 --host "Stanford"
 #   --name "Title" archives it under a different name than its TD gave it
 node tools/archive.mjs refresh <slug>          # recapture after a late correction
+node tools/archive.mjs edit <slug> --set "2026 Penn Bowl" --site "Stanford"
+#   relabel an archived one (name, date, host, set, site), nothing recaptured
 node tools/archive.mjs rebuild [<slug>]        # report pages again from the committed capture, offline
 node tools/archive.mjs remove <slug>           # un-approve
 node tools/archive_goldens.mjs <slug>          # a new archive's golden entries, before the commit
@@ -1669,13 +1671,20 @@ node tools/archive_goldens.mjs <slug>          # a new archive's golden entries,
 **From Discord.** With `ARCHIVE_REPO` set (`wrangler.toml`), a
 Finished alert's **Archive it** button opens a new issue on that repo, its
 title and body filled in: the slug, the date the tournament started, and
-an empty `host:` line to fill or leave. Submitting it is the approval.
+`host:`, `set:` and `site:` lines to fill or leave. For a mirror of a
+question set the set's name is filled in, and the host the set's editor
+gave the mirror as both host and site. A set puts the tournament on that
+set's archive page (`archive.html?set=`) with the set's other sites,
+`site:` being its short label there. Submitting it is the approval.
 `.github/workflows/archive.yml` checks that the issue's author can push to
 the repo (anyone else's issue is closed untouched), runs `add`, gives the
 new archive its golden entries (`tools/archive_goldens.mjs`) and a
 changelog line (`tools/changelog_add.mjs`), runs `npm test`, pushes to
 `main`, and closes the issue with what it captured. Anything that fails
-leaves the issue open with a link to the log; reopen it to try again.
+leaves the issue open with a link to the log; reopen it to try again. An
+issue for a slug that is already archived runs `edit` instead: that is
+how an archived tournament joins a set after the fact (an issue titled
+`Archive <name>` with `slug:` and `set:` lines).
 
 `add` reads the public routes, writes the frozen capture
 (`app/archive/<slug>.js`), generates the six report pages

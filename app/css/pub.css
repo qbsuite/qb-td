@@ -110,6 +110,16 @@ tr.nowrow td { background: var(--sel); }
   color: var(--fg); padding: 5px; border-bottom: 1px solid var(--line); background: var(--bg);
 }
 .nstats thead { position: sticky; top: 0; z-index: 2; }
+/* a number column's header sorts its table (newstats.js sortTables) */
+.sorth {
+  font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0;
+  cursor: pointer; text-align: inherit; white-space: nowrap;
+}
+.sorth:hover { color: var(--link); }
+.sorth:focus-visible { outline: 2px solid var(--act); outline-offset: 2px; border-radius: 3px; }
+th[aria-sort] .sorth { color: var(--link); }
+th[aria-sort="descending"] .sorth::after { content: " \25BE"; }
+th[aria-sort="ascending"] .sorth::after { content: " \25B4"; }
 /* Classic's row height: 11pt-ish text, a tight line, 5px cells */
 .nstats { font-size: 14px; line-height: 1.15; }
 .nstats .g0 { padding-left: 16px; }
@@ -144,6 +154,8 @@ tr.nowrow td { background: var(--sel); }
 .njump { margin-bottom: 4px; }
 
 /* on a phone a player's team rides under the name instead of a column */
+/* a set's site names are short: no room held for a long name */
+th.nsite, td.nsite { min-width: 0; }
 .subteam { display: none; }
 
 /* ---------- buzzpoints: where each tossup's buzzes landed ---------- */
@@ -249,3 +261,11 @@ details.qd .qdmeta.track { line-height: 20px; }
 .picklist [role="option"].on { background: var(--sel); }
 .picklist [role="option"][aria-selected="true"] { font-weight: 600; }
 @media (max-width: 640px) { .pick { width: 100%; } }
+
+/* ---------- a set's sites table (setview.js renderSitebar) ---------- */
+.sitebar { margin: 10px 0 14px; }
+.sitetable td.sitepick, .sitetable th.sitepick { width: 1px; padding-right: 2px; }
+.sitetable input { width: 16px; height: 16px; margin: 0; vertical-align: middle; accent-color: var(--act); cursor: pointer; }
+.sitetable input:disabled { cursor: default; }
+.sitetable tr.off td { color: var(--muted); }
+.sitetable tr.off td a { color: var(--muted); }

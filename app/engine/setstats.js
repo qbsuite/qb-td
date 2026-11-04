@@ -150,7 +150,7 @@ export function setCategories(sites, setCatmap) {
  * lines), merged and re-sorted the way each of those sorts on its own.
  * Sites are told apart by mirror id — two mirrors may share a label.
  */
-export function setCatLines(rows, cat, sub, kind) {
+export function setCatLines(rows, cat, sub, kind, sub2 = '') {
   const bySite = new Map();
   for (const r of rows) {
     if (!bySite.has(r.siteId)) bySite.set(r.siteId, []);
@@ -158,8 +158,8 @@ export function setCatLines(rows, cat, sub, kind) {
   }
   const lines = [];
   for (const list of bySite.values()) {
-    const own = kind === 'team' ? catTeamLines(list, cat, sub) : catPlayerLines(list, cat, sub);
-    for (const l of own) lines.push({ ...l, site: list[0].site });
+    const own = kind === 'team' ? catTeamLines(list, cat, sub, sub2) : catPlayerLines(list, cat, sub, sub2);
+    for (const l of own) lines.push({ ...l, site: list[0].site, siteId: list[0].siteId });
   }
   return kind === 'team'
     ? lines.sort((a, b) => (b.pts + b.bpts) - (a.pts + a.bpts) || (b.ppb ?? -1) - (a.ppb ?? -1))
@@ -204,7 +204,7 @@ const qmapOf = (catmap, p, v) => {
   return (e && e.q) || null;
 };
 
-function identOf(catmap, p, v, kind, pos) {
+export function identOf(catmap, p, v, kind, pos) {
   const q = qmapOf(catmap, p, v);
   const e = q && Array.isArray(q[kind]) ? q[kind][pos - 1] : null;
   return e ? { ident: 'q' + e[0], rev: e[1] } : { ident: `u${p}.${v}.${kind}${pos}`, rev: 1 };

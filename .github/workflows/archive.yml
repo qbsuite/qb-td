@@ -1,9 +1,15 @@
 # Archive a tournament from an issue. The Discord "Finished" alert links to
-# a new issue here with the slug and date filled in (worker.js
-# archiveUrl); submitting it is the approval. This runs `archive.mjs add`,
-# gives the archive its golden entries and a changelog line, runs npm test,
-# pushes to main, and closes the issue with what it did. Anything that
-# fails leaves the issue open with the reason.
+# a new issue here with the slug and date filled in, and the set and site
+# too for a mirror of a question set (worker.js archiveUrl); submitting it
+# is the approval. This runs `archive.mjs add`, gives the archive its
+# golden entries and a changelog line, runs npm test, pushes to main, and
+# closes the issue with what it did. Anything that fails leaves the issue
+# open with the reason.
+#
+# `set:` puts the tournament on that set's archive page, with the set's
+# other sites (`site:` is its short label there). An issue for a slug
+# that is already archived only relabels it (`archive.mjs edit`): that is
+# how an archived tournament joins a set after the fact.
 #
 # The gate is still push access: an issue from anyone who can't push to
 # this repo is closed untouched. Reopening an issue tries it again.
@@ -51,17 +57,18 @@ jobs:
           BODY: ${{ github.event.issue.body }}
         run: |
           field() { printf '%s\n' "$BODY" | tr -d '\r' | sed -n "s/^$1:[[:space:]]*//p" | head -1 | sed 's/[[:space:]]*$//'; }
-          slug=$(field slug); date=$(field date); host=$(field host)
+          slug=$(field slug); date=$(field date); host=$(field host); set=$(field set); site=$(field site)
           if ! printf '%s' "$slug" | grep -Eq '^[a-z0-9][a-z0-9-]{2,39}$'; then
             gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" -b "No valid \`slug:\` line in the issue body."; exit 1
           fi
           if [ -n "$date" ] && ! printf '%s' "$date" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
             gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" -b "\`date:\` must be YYYY-MM-DD."; exit 1
           fi
+          # one line, no shell or markdown surprises in a commit message
+          clean() { printf '%s' "$1" | tr -cd '[:alnum:] .,&@()'"'"'-' | cut -c1-80; }
           {
             echo "slug=$slug"; echo "date=$date"
-            # one line, no shell or markdown surprises in a commit message
-            echo "host=$(printf '%s' "$host" | tr -cd '[:alnum:] .,&@()'"'"'-' | cut -c1-80)"
+            echo "host=$(clean "$host")"; echo "set=$(clean "$set")"; echo "site=$(clean "$site")"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v5
@@ -77,14 +84,27 @@ jobs:
           SLUG: ${{ steps.req.outputs.slug }}
           DATE: ${{ steps.req.outputs.date }}
           HOST: ${{ steps.req.outputs.host }}
+          SET: ${{ steps.req.outputs.set }}
+          SITE: ${{ steps.req.outputs.site }}
         run: |
           set -o pipefail
-          args=(add "$SLUG")
+          # already archived: relabel it (a set to join), nothing recaptured
+          if node -e 'process.exit(require("./app/archive/index.json").tournaments.some(t=>t.slug===process.argv[1])?0:1)' "$SLUG"; then
+            cmd=edit
+          else
+            cmd=add
+          fi
+          args=("$cmd" "$SLUG")
           if [ -n "$DATE" ]; then args+=(--date "$DATE"); fi
           if [ -n "$HOST" ]; then args+=(--host "$HOST"); fi
+          if [ -n "$SET" ]; then args+=(--set "$SET"); fi
+          if [ -n "$SITE" ]; then args+=(--site "$SITE"); fi
           node tools/archive.mjs "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/add.txt"
           name=$(node -e 'const t=require("./app/archive/index.json").tournaments.find(t=>t.slug===process.argv[1]);console.log(t.name)' "$SLUG")
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          {
+            echo "name=$name"; echo "cmd=$cmd"
+            echo "set=$(node -e 'const t=require("./app/archive/index.json").tournaments.find(t=>t.slug===process.argv[1]);console.log(t.set||"")' "$SLUG")"
+          } >> "$GITHUB_OUTPUT"
 
       # Ubuntu 24.04 keeps Chrome's sandbox from starting; the UI golden
       # needs headless Chrome
@@ -94,9 +114,15 @@ jobs:
         env:
           SLUG: ${{ steps.req.outputs.slug }}
           NAME: ${{ steps.add.outputs.name }}
+          CMD: ${{ steps.add.outputs.cmd }}
+          SET: ${{ steps.add.outputs.set }}
         run: |
-          CHROME=$(command -v google-chrome) node tools/archive_goldens.mjs "$SLUG"
-          node tools/changelog_add.mjs ARCHIVE "Added $NAME."
+          if [ "$CMD" = add ]; then
+            CHROME=$(command -v google-chrome) node tools/archive_goldens.mjs "$SLUG"
+            node tools/changelog_add.mjs ARCHIVE "Added $NAME${SET:+ to the $SET set}."
+          elif [ -n "$SET" ]; then
+            node tools/changelog_add.mjs ARCHIVE "Added $NAME to the $SET set."
+          fi
 
       - run: npm test
 
@@ -105,19 +131,25 @@ jobs:
           SLUG: ${{ steps.req.outputs.slug }}
           NAME: ${{ steps.add.outputs.name }}
           AUTHOR: ${{ github.event.issue.user.login }}
+          SET: ${{ steps.add.outputs.set }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           git add app/archive app/changelog.txt tests/golden
+          # an issue for an archived slug that changes nothing
+          if git diff --cached --quiet; then
+            gh issue close "$ISSUE" -R "$GITHUB_REPOSITORY" -c "$NAME is already archived as the issue describes; nothing changed."
+            exit 0
+          fi
           git commit -q -F - <<EOF
-          Archive: $NAME
+          Archive: $NAME${SET:+, in the $SET set}
 
           Approved by @$AUTHOR in #$ISSUE.
           EOF
           git push -q origin HEAD:main
           gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" >/dev/null || echo "Pages build not requested"
           {
-            echo "Archived as $(git rev-parse --short HEAD). It shows on the archive page once Pages deploys."
+            echo "Archived as $(git rev-parse --short HEAD). It shows on the archive page${SET:+, and on the $SET set page with its other sites,} once Pages deploys."
             echo
             echo '```'
             grep -v -i -E 'wrangler|unsafe' "$RUNNER_TEMP/add.txt" | sed '/^[[:space:]]*$/d'

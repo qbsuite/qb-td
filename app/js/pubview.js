@@ -19,12 +19,15 @@ import { dedupeMatches } from '../engine/stats.js';
 import { buildReport, reportData } from '../engine/report.js';
 import { mountReport, reportPlace } from './reportframe.js';
 import { comfortScroll } from './place.js';
+import { viewsHtml, chipsHtml, pickerHtml, wirePicker, catChipsHtml, fx, newIds, goLink, rk, markTags,
+  newIndividuals, secHead, newTeams, newPlayers, newRounds, fitTables, catHead, lineCells,
+  questionsHtml, sortTables } from './newstats.js';
 import { slotText } from '../engine/schedule.js';
 import { scheduleFinished } from '../engine/finals.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes, sideRounds } from '../engine/buzz.js';
 import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket, setWordFormat } from './buzzview.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
-  categoryQuestionStats, questionLines, categoryQuestions, UNKNOWN_CAT } from '../engine/cats.js';
+  categoryQuestionStats, categoryQuestions } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
 import { buildScoresheet } from '../engine/scoresheet.js';
 import { sheetHtml } from './sheetview.js';
@@ -582,7 +585,7 @@ function backToSchedule() {
 // stretching happens once, on unlock, rather than on every packet fetch.
 // It carries the server's buzz_v stamp, so when the TD sets a new password
 // the stamp moves, the stale entry is dropped, and viewers re-enter.
-
+// With the TD's "No password: the set is clear" (buzz_v 'open') there is
 // nothing to enter: everything reads as unlocked, and no key is sent.
 function buzzStored() {
   if (state && state.buzz_v === 'open') return { tok: '', v: 'open', open: true };
@@ -707,159 +710,11 @@ const buzzEntries = () => {
   return rawEntries.filter((e) => done.has(e.round));
 };
 
-/* ---------- navigation + filters (td.css .views / .chips) ---------- */
-
-// View switch: bold words. items [{v, label} | {grow: true}].
-function viewsHtml(items, cur, attr) {
-  return `<div class="views">${items.map((i) => i.grow ? '<span class="grow"></span>'
-    : `<a href="#" class="view${i.v === cur ? ' on' : ''}" data-${attr}="${esc(i.v)}"${
-      i.v === cur ? ' aria-current="true"' : ''}>${esc(i.label)}</a>`).join('')}</div>`;
-}
-// Filter chips. items [{v, label, n?, off?, cls?}]; `sub` hangs the row
-// off a rule, for the level under another.
-// `sub` is true for the second row, 'sub2' for the third.
-function chipsHtml(items, cur, attr, sub = false) {
-  return `<div class="chips${sub ? ' sub' : ''}${sub === 'sub2' ? ' sub2' : ''}">${items.map((i) => i.off
-    ? `<span class="chip off">${esc(i.label)}</span>`
-    : `<a href="#" class="chip${i.v === cur ? ' on' : ''}${i.cls ? ' ' + i.cls : ''}" data-${attr}="${esc(i.v)}"${
-      i.v === cur ? ' aria-current="true"' : ''}>${esc(i.label)}${i.n ? `<span class="n">${i.n}</span>` : ''}</a>`).join('')}</div>`;
-}
 function wire(box, attr, pick) {
   box.querySelectorAll(`[data-${attr}]`).forEach((el) => {
     el.onclick = (e) => { e.preventDefault(); pick(el.dataset[attr]); render(); };
   });
 }
-// A player list: a button showing the picked player, which opens the
-// list with a search box on top. The list runs team by team, each team's
-// players under its name; typing narrows it to names (or teams) holding
-// every word typed, accents and case aside. The search box takes the
-// focus only on a mouse or trackpad: on a phone that would bring up the
-// keyboard over the list. items [{name, team}], sorted by team; `cur` is
-// the picked index.
-const foldName = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const pickLabel = (p) => `${p.name} (${p.team})`;
-function pickerHtml(id, items, cur) {
-  return `<div class="pick"><button type="button" id="${id}" class="pickbtn" aria-haspopup="listbox"
-    aria-expanded="false">${esc(items[cur] ? pickLabel(items[cur]) : '')}</button><div class="pickpanel" hidden>
-    <input type="search" id="${id}-q" role="combobox" aria-expanded="false" aria-controls="${id}-list"
-      aria-autocomplete="list" autocomplete="off" spellcheck="false" aria-label="Search players" placeholder="Search">
-    <ul id="${id}-list" class="picklist" role="listbox"></ul></div></div>`;
-}
-function wirePicker(id, items, cur, pick) {
-  const btn = $(id);
-  const input = $(id + '-q');
-  const list = $(id + '-list');
-  const panel = list.parentElement;
-  const keys = items.map((p) => foldName(pickLabel(p)));
-  let shown = [];
-  let at = -1;
-  const opts = () => [...list.querySelectorAll('[role="option"]')];
-  const mark = (i) => {
-    at = i;
-    opts().forEach((li, j) => li.classList.toggle('on', j === at));
-    const li = opts()[at];
-    if (li) {
-      input.setAttribute('aria-activedescendant', li.id);
-      li.scrollIntoView({ block: 'nearest' });
-    } else input.removeAttribute('aria-activedescendant');
-  };
-  // a tap or click outside the open list closes it
-  const outside = (e) => { if (!panel.contains(e.target) && e.target !== btn) close(); };
-  const open = (q) => {
-    const words = foldName(q).split(/\s+/).filter(Boolean);
-    shown = items.map((_, i) => i).filter((i) => words.every((w) => keys[i].includes(w)));
-    const teams = [];
-    shown.forEach((i, j) => {
-      const t = teams[teams.length - 1];
-      if (t && t.team === items[i].team) t.rows.push([i, j]);
-      else teams.push({ team: items[i].team, rows: [[i, j]] });
-    });
-    list.innerHTML = teams.length ? teams.map((t) =>
-      `<li role="group" aria-label="${esc(t.team)}"><div class="pickteam" aria-hidden="true">${esc(t.team)}</div><ul role="presentation">${
-        t.rows.map(([i, j]) => `<li id="${id}-o${j}" role="option" aria-selected="${i === cur}">${esc(items[i].name)}</li>`).join('')}</ul></li>`).join('')
-      : '<li class="muted none">No matches</li>';
-    if (panel.hidden) {
-      panel.hidden = false;
-      document.addEventListener('pointerdown', outside, true);
-    }
-    input.setAttribute('aria-expanded', 'true');
-    btn.setAttribute('aria-expanded', 'true');
-    mark(shown.length ? Math.max(0, words.length ? 0 : shown.indexOf(cur)) : -1);
-  };
-  function close() {
-    panel.hidden = true;
-    document.removeEventListener('pointerdown', outside, true);
-    input.setAttribute('aria-expanded', 'false');
-    btn.setAttribute('aria-expanded', 'false');
-    input.removeAttribute('aria-activedescendant');
-    input.value = '';
-  }
-  const choose = (j) => {
-    if (shown[j] === undefined) return;
-    close();
-    if (shown[j] === cur) { btn.blur(); return; }
-    pick(items[shown[j]]);
-    render();
-  };
-  btn.onclick = () => {
-    if (!panel.hidden) { close(); return; }
-    open('');
-    if (matchMedia('(pointer: fine)').matches) input.focus();
-  };
-  btn.onkeydown = (e) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(''); input.focus(); }
-  };
-  panel.parentElement.addEventListener('focusout', (e) => {
-    if (!panel.hidden && !panel.parentElement.contains(e.relatedTarget)) close();
-  });
-  input.oninput = () => open(input.value);
-  input.onkeydown = (e) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (shown.length) mark((at + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      choose(at);
-    } else if (e.key === 'Escape') {
-      close();
-      btn.focus();
-    }
-  };
-  // mousedown, not click: the focus stays put until the pick lands
-  list.onmousedown = (e) => {
-    e.preventDefault();
-    const li = e.target.closest('[role="option"]');
-    if (li) choose(opts().indexOf(li));
-  };
-}
-// Category chips, then the picked category's subcategories under them,
-// then the picked subcategory's own split (RMPSS → Beliefs → Narratives).
-// `items` are [{cat, sub, sub2}] with a count each (`n`); a subcategory
-// named like its category adds nothing and isn't offered. `all` offers an
-// All chip for no category.
-function catChipsHtml(items, [cat, sub, sub2], [catAttr, subAttr, sub2Attr], all = true) {
-  const count = new Map();
-  const bump = (k, n) => count.set(k, (count.get(k) || 0) + n);
-  for (const i of items) {
-    bump(i.cat, i.n);
-    if (i.sub && i.sub !== i.cat) bump(i.cat + '\n' + i.sub, i.n);
-    if (i.sub2) bump(i.cat + '\n' + i.sub + '\n' + i.sub2, i.n);
-  }
-  const cats = [...new Set(items.map((i) => i.cat))].sort(catCompare);
-  const subs = cat ? [...new Set(items.filter((i) => i.cat === cat && i.sub && i.sub !== cat)
-    .map((i) => i.sub))].sort() : [];
-  const subs2 = cat && sub ? [...new Set(items.filter((i) => i.cat === cat && i.sub === sub && i.sub2)
-    .map((i) => i.sub2))].sort() : [];
-  return `<div class="chipstack">
-    ${chipsHtml([...(all ? [{ v: '', label: 'All' }] : []),
-      ...cats.map((c) => ({ v: c, label: c, n: count.get(c), cls: c === UNKNOWN_CAT ? 'unc' : '' }))], cat, catAttr)}
-    ${subs.length ? chipsHtml([{ v: '', label: 'All' },
-      ...subs.map((s) => ({ v: s, label: s, n: count.get(cat + '\n' + s) }))], sub, subAttr, true) : ''}
-    ${subs2.length ? chipsHtml([{ v: '', label: 'All' },
-      ...subs2.map((s) => ({ v: s, label: s, n: count.get(cat + '\n' + sub + '\n' + s) }))], sub2, sub2Attr, 'sub2') : ''}
-  </div>`;
-}
-
 /* ---------- buzzpoints tab ---------- */
 
 function renderBuzzSummary(box) {
@@ -968,7 +823,7 @@ async function renderBuzzSide(box, rounds, byPlayer) {
     </div>
     <div id="buzzsideout"><div class="muted">Loading packets</div></div>`;
   if (byPlayer) {
-    wirePicker('buzzplayersel', players, cur, (p) => { buzzTeam = p.team; buzzPlayer = p.name; });
+    wirePicker('buzzplayersel', players, cur, (p) => { buzzTeam = p.team; buzzPlayer = p.name; }, render);
   } else {
     $('buzzteamsel').onchange = () => {
       buzzTeam = teams[Number($('buzzteamsel').value)];
@@ -1057,14 +912,6 @@ function showPowers(lines) {
   const f = effectiveFormat(state.format);
   return Boolean((f.powers || []).length) || lines.some((l) => l.powers);
 }
-const catHead = (pw) => (pw ? '<th class="num">15</th>' : '') + '<th class="num">10</th><th class="num">-5</th>'
-  + '<th class="num" title="Bouncebacks: tossups won after the other team missed them">BB</th>'
-  + '<th class="num">Pts</th>';
-function lineCells(l, pw) {
-  return (pw ? `<td class="num">${l.powers}</td>` : '') + `<td class="num">${l.gets}</td>`
-    + `<td class="num">${l.negs}</td><td class="num">${l.bb}</td><td class="num">${l.pts}</td>`;
-}
-
 // The category filter every view shares: categories as read, with how
 // many tossups each had (distinct questions, not readings: with two rooms
 // every tossup is read twice).
@@ -1087,26 +934,28 @@ function renderByCategory(box, rows, q) {
   const pw = showPowers(lines);
   // on a phone the team rides under the player's name (pub.css)
   box.innerHTML = `${catFilterHtml(q)}
-    ${lines.length ? `<div class="tablewrap"><table class="cattable">
+    ${lines.length ? `<div class="tablewrap"><table class="cattable" data-sort="catplayers" data-sort-by="Pts">
       <tr><th class="name">Player</th><th class="name teamcol">Team</th>${catHead(pw)}</tr>
       ${lines.map((l) =>
         `<tr><td class="name">${esc(l.player)}<span class="subteam">${esc(l.team)}</span></td>`
         + `<td class="name muted teamcol">${esc(l.team)}</td>${lineCells(l, pw)}</tr>`).join('')}
     </table></div>` : noneHere}`;
   wireCatFilter(box);
+  sortTables(box, statSorts);
 }
 
 function renderByTeam(box, teamRows, q) {
   const lines = catTeamLines(teamRows, catSel, catSubSel, catSub2Sel);
   const pw = showPowers(lines);
   box.innerHTML = `${catFilterHtml(q)}
-    ${lines.length ? `<div class="tablewrap"><table>
+    ${lines.length ? `<div class="tablewrap"><table data-sort="catteams">
       <tr><th class="name">Team</th>${catHead(pw)}<th class="num">Bonuses</th><th class="num">Bpts</th><th class="num">PPB</th></tr>
       ${lines.map((l) =>
         `<tr><td class="name">${esc(l.team)}</td>${lineCells(l, pw)}<td class="num">${l.bh}</td>`
         + `<td class="num">${l.bpts}</td><td class="num">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
     </table></div>` : noneHere}`;
   wireCatFilter(box);
+  sortTables(box, statSorts);
 }
 
 function renderByPlayer(box, rows) {
@@ -1133,53 +982,12 @@ function renderByPlayer(box, rows) {
             `<tr class="muted"><td style="padding-left:48px">${esc(x)}</td>${lineCells(l2, pw)}</tr>`).join('')).join('')
       ).join('')}
     </table></div>`;
-  wirePicker('catplayersel', items, cur, (p) => { catPlayerSel = players[items.indexOf(p)]; });
+  wirePicker('catplayersel', items, cur, (p) => { catPlayerSel = players[items.indexOf(p)]; }, render);
 }
 
-// How each category's questions played: tossups the way the buzzpoints
-// sites show them, bonuses with PPB and their easy / medium / hard parts.
+// How each category's questions played (newstats.js questionsHtml)
 function renderQuestions(box, q) {
-  const pct = (n, d) => (d ? Math.round((n / d) * 100) + '%' : '–');
-  // Unknown is marked, and its tags are quoted: they're the packet's
-  // own words, not a category this site recognized
-  const unc = (l) => l.cat === UNKNOWN_CAT;
-  const rowCls = (l) => ['cattop', 'catsub', 'catsub2'][l.level]
-    + (unc(l) ? ' uncat' : '');
-  const name = (l) => (l.isSub && unc(l) ? `\u201C${esc(l.sub)}\u201D`
-    : esc([l.cat, l.sub, l.sub2][l.level]));
-  const tl = questionLines(q.tossups, catSel, catSubSel, catSub2Sel);
-  const bl = questionLines(q.bonuses, catSel, catSubSel, catSub2Sel);
-  // the difficulty notice counts the bonuses on screen, once each: the
-  // lines at the shallowest level shown
-  const shallow = Math.min(...bl.map((l) => l.level));
-  const top = bl.filter((l) => l.level === shallow);
-  const ranked = top.reduce((n, l) => n + (l.ranked || 0), 0);
-  const marked = top.reduce((n, l) => n + (l.marked || 0), 0);
-  const note = !ranked ? '' : `<p class="ranknote" role="note"><span class="i" aria-hidden="true">i</span>${
-    marked ? `Bonus difficulty not available for ${ranked} of ${ranked + marked} bonuses, ranked by conversion rate.`
-      : 'Bonus difficulty not available, ranked by conversion rate.'}</p>`;
-  box.innerHTML = `${catFilterHtml(q)}
-    <div class="rhead">Tossups</div>
-    ${tl.length ? `<div class="tablewrap"><table>
-      <tr><th>Category</th><th class="num" title="Tossups in this category">Tossups</th>
-        <th class="num" title="Times they were read, one per room">Heard</th><th class="num">Conv %</th><th class="num">Power %</th>
-        <th class="num">Neg %</th><th class="num">Avg Buzz</th></tr>
-      ${tl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.questions}</td><td class="num">${l.heard}</td>
-        <td class="num">${pct(l.conv, l.heard)}</td><td class="num">${pct(l.powers, l.heard)}</td>
-        <td class="num">${pct(l.negs, l.heard)}</td>
-        <td class="num">${l.words && l.words.length ? (l.words.reduce((a, b) => a + b, 0) / l.words.length).toFixed(1) : '–'}</td></tr>`).join('')}
-    </table></div>` : '<div class="muted">None</div>'}
-    <div class="rhead" style="margin-top:18px">Bonuses</div>
-    ${note}
-    ${bl.length ? `<div class="tablewrap"><table>
-      <tr><th>Category</th><th class="num" title="Bonuses in this category">Bonuses</th>
-        <th class="num" title="Times they were read, one per room">Heard</th><th class="num">PPB</th>
-        <th class="num sep">Easy</th><th class="num">Medium</th><th class="num">Hard</th></tr>
-      ${bl.map((l) => `<tr class="${rowCls(l)}"><td>${name(l)}</td><td class="num">${l.questions}</td><td class="num">${l.heard}</td>
-        <td class="num">${l.heard ? (l.pts / l.heard).toFixed(2) : '–'}</td>
-        <td class="num sep">${pct(l.e, l.dHeard)}</td><td class="num">${pct(l.m, l.dHeard)}</td>
-        <td class="num">${pct(l.h, l.dHeard)}</td></tr>`).join('')}
-    </table></div>` : '<div class="muted">None</div>'}`;
+  box.innerHTML = questionsHtml(q, [catSel, catSubSel, catSub2Sel], catFilterHtml(q));
   wireCatFilter(box);
 }
 
@@ -1239,34 +1047,8 @@ let newMark = null; // the id a followed link landed on (marked)
 // {sec, y, mark}: the places links were followed from, latest last. Back
 // returns to the latest as it was, its own mark and Back link included.
 let newBack = [];
-
-const fx = (v, d) => (v === null || v === undefined ? '–' : v.toFixed(d));
-
-// ids for the New layout's anchors: by position, so any name is safe
-function newIds(rd) {
-  const team = new Map(rd.teams.map((t, i) => [t.name, 'nt-' + i]));
-  const player = new Map(rd.players.map((p, i) => [p.team + '\n' + p.name, 'np-' + i]));
-  const game = new Map(rd.games.map((g, i) => [g.id, 'ng-' + i]));
-  return {
-    team: (n) => team.get(n), player: (t, n) => player.get(t + '\n' + n),
-    game: (id) => game.get(id), round: (r) => 'nr-' + r,
-  };
-}
-const goLink = (sec, id, text) => (id ? `<a href="#" data-go="${sec}|${esc(id)}">${text}</a>` : text);
-
-// The New layout's tables share one shape: Classic's columns in Classic's
-// order, a header (in <thead>, so it can stay on screen), and a sticky
-// first column on a phone. Related columns sit together, and the first
-// column of each group gets the class g0, which opens a gap before it. A
-// rank or round column (nrkcol) hides on a phone, where the sticky cell
-// carries it instead (span.nrk).
-const rk = (v) => `<span class="nrk">${esc(String(v))}</span>`;
-// A team's or player's Undergraduate / Division II marks, as tags beside
-// the name (Classic gives each a column). reportData sets `ug` / `d2`
-// only for a mark the roster tracks, so an untracked one draws nothing.
-const markTags = (x) => (x.ug ? '<span class="ntag" title="Undergraduate">UG</span>' : '')
-  + (x.d2 ? '<span class="ntag d2" title="Division II">DII</span>' : '');
-const markWords = (x) => [x.ug && 'Undergraduate', x.d2 && 'Division II'].filter(Boolean).join(', ');
+// the number column each sortable table is ordered by (newstats.js sortTables)
+const statSorts = new Map();
 
 // The New layout's stage pick: a stage's name, or 'combined'; null until
 // the viewer picks (pickStage then opens the stage being played)
@@ -1293,7 +1075,7 @@ function pickStage(stages, grid) {
 }
 
 function newStandings(rd, ids, vals, pp, { chips = '', stage = null } = {}) {
-  const table = (teams, ranked) => `<div class="tablewrap"><table class="nstats">
+  const table = (teams, ranked) => `<div class="tablewrap"><table class="nstats" data-sort="standings">
     <thead><tr><th class="nrkcol"></th><th class="name nstick">Team</th><th class="num g0">W</th><th class="num">L</th>${rd.anyTies ? '<th class="num">T</th>' : ''}
       <th class="num g0" title="Points scored in regulation per ${rd.regTossups} regulation tossups heard">${pp}</th>
       ${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
@@ -1429,32 +1211,6 @@ function poolGrid(rd, ids, teams, rounds = null) {
     ${teams.map((tm) => `<tr><th class="rowh">${goLink('teams', ids.team(tm.name), esc(tm.name))}</th>${
       teams.map((o) => cell(tm, o)).join('')}<td class="rec">${rec(tm)}</td></tr>`).join('')}`;
 }
-
-function newIndividuals(rd, ids, vals, pp) {
-  return `<div class="tablewrap"><table class="nstats">
-    <thead><tr><th class="nrkcol"></th><th class="name nstick">Player</th><th class="name teamcol">Team</th>
-      <th class="num g0" title="Games played">GP</th>
-      ${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
-      <th class="num" title="Tossups heard">TUH</th>
-      <th class="num g0">Pts</th><th class="num" title="Points per ${rd.regTossups} tossups heard">${pp}</th></tr></thead>
-    <tbody>${rd.players.map((p) => `<tr>
-      <td class="muted nrkcol">${esc(p.rank)}</td>
-      <td class="name nstick">${rk(p.rank)}${goLink('players', ids.player(p.team, p.name), esc(p.name))}${markTags(p)}<span class="subteam">${esc(p.team)}</span></td>
-      <td class="name muted teamcol">${goLink('teams', ids.team(p.team), esc(p.team))}</td>
-      <td class="num g0">${p.gp.toFixed(1)}</td>
-      ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
-      <td class="num">${p.tuh}</td><td class="num g0">${p.points}</td><td class="num">${fx(p.pp, 2)}</td></tr>`).join('')}</tbody>
-  </table></div>`;
-}
-
-// a game row of a team's or player's log: round, opponent, result, score
-const logCells = (ids, g) => `<td class="muted nrkcol">${g.round}</td>
-  <td class="name nstick">${rk(g.round)}${goLink('teams', ids.team(g.opp), esc(g.opp))}</td><td>${g.result}</td>
-  <td class="name">${goLink('games', ids.game(g.gameId), esc(g.score))}</td>`;
-const logHead = '<th class="nrkcol">Rd</th><th class="name nstick">Opponent</th><th></th><th class="name">Score</th>';
-// `at`: the Classic report's id for the same thing (reportData anchor)
-const secHead = (id, title, meta, at) => `<div class="nsec" id="${id}" data-at="${esc(at)}"><h3 class="nhead"><span>${title}</span>${
-  meta ? `<span class="meta">${meta}</span>` : ''}</h3>`;
 
 // the Scoresheets switch: on/off once unlocked; locked, it is off with a
 // closed padlock, and pressing it opens the password field
@@ -1599,69 +1355,6 @@ function newGames(rd, ids, vals) {
       rd.games.filter((g) => g.round === r).map(box).join('')}`).join('');
 }
 
-function newTeams(rd, ids, vals, pp) {
-  const byName = [...rd.teams].sort((a, b) => a.name.toLocaleUpperCase().localeCompare(b.name.toLocaleUpperCase()));
-  return byName.map((t) => {
-    const players = rd.players.filter((p) => p.team === t.name);
-    return `${secHead(ids.team(t.name), esc(t.name), [esc(t.record), markWords(t)].filter(Boolean).join(' · '), t.anchor)}
-      <div class="tablewrap"><table class="nstats">
-        <thead><tr>${logHead}${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
-          <th class="num" title="Tossups heard">TUH</th><th class="num g0" title="Bonuses heard">BHrd</th>
-          <th class="num" title="Points scored on bonuses">BPts</th><th class="num" title="Points per bonus">PPB</th></tr></thead>
-        <tbody>${t.games.map((g) => `<tr>${logCells(ids, g)}${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${g.counts[v] || 0}</td>`).join('')}
-          <td class="num">${g.tuh}</td><td class="num g0">${g.bonusesHeard}</td><td class="num">${g.bonusPoints}</td>
-          <td class="num">${fx(g.ppb, 2)}</td></tr>`).join('')}
-        <tr class="ntot"><td class="nrkcol"></td><td class="name nstick">Total</td><td>${esc(t.record)}</td><td></td>
-          ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${t.counts[v] || 0}</td>`).join('')}
-          <td class="num">${t.tuh}</td><td class="num g0">${t.bonusesHeard}</td><td class="num">${t.bonusPoints}</td>
-          <td class="num">${fx(t.ppb, 2)}</td></tr></tbody>
-      </table></div>
-      ${players.length ? `<div class="tablewrap"><table class="nstats">
-        <thead><tr><th class="name nstick">Player</th><th class="num g0" title="Games played">GP</th>${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
-          <th class="num" title="Tossups heard">TUH</th><th class="num g0">${pp}</th></tr></thead>
-        <tbody>${players.map((p) => `<tr><td class="name nstick">${goLink('players', ids.player(p.team, p.name), esc(p.name))}${markTags(p)}</td>
-          <td class="num g0">${p.gp.toFixed(1)}</td>${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
-          <td class="num">${p.tuh}</td><td class="num g0">${fx(p.pp, 2)}</td></tr>`).join('')}</tbody>
-      </table></div>` : ''}</div>`;
-  }).join('');
-}
-
-function newPlayers(rd, ids, vals) {
-  const sorted = [...rd.players].sort((a, b) =>
-    a.team.toLocaleUpperCase().localeCompare(b.team.toLocaleUpperCase())
-    || a.name.toLocaleUpperCase().localeCompare(b.name.toLocaleUpperCase()));
-  return sorted.map((p) => `${secHead(ids.player(p.team, p.name), esc(p.name),
-    [goLink('teams', ids.team(p.team), esc(p.team)), markWords(p)].filter(Boolean).join(' · '), p.anchor)}
-    <div class="tablewrap"><table class="nstats">
-      <thead><tr>${logHead}<th class="num g0" title="Games played">GP</th>${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}</th>`).join('')}
-        <th class="num" title="Tossups heard">TUH</th><th class="num g0">Pts</th></tr></thead>
-      <tbody>${p.games.map((g) => `<tr>${logCells(ids, g)}<td class="num g0">${g.gp.toFixed(1)}</td>
-        ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${g.counts[v] || 0}</td>`).join('')}
-        <td class="num">${g.tuh}</td><td class="num g0">${g.points}</td></tr>`).join('')}
-      <tr class="ntot"><td class="nrkcol"></td><td class="name nstick">Total</td><td></td><td></td><td class="num g0">${p.gp.toFixed(1)}</td>
-        ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${p.counts[v] || 0}</td>`).join('')}
-        <td class="num">${p.tuh}</td><td class="num g0">${p.points}</td></tr></tbody>
-    </table></div></div>`).join('');
-}
-
-function newRounds(rd, ids) {
-  const n = rd.regTossups;
-  const cells = (r) => `<td class="num">${r.games}</td><td class="num">${fx(r.ppTeam, 1)}</td>
-    ${rd.hasPowers ? `<td class="num">${r.powerPct === null ? '–' : r.powerPct.toFixed(0) + '%'}</td>` : ''}
-    <td class="num">${r.convPct === null ? '–' : r.convPct.toFixed(0) + '%'}</td>
-    ${rd.hasNegs ? `<td class="num">${fx(r.negsTeam, 1)}</td>` : ''}<td class="num">${fx(r.ppb, 2)}</td>`;
-  return `<div class="tablewrap"><table class="nstats">
-    <thead><tr><th class="nstick">Round</th><th class="num">Games</th>
-      <th class="num" title="Points per team per ${n} tossups heard">Pts/Tm/${n}TUH</th>
-      ${rd.hasPowers ? '<th class="num" title="Tossups powered by either team">TU Powered</th>' : ''}
-      <th class="num" title="Tossups answered correctly by either team">TU Converted</th>
-      ${rd.hasNegs ? `<th class="num" title="Incorrect interrupts per team per ${n} tossups heard">Negs/Tm/${n}TUH</th>` : ''}
-      <th class="num" title="Points per bonus">PPB</th></tr></thead>
-    <tbody>${rd.rounds.map((r) => `<tr><td class="nstick">${goLink('games', ids.round(r.round), String(r.round))}</td>${cells(r)}</tr>`).join('')}
-    <tr class="ntot"><td class="nstick">Total</td>${cells(rd.total)}</tr></tbody>
-  </table></div>`;
-}
-
 // Switching layouts keeps the place: the same page, at the same team,
 // player, game or round. Classic's pages map onto New's sections one to
 // one, and New's sections carry Classic's ids (data-at).
@@ -1681,31 +1374,6 @@ function newPlace(box) {
   return { page, anchor };
 }
 
-// A sticky header only sticks inside its nearest scrolling box. A table
-// that fits its width doesn't scroll sideways (nfit), so its header
-// sticks to the page. One that doesn't (a phone, mostly) becomes its own
-// scroll box, both ways and at most most of a screen tall (nscroll), so
-// its header and first column stay put inside it; an edge fade (more)
-// says there's more to the right until the end is reached.
-function fitTables(box) {
-  for (const table of box.querySelectorAll('table.nstats')) {
-    const wrap = table.parentElement;
-    let fade = wrap.parentElement;
-    if (!fade.classList.contains('nfade')) {
-      fade = document.createElement('div');
-      fade.className = 'nfade';
-      wrap.replaceWith(fade);
-      fade.appendChild(wrap);
-    }
-    wrap.classList.remove('nfit', 'nscroll');
-    const over = table.scrollWidth > wrap.clientWidth + 1;
-    wrap.classList.add(over ? 'nscroll' : 'nfit');
-    const edge = () => fade.classList.toggle('more',
-      over && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2);
-    wrap.onscroll = edge;
-    edge();
-  }
-}
 let refitTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(refitTimer);
@@ -1749,6 +1417,7 @@ function renderNewStats(box) {
     games: () => top(newGames(rd, ids, vals)), teams: () => top(newTeams(rd, ids, vals, pp)),
     players: () => top(newPlayers(rd, ids, vals)), rounds: () => top(newRounds(rd, ids)) };
   box.innerHTML = (draw[statsSec] || draw.standings)();
+  sortTables(box, statSorts);
   wire(box, 'standview', (v) => { standView = v; savePref(STAND_VIEW_KEY, v); });
   wire(box, 'statstage', (v) => { statStage = v; });
   wireSheetToggle();
@@ -1836,7 +1505,7 @@ function renderStatsTab(box) {
   const opts = statsOpts();
   let pages = buildReport(opts);
   if (state.scoresheets && buzzStored() && sheetsShown()) pages = withSheets(pages, reportData(opts));
-  unmountReport = mountReport(box.querySelector('.reportbox'), pages, { start: pendingPlace, onBack: backToSchedule });
+  unmountReport = mountReport(box.querySelector('.reportbox'), pages, { start: pendingPlace, onBack: backToSchedule, sorts: statSorts });
   pendingPlace = null;
 }
 

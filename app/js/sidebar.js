@@ -68,7 +68,7 @@ const setHtml = (name, sites) => {
   const label = (t) => t.site || t.host || t.name;
   const rows = [...sites].sort((a, b) => b.at - a.at || label(a).localeCompare(label(b)))
     .map((t) => itemHtml({ ...t, name: label(t) })).join('');
-  return `<div class="itset"><div class="sethead"><span>${esc(name)}</span><small>${sites.length} sites</small></div>
+  return `<div class="itset"><a class="sethead" href="archive.html?set=${encodeURIComponent(name)}"><span>${esc(name)}</span><small>${sites.length} sites</small></a>
     <div class="sites">${rows}</div></div>`;
 };
 

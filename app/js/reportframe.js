@@ -32,7 +32,7 @@ const PAGE_NAMES = { standings: 'Standings', individuals: 'Individuals', games: 
 const scriptJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
 
 /** buildReport()'s pages -> the srcdoc of a frame that shows them. */
-export function reportSrcdoc(pages, { start = null } = {}) {
+export function reportSrcdoc(pages, { start = null, sorts = null } = {}) {
   const sections = pages.map((page) => {
     const pg = page.name.replace(/\.html$/, '');
     let body = bodyOf(page.text).replace(/<style>[\s\S]*?<\/style>/i, '');
@@ -65,7 +65,13 @@ export function reportSrcdoc(pages, { start = null } = {}) {
   // where the reader is (reportPlace): the page shown, the anchor a
   // followed link marked, and each anchor's distance from the frame's top,
   // sent again whenever a resize or scroll could move them.
+  // Standings and Individuals sort by a number column (one YF sets right
+  // aligned) when its header is clicked, as the New layout's tables do
+  // (newstats.js sortTables): highest first, then lowest, then YF's own
+  // order. The pick goes to the page, which hands it back to the next
+  // frame, so a redraw keeps it.
   const script = `
+    var sorts = ${scriptJson(sorts ? Object.fromEntries([...sorts].filter(([k]) => k.indexOf('yf-') === 0)) : {})};
     var files = ${JSON.stringify(FILES)};
     var names = ${JSON.stringify(PAGE_NAMES)};
     var current = '';
@@ -191,6 +197,77 @@ export function reportSrcdoc(pages, { start = null } = {}) {
         });
       })();
     }
+    function num(td) {
+      var n = parseFloat((td ? td.textContent : '').replace(/[%,]/g, ''));
+      return isNaN(n) ? null : n;
+    }
+    ['standings', 'individuals'].forEach(function (pg) {
+      var key = 'yf-' + pg;
+      var tables = [];
+      document.getElementById('page-' + pg).querySelectorAll('table').forEach(function (table) {
+        var head = table.rows[0];
+        if (!head || head.querySelector('a') || table.rows.length < 3) return; // the page links
+        var rows = [].slice.call(table.rows, 1);
+        rows.forEach(function (r, i) { r.setAttribute('data-ord', i); });
+        // the pick names its column by header: a stage's table has a Rank
+        // column the All Games one doesn't
+        var label = function (td) { return td.textContent.trim(); };
+        var colOf = function (p) {
+          var c = -1;
+          if (p) [].forEach.call(head.cells, function (td, i) { if (td.getAttribute('align') === 'right' && label(td) === p.head) c = i; });
+          return c;
+        };
+        // YF orders Individuals by PP20TUH (PP<n>TUH): that column has the
+        // arrow until another is picked; Standings' order is no one column
+        var own = null;
+        if (pg === 'individuals') {
+          [].forEach.call(head.cells, function (td) { if (/^PP\\d+TUH$/.test(label(td))) own = { head: label(td), dir: 'desc' }; });
+        }
+        var apply = function () {
+          var pick = sorts[key];
+          var col = colOf(pick);
+          var ordered = rows.slice().sort(function (a, b) {
+            var oa = +a.getAttribute('data-ord');
+            var ob = +b.getAttribute('data-ord');
+            if (col < 0) return oa - ob;
+            var x = num(a.cells[col]);
+            var y = num(b.cells[col]);
+            if (x === y) return oa - ob;
+            if (x === null) return 1;
+            if (y === null) return -1;
+            return pick.dir === 'desc' ? y - x : x - y;
+          });
+          var now = [].slice.call(table.rows, 1);
+          if (ordered.some(function (r, i) { return r !== now[i]; })) ordered.forEach(function (r) { r.parentNode.appendChild(r); });
+          var shown = col >= 0 ? pick : own;
+          var at = col >= 0 ? col : colOf(own);
+          [].forEach.call(head.cells, function (td, i) {
+            if (at === i) td.setAttribute('aria-sort', shown.dir === 'desc' ? 'descending' : 'ascending');
+            else td.removeAttribute('aria-sort');
+          });
+        };
+        [].forEach.call(head.cells, function (td) {
+          if (td.getAttribute('align') !== 'right') return;
+          var name = label(td);
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'qt-sort';
+          while (td.firstChild) btn.appendChild(td.firstChild);
+          td.appendChild(btn);
+          btn.addEventListener('click', function () {
+            var pick = sorts[key] || own;
+            if (!pick || pick.head !== name) sorts[key] = { head: name, dir: 'desc' };
+            else if (pick.dir === 'desc') sorts[key] = { head: name, dir: 'asc' };
+            else delete sorts[key];
+            tables.forEach(function (f) { f(); });
+            parent.postMessage({ qbtdReport: 'sort', key: key, pick: sorts[key] || null }, '*');
+            tellPlace();
+          });
+        });
+        tables.push(apply);
+        apply();
+      });
+    });
     window.addEventListener('load', function () { whenSized(function () { show(current); }); });
     // opened from the other layout: the same page, scrolled to the same
     // team, player, game or round when there is one
@@ -230,7 +307,11 @@ export function reportSrcdoc(pages, { start = null } = {}) {
     :root{--qtBar:#1d4ed8}
     @media (prefers-color-scheme: dark){:root{--qtBar:#7aa2f7}}
     .qt-mark{border-left:4px solid var(--qtBar);padding-left:4px;margin-left:-8px}
-    .qt-back{font-size:14px;font-weight:normal;margin-left:14px;white-space:nowrap}`;
+    .qt-back{font-size:14px;font-weight:normal;margin-left:14px;white-space:nowrap}
+    .qt-sort{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
+    .qt-sort:hover,[aria-sort] .qt-sort{color:var(--qtBar)}
+    [aria-sort=descending] .qt-sort::after{content:" \\25BE"}
+    [aria-sort=ascending] .qt-sort::after{content:" \\25B4"}`;
   return `<!doctype html><html><head><meta charset="utf-8">${styleOf(pages[0].text)}
     <style>body{margin:0 8px 8px;background:#fff}
     .floatingTOC{position:static;box-shadow:none;margin:8px 0}
@@ -265,6 +346,15 @@ export function mountReport(box, pages, opts = {}) {
   const ys = []; // where the page was scrolled before each link the frame followed to another page
   const onMessage = (e) => {
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'back' && opts.onBack) opts.onBack();
+    // a sorted column, kept for the next frame (opts.sorts)
+    if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'sort' && opts.sorts
+      && /^yf-(standings|individuals)$/.test(e.data.key)) {
+      const p = e.data.pick;
+      if (p && typeof p.head === 'string' && p.head.length <= 40 && (p.dir === 'desc' || p.dir === 'asc')) {
+        opts.sorts.set(e.data.key, { head: p.head, dir: p.dir });
+      }
+      else opts.sorts.delete(e.data.key);
+    }
     if (e.source === frame.contentWindow && e.data && e.data.qbtdReport === 'place') {
       const at = cleanPlace(e.data);
       if (at) places.set(frame, at);

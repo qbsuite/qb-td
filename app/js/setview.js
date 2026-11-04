@@ -12,13 +12,19 @@
 // and from the Worker otherwise (one request per mirror, never per round).
 
 import { esc } from './api.js';
-import { renderStats } from './statsview.js';
+import { viewsHtml, pickerHtml, wirePicker, catChipsHtml, fx, newIds, goLink, rk, markTags, newIndividuals,
+  newTeams, newPlayers, newRounds, fitTables, catHead, lineCells, questionsHtml,
+  sortTables, chipsHtml } from './newstats.js';
+import { comfortScroll } from './place.js';
+import { rankFormat } from './read_core.js';
+import { reportData } from '../engine/report.js';
+import { dedupeMatches } from '../engine/stats.js';
 import { buzzSummaryHtml, tossupTextHtml, buzzListHtml, tossupMetaHtml, bonusMetaHtml, bonusBodyHtml,
   bonusAnswersHtml, mainAnswerHtml } from './buzzview.js';
-import { catCompare } from '../engine/cats.js';
-import { buildSite, setStandings, setCategories, setCatLines, setQuestionLines,
+import { categoryQuestionStats, catBreakdown } from '../engine/cats.js';
+import { buildSite, setCategories, setCatLines, identOf,
   setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary,
-  setQuestionTable, setBonusLines } from '../engine/setstats.js';
+  setQuestionTable } from '../engine/setstats.js';
 
 const SNAP_TIMEOUT_MS = 8000; // a hung snapshot must fall back like a failed one
 /**
@@ -40,7 +46,7 @@ export function mountSetView(root, source, opts = {}) {
       <button class="tab" data-tab="cats" hidden>Categories</button>
       <button class="tab" data-tab="buzz" hidden>Buzzpoints</button>
     </div>
-    <div class="sitebar row" style="margin:8px 0"></div>
+    <div class="sitebar"></div>
     <div class="setmsg"></div>
     <div class="setout"></div>`;
   const msg = root.querySelector('.setmsg');
@@ -58,7 +64,7 @@ export function mountSetView(root, source, opts = {}) {
   const shardCache = new Map();    // mirror id -> Map(round -> {v, entries})
   const packets = {};              // 'round:version' -> Promise<packet>
   let tab = opts.tab || 'stats';
-  let catView = 'questions';       // 'questions' | 'bonuses' | 'players' | 'teams'
+  let catView = 'cat';             // 'cat' (players) | 'team' | 'player' | 'questions'
   let catSel = '';
   let catSubSel = '';
   let buzzSel = null;              // {p, v, earlier} | 'table' | 'summary'
@@ -117,7 +123,7 @@ export function mountSetView(root, source, opts = {}) {
         if (!mirrors.some((m) => m.id === id)) shardCache.delete(id);
       }
       const jobs = [Promise.all(mirrors.map(async (m) => buildSite(m, await fetchMirror(m), errors)))
-        .then((built) => { sites = built; })];
+        .then((built) => { sites = built; reportCache = new WeakMap(); })];
       if (state.cats !== lastCats) {
         jobs.push((async () => {
           // the stamp is held only once the map is: a failed fetch must
@@ -138,172 +144,374 @@ export function mountSetView(root, source, opts = {}) {
     } catch (e) { say(e.message, true); }
   }
 
-  // Which mirrors every view is over. Each is a pill; excluded ones read
-  // struck through, and the count says how many are in.
+  // Which mirrors every view is over: the sites table, above every tab,
+  // a checkbox a site. A site left out stays in the table, muted, its
+  // numbers still there to compare; the last one in can't be left out,
+  // so there is always something to show.
   function renderSitebar() {
     const mirrors = state.mirrors || [];
-    if (mirrors.length < 2) { sitebar.innerHTML = ''; return; }
+    if (!mirrors.length) { sitebar.innerHTML = ''; return; }
+    const pick = mirrors.length > 1;
     const inCount = mirrors.length - excluded.size;
-    sitebar.innerHTML = `<span class="muted">Sites</span>
-      ${mirrors.map((m) => `<a href="#" class="chip${excluded.has(m.id) ? '' : ' on'}" data-site="${m.id}"
-        title="${excluded.has(m.id) ? 'Include' : 'Exclude'}"${excluded.has(m.id) ? ' style="text-decoration:line-through"' : ''}>${esc(m.label)}</a>`).join('')}
-      ${excluded.size ? `<a href="#" class="chip" data-site="all">All ${mirrors.length}</a>` : ''}
-      <span class="muted">${inCount === mirrors.length ? 'All ' + mirrors.length : inCount + ' of ' + mirrors.length}</span>`;
-    sitebar.querySelectorAll('[data-site]').forEach((el) => {
-      el.onclick = (e) => {
+    const bySite = new Map(sites.map((x) => [x.id, x]));
+    const regTossups = sites.length ? reportOf(sites[0]).regTossups : 20;
+    const pp = `PP${regTossups}TUH`;
+    // a host column only when some site's host says more than its label
+    const hosts = mirrors.some((m) => m.host && m.host !== m.label);
+    const rows = mirrors.map((m) => {
+      const site = bySite.get(m.id);
+      const x = site ? siteSums(reportOf(site)) : null;
+      const on = !excluded.has(m.id);
+      const link = source.mirrorLink ? source.mirrorLink(m) : '';
+      return `<tr${on ? '' : ' class="off"'}>
+        ${pick ? `<td class="sitepick"><input type="checkbox" data-site="${m.id}" aria-label="${esc(m.label)}"${on ? ' checked' : ''}${
+          on && inCount === 1 ? ' disabled' : ''}></td>` : ''}
+        <td class="name nstick">${link ? `<a href="${esc(link)}">${esc(m.label)}</a>` : esc(m.label)}</td>
+        ${hosts ? `<td class="name">${esc(m.host || '')}</td>` : ''}<td>${esc(m.date || '')}</td>
+        <td class="num g0">${x ? x.teams : '–'}</td><td class="num">${x ? x.games : '–'}</td>
+        <td class="num g0">${x && x.games ? fx(x.pp, 1) : '–'}</td><td class="num">${x && x.games ? fx(x.ppb, 2) : '–'}</td></tr>`;
+    }).join('');
+    sitebar.innerHTML = `<div class="tablewrap"><table class="nstats sitetable" data-sort="sites">
+      <thead><tr>${pick ? '<th class="sitepick"></th>' : ''}<th class="name nstick">Site</th>${hosts ? '<th class="name">Host</th>' : ''}<th>Date</th>
+        <th class="num g0">Teams</th><th class="num">Games</th>
+        <th class="num g0" title="Points per ${regTossups} tossups heard, per team">${pp}</th><th class="num" title="Points per bonus">PPB</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+    sitebar.querySelectorAll('input[data-site]').forEach((el) => {
+      el.onchange = () => {
+        const id = Number(el.dataset.site);
+        if (excluded.has(id)) excluded.delete(id);
+        else if (inCount > 1) excluded.add(id);
+        render();
+      };
+    });
+    sortTables(sitebar, statSorts);
+    fitTables(sitebar);
+  }
+
+  /* ---------- stats ----------
+     The public page's New layout (newstats.js), every site at once. No
+     standings: a record means something only against its own field, so
+     teams across sites are ordered by their numbers (PP20TUH, then PPB).
+     A team's and a player's games stay under their own site, and the
+     games themselves stay on each site's own page. */
+
+  const STAT_SECS = [['teamstats', 'Team Stats'], ['individuals', 'Individuals'], ['teams', 'Teams'],
+    ['players', 'Players'], ['packets', 'Packets']];
+  let statSec = 'teamstats';
+  let statMark = null;   // the id a followed link landed on
+  let statBack = [];     // {sec, y, mark}: where links were followed from, latest last
+  const statSorts = new Map(); // the number column each sortable table is ordered by
+  // Totals or Per game, for Team Stats and Individuals: sites play
+  // different numbers of games, so counts compare only per game. A
+  // viewer's own preference, kept in the browser when it can be.
+  const PER_KEY = 'qbtdSetPerGame';
+  let perGame = (() => { try { return localStorage.getItem(PER_KEY) === '1'; } catch (e) { return false; } })();
+  const perSwitchHtml = () => `<div class="poolbar">${chipsHtml([{ v: 'total', label: 'Totals' },
+    { v: 'game', label: 'Per game' }], perGame ? 'game' : 'total', 'statper')}</div>`;
+  function wirePer(box) {
+    box.querySelectorAll('[data-statper]').forEach((a) => {
+      a.onclick = (e) => {
         e.preventDefault();
-        if (el.dataset.site === 'all') excluded.clear();
-        else {
-          const id = Number(el.dataset.site);
-          if (excluded.has(id)) excluded.delete(id); else excluded.add(id);
-        }
+        perGame = a.dataset.statper === 'game';
+        try { localStorage.setItem(PER_KEY, perGame ? '1' : '0'); } catch (err) { /* private window */ }
         render();
       };
     });
   }
 
-  /* ---------- stats ---------- */
+  // a site's report numbers (engine/report.js), worked out once a load
+  let reportCache = new WeakMap();
+  function reportOf(site) {
+    if (!reportCache.has(site)) {
+      reportCache.set(site, reportData({ name: site.label, matches: dedupeMatches(site.matches), roster: null,
+        settings: rankFormat(state.format) }));
+    }
+    return reportCache.get(site);
+  }
+  // a site's line in the sites table: teams, games, and its PP20TUH and
+  // PPB over every team there
+  function siteSums(rd) {
+    const n = (f) => rd.teams.reduce((s, t) => s + (f(t) || 0), 0);
+    const tuh = n((t) => t.regTuh);
+    const heard = n((t) => t.bonusesHeard);
+    return { teams: rd.teams.length, games: rd.games.length,
+      pp: tuh ? n((t) => (t.pp || 0) * t.regTuh) / tuh : null, ppb: heard ? n((t) => t.bonusPoints) / heard : null };
+  }
+
+  // per site in the views: its report numbers and its ids
+  function siteReports() {
+    return activeSites().map((s) => {
+      const rd = reportOf(s);
+      const own = newIds(rd, 's' + s.id + '-');
+      // a game log's score has no box score here to open
+      return { site: s, rd, ids: { ...own, game: () => null } };
+    });
+  }
+
+  // Each packet over every site that read it: a site's games carried to
+  // the packet its round read (the round itself is that TD's choice), its
+  // teams kept apart from another site's. A round from no set packet is left out.
+  function packetReport(reports) {
+    const matches = [];
+    for (const { site } of reports) {
+      for (const m of dedupeMatches(site.matches)) {
+        const pv = site.vmap[m.round];
+        if (!Array.isArray(pv)) continue;
+        matches.push({ ...m, round: Number(pv[0]), teams: m.teams.map((t) => ({ ...t, name: site.id + '\n' + t.name })) });
+      }
+    }
+    return reportData({ name: state.name, matches, roster: null, settings: rankFormat(state.format) });
+  }
+
+  const byNumbers = (a, b) => (b.pp ?? -1) - (a.pp ?? -1) || (b.ppb ?? -1) - (a.ppb ?? -1) || a.name.localeCompare(b.name);
+
+  // games a team played, forfeits aside (YF counts no forfeit as a game)
+  const played = (tm) => tm.games.filter((g) => g.tuh > 0).length;
+
+  function teamStatsHtml(teams, vals, pp, regTossups) {
+    const per = (tm, n) => (perGame ? fx(played(tm) ? n / played(tm) : null, 2) : n);
+    return `<div class="tablewrap"><table class="nstats" data-sort="teamstats" data-sort-by="${pp}">
+        <thead><tr><th class="nrkcol"></th><th class="name nstick">Team</th><th class="name nsite">Site</th>
+          <th class="num g0" title="Games played">GP</th>
+          <th class="num g0" title="Points scored in regulation per ${regTossups} regulation tossups heard">${pp}</th>
+          ${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}${perGame ? '/G' : ''}</th>`).join('')}
+          <th class="num" title="Tossups heard in regulation">TUH</th><th class="num g0" title="Points per bonus">PPB</th></tr></thead>
+        <tbody>${teams.map((tm) => `<tr>
+          <td class="muted nrkcol">${tm.rank}</td>
+          <td class="name nstick">${rk(tm.rank)}${goLink('teams', tm.ids.team(tm.name), esc(tm.name))}${markTags(tm)}</td>
+          <td class="name muted nsite">${esc(tm.site)}</td>
+          <td class="num g0">${played(tm)}</td>
+          <td class="num g0">${fx(tm.pp, 1)}</td>
+          ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${per(tm, tm.counts[v] || 0)}</td>`).join('')}
+          <td class="num">${tm.regTuh}</td><td class="num g0">${fx(tm.ppb, 2)}</td></tr>`).join('')}</tbody>
+      </table></div>`;
+  }
 
   function renderStatsTab() {
     const mirrors = state.mirrors || [];
     if (!mirrors.length) { out.innerHTML = '<div class="muted">No mirrors have started yet</div>'; return; }
-    const s = setStandings(activeSites());
-    const bySite = new Map(s.sites.map((x) => [x.id, x]));
-    const siteRows = mirrors.map((m) => {
-      const x = bySite.get(m.id) || {};
-      const link = source.mirrorLink ? source.mirrorLink(m) : '';
-      const off = excluded.has(m.id);
-      return `<tr class="${off ? 'muted' : ''}">
-        <td class="name">${link ? `<a href="${esc(link)}">${esc(m.label)}</a>` : esc(m.label)}${
-          off ? ' <span class="pill">Excluded</span>' : ''}</td>
-        <td class="name muted">${esc(m.host || '')}</td>
-        <td class="muted">${esc(m.date || '')}</td>
-        <td class="num sep">${x.teams || 0}</td><td class="num sep">${x.games || 0}</td>
-        <td class="num sep">${x.games ? x.pp20tuh : '–'}</td><td class="num sep">${x.games ? x.ppb : '–'}</td>
-      </tr>`;
-    }).join('');
-    out.innerHTML = `
-      ${errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')}
-      <h2>sites</h2>
+    const reports = siteReports();
+    const errs = errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('');
+    if (!reports.some((r) => r.rd.games.length)) {
+      out.innerHTML = errs + '<div class="muted" style="margin-top:12px">No games yet</div>';
+      return;
+    }
+    const vals = [...new Set(reports.flatMap((r) => r.rd.vals))].filter((v) => v !== 0).sort((a, b) => b - a);
+    const regTossups = reports[0].rd.regTossups;
+    const pp = `PP${regTossups}TUH`;
+    const rankAll = (rows) => rows.sort(byNumbers).map((r, i) => ({ ...r, rank: i + 1 }));
+    const teams = rankAll(reports.flatMap((r) => r.rd.teams.map((t) => ({ ...t, site: r.site.label, ids: r.ids }))));
+    const players = rankAll(reports.flatMap((r) => r.rd.players.map((p) => ({ ...p, site: r.site.label, ids: r.ids }))));
+    const rowIds = { team: (n, row) => row.ids.team(n), player: (t, n, row) => row.ids.player(t, n) };
+    const perSite = (draw) => reports.filter((r) => r.rd.teams.length)
+      .map((r) => `<h2 class="stagehead">${esc(r.site.label)}</h2>${draw(r)}`).join('');
+    const draw = {
+      teamstats: () => teamStatsHtml(teams, vals, pp, regTossups),
+      individuals: () => newIndividuals({ players, regTossups }, rowIds, vals, pp, { site: true, perGame }),
+      teams: () => perSite((r) => newTeams(r.rd, r.ids, vals, pp)),
+      players: () => perSite((r) => newPlayers(r.rd, r.ids, vals)),
+      packets: () => newRounds(packetReport(reports), { round: () => null }, 'Packet'),
+    };
+    out.innerHTML = errs + `<div class="views statsbar">${STAT_SECS.map(([k, label]) =>
+      `<a href="#" class="view${statSec === k ? ' on' : ''}" data-statsec="${k}"${statSec === k ? ' aria-current="true"' : ''}>${label}</a>`).join('')}</div>
+      <div class="newstats">${statSec === 'teamstats' || statSec === 'individuals' ? perSwitchHtml() : ''}${
+        (draw[statSec] || draw.teamstats)()}</div>`;
+    const box = out.querySelector('.newstats');
+    sortTables(box, statSorts);
+    fitTables(box);
+    wirePer(out);
+    out.querySelectorAll('[data-statsec]').forEach((a) => {
+      a.onclick = (e) => { e.preventDefault(); statSec = a.dataset.statsec; statMark = null; statBack = []; render(); };
+    });
+    // a followed link: mark where it landed, with the way back
+    const el = statMark && document.getElementById(statMark);
+    if (el) {
+      el.classList.add('nmark');
+      const from = statBack[statBack.length - 1];
+      if (from) {
+        const label = (STAT_SECS.find(([k]) => k === from.sec) || [])[1];
+        el.querySelector('.nhead').insertAdjacentHTML('beforeend',
+          ` <a href="#" class="nback" data-back="1">← Back to ${esc(label || 'the last page')}</a>`);
+      }
+    }
+    box.onclick = (e) => {
+      const a = e.target.closest('[data-go], [data-back]');
+      if (!a) return;
+      e.preventDefault();
+      if (a.dataset.back) {
+        const from = statBack.pop();
+        statSec = from.sec; statMark = from.mark;
+        render();
+        window.scrollTo(0, from.y);
+        return;
+      }
+      const [sec, id] = a.dataset.go.split('|');
+      statBack.push({ sec: statSec, y: window.scrollY, mark: statMark });
+      statSec = sec;
+      statMark = id;
+      render();
+      comfortScroll(document.getElementById(id));
+    };
+  }
+
+  /* ---------- categories ----------
+     The public page's four views (newstats.js), every site at once: a
+     player's or team's lines stay at their own site, and the questions
+     are counted per packet version, so a question two sites both read
+     is one question heard twice. */
+
+  let catSub2Sel = '';
+  let catPlayerSel = null; // {siteId, team, player}
+
+  // every site's games and category map, keyed by the packet version
+  // each round read (a round from no set packet has no categories here)
+  function versionEntries() {
+    const rounds = {};
+    const entries = [];
+    for (const site of activeSites()) {
+      for (const e of site.entries) {
+        const pv = site.vmap[e.round];
+        const map = Array.isArray(pv) && catmap && catmap.packets && catmap.packets[pv[0]] && catmap.packets[pv[0]][pv[1]];
+        if (!map) continue;
+        const key = pv[0] + '.' + pv[1];
+        rounds[key] = { t: map.t || [], b: map.b || [] };
+        entries.push({ ...e, round: key, pv });
+      }
+    }
+    return { entries, catmap: { rounds } };
+  }
+
+  function catFilterHtml(q) {
+    const items = q.tossups.map((r) => ({ cat: r.cat, sub: r.sub, sub2: r.sub2, n: r.questions }))
+      .concat(q.bonuses.map((r) => ({ cat: r.cat, sub: r.sub, sub2: r.sub2, n: 0 })));
+    const cats = new Set(items.map((i) => i.cat));
+    if (catSel && !cats.has(catSel)) { catSel = ''; catSubSel = ''; catSub2Sel = ''; }
+    return catChipsHtml(items, [catSel, catSubSel, catSub2Sel], ['cat', 'catsub', 'catsub2']);
+  }
+  const wire = (attr, pick) => out.querySelectorAll(`[data-${attr}]`).forEach((el) => {
+    el.onclick = (e) => { e.preventDefault(); pick(el.dataset[attr]); render(); };
+  });
+  const wireCatFilter = () => {
+    wire('cat', (v) => { catSel = v; catSubSel = ''; catSub2Sel = ''; });
+    wire('catsub', (v) => { catSubSel = v; catSub2Sel = ''; });
+    wire('catsub2', (v) => { catSub2Sel = v; });
+  };
+  const noneHere = '<div class="muted">No buzzes in this category</div>';
+
+  // Per game: games played as the site's own stats count them, a player's
+  // partial games included; a category line divided by them
+  function gamesPlayed() {
+    const players = new Map();
+    const teams = new Map();
+    for (const s of activeSites()) {
+      const rd = reportOf(s);
+      for (const p of rd.players) players.set(s.id + '\n' + p.team + '\n' + p.name, p.gp);
+      for (const t of rd.teams) teams.set(s.id + '\n' + t.name, played(t));
+    }
+    return { player: (siteId, team, name) => players.get(siteId + '\n' + team + '\n' + name),
+      team: (siteId, name) => teams.get(siteId + '\n' + name) };
+  }
+  function perLine(l, games) {
+    if (!perGame) return l;
+    const f = (n) => (n === undefined ? n : fx(games ? n / games : null, 2));
+    return { ...l, powers: f(l.powers), gets: f(l.gets), negs: f(l.negs), bb: f(l.bb), pts: f(l.pts), bh: f(l.bh), bpts: f(l.bpts) };
+  }
+  const showPowers = (lines) => lines.some((l) => l.powers);
+
+  function byCategoryHtml(rows, q) {
+    const gp = gamesPlayed();
+    const lines = setCatLines(rows, catSel, catSubSel, 'player', catSub2Sel);
+    // per game, the order is per game too
+    if (perGame) {
+      const g = (l) => gp.player(l.siteId, l.team, l.player) || 0;
+      const by = (l, n) => (g(l) ? n / g(l) : -1);
+      lines.sort((a, b) => by(b, b.pts) - by(a, a.pts) || by(b, b.powers + b.gets) - by(a, a.powers + a.gets));
+    }
+    const pw = showPowers(lines);
+    return `${catFilterHtml(q)}
+      ${lines.length ? `<div class="tablewrap"><table class="cattable" data-sort="catplayers" data-sort-by="Pts">
+        <tr><th class="name">Player</th><th class="name teamcol">Team</th><th class="name nsite">Site</th>${catHead(pw, perGame)}</tr>
+        ${lines.map((l) =>
+          `<tr><td class="name">${esc(l.player)}<span class="subteam">${esc(l.team)}</span></td>`
+          + `<td class="name muted teamcol">${esc(l.team)}</td><td class="name muted nsite">${esc(l.site)}</td>${
+            lineCells(perLine(l, gp.player(l.siteId, l.team, l.player)), pw)}</tr>`).join('')}
+      </table></div>` : noneHere}`;
+  }
+
+  function byTeamHtml(rows, q) {
+    const gp = gamesPlayed();
+    const lines = setCatLines(rows, catSel, catSubSel, 'team', catSub2Sel);
+    if (perGame) {
+      const g = (l) => gp.team(l.siteId, l.team) || 0;
+      const by = (l) => (g(l) ? (l.pts + l.bpts) / g(l) : -1);
+      lines.sort((a, b) => by(b) - by(a) || (b.ppb ?? -1) - (a.ppb ?? -1));
+    }
+    const pw = showPowers(lines);
+    return `${catFilterHtml(q)}
+      ${lines.length ? `<div class="tablewrap"><table data-sort="catteams">
+        <tr><th class="name">Team</th><th class="name nsite">Site</th>${catHead(pw, perGame)}${
+          perGame ? '<th class="num">Bonuses/G</th><th class="num">Bpts/G</th>' : '<th class="num">Bonuses</th><th class="num">Bpts</th>'}<th class="num">PPB</th></tr>
+        ${lines.map((l) => [l, perLine(l, gp.team(l.siteId, l.team))]).map(([l, p]) =>
+          `<tr><td class="name">${esc(l.team)}</td><td class="name muted nsite">${esc(l.site)}</td>${lineCells(p, pw)}<td class="num">${p.bh}</td>`
+          + `<td class="num">${p.bpts}</td><td class="num">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
+      </table></div>` : noneHere}`;
+  }
+
+  // one player's categories: the picker lists every site's players, a
+  // team under its name and site
+  function byPlayer(box, rows) {
+    const key = (r) => JSON.stringify([r.siteId, r.team, r.player]);
+    const players = [...new Map(rows.map((r) => [key(r), { siteId: r.siteId, site: r.site, team: r.team, player: r.player }])).values()]
+      .sort((a, b) => a.site.localeCompare(b.site) || a.team.localeCompare(b.team) || a.player.localeCompare(b.player));
+    if (!catPlayerSel || !players.some((p) => key(p) === key(catPlayerSel))) catPlayerSel = players[0];
+    const items = players.map((p) => ({ name: p.player, team: `${p.team} · ${p.site}` }));
+    const cur = players.findIndex((p) => key(p) === key(catPlayerSel));
+    const bd = catBreakdown(rows.filter((r) => r.siteId === catPlayerSel.siteId), catPlayerSel.team, catPlayerSel.player);
+    const pw = showPowers(bd.map((b) => b.line));
+    const games = gamesPlayed().player(catPlayerSel.siteId, catPlayerSel.team, catPlayerSel.player);
+    const cells = (l) => lineCells(perLine(l, games), pw);
+    box.innerHTML = `
+      <div style="margin-bottom:10px">${pickerHtml('setplayersel', items, cur)}</div>
       <div class="tablewrap"><table>
-        <tr><th class="name">site</th><th class="name">host</th><th>date</th>
-          <th class="num sep">teams</th><th class="num sep">games</th>
-          <th class="num sep">PP20TUH</th><th class="num sep">PPB</th></tr>
-        ${siteRows}
-      </table></div>
-      <div class="setstats"></div>`;
-    if (s.teams.length) renderStats(out.querySelector('.setstats'), s, [], { site: true, games: false });
-    else out.querySelector('.setstats').innerHTML = '<div class="muted" style="margin-top:12px">No games yet</div>';
+        <tr><th>Category</th>${catHead(pw, perGame)}</tr>
+        ${bd.map(({ cat, line, subs }) =>
+          `<tr><td><b>${esc(cat)}</b></td>${cells(line)}</tr>`
+          + subs.map(({ sub, line: sl, subs: s2 }) =>
+            `<tr class="muted"><td style="padding-left:28px">${esc(sub)}</td>${cells(sl)}</tr>`
+            + s2.map(({ sub: x, line: l2 }) =>
+              `<tr class="muted"><td style="padding-left:48px">${esc(x)}</td>${cells(l2)}</tr>`).join('')).join('')
+        ).join('')}
+      </table></div>`;
+    wirePicker('setplayersel', items, cur, (p) => { catPlayerSel = players[items.indexOf(p)]; }, render);
   }
-
-  /* ---------- categories ---------- */
-
-  const pctOf = (n, d) => (d ? Math.round((n / d) * 100) + '%' : '–');
-
-  function catFilterHtml(rows) {
-    const cats = [...new Set(rows.map((r) => r.cat))].sort(catCompare);
-    if (catSel && !cats.includes(catSel)) { catSel = ''; catSubSel = ''; }
-    const subs = catSel && catView !== 'questions' && catView !== 'bonuses'
-      ? [...new Set(rows.filter((r) => r.cat === catSel && r.sub).map((r) => r.sub))].sort() : [];
-    return `<div class="chipstack">
-      <div class="chips">
-        ${['', ...cats].map((c) =>
-          `<a href="#" class="chip${catSel === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c) || 'All'}</a>`).join('')}
-      </div>
-      ${subs.length ? `<div class="chips sub">
-        ${['', ...subs].map((x) =>
-          `<a href="#" class="chip${catSubSel === x ? ' on' : ''}" data-catsub="${esc(x)}">${esc(x) || 'All'}</a>`).join('')}
-      </div>` : ''}
-    </div>`;
-  }
-
-  const lineCells = (l) => `<td class="num">${l.powers}</td><td class="num">${l.gets}</td>`
-    + `<td class="num">${l.negs}</td><td class="num">${l.bb || 0}</td><td class="num">${l.pts}</td>`;
-  const LINE_HEAD = '<th class="num">15</th><th class="num">10</th><th class="num">-5</th>'
-    + '<th class="num" title="Bouncebacks: tossups won after the other team missed them">BB</th><th class="num">Pts</th>';
-
-  const pct1 = (x) => (x === null || x === undefined ? '–' : Math.round(x * 100) + '%');
 
   function renderCatsTab() {
+    const { entries, catmap: vmap } = versionEntries();
+    // a question is one question wherever it was read (setstats.js identOf)
+    const q = categoryQuestionStats(entries, vmap, (e, kind, n) => identOf(catmap, e.pv[0], e.pv[1], kind, n).ident);
+    if (!q.tossups.length && !q.bonuses.length) { out.innerHTML = '<div class="muted">No categorized games yet</div>'; return; }
     const c = setCategories(activeSites(), catmap);
-    if (!c.questions.length) { out.innerHTML = '<div class="muted">No categorized games yet</div>'; return; }
-    const views = [['questions', 'Tossups'], ['bonuses', 'Bonuses'], ['players', 'Players'], ['teams', 'Teams']];
-    let body;
-    if (catView === 'bonuses') {
-      // bonus parts ranked by how they converted: "easiest" is the part
-      // most rooms got, wherever the writers put it
-      const index = setQuestionPlays(activeSites(), catmap);
-      const { bonuses } = setQuestionTable(index, catmap, state.packets);
-      const lines = setBonusLines(bonuses, catSel);
-      const rows = bonuses.filter((b) => b.cat);
-      body = `${catFilterHtml(rows)}
-        <div class="muted" style="font-size:13px;margin-bottom:8px">Parts are ranked by how they actually converted:
-          easiest is the part most rooms got, wherever it sat in the bonus.</div>
-        <div class="tablewrap"><table>
-          <tr><th class="name">${catSel ? 'subcategory' : 'category'}</th>
-            <th class="num sep">bonuses</th><th class="num sep">heard</th><th class="num sep">PPB</th>
-            <th class="num sep">0</th><th class="num">10</th><th class="num">20</th><th class="num">30</th>
-            <th class="num sep">easiest</th><th class="num">middle</th><th class="num">hardest</th></tr>
-          ${lines.map((l) => `<tr><td class="name">${esc(l.name)}</td>
-            <td class="num sep">${l.bonuses}</td><td class="num sep">${l.heard}</td>
-            <td class="num sep">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td>
-            <td class="num sep">${pct1(l.heard ? l.dist[0] / l.heard : null)}</td>
-            <td class="num">${pct1(l.heard ? l.dist[1] / l.heard : null)}</td>
-            <td class="num">${pct1(l.heard ? l.dist[2] / l.heard : null)}</td>
-            <td class="num">${pct1(l.heard ? l.dist[3] / l.heard : null)}</td>
-            <td class="num sep">${pct1(l.easy)}</td><td class="num">${pct1(l.mid)}</td><td class="num">${pct1(l.hard)}</td></tr>`).join('')}
-        </table></div>`;
-    } else if (catView === 'questions') {
-      // by category, or one category opened into its subcategories
-      const lines = setQuestionLines(c.questions, catSel);
-      const powers = c.questions.some((q) => q.powers); // a set without powers gets no column
-      body = `${catFilterHtml(c.questions)}
-        <div class="tablewrap"><table>
-          <tr><th class="name">${catSel ? 'subcategory' : 'category'}</th>
-            <th class="num sep">heard</th>${powers ? '<th class="num sep">power</th>' : ''}<th class="num sep">conv</th>
-            <th class="num sep">dead</th><th class="num sep">negs</th>
-            <th class="num sep">bonuses</th><th class="num sep">PPB</th></tr>
-          ${lines.map((l) => `<tr><td class="name">${esc(l.name)}</td>
-            <td class="num sep">${l.heard}</td>${powers ? `<td class="num sep">${pctOf(l.powers, l.heard)}</td>` : ''}
-            <td class="num sep">${pctOf(l.powers + l.gets, l.heard)}</td>
-            <td class="num sep">${pctOf(l.dead, l.heard)}</td><td class="num sep">${l.negs}</td>
-            <td class="num sep">${l.bh}</td><td class="num sep">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
-        </table></div>`;
-    } else if (catView === 'players') {
-      body = `${catFilterHtml(c.players)}
-        <div class="tablewrap"><table>
-          <tr><th class="name">player</th><th class="name">team</th><th class="name">site</th>${LINE_HEAD}</tr>
-          ${setCatLines(c.players, catSel, catSubSel, 'player').map((l) =>
-            `<tr><td class="name">${esc(l.player)}</td><td class="name muted">${esc(l.team)}</td>
-             <td class="name muted">${esc(l.site)}</td>${lineCells(l)}</tr>`).join('')}
-        </table></div>`;
-    } else {
-      body = `${catFilterHtml(c.teams)}
-        <div class="tablewrap"><table>
-          <tr><th class="name">team</th><th class="name">site</th>${LINE_HEAD}
-            <th class="num">bonuses</th><th class="num">bpts</th><th class="num">ppb</th></tr>
-          ${setCatLines(c.teams, catSel, catSubSel, 'team').map((l) =>
-            `<tr><td class="name">${esc(l.team)}</td><td class="name muted">${esc(l.site)}</td>${lineCells(l)}
-             <td class="num">${l.bh}</td><td class="num">${l.bpts}</td>
-             <td class="num">${l.ppb === null ? '–' : l.ppb.toFixed(2)}</td></tr>`).join('')}
-        </table></div>`;
-    }
     out.innerHTML = `
-      <div class="views">
-        ${views.map(([k, label]) =>
-          `<a href="#" class="view${catView === k ? ' on' : ''}" data-catview="${k}">${label}</a>`).join('')}
-      </div>${body}`;
-    out.querySelectorAll('[data-catview]').forEach((p) => {
-      p.onclick = (e) => { e.preventDefault(); catView = p.dataset.catview; catSubSel = ''; render(); };
-    });
-    out.querySelectorAll('[data-cat]').forEach((p) => {
-      p.onclick = (e) => { e.preventDefault(); catSel = p.dataset.cat; catSubSel = ''; render(); };
-    });
-    out.querySelectorAll('[data-catsub]').forEach((p) => {
-      p.onclick = (e) => { e.preventDefault(); catSubSel = p.dataset.catsub; render(); };
-    });
+      ${viewsHtml([{ v: 'cat', label: 'Players' }, { v: 'team', label: 'Teams' },
+        { v: 'player', label: 'By Player' }, { v: 'questions', label: 'Questions' }], catView, 'catview')}
+      ${catView === 'questions' ? '' : perSwitchHtml()}
+      <div class="catbody"></div>`;
+    wire('catview', (v) => { catView = v; });
+    wirePer(out);
+    const body = out.querySelector('.catbody');
+    if (catView === 'questions') body.innerHTML = questionsHtml(q, [catSel, catSubSel, catSub2Sel], catFilterHtml(q));
+    else if (catView === 'team') body.innerHTML = byTeamHtml(c.teams, q);
+    else if (catView === 'player') {
+      if (c.players.length) byPlayer(body, c.players);
+      else body.innerHTML = '<div class="muted">No buzzes yet</div>';
+    } else body.innerHTML = byCategoryHtml(c.players, q);
+    if (catView !== 'player') wireCatFilter();
+    sortTables(body, statSorts);
   }
 
+
+  const pct1 = (x) => (x === null || x === undefined ? '–' : Math.round(x * 100) + '%');
 
   /* ---------- buzzpoints ----------
      By question, not by round (setstats.js): a packet's page lists its
@@ -544,6 +752,11 @@ export function mountSetView(root, source, opts = {}) {
       if (opts.onTab) opts.onTab(tab);
       render();
     };
+  });
+  let refitTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(refitTimer);
+    refitTimer = setTimeout(() => { const b = root.querySelector('.newstats'); if (b) fitTables(b); }, 150);
   });
   load();
   return { refresh: load, state: () => state };

@@ -2166,14 +2166,24 @@ async function alertWrapUps(env) {
       'COUNT(*) AS games, COUNT(DISTINCT round) AS rounds FROM files ' +
       "WHERE tournament_id = ?1 AND kind IN ('qbj', 'combined') AND error IS NULL"
     ).bind(t.id).all()).results[0];
+    // a mirror of a question set (not hidden from it): the archive issue
+    // names the set, so the archive shows it with the set's other sites.
+    // Only a convenience: a failed lookup leaves the lines blank rather
+    // than lose the alert, which this tournament's claim above already took.
+    const set = await env.DB.prepare(
+      'SELECT s.name, m.host FROM set_mirrors m JOIN sets s ON s.id = m.set_id ' +
+      'WHERE m.tournament_id = ?1 AND m.hidden = 0 ORDER BY m.id LIMIT 1'
+    ).bind(t.id).all().then((r) => r.results[0] || null, () => null);
+    const archive = archiveUrl(env, t, set);
     await setTournamentAlert(env, t, {
       kind: 'finished', name: t.name, status: 'Finished',
       link: t.published ? publicLink(env, t.slug) : '`' + t.slug + '` (public page off)',
       more: [
         [count(n.rooms, 'room'), count(n.games, 'game'), count(n.rounds, 'round')].join(', '),
-        t.published && n.games && !archiveUrl(env, t) ? 'To archive: `node tools/archive.mjs add ' + t.slug + '`' : null,
+        t.published && n.games && !archive ? 'To archive: `node tools/archive.mjs add ' + t.slug
+          + (set ? ' --set "' + set.name + '"' + (set.host ? ' --site "' + set.host + '"' : '') : '') + '`' : null,
       ],
-      buttons: t.published && n.games && archiveUrl(env, t) ? [{ label: 'Archive it', url: archiveUrl(env, t), emoji: '📦' }] : [],
+      buttons: t.published && n.games && archive ? [{ label: 'Archive it', url: archive, emoji: '📦' }] : [],
     });
   }
 }
@@ -2183,14 +2193,20 @@ async function alertWrapUps(env) {
 // is the approval, and .github/workflows/archive.yml does the rest. The
 // workflow checks the issue's author can push to the repo, so the gate is
 // still push access. Unset, null, and the alert gives the archive tool's
-// command.
-export function archiveUrl(env, t) {
+// command. `set`: {name, host} when the tournament was a mirror of a
+// question set, which fills in the set (the archive shows a set's sites
+// together) and the host the set's editor gave the mirror, as host and
+// site label both.
+export function archiveUrl(env, t, set = null) {
   const repo = (env.ARCHIVE_REPO || '').trim();
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return null;
+  const host = (set && set.host) || '';
   const body = [
     'slug: ' + t.slug,
     'date: ' + new Date(t.started).toISOString().slice(0, 10),
-    'host: ',
+    'host: ' + host,
+    'set: ' + ((set && set.name) || ''),
+    'site: ' + host,
     '',
     'Fill in the host if you know it, then submit to archive this tournament.',
   ].join('\n');

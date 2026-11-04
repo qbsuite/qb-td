@@ -2002,22 +2002,22 @@ await section('Stats tab and s.html: the mirror\'s games; SET-37 hide from stats
   };
   await northIn(true, 'the set state with North\'s games');
   await openSet(C.secret, 'stats');
-  await waitJs(`!!document.querySelector('#setstats .setout table')`, 'the editor\'s stats');
-  const sites = () => js(`[...document.querySelectorAll('#setstats .setout table')][0] ? [...[...document.querySelectorAll('#setstats .setout table')][0].querySelectorAll('tr')].slice(1)
+  await waitJs(`!!document.querySelector('#setstats .sitebar table') && !!document.querySelector('#setstats .setout table')`, 'the editor\'s stats');
+  const sites = () => js(`document.querySelector('#setstats .sitebar table') ? [...document.querySelector('#setstats .sitebar table').querySelectorAll('tr')].slice(1)
     .map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim())) : []`);
   let s = await sites();
   ok('Stats: the editor\'s Stats tab lists the mirror with its host and date', s.length === 1 && s[0][0] === 'North mirror' && s[0][1] === 'North U' && s[0][2] === '2026-11-07', s);
   const games = s.length ? Number(s[0][4]) : 0;
   ok('Stats: … with its games (the re-exported Alpha–Beta game once, and Gamma–Delta)', games === 2, s);
-  ok('Stats: … and the standings below', await js(`document.querySelectorAll('#setstats .setstats table').length > 0`)
-    && (await text('#setstats .setstats')).includes('Alpha'));
+  ok('Stats: … and its teams ranked below, by their numbers, with no W–L', await js(`document.querySelectorAll('#setstats .newstats table').length === 1`)
+    && (await text('#setstats .newstats')).includes('Alpha') && !/\bW\b/.test(await js(`document.querySelector('#setstats .newstats table').tHead.textContent`)));
   await toTab('settings');
   await clearMsg();
   await click('#pub');
   await waitMsg(/^Set page is public$/);
   await open('s.html', { s: C.slug });
-  await waitJs(`document.querySelector('#sites').textContent === '1 site' && !!document.querySelector('#view .setout table')`, 'the public set page');
-  ok('s.html: the public set page lists the mirror ("1 site")', (await text('#view .setout table')).includes('North mirror'), await text('#view'));
+  await waitJs(`document.querySelector('#sites').textContent === '1 site' && !!document.querySelector('#view .sitebar table')`, 'the public set page');
+  ok('s.html: the public set page lists the mirror ("1 site")', (await text('#view .sitebar table')).includes('North mirror'), await text('#view'));
   await openSet(C.secret, 'mirrors');
   d1(`UPDATE tournaments SET pub_dirty = 0, pub_dirty_at = NULL WHERE id = ${north.tid}`);
   await clearMsg();

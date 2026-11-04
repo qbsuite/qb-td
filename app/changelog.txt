@@ -2,6 +2,16 @@ Release Notes for 11/3/2026
 
 [ ARCHIVE ]
 - Added 2026 Penn Bowl @ Queen's.
+- A set's name in the list opens one stats page for all of its sites.
+- An archive issue can name the set and site; for a question set's mirror they come filled in.
+
+[ PUBLIC PAGE ]
+- Click a number column's header to sort Standings, Individuals, Rounds and the category tables; an arrow marks the sorted column.
+
+[ SETS ]
+- Set stats use the player page's views: Team Stats (teams ranked by PP20TUH, no standings), Individuals, Teams, Players and Packets.
+- Sites are turned on and off with checkboxes in the sites table.
+- Team Stats, Individuals and Categories show Totals or Per game.
 
 Release Notes for 11/2/2026
 

@@ -1,10 +1,8 @@
 // statsview.js — render an aggregate() result as standings + individuals +
-// per-round games with expandable box scores. Shared by the TO dashboard,
-// whose rows are stats.js standings (the public page's order, overtime out
-// of TUH, PP20TUH and PPB), and the set page — which passes {site: true,
-// games: false}: its rows come from several mirrors (setstats.js
-// setStandings), so each carries the site it played at, and the game
-// lists stay on the mirrors' own pages.
+// per-round games with expandable box scores, for the TO dashboard, whose
+// rows are stats.js standings (the public page's order, overtime out of
+// TUH, PP20TUH and PPB). {site: true, games: false} tags each row with the
+// site it played at and leaves the game lists out.
 //
 // Column layout follows YellowFruit's reports: W/L as a tight pair, then a
 // rule before every stat column (PP20TUH, each point value, TUH, PPB). The

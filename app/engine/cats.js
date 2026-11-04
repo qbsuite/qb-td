@@ -275,8 +275,11 @@ export function catBreakdown(rows, team, player) {
  * keep packet order), so the easiest part is the one most rooms got.
  * e/m/h count conversions over dHeard readings; marked/ranked count the
  * distinct bonuses each way. Only three-part bonuses have a difficulty.
+ * `keyOf(entry, kind, number)` names a question ('t' or 'b'); by default
+ * round + number, while a set's page names the same question read in two
+ * packet versions alike (setview.js).
  */
-export function categoryQuestionStats(entries, catmap) {
+export function categoryQuestionStats(entries, catmap, keyOf = (e, kind, n) => e.round + ':' + n) {
   const tossups = new Map();
   const bonuses = new Map();
   const seen = new Map(); // slice row -> Set of "round:number" read in it
@@ -300,7 +303,7 @@ export function categoryQuestionStats(entries, catmap) {
       if (tb) continue; // tiebreakers have no packet category
       const info = catInfo(cats.t, tossup);
       if (!info) continue;
-      const r = slice(tossups, info, tInit, e.round + ':' + tossup);
+      const r = slice(tossups, info, tInit, keyOf(e, 't', tossup));
       r.heard++;
       const right = buzzes.find((b) => b.value > 0);
       if (right) {
@@ -314,11 +317,11 @@ export function categoryQuestionStats(entries, catmap) {
       if (!bn.team || bn.tb) continue; // a bonus nobody controlled wasn't read
       const info = catInfo(cats.b, bn.bonus);
       if (!info) continue;
-      const r = slice(bonuses, info, bInit, e.round + ':' + bn.bonus);
+      const key = keyOf(e, 'b', bn.bonus);
+      const r = slice(bonuses, info, bInit, key);
       r.heard++;
       r.pts += bn.total;
       if (bn.parts.length !== 3) continue;
-      const key = e.round + ':' + bn.bonus;
       const d = bonusMarks(cats.b, bn.bonus, bn.parts.length);
       if (d) {
         r.dHeard++;

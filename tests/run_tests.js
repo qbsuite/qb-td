@@ -2987,7 +2987,13 @@ test('the Finished alert\'s archive link is a pre-filled issue, with ARCHIVE_REP
   assert.equal(u.searchParams.get('title'), 'Archive SoCal Penn Bowl (UCSD)');
   // the lines .github/workflows/archive.yml reads, the date the day it started
   const body = u.searchParams.get('body').split('\n');
-  assert.deepEqual(body.slice(0, 3), ['slug: socal-penn-bowl', 'date: 2026-10-24', 'host: ']);
+  assert.deepEqual(body.slice(0, 5), ['slug: socal-penn-bowl', 'date: 2026-10-24', 'host: ', 'set: ', 'site: ']);
+  // a mirror of a question set: the set, and its host as host and site
+  const m = new URL(archiveUrl({ ARCHIVE_REPO: 'qbsuite/qb-td' }, t, { name: '2026 Penn Bowl', host: 'UCSD' }));
+  assert.deepEqual(m.searchParams.get('body').split('\n').slice(0, 5),
+    ['slug: socal-penn-bowl', 'date: 2026-10-24', 'host: UCSD', 'set: 2026 Penn Bowl', 'site: UCSD']);
+  const n = new URL(archiveUrl({ ARCHIVE_REPO: 'qbsuite/qb-td' }, t, { name: '2026 Penn Bowl', host: null }));
+  assert.deepEqual(n.searchParams.get('body').split('\n').slice(2, 5), ['host: ', 'set: 2026 Penn Bowl', 'site: ']);
 });
 
 test('alert messages: links are buttons, a slug is text, a long URL a Markdown link', () => {
