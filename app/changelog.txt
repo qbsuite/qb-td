@@ -12,6 +12,7 @@ Release Notes for 11/3/2026
 - Set stats use the player page's views: Team Stats (teams ranked by PP20TUH, no standings), Individuals, Teams, Players and Packets.
 - Sites are turned on and off with checkboxes in the sites table.
 - Team Stats, Individuals and Categories show Totals or Per game.
+- Team Stats has SOS and A-value columns, with the ticked sites as the field.
 
 Release Notes for 11/2/2026
 

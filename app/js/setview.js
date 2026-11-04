@@ -269,6 +269,27 @@ export function mountSetView(root, source, opts = {}) {
   // games a team played, forfeits aside (YF counts no forfeit as a game)
   const played = (tm) => tm.games.filter((g) => g.tuh > 0).length;
 
+  // A-value (ACF's, after Dwight Wynne): PP20TUH times strength of
+  // schedule. SOS is the points per tossup heard of a team's opponents,
+  // one per game played against them, over the field's: every team at the
+  // ticked sites, its total points over its total tossups heard. A team's
+  // opponents are all at its own site, so ticking a site in or out moves
+  // only the field's average: every A-value scales alike, and none passes
+  // another.
+  function withAValues(teams) {
+    const rate = (t) => (t.regTuh && t.pp !== null ? t.pp / 20 : null);
+    const byName = new Map(teams.map((t) => [t.siteId + '\n' + t.name, t]));
+    const counted = teams.filter((t) => rate(t) !== null);
+    const tuh = counted.reduce((n, t) => n + t.regTuh, 0);
+    const field = tuh ? counted.reduce((n, t) => n + rate(t) * t.regTuh, 0) / tuh : null;
+    return teams.map((t) => {
+      const opps = t.games.filter((g) => g.tuh > 0).map((g) => rate(byName.get(t.siteId + '\n' + g.opp) || {}))
+        .filter((x) => x !== null);
+      const sos = field && opps.length ? opps.reduce((a, b) => a + b, 0) / opps.length / field : null;
+      return { ...t, sos, aValue: sos !== null && t.pp !== null ? t.pp * sos : null };
+    });
+  }
+
   function teamStatsHtml(teams, vals, pp, regTossups) {
     const per = (tm, n) => (perGame ? fx(played(tm) ? n / played(tm) : null, 2) : n);
     return `<div class="tablewrap"><table class="nstats" data-sort="teamstats" data-sort-by="${pp}">
@@ -276,7 +297,8 @@ export function mountSetView(root, source, opts = {}) {
           <th class="num g0" title="Games played">GP</th>
           <th class="num g0" title="Points scored in regulation per ${regTossups} regulation tossups heard">${pp}</th>
           ${vals.map((v, i) => `<th class="num${i ? '' : ' g0'}">${v}${perGame ? '/G' : ''}</th>`).join('')}
-          <th class="num" title="Tossups heard in regulation">TUH</th><th class="num g0" title="Points per bonus">PPB</th></tr></thead>
+          <th class="num" title="Tossups heard in regulation">TUH</th><th class="num g0" title="Points per bonus">PPB</th>
+          <th class="num g0" title="Strength of schedule">SOS</th><th class="num" title="${pp} × strength of schedule">A-value</th></tr></thead>
         <tbody>${teams.map((tm) => `<tr>
           <td class="muted nrkcol">${tm.rank}</td>
           <td class="name nstick">${rk(tm.rank)}${goLink('teams', tm.ids.team(tm.name), esc(tm.name))}${markTags(tm)}</td>
@@ -284,7 +306,8 @@ export function mountSetView(root, source, opts = {}) {
           <td class="num g0">${played(tm)}</td>
           <td class="num g0">${fx(tm.pp, 1)}</td>
           ${vals.map((v, j) => `<td class="num${j ? '' : ' g0'}">${per(tm, tm.counts[v] || 0)}</td>`).join('')}
-          <td class="num">${tm.regTuh}</td><td class="num g0">${fx(tm.ppb, 2)}</td></tr>`).join('')}</tbody>
+          <td class="num">${tm.regTuh}</td><td class="num g0">${fx(tm.ppb, 2)}</td>
+          <td class="num g0">${fx(tm.sos, 3)}</td><td class="num">${fx(tm.aValue, 1)}</td></tr>`).join('')}</tbody>
       </table></div>`;
   }
 
@@ -301,7 +324,7 @@ export function mountSetView(root, source, opts = {}) {
     const regTossups = reports[0].rd.regTossups;
     const pp = `PP${regTossups}TUH`;
     const rankAll = (rows) => rows.sort(byNumbers).map((r, i) => ({ ...r, rank: i + 1 }));
-    const teams = rankAll(reports.flatMap((r) => r.rd.teams.map((t) => ({ ...t, site: r.site.label, ids: r.ids }))));
+    const teams = withAValues(rankAll(reports.flatMap((r) => r.rd.teams.map((t) => ({ ...t, site: r.site.label, siteId: r.site.id, ids: r.ids })))));
     const players = rankAll(reports.flatMap((r) => r.rd.players.map((p) => ({ ...p, site: r.site.label, ids: r.ids }))));
     const rowIds = { team: (n, row) => row.ids.team(n), player: (t, n, row) => row.ids.player(t, n) };
     const perSite = (draw) => reports.filter((r) => r.rd.teams.length)
