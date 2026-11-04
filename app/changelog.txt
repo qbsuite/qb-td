@@ -13,6 +13,7 @@ Release Notes for 11/3/2026
 - Sites are turned on and off with checkboxes in the sites table.
 - Team Stats, Individuals and Categories show Totals or Per game.
 - Team Stats has SOS and A-value columns, with the ticked sites as the field.
+- A-value now follows ACF's formula term by term (tossup points, tossups converted and PPB), counting overtime tossups heard.
 
 Release Notes for 11/2/2026
 
