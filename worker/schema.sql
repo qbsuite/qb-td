@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS tournaments (
   -- serve nothing; once set, every link closes RUN_TTL after it.
   -- Existing databases get it from migrate-start.sql.
   started INTEGER,
+  -- The operator's override for when every link closes (worker.js
+  -- closesAt); NULL keeps the clocks above. From migrate-reopen.sql.
+  closes_at INTEGER,
   published INTEGER NOT NULL DEFAULT 0,
   settings TEXT NOT NULL DEFAULT '{}', -- JSON: reader gameFormat etc.
   -- Retired: the TD's broadcasts, removed 9/28/2026. Nothing reads or

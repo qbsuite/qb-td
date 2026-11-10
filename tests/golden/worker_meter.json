@@ -3,7 +3,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -20,7 +20,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -38,7 +38,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -55,7 +55,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -72,7 +72,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -87,7 +87,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -102,7 +102,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -117,7 +117,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",
@@ -134,7 +134,7 @@
   "status": 200,
   "ops": [
    "crypto digest",
-   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
+   "d1 all SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, t.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, t.created AS t_created, t.started, t.closes_at FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2",
    "crypto importKey",
    "crypto deriveKey",
    "crypto decrypt",

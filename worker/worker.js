@@ -41,6 +41,9 @@
 // dying is question security: a leaked link stops working soon after the
 // tournament, a forgotten one can't be phished later. Published stats
 // stay up — the publish flag, not the admin link, gates /pub.
+// tournaments.closes_at, when set, replaces both clocks: the operator's
+// way to reopen a finished tournament's links for a few more days (README
+// "Reopening a tournament"). Nothing in the Worker writes it.
 
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
 import { qbjTextWithRound } from '../app/engine/modaqfile.js';
@@ -59,8 +62,12 @@ const LIVE_LIST_TTL = 48 * 3600 * 1000;
 // moment of setup. Queries for "tournaments that might be open" use it.
 const MAX_LIFE = SETUP_TTL + RUN_TTL;
 function closesAt(t) {
+  if (t.closes_at) return t.closes_at;
   return t.started ? t.started + RUN_TTL : t.created + SETUP_TTL;
 }
+// closesAt in SQL, for the tournaments row aliased `p` ('t.') or unaliased.
+const closesSql = (p = '') =>
+  `COALESCE(${p}closes_at, CASE WHEN ${p}started IS NULL THEN ${p}created + ${SETUP_TTL} ELSE ${p}started + ${RUN_TTL} END)`;
 // Live state may be re-served briefly to anything that caches it. The
 // public page deliberately revalidates past this (pubview.js) so its
 // refresh button can't no-op; the value is here for other /pub consumers
@@ -2143,7 +2150,7 @@ function alertStarted(env, ctx, t) {
 async function alertWrapUps(env) {
   if (!alertsEnabled(env)) return;
   const now = Date.now();
-  const closes = `(CASE WHEN started IS NULL THEN created + ${SETUP_TTL} ELSE started + ${RUN_TTL} END)`;
+  const closes = `(${closesSql()})`;
   const { results } = await env.DB.prepare(
     `SELECT id, slug, name, started, published, alert_msg FROM tournaments ` +
     `WHERE wrapped = 0 AND ${closes} <= ?1 AND ${closes} > ?2 ORDER BY id LIMIT ${WRAP_PER_RUN}`
@@ -2234,7 +2241,7 @@ const PRUNE_AFTER = 7 * 24 * 3600 * 1000;
 const PRUNE_PER_RUN = 8;
 
 async function pruneUploads(env, now = Date.now()) {
-  const closes = `(CASE WHEN t.started IS NULL THEN t.created + ${SETUP_TTL} ELSE t.started + ${RUN_TTL} END)`;
+  const closes = `(${closesSql('t.')})`;
   const all = `(${closes} + ${PRUNE_AFTER} <= ?1 AND NOT (s.id IS NOT NULL AND s.created + ${SET_TTL} > ?1))`;
   const { results } = await env.DB.prepare(
     `SELECT t.id, ${all} AS clear_all FROM tournaments t LEFT JOIN sets s ON s.id = t.set_id ` +
@@ -4294,7 +4301,7 @@ async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, ' +
     't.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, ' +
-    't.created AS t_created, t.started ' +
+    't.created AS t_created, t.started, t.closes_at ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2'
   ).bind(secret, await secretHash(secret)).all();
   const b = results[0] || null;
@@ -4306,7 +4313,7 @@ async function getBucketRow(env, secret) {
 // "expired" distinct from "never existed" so the mod's page can say
 // "room closed" instead of "bad link".
 function bucketClosed(b) {
-  return Date.now() > closesAt({ created: b.t_created, started: b.started });
+  return Date.now() > closesAt({ created: b.t_created, started: b.started, closes_at: b.closes_at });
 }
 // Before Start a room link serves nothing at all — not the round's
 // packet, not the tiebreakers, not uploads — whatever the setup clock
@@ -4359,7 +4366,7 @@ async function testAccess(env, b, url) {
   const key = url.searchParams.get('test');
   if (!key || !b || b.started) return false;
   const { results } = await env.DB.prepare(
-    'SELECT admin_secret, created, started FROM tournaments WHERE id = ?1'
+    'SELECT admin_secret, created, started, closes_at FROM tournaments WHERE id = ?1'
   ).bind(b.tournament_id).all();
   const t = results[0];
   return !!t && !adminClosed(t) && sameDigest(key, await testToken(t.admin_secret));
@@ -4440,7 +4447,7 @@ async function bucketState(env, secret, url) {
     // the tournament's (lowest bracket's) round, and this room's bracket
     tournament_round: b.current_round,
     bracket: place.bracket,
-    closes: closesAt({ created: b.t_created, started: b.started }),
+    closes: closesAt({ created: b.t_created, started: b.started, closes_at: b.closes_at }),
     packet: packets.find((p) => p.number === place.round) || null,
     packets,
     roster: !!b.roster_r2_key,
@@ -5756,7 +5763,7 @@ async function getSet(env, s, ctx) {
     env.DB.prepare(
       'SELECT m.id, m.name, m.slug, m.host, m.event_date, m.invite_enc, m.created, m.revoked, m.hidden, m.started, ' +
       'm.tournament_id, m.mirror_key_enc IS NOT NULL AS files, t.slug AS t_slug, t.name AS t_name, ' +
-      't.created AS t_created, t.started AS t_started, t.current_round AS t_round, t.published AS t_published ' +
+      't.created AS t_created, t.started AS t_started, t.closes_at AS t_closes_at, t.current_round AS t_round, t.published AS t_published ' +
       'FROM set_mirrors m LEFT JOIN tournaments t ON t.id = m.tournament_id WHERE m.set_id = ?1 ORDER BY m.id'
     ).bind(s.id).all(),
     env.DB.prepare(
@@ -5779,7 +5786,7 @@ async function getSet(env, s, ctx) {
     set: { ...pub_s, closes: s.created + SET_TTL },
     packets: packets.results,
     tiebreakers: !!tbHead,
-    mirrors: await Promise.all(mirrors.results.map(async ({ invite_enc, t_slug, t_name, t_created, t_started, t_round, t_published, ...m }) => ({
+    mirrors: await Promise.all(mirrors.results.map(async ({ invite_enc, t_slug, t_name, t_created, t_started, t_closes_at, t_round, t_published, ...m }) => ({
       ...m,
       // an invite is only worth showing while it can still be used
       invite: !m.tournament_id && !m.revoked ? await decField(s.ckey, invite_enc) : null,
@@ -5789,8 +5796,8 @@ async function getSet(env, s, ctx) {
         started: t_started || null, games: gamesBy.get(m.tournament_id) || 0,
         // until then its rooms can still upload — and a packet fix still
         // reaches its unplayed rounds (mirrorsOpenFor uses the same window)
-        closes: closesAt({ created: t_created, started: t_started }),
-        final: closesAt({ created: t_created, started: t_started }),
+        closes: closesAt({ created: t_created, started: t_started, closes_at: t_closes_at }),
+        final: closesAt({ created: t_created, started: t_started, closes_at: t_closes_at }),
       } : null,
     }))),
   });
@@ -5953,19 +5960,19 @@ function versionCats(setCats, packet, version) {
 async function mirrorsOpenFor(env, sid, packet, offer) {
   const prefix = `${setPacketPrefix(sid)}${packet}/%`;
   const now = Date.now();
-  const since = now - MAX_LIFE; // an index-friendly pre-filter; openAt decides
-  const openAt = (n) => `(CASE WHEN t.started IS NULL THEN t.created + ${SETUP_TTL} ELSE t.started + ${RUN_TTL} END) > ?${n}`;
+  const since = now - MAX_LIFE; // an index-friendly pre-filter (closes_at aside); openAt decides
+  const openAt = (n) => `${closesSql('t.')} > ?${n}`;
   const mirrors = '(SELECT tournament_id FROM set_mirrors WHERE set_id = ?1 AND tournament_id IS NOT NULL)';
   const played = "SELECT 1 FROM files f WHERE f.tournament_id = t.id AND f.kind IN ('qbj', 'combined') AND f.error IS NULL AND f.round = ";
   const { results: open } = await env.DB.prepare(
     'SELECT r.tournament_id AS tid, r.number AS round FROM rounds r JOIN tournaments t ON t.id = r.tournament_id ' +
-    `WHERE t.created > ?2 AND ${openAt(4)} ` +
+    `WHERE (t.created > ?2 OR t.closes_at IS NOT NULL) AND ${openAt(4)} ` +
     `AND t.id IN ${mirrors} AND r.served = 0 AND r.packet_r2_key LIKE ?3 ` +
     `AND NOT EXISTS (${played}r.number)`
   ).bind(sid, since, prefix, now).all();
   if (!offer) return open;
   const { results: fresh } = await env.DB.prepare(
-    `SELECT t.id AS tid, ?4 AS round FROM tournaments t WHERE t.created > ?2 AND ${openAt(5)} AND t.id IN ${mirrors} ` +
+    `SELECT t.id AS tid, ?4 AS round FROM tournaments t WHERE (t.created > ?2 OR t.closes_at IS NOT NULL) AND ${openAt(5)} AND t.id IN ${mirrors} ` +
     'AND NOT EXISTS (SELECT 1 FROM rounds r WHERE r.tournament_id = t.id AND (r.number = ?4 OR r.packet_r2_key LIKE ?3)) ' +
     `AND NOT EXISTS (${played}?4)`
   ).bind(sid, since, prefix, packet, now).all();

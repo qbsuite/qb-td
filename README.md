@@ -420,7 +420,9 @@ dashboard shows which invites are still unused, and revokes them.
   lost or leaked link can't be phished or abused after the event;
   published stats stay up, and the public qbj + roster remain importable
   into YellowFruit, so results outlive the link. A leak mid-tournament is
-  handled by the dashboard's "new admin link" button.
+  handled by the dashboard's "new admin link" button. The operator can
+  reopen a closed tournament for a few more days (see "Reopening a
+  tournament").
 - **Room links serve nothing before Start** (403 "Tournament hasn't
   started"): no packet, tiebreaker, roster, schedule or upload, whatever
   the setup week has left — so a week of setup can't leak round 1 early.
@@ -796,6 +798,7 @@ npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-directory.sql     # the directory
 #   npx wrangler d1 execute qb-td --local --file migrate-buzzpub.sql       # buzzpoints packets as files
 #   npx wrangler d1 execute qb-td --local --file migrate-prune.sql         # uploads cleared after close
+#   npx wrangler d1 execute qb-td --local --file migrate-reopen.sql        # reopening a tournament
 #   npx wrangler d1 execute qb-td --local --file schema.sql
 #   npx wrangler d1 execute qb-td --local --file migrate-rev.sql           # the Live Hub rev
 # --test-scheduled is required: the cron builds the round shards the
@@ -996,7 +999,9 @@ first.
    and one from before room uploads were cleared after close needs
    `npx wrangler d1 execute qb-td --remote --file migrate-prune.sql`
    BEFORE the Worker (the hourly cron and a set's file list read
-   `files.gone`),
+   `files.gone`), and one from before tournaments could be reopened needs
+   `npx wrangler d1 execute qb-td --remote --file migrate-reopen.sql`
+   BEFORE the Worker (every link check reads `tournaments.closes_at`),
    then `schema.sql` again for its two indexes,
    each once — `schema.sql` is re-runnable and can't add a column.
    Apply `migrate-crypt.sql` BEFORE deploying a Worker that expects it;
@@ -1522,6 +1527,22 @@ delete endpoint and no documented cap (see "Watching it" above), and the
 Cloudflare API has rate limits. Try it during a low-stakes event and
 watch `node tools/cf_watch.mjs` for the version count and any refused
 deploys; if it is a problem, publish every few minutes or move to C.
+
+## Reopening a tournament (operator runbook)
+
+A TD who still needs the admin or room links after they close gets them
+back by setting `tournaments.closes_at`, which replaces both clocks:
+
+```
+npx wrangler d1 execute qb-td --remote --command \
+  "UPDATE tournaments SET closes_at = <ms since epoch>, wrapped = 0 WHERE slug = '<slug>'"
+```
+
+Every link, the admin link and every room's, works again until then and
+closes at that moment. `wrapped = 0` sends a fresh Finished alert at the
+new close. Start and the Live now listing are unchanged, and step two of
+the upload cleanup moves with the close. `closes_at = NULL` puts the
+usual clocks back.
 
 ## Deleting a tournament (operator runbook)
 

@@ -1668,6 +1668,21 @@ ok('final state caches for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
 r = await call('/pub/' + slug + '/rounds?n=1');
 ok('final round shards cache for a week', maxAge(r.cache) >= 7 * 24 * 3600, r.cache);
 
+// The operator reopens it (README "Reopening a tournament"): closes_at
+// replaces the clocks, for the admin link, every room and /pub alike.
+const reopenedTo = Date.now() + 48 * 3600 * 1000;
+d1exec(`UPDATE tournaments SET closes_at = ${reopenedTo} WHERE slug = '${slug}'`);
+r = await call(A);
+ok('reopened: the admin link works until closes_at', r.status === 200 && r.body.tournament.closes === reopenedTo, r.body.tournament && r.body.tournament.closes);
+r = await call('/b/' + lateRoom);
+ok('reopened: its rooms work until closes_at', r.status === 200 && r.body.closes === reopenedTo, r.body);
+r = await call('/pub/' + slug);
+ok('reopened: not final', !r.body.final && maxAge(r.cache) < 3600, [r.body.final, r.cache]);
+d1exec(`UPDATE tournaments SET closes_at = ${Date.now() - 1000} WHERE slug = '${slug}'`);
+ok('a closes_at past closes it again', (await call(A)).status === 410 && (await call('/b/' + lateRoom)).status === 410);
+d1exec(`UPDATE tournaments SET closes_at = NULL WHERE slug = '${slug}'`);
+ok('closes_at NULL: the usual clocks again', (await call(A)).status === 410);
+
 // The rule itself, on tournaments backdated in D1: Start replaces the
 // setup deadline whichever way it moves it.
 {

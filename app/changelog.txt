@@ -1,3 +1,8 @@
+Release Notes for 11/10/2026
+
+[ MISC ]
+- A finished tournament's links can be reopened for a few more days on request.
+
 Release Notes for 11/3/2026
 
 [ ARCHIVE ]
