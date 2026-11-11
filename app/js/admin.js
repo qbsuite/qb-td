@@ -165,8 +165,9 @@ function showList() {
             const live = Date.now() < e.closes;
             return `
           <div class="trow">
-            ${live ? `<a class="nm" href="${esc(adminLink(e.secret))}">${esc(e.name)}</a>`
-                   : `<span class="nm muted">${esc(e.name)}</span>`}
+            ${/* a link even when closed: e.closes is this device's copy, and
+                  only opening the hub refreshes it (an operator's closes_at) */ ''}
+            <a class="nm${live ? '' : ' muted'}" href="${esc(adminLink(e.secret))}">${esc(e.name)}</a>
             <span class="st">${live ? 'open until ' + esc(shortDay(e.closes)) : 'closed'}</span>
             ${live ? '' : `<a href="${esc(statsLink(e.slug))}">Player page</a>`}
             <button class="linkbtn muted" data-forget="${esc(e.secret)}" title="Remove from this device's list">Remove</button>

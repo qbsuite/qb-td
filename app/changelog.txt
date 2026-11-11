@@ -1,3 +1,8 @@
+Release Notes for 11/11/2026
+
+[ HUB ]
+- A tournament listed as closed on your device still opens, so a reopened one shows up again.
+
 Release Notes for 11/10/2026
 
 [ MISC ]
