@@ -3042,6 +3042,18 @@ async function sectionSpecials(br) {
   x = await arch.fwait(`document.querySelector('#page-standings h2') && ${REPORT_READ}`, 'the archived report');
   ok1 = readsRight(x);
   await check(`st-04 special names: the archived page's report shows them as written, results included, and nothing ran ${tag}`, async () => (ok1.stages && ok1.results && ok1.names && ok1.inert) || { ok1, h2: x.h2, li: x.li, planted: x.planted, ran: x.ran });
+  // the strip's "download report": the hub's HTML report zip (reportZipFile),
+  // its six pages these same pages under <slug>_ names
+  await arch.js(`(() => { const make = URL.createObjectURL; URL.createObjectURL = (b) => { window.__dl = new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result.split(',')[1]); r.readAsDataURL(b); }); return make(b); }; })()`);
+  await arch.js(`document.querySelector('.annstrip [data-dlreport]').click()`);
+  const zipped = Buffer.from(await arch.wait(`window.__dl`, 'the report download'), 'base64');
+  const { readZip } = await import('../app/engine/zip.js');
+  const got = await readZip(new Uint8Array(zipped));
+  const want = buildReport({ name: T.name, matches: dedupeMatches(matches), roster,
+    settings: effectiveFormat(data[`/pub/${T.slug}`].format), schedule: data[`/pub/${T.slug}/schedule`], prefix: T.slug });
+  await check('arch-dl archived page: "download report" gives the six report pages, named as the hub names them', async () =>
+    (got.length === 6 && want.every((p) => got.some((g) => g.name === p.name && new TextDecoder().decode(g.data) === p.text))
+      && want.every((p) => p.name.startsWith(T.slug + '_'))) || { got: got.map((g) => g.name), want: want.map((p) => p.name) });
   await arch.goto(`${PAGES}/archive/${T.slug}/standings.html`);
   x = await arch.wait(`document.readyState === 'complete' && ${REPORT_READ}`, 'the static report');
   ok1 = readsRight(x);

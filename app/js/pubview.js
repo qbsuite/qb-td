@@ -12,7 +12,7 @@
 // the cron has published them and the file has deployed (a minute or
 // so behind a moderator's upload).
 
-import { pub, esc, usingStaticData, usingArchive, LIVE } from './api.js';
+import { pub, esc, usingStaticData, usingArchive, LIVE, download } from './api.js';
 import { parseRoster, rosterNameMap, resultOf } from '../engine/qbj.js';
 import { readGames } from '../engine/games.js';
 import { dedupeMatches } from '../engine/stats.js';
@@ -1464,6 +1464,22 @@ function renderNewStats(box) {
 }
 
 const statsOpts = () => ({ name: state.name, matches: dedupeMatches(matches), roster, settings: rankFormat(state.format), schedule });
+
+// The archived strip's "download report" (archive.js): the zip the hub's
+// "HTML report .zip" gives (hubgames.js reportZipFile), its six pages
+// named <slug>_standings.html etc., as the hsquizbowl.org database wants.
+async function downloadReport() {
+  try {
+    const { reportZipFile } = await import('./hubgames.js');
+    const z = reportZipFile(slug, statsOpts());
+    download(z.name, z.data, z.type);
+  } catch (e) { say(e.message, true); }
+}
+document.addEventListener('click', (ev) => {
+  if (!usingArchive() || !ev.target.closest('[data-dlreport]')) return;
+  ev.preventDefault();
+  if (matches.length) downloadReport();
+});
 
 function renderStatsTab(box) {
   // a redraw (new games on Refresh, a new password) keeps the Classic

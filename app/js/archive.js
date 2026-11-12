@@ -33,7 +33,9 @@ function archivedStrip(entry) {
     + `<span class="muted">final results · ${esc(when)}</span>`
     + '<span class="spacer" style="flex:1"></span>'
     + '<a href="index.html">home</a> '
-    + `<a href="archive/${encodeURIComponent(entry.slug)}/standings.html">stat report</a>`;
+    + `<a href="archive/${encodeURIComponent(entry.slug)}/standings.html">stat report</a> `
+    // pubview.js answers it: the zip the hub's HTML report download gives
+    + '<a href="#" data-dlreport>download report</a>';
   document.body.prepend(strip);
 }
 
