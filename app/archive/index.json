@@ -1,6 +1,15 @@
 {
   "tournaments": [
     {
+      "slug": "terrapin-open-stanford",
+      "name": "Terrapin Open @ Stanford",
+      "date": "2026-11-07",
+      "host": "",
+      "teams": 6,
+      "rounds": 11,
+      "games": 31
+    },
+    {
       "slug": "2026-penn-bowl-queens",
       "name": "2026 Penn Bowl @ Queen's",
       "date": "2026-10-31",

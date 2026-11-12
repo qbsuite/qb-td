@@ -925,6 +925,117 @@
    ],
    "foreign": []
   },
+  "archive terrapin-open-stanford": {
+   "header": "Terrapin Open @ Stanford",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "dbde3ec6cae1c82647dedcaa",
+      "chars": 14257
+     },
+     "schedview=all": {
+      "sha256": "dbde3ec6cae1c82647dedcaa",
+      "chars": 14257
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "fcd66336bfbd6ac9534e6f45",
+      "chars": 456999
+     },
+     "layout=classic": {
+      "sha256": "233ee6c939337e936737a9ad",
+      "chars": 457059
+     },
+     "layout=new": {
+      "sha256": "21c28d46a16e07551d31c6a7",
+      "chars": 4327
+     },
+     "new/standings": {
+      "sha256": "21c28d46a16e07551d31c6a7",
+      "chars": 4327
+     },
+     "new/individuals": {
+      "sha256": "62cda14e6f00d46710d01feb",
+      "chars": 11527
+     },
+     "new/games": {
+      "sha256": "5dea3d613c2a0b8810b3e1f6",
+      "chars": 101185
+     },
+     "new/teams": {
+      "sha256": "e8132224b653255d1a1532b7",
+      "chars": 40522
+     },
+     "new/players": {
+      "sha256": "8fb8a8e0e4b166befbebd639",
+      "chars": 91234
+     },
+     "new/rounds": {
+      "sha256": "29803e3165ec41a4d1497c72",
+      "chars": 4809
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "23129053ae6f85501a722f4c",
+      "chars": 6748
+     },
+     "catview=cat": {
+      "sha256": "23129053ae6f85501a722f4c",
+      "chars": 6748
+     },
+     "catview=team": {
+      "sha256": "0fcb75f75eff85a4d41da85a",
+      "chars": 3373
+     },
+     "catview=player": {
+      "sha256": "8e04f3c87bb3d3e6f218781e",
+      "chars": 2610
+     },
+     "catview=questions": {
+      "sha256": "a63d3ce558607bf3187903fa",
+      "chars": 14860
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/index.json",
+    "/archive/terrapin-open-stanford.js",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/newstats.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive 2026-penn-bowl-queens": {
    "header": "2026 Penn Bowl @ Queen's",
    "tabs": {
