@@ -2,6 +2,7 @@ Release Notes for 11/12/2026
 
 [ ARCHIVE ]
 - Added Terrapin Open @ Stanford.
+- The Stanford and USC Terrapin Opens are listed together under the 2026 Terrapin Open set.
 
 Release Notes for 11/11/2026
 

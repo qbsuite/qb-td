@@ -4,10 +4,12 @@
       "slug": "terrapin-open-stanford",
       "name": "Terrapin Open @ Stanford",
       "date": "2026-11-07",
-      "host": "",
+      "host": "Stanford",
       "teams": 6,
       "rounds": 11,
-      "games": 31
+      "games": 31,
+      "set": "2026 Terrapin Open",
+      "site": "Stanford"
     },
     {
       "slug": "2026-penn-bowl-queens",
@@ -76,7 +78,9 @@
       "host": "USC",
       "teams": 10,
       "rounds": 10,
-      "games": 50
+      "games": 50,
+      "set": "2026 Terrapin Open",
+      "site": "USC"
     },
     {
       "slug": "pbplaytest-19sep",
