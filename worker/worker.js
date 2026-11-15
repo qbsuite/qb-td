@@ -4419,7 +4419,7 @@ async function bucketState(env, secret, url) {
   const gate = bucketGate(env, b, test);
   if (gate) return gate;
   const place = await roomPlace(env, b);
-  const [rounds, uploads, count] = await Promise.all([
+  const [rounds, uploads, count, starts] = await Promise.all([
     env.DB.prepare(
       'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
     // a test reads any round's packet, not only those reached so far
@@ -4430,6 +4430,9 @@ async function bucketState(env, secret, url) {
     env.DB.prepare(
       'SELECT COUNT(*) AS n FROM files WHERE bucket_id = ?1'
     ).bind(b.id).all(),
+    // the rounds this room has started a game in, on any device: the
+    // reader warns before a round whose scheduled game never started
+    env.DB.prepare('SELECT round FROM room_starts WHERE bucket_id = ?1 ORDER BY round').bind(b.id).all(),
   ]);
   let settings = {};
   try { settings = JSON.parse(b.settings) || {}; } catch (e) { /* keep {} */ }
@@ -4454,6 +4457,7 @@ async function bucketState(env, secret, url) {
     settings,
     uploads: uploads.results,
     upload_count: count.results[0].n,
+    started_rounds: starts.results.map((x) => x.round),
   });
 }
 

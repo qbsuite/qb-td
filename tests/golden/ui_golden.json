@@ -276,7 +276,8 @@
     "/js/read_core.js",
     "/js/schededit.js",
     "/js/sheetview.js",
-    "/js/statsview.js"
+    "/js/statsview.js",
+    "/js/warnask.js"
    ],
    "foreign": [],
    "backend": []
@@ -729,7 +730,8 @@
     "/js/read_core.js",
     "/js/schededit.js",
     "/js/sheetview.js",
-    "/js/statsview.js"
+    "/js/statsview.js",
+    "/js/warnask.js"
    ],
    "foreign": [],
    "backend": []

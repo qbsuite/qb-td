@@ -54,6 +54,7 @@ import { protestRows, swingLines, qLabel, RULINGS, rulingLabel, fileSummary as u
 import { ownedJson, collectMatches, gameFormat, createHubNames,
   fileDownloads, yftFile, reportPages, reportZipFile, qbjZipFile, rosterFileText, fetchUploads, cacheKey, isUpload } from './hubgames.js';
 import { isGameFile, newestOf } from '../engine/games.js';
+import { askWarning, warningOpen } from './warnask.js';
 import { readTagged, settingsBody, rulingsBody, postSchedule, postRoster, FORMAT_KEYS,
   SCHED_CONFLICT, SCHED_KEPT, ROSTER_CONFLICT, ROSTER_KEPT } from './saves.js';
 
@@ -2311,6 +2312,23 @@ function autoBracketsHtml(bk, settings) {
   </div>`;
 }
 
+// Release packet n while rooms haven't started a game in their round:
+// ask first, naming them. True to go ahead.
+function releaseWarning(to, idle, pool) {
+  const rounds = [...new Set(idle.map((r) => r.round))];
+  const one = rounds.length === 1;
+  const names = idle.map((r) => r.name + (one ? '' : ` (round ${r.round})`));
+  const what = one ? ` round ${rounds[0]}` : ' their round';
+  const line = idle.length === 1 ? `${names[0]} hasn't started${what}.`
+    : `${idle.length} rooms haven't started${what}: ${andList(names)}.`;
+  return { title: `Release packet ${to}${pool ? ' to ' + pool : ''}?`, line, go: `Release packet ${to}` };
+}
+async function releaseOk(to, idle, pool = '') {
+  if (!idle.length) return true;
+  const w = releaseWarning(to, idle, pool);
+  return (await askWarning({ title: w.title, lines: [w.line], choices: [{ key: 'go', label: w.go, primary: true }] })) === 'go';
+}
+
 function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const box = $('viewbody');
   const totalRounds = roundCount(t, rounds, settings);
@@ -2814,9 +2832,21 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       showDetail();
     } catch (e) { say(e.message, true); }
   };
-  if ($('advround')) $('advround').onclick = () => goToRound(t.current_round + 1);
+  // Rooms still to start a game in the round they're on: Release asks
+  // first while there are any (a second click, a slip of the hand)
+  const idleNow = liveRows.filter((r) => !r.bye && r.state === 'idle').map((r) => ({ name: r.b.room_name, round: t.current_round }));
+  const idleIn = (groups) => groups.flatMap((g) => g.rows.filter((r) => r.game && r.state === 'idle')
+    .map((r) => ({ name: r.b.room_name, round: r.rr, pool: g.name })));
+  if ($('advround')) {
+    $('advround').onclick = async () => {
+      if (await releaseOk(t.current_round + 1, idleNow)) goToRound(t.current_round + 1);
+    };
+  }
   // brackets: all of them, or one
   const advance = async (which, btn) => {
+    const groups = bk ? bk.groups.filter((g) => which === 'all' || g.key === which) : [];
+    const to = which === 'all' ? bk.advTo : (groups[0] ? groups[0].round + 1 : 0);
+    if (!(await releaseOk(to, idleIn(groups), which !== 'all' && groups[0] ? groups[0].name : ''))) return;
     const run = busy(btn, { label: 'Releasing' });
     try {
       const out = await pub(a, { method: 'POST', json: { advance: which } });
@@ -4068,6 +4098,8 @@ if (adminSecret) {
       const el = document.activeElement;
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
       if (!$('linkmodal').hidden) return;
+      // a Release warning waiting on the TD
+      if (warningOpen()) return;
       // files picked in Add a game, or an open Download menu, would be wiped
       if (addOpen || ($('dlpanel') && !$('dlpanel').hidden)) return;
       const moved = await showDetail(true, lastDetail.tournament.rev);

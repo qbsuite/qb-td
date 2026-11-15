@@ -642,3 +642,9 @@ table.sx th { font-size: 9px; font-weight: 600; text-transform: none; letter-spa
 .sxsubs { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
 
 .tabnum { font-variant-numeric: tabular-nums; }
+
+/* warnask.js: a warning that asks before going on */
+.warnask .modal { max-width: 440px; }
+.warnask .modal h2 { margin-top: 0; font-size: 18px; text-transform: none; letter-spacing: normal; color: var(--fg); }
+.warnask .modal p { margin: 8px 0 0; }
+.warnask .modalbtns { gap: 8px; flex-wrap: wrap; }

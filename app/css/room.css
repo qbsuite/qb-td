@@ -147,3 +147,12 @@ a.rnd:hover { text-decoration: none; background: var(--hover-bg); }
 }
 
 body.reading .rmsg #msg { display: none; }
+
+/* an earlier round of this room's schedule not played yet (read_main.js renderRoundWarn) */
+.roundwarn {
+  margin-top: 10px; padding: 8px 12px; border-left: 3px solid var(--warn); border-radius: 4px;
+  background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--fg);
+  display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline;
+}
+.roundwarn[hidden] { display: none; }
+.roundwarn span { font-weight: 600; }

@@ -36,6 +36,7 @@ import { Tossup } from 'modaq/src/state/PacketState.js';
 import { toQBJString } from 'modaq/src/qbj/QBJ.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 import { slotLabel } from '../engine/brackets.js';
+import { askWarning, andList } from './warnask.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 // worker.js NOT_STARTED: every room route answers this until the TD presses Start
@@ -445,7 +446,57 @@ function applySchedDefault() {
   renderTeamPick();
 }
 
+// The rounds before `round` the schedule has this room playing a game in
+// that nothing says it played: no upload, no Start pressed on any device,
+// no game on this one. [{ round, a, b }]
+function unplayedBefore(round) {
+  if (!sched || schedRoom === null || testKey) return [];
+  const done = new Set([
+    ...(state.uploads || []).filter((u) => !u.error).map((u) => u.round),
+    ...(state.started_rounds || []),
+    ...deviceMetas().map((m) => m.round),
+  ]);
+  const out = [];
+  for (let r = 1; r < round; r++) {
+    const g = gameForRoom(sched, schedRoom, r);
+    if (g && !done.has(r)) out.push({ round: r, ...g });
+  }
+  return out;
+}
+const hasPacket = (n) => (state.packets || []).some((p) => p.number === n);
+// the round this room's schedule has these two teams in, other than `round`
+function roundOfTeams(a, b, round) {
+  if (!sched || schedRoom === null || testKey) return null;
+  const key = [a, b].sort().join('\n');
+  for (const { round: r } of roomRounds(sched, schedRoom)) {
+    const g = gameForRoom(sched, schedRoom, r);
+    if (r !== round && g && [g.a, g.b].sort().join('\n') === key) return r;
+  }
+  return null;
+}
+function goToRound(n) {
+  selectedRound = n;
+  renderRounds();
+  applySchedDefault();
+}
+
+// Above the teams: earlier rounds of this room's schedule not played yet
+function renderRoundWarn() {
+  const el = $('roundwarn');
+  const left = unplayedBefore(selectedRound);
+  el.hidden = !left.length;
+  if (!left.length) return;
+  const first = left[0];
+  el.innerHTML = `<span>${left.length === 1
+    ? esc(`Round ${first.round} hasn't been played in this room yet: ${first.a} vs ${first.b}.`)
+    : esc(`Rounds ${andList(left.map((x) => String(x.round)))} haven't been played in this room yet.`)}</span>
+    ${hasPacket(first.round) ? `<button class="linkbtn" data-goround="${first.round}">Go to round ${first.round}</button>` : ''}`;
+  const go = el.querySelector('[data-goround]');
+  if (go) go.onclick = () => goToRound(first.round);
+}
+
 function renderTeamPick() {
+  renderRoundWarn();
   $('schedmatch').hidden = !locked;
   $('teampickers').hidden = locked;
   $('changeteams').hidden = !locked;
@@ -624,9 +675,28 @@ function showTeams() {
     const info = (state.packets || []).find((p) => p.number === round);
     try { pickTeams(teams, a, b); } catch (e) { say(e.message, true); return; }
     if (!info) { say('no packet for round ' + round, true); return; }
+    // Another round's teams, or a round of this room's schedule not played
+    // yet: say so, with the way to that round
+    const other = roundOfTeams(a, b, round);
+    const left = unplayedBefore(round);
+    const back = other || (left.length ? left[0].round : null);
+    let asked = false;
+    if (back) {
+      const lines = other ? [`${a} vs ${b} play round ${other} in this room, not round ${round}.`] : [];
+      if (left.length) {
+        lines.push(left.length === 1 ? `Round ${left[0].round} hasn't been played in this room yet.`
+          : `Rounds ${andList(left.map((x) => String(x.round)))} haven't been played in this room yet.`);
+      }
+      const k = await askWarning({ title: `Start round ${round}?`, lines,
+        choices: [...(hasPacket(back) ? [{ key: 'back', label: `Go to round ${back}`, primary: true }] : []),
+          { key: 'go', label: `Start round ${round}` }] });
+      if (k === 'back') { goToRound(back); return; }
+      if (k !== 'go') return;
+      asked = true;
+    }
     // the same two teams on swapped sides is not a switch
     const same = schedGame && [a, b].sort().join('\n') === [schedGame.a, schedGame.b].sort().join('\n');
-    if (schedGame && !same && !confirm(`WARNING: The schedule indicates that "${schedGame.a}" vs "${
+    if (schedGame && !same && !asked && !confirm(`WARNING: The schedule indicates that "${schedGame.a}" vs "${
       schedGame.b}" are playing in the room ${state.room}. Are you sure you want to switch?`)) return;
     const noStarters = [a, b].filter((n) => !(starterSel.get(n) || new Set()).size);
     if (noStarters.length) { say('Pick at least one starter for ' + noStarters.join(' and '), true); return; }
@@ -726,9 +796,7 @@ async function boot() {
     const round = Number(e.target.dataset && e.target.dataset.round);
     if (!round) return;
     e.preventDefault();
-    selectedRound = round;
-    renderRounds();
-    applySchedDefault();
+    goToRound(round);
   };
   renderRounds();
 

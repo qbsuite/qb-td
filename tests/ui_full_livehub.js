@@ -123,6 +123,7 @@ const CHG = {
   addRound: '[changed: LIVE HUB: Add a game fills in Round from the match file, and notes when the round picked differs from the one the file names.]',
   unreadable: '[changed: LIVE HUB: When a game cannot be read, its playoff slots wait and the hub tries again, instead of filling from incomplete standings.]',
   rankOT: '[changed: LIVE HUB: Playoff slots, auto-fill and the Finals rank teams the way the public page does, without overtime in points per 20.]',
+  releaseAsk: '[changed: LIVE HUB: Release asks first while rooms haven\'t started the round, naming them.]',
   noCompute: '[changed: LIVE HUB: Removed Compute stats: each download reads the games it needs, and another download right after reads nothing again.]',
   computeOT: '[changed: LIVE HUB: Compute stats leaves overtime out of TUH, points per 20 and PPB, and sorts teams by winning percentage, as the public page does.]',
   levelOrder: '[changed: LIVE HUB: Teams tied on both winning percentage and points per 20 now fill playoff and Finals slots in the order the public page lists them, instead of always by name.]',
@@ -1793,6 +1794,16 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
   }
 });
 
+// Release (or a bracket's), answering "Release packet n?" if it asks
+// (rooms not started yet): after the moment it ignores clicks
+async function releaseAnyway(pg, sel) {
+  await pg.click(sel);
+  if (await pg.waitJs(`!!document.querySelector('.warnask')`, 'the Release question', 1000).catch(() => false)) {
+    await new Promise((r) => setTimeout(r, 700));
+    await pg.click('.warnask .primary');
+  }
+}
+
 // Show stats: the table under the grid, opened if it's closed, and filled
 async function showStats(pg, what = 'stats') {
   if (await pg.js(`document.querySelector('#statsec').hidden`)) await pg.click('#showstats');
@@ -1994,7 +2005,22 @@ section('rounds', '08 12 15 16 17 32 33: the round line, Advance, Set round, aut
       await pg.ntext('.advtip'), await pg.js(`getComputedStyle(document.querySelector('.advtip')).display`)];
     return (r[0] && r[1] === 'Auto-advance releases packet x+1 to the moderators once all rooms have started a game in round x.' && r[2] === 'block') || r;
   });
+  // neither room has started round 1: Release asks first
   await pg.click('#advround');
+  await pg.waitJs(`!!document.querySelector('.warnask')`, 'the Release question');
+  await check('12 advance: with rooms not started, "Release packet 2?" naming them ' + CHG.releaseAsk, async () => {
+    const x = await pg.js(`document.querySelector('.warnask .modal').innerText.replace(/\\s+/g, ' ').trim()`);
+    return x === "Release packet 2? 2 rooms haven't started round 1: Room 1 and Room 2. Cancel Release packet 2" || x;
+  });
+  await check('12 advance: Cancel has the focus ' + CHG.releaseAsk, () => pg.js(`document.activeElement === document.querySelector('.warnask button')`));
+  // a double click's second click, on the question's own button
+  await pg.js(`document.querySelector('.warnask .primary').click(); true`);
+  await check('12 advance: a click straight after it opens doesn\'t answer it ' + CHG.releaseAsk, async () =>
+    ((await pg.js(`!!document.querySelector('.warnask')`)) && (await cur()) === 1) || await cur());
+  await pg.click('.warnask button');
+  await check('12 advance: Cancel closes it and leaves round 1 ' + CHG.releaseAsk, async () =>
+    (!(await pg.js(`!!document.querySelector('.warnask')`)) && (await cur()) === 1) || await cur());
+  await releaseAnyway(pg, '#advround');
   await check('12 advance: it opens round 2, says "Round 2", and the hub shows it', async () => {
     await msgIs(pg, 'Round 2', false);
     await pg.waitJs(`document.querySelector('.biground').textContent.replace(/\\s+/g, ' ').trim() === 'Round 2 / 3'`, 'round 2');
@@ -2430,14 +2456,14 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
   // Advance all, twice: to the last round of the prelims
   await pg.watchTexts('#advall');
   await dismiss(pg);
-  await pg.click('#advall');
+  await releaseAnyway(pg, '#advall');
   await check('13 advance all: "Releasing…" while it works, then "Round 2"', async () => {
     await msgIs(pg, 'Round 2', false);
     return (await pg.seenTexts()).includes('Releasing…') || await pg.seenTexts();
   });
   await pg.waitJs(`/round 2 of 3/.test(document.querySelector('.roundline').textContent)`, 'round 2');
   await dismiss(pg);
-  await pg.click('#advall');
+  await releaseAnyway(pg, '#advall');
   await msgIs(pg, 'Round 3', false);
   await pg.waitJs(`/round 3 of 3/.test(document.querySelector('.roundline').textContent)`, 'round 3');
   await check('14 per-bracket advance: on a pool\'s last prelim round its line reads "last" in place of Advance', async () => {
@@ -2502,7 +2528,7 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
 
   // the playoffs: round 4 in, then the schedule's last round
   await dismiss(pg);
-  await pg.click('#advall');
+  await releaseAnyway(pg, '#advall');
   await msgIs(pg, 'Round 4', false);
   const s4 = filled || await T.savedSchedule();
   const g4 = s4.phases[1].rounds.find((r) => r.round === 4).games;
@@ -2511,7 +2537,7 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
   await check('11 brackets: the playoff round lists Championship and Consolation by name', async () =>
     JSON.stringify((await heads()).map((h) => h.split(' ')[0])) === JSON.stringify(['Championship', 'Consolation', 'No']) || await heads());
   await dismiss(pg);
-  await pg.click('#advall');
+  await releaseAnyway(pg, '#advall');
   await msgIs(pg, 'Round 5', false);
   await check('15 last round with brackets: a grayed "Release", and "Round 5 is the last round in the schedule."', () =>
     pg.waitJs(`(() => { const b = document.querySelector('.liverail button.advance'); return b && b.disabled && b.textContent.trim() === 'Release' && !document.querySelector('#advall')

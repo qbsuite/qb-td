@@ -328,6 +328,16 @@ async function setFiles(sel, files) {
   await S('DOM.setFileInputFiles', { nodeId, files });
 }
 // a click that opens a file picker (a hidden input clicked by a button)
+// Release (or a bracket's), answering "Release packet n?" if it asks
+// (rooms not started yet): after the moment it ignores clicks
+async function releaseAnyway(sel) {
+  await click(sel);
+  if (await waitJs(`!!document.querySelector('.warnask')`, 'the Release question', 1000).then(() => true, () => false)) {
+    await new Promise((r) => setTimeout(r, 700));
+    await click('.warnask .primary');
+  }
+}
+
 async function clickPick(sel, files) {
   const opened = once((m) => m.sessionId === sessionId && m.method === 'Page.fileChooserOpened');
   await click(sel);
@@ -1288,7 +1298,7 @@ ok('12 live: and off again', true);
 // two pools keep their own rounds: the button advances every pool
 await waitJs(`!!document.querySelector('#advall')`, 'Advance');
 ok('15 rounds: the button reads Release packet 2', (await text('#advall')).trim() === 'Release packet 2', await text('#advall'));
-await click('#advall');
+await releaseAnyway('#advall');
 d = await until(async () => { const x = await detail(); return x.tournament.current_round === 2 && x; }, 'advanced');
 await waitJs(`document.querySelector('.biground').textContent.includes('Round 2')`, 'hub on round 2');
 ok('15 rounds: Advance moves the Worker and the hub to round 2', true);
@@ -1849,7 +1859,7 @@ async function openHubOf(adminSecret) {
     await js(`document.querySelector('[data-cell="${a0}:1"]').title`));
 
   // Pool B's own Advance, through the page, reaches the Worker
-  await click('[data-advbracket="B"]');
+  await releaseAnyway('[data-advbracket="B"]');
   x = await until(async () => { const y = await P.detail(); return JSON.parse(y.tournament.bracket_rounds).B === 3 && y; }, 'Pool B advanced');
   ok('12b brackets: Pool B\'s Advance moves Pool B only, and the Worker agrees',
     x.tournament.current_round === 3 && JSON.parse(x.tournament.bracket_rounds).A === 3, x.tournament);

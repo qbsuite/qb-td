@@ -1,6 +1,7 @@
 Release Notes for 11/15/2026
 
 [ LIVE HUB ]
+- Release packet asks first while rooms haven't started the current round, and names them, so a double click can't skip a round.
 - Removed Compute stats: each download reads the games it needs, and another download right after reads nothing again.
 - Show stats opens a compact table under the grid: standings and individuals side by side, with PPG and the tournament's own point columns.
 - A download that leaves games out names each one and why, with a link to open it.
@@ -15,6 +16,10 @@ Release Notes for 11/15/2026
 
 [ PUBLIC PAGE ]
 - Classic stats no longer leave a blank space below a page after a longer one.
+
+[ READER ]
+- A room that hasn't played an earlier round of its schedule says so above the teams, with a link to that round.
+- Starting a round with another round's teams, or with an earlier round unplayed, asks first and offers to go to that round.
 
 Release Notes for 11/12/2026
 

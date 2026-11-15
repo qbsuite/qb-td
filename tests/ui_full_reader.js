@@ -803,6 +803,11 @@ await section('RT', 'the TD\'s Test link before Start', async () => {
 // the tournament starts, and goes to round 3
 await M.start();
 await M.round(3);
+// rounds 1 and 2 played in each room the schedule has playing them, as at
+// a tournament on round 3: else Start would first ask about them (R50)
+for (const n of ['Room 1', 'Room 2', 'Room 3', 'Room 4', 'Room 5', 'Room 6', 'Lecture Hall']) {
+  for (const r of [1, 2]) await call(`/b/${room(n)}/start?round=${r}`, { method: 'POST' });
+}
 
 await section('R03b', 'after Start, the room link shows the picker', async () => {
   await openRoom(tab, room('Room 2'));
@@ -1013,6 +1018,61 @@ await section('R18', 'changing round re-applies the schedule', async () => {
   }
   await tab.click('.rnd[data-round="3"]');
   ok('R18 back on round 3: the pickers again, nothing locked', (await tab.shown('#teampickers')) && !(await tab.shown('#schedmatch')) && !(await tab.shown('#changeteams')));
+});
+
+await section('R50', 'a round of this room\'s schedule not played yet: the banner, and Start asks', async () => {
+  // one room, rounds 1-3; round 1 started, round 2 never, the tournament on round 3
+  const T = await tournament('Reader Skip Open');
+  await T.room('Room 1');
+  await T.roster(rosterOf(TEAMS));
+  for (const r of [1, 2, 3]) await T.packet(r, `P${r}.json`, packetOf(r));
+  const PR = { 1: ['Alpha', 'Beta'], 2: ['Gamma', 'Delta'], 3: ['Alpha', 'Gamma'] };
+  await T.schedule({ v: 1, rooms: [{ name: 'Room 1', bucket: T.rooms['Room 1'].id }], updated: 0, phases: [{ name: 'Prelims',
+    rounds: [1, 2, 3].map((round) => ({ round, games: [{ room: 0, a: { team: PR[round][0] }, b: { team: PR[round][1] } }], byes: [] })) }] });
+  await T.start();
+  const S = T.rooms['Room 1'].secret;
+  await call(`/b/${S}/start?round=1`, { method: 'POST' });
+  await T.round(3);
+  const nt = (sel) => tab.js(`((document.querySelector(${q(sel)}) || {}).innerText || '').replace(/\\s+/g, ' ').trim()`);
+  const asked = () => tab.js(`!!document.querySelector('.warnask')`);
+  await openRoom(tab, S);
+  await tab.waitJs(`!document.querySelector('#roundwarn').hidden`, 'the banner');
+  ok('R50 a banner over the teams: "Round 2 hasn\'t been played in this room yet: Gamma vs Delta." and "Go to round 2" [new]',
+    (await nt('#roundwarn')) === "Round 2 hasn't been played in this room yet: Gamma vs Delta. Go to round 2", await nt('#roundwarn'));
+  // round 2's teams, on round 3
+  await tab.click('#changeteams');
+  await tab.pick('#teama', 'Gamma');
+  await tab.pick('#teamb', 'Delta');
+  let m = tab.mark();
+  const d0 = tab.dialogs.length;
+  await tab.click('#start');
+  await tab.waitJs(`!!document.querySelector('.warnask')`, 'the Start question');
+  ok('R50 Start with round 2\'s teams: "Start round 3?", why, and the way back [new]',
+    (await nt('.warnask .modal')) === "Start round 3? Gamma vs Delta play round 2 in this room, not round 3. Round 2 hasn't been played in this room yet. Cancel Go to round 2 Start round 3",
+    await nt('.warnask .modal'));
+  ok('R50 it takes the place of the switch warning, and nothing has started', tab.dialogs.length === d0 && !tab.worker(m).some((x) => x.startsWith('POST')), [tab.dialogs.slice(d0), tab.worker(m)]);
+  await tab.js(`document.querySelector('.warnask .primary').click(); true`);
+  ok('R50 a click straight after it opens doesn\'t answer it', await asked());
+  await sleep(700);
+  await tab.click('.warnask .primary');
+  ok('R50 "Go to round 2": round 2 picked, its scheduled teams, no banner, nothing started',
+    !(await asked()) && (await tab.js(`document.querySelector('.rnd.sel').dataset.round`)) === '2' && (await tab.text('#mteama')) === 'Gamma'
+      && (await tab.text('#mteamb')) === 'Delta' && !(await tab.shown('#roundwarn')) && !tab.worker(m).some((x) => x.startsWith('POST')));
+  // round 3's own teams: Start still asks, for round 2
+  await tab.click('.rnd[data-round="3"]');
+  m = tab.mark();
+  await tab.click('#start');
+  await tab.waitJs(`!!document.querySelector('.warnask')`, 'the Start question again');
+  ok('R50 the scheduled teams with round 2 not played: "Start round 3? Round 2 hasn\'t been played in this room yet."',
+    (await nt('.warnask .modal')) === "Start round 3? Round 2 hasn't been played in this room yet. Cancel Go to round 2 Start round 3", await nt('.warnask .modal'));
+  await sleep(700);
+  await tab.js(`[...document.querySelectorAll('.warnask button')].pop().click(); true`);
+  await tab.waitJs(`document.body.classList.contains('reading') && !!document.querySelector('#modaq .ms-CommandBar')`, 'MODAQ to open', 20000);
+  ok('R50 "Start round 3" starts it as asked', (await tab.text('#game')) === 'Alpha vs Gamma' && tab.worker(m).includes('POST /b/:s/start?round=3'), tab.worker(m));
+  // round 2 started on another device: it counts as played
+  await call(`/b/${S}/start?round=2`, { method: 'POST' });
+  await openRoom(tab, S);
+  ok('R50 a round started on another device counts: no banner', !(await tab.shown('#roundwarn')));
 });
 
 await section('R19', 'a room the schedule does not name', async () => {
