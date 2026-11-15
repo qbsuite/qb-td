@@ -239,15 +239,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "cf423bed6bcfdfaf7a00f94f",
-    "individuals.html": "cb19fbb2fc50a07a164ec931",
-    "games.html": "6421188913aebbd6abf35ac8",
-    "teamdetail.html": "a8d941c95931c2d6b01fe6fc",
-    "playerdetail.html": "f816a82dfd67315cfc166f27",
-    "rounds.html": "8d9cb3e14c18072100e36d3f"
+    "standings.html": "16dd7a7af5cead9b5b47b58a",
+    "individuals.html": "63afe664d92172dd59d7a8ae",
+    "games.html": "5597bbd6c8eae3b4c24f8b64",
+    "teamdetail.html": "155615fb27b746fe96bab6a0",
+    "playerdetail.html": "ac683d52d2eccb68cc3d1a7c",
+    "rounds.html": "648653aac9c2cc1b6fb5aa70"
    },
-   "reportData": "227fa628ecc134390749512c",
-   "yft4": "44eb0bbee66ebcf91a9b0918",
+   "reportData": "ca15bef35ede5bfb7117a3a9",
+   "yft4": "75ceafb0c082bfd7e38a2116",
    "yft3": "ce5eb995b4040211d299092a",
    "tossupBuzzes": {
     "1": "81869b0238687148df84d4e1",
@@ -757,15 +757,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "4d8caf73728ea7aa16b19621",
-    "individuals.html": "5cc291666cf292e0e27374d9",
-    "games.html": "bcca4b295e195cc53ca6d3c4",
-    "teamdetail.html": "d13137707051e20587c601be",
-    "playerdetail.html": "73827cf5f5773a93957939f5",
-    "rounds.html": "93a349978a2bb7ae2b16a265"
+    "standings.html": "2a39d740df0f5182ed1adacf",
+    "individuals.html": "36bcc05592361cdddaf9e51f",
+    "games.html": "166614686529b76528eaf771",
+    "teamdetail.html": "1652c4479ad1d6b3aa2032df",
+    "playerdetail.html": "bec2029b687f909737ec7f51",
+    "rounds.html": "d02716e496a52ef74a11b056"
    },
-   "reportData": "7e1e359aa8bf025bd565e331",
-   "yft4": "15087e9d4c92b9d02d3291b0",
+   "reportData": "67b8bd2b8f14476eeff9bf97",
+   "yft4": "9b8bd2c9be2bb01900a53a55",
    "yft3": "f4391910ae6dd9dac7878fae",
    "tossupBuzzes": {
     "1": "1e8345db28993c28bf328aff",
@@ -1285,15 +1285,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "124e7dd967b898fff1293273",
-    "individuals.html": "e0bcbf92e2665f477e84fa34",
-    "games.html": "1f470b60674ddbc7e86f178b",
+    "standings.html": "7999d397c3ca42dafccf86d2",
+    "individuals.html": "a98bacff199adf6cd8a86f44",
+    "games.html": "21c448ded3aa37a2ddf7bdf6",
     "teamdetail.html": "8c6cf7550a213d4f328f85fa",
     "playerdetail.html": "5976f2329e063affdbc9bb20",
     "rounds.html": "737375a4d4f4413f237c53f4"
    },
    "reportData": "51ef03de1c884290de791afa",
-   "yft4": "393a26ba3533523b253da8f5",
+   "yft4": "2855fcb5ff5f907db0c55c44",
    "yft3": "5fee13dd7a9a45e410a9484c",
    "tossupBuzzes": {
     "1": "b7e229ff22d6525c381cd393",
@@ -1591,15 +1591,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "ced277a238c6500ef6ba773e",
-    "individuals.html": "e5bdbddd255a0851fe20b3a4",
-    "games.html": "b4b6040df235f246c5402aaf",
-    "teamdetail.html": "563b08a0ba901bae70ae9ee2",
-    "playerdetail.html": "5c720a665e57638ba0bc3370",
-    "rounds.html": "8a3b815f22f735a5395ae155"
+    "standings.html": "2788122daa977abaffc646e1",
+    "individuals.html": "0702bd9d25096181e6cf3285",
+    "games.html": "6ee927fe85360867fa7c93a6",
+    "teamdetail.html": "e6f94d7f327c033646f46278",
+    "playerdetail.html": "77eac590243b07955398b389",
+    "rounds.html": "618af35bc57d81bae6c45549"
    },
-   "reportData": "70a47a39988ce55173f8b9cb",
-   "yft4": "ac969ff15fa413736b489bdf",
+   "reportData": "247b4ac8f3f41812d0566781",
+   "yft4": "f7301dba84d3fd30e7f0773b",
    "yft3": "67be375c2b053261100ced29",
    "tossupBuzzes": {
     "1": "77024d69183c595f4f92c30b",
@@ -1843,15 +1843,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "feefb4066a9f9af5e5d9b6db",
-    "individuals.html": "e783c34cd365aa46e45ad324",
-    "games.html": "47c009f35a1883066234e9a3",
-    "teamdetail.html": "83d336ea13e0b013bb75f5f8",
-    "playerdetail.html": "9af7d5b0cebd7196c61ca643",
-    "rounds.html": "0bc5234bf6dc15aa9b5650de"
+    "standings.html": "256bae7227d6c57063cf3f61",
+    "individuals.html": "8f1a84def3efe92766a9371b",
+    "games.html": "c8dc0e197fd160b6d3b08da4",
+    "teamdetail.html": "adcac6a233366e4956c1aca7",
+    "playerdetail.html": "4c47abb48df98ae9a0e93c1b",
+    "rounds.html": "f894bcea3b22e7d956f2ac6c"
    },
-   "reportData": "b7b2bf5e37d6e669803a09a4",
-   "yft4": "24179181147cbe33f0f2823a",
+   "reportData": "4ae14b65b05d6e40a02db72f",
+   "yft4": "3746626f4efb86c58d70a731",
    "yft3": "99d724fd88f862b11b4c473c",
    "tossupBuzzes": {
     "1": "afe4d16d956cc27599943c95",
@@ -3430,15 +3430,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "4718f4570616f455a40fb2db",
-    "individuals.html": "d7dbc6bebeca18aa0b254547",
-    "games.html": "b747ddac2f5a09c7445b8724",
+    "standings.html": "6d07299b9f1c242c06b60d4b",
+    "individuals.html": "3900b5541960412745aea9f7",
+    "games.html": "c13173310acc888d88b073bd",
     "teamdetail.html": "7a96f24caf8f2a2594c46556",
     "playerdetail.html": "7e1536e0874266c28381141e",
     "rounds.html": "e0c11bf6863374d7677ad032"
    },
    "reportData": "3131ceb7ac4d77084178a490",
-   "yft4": "39bd4b89a4b4b377810b56b5",
+   "yft4": "7840503c6e6f9b4107fcf70f",
    "yft3": "fb06994447110e3dde627461",
    "tossupBuzzes": {
     "1": "f2bd5c76dd99dda31a9a5edb",
@@ -3635,15 +3635,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "30426c7a741e877bd970797a",
-    "individuals.html": "dbd693d5cbfdf74bf9aca854",
-    "games.html": "b19ebb2f2e0343a435aaba80",
-    "teamdetail.html": "6fc4537bbb90cb666379bdbb",
-    "playerdetail.html": "31b2e960db4b74558f3a43eb",
-    "rounds.html": "816ddb7bc2f41ec883068b50"
+    "standings.html": "d0e74ddbe8a5429bd535a175",
+    "individuals.html": "a69b3138cbf65bb55b237254",
+    "games.html": "9d144907655e63cdfd42602a",
+    "teamdetail.html": "2befbc00136595b9b7d73210",
+    "playerdetail.html": "51b2e48fded0507d89ff1827",
+    "rounds.html": "3810cc7af319b70bfcac3168"
    },
-   "reportData": "a00a8cbe7753205a634651b1",
-   "yft4": "836f8a3be62427c10b9ef6a0",
+   "reportData": "22e3f252fca08909057eec86",
+   "yft4": "a3c710f9725b92bdf3d3a95c",
    "yft3": "45044fb3a4fe928be58b0c93",
    "tossupBuzzes": {
     "1": "2fca886d1cb8856cdc90f5e7",
@@ -3875,15 +3875,15 @@
   },
   "derived": {
    "report": {
-    "standings.html": "131d005545bea7c8e18b59f1",
-    "individuals.html": "fd94630582d4a0bf7a6879a1",
-    "games.html": "3df4efb86178c1314f929f92",
-    "teamdetail.html": "a38fbff5c26596d8dbd3c851",
-    "playerdetail.html": "903db1dcb1f0cfd9f716c05a",
-    "rounds.html": "5ff599b0341e7460a4eaa8b1"
+    "standings.html": "c2b0a97875b81878391e39d0",
+    "individuals.html": "61096f00dc8c9acb53e59ae7",
+    "games.html": "d2848285b6c0f147f7c0cc5c",
+    "teamdetail.html": "76c65e25c1a43eb5bd7bf2d2",
+    "playerdetail.html": "1ad382af37fbc98bba50f79a",
+    "rounds.html": "197a5ce265f6952daba9f879"
    },
-   "reportData": "e78a1d7512594c0503896158",
-   "yft4": "19ed6d2f3689046d964364b4",
+   "reportData": "8645071e3273487617b26d07",
+   "yft4": "a4bebd2fda5ba6ed44e5cca0",
    "yft3": "c5115067f8cdc6bf279990cc",
    "tossupBuzzes": {
     "1": "927a45684edcb898d2e8df2f",

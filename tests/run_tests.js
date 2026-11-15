@@ -10,7 +10,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
 import { aggregate, dedupeMatches, standings, headToHead, levelRuns, standingsOrder, tiebreakOf, ruleOf } from '../app/engine/stats.js';
 import { rankFormat } from '../app/js/read_core.js';
 import { pasteGrid } from '../app/engine/rosterpaste.js';
-import { buildYft, yfStages } from '../app/engine/yft.js';
+import { buildYft, yfStages, repeatedPhases } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
 import { reportSrcdoc, mountReport, reportPlace } from '../app/js/reportframe.js';
 import { makeZip, readZip } from '../app/engine/zip.js';
@@ -2740,7 +2740,8 @@ function runFrameScript(doc, width) {
   const env = { width };
   const document = {
     body: { getBoundingClientRect: () => ({ width: env.width }) },
-    documentElement: { scrollHeight: 900 },
+    documentElement: { scrollHeight: 900, getBoundingClientRect: () => ({ height: 900 }) },
+    querySelectorAll: () => [],
     getElementById: (id) => (id.startsWith('page-')
       ? (pages[id] ||= { hidden: true, querySelector: () => null, querySelectorAll: () => [] }) : null),
     addEventListener() {},
@@ -6121,10 +6122,14 @@ test('yfStages: a played final whose slots were never filled in is still a Final
   assert.ok(plan && plan.stages[2].type === 'Finals' && !plan.stages[2].unplayed);
 });
 
-test('yfStages: one stage, or anything it can\'t place, keeps the single pool', () => {
+test('yfStages: one pool stage is a stage, as in YF; anything it can\'t place keeps the single pool', () => {
+  // YF's triple round robin template: one Prelim stage, its pool 3x
   const rr = { phases: [{ name: 'Round robin', meet: 3, rounds: [{ round: 1, games: [{ bracket: 'A', a: { team: 'x' }, b: { team: 'y' } }] }] }] };
-  assert.equal(yfStages(rr, [{ round: 1, teams: [{ name: 'x' }, { name: 'y' }] }]), null);
+  const one = yfStages(rr, [{ round: 1, teams: [{ name: 'x' }, { name: 'y' }] }]);
+  assert.deepEqual(one.stages.map((st) => [st.name, st.type, st.meet, st.pools.map((pl) => pl.teams)]), [['Round robin', 'Prelim', 3, [['x', 'y']]]]);
   assert.equal(yfStages(null, []), null);
+  // no pool stage played yet: nothing to say
+  assert.equal(yfStages(rr, []), null);
   const s = stageSched();
   // a game between pools in the prelims, or in a round the schedule lacks
   assert.equal(yfStages(s, [...stageGames(s), { round: 2, teams: [{ name: 'a2' }, { name: 'b3' }] }]), null);
@@ -6655,23 +6660,23 @@ test('the same pools again: a double round robin\'s Finals rank on both cycles, 
   const { games, files } = playedCycles(s, 2, againOrder([teams]));
   const res = finalsFill(s, games, finalsProgress(s, files).ready);
   assert.deepEqual(finalTeams(res.schedule).flat(2).sort(), ['T1', 'T3']);
-  // advantaged: T1 and T3 are level on both counts. The public page's
-  // table of both cycles, Round robin 2: Total, lists T3 first (Round robin
-  // 2's games do), so T3 is the first seed, not T1 by name or for coming
-  // first in Round robin 1's games
+  // advantaged: T1 and T3 are level on both counts. Both cycles are one
+  // stage (YF's 2x round robin), so the public page's table of them is its
+  // standings of the whole field, which list an exact tie by name: T1 is
+  // the first seed, whatever order either cycle's games alone give
   const lead = build('advantaged');
   const both = playedCycles(lead, 2, againOrder([teams]));
   both.games.forEach((m, i) => { m.fileId = i + 1; });
-  const total = reportData({ name: 'RR', matches: dedupeMatches(both.games), roster: null, settings: {}, schedule: lead }).stageStandings
-    .find((sec) => sec.name === 'Round robin 2: Total').pools[0].teams;
-  assert.deepEqual(total.slice(0, 2).map((t) => [t.name, t.rank]), [['T3', '1='], ['T1', '1=']]);
+  const rd = reportData({ name: 'RR', matches: dedupeMatches(both.games), roster: null, settings: {}, schedule: lead });
+  assert.equal(rd.stageStandings, null);
+  assert.deepEqual(rd.teams.slice(0, 2).map((t) => [t.name, t.rank]), [['T1', '1='], ['T3', '1=']]);
   const led = finalsFill(lead, both.games, finalsProgress(lead, both.files).ready);
-  assert.deepEqual(finalTeams(led.schedule)[0][0], ['T3', 'T1']);
-  assert.deepEqual(led.ties.map((x) => [x.record, x.teams.map((t) => t.name), x.level, x.kept]), [['6–2', ['T3', 'T1'], [['T3', 'T1']], 'table']]);
+  assert.deepEqual(finalTeams(led.schedule)[0][0], ['T1', 'T3']);
+  assert.deepEqual(led.ties.map((x) => [x.record, x.teams.map((t) => t.name), x.level, x.kept]), [['6–2', ['T1', 'T3'], [['T1', 'T3']], 'standings']]);
   assert.equal(filledNote(autoFillSaved(lead, both.files, both.games).schedule.filled[0]),
-    'Round robin 2: T3 and T1 were tied at 6–2 with the same points per 20, so they kept their order in the Round robin 2: Total table.');
+    'Round robin 2: T1 and T3 were tied at 6–2 with the same points per 20, so they were placed by name.');
   const wait = finalsFill(lead, both.games, finalsProgress(lead, both.files).ready, [], { holdTies: true });
-  assert.deepEqual([wait.filled, wait.held.map((x) => heldLevel(x).label)], [0, ['Fill in table order']]);
+  assert.deepEqual([wait.filled, wait.held.map((x) => heldLevel(x).label)], [0, ['Fill by name']]);
   // an advantaged final, seed order both times: T1 8–0 is two wins clear
   // of T2 6–2 (the second cycle alone, one win), so no final is played
   const adv = build('advantaged');
@@ -6696,10 +6701,10 @@ test('the same pools again: Copy this phase, then crossover playoffs, seeds on b
   // each pool's 1st and 3rd seeds (6–2) play for 1st–4th place, its 5th seed (3–5) for 5th–8th
   assert.deepEqual(bracketTeams(res.schedule, 2, '1st–4th place'), [pools[0][0], pools[0][2], pools[1][0], pools[1][2]].sort());
   for (const pool of pools) assert.ok(bracketTeams(res.schedule, 2, '5th–8th place').includes(pool[4]));
-  // level on both counts: the public page has no pool table here (both
-  // times are named Pool A), only its standings of the whole field, which
-  // list them by name. So the hub does too: Rice, though pool A lists
-  // Tufts first, and Duke, though Prelims 2's games list Yale first.
+  // level on both counts: both times the pools played are one Prelims
+  // stage (YF's 2x round robin), so the public page has a table per pool
+  // over both, listing an exact tie in the pool's own order, as YF does.
+  // The hub follows it: Tufts before Rice, Duke before Yale.
   const named = ['Tufts', 'Duke', 'Army', 'Penn', 'Rice', 'Yale', 'Iowa', 'Navy', 'Ohio', 'Brown'];
   const c = buildPlan(named, planRooms(5), P, 'snake', 1);
   tagBrackets(c);
@@ -6710,15 +6715,110 @@ test('the same pools again: Copy this phase, then crossover playoffs, seeds on b
   const day = playedCycles(c, 2, againOrder(cp));
   day.games.forEach((m, i) => { m.fileId = i + 1; });
   const rd = reportData({ name: 'Copy', matches: dedupeMatches(day.games), roster: null, settings: {}, schedule: c });
-  assert.equal(rd.stageStandings, null);
-  const pub = cp.map((pool) => rd.teams.filter((t) => pool.includes(t.name)).map((t) => t.name));
-  assert.deepEqual(pub.map((list) => list.slice(0, 2)), [['Rice', 'Tufts'], ['Duke', 'Yale']]);
+  const prelims = rd.stageStandings.find((sec) => sec.name === 'Prelims');
+  const pub = ['Pool A', 'Pool B'].map((name) => prelims.pools.find((p) => p.name === name).teams.map((t) => t.name));
+  assert.deepEqual(pub.map((list) => list.slice(0, 2)), [['Tufts', 'Rice'], ['Duke', 'Yale']]);
   const filled = finalsFill(c, day.games, finalsProgress(c, day.files).ready);
   const slot = (lab) => filled.schedule.phases[2].rounds.flatMap((r) => r.games.flatMap((g) => [g.a, g.b])).find((x) => x.from === lab).team;
   assert.deepEqual(['Pool A', 'Pool B'].map((name) => [1, 2, 3, 4, 5].map((n) => slot(`${n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th'} in ${name}`))), pub);
-  assert.deepEqual(filled.ties.map((x) => [x.bracket, x.level, x.kept]), [['Pool A', [['Rice', 'Tufts']], 'standings'], ['Pool B', [['Duke', 'Yale']], 'standings']]);
+  assert.deepEqual(filled.ties.map((x) => [x.bracket, x.level, x.kept]), [['Pool A', [['Tufts', 'Rice']], 'table'], ['Pool B', [['Duke', 'Yale']], 'table']]);
   assert.equal(filledNote(autoFillSaved(c, day.files, day.games).schedule.filled[1]),
-    'Pool B: Duke and Yale were tied at 6–2 with the same points per 20, so they were placed by name.');
+    'Pool B: Duke and Yale were tied at 6–2 with the same points per 20, so they kept their order in the Pool B table in Prelims.');
+});
+
+/* ---------- the same pools again are one stage, as YF's 2x / 3x round robin ---------- */
+
+// Every game the schedule has, phases 0 to upTo - 1, the earlier slot winning.
+const playedAll = (s, upTo = s.phases.length) => playedCycles(s, upTo, (p, team) => s.phases[p].rounds
+  .flatMap((r) => r.games.flatMap((g) => [g.a.team, g.b.team])).filter((t, i, all) => all.indexOf(t) === i)).games;
+
+// The schedule with the slots that read places in the first `upTo` stages
+// filled as the hub fills them (pool places "A1", then "1st in …" slots),
+// those stages played.
+const fillFrom = (s, upTo) => {
+  if (hasPlaceholders(s)) fillPlaceholders(s, fillReport(s, standings(playedAll(s, upTo))).ranks);
+  const games = playedAll(s, upTo);
+  const files = games.map((m, i) => ({ id: i + 1, kind: 'qbj', round: m.round, summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }));
+  return finalsFill(s, games, finalsProgress(s, files).ready).schedule;
+};
+
+test('YF\'s triple round robin: a repeated stage joins the stage before, its pool played 3x', () => {
+  const teams = planTeams(4);
+  const P = [planPhase('Round robin 1'), planPhase('Round robin 2', { same: true }), planPhase('Round robin 3', { same: true })];
+  const s = buildPlan(teams, planRooms(2), P, 'snake', 1);
+  tagBrackets(s);
+  // the builder marks a repeat on the stage itself
+  assert.deepEqual(s.phases.map((ph) => !!ph.repeat), [false, true, true]);
+  const games = playedAll(s);
+  const plan = yfStages(s, games);
+  assert.deepEqual(plan.stages.map((st) => [st.name, st.type, st.meet, st.rounds.length, st.pools.map((pl) => pl.name)]),
+    [['Round robin', 'Prelim', 3, 9, ['Round robin']]]);
+  // the .yft: one Prelim stage of nine rounds, its pool 3x, as YF's own template
+  const yft = buildYft({ name: 'RR3', matches: games, roster: null, settings: {}, schedule: s }).objects[0];
+  assert.deepEqual(yft.phases.map((ph) => [ph.name, ph.YfData.phaseType, ph.rounds.length, ph.pools.map((pl) => pl.YfData.roundRobins)]),
+    [['Round robin', 'Prelim', 9, [3]]]);
+  // the report: one ranked table over all nine rounds, no All Games
+  const pages = Object.fromEntries(buildReport({ name: 'RR3', matches: dedupeMatches(games), roster: null, settings: {}, schedule: s }).map((p) => [p.name, p.text]));
+  const heads = (t) => [...t.matchAll(/<h2[^>]*>(.*?)<\/h2>/gs)].map((m) => m[1].replace(/<[^>]+>|&nbsp;/g, '').trim());
+  assert.deepEqual(heads(pages['standings.html']), ['Round robin']);
+  assert.deepEqual(heads(pages['individuals.html']), ['Round robin']);
+});
+
+test('a double round robin and its final: the cycles are one stage, the final its own, as YF reports them', () => {
+  const teams = planTeams(6);
+  const P = [planPhase('Round robin 1'), planPhase('Round robin 2', { same: true })];
+  const s = buildPlan(teams, planRooms(3), P, 'snake', 1);
+  addFinals(s, planGroups(teams, P, 'snake', () => 0.5), P, undefined, 'one');
+  tagBrackets(s);
+  const rr = playedAll(s, 2);
+  const fin = finalsFill(s, rr, finalsProgress(s, rr.map((m, i) => ({ id: i + 1, kind: 'qbj', round: m.round,
+    summary: JSON.stringify({ teams: m.teams.map((t) => t.name) }) }))).ready).schedule;
+  const games = playedAll(fin);
+  const yft = buildYft({ name: 'DRR', matches: games, roster: null, settings: {}, schedule: fin }).objects[0];
+  assert.deepEqual(yft.phases.map((ph) => [ph.name, ph.YfData.phaseType, ph.rounds.length, ph.pools.map((pl) => pl.YfData.roundRobins)]),
+    [['Round robin', 'Prelim', 10, [2]], ['Finals', 'Finals', 1, []]]);
+  const pages = Object.fromEntries(buildReport({ name: 'DRR', matches: dedupeMatches(games), roster: null, settings: {}, schedule: fin }).map((p) => [p.name, p.text]));
+  const heads = (t) => [...t.matchAll(/<h2[^>]*>(.*?)<\/h2>/gs)].map((m) => m[1].replace(/<[^>]+>|&nbsp;/g, '').trim());
+  // YF: the final's result, the stage, then Cumulative (two stages have games)
+  assert.deepEqual(heads(pages['standings.html']), ['Finals', 'Round robin', 'Cumulative']);
+  // players ranked over both cycles, then All Games with the final
+  assert.deepEqual(heads(pages['individuals.html']), ['Round robin', 'All Games']);
+});
+
+test('the same pools again join; pools made anew (a rebracket, even to the same sizes) are playoffs', () => {
+  const teams = planTeams(12);
+  // 6/6, then rebracketed into 6/6 by finish: YF's "2 Pools of 6, Then 2 Pools of 6"
+  const re = [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { sizes: [6, 6], carry: false })];
+  const a = buildPlan(teams, planRooms(6), re, 'snake', 1);
+  tagBrackets(a);
+  assert.deepEqual(a.phases.map((ph) => !!ph.repeat), [false, false]);
+  // 6/6 played twice, then that rebracket: the two times are one Prelims stage
+  const twice = [planPhase('Prelims 1', { groups: 2 }), planPhase('Prelims 2', { groups: 2, same: true }), planPhase('Playoffs', { sizes: [6, 6], carry: false })];
+  const b = buildPlan(teams, planRooms(6), twice, 'snake', 1);
+  tagBrackets(b);
+  const plan = yfStages(fillFrom(b, 2), playedAll(fillFrom(b, 2)));
+  assert.deepEqual(plan.stages.map((st) => [st.name, st.type, st.meet, st.pools.length]), [['Prelims', 'Prelim', 2, 2], ['Playoffs', 'Playoff', 1, 2]]);
+  // and a playoff bracket played again joins the playoffs (YF's 2x playoff pool)
+  const po = [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { sizes: [6, 6], carry: false }), planPhase('Playoffs again', { same: true })];
+  const c = buildPlan(teams, planRooms(6), po, 'snake', 1);
+  tagBrackets(c);
+  const pc = yfStages(fillFrom(c, 1), playedAll(fillFrom(c, 1)));
+  assert.deepEqual(pc.stages.map((st) => [st.name, st.type, st.meet]), [['Prelims', 'Prelim', 1], ['Playoffs', 'Playoff', 2]]);
+});
+
+test('repeatedPhases: the mark, else the plan the schedule was built from, else the old rr2–rr4 formats', () => {
+  const ph = (name, o = {}) => ({ name, rounds: [], ...o });
+  // the mark
+  assert.deepEqual([...repeatedPhases({ phases: [ph('A'), ph('B', { repeat: true })] })], [1]);
+  // a schedule saved before the mark: its plan, the builder's tiebreaker and finals stages aside
+  const old = { phases: [ph('Round robin 1'), ph('Round robin 2'), ph('Tiebreakers', { kind: 'tiebreak' }), ph('Finals', { kind: 'final' })],
+    options: { plan: { phases: [{ name: 'Round robin 1' }, { name: 'Round robin 2', same: true }] } } };
+  assert.deepEqual([...repeatedPhases(old)], [1]);
+  // stages renamed or added by hand since: the plan no longer says which is which
+  assert.deepEqual([...repeatedPhases({ ...old, phases: [ph('Day 1'), ...old.phases.slice(1)] })], []);
+  // the old engine's triple round robin
+  assert.deepEqual([...repeatedPhases({ format: 'rr3', phases: [ph('Round robin 1'), ph('Round robin 2'), ph('Round robin 3')] })], [1, 2]);
+  assert.deepEqual([...repeatedPhases({ format: 'rr', phases: [ph('Round robin')] })], []);
 });
 
 test('the same pools again: the replay after tiered pools counts both meetings and the tier\'s carryover; pools made anew are not a replay', () => {
@@ -6793,7 +6893,7 @@ test('the hub ranks as the public page does: an overtime win doesn\'t lift a tea
   const out = { innerHTML: '' };
   renderStats(out, agg);
   const row = out.innerHTML.split('<tr>').find((r) => r.includes(`>${X}<`));
-  assert.ok(row.includes('>83.33<') && row.includes('>60<') && !row.includes('>61<'), row);
+  assert.ok(row.includes(`>${x.ppg.toFixed(1)}<`) && row.includes('>60<') && !row.includes('>61<'), row);
   // the tournament's regulation tossup count decides what overtime is: at
   // 21 the 21st tossup is regulation, and X is ahead on both pages
   const at21 = { regulationTossupCount: 21 };
@@ -7064,13 +7164,14 @@ test('the hub ranks as the public page does: Finals slots fill in the order of t
   const names = ['Yale', 'Duke', 'Rice', 'Army', 'Navy', 'Iowa', 'Ohio', 'Penn', 'Tufts', 'Brown', 'Emory', 'Tulane'];
   const shapes = [
     { name: 'double round robin', n: 6, rooms: 3, P: [planPhase('Round robin 1'), planPhase('Round robin 2', { same: true })], finals: true,
-      table: (rd) => rd.stageStandings.find((sec) => sec.name === 'Round robin 2: Total').pools[0].teams },
+      // the cycles are one stage (YF's 2x round robin): its table is the
+      // standings of the whole field, which list an exact tie by name
+      byName: true, table: (rd) => { assert.equal(rd.stageStandings, null); return rd.teams; } },
     { name: 'Copy this phase', n: 10, rooms: 5, finals: false,
       P: [planPhase('Prelims 1', { groups: 2 }), planPhase('Prelims 2', { groups: 2, same: true }), planPhase('Playoffs', { sizes: [4, 4, 2], carry: true })],
-      table: (rd, src) => {
-        assert.equal(rd.stageStandings, null);
-        return rd.teams.filter((t) => src.teams.includes(t.name));
-      } },
+      // both times the pools played are one Prelims stage, a table per pool,
+      // which lists an exact tie in the pool's own order
+      inPoolOrder: true, table: (rd, src) => rd.stageStandings.find((sec) => sec.name === 'Prelims').pools.find((p) => p.name === src.name).teams },
     { name: 'prelim pools', n: 10, rooms: 5, P: [planPhase('Prelims', { groups: 2 })], finals: true,
       table: (rd, src) => rd.stageStandings[0].pools.find((p) => p.name === src.name).teams },
     { name: 'playoff brackets', n: 12, rooms: 6, P: [planPhase('Prelims', { groups: 2 }), planPhase('Playoffs', { sizes: [6, 6], carry: true })], finals: true,
@@ -7119,7 +7220,8 @@ test('the hub ranks as the public page does: Finals slots fill in the order of t
         ? Object.values(s.pools).find((pool) => pool.includes(run[0])).filter((m) => run.includes(m)) : [...run].sort());
       if (runs.some((run) => run.join() !== easier(run).join())) unlike++;
     }
-    assert.ok(tied > 0 && unlike > 0, `${shape.name}: some days have an exact tie for a place (${tied}), listed apart from the easier order (${unlike})`);
+    if (shape.byName || shape.inPoolOrder) assert.ok(tied > 0 && unlike === 0, `${shape.name}: some days have an exact tie for a place (${tied}), always listed ${shape.byName ? 'by name' : 'in pool order'} (${unlike} not)`);
+    else assert.ok(tied > 0 && unlike > 0, `${shape.name}: some days have an exact tie for a place (${tied}), listed apart from the easier order (${unlike})`);
   }
 });
 

@@ -30,7 +30,7 @@ import { standings, dedupeMatches } from '../engine/stats.js';
 // imported here too, where this file used them before, so a cold load
 // asks for them as early as it did: found one module later, report.js
 // held up the hub's first render on a slow link.
-import '../engine/yft.js';
+import { answerTypes } from '../engine/yft.js';
 import '../engine/yft3.js';
 import '../engine/report.js';
 import { makeZip } from '../engine/zip.js';
@@ -2601,7 +2601,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
         </section>
 
         ${renderProtests(prows, popen, openProt)}
-        <section id="statsec" hidden>
+        <section id="statsec" ${statsShown ? '' : 'hidden'}>
           <div class="sechead"><h2>Stats</h2></div>
           <div id="statsout"></div>
         </section>
@@ -2648,23 +2648,21 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
           <div class="muted small">For your records only. The moderator should fix the game in MODAQ and re-export.</div>
         </div>
         <div class="railblock">
-          <div class="railhead"><b>Stats</b></div>
+          <div class="railhead"><b>Stats</b><button class="linkbtn" id="showstats">${statsShown ? 'Hide stats' : 'Show stats'}</button></div>
           <div id="statrange">${statRangeHtml(t, files)}</div>
-          <div class="statbtns">
-            <button id="calc">Compute</button>
-            <div class="dlwrap">
-              <button id="dlmenu" aria-haspopup="true" aria-expanded="false" disabled>Download &#9662;</button>
-              <div id="dlpanel" class="dlpanel" role="menu" hidden>
-                <button id="dlyft4" role="menuitem" disabled>YellowFruit 4 (.yft)<span class="muted">4.0.18+</span></button>
-                <button id="dlyft3" role="menuitem" disabled>YellowFruit 3 (.yft)<span class="muted">3.0.2</span></button>
-                <button id="dlreport" role="menuitem" class="sep" disabled>HTML report<span class="muted">.zip</span></button>
-                <button id="dlreportfiles" role="menuitem" disabled>HTML report<span class="muted">6 separate files</span></button>
-                <button id="dlzip" role="menuitem" disabled>QBJ bundle<span class="muted">split per game</span></button>
-                <button id="rebuild" role="menuitem" class="sep" disabled>Rebuild player page</button>
-              </div>
+          <div class="dlwrap">
+            <button id="dlmenu" aria-haspopup="true" aria-expanded="false" ${statsNote(t, files).n ? '' : 'disabled'}>Download &#9662;</button>
+            <div id="dlpanel" class="dlpanel" role="menu" hidden>
+              <button id="dlyft4" role="menuitem">YellowFruit 4 (.yft)<span class="muted">4.0.18+</span></button>
+              <button id="dlyft3" role="menuitem">YellowFruit 3 (.yft)<span class="muted">3.0.2</span></button>
+              <button id="dlreport" role="menuitem" class="sep">HTML report<span class="muted">.zip</span></button>
+              <button id="dlreportfiles" role="menuitem">HTML report<span class="muted">6 separate files</span></button>
+              <button id="dlzip" role="menuitem">QBJ bundle<span class="muted">split per game</span></button>
+              <button id="rebuild" role="menuitem" class="sep">Rebuild player page</button>
             </div>
           </div>
-          <div class="muted small" id="statsnote">${files.filter(good).length} games ready</div>
+          <div class="muted small" id="statsnote">${esc(statsNote(t, files).text)}</div>
+          <div id="dlissue">${dlIssueHtml(t, files, buckets)}</div>
         </div>
       </aside>
     </div>`;
@@ -2878,15 +2876,25 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   placeCellPop(box);
   wireFix(box, a, t, buckets, files);
   if ($('addgame')) $('addgame').onclick = () => addGame(a, buckets);
-  if ($('calc')) $('calc').onclick = () => computeStats(a, t, buckets, files, settings);
-  wireStatRange(t, files);
+  wireDownloads(a, t, buckets, files, settings);
+  wireDlIssue(t, files, buckets);
+  if ($('showstats')) {
+    $('showstats').onclick = () => {
+      statsShown = !statsShown;
+      $('showstats').textContent = statsShown ? 'Hide stats' : 'Show stats';
+      $('statsec').hidden = !statsShown;
+      if (statsShown) fillHubTable({ a, t, buckets, files }, settings);
+    };
+  }
+  fillHubTable({ a, t, buckets, files }, settings);
+  wireStatRange(t, files, () => fillHubTable({ a, t, buckets, files }, settings));
 }
 
 /* ---------- which games the stats use ----------
    One or the other: By stage (tick the stages to include), or Finished
    rounds only — every round up to the first one still missing a game (a
-   round counts once all its games are in). Compute and every download
-   follow; the player page and Rebuild player page always use every game.
+   round counts once all its games are in). Every download
+   follows; the player page and Rebuild player page always use every game.
    The choice lasts the session, per tournament. */
 
 let statPick = null; // {tid, off: [phase index], finished}
@@ -2944,13 +2952,16 @@ function statRangeHtml(t, files) {
       Finished rounds only <span class="muted">(${through ? span(1, through) : 'none yet'})</span></label>
   </div>`;
 }
-function wireStatRange(t, files) {
+function wireStatRange(t, files, refill) {
   const box = $('statrange');
   if (!box) return;
   const redo = () => {
     box.innerHTML = statRangeHtml(t, files);
-    wireStatRange(t, files);
-    if (lastStats && lastStats.t.id === t.id) showStats(lastStats);
+    wireStatRange(t, files, refill);
+    const note = statsNote(t, files);
+    $('statsnote').textContent = note.text;
+    $('dlmenu').disabled = !note.n;
+    refill();
   };
   box.querySelectorAll('[data-statph]').forEach((el) => {
     el.onchange = () => {
@@ -3548,7 +3559,7 @@ function renderProtests(rows, open, isOpen) {
 /* ---------- stats + export ---------- */
 
 // The games themselves are read by hubgames.js: collectMatches, shared by
-// Compute stats and the playoff fill below, and ownedJson for one file.
+// the downloads and the playoff fill below, and ownedJson for one file.
 
 /* ---------- playoff slots fill themselves ----------
    Once a pool's prelim games are all in — told from the upload list the
@@ -3707,24 +3718,122 @@ function playoffNoteHtml(files) {
     <div>${lines.map((l) => `<div>${l}</div>`).join('')}</div></div>`).join('');
 }
 
-async function computeStats(a, t, buckets, files, settings) {
-  const out = $('statsout');
-  out.innerHTML = '';
-  $('statsec').hidden = false;
-  // The games' public copies, a hundred to a request, as the playoff
-  // fill reads them (and with its cache: a game either has read is not
-  // read again). The stored uploads, packet text and all, are read only
-  // by the downloads that need them: the QBJ bundle and Rebuild.
-  const run = busy($('calc'), { label: 'Computing stats', scope: $('calc').closest('.row') });
-  let got;
-  try {
-    got = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true, roster: hubNames.rosterFor(t) });
-  } finally { run.end(); }
-  lastStats = { a, t, buckets, files, settings, got };
-  showStats(lastStats);
+// Show stats opens the stats under the grid, kept up to date across the
+// hub's redraws until Hide stats
+let statsShown = false;
+
+// What the last download left out, or why it couldn't be made, under
+// the Download button until the next one: {tid, head, items: [{file,
+// text}], foot}. An item about an upload goes once that upload is gone
+// or a readable one has replaced it, and the note with its last item.
+let dlIssue = null;
+const DL_TEXT = {
+  left: 'Left out of this download:',
+  none: 'None of the games could be read:',
+  nonePicked: 'No games are in the stages and rounds picked.',
+  unread: (why) => `The games couldn't be read (${why}).`,
+  failed: (label, why) => `The ${label} couldn't be made${why ? ` (${why})` : ':'}`,
+  fix: 'Open a game to fix or delete it, then download again.',
+  retry: 'Please check the connection and try again.',
+  report: 'Please try again. If it keeps failing, let us know what it says.',
+  broken: (why) => `not a game file (${why})`,
+  roster: (why) => `The roster couldn't be read (${why}), so it isn't in this download.`,
+};
+// "Round 3, Room 2 (Duke v Yale)"
+function gameWhere(f, buckets) {
+  const b = buckets.find((x) => x.id === f.bucket_id);
+  const sum = fileSummary(f);
+  return `Round ${f.round}, ${b ? b.room_name : 'a deleted room'}${sum ? ` (${sum.teams.join(' v ')})` : ''}`;
+}
+// What a download leaves out of the rounds picked: games that couldn't be
+// read, uploads that were never a game (with no readable one beside them
+// in that room and round), and the roster when it couldn't be read
+function leftOut(s, files, buckets) {
+  const keep = statRounds(lastDetail.tournament, filesAsGames(files));
+  const inPick = (f) => !keep || keep.has(f.round);
+  const items = s.got.bad.filter((x) => inPick(x.file))
+    .map((x) => ({ file: x.file, text: `${gameWhere(x.file, buckets)}: ${x.message}` }));
+  for (const f of files) {
+    if (!f.error || !(f.kind === 'qbj' || f.kind === 'combined') || !inPick(f)) continue;
+    if (files.some((g) => isGameFile(g) && g.bucket_id === f.bucket_id && g.round === f.round)) continue;
+    items.push({ file: f, text: `${gameWhere(f, buckets)}: ${DL_TEXT.broken(f.error)}`, upload: true });
+  }
+  if (s.got.rosterError) items.push({ file: null, text: DL_TEXT.roster(s.got.rosterError) });
+  return items;
+}
+function dlIssueItems(files) {
+  if (!dlIssue) return [];
+  return dlIssue.items.filter((x) => !x.file || (files.some((f) => f.id === x.file.id)
+    && !(x.upload && files.some((g) => isGameFile(g) && g.bucket_id === x.file.bucket_id && g.round === x.file.round))));
+}
+function dlIssueHtml(t, files) {
+  if (!dlIssue || dlIssue.tid !== t.id) return '';
+  const items = dlIssueItems(files);
+  if (dlIssue.items.length && !items.length) return ''; // every one fixed
+  return `<div class="dlissue" role="alert"><div class="dlhead">${esc(dlIssue.head)}</div>
+    ${items.map((x) => `<div class="dlitem">${esc(x.text)}${x.file
+      ? ` <button class="linkbtn" data-dlopen="${x.file.bucket_id}:${x.file.round}">Open</button>` : ''}</div>`).join('')}
+    ${dlIssue.foot ? `<div class="dlfoot">${esc(dlIssue.foot)}</div>` : ''}
+    <button class="linkbtn muted" data-dlclose>Dismiss</button></div>`;
+}
+function showDlIssue(t, files, buckets) {
+  const box = $('dlissue');
+  if (!box) return;
+  box.innerHTML = dlIssueHtml(t, files);
+  wireDlIssue(t, files, buckets);
+}
+function wireDlIssue(t, files, buckets) {
+  const box = $('dlissue');
+  if (!box) return;
+  box.querySelectorAll('[data-dlopen]').forEach((b) => {
+    b.onclick = () => {
+      const [bid, round] = b.dataset.dlopen.split(':').map(Number);
+      cellOpen = { bid, round };
+      render();
+      if ($('cellpop')) $('cellpop').scrollIntoView({ block: 'center' });
+    };
+  });
+  const close = box.querySelector('[data-dlclose]');
+  if (close) close.onclick = () => { dlIssue = null; showDlIssue(t, files, buckets); };
 }
 
-let lastStats = null; // the games Compute fetched, so a new pick needs no refetch
+// The games the stats count, read when a download is picked (or the table
+// shown): their public copies, a hundred to a request, with the playoff
+// fill's cache, so a game either has read is not read again and a second
+// download straight after reads nothing. The stored uploads, packet text
+// and all, are read only by the downloads that need them: the QBJ bundle
+// and Rebuild. Then the stages and rounds picked (statRounds).
+let unreadable = new Set(); // uploads the last read couldn't make a game of: the count leaves them out
+async function statGames({ a, t, buckets, files }) {
+  const got = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true, roster: hubNames.rosterFor(t) });
+  unreadable = new Set(got.bad.map((x) => x.file.id));
+  if ($('statsnote')) $('statsnote').textContent = statsNote(t, files).text;
+  const keepRounds = statRounds(t, got.matches);
+  const inPick = (x) => !keepRounds || keepRounds.has(x.round);
+  return { got, inPick, matches: got.matches.filter(inPick) };
+}
+
+// The line under Download: how many games the stats hold, told from the
+// upload list as the grid tells it (a game uploaded again counts once).
+// { n, text }
+function statsNote(t, files) {
+  const keep = statRounds(t, filesAsGames(files));
+  const seen = new Set();
+  for (const f of files) {
+    if (!isGameFile(f) || unreadable.has(f.id) || (keep && !keep.has(f.round))) continue;
+    const s = fileSummary(f);
+    seen.add(`${f.bucket_id}|${f.round}|${s ? [...s.teams].sort().join('|') : f.id}`);
+  }
+  const n = seen.size;
+  if (!n) return { n, text: 'No games in these stats' };
+  const nGames = `${n} ${n === 1 ? 'game' : 'games'}`;
+  if (!keep) return { n, text: `${nGames} in these stats` };
+  const kept = [...keep].sort((x, y) => x - y);
+  const stages = statStages().filter((x) => !pickFor(t).off.includes(x.i)).map((x) => x.name);
+  return { n, text: pickFor(t).finished || stages.length === statStages().length
+    ? `${nGames} in ${kept.length ? roundSpan(kept) : 'no rounds'}` : `${nGames} in ${andList(stages)}` };
+}
+
 // every stored upload the QBJ bundle and Rebuild have read in this tab:
 // either reads only new ones the next time
 const uploadCache = new Map();
@@ -3739,32 +3848,34 @@ async function readUploads({ a, t, buckets }, files, onDone) {
 }
 // how many of these a read would fetch: the busy button's count
 const toRead = (files) => files.filter((f) => isUpload(f) && !uploadCache.has(cacheKey(f))).length;
-function showStats({ a, t, files, settings, got }) {
-  const out = $('statsout');
-  if (!out) return;
-  // the stages and rounds picked (statRounds); null keeps every game
-  const keepRounds = statRounds(t, got.matches);
-  const inPick = (x) => !keepRounds || keepRounds.has(x.round);
-  const { roster, errors } = got;
-  const matches = got.matches.filter(inPick);
-  out.innerHTML = '';
 
-  if (!got.matches.length) {
+// Show stats: the stats under the grid, ranked and figured as the
+// public page does it (overtime out), for the stages and rounds picked.
+async function fillHubTable(ctx, settings) {
+  if (!statsShown || !$('statsout')) return;
+  let s;
+  try { s = await statGames(ctx); } catch (e) { say(e.message, true); return; }
+  const out = $('statsout'); // the hub may have been drawn again meanwhile
+  if (!out || !statsShown) return;
+  const { roster, errors } = s.got;
+  if (!s.got.matches.length) {
     out.innerHTML = `<div class="bad">No readable game files</div>
       ${errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')}`;
     return;
   }
-  if (!matches.length) {
-    // nothing to download until the pick holds a game
-    out.innerHTML = '<div class="muted">No games are in the stages and rounds picked.</div>';
-    $('dlmenu').disabled = true;
-    $('statsnote').textContent = 'No games in these stats';
-    return;
-  }
+  if (!s.matches.length) { out.innerHTML = '<div class="muted">No games are in the stages and rounds picked.</div>'; return; }
+  // the point-value columns the player page shows: every value the
+  // tournament's rules allow, a power nobody got included (yft.js answerTypes)
+  const rules = rankFormat(settings);
+  renderStats(out, standings(s.matches, roster, rules), errors, { vals: answerTypes(dedupeMatches(s.matches), rules).values });
+}
 
-  // ranked and figured as the public page does it (overtime out)
-  renderStats(out, standings(matches, roster, rankFormat(settings)), errors);
-
+// The Download menu: each item reads the games it needs, then downloads.
+function wireDownloads(a, t, buckets, files, settings) {
+  if (!$('dlmenu')) return;
+  const ctx = { a, t, buckets, files };
+  let inPick = () => true; // the QBJ bundle's pick, for buildZip
+  const closeMenu = () => { $('dlpanel').hidden = true; $('dlmenu').setAttribute('aria-expanded', 'false'); };
   // The tournament's own rules reach every export: the .yft's scoring
   // rules, the overtime split, and the stat report's rate-stat scaling all
   // come from the regulation tossup count and answer values the TO set
@@ -3774,73 +3885,101 @@ function showStats({ a, t, files, settings, got }) {
   // The saved schedule gives the YellowFruit 4 file its stages: pools,
   // playoff brackets with their carryover, finals (yft.js yfStages). A
   // round robin, or a schedule not filled in yet, stays one stage.
-  const exportOpts = {
-    name: t.name, matches: dedupeMatches(matches), roster,
+  const exportOpts = (s) => ({
+    name: t.name, matches: dedupeMatches(s.matches), roster: s.got.roster,
     settings: rankFormat(settings), schedule: sched,
+  });
+  // the games of the pick, read under a busy Download button, or null
+  // (said why) when there are none to download
+  const issue = (x) => { dlIssue = x && { tid: t.id, ...x }; showDlIssue(t, files, buckets); };
+  const games = async () => {
+    const run = busy($('dlmenu'), { label: 'Reading games', scope: $('dlmenu').closest('.dlwrap') });
+    let s;
+    try { s = await statGames(ctx); } catch (e) {
+      issue({ head: DL_TEXT.unread(e.message), items: [], foot: DL_TEXT.retry });
+      return null;
+    } finally { run.end(); }
+    const left = leftOut(s, files, buckets);
+    if (!s.got.matches.length) { issue({ head: DL_TEXT.none, items: left, foot: DL_TEXT.fix }); return null; }
+    if (!s.matches.length) { issue({ head: DL_TEXT.nonePicked, items: [] }); return null; }
+    issue(left.length ? { head: DL_TEXT.left, items: left, foot: left.some((x) => x.file) ? DL_TEXT.fix : '' } : null);
+    return s;
+  };
+  // A file that couldn't be made: each game made alone finds the ones it
+  // fails on, so the note names the games to fix; when every game fails
+  // alone too, it's no one game's doing and the note gives the reason
+  const failed = (label, make, o, e) => {
+    const items = [];
+    if (make) {
+      for (const m of o.matches) {
+        try { make({ ...o, matches: [m] }); } catch (one) {
+          const f = files.find((x) => x.id === m.fileId);
+          items.push({ file: f || null, text: `${f ? gameWhere(f, buckets) : `Round ${m.round}`}: ${one.message}` });
+        }
+      }
+    }
+    const some = items.length && items.length < o.matches.length;
+    issue({ head: DL_TEXT.failed(label, some ? null : e.message), items: some ? items : [], foot: some ? DL_TEXT.fix : DL_TEXT.report });
+  };
+  const save = (label, make) => async () => {
+    const s = await games();
+    if (!s) return;
+    const o = exportOpts(s);
+    try {
+      const f = make(o);
+      download(f.name, f.data, f.type);
+      closeMenu();
+    } catch (e) { failed(label, make, o, e); }
   };
   // The two YellowFruits share an extension and nothing else, and neither
   // says so when handed the other's file: YellowFruit 4 refuses a file
   // stamped newer than itself, and YellowFruit 3 throws before it can show
   // an error. So the menu names the version, and what it needs, on each
   // item. The files are still named apart, so both can sit in one folder.
-  $('dlmenu').disabled = false;
-  for (const id of ['dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild']) $(id).disabled = false;
-  const closeMenu = () => { $('dlpanel').hidden = true; $('dlmenu').setAttribute('aria-expanded', 'false'); };
-  // games, not files: a re-exported game counts once, as it does in the stats
-  const n = exportOpts.matches.length;
-  const nGames = `${n} ${n === 1 ? 'game' : 'games'}`;
-  const kept = keepRounds ? [...keepRounds].sort((x, y) => x - y) : null;
-  const stages = statStages().filter((x) => !pickFor(t).off.includes(x.i)).map((x) => x.name);
-  $('statsnote').textContent = !kept ? `${nGames} in these stats`
-    : pickFor(t).finished || stages.length === statStages().length ? `${nGames} in ${kept.length ? roundSpan(kept) : 'no rounds'}`
-      : `${nGames} in ${andList(stages)}`;
-  const yft = (f) => {
-    try { download(f.name, f.data, f.type); closeMenu(); }
-    catch (e) { say(e.message, true); }
-  };
-  $('dlyft4').onclick = () => yft(yftFile(t.slug, exportOpts, 4));
-  $('dlyft3').onclick = () => yft(yftFile(t.slug, exportOpts, 3));
+  $('dlyft4').onclick = save('YellowFruit 4 file', (o) => yftFile(t.slug, o, 4));
+  $('dlyft3').onclick = save('YellowFruit 3 file', (o) => yftFile(t.slug, o, 3));
   // YellowFruit-style six-page HTML report, zipped so the interlinked
   // files land as one folder ready to host. Named <slug>_standings.html
   // etc., as YellowFruit saves them: the hsquizbowl.org tournament
   // database refuses report files without that prefix.
-  $('dlreport').disabled = false;
-  $('dlreport').onclick = () => {
-    try {
-      const z = reportZipFile(t.slug, exportOpts);
-      download(z.name, z.data, z.type);
-      closeMenu();
-    } catch (e) { say(e.message, true); }
-  };
+  $('dlreport').onclick = save('HTML report', (o) => reportZipFile(t.slug, o));
   // the same pages as six files, for a TD who would rather not unzip; the
   // browser may ask once to allow several downloads. Saved into one
   // folder, their links to each other work as in the zip.
-  $('dlreportfiles').disabled = false;
   $('dlreportfiles').onclick = async () => {
-    try {
-      const pages = reportPages(t.slug, exportOpts);
-      closeMenu();
-      for (const f of pages) {
-        download(f.name, f.text, 'text/html');
-        await new Promise((res) => setTimeout(res, 300)); // one at a time, or the browser drops some
-      }
-    } catch (e) { say(e.message, true); }
+    const s = await games();
+    if (!s) return;
+    const o = exportOpts(s);
+    let pages;
+    try { pages = reportPages(t.slug, o); } catch (e) { failed('HTML report', (x) => reportPages(t.slug, x), o, e); return; }
+    closeMenu();
+    for (const f of pages) {
+      download(f.name, f.text, 'text/html');
+      await new Promise((res) => setTimeout(res, 300)); // one at a time, or the browser drops some
+    }
   };
-  $('dlzip').disabled = false;
   $('dlzip').onclick = async () => {
+    const s = await games();
+    if (!s) return;
+    const { matches } = s;
+    inPick = s.inPick;
     // only the uploads it holds: the one the standings count of each game
     // picked (not one it replaced), and the game files added by hand
     const counted = new Set(dedupeMatches(matches).map((m) => m.fileId));
     const zipFiles = files.filter((f) => counted.has(f.id) || (f.kind === 'game' && inPick(f)));
-    const run = busy($('dlzip'), { label: 'Building zip', total: toRead(zipFiles), scope: $('dlzip').closest('.row') });
+    const run = busy($('dlzip'), { label: 'Building zip', total: toRead(zipFiles), scope: $('dlzip').closest('.dlwrap') });
     try {
-      const up = await readUploads(lastStats, zipFiles, (done) => run.step(done));
+      const up = await readUploads(ctx, zipFiles, (done) => run.step(done));
       await buildZip({
         matches: up.matches.filter(inPick), modaqFiles: up.modaqFiles.filter(inPick), raw: up.raw.filter(inPick), names: up.names,
         read: (f) => uploadCache.get(cacheKey(f)), roster: hubNames.rosterFor(t),
       });
       closeMenu();
-    } finally { run.end(); }
+      // an upload whose public copy read but whose stored file didn't
+      const more = up.bad.filter((x) => !dlIssue || !dlIssue.items.some((y) => y.file && y.file.id === x.file.id))
+        .map((x) => ({ file: x.file, text: `${gameWhere(x.file, buckets)}: ${x.message}` }));
+      if (more.length) issue({ head: DL_TEXT.left, items: [...(dlIssue ? dlIssue.items : []), ...more], foot: DL_TEXT.fix });
+    } catch (e) { failed('QBJ bundle', null, null, e); } finally { run.end(); }
   };
   const buildZip = async ({ matches, modaqFiles, raw, names, read = () => undefined, roster = null }) => {
     // The games the standings count, each as its separated files: match
@@ -3864,13 +4003,12 @@ function showStats({ a, t, files, settings, got }) {
     const z = qbjZipFile(t.slug, { matches, modaqFiles, raw, gameFiles, roster: rosterFile, names });
     download(z.name, z.data, z.type);
   };
-  $('rebuild').disabled = false;
   $('rebuild').onclick = async () => {
     // from the stored uploads, not the public copies it remakes; the
     // public stats always hold every game, whatever the pick
     let run = busy($('rebuild'), { label: 'Reading games', total: toRead(files), scope: $('rebuild').closest('.row') });
     try {
-      const allRaw = (await readUploads(lastStats, files, (done) => run.step(done))).raw;
+      const allRaw = (await readUploads(ctx, files, (done) => run.step(done))).raw;
       run.end();
       const batches = Math.ceil(allRaw.length / REBUILD_BATCH);
       run = busy($('rebuild'), { label: 'Rebuilding', total: batches, scope: $('rebuild').closest('.row') });

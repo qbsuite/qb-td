@@ -133,6 +133,7 @@ export function reportSrcdoc(pages, { start = null, sorts = null } = {}) {
       current = hash;
       var pg = pageOf(hash);
       files.forEach(function (f) { document.getElementById('page-' + f).hidden = f !== pg; });
+      if (pg === 'games') sizeGames();
       window.scrollTo(0, 0);
       var el = link || (hash ? document.getElementById(hash) : null);
       if (go) mark(el, pg);
@@ -142,10 +143,71 @@ export function reportSrcdoc(pages, { start = null, sorts = null } = {}) {
       // else the element itself (Back's link); a page's top as is
       var shown = marked && marked.box && (go || marked.el === el) ? marked.box : el;
       var r = shown ? shown.getBoundingClientRect() : null;
-      parent.postMessage({ qbtdReport: 'height', height: document.documentElement.scrollHeight,
+      parent.postMessage({ qbtdReport: 'height', height: pageHeight(),
         y: r ? r.top : 0, h: r ? r.height : 0, top: !el || /-top$/.test(el.id || ''), go: !!(go || link), nav: nav }, '*');
       nav = '';
+      shownOnce = true;
       tellPlace();
+    }
+    // The Scoreboard lays out a game only as it nears the screen (the
+    // content-visibility rule below): with scoresheets it holds tens of
+    // thousands of cells, and laying them all out made it slow to open.
+    // Until a game is drawn it holds the space it is expected to take: a
+    // few games are laid out here to measure the height of a table row,
+    // and each game gets its rows' worth, so the frame's height, and the
+    // place a link lands on, come out as they will be. Once drawn, a game
+    // keeps its real height (contain-intrinsic-size: auto).
+    var sized = false;
+    function sizeGames() {
+      if (sized) return;
+      sized = true;
+      var games = [].slice.call(document.querySelectorAll('#page-games .cslay, #page-games .boxScoreTable'))
+        .filter(function (el) { return !el.parentNode.closest('.cslay'); });
+      // Two columns' worth: the box score (.csleft, or a game without a
+      // scoresheet) and the scoresheet beside it. Each is its rows times a
+      // row's height, measured on a few games; a game is as tall as its
+      // taller column, or both together when the frame is too narrow to
+      // set them side by side.
+      var rowsIn = function (el) { return el ? el.querySelectorAll('tr, .sxsubs > div').length : 0; };
+      var parts = function (el) {
+        return el.classList.contains('cslay') ? [el.querySelector('.csleft'), el.querySelector('.sxwrap')] : [el, null];
+      };
+      var per = [0, 0];
+      var cnt = [0, 0];
+      var beside = true;
+      games.slice(0, 6).forEach(function (el) {
+        el.style.contentVisibility = 'visible';
+        var p = parts(el);
+        p.forEach(function (x, k) {
+          if (!x || !rowsIn(x)) return;
+          per[k] += x.getBoundingClientRect().height;
+          cnt[k] += rowsIn(x);
+        });
+        if (p[1]) beside = p[1].getBoundingClientRect().top - p[0].getBoundingClientRect().top < 4;
+        el.style.contentVisibility = '';
+      });
+      var rowH = [cnt[0] ? per[0] / cnt[0] : 0, cnt[1] ? per[1] / cnt[1] : 0];
+      if (!rowH[0]) return;
+      games.forEach(function (el) {
+        var p = parts(el);
+        var h = p.map(function (x, k) { return rowsIn(x) * (rowH[k] || rowH[0]); });
+        el.style.setProperty('--qtH', Math.round(beside ? Math.max(h[0], h[1]) : h[0] + h[1]) + 'px');
+      });
+    }
+    // The height of the page shown: the root element's, which is its
+    // content, margins and all. Not the document's scrollHeight, which
+    // never reads less than the frame's own height, so after a long page
+    // (the Scoreboard) a short one kept the long one's height, blank below.
+    function pageHeight() {
+      return Math.ceil(document.documentElement.getBoundingClientRect().height);
+    }
+    // as games are drawn their real heights replace the estimates: the
+    // frame is sized to its page again
+    var shownOnce = false;
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () {
+        if (shownOnce) parent.postMessage({ qbtdReport: 'height', height: pageHeight() }, '*');
+      }).observe(document.body);
     }
     function tellPlace() {
       var sec = document.getElementById('page-' + pageOf(current));
@@ -309,6 +371,7 @@ export function reportSrcdoc(pages, { start = null, sorts = null } = {}) {
     .qt-mark{border-left:4px solid var(--qtBar);padding-left:4px;margin-left:-8px}
     .qt-back{font-size:14px;font-weight:normal;margin-left:14px;white-space:nowrap}
     .qt-sort{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
+    #page-games .cslay,#page-games .boxScoreTable:not(.csleft>.boxScoreTable){content-visibility:auto;contain-intrinsic-block-size:auto var(--qtH,480px)}
     .qt-sort:hover,[aria-sort] .qt-sort{color:var(--qtBar)}
     [aria-sort=descending] .qt-sort::after{content:" \\25BE"}
     [aria-sort=ascending] .qt-sort::after{content:" \\25B4"}`;

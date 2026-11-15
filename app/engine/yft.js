@@ -212,13 +212,43 @@ const ref = ($ref) => ({ $ref });
    an elimination bracket. Carried games are
    marked the way YF marks them (Tournament.carryOverMatches).
 
-   Anything the schedule can't place cleanly — no schedule, one stage,
-   slots not filled yet, a game in a round the schedule doesn't have, a
-   team in two pools of a stage, a game between pools — keeps the single
-   stage and pool below, as before. So a round robin, double or triple
-   included, is unchanged. */
+   A stage that repeats the one before it (the same pools again) is not a
+   stage of its own: YF runs a double or triple round robin as one stage
+   whose pool is played 2x or 3x (its Round Robin setting), so the cycles
+   join into one stage, roundRobins counting them.
+
+   Anything the schedule can't place cleanly — no schedule, no pool stage
+   played, slots not filled yet, a game in a round the schedule doesn't
+   have, a team in two pools of a stage, a game between pools — keeps the
+   single "All Games" stage and pool below, as before. */
 
 const MINOR = { final: 'Finals', tiebreak: 'Tiebreaker' };
+
+/** The schedule's stages (indexes) that repeat the stage before them:
+    marked `repeat` (plan.js buildPlan), or, for a schedule saved before
+    that mark, "Repeat previous phases" in the plan it was built from
+    (options.plan: its stages in order, the tiebreaker and finals stages
+    the builder adds aside, names matching), or the old engine's double,
+    triple and quadruple round robins (format rr2–rr4), which could only
+    repeat. */
+export function repeatedPhases(schedule) {
+  const out = new Set();
+  const phases = schedule.phases || [];
+  phases.forEach((ph, p) => { if (ph.repeat) out.add(p); });
+  if (out.size) return out;
+  const plan = schedule.options && schedule.options.plan;
+  if (plan && Array.isArray(plan.phases)) {
+    const built = phases.map((ph, p) => [ph, p]).filter(([ph]) => !MINOR[ph.kind]);
+    if (built.length === plan.phases.length && built.every(([ph], i) => ph.name === plan.phases[i].name)) {
+      built.forEach(([, p], i) => { if (i > 0 && plan.phases[i].same) out.add(p); });
+    }
+    return out;
+  }
+  if (/^rr[234]$/.test(schedule.format || '')) {
+    phases.forEach((ph, p) => { if (p > 0 && !ph.kind) out.add(p); });
+  }
+  return out;
+}
 
 export function yfStages(schedule, matches) {
   if (!schedule || !Array.isArray(schedule.phases)) return null;
@@ -247,20 +277,48 @@ export function yfStages(schedule, matches) {
       }
     }
     stages.push({ name: ph.name, type, full: !MINOR[ph.kind], elim: ph.kind === 'single' || ph.kind === 'double',
-      meet: ph.meet || 1, rounds, pools, carry: false });
+      meet: ph.meet || 1, rounds, pools, carry: false, src: [p] });
   }
+  // A repeated stage (the same pools again: "Repeat previous phases") is
+  // the stage before it played once more, as YF's 2x / 3x round robin
+  // pool is one stage: its rounds join that stage and its pools count one
+  // more round robin. "Round robin 1" + "Round robin 2" is "Round robin".
+  const repeats = repeatedPhases(schedule);
+  let kept = stages.slice();
+  for (const p of [...repeats].sort((a, b) => a - b)) {
+    const st = stages[p];
+    const into = kept[kept.indexOf(st) - 1];
+    if (!into || !into.full || into.elim || !st.full || st.elim) continue;
+    into.rounds.push(...st.rounds);
+    into.meet += st.meet;
+    into.src.push(...st.src);
+    kept = kept.filter((x) => x !== st);
+  }
+  for (const st of kept) {
+    if (st.src.length < 2) continue;
+    const names = st.src.map((p) => schedule.phases[p].name);
+    const base = /^(.*\S)\s+1$/.exec(names[0]);
+    const was = st.name;
+    if (base && names.every((n, i) => n === `${base[1]} ${i + 1}`)) st.name = base[1];
+    for (const pl of st.pools) if (pl.name === was) pl.name = st.name;
+  }
+  stages.length = 0;
+  stages.push(...kept);
   // A stage nobody has played yet is left out (its slots may not be
   // filled); a pool stage with games needs all its slots filled, or its
   // brackets aren't known
   const playedRounds = new Set(matches.map((m) => m.round));
-  for (const [p, ph] of schedule.phases.entries()) {
-    if (!stages[p].rounds.some((n) => playedRounds.has(n))) { stages[p].unplayed = true; continue; }
+  for (const st of stages) {
+    if (!st.rounds.some((n) => playedRounds.has(n))) { st.unplayed = true; continue; }
     // (finals and tiebreakers have no pools: their slots may stay as written)
-    const open = stages[p].full && (ph.rounds || []).some((r) => (r.games || []).some((g) => (g.a && !nameOf(g.a)) || (g.b && !nameOf(g.b))));
+    const open = st.full && st.src.some((p) => (schedule.phases[p].rounds || []).some((r) => (r.games || []).some((g) => (g.a && !nameOf(g.a)) || (g.b && !nameOf(g.b)))));
     if (open) return null;
   }
   const full = stages.filter((x) => x.full && !x.unplayed);
-  if (full.length < 2 && !(full.length === 1 && full[0].pools.length > 1)) return null;
+  // one pool stage alone is still a stage, as in YF: its name heads the
+  // report (a round robin is "Round robin", not "All Games"), and a final
+  // or tiebreaker played after it is a stage of its own
+  if (!full.length) return null;
   // YF's first stage is its Prelim stage, the one it ranks players in: when
   // the games start later (the hub's stats pick of the playoffs alone),
   // the first stage with games takes that place
@@ -293,7 +351,7 @@ export function yfStages(schedule, matches) {
     if (!i) continue;
     const prev = full[i - 1];
     const playedHere = new Set([...placed].filter(([, s]) => s === st).map(([m]) => key(m.teams[0].name, m.teams[1].name)));
-    const scheduledHere = new Set(schedule.phases.flatMap((ph) => ph.name === st.name ? ph.rounds.flatMap((r) => r.games.map((g) => key(nameOf(g.a), nameOf(g.b)))) : []));
+    const scheduledHere = new Set(st.src.flatMap((p) => schedule.phases[p].rounds.flatMap((r) => r.games.map((g) => key(nameOf(g.a), nameOf(g.b))))));
     for (const pl of st.pools) {
       const mates = [];
       for (let x = 0; x < pl.teams.length; x++) for (let y = x + 1; y < pl.teams.length; y++) {

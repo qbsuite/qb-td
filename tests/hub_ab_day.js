@@ -239,7 +239,7 @@ async function laptop(which) {
       : `${PAGES}/${which}/index.html?a=${T.admin_secret}&server=${encodeURIComponent(BASE)}`);
     await c.waitJs(`!!document.querySelector('.hubtab')`, which + ': the hub', 60000);
     if (!(await c.js(`!!document.querySelector('.biground')`))) await c.click('[data-view="live"]');
-    await c.waitJs(`!!document.querySelector('#calc')`, which + ': the Live Hub', 60000).catch(async (e) => {
+    await c.waitJs(`!!document.querySelector('#calc, #showstats')`, which + ': the Live Hub', 60000).catch(async (e) => {
       throw new Error(hide(e.message + ' — page: ' + (await c.js('document.body.innerText')).slice(0, 300) + ' | errors: ' + c.errors.join(' | ') + ' | requests: ' + c.requests.slice(-8).map((r) => r.method + ' ' + r.url).join(' ; ')));
     });
     await c.settle();
@@ -256,8 +256,10 @@ async function laptop(which) {
   };
   c.refresh = async () => { await c.js(`document.dispatchEvent(new Event('visibilitychange')); true`); await sleep(100); await c.settle(); };
   c.busy = () => c.js(`!!document.querySelector('[aria-busy="true"]')`);
+  // Compute stats, or (since it went) Show stats, which fills the table on its own
   c.compute = async () => {
-    await c.click('#calc');
+    if (await c.js(`!!document.querySelector('#calc')`)) await c.click('#calc');
+    else if (await c.js(`document.querySelector('#statsec').hidden`)) await c.click('#showstats');
     await sleep(50);
     await until(async () => !(await c.busy()) && (await c.js(`/in these stats$|No games|No readable/.test((document.querySelector('#statsnote') || {}).textContent || '') || /No readable/.test(document.querySelector('#statsout').textContent)`)),
       which + ': Compute', 120000);

@@ -32,7 +32,7 @@ import { fileSummary } from './protests.js';
 
 export { uploadQbjName, publicQbjName, publicQbjText, storedFileText, rosterExportBody, fileDownloads } from '../engine/exportfile.js';
 
-// Game files read at once by Compute stats and the playoff fill
+// Game files read at once by the stats downloads and the playoff fill
 const FETCH_AT_ONCE = 6;
 
 // Blob routes return parsed JSON when stored as JSON (qbj, roster,
@@ -99,7 +99,7 @@ export async function fetchUploads(pub, a, files, cache, onDone = () => {}) {
   return want.length;
 }
 
-// Every clean game file parsed, plus the roster: shared by Compute stats
+// Every clean game file parsed, plus the roster: shared by the stats downloads
 // and the schedule's fill-from-standings.
 // onFile(done, total) after each game file, for the caller's progress.
 // opts.roster ({ json }, the roster as the hub already read it: hubNames
@@ -107,15 +107,19 @@ export async function fetchUploads(pub, a, files, cache, onDone = () => {}) {
 // standings are wanted, so the games come from their public copies (the
 // qbj half, notes stripped) in a request or two rather than one stored
 // upload, packet text and all, per game. Those leave the zip's MODAQ
-// files out, so Compute stats reads the uploads themselves.
+// files out, so the QBJ bundle reads the uploads themselves.
 export async function collectMatches(pub, a, t, buckets, files, onFile = () => {}, opts = {}) {
   const { cache = null, rank = false, roster: given = null } = opts;
   const qbjFiles = files.filter(isGameFile);
   const errors = [];
+  // the same failures as `errors`, each with its upload ({file, message}),
+  // or the roster's message, so the hub can say which game to fix
+  const bad = [];
+  let rosterError = null;
   let roster = null;
   if (t.roster_r2_key) {
     try { roster = parseRoster(given ? given.json : await ownedJson(pub, a, t.roster_r2_key)); }
-    catch (e) { errors.push('Roster: ' + e.message); }
+    catch (e) { errors.push('Roster: ' + e.message); rosterError = e.message; }
   }
   const names = rosterNameMap(roster);
   const matches = [];
@@ -190,9 +194,10 @@ export async function collectMatches(pub, a, t, buckets, files, onFile = () => {
       }
     } catch (e) {
       errors.push(f.filename + ': ' + e.message);
+      bad.push({ file: f, message: e.message });
     }
   }
-  return { roster, names, matches, raw, games, errors, modaqFiles };
+  return { roster, names, matches, raw, games, errors, modaqFiles, bad, rosterError };
 }
 
 // The tournament's game format: its regulation tossup count is where
@@ -210,7 +215,7 @@ export function gameFormat(t) {
 // roster is saved, from the hub (which sets key to null) or from another
 // tab (its save time, roster_at, moves). key and map are the object's
 // own: the hub reads map and clears key directly. The roster read is kept
-// too (json), so Compute stats, the playoff fill and the QBJ bundle take
+// too (json), so the stats downloads, the playoff fill and the QBJ bundle take
 // it from here rather than read it again (rosterFor).
 export function createHubNames() {
   const keyOf = (t) => (t.roster_r2_key ? t.roster_r2_key + '@' + (t.roster_at || '') : '');

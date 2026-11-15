@@ -564,7 +564,9 @@ export function buildPlan(teams, rooms, phases, seeding, seed) {
       s.phases.push({ name: 'Tiebreakers', rounds: [{ round: roundNo++, games: [], byes: [] }], meet: 1, kind: 'tiebreak' });
     }
     rounds.forEach((round) => { round.games.sort((x, y) => x.room - y.room); round.round = roundNo++; });
-    s.phases.push({ name: ph.name, rounds, meet: ph.meets || 1, ...(elim ? { kind: ph.kind } : {}) });
+    // a repeat (the same groups again) is marked, so the stats and the .yft
+    // join it to the stage before as YF's 2x / 3x round robin (yft.js)
+    s.phases.push({ name: ph.name, rounds, meet: ph.meets || 1, ...(elim ? { kind: ph.kind } : {}), ...(p > 0 && ph.same && !elim ? { repeat: true } : {}) });
     // a group of one team has no games, so no bracket, except where the
     // engine lists one
     const at = s.phases.length - 1;

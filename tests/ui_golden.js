@@ -4,7 +4,7 @@
 // &live=off, so nothing can reach a real backend, and any request to a
 // host other than the two local servers fails the run.
 //   index.html?a=demo  the Live Hub (grid, Live now, a cell's files and
-//                      their download links, protests), Compute stats with
+//                      their download links, protests), Show stats with
 //                      every stage, Finished rounds only and one stage off,
 //                      and each download's bytes: YellowFruit 4 and 3, the
 //                      report zip and its six files, the QBJ zip, and the
@@ -80,8 +80,13 @@ const MONTH = '(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)';
 const literal = (s) => new RegExp(s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'g');
 // both local origins come out, so the golden holds on any port pair: the
 // hub's Live view shows the public link (the static server's own URL)
+// The New layout's sideways-scroll marks (newstats.js fitTables) come out
+// too: a scoresheet game's tables are fitted only once the browser reports
+// it near the screen, which comes at no fixed moment.
 function norm(html) {
   return String(html)
+    .replace(/class="tablewrap(?: n(?:fit|scroll))?"/g, 'class="tablewrap"')
+    .replace(/class="nfade(?: more)?"/g, 'class="nfade"')
     .replace(new RegExp(MONTH + ' \\d{1,2}, \\d{1,2}:\\d{2}\\s?(?:AM|PM)', 'g'), '<when>')
     .replace(/\b\d{1,2}:\d{2}\s?(?:AM|PM)\b/g, '<time>')
     .replace(/\b\d+ (?:seconds?|minutes?|hours?|days?|min|h|s) ago\b/g, '<ago>')
@@ -124,7 +129,8 @@ async function pick(attr, v) {
   await c.js(`(() => { const e = document.querySelector('#out [data-${attr}="${v}"]'); if (!e) throw new Error('no ${attr} ${v}'); e.click(); return true; })()`);
   await settle();
 }
-const outHtml = () => c.js(`document.getElementById('out').innerHTML`);
+// #out, and the Classic report kept beside it (pubview.js reportHost) while shown
+const outHtml = () => c.js(`document.getElementById('out').innerHTML + (() => { const h = document.getElementById('reporthost'); return h && !h.hidden ? h.outerHTML : ''; })()`);
 
 async function publicPage(url) {
   const page = await load(url);
@@ -196,10 +202,10 @@ async function hub(label) {
   out.protests = norm(await c.js(`(document.getElementById('protdrawer') || {}).innerText || ''`));
   out.protestsHtml = hashed(await c.js(`(document.getElementById('protdrawer') || {}).innerHTML || ''`));
 
-  // Compute with every stage
+  // Show stats with every stage
   await c.js(`window.__demoCalls = []; true`);
-  await c.click('#calc');
-  await c.waitJs(`!document.getElementById('dlmenu').disabled || /No readable/.test(document.getElementById('statsout').textContent)`, 'stats', 30000);
+  await c.click('#showstats');
+  await c.waitJs(`!!document.querySelector('#statsout table') || /No readable/.test(document.getElementById('statsout').textContent)`, 'stats', 30000);
   await settle(`document.getElementById('statsout').innerHTML`);
   out.computeRequests = await c.js(`window.__demoCalls.map((x) => x.method + ' ' + x.path.replace(/key=t%2F1%2Ffile%2F\\d+/, 'key=<game>'))`);
   out.all = { ...(await hubStats()), downloads: await downloads(['dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip'], 10) };

@@ -1511,9 +1511,9 @@ await section('R47', 're-exporting replaces the game', async () => {
   const drawer = await drawerText();
   ok('R47 its protest now comes from the newest upload: "Before the correction", "Corrected game received"',
     drawer.includes('treaty of paris') && drawer.includes('Before the correction') && drawer.includes('Corrected game received'), drawer.slice(0, 600));
-  await hub.click('#calc');
+  if (await hub.js(`document.querySelector('#statsec').hidden`)) await hub.click('#showstats');
   await hub.waitJs(`!document.querySelector('#statsec').hidden && !!document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats', 30000);
-  ok('R47 Compute counts the game once', /^1 games? in these stats$/.test(await hub.text('#statsnote')), await hub.text('#statsnote'));
+  ok('R47 the stats count the game once', /^1 games? in these stats$/.test(await hub.text('#statsnote')), await hub.text('#statsnote'));
   await hub.click('#dlmenu');
   await hub.waitJs(`!document.querySelector('#dlpanel').hidden`, 'the downloads menu');
   const zip = await readZip(new Uint8Array((await downloadFrom(hub, '#dlzip')).bytes));

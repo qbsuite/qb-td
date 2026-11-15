@@ -809,3 +809,33 @@ body.aboutpage .wrap { max-width: 820px; }
 .fdlpanel a, .fdlpanel button { padding: 3px 8px; border-radius: 5px; text-align: left; }
 .fdlpanel a:hover, .fdlpanel button:hover { background: var(--hover-bg); text-decoration: none; }
 .pprev { align-self: flex-start; }
+
+/* the stats under the grid (Show stats): as tight as the numbers allow,
+   standings and individuals side by side */
+.hstats { font-size: 12px; line-height: 1.35; }
+.hstats h3 { font-size: 13px; font-weight: 600; margin: 10px 0 2px; }
+.hstats table { width: auto; }
+.hstats th, .hstats td { padding: 1px 5px; }
+.hstats th { font-size: 11px; font-weight: 500; color: var(--muted); }
+.hstats th.name, .hstats td.name { min-width: 0; white-space: nowrap; }
+.hstats td.rk, .hstats th.rk { color: var(--muted); text-align: right; padding: 1px 1px 1px 0; }
+.hstats .g0 { border-left: 1px solid var(--line); }
+.hcols { display: flex; gap: 18px; align-items: start; overflow-x: auto; }
+.hcols > div { flex: none; }
+.hgames { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 18px; align-items: start; }
+.hstats .rhead { font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--muted); margin: 6px 0 0; }
+.hstats .game.plain, .hstats details.game summary {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 1px 3px; border-bottom: 1px solid var(--line);
+}
+.hstats details.game summary { list-style: none; }
+.hstats details.game summary::-webkit-details-marker { display: none; }
+.hstats details.game[open] summary { background: var(--hover-bg); }
+.hstats details.game .boxes { display: block; padding: 2px 0 6px; border-bottom: 1px solid var(--line); }
+.hstats details.game .boxes .tablewrap { min-width: 0; margin-top: 2px; }
+.hstats table.box th:first-child { font-size: 11px; }
+
+/* what the last download left out, or why it couldn't be made */
+.dlissue { margin-top: 8px; padding: 6px 0 2px 10px; border-left: 3px solid var(--warn); font-size: 13px; display: grid; gap: 3px; }
+.dlissue .dlhead { font-weight: 600; }
+.dlissue .dlfoot { color: var(--muted); }
+.dlissue [data-dlclose] { justify-self: start; font-size: 12px; }

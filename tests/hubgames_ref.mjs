@@ -144,7 +144,12 @@ async function bothSides(makePub, calls, measure = null) {
     c.noGameHalf = modaqIds(c.out);
     assert.equal(r.out.modaqFiles.length + c.noGameHalf.length, c.out.modaqFiles.length);
     assert.deepEqual(c.out.names, r.out.names, `call ${i + 1}: the same renames`);
-    assert.deepEqual(Object.keys(c.out), Object.keys(r.out), `call ${i + 1}: the same fields`);
+    // since 11/13 two more: the failures as {file, message}, and the
+    // roster's, so the hub's downloads can say which game to fix
+    assert.deepEqual(Object.keys(c.out), [...Object.keys(r.out), 'bad', 'rosterError'], `call ${i + 1}: the same fields, and the two new ones`);
+    const fileErrors = r.out.errors.filter((e) => !e.startsWith('Roster: '));
+    assert.deepEqual(c.out.bad.map((x) => x.file.filename + ': ' + x.message), fileErrors, `call ${i + 1}: a bad entry per file error`);
+    assert.equal(c.out.rosterError, (r.out.errors.find((e) => e.startsWith('Roster: ')) || '').slice(8) || null, `call ${i + 1}: the roster's error`);
     if (r.cache) {
       // filled as the reads finish, so in no fixed order; the hub only
       // asks it has() and get()

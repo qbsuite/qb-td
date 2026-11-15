@@ -123,6 +123,7 @@ const CHG = {
   addRound: '[changed: LIVE HUB: Add a game fills in Round from the match file, and notes when the round picked differs from the one the file names.]',
   unreadable: '[changed: LIVE HUB: When a game cannot be read, its playoff slots wait and the hub tries again, instead of filling from incomplete standings.]',
   rankOT: '[changed: LIVE HUB: Playoff slots, auto-fill and the Finals rank teams the way the public page does, without overtime in points per 20.]',
+  noCompute: '[changed: LIVE HUB: Removed Compute stats: each download reads the games it needs, and another download right after reads nothing again.]',
   computeOT: '[changed: LIVE HUB: Compute stats leaves overtime out of TUH, points per 20 and PPB, and sorts teams by winning percentage, as the public page does.]',
   levelOrder: '[changed: LIVE HUB: Teams tied on both winning percentage and points per 20 now fill playoff and Finals slots in the order the public page lists them, instead of always by name.]',
   levelNote: '[changed: LIVE HUB: When tied teams also had the same points per 20, the Playoffs and Finals notes say which order they kept, and a waiting tie\'s button says so too.]',
@@ -1721,8 +1722,7 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
     // 31: Save correction on a game filed under round 3 whose file says round 2 (an upload from before files took their filed round)
     d1(`UPDATE files SET round = 3 WHERE id = ${f21.id}`);
     await openLive(pg, T);
-    await pg.click('#calc');
-    await pg.waitJs(`/games in these stats$/.test(document.querySelector('#statsnote').textContent)`, 'stats', 30000);
+    await showStats(pg);
     const before = await pg.text('#statsnote');
     await openCell(pg, R1.id, 3);
     await pg.click(`[data-fixbuzz="${f21.id}"]`);
@@ -1741,21 +1741,19 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
       const c = (m, n) => JSON.stringify(m.match_teams[0].match_players.find((p) => p.player.name === n).answer_counts.map((a) => [a.answer.value, a.number]).sort());
       return (c(x, A2 + ' 1') === c(o, A2 + ' 2') && c(x, A2 + ' 2') === c(o, A2 + ' 1')) || [c(x, A2 + ' 1'), c(o, A2 + ' 2')];
     });
-    await pg.click('#calc');
-    await pg.waitJs(`!document.querySelector('#statsec').hidden && /games in these stats$/.test(document.querySelector('#statsnote').textContent)`, 'stats again', 30000);
-    // Compute keeps what it read per file (id, size, created, round), but
+    await showStats(pg, 'stats again');
+    // the stats keep what they read per file (id, size, created, round), but
     // never a game whose file named another round: the original,
     // restamped in place, is read again under the round it is filed in
-    await check('31 save correction: in the tab that fixed it, Compute counts the game once', async () => (await pg.text('#statsnote')) === before || [before, await pg.text('#statsnote')]);
+    await check('31 save correction: in the tab that fixed it, the stats count the game once', async () => (await pg.text('#statsnote')) === before || [before, await pg.text('#statsnote')]);
     await check('31 save correction: in that tab, in the round it is filed under (3)', async () => {
       const byRound = await statsGames(pg);
       const mine = Object.entries(byRound).filter(([, gs]) => gs.some((g) => g.includes(A2) && g.includes(B2))).map(([rd]) => rd);
       return JSON.stringify(mine) === '["3"]' || byRound;
     });
     await openLive(pg, T);
-    await pg.click('#calc');
-    await pg.waitJs(`!document.querySelector('#statsec').hidden && /games in these stats$/.test(document.querySelector('#statsnote').textContent)`, 'stats after a reload', 30000);
-    await check('31 save correction: Compute counts the game once ' + CHG.filedRound, async () => (await pg.text('#statsnote')) === before || [before, await pg.text('#statsnote')]);
+    await showStats(pg, 'stats after a reload');
+    await check('31 save correction: the stats count the game once ' + CHG.filedRound, async () => (await pg.text('#statsnote')) === before || [before, await pg.text('#statsnote')]);
     await check('31 save correction: in the round it is filed under (3), with the fix\'s numbers ' + CHG.filedRound, async () => {
       const byRound = await statsGames(pg);
       const mine = Object.entries(byRound).filter(([, gs]) => gs.some((g) => g.includes(A2) && g.includes(B2))).map(([rd]) => rd);
@@ -1795,10 +1793,17 @@ section('main-fix', '27 29 30 31: Fix stats, Edit in MODAQ\'s errors, and the no
   }
 });
 
-// the hub's Compute: its games by round, {round: [summary lines]}
+// Show stats: the table under the grid, opened if it's closed, and filled
+async function showStats(pg, what = 'stats') {
+  if (await pg.js(`document.querySelector('#statsec').hidden`)) await pg.click('#showstats');
+  await pg.waitJs(`(() => { const o = document.querySelector('#statsout');
+    return !document.querySelector('#statsec').hidden && !!o.querySelector('table, .bad, .muted'); })()`, what, 30000);
+}
+
+// the hub's stats table: its games by round, {round: [summary lines]}
 const statsGames = (pg) => pg.js(`(() => { const out = {}; let rd = null;
   for (const el of document.querySelectorAll('#statsout .rhead, #statsout .game')) {
-    if (el.classList.contains('rhead')) { rd = el.textContent.replace('round', '').trim(); out[rd] = []; }
+    if (el.classList.contains('rhead')) { rd = el.textContent.replace(/round/i, '').trim(); out[rd] = []; }
     else out[rd].push((el.querySelector('summary') || el).textContent.replace(/\\s+/g, ' ').trim());
   } return out; })()`);
 
@@ -1866,38 +1871,34 @@ section('main-rename', '51: a team renamed in another tab, in the hub\'s listing
   await pg.click('[data-fixcancel]');
 });
 
-section('main-stats', '26 42 43 48: Compute, the Download menu and the QBJ bundle', async () => {
+section('main-stats', '26 42 43 48: Show stats, the Download menu and the QBJ bundle', async () => {
   const M = await mainDay();
   const { T } = M;
   const pg = hub;
   await openLive(pg, T);
   const d = await T.detail();
-  const nReady = d.files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') && !f.error).length;
-  await check('42 stats: before Compute, "N games ready"', async () => (await pg.text('#statsnote')) === `${nReady} games ready` || await pg.text('#statsnote'));
-  await check('43 download menu: off before Compute', () => pg.js(`document.querySelector('#dlmenu').disabled`));
-  await pg.watchTexts('#calc');
+  await check('42 stats: "N games in these stats", the table closed ' + CHG.noCompute, async () =>
+    ((await pg.js(`document.querySelector('#statsec').hidden && !document.querySelector('#calc')`)) && /^\d+ games in these stats$/.test(await pg.text('#statsnote'))) || await pg.text('#statsnote'));
+  await check('43 download menu: on with no stats shown ' + CHG.noCompute, () => pg.js(`!document.querySelector('#dlmenu').disabled`));
   const c0 = pg.reqs.length;
-  await pg.click('#calc');
-  await pg.waitJs(`!document.querySelector('#statsec').hidden && /games in these stats$/.test(document.querySelector('#statsnote').textContent)`, 'stats', 30000);
-  await check('42 stats: Compute reads "Computing stats…"', async () =>
-    (await pg.seenTexts()).includes('Computing stats…') || await pg.seenTexts());
+  await showStats(pg);
+  await check('42 stats: Show stats reads "Hide stats" with the table open', async () => (await pg.text('#showstats')) === 'Hide stats' || await pg.text('#showstats'));
   // the games' public copies, a hundred to a request; the stored uploads
   // only for the QBJ bundle and Rebuild
   const statAsks = pg.reqs.slice(c0).filter((r) => r.method === 'GET' && r.url.startsWith(BASE + T.A + '/'))
     .map((r) => new URL(r.url)).filter((u) => u.pathname.endsWith('/games')
       || (u.pathname.endsWith('/file') && u.searchParams.get('key') !== d.tournament.roster_r2_key));
-  await check('42 stats: Compute reads the public copies in one request, no stored upload', () =>
+  await check('42 stats: the table reads the public copies in one request, no stored upload', () =>
     (statAsks.length <= 1 && statAsks.every((u) => u.pathname.endsWith('/games'))) || statAsks.map((u) => u.pathname + u.search));
   // the roster the hub read for its listings, not read again
   const rosterAsks = (from) => pg.reqs.slice(from).filter((r) => r.method === 'GET' && r.url.startsWith(BASE + T.A + '/file')
     && new URL(r.url).searchParams.get('key') === d.tournament.roster_r2_key);
-  await check('42 stats: Compute doesn\'t read the roster again', () => rosterAsks(c0).length === 0 || rosterAsks(c0).map((r) => r.url));
+  await check('42 stats: the table doesn\'t read the roster again', () => rosterAsks(c0).length === 0 || rosterAsks(c0).map((r) => r.url));
   await check('26 add a game: a game added under round 5 whose file says round 1 is counted in round 5 ' + CHG.filedRound, async () => {
     const byRound = await statsGames(pg);
     const [a, b] = M.pair(5, 1);
     return ((byRound['5'] || []).some((g) => g.includes(a) && g.includes(b)) && !(byRound['1'] || []).some((g) => g.includes(a) && g.includes(b))) || byRound;
   });
-  await check('43 download menu: on after Compute', () => pg.js(`!document.querySelector('#dlmenu').disabled`));
   await pg.click('#dlmenu');
   await check('43 download menu: opens, aria-expanded true, five downloads and Rebuild player page', async () =>
     (await pg.js(`!document.querySelector('#dlpanel').hidden && document.querySelector('#dlmenu').getAttribute('aria-expanded') === 'true'`))
@@ -1954,11 +1955,12 @@ section('main-stats', '26 42 43 48: Compute, the Download menu and the QBJ bundl
       return (!ro.includes('_formerNames') && j.version && j.objects.some((o) => o.type === 'Tournament' && o.registrations.length === 8)) || ro.slice(0, 300);
     });
   }
-  // observed: a redraw after Compute hides the table and turns Download off again
   await bumpAndRefresh(pg, T);
-  if (await pg.js(`document.querySelector('#statsec').hidden && document.querySelector('#dlmenu').disabled`)) {
-    note('BUG (Compute stats): any redraw after Compute (a refresh that finds a change, a ruling, a round change) hides the stats table and turns Download off until Compute is pressed again');
-  }
+  await check('42 stats: a redraw keeps the table open and Download on ' + CHG.noCompute, async () =>
+    (await pg.js(`!document.querySelector('#statsec').hidden && !document.querySelector('#dlmenu').disabled`))
+      && !!(await pg.waitJs(`!!document.querySelector('#statsout table')`, 'the table again').catch(() => false)));
+  await pg.click('#showstats');
+  await check('42 stats: Hide stats closes it', () => pg.js(`document.querySelector('#statsec').hidden && document.querySelector('#showstats').textContent === 'Show stats'`));
 });
 
 section('rounds', '08 12 15 16 17 32 33: the round line, Advance, Set round, auto-advance, and no protests', async () => {
@@ -2520,11 +2522,7 @@ section('brackets', '11 13 14 15 17 36 41 44 45 49: pools and playoffs: Live now
     return (i.checked ? '[x] ' : '[ ] ') + (i.disabled ? '(off) ' : '') + l.textContent.replace(/\\s+/g, ' ').trim(); })`);
   await check('41 stats pick: By stage (each stage with games, and its rounds), or Finished rounds only (and how far)', async () =>
     JSON.stringify(await pick()) === JSON.stringify(['[x] By stage', '[x] Prelims (rounds 1–3)', '[x] Playoffs (rounds 4–5)', '[ ] Finished rounds only (Rounds 1–4)']) || await pick());
-  const compute = async () => {
-    await pg.click('#calc');
-    await pg.waitJs(`!document.querySelector('#statsec').hidden && /games/.test(document.querySelector('#statsnote').textContent) && !/ready$/.test(document.querySelector('#statsnote').textContent)`, 'stats', 30000);
-  };
-  await compute();
+  await showStats(pg);
   await check('41 stats pick: every stage: "16 games in these stats"', async () => (await pg.text('#statsnote')) === '16 games in these stats' || await pg.text('#statsnote'));
   await pg.click('[data-statph="1"]');
   await check('41 stats pick: Prelims only: "12 games in Prelims", the table follows', async () =>
@@ -2611,6 +2609,7 @@ async function finalsDay(name, { teams = FTEAMS, kind = 'rr', tiebreak = false, 
   for (const n of ['Room 1', 'Room 2']) await T.addRoom(n);
   await T.roster(teams.map((n) => ({ name: n, players: PLAY(n) })));
   const s = buildSchedule(kind, teams, T.rooms.map((b) => ({ name: b.room_name, bucket: b.id })));
+  s.format = kind; // as the hub saves a format it built
   // phases (and their brackets) renamed: stages[i] names phase i
   stages.forEach((n, i) => { s.phases[i].name = n; for (const b of s.brackets) if (b.phase === i) b.name = n; });
   let next = Math.max(...s.phases.flatMap((ph) => ph.rounds.map((r) => r.round))) + 1;
@@ -2643,10 +2642,6 @@ async function finalsDay(name, { teams = FTEAMS, kind = 'rr', tiebreak = false, 
 }
 const noteLines = (pg) => pg.js(`[...document.querySelectorAll('.playoffnote')].map((x) => x.textContent.replace(/\\s+/g, ' ').trim())`);
 const statRows = (pg) => pg.js(`(() => { const t = document.querySelector('#statsout table'); return t ? [...t.rows].slice(1).map((r) => [...r.cells].map((c) => c.textContent.replace(/\\s+/g, ' ').trim())) : []; })()`);
-const compute = async (pg) => {
-  await pg.click('#calc');
-  await pg.waitJs(`!document.querySelector('#statsec').hidden && / in /.test(document.querySelector('#statsnote').textContent)`, 'the stats', 30000);
-};
 const menuDownload = async (pg, id) => {
   if (await pg.js(`document.querySelector('#dlpanel').hidden`)) await pg.click('#dlmenu');
   await pg.waitJs(`!document.querySelector('#dlpanel').hidden`, 'the Download menu');
@@ -2682,11 +2677,12 @@ section('finals', '37 38 42: the Finals fill on their own, ranked without overti
   });
   await check('38 finals note: "Finals · Round robin: Ants and Bees were tied at 2–1, so points per 20 decided their places." ' + CHG.rankOT, async () =>
     JSON.stringify(await noteLines(pg)) === JSON.stringify(['Finals Round robin: Ants and Bees were tied at 2–1, so points per 20 decided their places.']) || await noteLines(pg));
-  // Compute, with the game that went to overtime
-  await compute(pg);
-  await check('42 compute: teams by winning percentage, then points per 20; overtime out of PP20TUH and TUH ' + CHG.computeOT, async () => {
+  // the stats table, with the game that went to overtime
+  await showStats(pg);
+  // (PPG counts every point scored, overtime's too: Bees' overtime tossup puts it ahead there)
+  await check('42 compute: teams by winning percentage, then points per 20 without overtime; overtime out of TUH ' + CHG.computeOT, async () => {
     const rows = (await statRows(pg)).map((r) => [r[1], r[2], r[3], r[4], r[r.length - 2]]);
-    return JSON.stringify(rows) === JSON.stringify([['Ants', '2', '1', '140', '60'], ['Bees', '2', '1', '138.33', '60'], ['Cats', '1', '2', '113.33', '60'], ['Dogs', '1', '2', '106.67', '60']]) || rows;
+    return JSON.stringify(rows) === JSON.stringify([['Ants', '2', '1', '138.3', '60'], ['Bees', '2', '1', '141.7', '60'], ['Cats', '1', '2', '113.3', '60'], ['Dogs', '1', '2', '106.7', '60']]) || rows;
   });
   await check('42 compute: the overtime tossup still counts in the buzz columns (Bees 22 tens, one -5 each)', async () => {
     const rows = await statRows(pg);
@@ -2813,7 +2809,7 @@ section('finals-same', '37: a double round robin\'s Finals seed on both times th
 section('report-escape', '10 42 46 47: names with special characters, in the hub and in the HTML report', async () => {
   const pg = hub;
   const ODD = ['Ants', 'Bees <b>2</b>', 'Cats & Co', 'Dogs'];
-  // a double round robin, each time through its own stage (the report heads each), and a final the report lists as a result
+  // a double round robin, each time through renamed (the report joins them as YF's 2x round robin, under the first name), and a final the report lists as a result
   const F = await finalsDay('Odd Names', { teams: ODD, kind: 'rr2', stages: ['Prelims <i>x</i>', 'Second <u>go</u>'], final: ['Bees <b>2</b>', 'Ants'] });
   const { T } = F;
   for (const g of [...F.games(0), ...F.games(1)]) {
@@ -2825,10 +2821,11 @@ section('report-escape', '10 42 46 47: names with special characters, in the hub
     const r = await pg.js(`[...document.querySelectorAll('.lrow .lgame')].map((x) => [x.textContent.replace(/\\s+/g, ' ').trim(), x.querySelectorAll('b, i, u').length])`);
     return (r.some(([t]) => t.includes('Bees <b>2</b>')) && r.every(([, n]) => n === 0)) || r;
   });
-  await compute(pg);
+  await showStats(pg);
   await check('42 compute: the stats table shows the names as text', async () => {
     const names = (await statRows(pg)).map((r) => r[1]);
-    return (JSON.stringify([...names].sort()) === JSON.stringify([...ODD].sort()) && (await pg.js(`document.querySelectorAll('#statsout b, #statsout i, #statsout u').length`)) === 0) || names;
+    // (a game's winner is in bold: <b> holding a name, never one inside it)
+    return (JSON.stringify([...names].sort()) === JSON.stringify([...ODD].sort()) && (await pg.js(`document.querySelectorAll('#statsout td b, #statsout b b, #statsout i, #statsout u').length`)) === 0) || names;
   });
   const z = await menuDownload(pg, 'dlreport');
   const pages = Object.fromEntries((await readZip(new Uint8Array(z.bytes))).map((e) => [e.name.replace(`${T.slug}_`, ''), new TextDecoder().decode(e.data)]));
@@ -2836,7 +2833,7 @@ section('report-escape', '10 42 46 47: names with special characters, in the hub
   const heads = (st.match(/<h2>[^]*?<\/h2>/g) || []).map((h) => norm(h.replace(/<\/?h2>|&nbsp;/g, '')));
   await check('46 html report zip: <slug>-report.zip, six pages', () => (z.name === `${T.slug}-report.zip` && Object.keys(pages).length === 6) || [z.name, Object.keys(pages)]);
   await check('46 html report: stage names with markup head their tables as text ' + CHG.reportEscape, () =>
-    (heads.includes('Prelims &lt;i&gt;x&lt;/i&gt;') && heads.includes('Second &lt;u&gt;go&lt;/u&gt;: Total')) || heads);
+    (heads.includes('Prelims &lt;i&gt;x&lt;/i&gt;') && !heads.some((h) => h.includes('Second'))) || heads);
   await check('46 html report: the Finals result names its teams as text ' + CHG.reportEscape, () =>
     /Bees &lt;b&gt;2&lt;\/b&gt; def\. Ants/.test(st) || (st.match(/<li>[^]*?<\/li>/g) || []).map(norm));
   await check('46 html report: no page of the six carries a name\'s markup as markup ' + CHG.reportEscape, () => {
@@ -2868,7 +2865,7 @@ section('report-escape', '10 42 46 47: names with special characters, in the hub
       await P.upload(P.rooms[g.room], 1, `Round_1_${g.a.team}_${g.b.team}.qbj`, poolGame(1, g.a.team, g.b.team));
     }
     await openLive(pg, P);
-    await compute(pg);
+    // straight from the menu: no stats shown first
     const pz = await menuDownload(pg, 'dlreport');
     const ppages = Object.fromEntries((await readZip(new Uint8Array(pz.bytes))).map((e) => [e.name.replace(`${P.slug}_`, ''), new TextDecoder().decode(e.data)]));
     const h3 = ((ppages['standings.html'] || '').match(/<h3>[^]*?<\/h3>/g) || []).map((h) => norm(h.replace(/<\/?h3>|&nbsp;/g, '')));
@@ -2925,13 +2922,13 @@ section('room-gone', '21 30 31: a room deleted in another tab while Fix stats is
     await pg.click('#ffcancel');
     return Object.values(seen).every((l) => JSON.stringify(l) === '["Room 1"]') || seen;
   });
-  await compute(pg);
+  await showStats(pg);
   await check('42 compute: the deleted room\'s game still counts (2 games)', async () => (await pg.text('#statsnote')) === '2 games in these stats' || await pg.text('#statsnote'));
   // a room's own picker lists "#<id>" for a room since deleted (admin.js cellPanel), but the
   // panel shows only the files of a room still there: say so if that changes
   const shown = await pg.js(`[...document.querySelectorAll('.ugrid button.umark')].length`);
   if (!(await pg.js(`[...document.querySelectorAll('select[data-movefile] option')].some((o) => /^#\\d+$/.test(o.textContent))`))) {
-    note(`room deleted with an upload in it: the hub lists that upload nowhere (${shown} grid cell(s), all Room 1's), so it can't be moved to another room, downloaded or deleted from the hub, and the room picker's "#<id>" choice for a deleted room never shows; Compute still counts the game`);
+    note(`room deleted with an upload in it: the hub lists that upload nowhere (${shown} grid cell(s), all Room 1's), so it can't be moved to another room, downloaded or deleted from the hub, and the room picker's "#<id>" choice for a deleted room never shows; the stats still count the game`);
   }
 });
 

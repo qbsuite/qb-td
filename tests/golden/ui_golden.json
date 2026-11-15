@@ -3,8 +3,8 @@
   "hub demo": {
    "label": "as shipped",
    "live": {
-    "sha256": "b67db821c9e209705a72394e",
-    "chars": 12764
+    "sha256": "6471b62c30605b410ba8a98c",
+    "chars": 12663
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -22,83 +22,83 @@
     "2:6 umark Game in ✓",
     "2:7 umark Game in ✓"
    ],
-   "liveNow": "Live now\n1/2 in\nRoom A\nStanford v Berkeley\nUpload\n–\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t–\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\nNone logged\nModerator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\nAuto-advance\n 0/2 started\nRoom A\nRoom B\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nCompute\nDownload ▾\n13 games ready",
-   "rail": "Moderator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\n--\nAuto-advance\n 0/2 started\nRoom A\nRoom B\n--\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nCompute\nDownload ▾\n13 games ready",
+   "liveNow": "Live now\n1/2 in\nRoom A\nStanford v Berkeley\nUpload\n–\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t–\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\nNone logged\nModerator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\nAuto-advance\n 0/2 started\nRoom A\nRoom B\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nShow stats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nDownload ▾\n13 games in these stats",
+   "rail": "Moderator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\n--\nAuto-advance\n 0/2 started\nRoom A\nRoom B\n--\nProtests\nNone logged\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nShow stats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)\nDownload ▾\n13 games in these stats",
    "cells": {
     "1:1": {
-     "panel": "Stanford 300 – 140 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_Stanford_Berkeley.qbj · qbj · 9.0 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 300 – 140 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_Stanford_Berkeley.qbj · qbj · 9.0 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F1&part=qbj&dl=Round_1_Stanford_Berkeley.qbj"
      ]
     },
     "1:2": {
-     "panel": "Stanford 355 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Stanford_ASU.qbj · qbj · 9.8 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 355 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Stanford_ASU.qbj · qbj · 9.8 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F3&part=qbj&dl=Round_2_Stanford_ASU.qbj"
      ]
     },
     "1:3": {
-     "panel": "Stanford 370 – 70 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_Stanford_UIUC.qbj · qbj · 9.8 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 370 – 70 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_Stanford_UIUC.qbj · qbj · 9.8 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F5&part=qbj&dl=Round_3_Stanford_UIUC.qbj"
      ]
     },
     "1:4": {
-     "panel": "Stanford 235 – 295 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_Stanford_Berkeley.qbj · qbj · 10.4 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 235 – 295 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_Stanford_Berkeley.qbj · qbj · 10.4 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F7&part=qbj&dl=Round_4_Stanford_Berkeley.qbj"
      ]
     },
     "1:5": {
-     "panel": "Stanford 360 – 100 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Stanford_ASU.qbj · qbj · 9.8 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 360 – 100 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Stanford_ASU.qbj · qbj · 9.8 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F9&part=qbj&dl=Round_5_Stanford_ASU.qbj"
      ]
     },
     "1:6": {
-     "panel": "Stanford 385 – 105 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_Stanford_UIUC.qbj · qbj · 10.1 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 385 – 105 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_Stanford_UIUC.qbj · qbj · 10.1 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F11&part=qbj&dl=Round_6_Stanford_UIUC.qbj"
      ]
     },
     "2:1": {
-     "panel": "UIUC 415 – 115 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_UIUC_ASU.qbj · qbj · 9.3 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "UIUC 415 – 115 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_UIUC_ASU.qbj · qbj · 9.3 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F2&part=qbj&dl=Round_1_UIUC_ASU.qbj"
      ]
     },
     "2:2": {
-     "panel": "Berkeley 370 – 155 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Berkeley_UIUC.qbj · qbj · 9.3 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Berkeley 370 – 155 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Berkeley_UIUC.qbj · qbj · 9.3 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F4&part=qbj&dl=Round_2_Berkeley_UIUC.qbj"
      ]
     },
     "2:3": {
-     "panel": "ASU 140 – 355 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_ASU_Berkeley.qbj · qbj · 10.0 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "ASU 140 – 355 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_ASU_Berkeley.qbj · qbj · 10.0 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F6&part=qbj&dl=Round_3_ASU_Berkeley.qbj"
      ]
     },
     "2:4": {
-     "panel": "UIUC 315 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_UIUC_ASU.qbj · qbj · 9.6 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "UIUC 315 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_UIUC_ASU.qbj · qbj · 9.6 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F8&part=qbj&dl=Round_4_UIUC_ASU.qbj"
      ]
     },
     "2:5": {
-     "panel": "Berkeley 390 – 90 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Berkeley_UIUC.qbj · qbj · 9.9 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Berkeley 390 – 90 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Berkeley_UIUC.qbj · qbj · 9.9 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F10&part=qbj&dl=Round_5_Berkeley_UIUC.qbj"
      ]
     },
     "2:6": {
-     "panel": "ASU 105 – 470 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_ASU_Berkeley.qbj · qbj · 9.7 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "ASU 105 – 470 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_ASU_Berkeley.qbj · qbj · 9.7 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F12&part=qbj&dl=Round_6_ASU_Berkeley.qbj"
      ]
     },
     "2:7": {
-     "panel": "UIUC 140 – 375 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_7_UIUC_ASU.qbj · qbj · 9.2 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "UIUC 140 – 375 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_7_UIUC_ASU.qbj · qbj · 9.2 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F13&part=qbj&dl=Round_7_UIUC_ASU.qbj"
      ]
@@ -110,27 +110,14 @@
     "chars": 366
    },
    "computeRequests": [
-    "GET /a/demo/file?key=t%2F1%2Froster.qbj",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>"
+    "GET /a/demo/games?ids=13,12,11,10,9,8,7,6,5,4,3,2,1"
    ],
    "all": {
     "note": "13 games in these stats",
     "range": "By stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)",
     "out": {
-     "sha256": "0e67faf1eb4c28c74e5f03cf",
-     "chars": 34412
+     "sha256": "df4f5dc37ed3e13dee0eaf22",
+     "chars": 29827
     },
     "downloads": [
      {
@@ -196,8 +183,8 @@
     "note": "12 games in rounds 1–6",
     "range": "By stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)",
     "out": {
-     "sha256": "19fc8b9195c35d87bc93a4f2",
-     "chars": 32419
+     "sha256": "4f7b8ae06f67a70ff623e913",
+     "chars": 28084
     },
     "downloads": [
      {
@@ -226,8 +213,8 @@
     "note": "7 games in Round robin 2 and Round robin 3",
     "range": "By stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–6)",
     "out": {
-     "sha256": "511f558245cb63f1f33746d5",
-     "chars": 21486
+     "sha256": "44346a0f0711e689c3415de2",
+     "chars": 18675
     },
     "downloads": [
      {
@@ -267,6 +254,7 @@
     "/engine/plan.js",
     "/engine/qbj.js",
     "/engine/report.js",
+    "/engine/rosterpaste.js",
     "/engine/schedule.js",
     "/engine/scoresheet.js",
     "/engine/stats.js",
@@ -281,6 +269,7 @@
     "/js/buzzview.js",
     "/js/demo.js",
     "/js/formatui.js",
+    "/js/icons.js",
     "/js/limit.js",
     "/js/packetsui.js",
     "/js/protests.js",
@@ -311,58 +300,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "452f436c57567522c7be72c9",
-      "chars": 243116
+      "sha256": "55107857ad58cc1b5aefa4c9",
+      "chars": 250803
      },
      "layout=classic": {
-      "sha256": "227c3455ff1b391b2987048c",
-      "chars": 243176
+      "sha256": "55107857ad58cc1b5aefa4c9",
+      "chars": 250803
      },
      "layout=new": {
-      "sha256": "b087c4248eef89bf1f944219",
-      "chars": 3110
+      "sha256": "9af66cf3f4539ab4b225ba54",
+      "chars": 3539
      },
      "new/standings": {
-      "sha256": "b087c4248eef89bf1f944219",
-      "chars": 3110
+      "sha256": "9af66cf3f4539ab4b225ba54",
+      "chars": 3539
      },
      "new/individuals": {
-      "sha256": "7aaa85b62b397caeae381376",
-      "chars": 4349
+      "sha256": "d9279d816ce060c8bc16fc82",
+      "chars": 4807
      },
      "new/games": {
-      "sha256": "61cb208becb80c7651dbba9e",
-      "chars": 4287
+      "sha256": "e14c68c168c7475bf493967c",
+      "chars": 4272
      },
      "new/teams": {
-      "sha256": "e86c892ead185d8cafbe5c9b",
-      "chars": 8191
+      "sha256": "669d94fba233deff954b24ea",
+      "chars": 8161
      },
      "new/players": {
-      "sha256": "dfaf22a64b944f0e59bc043d",
-      "chars": 8718
+      "sha256": "2971b87856edbee014452cdd",
+      "chars": 8688
      },
      "new/rounds": {
-      "sha256": "3f67c45b3ac7bdfb01573161",
-      "chars": 2118
+      "sha256": "6a0a19f76292c477fa03dd14",
+      "chars": 2132
      }
     },
     "cats": {
      "first": {
-      "sha256": "a6ca78a5d7e51c30c9f2f87a",
-      "chars": 4389
+      "sha256": "782040b98c2568c6cef954f8",
+      "chars": 4820
      },
      "catview=cat": {
-      "sha256": "a6ca78a5d7e51c30c9f2f87a",
-      "chars": 4389
+      "sha256": "782040b98c2568c6cef954f8",
+      "chars": 4820
      },
      "catview=team": {
-      "sha256": "0e89c6b30714016ad48b0047",
-      "chars": 2378
+      "sha256": "16969e4f01a5f279c4769824",
+      "chars": 2766
      },
      "catview=player": {
-      "sha256": "17703a8c862e3e0805cca273",
-      "chars": 4890
+      "sha256": "fbb51eadd82450aacca7b24f",
+      "chars": 4727
      },
      "catview=questions": {
       "sha256": "6c5da5250204771a7669a6f1",
@@ -407,12 +396,12 @@
       "chars": 94563
      },
      "buzzmode=player": {
-      "sha256": "950f04bd566aef85b59e2b35",
-      "chars": 48318
+      "sha256": "d013ae87b8ccff8ffcf8e662",
+      "chars": 48338
      },
      "buzzmode=team": {
-      "sha256": "adc61811268e3202ccca1a35",
-      "chars": 160711
+      "sha256": "fb99b14c13b413ad64a1a7da",
+      "chars": 160706
      },
      "buzzmode=summary": {
       "sha256": "2e4c904d0ca77e7c31740d23",
@@ -446,6 +435,8 @@
     "/js/buzzkey.js",
     "/js/buzzview.js",
     "/js/demo.js",
+    "/js/newstats.js",
+    "/js/place.js",
     "/js/protests.js",
     "/js/pubview.js",
     "/js/read_core.js",
@@ -458,8 +449,8 @@
   "hub demo after uploads": {
    "label": "after uploads",
    "live": {
-    "sha256": "2b7c4153f7679848989a899c",
-    "chars": 14929
+    "sha256": "8fadb723e9714a52359e4a1b",
+    "chars": 14828
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -477,92 +468,90 @@
     "2:6 umark Game in ✓",
     "2:7 umark Game in ✓"
    ],
-   "liveNow": "Live now\n2/2 in\nRoom A\nBerkeley 295 – 235 Stanford protest\nqbj\ngame\nEdit\n✓\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n2\n\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\n1 open · R7 Room A: Berkeley protests TU 3\nRound\tRoom\tQuestion\tProtest\tScore\tRuling\n7\tRoom A\nBerkeley v Stanford\tTU 3\tBerkeley\nclose enough\n\tBerkeley 295\nStanford 235\n\nSwing unknown: uploaded as a bare qbj, so the buzz position is missing\n\t\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nModerator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\nAuto-advance\n 0/2 started\nRoom A\nRoom B\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nCompute\nDownload ▾\n15 games ready",
-   "rail": "Moderator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\n--\nAuto-advance\n 0/2 started\nRoom A\nRoom B\n--\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nCompute\nDownload ▾\n15 games ready",
+   "liveNow": "Live now\n2/2 in\nRoom A\nBerkeley 295 – 235 Stanford protest\nqbj\ngame\nEdit\n✓\nRoom B\nUIUC 140 – 375 ASU\nDownload\n✓\nUploads\nRecord a forfeit Add a game\nRoom\t1\t2\t3\t4\t5\t6\t7\t8\t9\nRoom A\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n2\n\t\t\nRoom B\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\n✓\n\t\t\n✓ in ·  in progress · ○ started · – missing · ! can’t read · orange: needs a look\nAll protests\n1 open · R7 Room A: Berkeley protests TU 3\nRound\tRoom\tQuestion\tProtest\tScore\tRuling\n7\tRoom A\nBerkeley v Stanford\tTU 3\tBerkeley\nclose enough\n\tBerkeley 295\nStanford 235\n\nSwing unknown: uploaded as a bare qbj, so the buzz position is missing\n\t\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nModerator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\nAuto-advance\n 0/2 started\nRoom A\nRoom B\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\nStats\nShow stats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nDownload ▾\n14 games in these stats",
+   "rail": "Moderator packets\nRelease packet 8\n1\n2\n3\n4\n5\n6\n7\n8\n9\nSet round\nSet\n--\nAuto-advance\n 0/2 started\nRoom A\nRoom B\n--\nProtests 1\nAll\nR7 · Room A · TU 3\nBerkeley\nOpen\nUpheld\nDenied\nWithdrawn\nFor your records only. The moderator should fix the game in MODAQ and re-export.\n--\nStats\nShow stats\nBy stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)\nDownload ▾\n14 games in these stats",
    "cells": {
     "1:1": {
-     "panel": "Stanford 300 – 140 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_Stanford_Berkeley.qbj · qbj · 9.0 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 300 – 140 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_Stanford_Berkeley.qbj · qbj · 9.0 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F1&part=qbj&dl=Round_1_Stanford_Berkeley.qbj"
      ]
     },
     "1:2": {
-     "panel": "Stanford 355 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Stanford_ASU.qbj · qbj · 9.8 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 355 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Stanford_ASU.qbj · qbj · 9.8 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F3&part=qbj&dl=Round_2_Stanford_ASU.qbj"
      ]
     },
     "1:3": {
-     "panel": "Stanford 370 – 70 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_Stanford_UIUC.qbj · qbj · 9.8 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 370 – 70 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_Stanford_UIUC.qbj · qbj · 9.8 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F5&part=qbj&dl=Round_3_Stanford_UIUC.qbj"
      ]
     },
     "1:4": {
-     "panel": "Stanford 235 – 295 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_Stanford_Berkeley.qbj · qbj · 10.4 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 235 – 295 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_Stanford_Berkeley.qbj · qbj · 10.4 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F7&part=qbj&dl=Round_4_Stanford_Berkeley.qbj"
      ]
     },
     "1:5": {
-     "panel": "Stanford 360 – 100 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Stanford_ASU.qbj · qbj · 9.8 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 360 – 100 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Stanford_ASU.qbj · qbj · 9.8 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F9&part=qbj&dl=Round_5_Stanford_ASU.qbj"
      ]
     },
     "1:6": {
-     "panel": "Stanford 385 – 105 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_Stanford_UIUC.qbj · qbj · 10.1 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Stanford 385 – 105 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_Stanford_UIUC.qbj · qbj · 10.1 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F11&part=qbj&dl=Round_6_Stanford_UIUC.qbj"
      ]
     },
     "1:7": {
-     "panel": "Berkeley 295 – 235 Stanford\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_7_Berkeley_Stanford.qbj · combined · 10.5 KB 1 protest open\nqbj\ngame\nEdit in MODAQ\nFix buzzes\nDelete\nStanford 235 – 295 Berkeley · superseded\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_7_Stanford_Berkeley.qbtd.json · combined · 10.5 KB 1 protest · superseded\nqbj\ngame\nEdit in MODAQ\nFix buzzes\nDelete",
+     "panel": "Berkeley 295 – 235 Stanford\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_7_Berkeley_Stanford.qbj · combined · 10.5 KB 1 protest open\nEdit in MODAQ\nFix stats\nDownload ▾\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F1001&part=qbj&dl=Round_7_Berkeley_Stanford.qbj",
-      "<stub>/a/demo/file?key=t%2F1%2Ffile%2F1001&part=game&dl=Round_7_Berkeley_Stanford_Game.json",
-      "<stub>/a/demo/file?key=t%2F1%2Ffile%2F1000&part=qbj&dl=Round_7_Stanford_Berkeley.qbj",
-      "<stub>/a/demo/file?key=t%2F1%2Ffile%2F1000&part=game&dl=Round_7_Stanford_Berkeley_Game.json"
+      "<stub>/a/demo/file?key=t%2F1%2Ffile%2F1001&part=game&dl=Round_7_Berkeley_Stanford_Game.json"
      ]
     },
     "2:1": {
-     "panel": "UIUC 415 – 115 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_UIUC_ASU.qbj · qbj · 9.3 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "UIUC 415 – 115 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_1_UIUC_ASU.qbj · qbj · 9.3 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F2&part=qbj&dl=Round_1_UIUC_ASU.qbj"
      ]
     },
     "2:2": {
-     "panel": "Berkeley 370 – 155 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Berkeley_UIUC.qbj · qbj · 9.3 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Berkeley 370 – 155 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_2_Berkeley_UIUC.qbj · qbj · 9.3 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F4&part=qbj&dl=Round_2_Berkeley_UIUC.qbj"
      ]
     },
     "2:3": {
-     "panel": "ASU 140 – 355 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_ASU_Berkeley.qbj · qbj · 10.0 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "ASU 140 – 355 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_3_ASU_Berkeley.qbj · qbj · 10.0 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F6&part=qbj&dl=Round_3_ASU_Berkeley.qbj"
      ]
     },
     "2:4": {
-     "panel": "UIUC 315 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_UIUC_ASU.qbj · qbj · 9.6 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "UIUC 315 – 175 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_4_UIUC_ASU.qbj · qbj · 9.6 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F8&part=qbj&dl=Round_4_UIUC_ASU.qbj"
      ]
     },
     "2:5": {
-     "panel": "Berkeley 390 – 90 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Berkeley_UIUC.qbj · qbj · 9.9 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "Berkeley 390 – 90 UIUC\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_5_Berkeley_UIUC.qbj · qbj · 9.9 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F10&part=qbj&dl=Round_5_Berkeley_UIUC.qbj"
      ]
     },
     "2:6": {
-     "panel": "ASU 105 – 470 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_ASU_Berkeley.qbj · qbj · 9.7 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "ASU 105 – 470 Berkeley\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_6_ASU_Berkeley.qbj · qbj · 9.7 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F12&part=qbj&dl=Round_6_ASU_Berkeley.qbj"
      ]
     },
     "2:7": {
-     "panel": "UIUC 140 – 375 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_7_UIUC_ASU.qbj · qbj · 9.2 KB\nDownload\nFix buzzes\nDelete",
+     "panel": "UIUC 140 – 375 ASU\nRound 1\nRound 2\nRound 3\nRound 4\nRound 5\nRound 6\nRound 7\nRound 8\nRound 9\nMove files\nRoom A\nRoom B\nRound_7_UIUC_ASU.qbj · qbj · 9.2 KB\nFix stats\nDownload\nDelete",
      "links": [
       "<stub>/a/demo/file?key=t%2F1%2Ffile%2F13&part=qbj&dl=Round_7_UIUC_ASU.qbj"
      ]
@@ -574,29 +563,14 @@
     "chars": 1562
    },
    "computeRequests": [
-    "GET /a/demo/file?key=t%2F1%2Froster.qbj",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>",
-    "GET /a/demo/file?key=<game>"
+    "GET /a/demo/games?ids=13,12,11,10,9,8,7,6,5,4,3,2,1,1001,1000"
    ],
    "all": {
     "note": "14 games in these stats",
     "range": "By stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)",
     "out": {
-     "sha256": "533b482a4e713f899e9c4b2e",
-     "chars": 36731
+     "sha256": "4f6059b6f6b20150c14c45b5",
+     "chars": 31795
     },
     "downloads": [
      {
@@ -662,8 +636,8 @@
     "note": "14 games in rounds 1–7",
     "range": "By stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)",
     "out": {
-     "sha256": "533b482a4e713f899e9c4b2e",
-     "chars": 36731
+     "sha256": "4f6059b6f6b20150c14c45b5",
+     "chars": 31795
     },
     "downloads": [
      {
@@ -692,8 +666,8 @@
     "note": "8 games in Round robin 2 and Round robin 3",
     "range": "By stage\nRound robin 1\n(rounds 1–3)\nRound robin 2\n(rounds 4–6)\nRound robin 3\n(rounds 7–9)\nFinished rounds only\n(Rounds 1–7)",
     "out": {
-     "sha256": "697a585fc7b8e7f52e22b0b6",
-     "chars": 23804
+     "sha256": "523a1ecaf311434f8ce76877",
+     "chars": 20643
     },
     "downloads": [
      {
@@ -733,6 +707,7 @@
     "/engine/plan.js",
     "/engine/qbj.js",
     "/engine/report.js",
+    "/engine/rosterpaste.js",
     "/engine/schedule.js",
     "/engine/scoresheet.js",
     "/engine/stats.js",
@@ -747,6 +722,7 @@
     "/js/buzzview.js",
     "/js/demo.js",
     "/js/formatui.js",
+    "/js/icons.js",
     "/js/limit.js",
     "/js/packetsui.js",
     "/js/protests.js",
@@ -777,58 +753,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "1f3acd0a28e962db647d4fd8",
-      "chars": 3133
+      "sha256": "8491b1abd54ab67caa44578b",
+      "chars": 3562
      },
      "layout=classic": {
-      "sha256": "a348ad2a20ecfe5b3271aad6",
-      "chars": 255366
+      "sha256": "01b2fb6d765970e3e44eae74",
+      "chars": 263053
      },
      "layout=new": {
-      "sha256": "1f3acd0a28e962db647d4fd8",
-      "chars": 3133
+      "sha256": "8491b1abd54ab67caa44578b",
+      "chars": 3562
      },
      "new/standings": {
-      "sha256": "1f3acd0a28e962db647d4fd8",
-      "chars": 3133
+      "sha256": "8491b1abd54ab67caa44578b",
+      "chars": 3562
      },
      "new/individuals": {
-      "sha256": "a6f04d6b4a318ed5620de320",
-      "chars": 8128
+      "sha256": "faa62b89b1aa1dd54c272b07",
+      "chars": 8694
      },
      "new/games": {
-      "sha256": "96c4b9c874980e8dbd34f182",
-      "chars": 7825
+      "sha256": "853d589cdc427e89fe8fbfc4",
+      "chars": 7795
      },
      "new/teams": {
-      "sha256": "3aa1c2fdd6fa13fc78d2d983",
-      "chars": 11840
+      "sha256": "a3e13829cc3462e80e2a8e88",
+      "chars": 11800
      },
      "new/players": {
-      "sha256": "0e6767874ca80a636c7c23d6",
-      "chars": 19040
+      "sha256": "31521b756c82364c33bb36a2",
+      "chars": 18970
      },
      "new/rounds": {
-      "sha256": "4e05f52b55ae450e15f127c0",
-      "chars": 2118
+      "sha256": "5f2b3e094436bab9117bc21a",
+      "chars": 2132
      }
     },
     "cats": {
      "first": {
-      "sha256": "5aab0eac6fba28d3485a1719",
-      "chars": 4389
+      "sha256": "96663f0b0a601ccf2c56a9de",
+      "chars": 4820
      },
      "catview=cat": {
-      "sha256": "5aab0eac6fba28d3485a1719",
-      "chars": 4389
+      "sha256": "96663f0b0a601ccf2c56a9de",
+      "chars": 4820
      },
      "catview=team": {
-      "sha256": "7cabe6b4ef113cc80099df3a",
-      "chars": 2379
+      "sha256": "55486ef261f2975095ac02bf",
+      "chars": 2767
      },
      "catview=player": {
-      "sha256": "17703a8c862e3e0805cca273",
-      "chars": 4890
+      "sha256": "fbb51eadd82450aacca7b24f",
+      "chars": 4727
      },
      "catview=questions": {
       "sha256": "6ed9a7131a47fe67bb4d109b",
@@ -877,12 +853,12 @@
       "chars": 110028
      },
      "buzzmode=player": {
-      "sha256": "d7df9b8e3d65a94303777c86",
-      "chars": 61836
+      "sha256": "4a43442eff37b3c9f08b7cca",
+      "chars": 61856
      },
      "buzzmode=team": {
-      "sha256": "c33dbf47f869f54ff9f5a4f0",
-      "chars": 212933
+      "sha256": "6097921bc6172fd6076144e9",
+      "chars": 212928
      },
      "buzzmode=summary": {
       "sha256": "d9b7e6e97455a37ca3ce3ee3",
@@ -916,6 +892,8 @@
     "/js/buzzkey.js",
     "/js/buzzview.js",
     "/js/demo.js",
+    "/js/newstats.js",
+    "/js/place.js",
     "/js/protests.js",
     "/js/pubview.js",
     "/js/read_core.js",
@@ -940,40 +918,40 @@
     },
     "stats": {
      "first": {
-      "sha256": "fcd66336bfbd6ac9534e6f45",
-      "chars": 456999
+      "sha256": "a6dfc7b5c3683b2c5c35114e",
+      "chars": 453399
      },
      "layout=classic": {
-      "sha256": "233ee6c939337e936737a9ad",
-      "chars": 457059
+      "sha256": "a6dfc7b5c3683b2c5c35114e",
+      "chars": 453399
      },
      "layout=new": {
-      "sha256": "21c28d46a16e07551d31c6a7",
-      "chars": 4327
+      "sha256": "7dfea457f481e7cc93815e0a",
+      "chars": 4245
      },
      "new/standings": {
-      "sha256": "21c28d46a16e07551d31c6a7",
-      "chars": 4327
+      "sha256": "7dfea457f481e7cc93815e0a",
+      "chars": 4245
      },
      "new/individuals": {
-      "sha256": "62cda14e6f00d46710d01feb",
-      "chars": 11527
+      "sha256": "5ae278808212ed209a4e3938",
+      "chars": 11445
      },
      "new/games": {
-      "sha256": "5dea3d613c2a0b8810b3e1f6",
-      "chars": 101185
+      "sha256": "f327f11e8653706617f1caaa",
+      "chars": 100643
      },
      "new/teams": {
-      "sha256": "e8132224b653255d1a1532b7",
-      "chars": 40522
+      "sha256": "07aaaf1ff6021eac591fa73d",
+      "chars": 40385
      },
      "new/players": {
-      "sha256": "8fb8a8e0e4b166befbebd639",
-      "chars": 91234
+      "sha256": "df3586eeaa1eb7ccdfa8c865",
+      "chars": 91062
      },
      "new/rounds": {
-      "sha256": "29803e3165ec41a4d1497c72",
-      "chars": 4809
+      "sha256": "650ed01f120d67c94ff670a1",
+      "chars": 4727
      }
     },
     "cats": {
@@ -1051,54 +1029,54 @@
     },
     "stats": {
      "first": {
-      "sha256": "3e5ab589d8f0c1f690f322d9",
-      "chars": 998271
+      "sha256": "d366d52d3007fd9695230bb0",
+      "chars": 1104137
      },
      "layout=classic": {
-      "sha256": "416ee7b4348c44f5c9b0e985",
-      "chars": 998331
+      "sha256": "d366d52d3007fd9695230bb0",
+      "chars": 1104137
      },
      "layout=new": {
-      "sha256": "dce9ee7d74a23a0a77d4a150",
-      "chars": 6035
+      "sha256": "ba0338a24d2d08dbb9341bc8",
+      "chars": 6777
      },
      "new/standings": {
-      "sha256": "dce9ee7d74a23a0a77d4a150",
-      "chars": 6035
+      "sha256": "ba0338a24d2d08dbb9341bc8",
+      "chars": 6777
      },
      "new/individuals": {
-      "sha256": "9ee40e2a12975a539d0572ef",
-      "chars": 26234
+      "sha256": "202734c4d2cda41c20e90ab7",
+      "chars": 27497
      },
      "new/games": {
-      "sha256": "f050efcb964477dc5b4e8715",
-      "chars": 249248
+      "sha256": "ecadd1026e141435c7a1cc5b",
+      "chars": 248450
      },
      "new/teams": {
-      "sha256": "610e674dd5ba7c78a8bf4a46",
-      "chars": 88098
+      "sha256": "c7e15fea2b7158a0729210e4",
+      "chars": 88185
      },
      "new/players": {
-      "sha256": "5488985883ea66174fc2ad9a",
-      "chars": 261900
+      "sha256": "dda98c9a7e8f2bc5d76b7b16",
+      "chars": 261862
      },
      "new/rounds": {
-      "sha256": "67b2fc88d6df3b0a11611b2f",
-      "chars": 4323
+      "sha256": "ebadd5409f5273c7ed7a25ab",
+      "chars": 4972
      }
     },
     "cats": {
      "first": {
-      "sha256": "641d65ff63d6e8ad16dad5c7",
-      "chars": 14177
+      "sha256": "ec7813e0096f65a1b241fe4e",
+      "chars": 15129
      },
      "catview=cat": {
-      "sha256": "641d65ff63d6e8ad16dad5c7",
-      "chars": 14177
+      "sha256": "ec7813e0096f65a1b241fe4e",
+      "chars": 15129
      },
      "catview=team": {
-      "sha256": "e5389680ecc140e28bfd8cca",
-      "chars": 4497
+      "sha256": "4da21c594985845908d17b90",
+      "chars": 5036
      },
      "catview=player": {
       "sha256": "b9dbbf31b906105882098a9b",
@@ -1137,6 +1115,7 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
@@ -1161,40 +1140,40 @@
     },
     "stats": {
      "first": {
-      "sha256": "605d73bb7b8704576bbe8d11",
-      "chars": 886902
+      "sha256": "b13b10d604e24cd3c9567fd7",
+      "chars": 894015
      },
      "layout=classic": {
-      "sha256": "309910629e8db27925a46420",
-      "chars": 886962
+      "sha256": "b13b10d604e24cd3c9567fd7",
+      "chars": 894015
      },
      "layout=new": {
-      "sha256": "c5d906aa1545966802e9cabe",
-      "chars": 5883
+      "sha256": "26dcd70307724815a9358be6",
+      "chars": 6418
      },
      "new/standings": {
-      "sha256": "c5d906aa1545966802e9cabe",
-      "chars": 5883
+      "sha256": "26dcd70307724815a9358be6",
+      "chars": 6418
      },
      "new/individuals": {
-      "sha256": "93eefec0f285525339b20c4d",
-      "chars": 23622
+      "sha256": "908ad6b440171ffe6816d473",
+      "chars": 24636
      },
      "new/games": {
-      "sha256": "205d2e485ab405d107d534ac",
-      "chars": 221724
+      "sha256": "85399e16cee1534cfc65ea6b",
+      "chars": 220779
      },
      "new/teams": {
-      "sha256": "ecfa9af7334c9bee67c44f46",
-      "chars": 84545
+      "sha256": "9f33ab1a78d83e266f8a1eb8",
+      "chars": 84425
      },
      "new/players": {
-      "sha256": "1505789eadb43dcdc829705b",
-      "chars": 223979
+      "sha256": "2ce13c5ae06d0e8bb014c01d",
+      "chars": 223749
      },
      "new/rounds": {
-      "sha256": "8fcd1344e3f8242de5a04d22",
-      "chars": 4088
+      "sha256": "cb820c57ff57ca61988ba904",
+      "chars": 4516
      }
     }
    },
@@ -1224,6 +1203,7 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
@@ -1248,58 +1228,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "6ff37b6d33541e9e541c7074",
-      "chars": 464733
+      "sha256": "3913ea8f5998db9c47f49bb5",
+      "chars": 424127
      },
      "layout=classic": {
-      "sha256": "f360d530aff1b9350d566425",
-      "chars": 464793
+      "sha256": "3913ea8f5998db9c47f49bb5",
+      "chars": 424127
      },
      "layout=new": {
-      "sha256": "b0689e873283e4b266e0d57a",
-      "chars": 6858
+      "sha256": "aa45380beeb283e7562109d0",
+      "chars": 4049
      },
      "new/standings": {
-      "sha256": "b0689e873283e4b266e0d57a",
-      "chars": 6858
+      "sha256": "aa45380beeb283e7562109d0",
+      "chars": 4049
      },
      "new/individuals": {
-      "sha256": "b06c3e18ce067954d7f41c00",
-      "chars": 11310
+      "sha256": "c6ef1822fbe4c371582bbe3a",
+      "chars": 12753
      },
      "new/games": {
-      "sha256": "29a98a37a6e6cf5e00f2199b",
-      "chars": 51191
+      "sha256": "3e50f9f7551fda743cc50f03",
+      "chars": 100361
      },
      "new/teams": {
-      "sha256": "2c5fc595d937c086833ffc89",
-      "chars": 27344
+      "sha256": "f83f452896e76115c7895fab",
+      "chars": 40152
      },
      "new/players": {
-      "sha256": "95069c5110e8617e5c62d468",
-      "chars": 57726
+      "sha256": "21193cb4c62747d5b49e3b43",
+      "chars": 97029
      },
      "new/rounds": {
-      "sha256": "22662c0939ad1cbb7fa4540c",
-      "chars": 2979
+      "sha256": "f06c04a7114a9027c4cbe809",
+      "chars": 4269
      }
     },
     "cats": {
      "first": {
-      "sha256": "11a08c52cc530ae46c6cc4ed",
-      "chars": 6750
+      "sha256": "7b1cd57148849ad968ad052d",
+      "chars": 7324
      },
      "catview=cat": {
-      "sha256": "11a08c52cc530ae46c6cc4ed",
-      "chars": 6750
+      "sha256": "7b1cd57148849ad968ad052d",
+      "chars": 7324
      },
      "catview=team": {
-      "sha256": "958f4dc9bfcc334f6b0ab00d",
-      "chars": 2992
+      "sha256": "2911bc0c6c7d47fea7b4e244",
+      "chars": 3451
      },
      "catview=player": {
-      "sha256": "c60b568c4a71b90b2a059c64",
-      "chars": 3697
+      "sha256": "f08fa5895cd2db3f6f598305",
+      "chars": 2943
      },
      "catview=questions": {
       "sha256": "4f9b81f82475ee7bc0478894",
@@ -1334,6 +1314,7 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
@@ -1358,58 +1339,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "5c1f5d3d61bc9884e823bddc",
-      "chars": 526556
+      "sha256": "582daf42f32a80537dd43ebd",
+      "chars": 479449
      },
      "layout=classic": {
-      "sha256": "94837b6350cbd43c04d5d3b7",
-      "chars": 526616
+      "sha256": "582daf42f32a80537dd43ebd",
+      "chars": 479449
      },
      "layout=new": {
-      "sha256": "cd34faa55a528ec97b00c771",
-      "chars": 3988
+      "sha256": "facb0837a366743bf15d6aea",
+      "chars": 4159
      },
      "new/standings": {
-      "sha256": "cd34faa55a528ec97b00c771",
-      "chars": 3988
+      "sha256": "facb0837a366743bf15d6aea",
+      "chars": 4159
      },
      "new/individuals": {
-      "sha256": "cf658c494812995ae333d190",
-      "chars": 14273
+      "sha256": "3d2acfe43e84a0833b783fa5",
+      "chars": 14695
      },
      "new/games": {
-      "sha256": "38604739d6b0ae1a2cb8dc1c",
-      "chars": 113198
+      "sha256": "d2663b76a28fd13979fc4357",
+      "chars": 112464
      },
      "new/teams": {
-      "sha256": "b0154735fa4af26d7d783a19",
-      "chars": 42335
+      "sha256": "2c82c05d69f811ee8d3cc23e",
+      "chars": 41991
      },
      "new/players": {
-      "sha256": "20a8e333e904dcb8f351d5cc",
-      "chars": 119772
+      "sha256": "8c06c66f206428fb8cb8de90",
+      "chars": 119368
      },
      "new/rounds": {
-      "sha256": "9931463b6fbe93f44ee513da",
-      "chars": 4138
+      "sha256": "0729b8e528d0b48536dda834",
+      "chars": 4268
      }
     },
     "cats": {
      "first": {
-      "sha256": "7d6d40199f5b61027f724903",
-      "chars": 8111
+      "sha256": "c706fede373308d589e0108c",
+      "chars": 8713
      },
      "catview=cat": {
-      "sha256": "7d6d40199f5b61027f724903",
-      "chars": 8111
+      "sha256": "c706fede373308d589e0108c",
+      "chars": 8713
      },
      "catview=team": {
-      "sha256": "5b2cb3650e7d57a17851bcbe",
-      "chars": 3101
+      "sha256": "fd5642e5d35cfc5680f1a67e",
+      "chars": 3560
      },
      "catview=player": {
-      "sha256": "7bf04794228ed8b3cd3753da",
-      "chars": 4081
+      "sha256": "17d102f39d43a73478972dfb",
+      "chars": 2791
      },
      "catview=questions": {
       "sha256": "cfda47863e1aecd715efb295",
@@ -1444,6 +1425,7 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
@@ -1468,58 +1450,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "f516f1259b40b92ae34ac6ab",
-      "chars": 3802124
+      "sha256": "528e4f7b1bc7312581cdc0b8",
+      "chars": 3809811
      },
      "layout=classic": {
-      "sha256": "7947564024ce28af81028b5b",
-      "chars": 3802184
+      "sha256": "528e4f7b1bc7312581cdc0b8",
+      "chars": 3809811
      },
      "layout=new": {
-      "sha256": "eb1f257d814d6098397088c2",
-      "chars": 10578
+      "sha256": "5bfa654df528752423a1cb56",
+      "chars": 11208
      },
      "new/standings": {
-      "sha256": "eb1f257d814d6098397088c2",
-      "chars": 10578
+      "sha256": "5bfa654df528752423a1cb56",
+      "chars": 11208
      },
      "new/individuals": {
-      "sha256": "02cefff7bf3cde7a91782e8a",
-      "chars": 43009
+      "sha256": "7c249375fe9de35e0a48470f",
+      "chars": 44468
      },
      "new/games": {
-      "sha256": "01aba78c01f3b6bfc9a21924",
-      "chars": 1513863
+      "sha256": "8457031b19c36a43ea0f9472",
+      "chars": 1514983
      },
      "new/teams": {
-      "sha256": "7fc657d6d4f7c99f03df8701",
-      "chars": 143473
+      "sha256": "5ae9c944d917eee642868f65",
+      "chars": 143253
      },
      "new/players": {
-      "sha256": "33f79c4f8ea259979957de4c",
-      "chars": 372916
+      "sha256": "db7481e964af37b1ba28cb51",
+      "chars": 372511
      },
      "new/rounds": {
-      "sha256": "5feda40bf3efe6f25284f180",
-      "chars": 4213
+      "sha256": "145254e19e07caf75cf51980",
+      "chars": 4610
      }
     },
     "cats": {
      "first": {
-      "sha256": "af2695d5fc5024c11c51f705",
-      "chars": 19398
+      "sha256": "c799825badac773f18f25251",
+      "chars": 20767
      },
      "catview=cat": {
-      "sha256": "af2695d5fc5024c11c51f705",
-      "chars": 19398
+      "sha256": "c799825badac773f18f25251",
+      "chars": 20767
      },
      "catview=team": {
-      "sha256": "92c98e52905164c37dab8692",
-      "chars": 6155
+      "sha256": "9490628bc0f840dcb415151c",
+      "chars": 6789
      },
      "catview=player": {
-      "sha256": "138cf67a97b53649e75b1431",
-      "chars": 6376
+      "sha256": "1f2ad7ea8f25c1c9dc84aecd",
+      "chars": 2418
      },
      "catview=questions": {
       "sha256": "b93d41a12590b7cbbef49992",
@@ -1588,12 +1570,12 @@
       "chars": 305166
      },
      "buzzmode=player": {
-      "sha256": "6b7f8218315a3b50fc0b1e10",
-      "chars": 49054
+      "sha256": "e1adf15422785f49751bc61d",
+      "chars": 48258
      },
      "buzzmode=team": {
-      "sha256": "3819d918673189fc88a379d0",
-      "chars": 404249
+      "sha256": "2e976f8190a3fc561d864e09",
+      "chars": 404244
      },
      "buzzmode=replacements": {
       "sha256": "278fc2bc780583e38e96ded8",
@@ -1646,6 +1628,8 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
+    "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
     "/js/reportframe.js",
@@ -1669,58 +1653,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "22d45e1e8b0891a12b918a44",
-      "chars": 949479
+      "sha256": "185f2d5c2b5fa77fc508ccc8",
+      "chars": 957166
      },
      "layout=classic": {
-      "sha256": "7c141a514d265b776d16c06f",
-      "chars": 949539
+      "sha256": "185f2d5c2b5fa77fc508ccc8",
+      "chars": 957166
      },
      "layout=new": {
-      "sha256": "f039bc3a9a3c1a93ce10c7b0",
-      "chars": 7104
+      "sha256": "9f26cb09d07d6ac6253401c5",
+      "chars": 7667
      },
      "new/standings": {
-      "sha256": "f039bc3a9a3c1a93ce10c7b0",
-      "chars": 7104
+      "sha256": "9f26cb09d07d6ac6253401c5",
+      "chars": 7667
      },
      "new/individuals": {
-      "sha256": "cfcbbf7f018f69e3b3e44259",
-      "chars": 26248
+      "sha256": "917e0752c1bd2dd879bb7b99",
+      "chars": 27332
      },
      "new/games": {
-      "sha256": "a66195488181458268ffc7b8",
-      "chars": 203977
+      "sha256": "594e374ee74881d93ca50647",
+      "chars": 203092
      },
      "new/teams": {
-      "sha256": "e4ea1558565d457e5099b473",
-      "chars": 83165
+      "sha256": "24ce68f638eb7fee2d6fa491",
+      "chars": 83025
      },
      "new/players": {
-      "sha256": "6ab39c22283264ab81f06c89",
-      "chars": 211839
+      "sha256": "78482af82c02a7ecc6f6070b",
+      "chars": 211584
      },
      "new/rounds": {
-      "sha256": "d2fc820cec2af45a05061dce",
-      "chars": 4116
+      "sha256": "9f5fd71d6e4a16166460370c",
+      "chars": 4530
      }
     },
     "cats": {
      "first": {
-      "sha256": "69a7de5248f8c142c6b113e1",
-      "chars": 13285
+      "sha256": "9755dba8f38ee80a16976b54",
+      "chars": 14251
      },
      "catview=cat": {
-      "sha256": "69a7de5248f8c142c6b113e1",
-      "chars": 13285
+      "sha256": "9755dba8f38ee80a16976b54",
+      "chars": 14251
      },
      "catview=team": {
-      "sha256": "ada233165a2b380ef5054863",
-      "chars": 4803
+      "sha256": "dd2648e3425d9bfd738d8948",
+      "chars": 5370
      },
      "catview=player": {
-      "sha256": "03b10a4b11abf89e7e658548",
-      "chars": 4286
+      "sha256": "88186cd84b36918b73cbf065",
+      "chars": 2140
      },
      "catview=questions": {
       "sha256": "36318d25498ae3a45b33d9ea",
@@ -1755,6 +1739,8 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
+    "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
     "/js/reportframe.js",
@@ -1778,58 +1764,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "87acac858b83159ade1a3e79",
-      "chars": 681864
+      "sha256": "b712f2a06ba2b142f6f23d42",
+      "chars": 689577
      },
      "layout=classic": {
-      "sha256": "f8f85fd93e4935d9a41071fa",
-      "chars": 681924
+      "sha256": "b712f2a06ba2b142f6f23d42",
+      "chars": 689577
      },
      "layout=new": {
-      "sha256": "68536a84616b21382d641f52",
-      "chars": 5180
+      "sha256": "8febd6081da8d0d1036ae73e",
+      "chars": 5687
      },
      "new/standings": {
-      "sha256": "68536a84616b21382d641f52",
-      "chars": 5180
+      "sha256": "8febd6081da8d0d1036ae73e",
+      "chars": 5687
      },
      "new/individuals": {
-      "sha256": "96b5cbbac890810dd187795f",
-      "chars": 18291
+      "sha256": "69fdd39bcda50fe340c59941",
+      "chars": 19137
      },
      "new/games": {
-      "sha256": "dd1b9350168a16b27c8347a3",
-      "chars": 170505
+      "sha256": "8dcf4892925be9f9f4f73c09",
+      "chars": 169755
      },
      "new/teams": {
-      "sha256": "2fb06455eeba091d57859d66",
-      "chars": 66116
+      "sha256": "0a59b46e762eaf830174252c",
+      "chars": 66016
      },
      "new/players": {
-      "sha256": "c6da2944ce387c6f5907073c",
-      "chars": 165734
+      "sha256": "d5ede6dbda9d50df3624ef6b",
+      "chars": 165564
      },
      "new/rounds": {
-      "sha256": "5d9129048358966ded9d4d63",
-      "chars": 3854
+      "sha256": "c8b00ce48db049084c743a91",
+      "chars": 4268
      }
     },
     "cats": {
      "first": {
-      "sha256": "d462bfd786b04ecc81648f15",
-      "chars": 9956
+      "sha256": "e7e455cc218fca3c78820bbb",
+      "chars": 10698
      },
      "catview=cat": {
-      "sha256": "d462bfd786b04ecc81648f15",
-      "chars": 9956
+      "sha256": "e7e455cc218fca3c78820bbb",
+      "chars": 10698
      },
      "catview=team": {
-      "sha256": "639fb88add5ac0866b0ed26b",
-      "chars": 3658
+      "sha256": "3e572dc15bba0b0efdb7bec1",
+      "chars": 4156
      },
      "catview=player": {
-      "sha256": "64db862fefa5e77ba78cbfbf",
-      "chars": 6396
+      "sha256": "dabb0668d5c6cbfcb686fb67",
+      "chars": 4826
      },
      "catview=questions": {
       "sha256": "1ec8c6270a6b55e59c168ebd",
@@ -1864,6 +1850,8 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
+    "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
     "/js/reportframe.js",
@@ -1887,58 +1875,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "c31a89ee43359a068fd1c9da",
-      "chars": 290562
+      "sha256": "36b6dffb950853519c2b92f4",
+      "chars": 264528
      },
      "layout=classic": {
-      "sha256": "2a47bde632a32b112009fdda",
-      "chars": 290622
+      "sha256": "36b6dffb950853519c2b92f4",
+      "chars": 264528
      },
      "layout=new": {
-      "sha256": "faabbce327533a5b361fb508",
-      "chars": 3178
+      "sha256": "0e7dfa40ec580794cebe7455",
+      "chars": 3242
      },
      "new/standings": {
-      "sha256": "faabbce327533a5b361fb508",
-      "chars": 3178
+      "sha256": "0e7dfa40ec580794cebe7455",
+      "chars": 3242
      },
      "new/individuals": {
-      "sha256": "2f83587dbb2748c680d0a051",
-      "chars": 7481
+      "sha256": "ca9492719e8c317e61ac5913",
+      "chars": 7662
      },
      "new/games": {
-      "sha256": "7c5f5a4a768315e1c03e4723",
-      "chars": 62523
+      "sha256": "62f95da5be38308007c993ba",
+      "chars": 61866
      },
      "new/teams": {
-      "sha256": "c908df203881b682d0dbc132",
-      "chars": 26721
+      "sha256": "dfb0f403a5721072a334de95",
+      "chars": 26324
      },
      "new/players": {
-      "sha256": "090dc00ae816f588f75fb91a",
-      "chars": 52772
+      "sha256": "5c8b4ff69fb8792cf6c00df4",
+      "chars": 52355
      },
      "new/rounds": {
-      "sha256": "c721c10c05997e9c7266c8f3",
-      "chars": 4216
+      "sha256": "bb17bf675707f2c41f9bb056",
+      "chars": 4273
      }
     },
     "cats": {
      "first": {
-      "sha256": "abe1aef3b1be6bd268dec533",
-      "chars": 4300
+      "sha256": "74a3937852f4989b889d2da1",
+      "chars": 4734
      },
      "catview=cat": {
-      "sha256": "abe1aef3b1be6bd268dec533",
-      "chars": 4300
+      "sha256": "74a3937852f4989b889d2da1",
+      "chars": 4734
      },
      "catview=team": {
-      "sha256": "15931f3271dd7d9caa05555f",
-      "chars": 2522
+      "sha256": "bba532e1e40dd4e6e0ba59cf",
+      "chars": 2955
      },
      "catview=player": {
-      "sha256": "d283a8f29ede202543d6b638",
-      "chars": 5874
+      "sha256": "2570d370bbe274b0dca81fd6",
+      "chars": 5682
      },
      "catview=questions": {
       "sha256": "ff960c3c5e7e9c0b1307b493",
@@ -1973,6 +1961,8 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
+    "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
     "/js/reportframe.js",
@@ -1996,58 +1986,58 @@
     },
     "stats": {
      "first": {
-      "sha256": "a0ea5e0e6f0d0723ad22ebf7",
-      "chars": 389864
+      "sha256": "8a3ce59ea8ff5d99a6e6f4c9",
+      "chars": 351516
      },
      "layout=classic": {
-      "sha256": "8461188cf7fb1cc95db4bd37",
-      "chars": 389924
+      "sha256": "8a3ce59ea8ff5d99a6e6f4c9",
+      "chars": 351516
      },
      "layout=new": {
-      "sha256": "28de32b22e6f8f05b6a3aa01",
-      "chars": 3363
+      "sha256": "baa5bc7b2e41864f086685f7",
+      "chars": 3358
      },
      "new/standings": {
-      "sha256": "28de32b22e6f8f05b6a3aa01",
-      "chars": 3363
+      "sha256": "baa5bc7b2e41864f086685f7",
+      "chars": 3358
      },
      "new/individuals": {
-      "sha256": "3f33a1e0c7c6f0e2384e1b82",
-      "chars": 8787
+      "sha256": "9c4a86baf84c6080c5780d1f",
+      "chars": 8909
      },
      "new/games": {
-      "sha256": "52773dfa1952ed6a43ad0281",
-      "chars": 85873
+      "sha256": "b12a4f14b0c9466c28f06e0a",
+      "chars": 85083
      },
      "new/teams": {
-      "sha256": "f52750b228b56321b6bf30ef",
-      "chars": 31941
+      "sha256": "63f2914d191f9d52c9455188",
+      "chars": 31471
      },
      "new/players": {
-      "sha256": "e87737ef24d505478411a2be",
-      "chars": 78752
+      "sha256": "26eed46076b082c8c0a31a9f",
+      "chars": 78257
      },
      "new/rounds": {
-      "sha256": "8455fedb53fd659925d6c4ed",
-      "chars": 4753
+      "sha256": "435fde65d0f78a41d9e07417",
+      "chars": 4765
      }
     },
     "cats": {
      "first": {
-      "sha256": "6c94c85625e75ff64cd6c80f",
-      "chars": 5259
+      "sha256": "e25f7e97c776411d65ffb24a",
+      "chars": 5721
      },
      "catview=cat": {
-      "sha256": "6c94c85625e75ff64cd6c80f",
-      "chars": 5259
+      "sha256": "e25f7e97c776411d65ffb24a",
+      "chars": 5721
      },
      "catview=team": {
-      "sha256": "2c459d29e44050521193bbea",
-      "chars": 2388
+      "sha256": "b19813696ad72ff485401233",
+      "chars": 2821
      },
      "catview=player": {
-      "sha256": "c95cfe8c86185cdc794e9377",
-      "chars": 4118
+      "sha256": "6adf6049052ac48bb49767eb",
+      "chars": 3473
      },
      "catview=questions": {
       "sha256": "ce4fa0e69cc0dae257219a60",
@@ -2082,6 +2072,8 @@
     "/js/archive.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/newstats.js",
+    "/js/place.js",
     "/js/pubview.js",
     "/js/read_core.js",
     "/js/reportframe.js",

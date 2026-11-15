@@ -1245,7 +1245,7 @@ function sheetToggle() {
 // The switch's handlers, for whichever layout drew it. A redraw remounts
 // the Classic report, so its place (page and scroll) is kept first.
 function wireSheetToggle() {
-  const keep = () => { const rb = document.querySelector('.reportbox'); if (rb) pendingPlace = reportPlace(rb); };
+  const keep = () => { const rb = $('reporthost'); if (rb && !rb.hidden) pendingPlace = reportPlace(rb); };
   if ($('sheetchip')) {
     $('sheetchip').onclick = () => {
       keep();
@@ -1318,6 +1318,41 @@ function withSheets(pages, rd) {
     css = '';
   }
   return pages.map((p, i) => (i === at ? { ...p, text } : p));
+}
+
+// A game with its scoresheet is laid out only as it nears the screen
+// (.slay, content-visibility in pub.css): every scoresheet at once was
+// tens of thousands of cells, and slow to show. Until then it holds the
+// space it is expected to take, its rows' worth at the height a few games
+// laid out here measure, so the page's length and a link's landing place
+// come out as they will be; once drawn it keeps its real height.
+function sizeSheetGames(box) {
+  const games = [...box.querySelectorAll('.slay')];
+  if (!games.length) return;
+  // two columns: the tables (.sleft) and the scoresheet, each its rows
+  // times a row's height; a game is its taller column, or both stacked
+  const rowsIn = (el) => (el ? el.querySelectorAll('tr, .sxsubs > div').length : 0);
+  const parts = (el) => [el.querySelector('.sleft'), el.querySelector('.sxwrap')];
+  const per = [0, 0];
+  const cnt = [0, 0];
+  let beside = true;
+  for (const el of games.slice(0, 6)) {
+    el.style.contentVisibility = 'visible';
+    const p = parts(el);
+    p.forEach((x, k) => {
+      if (!rowsIn(x)) return;
+      per[k] += x.getBoundingClientRect().height;
+      cnt[k] += rowsIn(x);
+    });
+    if (p[0] && p[1]) beside = p[1].getBoundingClientRect().top - p[0].getBoundingClientRect().top < 4;
+    el.style.contentVisibility = '';
+  }
+  const rowH = per.map((h, k) => (cnt[k] ? h / cnt[k] : 0));
+  if (!rowH[0] || !rowH[1]) return;
+  for (const el of games) {
+    const [a, b] = parts(el).map((x, k) => rowsIn(x) * rowH[k]);
+    el.style.setProperty('--sheetH', Math.round(beside ? Math.max(a, b) : a + b + 12) + 'px');
+  }
 }
 
 function newGames(rd, ids, vals) {
@@ -1422,6 +1457,7 @@ function renderNewStats(box) {
   wire(box, 'statstage', (v) => { statStage = v; });
   wireSheetToggle();
   fitTables(box);
+  sizeSheetGames(box);
   // a followed link: mark where it landed, with the way back (a round's
   // heading gets only the way back)
   const el = newMark && document.getElementById(newMark);
@@ -1481,13 +1517,35 @@ document.addEventListener('click', (ev) => {
   if (matches.length) downloadReport();
 });
 
+// The Classic report is built once and kept: its frame sits beside #out
+// rather than in it, so drawing another tab or layout only hides it, and
+// coming back shows it as it was, without building it again. It is built
+// again when what it shows has changed (reportKey): new games, the
+// roster, the schedule, the scoresheets, the theme.
+let reportKept = null;
+function reportHost() {
+  let host = $('reporthost');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'reporthost';
+    host.className = 'reportbox';
+    host.hidden = true;
+    $('out').after(host);
+  }
+  return host;
+}
+function reportKey() {
+  const sheets = Boolean(state.scoresheets && buzzStored() && sheetsShown());
+  return [matches, roster, schedule, sheets ? catmap : null, sheets ? rawEntries : null,
+    JSON.stringify([state.name, state.format, sheets, sheets ? [...buzzDoneSet()].sort((x, y) => x - y) : null,
+      getComputedStyle(document.documentElement).getPropertyValue('--fg')])];
+}
+const sameKey = (a, b) => Boolean(a && b) && a.length === b.length && a.every((x, i) => x === b[i]);
+
 function renderStatsTab(box) {
-  // a redraw (new games on Refresh, a new password) keeps the Classic
-  // report where the reader was, as a layout switch does
-  const shown = box.querySelector('.reportbox');
-  if (!pendingPlace && shown) pendingPlace = reportPlace(shown);
-  if (unmountReport) { unmountReport(); unmountReport = null; }
+  const host = reportHost();
   if (!matches.length) {
+    host.hidden = true;
     box.innerHTML = statsErrors.length
       ? statsErrors.map((e) => `<div class="bad">${esc(e)}</div>`).join('')
       : pendingNote() || '<div class="muted">No games yet</div>';
@@ -1507,21 +1565,30 @@ function renderStatsTab(box) {
       : '<div class="reportbox"></div>');
   wire(box, 'layout', (v) => {
     if (v === statsLayout) return;
-    pendingPlace = statsLayout === 'new' ? newPlace($('newstats')) : reportPlace(box.querySelector('.reportbox'));
+    pendingPlace = statsLayout === 'new' ? newPlace($('newstats')) : reportPlace(host);
     if (v === 'new' && pendingPlace) statsSec = PAGE_SEC[pendingPlace.page] || 'standings';
     newMark = null; newBack = [];
     statsLayout = v; savePref(STATS_LAYOUT_KEY, v);
   });
   wire(box, 'statssec', (v) => { statsSec = v; newMark = null; newBack = []; });
-  if (isNew) { renderNewStats($('newstats')); return; }
+  if (isNew) { host.hidden = true; renderNewStats($('newstats')); return; }
   wireSheetToggle();
+  const key = reportKey();
+  // the report as it was: nothing it shows has changed, and no place to open at
+  if (!pendingPlace && sameKey(reportKept, key)) { host.hidden = false; return; }
+  // a redraw (new games on Refresh, a new password) keeps the report
+  // where the reader was, as a layout switch does
+  if (!pendingPlace && !host.hidden) pendingPlace = reportPlace(host);
+  if (unmountReport) { unmountReport(); unmountReport = null; }
   // same rules the TO's own download uses: the report is scaled and its
   // overtime split by the tournament's regulation tossup count, and the
   // schedule's stages and pools head its standings
   const opts = statsOpts();
   let pages = buildReport(opts);
   if (state.scoresheets && buzzStored() && sheetsShown()) pages = withSheets(pages, reportData(opts));
-  unmountReport = mountReport(box.querySelector('.reportbox'), pages, { start: pendingPlace, onBack: backToSchedule, sorts: statSorts });
+  host.hidden = false;
+  unmountReport = mountReport(host, pages, { start: pendingPlace, onBack: backToSchedule, sorts: statSorts });
+  reportKept = key;
   pendingPlace = null;
 }
 
@@ -1534,6 +1601,7 @@ function render() {
   // a tab picked before the first load lands: load() renders it then
   if (!state) return;
   $('round').textContent = finished() ? 'Finished' : 'Round ' + liveRound();
+  if (tab !== 'stats' && $('reporthost')) $('reporthost').hidden = true;
   if (tab === 'schedule') renderSchedule(box);
   else if (tab === 'buzz') renderBuzz(box);
   else if (tab === 'cats') renderCats(box);

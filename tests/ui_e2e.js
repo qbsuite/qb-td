@@ -1486,11 +1486,16 @@ const good = d.files.filter((f) => (f.kind === 'qbj' || f.kind === 'combined') &
 const parsed = played.map((p) => parseMatch(JSON.parse(JSON.stringify(p.qbj)), { filename: p.filename }));
 const deduped = dedupeMatches(parsed);
 const expectAgg = aggregate(deduped, rosterTeams);
-ok('17 stats: every download is off before Compute', await js(`['dlmenu', 'dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild'].every((id) => document.getElementById(id).disabled)`));
-await click('#calc');
-await waitJs(`!document.querySelector('#statsec').hidden && document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats computed', 30000);
-ok('17 stats: Compute renders the stats', (await text('#statsnote')) === `${good.length} games in these stats`, await text('#statsnote'));
-ok('17 stats: Compute shows no errors', !(await exists('#statsout .bad')), await js(`[...document.querySelectorAll('#statsout .bad')].map((x) => x.textContent).join(' | ')`));
+// Show stats: the table under the grid, opened if it's closed, and filled
+async function showStats(what = 'stats') {
+  if (await js(`document.querySelector('#statsec').hidden`)) await click('#showstats');
+  await waitJs(`(() => { const o = document.querySelector('#statsout');
+    return !document.querySelector('#statsec').hidden && !!o.querySelector('table') && !document.querySelector('#dlmenu').disabled; })()`, what, 30000);
+}
+ok('17 stats: every download is on with no stats shown', await js(`['dlmenu', 'dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild'].every((id) => !document.getElementById(id).disabled)`));
+await showStats('stats shown');
+ok('17 stats: Show stats renders the stats', (await text('#statsnote')) === `${good.length} games in these stats`, await text('#statsnote'));
+ok('17 stats: the table shows no errors', !(await exists('#statsout .bad')), await js(`[...document.querySelectorAll('#statsout .bad')].map((x) => x.textContent).join(' | ')`));
 ok('17 stats: every download is on after', await js(`['dlmenu', 'dlyft4', 'dlyft3', 'dlreport', 'dlreportfiles', 'dlzip', 'rebuild'].every((id) => !document.getElementById(id).disabled)`));
 const menu = async (id) => {
   await click('#dlmenu');
@@ -2202,8 +2207,7 @@ await flow('24c. renaming a team and a player after games are in');
 
   // the hub's stats: one row under the new name, with every game it played
   await openHub();
-  await click('#calc');
-  await waitJs(`!document.querySelector('#statsec').hidden && document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats again', 30000);
+  await showStats('stats again');
   const cells = await js(`[...document.querySelectorAll('#statsout td')].map((c) => c.textContent.replace(/\s*\?$/, '').trim())`);
   ok('24c rename: the hub stats show the new names only', cells.includes(newTeam) && cells.includes(newPlayer)
     && !cells.includes(oldTeam) && !cells.includes(oldPlayer), cells.filter((c) => c.includes(oldTeam)));
@@ -2254,8 +2258,7 @@ await flow('24d. recording a forfeit');
     const row = [...t.rows].find((r) => [...r.cells].some((c) => c.classList.contains('name') && c.firstChild && c.firstChild.textContent.trim() === ${q(team)}));
     return row ? [Number(row.cells[head.indexOf('W')].textContent), Number(row.cells[head.indexOf('L')].textContent)] : null;
   })()`);
-  await click('#calc');
-  await waitJs(`document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats before', 30000);
+  await showStats('stats before');
   const before = [await wl(win), await wl(lose)];
   await click('#ffsave');
   const ffFile = await until(async () => {
@@ -2268,8 +2271,7 @@ await flow('24d. recording a forfeit');
   if (!(await exists('.cellpanel .pfile'))) await click(`[data-cell="${room.id}:2"]`);
   await waitJs(`!!document.querySelector('.cellpanel .pfile')`, 'the cell panel');
   ok('24d forfeit: the hub lists it as a forfeit', (await text('.cellpanel')).includes(`${win} defeats ${lose} by forfeit`), await text('.cellpanel'));
-  await click('#calc');
-  await waitJs(`document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats after', 30000);
+  await showStats('stats after');
   const after = [await wl(win), await wl(lose)];
   ok('24d forfeit: a win for one, a loss for the other, in the hub stats',
     before[0] && after[0][0] === before[0][0] + 1 && after[0][1] === before[0][1] && after[1][1] === before[1][1] + 1 && after[1][0] === before[1][0],
@@ -2541,11 +2543,10 @@ await flow('24h. games of every shape in one hub');
   await openHubOf(t.admin_secret);
   await capPanes('24h', t.admin_secret);
   await openHubOf(t.admin_secret);
-  await click('#calc');
-  await waitJs(`!document.querySelector('#statsec').hidden && document.querySelector('#statsout table') && !document.querySelector('#dlmenu').disabled`, 'stats of every shape', 30000);
+  await showStats('stats of every shape');
   const note = await text('#statsnote');
   capJson('stats', '24h', { note, out: await js(`document.querySelector('#statsout').innerText`) });
-  ok('24h shapes: Compute counts the re-exported game once (8 games)', note === '8 games in these stats', note);
+  ok('24h shapes: the stats count the re-exported game once (8 games)', note === '8 games in these stats', note);
   const zip = await readZip(new Uint8Array((await menu('dlzip')).bytes));
   const zn = zip.map((e) => e.name);
   // the games the stats count, the newest upload of each: the game re-read

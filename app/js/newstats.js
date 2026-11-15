@@ -361,6 +361,14 @@ export function sortTables(box, sorts) {
 // its header and first column stay put inside it; an edge fade (more)
 // says there's more to the right until the end is reached.
 export function fitTables(box) {
+  // Wrapped first, measured after, and marked last, each for every table
+  // in turn: a measurement after a change lays the page out again, so
+  // doing them table by table laid it out once per table (hundreds on the
+  // Games page). A table in a game laid out only near the screen (.slay)
+  // is measured when it gets there: measuring it any sooner would lay out
+  // that game, scoresheet and all.
+  const now = [];
+  const later = new Map();
   for (const table of box.querySelectorAll('table.nstats')) {
     const wrap = table.parentElement;
     let fade = wrap.parentElement;
@@ -370,14 +378,34 @@ export function fitTables(box) {
       wrap.replaceWith(fade);
       fade.appendChild(wrap);
     }
-    wrap.classList.remove('nfit', 'nscroll');
-    const over = table.scrollWidth > wrap.clientWidth + 1;
-    wrap.classList.add(over ? 'nscroll' : 'nfit');
-    const edge = () => fade.classList.toggle('more',
-      over && wrap.scrollLeft + wrap.clientWidth < wrap.scrollWidth - 2);
-    wrap.onscroll = edge;
-    edge();
+    const x = { table, wrap, fade };
+    const game = typeof IntersectionObserver === 'function' && table.closest('.slay');
+    if (game) {
+      if (!later.has(game)) later.set(game, []);
+      later.get(game).push(x);
+    } else now.push(x);
   }
+  fitSome(now);
+  if (!later.size) return;
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      seen.unobserve(e.target);
+      fitSome(later.get(e.target));
+    }
+  }, { rootMargin: '1500px 0px' });
+  for (const game of later.keys()) seen.observe(game);
+}
+function fitSome(list) {
+  for (const x of list) x.wrap.classList.remove('nfit', 'nscroll');
+  for (const x of list) x.over = x.table.scrollWidth > x.wrap.clientWidth + 1;
+  for (const x of list) x.wrap.classList.add(x.over ? 'nscroll' : 'nfit');
+  const more = (x) => x.over && x.wrap.scrollLeft + x.wrap.clientWidth < x.wrap.scrollWidth - 2;
+  const edges = list.map(more);
+  list.forEach((x, i) => {
+    x.fade.classList.toggle('more', edges[i]);
+    x.wrap.onscroll = () => x.fade.classList.toggle('more', more(x));
+  });
 }
 
 // perGame: the same columns per game played (15/G … PPG)

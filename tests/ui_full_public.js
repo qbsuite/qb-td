@@ -1324,8 +1324,10 @@ async function sectionMain(br) {
       && x.shown === 'standings' && q(x.nav) === q(['Standings', 'Individuals', 'Scoreboard', 'Team Detail', 'Player Detail', 'Round Report'])) || x;
   });
   await check('st-02 classic: the frame grows to its content (at least 400 px)', async () => {
+    // the content's height: the root element's (scrollHeight never reads
+    // less than the frame itself, which has a minimum height)
     const h = await tab.js(`parseInt(document.querySelector('iframe.report').style.height, 10)`);
-    const inner = await tab.fjs('document.documentElement.scrollHeight');
+    const inner = await tab.fjs('Math.ceil(document.documentElement.getBoundingClientRect().height)');
     return (h >= 400 && Math.abs(h - Math.max(400, inner + 16)) <= 24) || { h, inner };
   });
   const classicStandings = async () => {
@@ -1406,8 +1408,14 @@ async function sectionMain(br) {
   });
 
   // st-07: switching layouts keeps the place
+  const boardH = await tab.js(`parseInt(document.querySelector('iframe.report').style.height, 10)`);
   await tab.fclick('#page-games a[href="#standings-top"]');
   await tab.fwait(`${SHOWN_PAGE} === 'standings'`, 'standings');
+  await check('st-02 classic: back from the longer Scoreboard, the frame shrinks to Standings again [changed: Classic stats no longer leave a blank space below a page after a longer one.]', async () => {
+    const x = await tab.wait(`(() => { const h = parseInt(document.querySelector('iframe.report').style.height, 10); return h < ${boardH} && h; })()`, 'the frame to shrink').catch(() => null);
+    const inner = await tab.fjs('Math.ceil(document.documentElement.getBoundingClientRect().height)');
+    return (x && Math.abs(x - Math.max(400, inner + 16)) <= 24) || { boardH, h: x, inner };
+  });
   await tab.fclick('#page-standings a[href="#teamdetail-Elm"]');
   await tab.fwait(`${SHOWN_PAGE} === 'teamdetail' && !!document.querySelector('.qt-mark')`, 'Elm');
   await tab.click('[data-layout="new"]');

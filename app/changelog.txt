@@ -1,3 +1,21 @@
+Release Notes for 11/15/2026
+
+[ LIVE HUB ]
+- Removed Compute stats: each download reads the games it needs, and another download right after reads nothing again.
+- Show stats opens a compact table under the grid: standings and individuals side by side, with PPG and the tournament's own point columns.
+- A download that leaves games out names each one and why, with a link to open it.
+
+[ EXPORTS ]
+- A double or triple round robin goes to YellowFruit and the HTML report as one stage played 2x or 3x, as YellowFruit sets it up.
+- A single round robin's report is headed by its stage's name, not "All Games".
+
+[ PERFORMANCE ]
+- The Scoreboard with scoresheets on opens several times faster in both layouts.
+- Going back to Classic stats from another tab keeps the report already drawn.
+
+[ PUBLIC PAGE ]
+- Classic stats no longer leave a blank space below a page after a longer one.
+
 Release Notes for 11/12/2026
 
 [ ARCHIVE ]

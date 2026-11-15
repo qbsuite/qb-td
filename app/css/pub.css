@@ -210,6 +210,8 @@ details.qd .qdmeta.track { line-height: 20px; }
 /* Scoreboard scoresheets: the game's tables stacked on the left, the
    scoresheet (td.css .sx) on the right, which drops below them on a phone. */
 .slay { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; }
+/* laid out only near the screen; until then its expected height (pubview.js sizeSheetGames) */
+.slay { content-visibility: auto; contain-intrinsic-block-size: auto var(--sheetH, 480px); }
 .sleft { flex: 0 1 auto; min-width: 0; }
 .sleft .nbox { flex-direction: column; }
 .sleft .nbox > .nfade { flex: none; }
