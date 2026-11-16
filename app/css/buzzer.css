@@ -1,0 +1,193 @@
+/* Throwaway mock: the buzzer on the reader (buzzer-read.html) and on the
+   public page (buzzer-t.html). Uses td.css's variables. */
+:root { --bz: #c2410c; --bz-fg: #fff; }
+@media (prefers-color-scheme: dark) { :root { --bz: #ea7a3c; --bz-fg: #1a1a1a; } }
+
+/* mock only: the variant switch */
+.mockswitch { position: fixed; left: 8px; bottom: 8px; z-index: 3000000; display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); font-size: 12px; }
+.mockswitch span { display: flex; gap: 2px; }
+.mockswitch span + span { margin-left: 6px; padding-left: 6px; border-left: 1px solid var(--line); }
+.mockswitch a { padding: 2px 8px; border-radius: 5px; color: var(--muted); }
+.mockswitch a.on { background: var(--fg); color: var(--bg); }
+
+/* ---------- reader ---------- */
+.bzr { display: flex; align-items: center; gap: 10px; position: relative; font-size: 14px; }
+.bzr button { font: inherit; cursor: pointer; }
+.bzcount { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--fg); font-variant-numeric: tabular-nums; }
+.bzcount i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.bzcount.off i { background: var(--muted); }
+.bzwho { display: inline-flex; align-items: baseline; gap: 8px; min-width: 0; }
+.bzwho b { font-size: 16px; }
+.bzwho span { color: var(--muted); }
+.bzwho.none { color: var(--muted); }
+.bzclear { padding: 5px 14px; border-radius: 7px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); font-weight: 600; }
+.bzclear:disabled { opacity: .35; cursor: default; }
+.bzlist { display: grid; gap: 6px; font-size: 13px; }
+.bzlist div { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.bzlist b { font-weight: 600; }
+.bzlist span { color: var(--muted); }
+.bzr.wait .bzcount i { background: var(--bz); }
+
+/* chip: lives in the top bar; grows when someone buzzes */
+.bz-chip .bzr.has { padding: 4px 6px 4px 12px; border-radius: 10px; background: var(--bz); color: var(--bz-fg); }
+.bz-chip .bzr.has .bzwho span { color: inherit; opacity: .85; }
+.bz-chip .bzr.has .bzcount { display: none; }
+.bz-chip .bzr.has .bzclear { background: var(--bz-fg); color: var(--bz); border-color: var(--bz-fg); }
+.bz-chip .bzr .bzlist, .bz-bar .bzr .bzlist { position: absolute; top: calc(100% + 8px); right: 0; z-index: 1000001; width: max-content; max-width: 320px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); box-shadow: 0 6px 24px rgba(0, 0, 0, .12); }
+
+/* card: floats under the top bar, always open */
+.bz-card .bzr { position: fixed; top: var(--bztop, 64px); right: 16px; z-index: 1000001; display: grid; gap: 10px; width: 250px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); box-shadow: 0 6px 24px rgba(0, 0, 0, .12); }
+.bz-card .bzhead, .bz-card .bzline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bz-card .bztitle { font-weight: 600; }
+.bz-card .bzcount { cursor: default; }
+.bz-card .bzwho { flex-direction: column; gap: 0; }
+.bz-card .bzr.has { border-color: var(--bz); box-shadow: 0 0 0 2px var(--bz), 0 6px 24px rgba(0, 0, 0, .12); }
+
+/* bar: nothing until a buzz, then a strip across the top */
+.bz-bar .bzr { position: fixed; top: 0; right: 0; z-index: 1000001; padding: 14px 24px; }
+.bz-bar .bzr.has { left: 0; justify-content: center; gap: 18px; background: var(--bz); color: var(--bz-fg); }
+.bz-bar .bzr.has .bzwho b { font-size: 20px; }
+.bz-bar .bzr.has .bzwho span { color: inherit; opacity: .85; }
+.bz-bar .bzr.has .bzcount { display: none; }
+.bz-bar .bzr.has .bzclear { background: var(--bz-fg); color: var(--bz); border-color: var(--bz-fg); }
+.bz-bar #newgame { margin-right: 64px; }
+
+/* the buzzer's row in MODAQ's menu */
+.ms-ContextualMenu-link.bzready { box-shadow: inset 3px 0 0 var(--bz); font-weight: 600; }
+
+/* ---------- public page ---------- */
+.bzp { max-width: 420px; margin: 0 auto; }
+.bzp[hidden] { display: none; }
+.bzp button, .bzp select, .bzp input { font: inherit; }
+.bzjoin, .bzstep { display: grid; gap: 10px; padding-top: 12px; }
+.bzrow { display: flex; gap: 8px; }
+.bzrow input { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+.bzp .primary { padding: 9px 18px; border-radius: 8px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); font-weight: 600; cursor: pointer; }
+.bzlabel { color: var(--muted); }
+.bzp .linkbtn { border: 0; background: none; color: var(--link); cursor: pointer; padding: 0; }
+.bzpick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.bzpick button { padding: 14px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); cursor: pointer; }
+.bzpick button:hover { background: var(--hover-bg); }
+.bzroom { display: grid; gap: 22px; justify-items: center; padding-top: 6px; }
+.bztop { display: flex; align-items: center; gap: 10px; width: 100%; }
+.bztop select { padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+.bzme { flex: 1; min-width: 0; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bzp .bzbtn { display: grid; place-content: center; gap: 2px; width: min(72vw, 280px); aspect-ratio: 1; border-radius: 50%; border: 0; background: var(--bz); color: var(--bz-fg); font-size: 34px; font-weight: 700; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; }
+.bzbtn:active { transform: scale(.97); }
+.bzbtn small { font-size: 16px; font-weight: 500; opacity: .85; }
+.bzbtn.taken { background: var(--card); color: var(--fg); cursor: default; }
+.bzbtn.mine { background: var(--ok); color: var(--bg); cursor: default; }
+.bzbtn.off { background: var(--card); color: var(--muted); }
+.bzroom .bzlist { width: 100%; }
+
+.bzfab { position: fixed; right: 16px; bottom: 16px; z-index: 900; padding: 12px 20px; border-radius: 999px; border: 0; background: var(--bz); color: var(--bz-fg); font: inherit; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .2); }
+.bzsheet { position: fixed; inset: 0; z-index: 1000; padding: 56px 16px 24px; background: var(--bg); overflow: auto; }
+.bzsheet[hidden] { display: none; }
+.bzclose { position: absolute; top: 10px; right: 14px; border: 0; background: none; color: var(--fg); font-size: 30px; line-height: 1; cursor: pointer; }
+
+/* ---------- the page-wide buzz signal (reader) ---------- */
+.bzsignal { position: fixed; inset: 0; z-index: 1000000; pointer-events: none; opacity: 0; }
+/* flash: the whole page pulses twice, then a frame stays until Clear */
+.bzfx-flash.on { opacity: 1; box-shadow: inset 0 0 0 10px var(--bz); }
+.bzfx-flash.go { animation: bzflash .9s ease-out; }
+@keyframes bzflash {
+  0%, 40% { background: color-mix(in srgb, var(--bz) 55%, transparent); }
+  20%, 60% { background: color-mix(in srgb, var(--bz) 12%, transparent); }
+  100% { background: transparent; }
+}
+/* frame: a thick frame until Clear, nothing moving */
+.bzfx-frame.on { opacity: 1; box-shadow: inset 0 0 0 14px var(--bz); }
+/* tint: the page stays tinted until Clear */
+.bzfx-tint.on { opacity: 1; background: color-mix(in srgb, var(--bz) 22%, transparent); box-shadow: inset 0 0 0 6px var(--bz); }
+@media (prefers-reduced-motion: reduce) { .bzfx-flash.go { animation: none; } }
+/* long names stay on one line in the card and the bar */
+.bzwho b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bz-card .bzwho { min-width: 0; flex: 1; }
+.bz-card .bzwho span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bz-card .bzr { grid-template-columns: minmax(0, 1fr); width: 280px; }
+.bzclear, .bzcount { flex: none; }
+.bz-chip .bzr.has .bzwho, .bz-bar .bzr.has .bzwho { max-width: 46vw; }
+
+/* ---------- a player's button: pressed, won, lost ---------- */
+.bzp .bzbtn.sent { filter: brightness(.8); transform: scale(.97); }
+.bzp .bzbtn.mine { box-shadow: 0 0 0 10px color-mix(in srgb, var(--ok) 30%, transparent); }
+.bzp .bzbtn.lost { box-shadow: inset 0 0 0 4px var(--bad); }
+.bzp .bzbtn em { font-style: normal; font-size: 15px; font-weight: 600; color: var(--bad); letter-spacing: .02em; }
+.bzp .bzbtn.shake { animation: bzshake .35s; }
+@keyframes bzshake { 20% { transform: translateX(-9px); } 45% { transform: translateX(8px); } 70% { transform: translateX(-5px); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .bzp .bzbtn.shake { animation: none; } }
+
+/* ---------- 11/16: buzzin.live's way of showing a buzz ---------- */
+:root { --bz-lock: #e3b341; --bz-lock-fg: #1a1a1a; }
+/* the player's button: open, yours, locked out */
+.bzp .bzbtn.mine { background: var(--ok); color: var(--bg); box-shadow: none; cursor: default; }
+.bzp .bzbtn.locked { background: var(--bz-lock); color: var(--bz-lock-fg); }
+.bzp .bzbtn:disabled { cursor: default; }
+/* who has buzzed since Clear, in order: under the buzzer, and in the reader's card */
+.bzorder { list-style: none; counter-reset: bz; display: grid; gap: 4px; width: 100%; max-width: 280px; }
+.bzorder li { counter-increment: bz; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--card); }
+.bzorder li::before { content: counter(bz); color: var(--muted); font-variant-numeric: tabular-nums; }
+.bzorder li span { color: var(--muted); margin-left: auto; }
+.bzroom .bzorder li:first-child { background: var(--win-bg); color: var(--win-fg); font-size: 17px; }
+.bzroom .bzorder li:first-child span, .bzroom .bzorder li:first-child::before { color: inherit; opacity: .8; }
+.bzroom { gap: 16px; }
+/* the reader's card lists the buzzes behind the first, numbered from 2 */
+.bz-card .bzorder { counter-reset: bz 1; font-size: 13px; max-width: none; }
+.bz-card .bzorder li { padding: 3px 8px; }
+.bzsound { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; cursor: pointer; }
+/* the card moves by its top line */
+.bz-card .bzhead { cursor: grab; user-select: none; touch-action: none; }
+.bz-card .bzr.drag .bzhead { cursor: grabbing; }
+.bz-card .bzr.drag { box-shadow: 0 10px 34px rgba(0, 0, 0, .3); }
+
+/* ---------- 11/16: buzz on press or release, and the Space key ---------- */
+.bzp .bzbtn kbd { justify-self: center; margin-top: 6px; padding: 2px 10px; border: 1.5px solid currentColor; border-bottom-width: 3px; border-radius: 6px; font: 600 13px/1.4 ui-sans-serif, system-ui, sans-serif; opacity: .75; }
+/* a phone has no Space key */
+@media (hover: none), (pointer: coarse) { .bzp .bzbtn kbd { display: none; } }
+.bzopts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 18px; width: 100%; }
+.bzwhen { display: inline-flex; align-items: center; gap: 0; color: var(--muted); font-size: 13px; }
+.bzwhen button { margin-left: 8px; padding: 4px 10px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); font-size: 13px; cursor: pointer; border-radius: 7px 0 0 7px; }
+.bzwhen button + button { margin-left: -1px; border-radius: 0 7px 7px 0; }
+.bzwhen button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+[hidden].mockswitch { display: none; }
+
+/* ---------- 11/16: the team's schedule under the buzzer's settings ---------- */
+.bzsched { width: 100%; border-collapse: collapse; font-size: 14px; }
+.bzsched th { padding: 4px 8px; text-align: left; font-weight: 500; font-size: 12px; color: var(--muted); }
+.bzsched td { padding: 6px 8px; border-top: 1px solid var(--line); }
+.bzsched .num { width: 1%; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.bzsched .res { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bzsched td.res { color: var(--muted); }
+.bzsched td.res b { color: var(--fg); font-weight: 600; }
+
+/* ---------- 11/16: rows go to their room; a nudge to the next one ---------- */
+.bzsched tr[data-goroom] { cursor: pointer; }
+.bzsched tr[data-goroom]:hover td, .bzsched tr[data-goroom]:focus-visible td { background: var(--hover-bg); }
+.bzp .bznext { padding: 3px 10px; border: 1.5px solid var(--bz); border-radius: 7px; background: none; color: var(--fg); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* ---------- 11/16: the card lists buzzes the way a player's page does ---------- */
+/* numbered from 1, the player who has it first and larger; Clear keeps its place above */
+.bz-card .bzclear { width: 100%; padding: 7px 14px; }
+.bz-card .bzorder { counter-reset: bz; }
+.bz-card .bzorder li:first-child { padding: 6px 8px; background: var(--win-bg); color: var(--win-fg); font-size: 16px; }
+.bz-card .bzorder li:first-child span, .bz-card .bzorder li:first-child::before { color: inherit; opacity: .8; }
+.bz-card .bzwho.none { display: block; padding: 6px 0; }
+
+/* Clear sits in the card's top line, between the title and the count */
+.bz-card .bzhead .bzclear { width: auto; flex: 1; padding: 5px 14px; }
+
+/* ---------- 11/16: the card shows it can be dragged ---------- */
+/* the start card's six-dot grip, on a top line set apart as a handle */
+.bz-card .bzr { padding-top: 0; }
+.bz-card .bzhead { margin: 0 -12px; padding: 8px 12px; border-bottom: 1px solid var(--line); border-radius: 11px 11px 0 0; background: var(--card); }
+.bz-card .bzgrip { color: var(--muted); letter-spacing: -3px; font-size: 16px; line-height: 1; margin-right: -2px; }
+.bz-card .bzhead:hover .bzgrip, .bz-card .bzr.drag .bzgrip { color: var(--fg); }
+
+/* ---------- 11/16: the TD's buzzer settings (buzzer-hub.html) ---------- */
+.bzset { display: grid; gap: 10px; margin: 4px 0 16px; }
+.bzpwrow { gap: 10px; align-items: center; }
+.bzpwshow { padding: 3px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.roomtable .bzcol { text-align: center; width: 1%; white-space: nowrap; }
+.roomtable .bzcol input { width: 16px; height: 16px; vertical-align: middle; }
+.roomtable.bzrooms { width: auto; min-width: 260px; }
+.bzfab[hidden] { display: none; }

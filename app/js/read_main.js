@@ -37,6 +37,7 @@ import { toQBJString } from 'modaq/src/qbj/QBJ.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 import { slotLabel } from '../engine/brackets.js';
 import { askWarning, andList } from './warnask.js';
+import { mountBuzzer, rememberBuzzer, recallBuzzer } from './buzzer_read.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 // worker.js NOT_STARTED: every room route answers this until the TD presses Start
@@ -760,6 +761,10 @@ async function boot() {
     }
     fetchTbPool(); // refresh the Add Questions pool; the game itself is offline
     mountMODAQ(gid, meta, false);
+    // the room's buzzer, as its room link left it on this device
+    // (buzzer_read.js); the roster's names, else this game's players
+    const bz = recallBuzzer(store);
+    if (bz) mountBuzzer(bz, bz.names.length ? bz.names : Object.values(meta.order || {}).flat().filter(Boolean));
     return;
   }
 
@@ -781,6 +786,10 @@ async function boot() {
     return;
   }
   setHeader(state.tournament, state.room, state.current_round, '', state.bracket);
+  // a room with a buzzer (state.buzzer: {slug, room, token}) gets the
+  // moderator's card, and its game links find the buzzer on this device
+  rememberBuzzer(store, state.buzzer);
+  if (state.buzzer) mountBuzzer(state.buzzer, (recallBuzzer(store) || {}).names);
   // schedule-less tournaments: this quietly 404s and nothing changes
   const schedP = pub(tq('/b/' + secret + '/schedule')).then((r) => r, () => null);
   // likewise tournaments without a tiebreaker pool
@@ -812,6 +821,12 @@ async function boot() {
   }
   say('');
   showTeams();
+  if (state.buzzer) {
+    // the card's short names come from the whole roster
+    const names = teams.flatMap((t) => t.players.map((p) => p.name));
+    rememberBuzzer(store, state.buzzer, names);
+    mountBuzzer(state.buzzer, names);
+  }
   const sr = await schedP;
   if (sr && sr.room !== null && sr.schedule) {
     sched = sr.schedule;

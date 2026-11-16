@@ -1,0 +1,33 @@
+# qb-td buzzer rooms. Deployed 11/16/2026 for latency and cost trials only
+# (nothing in qb-td points at it yet). Locally, with the mockups:
+#   cd buzzer && npx wrangler dev --local --port 8789 --ip 0.0.0.0
+# One Durable Object per tournament room: no storage, one alarm (the
+# tournament's close).
+name = "qb-td-buzzer"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# Trial (11/16): the app and the mockups served from here, so the buzzer can
+# be tried by people elsewhere before it is wired into qb-td. Remove after.
+[assets]
+directory = "./site"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "BuzzRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BuzzRoom"]
+
+# No vars. The one secret is BUZZER_SECRET (`npx wrangler secret put
+# BUZZER_SECRET`), shared with the qb-td Worker, which signs join tokens
+# with it (token.js). Local runs read .dev.vars instead.
+
+# Trial logging (11/16): the room's own event lines only. Per-request logs
+# stay off, since a request's address carries the join token and the name.
+[observability]
+enabled = true
+[observability.logs]
+enabled = true
+invocation_logs = false

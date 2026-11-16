@@ -4,3 +4,6 @@ worker/.wrangler/
 worker/.dev.vars
 forum_post.txt
 wrangler_dev.log
+buzzer/.wrangler/
+buzzer/.dev.vars
+buzzer/site/

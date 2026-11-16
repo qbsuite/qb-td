@@ -448,6 +448,47 @@ function scheduleTeams() {
   return [...names].sort();
 }
 
+// A team's schedule as data, for the buzzer (buzzer_pub.js): the rows
+// renderTeamView shows. A game's room is its bucket id (null: none), and
+// its score is null until the game is in.
+function teamGames(team) {
+  if (!schedule) return [];
+  const results = resultMap();
+  const rows = [];
+  for (const phase of schedule.phases) {
+    for (const round of phase.rounds) {
+      const g = round.games.find((x) => slotText(x.a) === team || slotText(x.b) === team);
+      if (g) {
+        const opp = slotText(slotText(g.a) === team ? g.b : g.a);
+        const m = g.a && g.a.team && g.b && g.b.team ? resultFor(results, round, g.a.team, g.b.team) : null;
+        const mine = m && m.teams.find((t) => t.name === team);
+        const theirs = m && m.teams.find((t) => t.name === opp);
+        rows.push({ round: round.round, vs: opp, room: schedule.rooms[g.room] ? schedule.rooms[g.room].bucket ?? null : null,
+          roomName: roomName(g),
+          score: mine && theirs
+            ? { res: resultOf(mine, theirs), us: mine.points, them: theirs.points, forfeit: Boolean(m.forfeit) } : null });
+      } else if (round.byes.some((s) => slotText(s) === team)) rows.push({ round: round.round, bye: true });
+    }
+  }
+  return rows;
+}
+
+// The players' buzzer (buzzer_pub.js): fetched only once the tournament
+// has buzzer rooms (state.buzzer), then brought up to date by each load.
+let buzzerPub = null;
+function mountBuzzer() {
+  if (state.buzzer !== 1 && !buzzerPub) return;
+  buzzerPub = buzzerPub || import('./buzzer_pub.js');
+  buzzerPub.then((m) => m.mountBuzzer({
+    slug,
+    on: () => state.buzzer === 1,
+    teams: () => (roster || []).map((t) => ({ name: t.name, players: t.players })),
+    rooms: () => (schedule ? schedule.rooms.map((r) => ({ id: r.bucket ?? null, name: r.name })) : []),
+    games: teamGames,
+    liveRound,
+  })).catch(() => { buzzerPub = null; }); // the page works without it; the next load tries again
+}
+
 // The round on the floor (worker.js liveRound): rooms may already have
 // the next one, but it's live here once a room starts it. Older states
 // and frozen copies carry only current_round.
@@ -1720,6 +1761,7 @@ async function load() {
     if (!statsMoved && !schedMoved && !catsMoved) {
       say('');
       if (dropped && tab !== null) { sheetAsk = false; render(); }
+      mountBuzzer();
       return;
     }
     say('Loading');
@@ -1762,6 +1804,7 @@ async function load() {
         ? wanted : schedule && !usingArchive() ? 'schedule' : 'stats', false);
     } else render();
     say('');
+    mountBuzzer();
   } catch (e) { say(e.message, true); }
 }
 

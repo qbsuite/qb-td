@@ -57,6 +57,7 @@ import { isGameFile, newestOf } from '../engine/games.js';
 import { askWarning, warningOpen } from './warnask.js';
 import { readTagged, settingsBody, rulingsBody, postSchedule, postRoster, FORMAT_KEYS,
   SCHED_CONFLICT, SCHED_KEPT, ROSTER_CONFLICT, ROSTER_KEPT } from './saves.js';
+import { buzzerOf, buzzerSetHtml, buzzerCellHtml, wireBuzzer, BUZZER_TH, BUZZER_BLANK } from './buzzer_hub.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -967,10 +968,14 @@ function renderRoomsSec(a, t, buckets, files) {
   const box = $('setupsec');
   const next = nextRoomNumber(buckets);
   const bye = lastDetail && lastDetail.byeRoom;
+  // the buzzer settings (buzzer_hub.js): null unless this browser opted in
+  // or the tournament has them, and then nothing below is drawn for them
+  const bzWas = JSON.parse(t.settings || '{}') || {};
+  const bz = buzzerOf(bzWas, buckets);
   box.innerHTML = `
-    <h2>Rooms</h2>
+    <h2>Rooms</h2>${bz ? buzzerSetHtml(bz) : ''}
     ${buckets.length ? `<div class="tablewrap"><table class="roomtable">
-      <tr><th>Name</th><th>Reader link</th><th class="num">Files</th><th></th></tr>
+      <tr><th>Name</th><th>Reader link</th>${bz ? BUZZER_TH : ''}<th class="num">Files</th><th></th></tr>
       ${buckets.map((b) => {
         // names go into a JS string inside an attribute: escape for both
         const js = (s) => esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
@@ -979,12 +984,12 @@ function renderRoomsSec(a, t, buckets, files) {
           <td><input class="inlinename" data-roomrename="${b.id}" value="${esc(b.room_name)}" aria-label="Room name"></td>
           <td class="linkpair"><button class="ico" onclick="qtd.copy('${js(link)}', '${js(b.room_name)} reader link')" ${named('Copy reader link')}>${ICON.copy}</button>
             <a class="ico muted" href="${esc(link)}" target="_blank" ${named('Open reader link')}>${ICON.open}</a>${t.started || !testToken ? ''
-              : `<a href="${esc(testLink(b.secret))}" target="_blank">Test</a>`}</td>
+              : `<a href="${esc(testLink(b.secret))}" target="_blank">Test</a>`}</td>${bz ? buzzerCellHtml(bz, b.id, b.room_name) : ''}
           <td class="num muted">${files.filter((f) => f.bucket_id === b.id).length}</td>
           <td class="num"><button class="ico muted" data-delbucket="${b.id}" ${named('Remove room')}>${ICON.trash}</button></td>
         </tr>`;
       }).join('')}
-      <tfoot><tr><td></td><td class="linkpair"><button class="linkbtn copyall" id="copyrooms" ${named('Copy all reader links')}>${ICON.copy}<span>Copy all</span></button></td><td></td><td></td></tr></tfoot>
+      <tfoot><tr><td></td><td class="linkpair"><button class="linkbtn copyall" id="copyrooms" ${named('Copy all reader links')}>${ICON.copy}<span>Copy all</span></button></td>${bz ? BUZZER_BLANK : ''}<td></td><td></td></tr></tfoot>
     </table></div>
     <p class="muted" style="font-size:13px;margin:6px 0 0">${t.started
       ? `Room links will stop working in <span class="tabnum" data-until="${t.closes}">${fmtLeft(t.closes)}</span>.`
@@ -1005,6 +1010,18 @@ function renderRoomsSec(a, t, buckets, files) {
       <p class="muted">Bye Room can be used by several readers at once and does not export or save results.</p>
     </div>` : ''}`;
   if ($('copybye')) $('copybye').onclick = () => copy(byeLink(bye.secret), 'Bye Room link');
+  // one settings key, saved whole each time (settings.buzzer)
+  if (bz) {
+    wireBuzzer(box, bz, {
+      save: async (next) => {
+        try {
+          await pub(a, { method: 'POST', json: settingsBody(bzWas, { ...bzWas, buzzer: next }, {}, ['buzzer']) });
+        } catch (e) { say(e.message, true); }
+        showDetail();
+      },
+      redraw: () => renderRoomsSec(a, t, buckets, files),
+    });
+  }
   // each room's link, one a line ("Room 101: https://…"), to paste in a message
   if ($('copyrooms')) {
     $('copyrooms').onclick = () => copy(buckets.map((b) => `${b.room_name}: ${readLink(b.secret)}`).join('\n'), 'all room links');

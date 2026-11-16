@@ -49,6 +49,7 @@
 import { qbjTextWithRound } from '../app/engine/modaqfile.js';
 import { withRound } from '../app/engine/qbj.js';
 import { rosterNamesFromText } from '../app/engine/games.js';
+import { signToken, PLAYER_TOKEN_MS } from '../buzzer/token.js';
 import { storedFileText, rosterExportBody, publicQbjName, publicQbjText } from '../app/engine/exportfile.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
@@ -4301,7 +4302,7 @@ async function getBucketRow(env, secret) {
   const { results } = await env.DB.prepare(
     'SELECT b.id, b.room_name, b.created, b.tournament_id, b.wrap, t.name AS tournament_name, ' +
     't.current_round, t.bracket_rounds, t.roster_r2_key, t.settings, t.set_id, t.set_key_enc, ' +
-    't.created AS t_created, t.started, t.closes_at ' +
+    't.created AS t_created, t.started, t.closes_at, t.slug ' +
     'FROM buckets b JOIN tournaments t ON t.id = b.tournament_id WHERE b.secret = ?1 OR b.secret = ?2'
   ).bind(secret, await secretHash(secret)).all();
   const b = results[0] || null;
@@ -4440,6 +4441,10 @@ async function bucketState(env, secret, url) {
   // config in particular carries the stored password hash, which must
   // never leave the Worker (see "buzzpoints gate").
   delete settings.buzz;
+  // The buzzer setting carries the players' password: the room gets a
+  // join token for its own buzzer instead, when it has one.
+  const buzzer = await roomBuzzer(env, b, settings.buzzer);
+  delete settings.buzzer;
   const packets = rounds.results;
   return json(env, {
     tournament: b.tournament_name,
@@ -4455,6 +4460,7 @@ async function bucketState(env, secret, url) {
     packets,
     roster: !!b.roster_r2_key,
     settings,
+    ...(buzzer ? { buzzer } : {}),
     uploads: uploads.results,
     upload_count: count.results[0].n,
     started_rounds: starts.results.map((x) => x.round),
@@ -5040,6 +5046,50 @@ async function buzzLimit(request, env, scope) {
 // The per-IP cap behind buzzLimit, for a request whatever it carries: a
 // tournament with no password (statsOpen) has nothing to guess, but its
 // packets are still only handed out at a viewer's pace.
+// ---------------------------------------------------------------- buzzer
+// Buzzer rooms (buzzer/worker.js, its own Worker). settings.buzzer is
+// { online, rooms: [bucket ids], pw }: every room when the tournament is
+// online, else the ticked ones. This Worker only decides who may join and
+// signs a token saying so (buzzer/token.js, under BUZZER_SECRET, which
+// both Workers hold); the rooms themselves never call back here.
+function buzzerConfig(settingsText) {
+  let s;
+  try { s = JSON.parse(settingsText || '{}') || {}; } catch (e) { return null; }
+  const c = s.buzzer;
+  if (!c || typeof c !== 'object') return null;
+  return { online: !!c.online, rooms: Array.isArray(c.rooms) ? c.rooms.filter(Number.isInteger) : [], pw: typeof c.pw === 'string' ? c.pw : '' };
+}
+// Players can get in: a password is set and some room has a buzzer.
+function buzzerOn(c) { return !!(c && c.pw && (c.online || c.rooms.length)); }
+// A moderator's token for this room's buzzer, with its room page's state.
+async function roomBuzzer(env, b, c) {
+  if (!env.BUZZER_SECRET || !b.slug || !c || typeof c !== 'object') return null;
+  if (!c.online && !(Array.isArray(c.rooms) && c.rooms.includes(b.id))) return null;
+  const closes = closesAt({ created: b.t_created, started: b.started, closes_at: b.closes_at });
+  if (Date.now() >= closes) return null;
+  const token = await signToken(env.BUZZER_SECRET, { slug: b.slug, role: 'reader', rooms: [b.id], expires: closes, closes });
+  return { slug: b.slug, room: b.id, token };
+}
+// POST /pub/:slug/buzzer {pw}: a player's token for every buzzer room.
+async function pubBuzzer(request, env, slug) {
+  const limited = await ipLimit(request, env, 'bz:' + slug);
+  if (limited) return limited;
+  const t = await getPublishedTournament(env, slug);
+  const c = t && buzzerConfig(t.settings);
+  if (!env.BUZZER_SECRET || !buzzerOn(c)) return err(env, 404, 'not found');
+  const closes = closesAt(t);
+  if (Date.now() >= closes) return err(env, 410, 'tournament closed');
+  let body = null;
+  try { body = await request.json(); } catch (e) { /* refused below */ }
+  const pw = body && typeof body.pw === 'string' ? body.pw.trim().slice(0, 200) : '';
+  if (!pw || !sameDigest(await sha256Hex(pw), await sha256Hex(c.pw.trim()))) return err(env, 403, 'wrong password');
+  const { results } = await env.DB.prepare('SELECT id FROM buckets WHERE tournament_id = ?1').bind(t.id).all();
+  const bye = byeRoomIds(t.settings);
+  const rooms = results.map((r) => r.id).filter((id) => !bye.includes(id) && (c.online || c.rooms.includes(id)));
+  const token = await signToken(env.BUZZER_SECRET, { slug, role: 'player', rooms, expires: Math.min(closes, Date.now() + PLAYER_TOKEN_MS), closes });
+  return json(env, { token, rooms, closes });
+}
+
 async function ipLimit(request, env, scope) {
   // Guessing the password is an online attack, so cap attempts per IP.
   // Generous enough for a viewer opening every round of a long tournament,
@@ -5489,7 +5539,7 @@ function pubOverlay(env, t) {
     } catch (e) { return null; }
   })();
   return { name: t.name, current_round: t.current_round, roster: !!t.roster_r2_key,
-    format: pubFormat(t), pub };
+    format: pubFormat(t), pub, ...(buzzerOn(buzzerConfig(t.settings)) ? { buzzer: 1 } : {}) };
 }
 
 // fb: the page came here because the qb-td-live file failed it (404, err,
@@ -5509,6 +5559,7 @@ async function pubState(env, slug, ctx, fb = null) {
   // hasn't run): derive it live, and have the next tick build it
   if (ctx) ctx.waitUntil(markPub(env, t.id));
   const body = await pubStateBody(env, t, pub);
+  if (buzzerOn(buzzerConfig(t.settings))) body.buzzer = 1;
   // Games but no shards to serve them from: a tournament published
   // before the round shards existed. Flag it so the next tick
   // materializes it — otherwise
@@ -6946,6 +6997,7 @@ async function route(request, env, ctx, url) {
   if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/qtiebreakers$/)) && method === 'GET') return pubQTiebreakers(request, url, env, m[1]);
   if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/unlock$/)) && method === 'GET') return pubUnlock(request, env, m[1], ctx);
   if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/cats$/)) && method === 'GET') return pubCats(env, m[1]);
+  if ((m = path.match(/^\/pub\/([a-z0-9-]{3,40})\/buzzer$/)) && method === 'POST') return pubBuzzer(request, env, m[1]);
 
   // Public set routes — gated by the set's own publish flag inside.
   if ((m = path.match(/^\/pubset\/([a-z0-9-]{3,40})$/)) && method === 'GET') return pubSetState(env, m[1]);
