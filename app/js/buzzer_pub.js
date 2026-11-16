@@ -256,6 +256,21 @@ function wirePanel() {
  * The first call builds the button and joins the remembered room; a later
  * one only redraws from the new data, and leaves a live connection alone.
  */
+// The roster changed under a remembered player (renamed, moved, removed):
+// a team or a name the roster no longer has is picked again. Without a
+// roster to check against, the remembered one stands.
+function outdated() {
+  const roster = page.teams();
+  if (!roster.length || !me.team) return false;
+  const t = roster.find((x) => x.name === me.team);
+  if (t && (!me.name || t.players.includes(me.name))) return false;
+  if (!t) delete me.team;
+  delete me.name;
+  delete me.room;
+  keep();
+  return true;
+}
+
 export function mountBuzzer(p) {
   page = p;
   short = shortNames(p.teams().flatMap((t) => t.players));
@@ -263,6 +278,7 @@ export function mountBuzzer(p) {
     KEY = 'qbtdBuzzer:' + p.slug;
     try { me = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { me = {}; }
     wirePanel();
+    outdated();
     // a Buzzer button in the corner: the room opens over the page
     fab = document.createElement('button');
     fab.className = 'bzfab';
@@ -281,6 +297,7 @@ export function mountBuzzer(p) {
   }
   // the tournament has no buzzer rooms: the public page is as it is without one
   fab.hidden = !p.on();
+  if (outdated()) { enter(); return; }
   // remembered, but the schedule wasn't there to find the room in: join now
   if (!conn && me.pw && me.team && me.name) enter();
   // a password being typed is left alone
