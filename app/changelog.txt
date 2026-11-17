@@ -5,6 +5,7 @@ Release Notes for 11/16/2026
 
 [ PUBLIC PAGE ]
 - Buzzer asks a player to pick again when the roster no longer has their team or name.
+- Buzzer shows a press as Buzzed at once, and locks for everyone else on the first word of a buzz.
 
 [ READER ]
 - With a buzzer, a buzz puts a box around the question being read.

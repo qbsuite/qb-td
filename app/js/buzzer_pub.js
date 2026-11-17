@@ -125,7 +125,8 @@ function enter() {
         token: tokenFor(gen),
         on: (s, why) => {
           st = s;
-          if (why === 'pending' && sound.on) beep();
+          // the presser heard it on pressing
+          if (why === 'pending' && sound.on && !pressed) beep();
           if (why === 'clear' || (why === 'hello' && !s.buzz)) pressed = false;
           if (why === 'buzz' && pressed && navigator.vibrate) {
             navigator.vibrate(s.buzz.name === me.name && s.buzz.team === me.team ? 200 : [40, 60, 40]);
@@ -163,6 +164,10 @@ function draw() {
   }
   const b = st.buzz;
   const mine = b && b.name === me.name && b.team === me.team;
+  // Shown ahead of the room's answer, so nothing waits on the network: a
+  // press reads Buzzed at once, and the first word that anyone has buzzed
+  // locks everyone else. The named winner then settles it either way.
+  const look = b ? (mine ? 'mine' : 'locked') : pressed ? 'mine' : st.pending ? 'locked' : '';
   const teams = new Map();
   for (const p of st.players) teams.set(p.team, [...(teams.get(p.team) || []), p.name]);
   panel.innerHTML = `<div class="bzroom">
@@ -171,9 +176,9 @@ function draw() {
       <span class="bzme">${esc(me.name)} · ${esc(me.team)}</span>
       <button class="linkbtn" data-leave>Leave</button>
     </div>
-    <button class="bzbtn${mine ? ' mine' : b ? ' locked' : pressed ? ' sent' : ''}${st.live ? '' : ' off'}"${!st.live ? ' disabled' : ''}>
-      <span>${mine ? 'Buzzed' : b ? 'Locked' : 'Buzz'}</span>
-      ${b ? '' : '<kbd>Space</kbd>'}
+    <button class="bzbtn${look === 'mine' ? ' mine' : look === 'locked' ? ' locked' : ''}${st.live ? '' : ' off'}"${!st.live ? ' disabled' : ''}>
+      <span>${look === 'mine' ? 'Buzzed' : look === 'locked' ? 'Locked' : 'Buzz'}</span>
+      ${look ? '' : '<kbd>Space</kbd>'}
     </button>
     ${orderHtml(st.list, label)}
     <div class="bzlist">${[...teams].map(([t, names]) => `<div><b>${esc(t)}</b>${names.sort().map((n) => `<span title="${esc(n)}">${esc(label(n))}</span>`).join('')}</div>`).join('')}</div>
@@ -189,6 +194,8 @@ function draw() {
 function press() {
   // a press behind someone else's buzz still joins the order, once
   if (!conn || !st.live || pressed) return;
+  // the first press sounds at once; one behind someone else's buzz is silent
+  if (sound.on && !st.buzz && !st.pending) beep();
   pressed = true;
   conn.buzz();
   draw();

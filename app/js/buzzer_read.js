@@ -98,7 +98,8 @@ export function mountBuzzer(info, names) {
     const n = st.players.length;
     const clear = `<button class="bzclear"${b || st.pending ? '' : ' disabled'}>Clear</button>`;
     const count = `<button class="bzcount${st.live ? '' : ' off'}" aria-label="Players in the room" aria-expanded="${showList}"><i></i>${n}</button>`;
-    box.className = 'bzr' + (b ? ' has' : st.pending ? ' wait' : '');
+    // lit from the first word of a buzz, before the winner is named
+    box.className = 'bzr' + (b || st.pending ? ' has' : '') + (!b && st.pending ? ' wait' : '');
     // the card: who has it and Clear, the buzzes in order, who is in the room
     box.innerHTML = `<div class="bzhead" title="Drag to move"><span class="bzgrip" aria-hidden="true">⋮⋮</span><span class="bztitle">Buzzer</span>${clear}${count}</div>
     ${orderHtml(st.list, label) || '<div class="bzwho none">No buzz</div>'}${listHtml()}
