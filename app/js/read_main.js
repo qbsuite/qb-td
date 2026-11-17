@@ -509,6 +509,8 @@ function renderTeamPick() {
       : esc(`From the schedule \u00b7 Round ${selectedRound} in ${state.room}`);
     $('mteama').textContent = schedGame.a;
     $('mteamb').textContent = schedGame.b;
+    // long names: smaller, and each team keeps to its own lines (room.css)
+    $('mteama').parentElement.classList.toggle('long', (schedGame.a + schedGame.b).length > 44);
   }
   renderStarters();
 }

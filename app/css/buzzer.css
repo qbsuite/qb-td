@@ -196,3 +196,89 @@
    container; its class is generated, but always starts with this name) */
 body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); outline-offset: 8px; border-radius: 4px;
   background: color-mix(in srgb, var(--bz) 14%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--bz) 14%, transparent); }
+
+/* ---------- 11/17: a sound to pick, and how the button answers a press ---------- */
+.bzsound { cursor: default; }
+.bzsound label, .bzanim { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.bzsound select, .bzanim select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
+.bzplay { padding: 3px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--muted); font-size: 12px; line-height: 1.4; cursor: pointer; }
+.bzp .bzbtn { position: relative; }
+/* each starts from --fxd, a negative delay, so a redraw mid-way carries on */
+.bzp .bzbtn.fx-ring::after, .bzp .bzbtn.fx-pulse::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 6px solid var(--ok); pointer-events: none; animation: bzfxring .6s ease-out var(--fxd, 0ms) forwards; }
+.bzp .bzbtn.fx-pulse::after { border-width: 5px; animation: bzfxring 1.1s ease-out var(--fxd, 0ms) infinite; }
+@keyframes bzfxring { from { transform: scale(1); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
+.bzp .bzbtn.fx-pop { animation: bzfxpop .38s cubic-bezier(.2, 1.6, .4, 1) var(--fxd, 0ms); }
+@keyframes bzfxpop { 0% { transform: scale(.88); } 60% { transform: scale(1.07); } 100% { transform: scale(1); } }
+.bzp .bzbtn.fx-ripple { overflow: hidden; }
+.bzp .bzbtn.fx-ripple i.rip { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: rgba(255, 255, 255, .55); pointer-events: none; animation: bzfxrip .55s ease-out var(--fxd, 0ms) forwards; }
+@keyframes bzfxrip { to { transform: scale(30); opacity: 0; } }
+.bzp .bzbtn.fx-flash { animation: bzfxflash .45s ease-out var(--fxd, 0ms); }
+@keyframes bzfxflash { 0% { filter: brightness(2.2); } 100% { filter: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .bzp .bzbtn.fx-ring::after, .bzp .bzbtn.fx-pulse::after, .bzp .bzbtn.fx-ripple i.rip { display: none; }
+  .bzp .bzbtn.fx-pop, .bzp .bzbtn.fx-flash { animation: none; }
+}
+
+/* ---------- long names wrap inside the sheet, never push it wider ---------- */
+.bzroom > * { min-width: 0; max-width: 100%; }
+.bztop select { min-width: 0; max-width: 45%; text-overflow: ellipsis; }
+.bzsched th:nth-child(2), .bzsched td:nth-child(2) { overflow-wrap: anywhere; }
+.bzsched th:first-child, .bzsched th.res { white-space: nowrap; }
+.bzorder li b, .bzorder li span, .bzlist span, .bzlist b { overflow-wrap: anywhere; min-width: 0; }
+
+/* ---------- one line a row, long names end in …, on the card and the player's sheet ---------- */
+.bzorder li { min-width: 0; flex-wrap: nowrap; }
+.bzorder li b { flex: 0 1 auto; min-width: 0; max-width: 62%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.bzorder li span { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; overflow-wrap: normal; }
+.bzlist { grid-template-columns: minmax(0, 1fr); }
+.bzlist div { min-width: 0; }
+.bzlist b { flex: 0 0 100%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.bzlist span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; overflow-wrap: normal; }
+/* the schedule's "<team> vs" heading: one line, cut to its column (the rows below still wrap) */
+.bzsched th:nth-child(2) { max-width: 0; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+/* whoever has the buzz is marked by colour alone: every row the same size */
+.bzroom .bzorder li:first-child { font-size: inherit; }
+.bz-card .bzorder li:first-child { font-size: inherit; padding: 3px 8px; }
+
+/* ---------- the card: any corner resizes it; C on the Clear button ---------- */
+/* any corner drags the card bigger or smaller (buzzer_read.js scales it from its top left) */
+.bz-card .bzr { transform-origin: 0 0; }
+.bzcorner { position: absolute; width: 18px; height: 18px; touch-action: none; }
+.bzcorner.nw { left: -5px; top: -5px; cursor: nwse-resize; }
+.bzcorner.se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.bzcorner.ne { right: -5px; top: -5px; cursor: nesw-resize; }
+.bzcorner.sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.bzr:hover .bzcorner::after { content: ''; position: absolute; inset: 5px; border: 0 solid var(--muted); opacity: .7; }
+.bzr:hover .bzcorner.nw::after { border-width: 2px 0 0 2px; border-top-left-radius: 8px; }
+.bzr:hover .bzcorner.ne::after { border-width: 2px 2px 0 0; border-top-right-radius: 8px; }
+.bzr:hover .bzcorner.sw::after { border-width: 0 0 2px 2px; border-bottom-left-radius: 8px; }
+.bzr:hover .bzcorner.se::after { border-width: 0 2px 2px 0; border-bottom-right-radius: 8px; }
+.bzclear kbd { margin-left: 6px; padding: 0 5px; border: 1px solid currentColor; border-bottom-width: 2px; border-radius: 4px; font: 600 11px/1.5 ui-sans-serif, system-ui, sans-serif; opacity: .7; }
+@media (hover: none), (pointer: coarse) { .bzclear kbd { display: none; } }
+
+/* ---------- who is in the room: a column a team, the lines under the names level ---------- */
+.bzcols { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; grid-auto-columns: minmax(0, 1fr); gap: 0 20px; width: 100%; font-size: 14px; }
+.bzcols b { align-self: end; min-width: 0; padding-bottom: 5px; border-bottom: 1px solid var(--line); font-weight: 600; overflow-wrap: anywhere; }
+.bzcols div { display: grid; gap: 5px; align-content: start; min-width: 0; padding-top: 6px; }
+.bzcols span { color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+/* on the moderator's card a name is one line, ending in … */
+.bz-card .bzcols { font-size: 13px; gap: 0 14px; }
+.bz-card .bzcols b, .bz-card .bzcols span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+
+/* ---------- the buzz order as a table: numbers, names and teams each start level ---------- */
+.bzorder { grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr); column-gap: 8px; }
+.bzorder li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline; gap: 0 8px; }
+.bzorder li b { max-width: 11em; }
+.bzorder li span { margin-left: 0; text-align: left; }
+
+/* ---------- under the Buzz button, one thing at a time: Room, Schedule, Settings ---------- */
+.bztabs { display: flex; width: 100%; border-bottom: 1px solid var(--line); }
+.bztabs button { position: relative; flex: 1; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
+.bztabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--bz); font-weight: 600; }
+/* the next game is in another room: a dot on Schedule */
+.bztabs button.mark::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--bz); vertical-align: middle; }
+.bzpane { width: 100%; display: grid; gap: 14px; justify-items: center; }
+.bzpane > * { min-width: 0; max-width: 100%; }
+.bzpane .bzopts { justify-content: flex-start; }
+/* on the player's sheet the team columns are centred */
+.bzpane .bzcols { text-align: center; }

@@ -4,7 +4,7 @@
 // pubview.js loads this only when the tournament has buzzer rooms
 // (state.buzzer) and hands it the page's own data through mountBuzzer.
 import { pub } from './api.js';
-import { joinRoom, beep, esc, shortNames, sound, orderHtml } from './buzzer_client.js';
+import { joinRoom, beep, esc, shortNames, sound, orderHtml, soundHtml, wireSound, teamsHtml } from './buzzer_client.js';
 
 // a token lasts up to 12 hours: ask for a new one once it is 10 hours old
 const TOKEN_FRESH_MS = 10 * 60 * 60 * 1000;
@@ -13,7 +13,7 @@ const TOKEN_LIFE_MS = 12 * 60 * 60 * 1000;
 // Buzz when the button goes down, or when it comes back up: the player's
 // choice, remembered on this device
 const when = {
-  get v() { try { return localStorage.getItem('qbtdBuzzerOn') === 'release' ? 'release' : 'press'; } catch (e) { return 'press'; } },
+  get v() { try { return localStorage.getItem('qbtdBuzzerOn') === 'press' ? 'press' : 'release'; } catch (e) { return 'release'; } },
   set v(x) { try { localStorage.setItem('qbtdBuzzerOn', x); } catch (e) { /* private */ } },
 };
 
@@ -37,6 +37,7 @@ let gen = 0; // counts enter(): a token asked for an earlier room is dropped
 let st = { live: false, players: [], buzz: null, list: [], pending: false };
 let wrong = false;
 let pressed = false; // this player pressed since the last Clear
+let tab = 'Room';     // what shows under the button: Room, Schedule or Settings
 
 /** A room is its schedule room's bucket id; it has a buzzer when the
     token's reply listed it. */
@@ -127,7 +128,7 @@ function enter() {
           st = s;
           // the presser heard it on pressing
           if (why === 'pending' && sound.on && !pressed) beep();
-          if (why === 'clear' || (why === 'hello' && !s.buzz)) pressed = false;
+          if (why === 'clear' || (why === 'hello' && !s.buzz)) { pressed = false; if (fx && !fx.preview) fx = null; }
           if (why === 'buzz' && pressed && navigator.vibrate) {
             navigator.vibrate(s.buzz.name === me.name && s.buzz.team === me.team ? 200 : [40, 60, 40]);
           }
@@ -168,12 +169,22 @@ function draw() {
   // press reads Buzzed at once, and the first word that anyone has buzzed
   // locks everyone else. The named winner then settles it either way.
   const look = b ? (mine ? 'mine' : 'locked') : pressed ? 'mine' : st.pending ? 'locked' : '';
-  const teams = new Map();
-  for (const p of st.players) teams.set(p.team, [...(teams.get(p.team) || []), p.name]);
+  // the next game is in another room: the Schedule tab is marked, since
+  // that is where the way there is
+  const next = nextGame(teamRounds(me.team));
+  const elsewhere = !!(next && hasBuzzer(next.room) && next.room !== me.room);
+  const pane = tab === 'Schedule' ? schedHtml()
+    : tab === 'Settings' ? `<div class="bzopts">
+      <span class="bzwhen" role="group" aria-label="Buzz on">Buzz on
+        <button data-when="press" aria-pressed="${when.v === 'press'}">Press</button><button data-when="release" aria-pressed="${when.v === 'release'}">Release</button></span>
+      ${soundHtml()}
+      <label class="bzanim">Animation <select data-bzanim>${ANIMS.map((n) => `<option${n === anim.v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+    </div>`
+    : teamsHtml(st.players, label);
   panel.innerHTML = `<div class="bzroom">
     <div class="bztop">
       <select id="bzroomsel" aria-label="Room">${buzzerRooms().map((r) => `<option value="${r.id}"${r.id === me.room ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
-      <span class="bzme">${esc(me.name)} · ${esc(me.team)}</span>
+      <span class="bzme" title="${esc(me.name)} · ${esc(me.team)}">${esc(me.name)} · ${esc(me.team)}</span>
       <button class="linkbtn" data-leave>Leave</button>
     </div>
     <button class="bzbtn${look === 'mine' ? ' mine' : look === 'locked' ? ' locked' : ''}${st.live ? '' : ' off'}"${!st.live ? ' disabled' : ''}>
@@ -181,27 +192,58 @@ function draw() {
       ${look ? '' : '<kbd>Space</kbd>'}
     </button>
     ${orderHtml(st.list, label)}
-    <div class="bzlist">${[...teams].map(([t, names]) => `<div><b>${esc(t)}</b>${names.sort().map((n) => `<span title="${esc(n)}">${esc(label(n))}</span>`).join('')}</div>`).join('')}</div>
-    <div class="bzopts">
-      <span class="bzwhen" role="group" aria-label="Buzz on">Buzz on
-        <button data-when="press" aria-pressed="${when.v === 'press'}">Press</button><button data-when="release" aria-pressed="${when.v === 'release'}">Release</button></span>
-      <label class="bzsound"><input type="checkbox"${sound.on ? ' checked' : ''}> Sound</label>
-    </div>
-    ${schedHtml()}
+    <div class="bztabs" role="tablist">${['Room', 'Schedule', 'Settings'].map((t) => `<button role="tab" data-tab="${t}" aria-selected="${tab === t}"${
+      t === 'Schedule' && elsewhere && tab !== t ? ' class="mark"' : ''}>${t}</button>`).join('')}</div>
+    <div class="bzpane" role="tabpanel">${pane}</div>
   </div>`;
+  animate(look);
 }
 
-function press() {
+function press(at = null) {
   // a press behind someone else's buzz still joins the order, once
   if (!conn || !st.live || pressed) return;
   // the first press sounds at once; one behind someone else's buzz is silent
   if (sound.on && !st.buzz && !st.pending) beep();
   pressed = true;
+  if (!st.buzz && !st.pending) fx = { name: anim.v, at: Date.now(), x: at ? at.x : null, y: at ? at.y : null };
   conn.buzz();
   draw();
 }
 
+// ---- how the button answers a press. The panel is redrawn whenever the
+// room says something, which is within milliseconds of a press, so the
+// animation is put back on each redraw from where it had got to.
+const ANIMS = ['Ripple', 'Ring', 'Pop', 'Pulse', 'Flash', 'None'];
+const FX_MS = { Ripple: 550, Ring: 600, Pop: 380, Pulse: 1100, Flash: 450 };
+const anim = {
+  get v() { try { const n = localStorage.getItem('qbtdBuzzerAnim'); return ANIMS.includes(n) ? n : 'Ripple'; } catch (e) { return 'Ripple'; } },
+  set v(x) { try { localStorage.setItem('qbtdBuzzerAnim', x); } catch (e) { /* private */ } },
+};
+let fx = null; // { name, at, x, y, preview }: the press being animated
+function animate(look) {
+  const btn = panel.querySelector('.bzbtn');
+  if (!btn || !fx || !FX_MS[fx.name]) return;
+  // a press that turned out locked has nothing to celebrate
+  if (!fx.preview && look !== 'mine') { fx = null; return; }
+  const ms = FX_MS[fx.name];
+  let gone = Date.now() - fx.at;
+  // Pulse keeps going while the buzz is held (a preview shows two rounds)
+  if (fx.name === 'Pulse' && (!fx.preview || gone < ms * 2)) gone %= ms;
+  else if (gone >= ms) { fx = null; return; }
+  btn.style.setProperty('--fxd', `-${gone}ms`);
+  btn.classList.add('fx-' + fx.name.toLowerCase());
+  if (fx.name === 'Ripple') {
+    const r = btn.getBoundingClientRect();
+    const i = document.createElement('i');
+    i.className = 'rip';
+    i.style.left = (fx.x == null ? r.width / 2 : fx.x - r.left) + 'px';
+    i.style.top = (fx.y == null ? r.height / 2 : fx.y - r.top) + 'px';
+    btn.append(i);
+  }
+}
+
 function wirePanel() {
+  wireSound(panel);
   panel.addEventListener('submit', async (e) => {
     e.preventDefault();
     const pw = panel.querySelector('#bzpw').value;
@@ -223,15 +265,18 @@ function wirePanel() {
     else if (t.dataset.name) { me.name = t.dataset.name; keep(); enter(); }
     else if (t.dataset.leave != null) { me = { pw: me.pw, tk: me.tk, rooms: me.rooms, at: me.at }; keep(); enter(); }
     else if (t.dataset.when) { when.v = t.dataset.when; draw(); }
+    else if (t.dataset.tab) { tab = t.dataset.tab; draw(); }
     // release: the click. press: only a keyboard's click (Enter on the button)
-    else if (t.classList.contains('bzbtn') && (when.v === 'release' || e.detail === 0)) press();
+    else if (t.classList.contains('bzbtn') && (when.v === 'release' || e.detail === 0)) press(e.detail ? { x: e.clientX, y: e.clientY } : null);
   });
   // press: the moment a finger or the mouse goes down
   panel.addEventListener('pointerdown', (e) => {
-    if (when.v === 'press' && e.button === 0 && e.target.closest('.bzbtn')) press();
+    if (when.v === 'press' && e.button === 0 && e.target.closest('.bzbtn')) press({ x: e.clientX, y: e.clientY });
   });
   panel.addEventListener('change', (e) => {
-    if (e.target.closest('.bzsound')) { sound.on = e.target.checked; return; }
+    if (e.target.matches('[data-bzsound]')) return; // wireSound's
+    // choosing an animation shows it on the button
+    if (e.target.matches('[data-bzanim]')) { anim.v = e.target.value; fx = { name: anim.v, at: Date.now(), x: null, y: null, preview: true }; draw(); return; }
     if (e.target.id !== 'bzroomsel') return;
     me.room = Number(e.target.value); keep(); enter();
   });

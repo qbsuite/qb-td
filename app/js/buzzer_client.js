@@ -111,23 +111,40 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
 }
 
 let audio = null;
-/** The buzz sound: a short two-tone beep, made here so there is no file. */
-export function beep() {
+// Every sound is made here by the browser, so there is no file to load.
+function tone({ type = 'sine', f, f2 = null, at = 0, len = 0.16, vol = 0.18 }) {
+  const t = audio.currentTime + at;
+  const o = audio.createOscillator();
+  const g = audio.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + len);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  o.connect(g).connect(audio.destination);
+  o.start(t);
+  o.stop(t + len + 0.02);
+}
+const SOUNDS = {
+  Beep: () => { tone({ f: 880 }); tone({ f: 660, at: 0.09 }); },
+  Bell: () => { tone({ f: 1320, len: 0.9, vol: 0.2 }); tone({ f: 2640, len: 0.5, vol: 0.07 }); tone({ f: 3960, len: 0.25, vol: 0.04 }); },
+  Chime: () => { tone({ f: 660, len: 0.35 }); tone({ f: 880, at: 0.12, len: 0.4 }); tone({ f: 1320, at: 0.24, len: 0.6 }); },
+  Ding: () => { tone({ type: 'triangle', f: 1568, len: 0.5, vol: 0.22 }); },
+  Blip: () => { tone({ type: 'square', f: 420, f2: 1400, len: 0.12, vol: 0.12 }); },
+  Laser: () => { tone({ type: 'sawtooth', f: 1800, f2: 220, len: 0.22, vol: 0.12 }); },
+};
+/** The sounds to pick from, in the order listed; Off is silence. */
+export const SOUND_NAMES = [...Object.keys(SOUNDS), 'Off'];
+/** Plays one sound by name (a preview, or the buzz itself). */
+export function playSound(name) {
+  if (!SOUNDS[name]) return;
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    const t = audio.currentTime;
-    for (const [f, at] of [[880, 0], [660, 0.09]]) {
-      const o = audio.createOscillator();
-      const g = audio.createGain();
-      o.frequency.value = f;
-      g.gain.setValueAtTime(0.18, t + at);
-      g.gain.exponentialRampToValueAtTime(0.001, t + at + 0.16);
-      o.connect(g).connect(audio.destination);
-      o.start(t + at);
-      o.stop(t + at + 0.17);
-    }
+    SOUNDS[name]();
   } catch (e) { /* no sound */ }
 }
+/** The buzz sound this device chose. */
+export function beep() { playSound(sound.name); }
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -153,13 +170,41 @@ export function shortNames(names) {
   return out;
 }
 
-/** The Sound checkbox, remembered on this device (on unless turned off). */
+/** The buzz sound chosen on this device (Beep until one is picked; Off is
+    silence, which is also what the old Sound checkbox's off was). */
 export const sound = {
-  get on() { try { return localStorage.getItem('qbtdBuzzerSound') !== '0'; } catch (e) { return true; } },
-  set on(v) { try { localStorage.setItem('qbtdBuzzerSound', v ? '1' : '0'); } catch (e) { /* private */ } },
+  get name() {
+    try {
+      const n = localStorage.getItem('qbtdBuzzerSoundName');
+      if (SOUND_NAMES.includes(n)) return n;
+      return localStorage.getItem('qbtdBuzzerSound') === '0' ? 'Off' : 'Beep';
+    } catch (e) { return 'Beep'; }
+  },
+  set name(v) { try { localStorage.setItem('qbtdBuzzerSoundName', v); } catch (e) { /* private */ } },
+  get on() { return this.name !== 'Off'; },
 };
+/** The sound picker: the list, and a button to hear the one chosen. */
+export function soundHtml() {
+  return `<span class="bzsound"><label>Sound <select data-bzsound>${SOUND_NAMES.map((n) => `<option${n === sound.name ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+    <button type="button" class="bzplay" data-bzplay aria-label="Play sound" title="Play sound">▶</button></span>`;
+}
+/** Wires a sound picker anywhere under `root`: choosing one plays it. */
+export function wireSound(root) {
+  root.addEventListener('change', (e) => { if (e.target.matches('[data-bzsound]')) { sound.name = e.target.value; playSound(sound.name); } });
+  root.addEventListener('click', (e) => { if (e.target.closest('[data-bzplay]')) playSound(sound.name); });
+}
+/** Who is in the room: each team a column, its players down the column.
+    The team names share one row of the grid and the players the next, so
+    the lines under the names stay level however long a name is.
+    players: [{name, team}]; label(name) -> what to show. */
+export function teamsHtml(players, label) {
+  const teams = new Map();
+  for (const p of players) teams.set(p.team, [...(teams.get(p.team) || []), p.name]);
+  if (!teams.size) return '';
+  return `<div class="bzcols">${[...teams].map(([t, ns]) => `<b title="${esc(t)}">${esc(t)}</b><div>${ns.sort().map((n) => `<span title="${esc(n)}">${esc(label(n))}</span>`).join('')}</div>`).join('')}</div>`;
+}
 /** The buzzes since Clear, in order, as buzzin.live lists them. */
 export function orderHtml(list, label) {
   if (!list.length) return '';
-  return `<ol class="bzorder">${list.map((x) => `<li title="${esc(x.name)}"><b>${esc(label(x.name))}</b><span>${esc(x.team)}</span></li>`).join('')}</ol>`;
+  return `<ol class="bzorder">${list.map((x) => `<li title="${esc(x.name)}"><b>${esc(label(x.name))}</b><span title="${esc(x.team)}">${esc(x.team)}</span></li>`).join('')}</ol>`;
 }

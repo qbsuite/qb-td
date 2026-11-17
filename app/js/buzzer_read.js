@@ -8,7 +8,7 @@
 // frame goes around the page from the first buzz until Clear. A buzz also
 // readies that player in MODAQ's own menu: click the word they buzzed on
 // and their Correct / Wrong choices are already open.
-import { joinRoom, beep, esc, shortNames, sound, orderHtml } from './buzzer_client.js';
+import { joinRoom, beep, shortNames, sound, orderHtml, soundHtml, wireSound, teamsHtml } from './buzzer_client.js';
 
 /* ---------- what a room link remembers for its game links ---------- */
 
@@ -51,6 +51,8 @@ let mounted = null;
     info: {slug, room, token}; names: the roster's player names (for the
     short labels). Returns {names(list)} to hand the roster over once it
     has loaded; a second call only does that. */
+const CORNERS = ['nw', 'ne', 'sw', 'se'].map((c) => `<i class="bzcorner ${c}" data-c="${c}" aria-hidden="true"></i>`).join('');
+
 export function mountBuzzer(info, names) {
   if (mounted) { if (names) mounted.names(names); return mounted; }
   if (!validInfo(info)) return null;
@@ -86,29 +88,31 @@ export function mountBuzzer(info, names) {
     },
   });
 
-  function listHtml() {
-    const teams = new Map();
-    for (const p of st.players) teams.set(p.team, [...(teams.get(p.team) || []), p.name]);
-    if (!teams.size) return '';
-    return `<div class="bzlist">${[...teams].map(([t, ns]) => `<div><b>${esc(t)}</b>${ns.sort().map((n) => `<span title="${esc(n)}">${esc(label(n))}</span>`).join('')}</div>`).join('')}</div>`;
-  }
+  // who is in the room, a column a team (buzzer_client.js)
+  const listHtml = () => teamsHtml(st.players, label);
 
   function draw() {
     const b = st.buzz;
     const n = st.players.length;
-    const clear = `<button class="bzclear"${b || st.pending ? '' : ' disabled'}>Clear</button>`;
+    const clear = `<button class="bzclear"${b || st.pending ? '' : ' disabled'}>Clear<kbd>C</kbd></button>`;
     const count = `<button class="bzcount${st.live ? '' : ' off'}" aria-label="Players in the room" aria-expanded="${showList}"><i></i>${n}</button>`;
     // lit from the first word of a buzz, before the winner is named
     box.className = 'bzr' + (b || st.pending ? ' has' : '') + (!b && st.pending ? ' wait' : '');
     // the card: who has it and Clear, the buzzes in order, who is in the room
     box.innerHTML = `<div class="bzhead" title="Drag to move"><span class="bzgrip" aria-hidden="true">⋮⋮</span><span class="bztitle">Buzzer</span>${clear}${count}</div>
     ${orderHtml(st.list, label) || '<div class="bzwho none">No buzz</div>'}${listHtml()}
-    <label class="bzsound"><input type="checkbox"${sound.on ? ' checked' : ''}> Sound</label>`;
+    ${soundHtml()}${CORNERS}`;
     if (pos) place();
   }
-  box.addEventListener('change', (e) => { if (e.target.closest('.bzsound')) sound.on = e.target.checked; });
+  wireSound(box);
 
   // ---- the card moves: drag it by its top line; it stays where it's put ----
+  // Any corner drags the whole card bigger or smaller, words and all, with
+  // the opposite corner staying put. The size is remembered like the spot.
+  const SCALE = 'qbtdBuzzerCardScale';
+  let scale = 1;
+  try { const v = Number(localStorage.getItem(SCALE)); if (v >= 0.6 && v <= 2) scale = v; } catch (e) { /* full size */ }
+  const sized = () => { box.style.transform = scale === 1 ? '' : `scale(${scale})`; };
   const POS = 'qbtdBuzzerCard';
   let pos = null;
   try {
@@ -121,8 +125,23 @@ export function mountBuzzer(info, names) {
     pos.y = Math.max(0, Math.min(innerHeight - 40, pos.y));
     Object.assign(box.style, { left: pos.x + 'px', top: pos.y + 'px', right: 'auto' });
   }
+  sized();
+  // a size but no spot yet: keep the card's right edge where it was
+  if (scale !== 1 && !pos) { const r = box.getBoundingClientRect(); pos = { x: r.right - box.offsetWidth * scale, y: r.top }; place(); }
   let drag = null;
+  let size = null; // { ax, ay, left, top }: the corner that stays put, and which sides move
   box.addEventListener('pointerdown', (e) => {
+    const c = e.target.closest('.bzcorner');
+    if (c) {
+      const r = box.getBoundingClientRect();
+      const left = c.dataset.c.includes('w');
+      const top = c.dataset.c.includes('n');
+      size = { ax: left ? r.right : r.left, ay: top ? r.bottom : r.top, left, top };
+      box.setPointerCapture(e.pointerId);
+      box.classList.add('drag');
+      e.preventDefault();
+      return;
+    }
     if (!e.target.closest('.bzhead') || e.target.closest('button')) return;
     const r = box.getBoundingClientRect();
     drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
@@ -131,11 +150,28 @@ export function mountBuzzer(info, names) {
     e.preventDefault();
   });
   box.addEventListener('pointermove', (e) => {
+    if (size) {
+      const w = box.offsetWidth; // the card's width at full size
+      const h = box.offsetHeight;
+      // no bigger than the room between the fixed corner and the window's edges
+      const room = Math.min((size.left ? size.ax : innerWidth - size.ax) / w, (size.top ? size.ay : innerHeight - size.ay) / h);
+      scale = Math.max(0.6, Math.min(2, room, Math.abs(e.clientX - size.ax) / w));
+      sized();
+      pos = { x: size.left ? size.ax - w * scale : size.ax, y: size.top ? size.ay - h * scale : size.ay };
+      place();
+      return;
+    }
     if (!drag) return;
     pos = { x: e.clientX - drag.dx, y: e.clientY - drag.dy };
     place();
   });
   const drop = () => {
+    if (size) {
+      size = null;
+      box.classList.remove('drag');
+      try { localStorage.setItem(SCALE, String(+scale.toFixed(3))); localStorage.setItem(POS, JSON.stringify(pos)); } catch (e) { /* private */ }
+      return;
+    }
     if (!drag) return;
     drag = null;
     box.classList.remove('drag');
@@ -148,6 +184,18 @@ export function mountBuzzer(info, names) {
   box.addEventListener('click', (e) => {
     if (e.target.closest('.bzclear')) conn.clear();
   });
+  // C clears, as the button does. MODAQ's own keys are E, N, P, B and 1-5.
+  // Not while typing, not with a modifier held, not behind an open dialog.
+  document.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() !== 'c' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    const on = e.target;
+    if (on && on.closest && on.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+    if (document.querySelector('.ms-Modal, .ms-Dialog')) return;
+    if (!st.buzz && !st.pending) return;
+    e.preventDefault();
+    conn.clear();
+  });
+
   draw();
 
   // ---- the buzzer's name, ready in MODAQ's buzz menu ----

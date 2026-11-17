@@ -6,10 +6,17 @@ Release Notes for 11/16/2026
 [ PUBLIC PAGE ]
 - Buzzer asks a player to pick again when the roster no longer has their team or name.
 - Buzzer shows a press as Buzzed at once, and locks for everyone else on the first word of a buzz.
+- Buzzer has a choice of sounds, with a preview, and of press animations.
+- Buzzer sheet has Room, Schedule and Settings tabs, with each team in the room as a column.
+- Buzzer buzzes on release unless a player picks Press.
+- Long team, player and room names stay inside the buzzer sheet.
 
 [ READER ]
 - With a buzzer, a buzz puts a box around the question being read.
 - The buzz signal is the box around the question only; the frame around the page is gone.
+- Buzzer card has a choice of sounds.
+- Buzzer card resizes from any corner, C clears, and long names are cut to one line.
+- Starters: a long team name no longer puts the two teams' players out of line, and long matchups are set smaller.
 
 Release Notes for 11/15/2026
 
