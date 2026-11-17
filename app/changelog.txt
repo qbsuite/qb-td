@@ -6,6 +6,9 @@ Release Notes for 11/16/2026
 [ PUBLIC PAGE ]
 - Buzzer asks a player to pick again when the roster no longer has their team or name.
 
+[ READER ]
+- With a buzzer, a buzz puts a box around the question being read.
+
 Release Notes for 11/15/2026
 
 [ LIVE HUB ]

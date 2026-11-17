@@ -90,6 +90,8 @@ export function mountBuzzer(info, names) {
         signal.classList.remove('go'); void signal.offsetWidth; signal.classList.add('go');
       }
       signal.classList.toggle('on', !!(s.buzz || s.pending));
+      // and a box around the question being read
+      document.body.classList.toggle('bz-held', !!(s.buzz || s.pending));
       if (!s.buzz && !s.pending) signal.classList.remove('go');
       draw();
     },

@@ -191,3 +191,8 @@
 .roomtable .bzcol input { width: 16px; height: 16px; vertical-align: middle; }
 .roomtable.bzrooms { width: auto; min-width: 260px; }
 .bzfab[hidden] { display: none; }
+
+/* someone has buzzed: a box around the tossup being read (MODAQ's own
+   container; its class is generated, but always starts with this name) */
+body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); outline-offset: 8px; border-radius: 4px;
+  background: color-mix(in srgb, var(--bz) 14%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--bz) 14%, transparent); }
