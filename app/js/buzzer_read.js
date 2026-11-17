@@ -77,10 +77,12 @@ export function mountBuzzer(info, names) {
 
   let st = { live: false, players: [], buzz: null, list: [], pending: false };
   const showList = false;
+  let been = false; // this page has been in the room
   const conn = joinRoom({
     slug: info.slug, room: info.room, name: '', team: '', token: async () => info.token,
     on: (s, why) => {
       st = s;
+      if (s.live) been = true;
       if (why === 'pending' && sound.on) beep();
       // someone has buzzed: a box around the question being read, until Clear
       document.body.classList.toggle('bz-held', !!(s.buzz || s.pending));
@@ -97,9 +99,11 @@ export function mountBuzzer(info, names) {
     const clear = `<button class="bzclear"${b || st.pending ? '' : ' disabled'}>Clear<kbd>C</kbd></button>`;
     const count = `<button class="bzcount${st.live ? '' : ' off'}" aria-label="Players in the room" aria-expanded="${showList}"><i></i>${n}</button>`;
     // lit from the first word of a buzz, before the winner is named
-    box.className = 'bzr' + (b || st.pending ? ' has' : '') + (!b && st.pending ? ' wait' : '');
+    box.className = 'bzr' + (b || st.pending ? ' has' : '') + (!b && st.pending ? ' wait' : '') + (st.live ? '' : ' down');
+    // its own connection is down: said across the card, with a way to try at once
+    const down = st.live ? '' : `<div class="bzdown" role="status"><span>${been ? 'Buzzer disconnected' : 'Connecting'}</span>${been ? '<button data-bzretry>Reconnect</button>' : ''}</div>`;
     // the card: who has it and Clear, the buzzes in order, who is in the room
-    box.innerHTML = `<div class="bzhead" title="Drag to move"><span class="bzgrip" aria-hidden="true">⋮⋮</span><span class="bztitle">Buzzer</span>${clear}${count}</div>
+    box.innerHTML = `<div class="bzhead" title="Drag to move"><span class="bzgrip" aria-hidden="true">⋮⋮</span><span class="bztitle">Buzzer</span>${clear}${count}</div>${down}
     ${orderHtml(st.list, label) || '<div class="bzwho none">No buzz</div>'}${listHtml()}
     ${soundHtml()}${CORNERS}`;
     if (pos) place();
@@ -182,6 +186,7 @@ export function mountBuzzer(info, names) {
   addEventListener('resize', () => { if (pos) place(); });
 
   box.addEventListener('click', (e) => {
+    if (e.target.closest('[data-bzretry]')) { conn.retry(); return; }
     if (e.target.closest('.bzclear')) conn.clear();
   });
   // C clears, as the button does. MODAQ's own keys are E, N, P, B and 1-5.

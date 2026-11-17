@@ -5,7 +5,7 @@ export const BUZZER_WS = ['localhost', '127.0.0.1'].includes(location.hostname)
   ? `ws://${location.hostname}:8789` : 'wss://qb-td-buzzer.denisliu10.workers.dev';
 const SERVER = new URLSearchParams(location.search).get('buzzerws') || BUZZER_WS;
 
-const HEARTBEAT_MS = 5000, HEARTBEAT_WAIT_MS = 2500, REBUZZ_MS = 3000, BUZZ_WAIT_MS = 1200;
+const HEARTBEAT_MS = 5000, HEARTBEAT_WAIT_MS = 2500, REBUZZ_MS = 3000, BUZZ_WAIT_MS = 1200, RETRY_MAX_MS = 15000;
 
 export function joinRoom({ slug, room, name = '', team = '', token, on }) {
   let ws = null;
@@ -16,6 +16,7 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
   let owed = null;   // heartbeat reply timer
   let want = 0;      // when a buzz was pressed that the room has not answered yet
   let dropNow = null; // gives up on the current connection and joins again
+  let again = null;   // the wait before the next try, while one is being waited out
   const state = { live: false, players: [], buzz: null, list: [], pending: false, refused: false, over: false };
   const tell = (why) => on({ ...state }, why);
   const open = async () => {
@@ -91,13 +92,24 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
       if (!opened) tries++;
       if (!ever && tries >= 2) { closed = true; state.refused = true; tell('refused'); return; }
       tell('down');
-      // at once the first time, then backing off
-      setTimeout(open, tries ? Math.min(4000, 300 * 2 ** tries) : 0);
+      // At once the first time, so a cut connection is back before the next
+      // buzz. If that fails the service itself is in trouble, and every page
+      // in the tournament is in the same loop: wait longer each time, up to
+      // a quarter of a minute, and not all at the same moment (each attempt
+      // is a request, and a tight loop from every page would spend the
+      // day's). A person never has to sit the wait out: see retry().
+      again = setTimeout(() => { again = null; open(); }, tries ? Math.min(RETRY_MAX_MS, 300 * 2 ** tries) * (0.5 + Math.random() / 2) : 0);
       if (opened) tries++;
     };
     ws.onerror = () => {};
   };
   open();
+  // Try again now instead of waiting out the pause: for a press on the
+  // page, the network coming back, and the page coming back to the front.
+  const retry = () => { if (closed || state.live || !again) return; clearTimeout(again); again = null; open(); };
+  const seen = () => { if (document.visibilityState === 'visible') retry(); };
+  if (typeof addEventListener === 'function') addEventListener('online', retry);
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', seen);
   const send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
   return {
     // the room answers a buzz within a round trip; silence means the
@@ -108,7 +120,13 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
       setTimeout(() => { if (want === at && !closed && dropNow) dropNow('buzz'); }, BUZZ_WAIT_MS);
     },
     clear: () => send({ t: 'clear' }),
-    close: () => { closed = true; clearInterval(beat); clearTimeout(owed); try { ws.close(); } catch (e) { /* gone */ } },
+    retry,
+    close: () => {
+      closed = true; clearInterval(beat); clearTimeout(owed); clearTimeout(again);
+      if (typeof removeEventListener === 'function') removeEventListener('online', retry);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', seen);
+      try { ws.close(); } catch (e) { /* gone */ }
+    },
   };
 }
 

@@ -39,6 +39,7 @@ let gen = 0; // counts enter(): a token asked for an earlier room is dropped
 let st = { live: false, players: [], buzz: null, list: [], pending: false };
 let wrong = false;
 let pressed = false; // this player pressed since the last Clear
+let been = false;    // this page has been in its room
 let tab = 'Room';     // what shows under the button: Room, Schedule or Settings
 
 /** A room is its schedule room's bucket id; it has a buzzer when the
@@ -120,6 +121,7 @@ function enter() {
   conn = null;
   gen++;
   st = { live: false, players: [], buzz: null, list: [], pending: false };
+  been = false;
   if (me.pw && me.team && me.name) {
     if (me.room == null) me.room = scheduledRoom(me.team);
     if (!hasBuzzer(me.room)) { const first = buzzerRooms()[0]; me.room = first ? first.id : null; }
@@ -129,6 +131,7 @@ function enter() {
         token: tokenFor(gen),
         on: (s, why) => {
           st = s;
+          if (s.live) been = true;
           // the presser heard it on pressing
           if (why === 'pending' && sound.on && !pressed) beep();
           if (why === 'clear' || (why === 'hello' && !s.buzz)) { pressed = false; if (fx && !fx.preview) fx = null; }
@@ -188,10 +191,11 @@ function draw() {
       <span class="bzme" title="${esc(me.name)} · ${esc(me.team)}">${esc(me.name)} · ${esc(me.team)}</span>
       <button class="linkbtn" data-leave>Leave</button>
     </div>
-    <button class="bzbtn${look === 'mine' ? ' mine' : look === 'locked' ? ' locked' : ''}${st.live ? '' : ' off'}"${!st.live ? ' disabled' : ''}>
-      <span>${look === 'mine' ? 'Buzzed' : look === 'locked' ? 'Locked' : 'Buzz'}</span>
-      ${look ? '' : '<kbd>Space</kbd>'}
+    <button class="bzbtn${!st.live ? ' off' : look === 'mine' ? ' mine' : look === 'locked' ? ' locked' : ''}">
+      <span>${!st.live ? (been ? 'Reconnecting' : 'Connecting') : look === 'mine' ? 'Buzzed' : look === 'locked' ? 'Locked' : 'Buzz'}</span>
+      ${look || !st.live ? '' : '<kbd>Space</kbd>'}
     </button>
+    ${!st.live && been ? '<div class="bzdown" role="status">Disconnected. Press to retry.</div>' : ''}
     ${orderHtml(st.list, label)}
     <div class="bztabs" role="tablist">${['Room', 'Schedule', 'Settings'].map((t) => `<button role="tab" data-tab="${t}" aria-selected="${tab === t}"${
       t === 'Schedule' && elsewhere && tab !== t ? ' class="mark"' : ''}>${t}</button>`).join('')}</div>
@@ -201,6 +205,8 @@ function draw() {
 }
 
 function press(at = null) {
+  // disconnected: a press tries the connection again at once
+  if (conn && !st.live) { conn.retry(); return; }
   // a press behind someone else's buzz still joins the order, once
   if (!conn || !st.live || pressed) return;
   // the first press sounds at once; one behind someone else's buzz is silent

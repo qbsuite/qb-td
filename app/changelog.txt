@@ -7,10 +7,15 @@ Release Notes for 11/17/2026
 [ PUBLIC PAGE ]
 - Buzzer: joining says what to do, and finds your name with the player search.
 - Buzz order shows each buzzer's ping.
+- Buzzer shows Reconnecting, in red, when its connection is down; a press tries again at once.
 
 [ READER ]
 - Buzzer card shows each player's ping.
 - A long team name no longer squeezes "4 starting" or the drag handle beside it.
+- Buzzer card shows a red bar with Reconnect when its connection is down.
+
+[ MISC ]
+- Buzzer pages that cannot reconnect wait longer between tries, up to 15 seconds.
 
 Release Notes for 11/16/2026
 

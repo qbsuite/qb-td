@@ -300,3 +300,10 @@ body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); o
 .bzhelp { margin: 0 0 10px; }
 .bzwhostep .pick { width: 100%; }
 .bzwhostep .pickbtn.empty { color: var(--muted); }
+
+/* the connection is down: said plainly on the player's sheet and across the moderator's card */
+.bzdown { color: var(--bad); font-weight: 600; text-align: center; }
+.bzbtn.off { border: 2px dashed var(--bad); color: var(--bad); }
+.bzr.down { border-color: var(--bad); }
+.bzr .bzdown { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--bad); color: #fff; font-size: 13px; }
+.bzr .bzdown button { padding: 2px 10px; background: #fff; color: var(--bad); border: none; border-radius: 6px; font-weight: 600; }
