@@ -18,6 +18,9 @@ Release Notes for 11/16/2026
 - Buzzer card resizes from any corner, C clears, and long names are cut to one line.
 - Starters: a long team name no longer puts the two teams' players out of line, and long matchups are set smaller.
 
+[ SETUP ]
+- Rooms: Online tournament gives every room a buzzer, or tick Buzzer on single rooms; players join from the public page with the buzzer password.
+
 Release Notes for 11/15/2026
 
 [ LIVE HUB ]

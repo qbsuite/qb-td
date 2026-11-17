@@ -5,32 +5,18 @@
 //   settings.buzzer = { online: boolean, rooms: [room ids], pw: string }
 // The password is not the stats password: the TD sees it and copies it.
 //
-// Private for now: the controls show only in a browser that opted in (a
-// visit with ?buzzer=1, which sticks to this browser) or on a tournament
-// whose settings already hold a buzzer key. Otherwise buzzerOf answers
-// null and the Rooms step is drawn as it was.
 
 import { esc } from './api.js';
-
-const FLAG = 'qbtdBuzzerTD';
-const OPTED = (() => {
-  const asked = new URLSearchParams(location.search).get('buzzer') === '1';
-  try {
-    if (asked) localStorage.setItem(FLAG, '1');
-    return localStorage.getItem(FLAG) === '1';
-  } catch (e) { return asked; }
-})();
 
 let changing = false;   // the password field is open
 
 const COPY = '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>';
 
 /** The tournament's buzzer settings ({online, rooms, pw}) from its
-    settings object, or null when the controls are not to be drawn. A room
-    that is gone (not in `buckets`) is left out, so the next save drops it. */
+    settings object (all off when it has none). A room that is gone (not in
+    `buckets`) is left out, so the next save drops it. */
 export function buzzerOf(settings, buckets) {
   const has = !!settings && Object.prototype.hasOwnProperty.call(settings, 'buzzer');
-  if (!OPTED && !has) return null;
   const b = (has && settings.buzzer && typeof settings.buzzer === 'object') ? settings.buzzer : {};
   const ids = new Set(buckets.map((x) => x.id));
   return {
