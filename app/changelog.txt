@@ -8,6 +8,7 @@ Release Notes for 11/16/2026
 
 [ READER ]
 - With a buzzer, a buzz puts a box around the question being read.
+- The buzz signal is the box around the question only; the frame around the page is gone.
 
 Release Notes for 11/15/2026
 

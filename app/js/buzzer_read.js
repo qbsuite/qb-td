@@ -59,11 +59,6 @@ export function mountBuzzer(info, names) {
   let short = shortNames(names || []);
   const label = (n) => short.get(n) || n;
 
-  // the page-wide signal: over everything, never in the way of a click
-  const signal = document.createElement('div');
-  signal.className = 'bzsignal bzfx-frame';
-  document.body.append(signal);
-
   const box = document.createElement('div');
   box.className = 'bzr';
   document.body.append(box);
@@ -84,15 +79,9 @@ export function mountBuzzer(info, names) {
     slug: info.slug, room: info.room, name: '', team: '', token: async () => info.token,
     on: (s, why) => {
       st = s;
-      if (why === 'pending') {
-        if (sound.on) beep();
-        // restart the flash even when the last one is still fading
-        signal.classList.remove('go'); void signal.offsetWidth; signal.classList.add('go');
-      }
-      signal.classList.toggle('on', !!(s.buzz || s.pending));
-      // and a box around the question being read
+      if (why === 'pending' && sound.on) beep();
+      // someone has buzzed: a box around the question being read, until Clear
       document.body.classList.toggle('bz-held', !!(s.buzz || s.pending));
-      if (!s.buzz && !s.pending) signal.classList.remove('go');
       draw();
     },
   });
