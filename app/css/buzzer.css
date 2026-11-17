@@ -282,3 +282,21 @@ body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); o
 .bzpane .bzopts { justify-content: flex-start; }
 /* on the player's sheet the team columns are centred */
 .bzpane .bzcols { text-align: center; }
+
+/* a player's ping: in the buzz order, and beside each name on the moderator's card */
+.bzping { font-style: normal; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); opacity: .75; }
+.bzping.mid { color: #b26a00; opacity: 1; }
+.bzping.slow { color: #c62828; opacity: 1; font-weight: 600; }
+.bzorder { grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr) auto; }
+.bzorder li .bzping { grid-column: 4; }
+.bzorder li:first-child .bzping:not(.mid):not(.slow) { color: inherit; }
+.bzcols.pings span { display: flex; align-items: baseline; gap: 6px; }
+.bzcols.pings span em { font-style: normal; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bzcols.pings span .bzping { margin-left: auto; }
+/* the Online Buzzer column's heading holds the box for all rooms */
+.bzall { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+/* joining: a line saying what to do, and the page's player search for who you are */
+.bzhelp { margin: 0 0 10px; }
+.bzwhostep .pick { width: 100%; }
+.bzwhostep .pickbtn.empty { color: var(--muted); }

@@ -9,7 +9,12 @@ const player = await signToken(S, { slug: 'fall', role: 'player', rooms: [3, 4],
 const reader = await signToken(S, { slug: 'fall', role: 'reader', rooms: [3], expires: closes, closes });
 const at = (o) => ({ slug: 'fall', room: 3, now, ...o });
 
-assert.deepEqual(await checkToken(S, player, at()), { role: 'player', closes, expires: now + PLAYER_TOKEN_MS });
+assert.deepEqual(await checkToken(S, player, at()), { role: 'player', closes, expires: now + PLAYER_TOKEN_MS, region: 'enam' });
+// the TD's region rides in the token; one Cloudflare cannot place rooms in is the default
+const far = await signToken(S, { slug: 'fall', role: 'player', rooms: [3], expires: closes, closes, region: 'weur' });
+assert.equal((await checkToken(S, far, at())).region, 'weur');
+const odd = await signToken(S, { slug: 'fall', role: 'player', rooms: [3], expires: closes, closes, region: 'mars' });
+assert.equal((await checkToken(S, odd, at())).region, 'enam');
 assert.equal((await checkToken(S, reader, at())).role, 'reader');
 // a player's token never becomes a moderator's
 assert.equal((await checkToken(S, player, at({ room: 4 }))).role, 'player');

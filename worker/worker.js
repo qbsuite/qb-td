@@ -49,7 +49,7 @@
 import { qbjTextWithRound } from '../app/engine/modaqfile.js';
 import { withRound } from '../app/engine/qbj.js';
 import { rosterNamesFromText } from '../app/engine/games.js';
-import { signToken, PLAYER_TOKEN_MS } from '../buzzer/token.js';
+import { signToken, PLAYER_TOKEN_MS, regionOf } from '../buzzer/token.js';
 import { storedFileText, rosterExportBody, publicQbjName, publicQbjText } from '../app/engine/exportfile.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
@@ -5057,17 +5057,25 @@ function buzzerConfig(settingsText) {
   try { s = JSON.parse(settingsText || '{}') || {}; } catch (e) { return null; }
   const c = s.buzzer;
   if (!c || typeof c !== 'object') return null;
-  return { online: !!c.online, rooms: Array.isArray(c.rooms) ? c.rooms.filter(Number.isInteger) : [], pw: typeof c.pw === 'string' ? c.pw : '' };
+  return { online: !!c.online, rooms: Array.isArray(c.rooms) ? c.rooms.filter(Number.isInteger) : [], pw: typeof c.pw === 'string' ? c.pw : '', region: regionOf(c.region) };
 }
 // Players can get in: a password is set and some room has a buzzer.
 function buzzerOn(c) { return !!(c && c.pw && (c.online || c.rooms.length)); }
+// What the public state says of the buzzer: that there is one, and where
+// its rooms are when that is not the default (a page holding a token for
+// another region then asks for a new one).
+function pubBuzzerMark(t) {
+  const c = buzzerConfig(t.settings);
+  if (!buzzerOn(c)) return {};
+  return c.region === 'enam' ? { buzzer: 1 } : { buzzer: 1, bzg: c.region };
+}
 // A moderator's token for this room's buzzer, with its room page's state.
 async function roomBuzzer(env, b, c) {
   if (!env.BUZZER_SECRET || !b.slug || !c || typeof c !== 'object') return null;
   if (!c.online && !(Array.isArray(c.rooms) && c.rooms.includes(b.id))) return null;
   const closes = closesAt({ created: b.t_created, started: b.started, closes_at: b.closes_at });
   if (Date.now() >= closes) return null;
-  const token = await signToken(env.BUZZER_SECRET, { slug: b.slug, role: 'reader', rooms: [b.id], expires: closes, closes });
+  const token = await signToken(env.BUZZER_SECRET, { slug: b.slug, role: 'reader', rooms: [b.id], expires: closes, closes, region: c.region });
   return { slug: b.slug, room: b.id, token };
 }
 // POST /pub/:slug/buzzer {pw}: a player's token for every buzzer room.
@@ -5086,8 +5094,8 @@ async function pubBuzzer(request, env, slug) {
   const { results } = await env.DB.prepare('SELECT id FROM buckets WHERE tournament_id = ?1').bind(t.id).all();
   const bye = byeRoomIds(t.settings);
   const rooms = results.map((r) => r.id).filter((id) => !bye.includes(id) && (c.online || c.rooms.includes(id)));
-  const token = await signToken(env.BUZZER_SECRET, { slug, role: 'player', rooms, expires: Math.min(closes, Date.now() + PLAYER_TOKEN_MS), closes });
-  return json(env, { token, rooms, closes });
+  const token = await signToken(env.BUZZER_SECRET, { slug, role: 'player', rooms, expires: Math.min(closes, Date.now() + PLAYER_TOKEN_MS), closes, region: c.region });
+  return json(env, { token, rooms, closes, region: c.region });
 }
 
 async function ipLimit(request, env, scope) {
@@ -5539,7 +5547,7 @@ function pubOverlay(env, t) {
     } catch (e) { return null; }
   })();
   return { name: t.name, current_round: t.current_round, roster: !!t.roster_r2_key,
-    format: pubFormat(t), pub, ...(buzzerOn(buzzerConfig(t.settings)) ? { buzzer: 1 } : {}) };
+    format: pubFormat(t), pub, ...pubBuzzerMark(t) };
 }
 
 // fb: the page came here because the qb-td-live file failed it (404, err,
@@ -5559,7 +5567,7 @@ async function pubState(env, slug, ctx, fb = null) {
   // hasn't run): derive it live, and have the next tick build it
   if (ctx) ctx.waitUntil(markPub(env, t.id));
   const body = await pubStateBody(env, t, pub);
-  if (buzzerOn(buzzerConfig(t.settings))) body.buzzer = 1;
+  Object.assign(body, pubBuzzerMark(t));
   // Games but no shards to serve them from: a tournament published
   // before the round shards existed. Flag it so the next tick
   // materializes it — otherwise

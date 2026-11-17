@@ -12,6 +12,8 @@
 //     x   when the token stops working, ms. A player's lasts hours, so a
 //         changed password or an unticked room stops old tokens the same day
 //     c   when the tournament's links close, ms: rooms hang up then
+//     g   where the tournament's rooms are made (a Cloudflare location
+//         hint, REGIONS below); left out for the default, enam
 //
 // WebCrypto only, so it runs unchanged in Workers and in Node's tests.
 
@@ -22,9 +24,14 @@ const key = (secret) => crypto.subtle.importKey('raw', enc.encode(secret), { nam
 
 export const PLAYER_TOKEN_MS = 12 * 60 * 60 * 1000;
 
-export async function signToken(secret, { slug, role, rooms, expires, closes }) {
+// Where a tournament's rooms can be made: the hints Cloudflare places
+// rooms in for real (sam, afr and me only stand for a nearby one of these).
+export const REGIONS = ['enam', 'wnam', 'weur', 'eeur', 'apac', 'oc'];
+export const regionOf = (g) => (REGIONS.includes(g) ? g : 'enam');
+
+export async function signToken(secret, { slug, role, rooms, expires, closes, region }) {
   if (!secret) throw new Error('no BUZZER_SECRET');
-  const body = b64(enc.encode(JSON.stringify({ s: slug, r: role === 'reader' ? 'm' : 'p', rm: rooms, x: expires, c: closes })));
+  const body = b64(enc.encode(JSON.stringify({ s: slug, r: role === 'reader' ? 'm' : 'p', rm: rooms, x: expires, c: closes, ...(regionOf(region) === 'enam' ? {} : { g: region }) })));
   const sig = await crypto.subtle.sign('HMAC', await key(secret), enc.encode('v1.' + body));
   return `v1.${body}.${b64(sig)}`;
 }
@@ -46,5 +53,5 @@ export async function checkToken(secret, token, { slug, room, now = Date.now() }
   if (p.s !== slug) return { error: 'bad token' };
   if (!(now < p.x) || !(now < p.c)) return { error: 'expired' };
   if (!Array.isArray(p.rm) || !p.rm.includes(room)) return { error: 'no buzzer in this room' };
-  return { role: p.r === 'm' ? 'reader' : 'player', closes: p.c, expires: p.x };
+  return { role: p.r === 'm' ? 'reader' : 'player', closes: p.c, expires: p.x, region: regionOf(p.g) };
 }

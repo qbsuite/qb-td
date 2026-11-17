@@ -1,3 +1,17 @@
+Release Notes for 11/17/2026
+
+[ SETUP ]
+- Rooms: an Online Buzzer column replaces the Online tournament switch, with a box in its heading for all rooms.
+- Rooms: Region picks where a tournament's buzzer rooms run.
+
+[ PUBLIC PAGE ]
+- Buzzer: joining says what to do, and finds your name with the player search.
+- Buzz order shows each buzzer's ping.
+
+[ READER ]
+- Buzzer card shows each player's ping.
+- A long team name no longer squeezes "4 starting" or the drag handle beside it.
+
 Release Notes for 11/16/2026
 
 [ MISC ]

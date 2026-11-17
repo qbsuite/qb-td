@@ -93,14 +93,14 @@ a.rnd:hover { text-decoration: none; background: var(--hover-bg); }
   font-size: 15px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px;
   padding-bottom: 8px; border-bottom: 1px solid var(--line);
 }
-.lineup h4 .count { font-weight: 400; font-size: 13px; color: var(--muted); }
+.lineup h4 .count { font-weight: 400; font-size: 13px; color: var(--muted); white-space: nowrap; flex: none; }
 /* a team's column drags onto the other to swap sides */
 .lineup[draggable="true"] h4 { cursor: grab; }
 .lineup.lift { opacity: 0.4; }
 .lineup.target h4 { border-bottom-color: var(--link); }
 .lineup h4 .lname { display: flex; align-items: baseline; gap: 4px; min-width: 0; }
 .lineup h4 .tgrip {
-  width: 18px; margin-left: -4px; padding: 0; border: none; background: none;
+  width: 18px; flex: none; white-space: nowrap; margin-left: -4px; padding: 0; border: none; background: none;
   font: inherit; font-size: 14px; font-weight: 400; letter-spacing: -2px; color: var(--muted); cursor: grab; user-select: none;
 }
 .lineup h4 .tgrip:hover { color: var(--fg); border: none; }

@@ -31,8 +31,9 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
     // The connection can die without the browser hearing of it. Every few
     // seconds ask for an echo (Cloudflare answers without waking the room);
     // no echo, or a close, and the page joins again at once.
-    const drop = () => {
+    const drop = (why = '') => {
       if (ws !== sock) return;
+      state.why = why; // why the connection was given up: 'heartbeat', 'buzz', 'rejoin'
       clearInterval(beat); clearTimeout(owed); owed = null;
       sock.onopen = sock.onmessage = sock.onclose = null;
       try { sock.close(); } catch (e2) { /* gone */ }
@@ -48,7 +49,7 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
       beat = setInterval(() => {
         if (sock.readyState !== 1 || owed) return;
         sock.send('hb');
-        owed = setTimeout(drop, HEARTBEAT_WAIT_MS);
+        owed = setTimeout(() => drop('heartbeat'), HEARTBEAT_WAIT_MS);
       }, HEARTBEAT_MS);
     };
     ws.onmessage = (e) => {
@@ -62,7 +63,7 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
       // this player joined again somewhere else: this page steps aside
       if (m.t === 'elsewhere') { closed = true; state.live = false; clearInterval(beat); clearTimeout(owed); tell('elsewhere'); try { ws.close(); } catch (e2) { /* gone */ } return; }
       // the room stopped hearing this page's heartbeat and let it go
-      if (m.t === 'rejoin') { drop(); return; }
+      if (m.t === 'rejoin') { drop('rejoin'); return; }
       // the tournament's links closed: the room is over, nothing to rejoin
       if (m.t === 'over') { closed = true; state.live = false; state.over = true; tell('over'); try { ws.close(); } catch (e2) { /* gone */ } return; }
       if (m.t === 'hello') { state.players = m.players; state.buzz = m.buzz; state.list = m.list || []; state.pending = false; }
@@ -80,6 +81,7 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
       if (ws !== sock) return;
       clearInterval(beat); clearTimeout(owed); owed = null;
       state.live = false;
+      state.why = 'closed ' + e.code;
       if (closed) return;
       if (e.code === 4000) { closed = true; tell('elsewhere'); return; }
       // the tournament's links closed: the room is over, nothing to rejoin
@@ -103,7 +105,7 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
     buzz: () => {
       const at = want = Date.now();
       send({ t: 'buzz' });
-      setTimeout(() => { if (want === at && !closed && dropNow) dropNow(); }, BUZZ_WAIT_MS);
+      setTimeout(() => { if (want === at && !closed && dropNow) dropNow('buzz'); }, BUZZ_WAIT_MS);
     },
     clear: () => send({ t: 'clear' }),
     close: () => { closed = true; clearInterval(beat); clearTimeout(owed); try { ws.close(); } catch (e) { /* gone */ } },
@@ -197,14 +199,22 @@ export function wireSound(root) {
     The team names share one row of the grid and the players the next, so
     the lines under the names stay level however long a name is.
     players: [{name, team}]; label(name) -> what to show. */
-export function teamsHtml(players, label) {
+export function teamsHtml(players, label, pings = false) {
   const teams = new Map();
-  for (const p of players) teams.set(p.team, [...(teams.get(p.team) || []), p.name]);
+  for (const p of players) teams.set(p.team, [...(teams.get(p.team) || []), p]);
   if (!teams.size) return '';
-  return `<div class="bzcols">${[...teams].map(([t, ns]) => `<b title="${esc(t)}">${esc(t)}</b><div>${ns.sort().map((n) => `<span title="${esc(n)}">${esc(label(n))}</span>`).join('')}</div>`).join('')}</div>`;
+  return `<div class="bzcols${pings ? ' pings' : ''}">${[...teams].map(([t, ps]) => `<b title="${esc(t)}">${esc(t)}</b><div>${ps.sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0)).map((p) =>
+    `<span title="${esc(p.name)}">${pings ? `<em>${esc(label(p.name))}</em>${pingHtml(p.rtt)}` : esc(label(p.name))}</span>`).join('')}</div>`).join('')}</div>`;
+}
+/** A player's round trip to the room, as the room last measured it (the
+    figure its lag equalizing uses): small beside a name, coloured once it
+    is slow enough to matter. */
+export function pingHtml(ms) {
+  if (ms == null || !Number.isFinite(ms)) return '';
+  return `<i class="bzping${ms >= 250 ? ' slow' : ms >= 120 ? ' mid' : ''}">${Math.round(ms)} ms</i>`;
 }
 /** The buzzes since Clear, in order, as buzzin.live lists them. */
 export function orderHtml(list, label) {
   if (!list.length) return '';
-  return `<ol class="bzorder">${list.map((x) => `<li title="${esc(x.name)}"><b>${esc(label(x.name))}</b><span title="${esc(x.team)}">${esc(x.team)}</span></li>`).join('')}</ol>`;
+  return `<ol class="bzorder">${list.map((x) => `<li title="${esc(x.name)}"><b>${esc(label(x.name))}</b><span title="${esc(x.team)}">${esc(x.team)}</span>${pingHtml(x.rtt)}</li>`).join('')}</ol>`;
 }

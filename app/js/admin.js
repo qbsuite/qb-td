@@ -57,7 +57,7 @@ import { isGameFile, newestOf } from '../engine/games.js';
 import { askWarning, warningOpen } from './warnask.js';
 import { readTagged, settingsBody, rulingsBody, postSchedule, postRoster, FORMAT_KEYS,
   SCHED_CONFLICT, SCHED_KEPT, ROSTER_CONFLICT, ROSTER_KEPT } from './saves.js';
-import { buzzerOf, buzzerSetHtml, buzzerCellHtml, wireBuzzer, BUZZER_TH, BUZZER_BLANK } from './buzzer_hub.js';
+import { buzzerOf, buzzerSetHtml, buzzerCellHtml, wireBuzzer, buzzerThHtml, BUZZER_BLANK } from './buzzer_hub.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -975,7 +975,7 @@ function renderRoomsSec(a, t, buckets, files) {
   box.innerHTML = `
     <h2>Rooms</h2>${bz ? buzzerSetHtml(bz) : ''}
     ${buckets.length ? `<div class="tablewrap"><table class="roomtable">
-      <tr><th>Name</th><th>Reader link</th>${bz ? BUZZER_TH : ''}<th class="num">Files</th><th></th></tr>
+      <tr><th>Name</th><th>Reader link</th>${bz ? buzzerThHtml(bz) : ''}<th class="num">Files</th><th></th></tr>
       ${buckets.map((b) => {
         // names go into a JS string inside an attribute: escape for both
         const js = (s) => esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));

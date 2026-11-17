@@ -1,8 +1,10 @@
 // buzzer_hub.js — the TD's buzzer settings, drawn inside the hub's Rooms
-// step (admin.js renderRoomsSec): an Online tournament switch, the buzzer
-// password, and a Buzzer checkbox on each room (all ticked, and locked,
-// while the switch is on). They are one settings key, saved whole:
-//   settings.buzzer = { online: boolean, rooms: [room ids], pw: string }
+// step (admin.js renderRoomsSec): an Online Buzzer column with a box on
+// each room and one in its heading for all of them, and, once any room is
+// ticked, where the rooms are made and the buzzer password. They are one
+// settings key, saved whole:
+//   settings.buzzer = { online: boolean, rooms: [room ids], pw: string, region: string }
+// online: all rooms, the ones added later too (the heading's box).
 // The password is not the stats password: the TD sees it and copies it.
 //
 
@@ -23,8 +25,13 @@ export function buzzerOf(settings, buckets) {
     online: b.online === true,
     rooms: (Array.isArray(b.rooms) ? b.rooms : []).filter((id) => ids.has(id)),
     pw: typeof b.pw === 'string' ? b.pw : '',
+    region: REGIONS.some(([v]) => v === b.region) ? b.region : 'enam',
+    ids: [...ids],
   };
 }
+
+// where a tournament's rooms can be made (buzzer/token.js REGIONS)
+const REGIONS = [['enam', 'East NA'], ['wnam', 'West NA'], ['weur', 'West EU'], ['eeur', 'East EU'], ['apac', 'Asia'], ['oc', 'Oceania']];
 
 const anyOn = (cfg) => cfg.online || cfg.rooms.length > 0;
 const hasBuzzer = (cfg, id) => cfg.online || cfg.rooms.includes(id);
@@ -41,22 +48,23 @@ function pwHtml(cfg) {
     <button id="bzpwchange">Change password</button></div>`;
 }
 
-/** The switch and the password, under the Rooms heading. */
+/** Where the rooms are made and the password, under the Rooms heading:
+    there once any room has a buzzer. */
 export function buzzerSetHtml(cfg) {
-  return `<div class="bzset"><div class="row"><label class="row">Online tournament
-    <select id="bzonline">
-      <option value="">Off</option>
-      <option value="on"${cfg.online ? ' selected' : ''}>On</option>
-    </select></label></div>${pwHtml(cfg)}</div>`;
+  if (!anyOn(cfg)) return '';
+  return `<div class="bzset"><div class="row"><label class="row">Region
+    <select id="bzregion">${REGIONS.map(([v, name]) => `<option value="${v}"${v === cfg.region ? ' selected' : ''}>${name}</option>`).join('')}</select></label></div>${pwHtml(cfg)}</div>`;
 }
 
-/** The room table's Buzzer column: its heading, a room's checkbox, and
-    the blank cell of a row that is not a room. */
-export const BUZZER_TH = '<th class="bzcol">Buzzer</th>';
+/** The room table's Online Buzzer column: its heading (with the box that
+    ticks all rooms), a room's box, and the blank cell of a row that is
+    not a room. */
+export const buzzerThHtml = (cfg) => `<th class="bzcol"><label class="bzall"><input type="checkbox" id="bzall" aria-label="Online Buzzer in all rooms"${
+  cfg.online ? ' checked' : ''}>Online Buzzer</label></th>`;
 export const BUZZER_BLANK = '<td class="bzcol"></td>';
 export function buzzerCellHtml(cfg, id, name) {
-  return `<td class="bzcol"><input type="checkbox" data-bzroom="${id}" aria-label="Buzzer in ${esc(name)}"${
-    hasBuzzer(cfg, id) ? ' checked' : ''}${cfg.online ? ' disabled' : ''}></td>`;
+  return `<td class="bzcol"><input type="checkbox" data-bzroom="${id}" aria-label="Online Buzzer in ${esc(name)}"${
+    hasBuzzer(cfg, id) ? ' checked' : ''}></td>`;
 }
 
 /** Wire what the three above drew inside `box`. save(next): store the
@@ -65,8 +73,18 @@ export function buzzerCellHtml(cfg, id, name) {
 export function wireBuzzer(box, cfg, { save, redraw }) {
   const on = (sel, ev, fn) => { const el = box.querySelector(sel); if (el) el[ev] = fn; };
   // each change is made on the one before it, saved or still going out
-  const put = () => save({ online: cfg.online, rooms: [...cfg.rooms], pw: cfg.pw });
-  on('#bzonline', 'onchange', (e) => { cfg.online = e.target.value === 'on'; put(); });
+  const put = () => save({ online: cfg.online, rooms: [...cfg.rooms], pw: cfg.pw, region: cfg.region });
+  const all = box.querySelector('#bzall');
+  if (all) {
+    all.indeterminate = !cfg.online && cfg.rooms.length > 0;
+    all.onchange = () => { cfg.online = all.checked; cfg.rooms = []; put(); };
+  }
+  // another region is other rooms: players' pages go to them on their next refresh
+  on('#bzregion', 'onchange', (e) => {
+    if (!confirm('Change the region?\n\nPlayers who have already joined will need to refresh their page.')) { e.target.value = cfg.region; return; }
+    cfg.region = e.target.value;
+    put();
+  });
   on('#bzpwform', 'onsubmit', (e) => {
     e.preventDefault();
     const v = box.querySelector('#bztdpw').value.trim();
@@ -79,7 +97,11 @@ export function wireBuzzer(box, cfg, { save, redraw }) {
   box.querySelectorAll('[data-bzroom]').forEach((c) => {
     c.onchange = () => {
       const id = Number(c.dataset.bzroom);
-      cfg.rooms = c.checked ? [...new Set([...cfg.rooms, id])] : cfg.rooms.filter((x) => x !== id);
+      // all rooms ticked one by one is the heading's box: later rooms get one too
+      const had = cfg.online ? cfg.ids : cfg.rooms;
+      const now = c.checked ? [...new Set([...had, id])] : had.filter((x) => x !== id);
+      cfg.online = cfg.ids.length > 0 && cfg.ids.every((x) => now.includes(x));
+      cfg.rooms = cfg.online ? [] : now;
       put();
     };
   });

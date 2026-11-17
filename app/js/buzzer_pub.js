@@ -1,9 +1,11 @@
 // buzzer_pub.js — joining a buzzer room from the public page (t.html): a
 // Buzzer button in the corner that opens over the page, holding three
-// steps: password, who you are (from the tournament's roster), the room.
+// steps: password, who you are (found in the tournament's roster with the
+// page's own player search), the room.
 // pubview.js loads this only when the tournament has buzzer rooms
 // (state.buzzer) and hands it the page's own data through mountBuzzer.
 import { pub } from './api.js';
+import { pickerHtml, wirePicker } from './newstats.js';
 import { joinRoom, beep, esc, shortNames, sound, orderHtml, soundHtml, wireSound, teamsHtml } from './buzzer_client.js';
 
 // a token lasts up to 12 hours: ask for a new one once it is 10 hours old
@@ -53,6 +55,7 @@ async function ask(pw) {
     me.pw = pw;
     me.tk = r.token;
     me.rooms = Array.isArray(r.rooms) ? r.rooms : [];
+    me.region = typeof r.region === 'string' ? r.region : 'enam';
     me.at = Date.now();
     keep();
     return 'ok';
@@ -144,23 +147,21 @@ function enter() {
 function draw() {
   if (!me.pw) {
     panel.innerHTML = `<form class="bzjoin">
+      <p class="bzhelp">Enter the buzzer password from your tournament director.</p>
       <label for="bzpw">Password</label>
       <div class="bzrow"><input id="bzpw" type="password" autocomplete="off" autocapitalize="off"><button class="primary">Join</button></div>
       ${wrong ? '<div class="bad">Wrong password.</div>' : ''}</form>`;
     return;
   }
-  const roster = page.teams();
-  // picking a player: a team the roster no longer has is picked again
-  if (me.team && !me.name && !roster.some((x) => x.name === me.team)) delete me.team;
-  if (!me.team) {
-    panel.innerHTML = `<div class="bzstep"><div class="bzlabel">Team</div>
-      <div class="bzpick">${roster.map((t) => `<button data-team="${esc(t.name)}">${esc(t.name)}</button>`).join('')}</div></div>`;
-    return;
-  }
-  if (!me.name) {
-    const t = roster.find((x) => x.name === me.team);
-    panel.innerHTML = `<div class="bzstep"><div class="bzlabel"><button class="linkbtn" data-back>${esc(me.team)}</button></div>
-      <div class="bzpick">${t.players.map((p) => `<button data-name="${esc(p)}">${esc(p)}</button>`).join('')}</div></div>`;
+  // who you are: the roster's players under their teams, with a search box
+  if (!me.team || !me.name) {
+    const items = page.teams().flatMap((t) => t.players.map((name) => ({ name, team: t.name })))
+      .sort((x, y) => x.team.localeCompare(y.team) || x.name.localeCompare(y.name));
+    panel.innerHTML = `<div class="bzstep bzwhostep"><p class="bzhelp">Select your name.</p>${pickerHtml('bzwho', items, -1)}</div>`;
+    const btn = panel.querySelector('#bzwho');
+    btn.textContent = 'Search players';
+    btn.classList.add('empty');
+    wirePicker('bzwho', items, -1, (p) => { me.team = p.team; me.name = p.name; delete me.room; keep(); }, enter);
     return;
   }
   const b = st.buzz;
@@ -260,10 +261,7 @@ function wirePanel() {
     if (row) { goRoom(row); return; }
     const t = e.target.closest('button');
     if (!t) return;
-    if (t.dataset.team) { me.team = t.dataset.team; keep(); draw(); }
-    else if (t.dataset.back != null) { delete me.team; keep(); draw(); }
-    else if (t.dataset.name) { me.name = t.dataset.name; keep(); enter(); }
-    else if (t.dataset.leave != null) { me = { pw: me.pw, tk: me.tk, rooms: me.rooms, at: me.at }; keep(); enter(); }
+    if (t.dataset.leave != null) { me = { pw: me.pw, tk: me.tk, rooms: me.rooms, at: me.at, region: me.region }; keep(); enter(); }
     else if (t.dataset.when) { when.v = t.dataset.when; draw(); }
     else if (t.dataset.tab) { tab = t.dataset.tab; draw(); }
     // release: the click. press: only a keyboard's click (Enter on the button)
@@ -305,6 +303,7 @@ function wirePanel() {
  *                 (or null), score = null until the game is in, then
  *                 {res: 'W'|'L'|'T'|'', us, them, forfeit}
  *   liveRound()   the round being played
+ *   region()      where the tournament's rooms are made (state.bzg)
  * The first call builds the button and joins the remembered room; a later
  * one only redraws from the new data, and leaves a live connection alone.
  */
@@ -319,6 +318,15 @@ function outdated() {
   if (!t) delete me.team;
   delete me.name;
   delete me.room;
+  keep();
+  return true;
+}
+
+// The TD moved the rooms to another region: the token held opens the old
+// ones, so the next connection asks for a new one.
+function moved() {
+  if (!me.tk || !page.region || (me.region || 'enam') === page.region()) return false;
+  me.at = 0;
   keep();
   return true;
 }
@@ -344,12 +352,15 @@ export function mountBuzzer(p) {
     fab.onclick = () => { sheet.hidden = false; };
     sheet.querySelector('.bzclose').onclick = () => { sheet.hidden = true; };
     fab.hidden = !p.on();
+    moved();
     enter();
     return;
   }
   // the tournament has no buzzer rooms: the public page is as it is without one
   fab.hidden = !p.on();
-  if (outdated()) { enter(); return; }
+  if (outdated() || moved()) { enter(); return; }
+  // a name being looked for is left alone
+  if (panel.querySelector('.pickpanel:not([hidden])')) return;
   // remembered, but the schedule wasn't there to find the room in: join now
   if (!conn && me.pw && me.team && me.name) enter();
   // a password being typed is left alone

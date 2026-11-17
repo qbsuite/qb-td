@@ -32,7 +32,8 @@
 //                         it in Cloudflare's per-room figures)
 //                    {t:'players', players}            someone came or went
 //                    {t:'pending'}    a buzz arrived: stop reading (sound)
-//                    {t:'buzz', name, team, list}   who has it (lag-equalized)
+//                    {t:'buzz', name, team, rtt, list}   who has it (lag-equalized;
+//                         rtt: that player's round trip in ms, as in players)
 //                         and, as buzzin.live shows, everyone who has buzzed
 //                         since the last Clear, in order: the first window's
 //                         buzzes by press time, later ones as they arrive
@@ -75,7 +76,7 @@ export default {
       const closes = Number(q.get('closes')) || Date.now() + 72 * 3600 * 1000;
       const token = await signToken(env.BUZZER_SECRET, {
         slug: q.get('slug') || 'demo', role, rooms: (q.get('rooms') || '').split(',').filter(Boolean).map(Number),
-        expires: role === 'reader' ? closes : Math.min(closes, Date.now() + PLAYER_TOKEN_MS), closes,
+        expires: role === 'reader' ? closes : Math.min(closes, Date.now() + PLAYER_TOKEN_MS), closes, region: q.get('region') || undefined,
       });
       return Response.json({ token }, { headers: CORS });
     }
@@ -86,9 +87,13 @@ export default {
     // A room lives where Cloudflare first creates it, for good, and without
     // a hint that is wherever its first visitor's connection happened to
     // enter (measured 11/16: a room that landed in London answered Chicago
-    // in 100 ms, one in Chicago in 14). Ask for eastern North America.
-    // 'v2:' makes rooms created before the hint start over in the right place.
-    const stub = env.ROOMS.get(env.ROOMS.idFromName('v2:' + m[1] + '/' + m[2]), { locationHint: 'enam' });
+    // in 100 ms, one in Chicago in 14). So the room is asked for in the
+    // tournament's region: the TD's choice, signed into the token (eastern
+    // North America unless they chose another). A hint only counts when a
+    // room is first made, so another region is another room ('@weur');
+    // 'v2:' made rooms from before the hint start over in the right place.
+    const at = who.region === 'enam' ? '' : '@' + who.region;
+    const stub = env.ROOMS.get(env.ROOMS.idFromName('v2:' + m[1] + '/' + m[2] + at), { locationHint: who.region });
     // the room trusts these headers: only this Worker can reach it
     const headers = new Headers(request.headers);
     headers.set('x-buzz-role', who.role);
@@ -255,7 +260,7 @@ export class BuzzRoom {
     cands.sort((a, b) => a.adj - b.adj);
     const list = [];
     for (const c of cands) {
-      if (list.length < MAX_LIST && !list.some((x) => x.name === c.name && x.team === c.team)) list.push({ name: c.name, team: c.team });
+      if (list.length < MAX_LIST && !list.some((x) => x.name === c.name && x.team === c.team)) list.push({ name: c.name, team: c.team, rtt: c.rtt });
     }
     this.hold(list);
     this.all({ t: 'buzz', ...list[0], list });
@@ -312,22 +317,25 @@ export class BuzzRoom {
       a.rtt = Math.min(...a.rtts);
       a.pingN = 0;
       this.save(ws, a);
+      // a new arrival's first figure: the list sent when it joined had none
+      if (a.rtts.length === 1) this.all({ t: 'players', players: this.players() });
       return;
     }
     if (msg.t !== 'buzz') return;
     const adj = now - Math.min((a.rtt ?? 0) / 2 + SLACK_MS, MAX_COMP_MS);
-    if (this.pending) { this.pending.push({ name: a.name, team: a.team, adj }); return; }
+    const rtt = a.rtt ?? null;
+    if (this.pending) { this.pending.push({ name: a.name, team: a.team, rtt, adj }); return; }
     const list = this.held();
     if (list) {
       // locked: the buzz still joins the order shown under the buzzer
       if (list.length >= MAX_LIST || list.some((x) => x.name === a.name && x.team === a.team)) return;
-      const next = [...list, { name: a.name, team: a.team }];
+      const next = [...list, { name: a.name, team: a.team, rtt }];
       this.hold(next);
       this.all({ t: 'buzz', ...next[0], list: next });
       return;
     }
     // No await between the check and the lock: one buzz opens the window.
-    this.pending = [{ name: a.name, team: a.team, adj }];
+    this.pending = [{ name: a.name, team: a.team, rtt, adj }];
     this.all({ t: 'pending' });
     const w = this.window();
     if (w) setTimeout(() => this.resolve(), w); else this.resolve();

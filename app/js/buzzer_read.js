@@ -89,7 +89,7 @@ export function mountBuzzer(info, names) {
   });
 
   // who is in the room, a column a team (buzzer_client.js)
-  const listHtml = () => teamsHtml(st.players, label);
+  const listHtml = () => teamsHtml(st.players, label, true);
 
   function draw() {
     const b = st.buzz;

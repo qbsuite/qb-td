@@ -482,6 +482,7 @@ function mountBuzzer() {
   buzzerPub.then((m) => m.mountBuzzer({
     slug,
     on: () => state.buzzer === 1,
+    region: () => state.bzg || 'enam',
     teams: () => (roster || []).map((t) => ({ name: t.name, players: t.players })),
     rooms: () => (schedule ? schedule.rooms.map((r) => ({ id: r.bucket ?? null, name: r.name })) : []),
     games: teamGames,
