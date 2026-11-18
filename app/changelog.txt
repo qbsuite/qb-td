@@ -8,6 +8,10 @@ Release Notes for 11/18/2026
 [ READER ]
 - Buzzer card plays a sound for each team of the game, Anderson (g) for the first and Anderson (r) for the second.
 - Buzzer card: a speaker button opens each team's sound and the volume.
+- After Replace tossup or Replace bonus, the replacement shows the number of the question it replaced.
+
+[ CATEGORIES ]
+- Replacement and tiebreaker questions count in category stats, under their own category.
 
 Release Notes for 11/17/2026
 

@@ -3189,35 +3189,38 @@ export function categoryFromMetadata(meta) {
 // them from "[10e]"-style markers); absent when the packet has none.
 // Maps written before bonuses were extracted store a bare tossup array;
 // readers accept both.
+// a question whose tag nothing recognizes keeps the tag itself (`u`),
+// minus the writer's name, so the Categories tab can list it under
+// Unknown instead of leaving it out
+const questionCat = (q) => {
+  if (!q) return null;
+  if (typeof q.category === 'string' && q.category) {
+    return { c: q.category, s: typeof q.subcategory === 'string' ? q.subcategory : '' };
+  }
+  const meta = typeof q.metadata === 'string' ? q.metadata.replace(/<[^>]*>/g, '').trim() : '';
+  if (!meta) return null;
+  return categoryFromMetadata(meta) || { u: tagWithoutWriter(meta).slice(0, 120) };
+};
+const bonusMarksOf = (q) => {
+  const m = q && Array.isArray(q.difficultyModifiers) ? q.difficultyModifiers : null;
+  if (!m || !m.length) return '';
+  const d = m.map((x) => String(x || '').trim().toLowerCase().charAt(0)).join('');
+  return d.length === m.length && /^[emh]+$/.test(d) ? d : '';
+};
+// a bonus's entry: its category, with its e/m/h marks when it has them
+const bonusCat = (q) => {
+  const c = questionCat(q);
+  const d = bonusMarksOf(q);
+  return c && d ? { ...c, d } : c;
+};
+
 export function packetCategories(body, filename) {
   if (!/\.json$/i.test(filename)) return null;
   let parsed;
   try { parsed = JSON.parse(new TextDecoder().decode(body)); } catch (e) { return null; }
   if (!parsed || !Array.isArray(parsed.tossups) || !parsed.tossups.length) return null;
-  // a question whose tag nothing recognizes keeps the tag itself (`u`),
-  // minus the writer's name, so the Categories tab can list it under
-  // Unknown instead of leaving it out
-  const catOf = (q) => {
-    if (!q) return null;
-    if (typeof q.category === 'string' && q.category) {
-      return { c: q.category, s: typeof q.subcategory === 'string' ? q.subcategory : '' };
-    }
-    const meta = typeof q.metadata === 'string' ? q.metadata.replace(/<[^>]*>/g, '').trim() : '';
-    if (!meta) return null;
-    return categoryFromMetadata(meta) || { u: tagWithoutWriter(meta).slice(0, 120) };
-  };
-  const marksOf = (q) => {
-    const m = q && Array.isArray(q.difficultyModifiers) ? q.difficultyModifiers : null;
-    if (!m || !m.length) return '';
-    const d = m.map((x) => String(x || '').trim().toLowerCase().charAt(0)).join('');
-    return d.length === m.length && /^[emh]+$/.test(d) ? d : '';
-  };
-  const t = parsed.tossups.map(catOf);
-  const b = (Array.isArray(parsed.bonuses) ? parsed.bonuses : []).map((q) => {
-    const c = catOf(q);
-    const d = marksOf(q);
-    return c && d ? { ...c, d } : c;
-  });
+  const t = parsed.tossups.map(questionCat);
+  const b = (Array.isArray(parsed.bonuses) ? parsed.bonuses : []).map(bonusCat);
   return t.some(Boolean) || b.some(Boolean) ? { t, b } : null;
 }
 
@@ -3383,6 +3386,12 @@ async function rebuildCatmap(env, t) {
     }
     if (cats) map.rounds[String(row.number)] = cats;
   }
+  // replacement and tiebreaker questions games have read (tbCatsOf)
+  try {
+    const read = await readTbPool(env, TB_READ_KEY(tid), t.ckey);
+    const tb = tbCatsOf(read.pool.tossups, read.pool.bonuses);
+    if (Object.keys(tb.t).length || Object.keys(tb.b).length) map.tb = tb;
+  } catch (e) { console.log('catmap replacement lists unreadable for tournament', tid); }
   // a round YAPP couldn't be reached for keeps the map stale, so a later
   // load tries again — that round only, the others' parses being kept,
   // and not before CATMAP_RETRY_MS (a refused packet is not retried)
@@ -3391,6 +3400,54 @@ async function rebuildCatmap(env, t) {
     customMetadata: failed ? { v: 'retry', at: String(Date.now()) } : { v: CATMAP_VERSION },
   });
   await markPub(env, tid);
+}
+
+/* Replacement and tiebreaker questions in the category map: a game's qbj
+   names one it read by its pool id (qbtd_tiebreaker), not by a packet
+   number, so the round lists can't place it. The map's `tb` lists do,
+   {tb: {t: {TU1: {c, s}}, b: {B1: {c, s, d?}}}}, from the same tags a
+   packet question has. Only questions a game has read are listed (the
+   tiebreaker log's own moment, logTbUses), so the public map says nothing
+   of the spare questions still to come; an entry stays once written, as
+   the games that read the question do. */
+const hasTbCats = (map) => Boolean(map && map.tb && typeof map.tb === 'object'
+  && (Object.keys(map.tb.t || {}).length || Object.keys(map.tb.b || {}).length));
+function tbCatsOf(tossups, bonuses) {
+  const t = {};
+  const b = {};
+  for (const q of tossups || []) { const c = q && typeof q.id === 'string' ? questionCat(q) : null; if (c) t[q.id] = c; }
+  for (const q of bonuses || []) { const c = q && typeof q.id === 'string' ? bonusCat(q) : null; if (c) b[q.id] = c; }
+  return { t, b };
+}
+async function addTbCats(env, tid, tossups, bonuses) {
+  const add = tbCatsOf(tossups, bonuses);
+  if (!Object.keys(add.t).length && !Object.keys(add.b).length) return;
+  const key = `t/${tid}/catmap.json`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await env.DATA.get(key);
+    let map = { rounds: {} };
+    if (cur) {
+      map = await cur.json().catch(() => ({ rounds: {} }));
+      if (!map || typeof map.rounds !== 'object') map = { rounds: {} };
+    }
+    const tb = map.tb && typeof map.tb === 'object' ? map.tb : {};
+    const next = { t: { ...(tb.t || {}), ...add.t }, b: { ...(tb.b || {}), ...add.b } };
+    if (JSON.stringify(next) === JSON.stringify({ t: tb.t || {}, b: tb.b || {} })) return; // all there already
+    map.tb = next;
+    // a map made here has no round checked yet: stamped old, so the next
+    // dashboard load rebuilds it (rebuildCatmap, which keeps these lists)
+    const v = cur ? (cur.customMetadata || {}).v || '1' : '1';
+    const onlyIf = cur ? { etagMatches: cur.etag } : { etagDoesNotMatch: '*' };
+    try {
+      const put = await env.DATA.put(key, JSON.stringify(map), {
+        httpMetadata: { contentType: 'application/json' },
+        customMetadata: { ...(cur ? cur.customMetadata || {} : {}), v },
+        onlyIf,
+      });
+      if (put) { await markPub(env, tid); return; }
+    } catch (e) { /* precondition failed -> retry */ }
+  }
+  console.log('catmap replacement lists lost the retry race for tournament', tid);
 }
 
 // mark: false when the caller flags the tournament itself afterwards (a
@@ -3407,7 +3464,7 @@ async function updateCatmap(env, tid, round, cats, mark = true) {
     if (cats) map.rounds[String(round)] = cats;
     else if (cur) delete map.rounds[String(round)]; // replacement without categories clears the round
     else return; // nothing stored, nothing to clear
-    if (!Object.keys(map.rounds).length) {
+    if (!Object.keys(map.rounds).length && !hasTbCats(map)) {
       // an empty map reads as "no categories": drop the blob so the tab hides
       if (cur) { await env.DATA.delete(key); if (mark) await markPub(env, tid); }
       return;
@@ -4292,6 +4349,8 @@ async function logTbUses(env, b, roomName, round, teams, usedIds) {
     pool.tossups.push(...tus.filter((q) => !have.has(q.id)).map(strip));
     pool.bonuses.push(...bos.filter((q) => !have.has(q.id)).map(strip));
   });
+  // and their categories into the category map, so category stats count them
+  await addTbCats(env, tid, tus, bos);
 }
 
 /* ---------- moderator bucket API (/b/*, secret-authed) ---------- */

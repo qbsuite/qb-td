@@ -107,6 +107,33 @@ const throwOutEventPlugin = {
   },
 };
 
+// The number MODAQ prints before a question's text counts every question
+// put into the packet, so a replacement for tossup 1 read "2.". It comes
+// from tb_add_dialog shownQuestionNumber instead: a replacement has the
+// number of the question it replaced, and packet questions keep theirs.
+const TU_NUMBER = /children: \[props\.tossupNumber, "\. "\]/;
+const BO_LEADIN = /( *)(const formattedLeadin = React\.useMemo\(\(\) => PacketState\.getBonusWords\(`\$\{)props\.bonusIndex \+ 1(\}\. \$\{props\.bonus\.leadin\}`, props\.appState\.game\.gameFormat\), \[)(props\.bonusIndex, props\.bonus\.leadin, props\.appState\.game\.gameFormat\]\);)/;
+const questionNumberPlugin = {
+  name: 'qbtd-question-number',
+  setup(build) {
+    const ours = 'require("./dialogs/AddQuestionsDialog")';
+    build.onLoad({ filter: /[/\\]modaq[/\\]src[/\\]components[/\\]TossupQuestion\.js$/ }, async (args) => {
+      const text = await readFile(args.path, 'utf8');
+      if (!TU_NUMBER.test(text)) throw new Error('build_read: MODAQ TossupQuestion.js changed; update the question number patch');
+      return { contents: text.replace(TU_NUMBER, `children: [${ours}.shownQuestionNumber(props.appState, true, props.tossupNumber - 1), ". "]`), loader: 'js' };
+    });
+    build.onLoad({ filter: /[/\\]modaq[/\\]src[/\\]components[/\\]BonusQuestion\.js$/ }, async (args) => {
+      const text = await readFile(args.path, 'utf8');
+      if (!BO_LEADIN.test(text)) throw new Error('build_read: MODAQ BonusQuestion.js changed; update the question number patch');
+      return {
+        contents: text.replace(BO_LEADIN, (m, pad, head, mid, deps) =>
+          `${pad}const qbtdNumber = ${ours}.shownQuestionNumber(props.appState, false, props.bonusIndex);\n${pad}${head}qbtdNumber${mid}qbtdNumber, ${deps}`),
+        loader: 'js',
+      };
+    });
+  },
+};
+
 await esbuild.build({
   entryPoints: [path.join(root, 'app', 'js', 'read_main.js')],
   bundle: true,
@@ -115,5 +142,5 @@ await esbuild.build({
   outfile: path.join(root, 'app', 'js', 'read.bundle.js'),
   define: { 'process.env.NODE_ENV': '"production"' },
   logLevel: 'warning',
-  plugins: [tbDialogPlugin, replaceMenuPlugin, throwOutPlugin, throwOutEventPlugin],
+  plugins: [tbDialogPlugin, replaceMenuPlugin, throwOutPlugin, throwOutEventPlugin, questionNumberPlugin],
 });

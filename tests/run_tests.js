@@ -46,7 +46,7 @@ import * as hubgamesMod from '../app/js/hubgames.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, exportStatus, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, shownNumber, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, exportStatus, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -1813,6 +1813,36 @@ const CATMAP = { rounds: { 1: {
     { c: 'Mythology', s: '' },
   ],
 } } };
+
+test('category stats count a replacement or tiebreaker question in its own category', () => {
+  // question 2 was replaced by pool tossup TU1 (History), its bonus by B1 (Science, marked e/m/h)
+  const qbj = catQbj([
+    { t: 1, team: 'Alpha', player: 'Ann', pos: 5, value: 15 },
+    { t: 2, team: 'Beta', player: 'Bob', pos: 9, value: 10 },
+  ], { 2: [10, 10, 0] });
+  const q2 = qbj.match_questions.find((q) => q.question_number === 2);
+  q2.tossup_question = { question_number: 21, qbtd_tiebreaker: 'TU1' };
+  q2.replacement_tossup_question = { question_number: 21, qbtd_tiebreaker: 'TU1' };
+  q2.bonus.question = { type: 'bonus', question_number: 21, qbtd_tiebreaker: 'B1' };
+  const entries = [{ round: 1, room: 'R1', qbj }];
+  const map = { ...CATMAP, tb: { t: { TU1: { c: 'History', s: 'World History' } }, b: { B1: { c: 'Science', s: 'Physics', d: 'emh' } } } };
+  const bob = categoryStats(entries, map).filter((r) => r.player === 'Bob');
+  assert.deepEqual(bob.map((r) => [r.cat, r.sub, r.gets, r.pts]), [['History', 'World History', 1, 10]],
+    'the replacement counts as History, not as the British Literature tossup it replaced');
+  const beta = categoryTeamStats(entries, map).filter((r) => r.team === 'Beta');
+  assert.deepEqual(beta.map((r) => [r.cat, r.gets, r.bh, r.bpts]).sort(), [['History', 1, 0, 0], ['Science', 0, 1, 20]]);
+  const q = categoryQuestionStats(entries, map);
+  const hist = q.tossups.find((r) => r.cat === 'History');
+  assert.equal(hist.heard, 1);
+  assert.equal(hist.conv, 1);
+  assert.ok(!q.tossups.some((r) => r.sub === 'British Literature'), 'the thrown-out tossup is in no category');
+  const sci = q.bonuses.find((r) => r.cat === 'Science' && r.sub === 'Physics');
+  assert.equal(sci.pts, 20);
+  assert.deepEqual([sci.e, sci.m, sci.h], [1, 1, 0], 'its e/m/h marks come from the replacement lists');
+  // a map without the lists (or an untagged question) leaves it out, as before
+  assert.deepEqual(categoryStats(entries, CATMAP).filter((r) => r.player === 'Bob'), []);
+  assert.deepEqual(categoryTeamStats(entries, { ...CATMAP, tb: { t: {}, b: {} } }).filter((r) => r.team === 'Beta'), []);
+});
 
 test('categoryStats credits only the players who buzzed', () => {
   const entries = [{ round: 1, room: 'R1', qbj: catQbj([
@@ -4046,6 +4076,36 @@ test('Replace: refused, with nothing changed, without a held bonus, a bonus bein
   assert.equal(paired.replace(2, 'tossup', paired.tu(1, 'TB'), 'TU1'), '', 'the latest question still can be');
   // the current tossup, buzzes and all, needs no held bonus
   assert.equal(g.replace(6, 'tossup', g.tu(1, 'TB'), 'TU1'), '');
+});
+
+test('shownNumber: a replacement has the number of the question it replaced', () => {
+  // nothing added: MODAQ's own numbers
+  assert.equal(shownNumber(0, [], []), 1);
+  assert.equal(shownNumber(7, [], [3]), 8, 'a plain throw-out moves on to the next packet question');
+  // tossup 1 replaced: thrown at 0, the replacement at 1
+  assert.equal(shownNumber(1, ['1'], [0]), 1, 'the replacement reads 1., not 2.');
+  assert.equal(shownNumber(2, ['1'], [0]), 2, 'packet tossup 2 keeps its number');
+  assert.equal(shownNumber(20, ['1'], [0]), 20);
+  // the replacement itself thrown out and replaced again
+  assert.equal(shownNumber(2, [1, 2], [0, 1]), 1);
+  assert.equal(shownNumber(3, [1, 2], [0, 1]), 2);
+  // the last packet tossup replaced, then two tiebreakers after the packet (packet of 20)
+  const added = [20, 21, 22], thrown = [19];
+  assert.equal(shownNumber(20, added, thrown), 20, 'the replacement for tossup 20');
+  assert.equal(shownNumber(21, added, thrown), 21, 'the first tiebreaker');
+  assert.equal(shownNumber(22, added, thrown), 22, 'the second');
+  // tiebreakers only
+  assert.equal(shownNumber(20, [20, 21], []), 21);
+  assert.equal(shownNumber(21, [20, 21], []), 22);
+  // a replacement mid-packet after an earlier plain throw-out
+  assert.equal(shownNumber(8, [8], [3, 7]), 8, 'packet tossup 8 was thrown out and replaced');
+  assert.equal(shownNumber(9, [8], [3, 7]), 9);
+});
+
+test('reader bundle: question numbers come from shownQuestionNumber', () => {
+  const bundle = readFileSync(new URL('../app/js/read.bundle.js', import.meta.url), 'utf8');
+  assert.ok(/\.shownQuestionNumber\(\w+\.appState,!0,\w+\.tossupNumber-1\)/.test(bundle), 'run npm run build:read');
+  assert.ok(/\.shownQuestionNumber\(\w+\.appState,!1,\w+\.bonusIndex\)/.test(bundle), 'run npm run build:read');
 });
 
 test('reader bundle: the event log keeps a replacement\'s throw-outs and names a held bonus', () => {

@@ -247,6 +247,33 @@ export function tbNumbering(tb) {
   return { tu: fn(st && st.t, st && st.tuAt), bo: fn(st && st.b, st && st.boAt) };
 }
 
+/** The number shown before a question's text, for the question at 0-based
+    game index `index`. MODAQ shows index + 1, which counts every question
+    put into the packet: after Replace tossup on tossup 1, the replacement
+    read "2." and packet tossup 2 read "3.". Here a packet question keeps
+    its packet number, a replacement (an added question right after a
+    thrown-out one) has the number of the question it replaced, and any
+    other added question (a tiebreaker after the packet) follows on from
+    the packet questions before it. added: the game indices of added
+    questions (tb.tuAt / tb.boAt keys); thrown: the game indices thrown
+    out, in any cycle. */
+export function shownNumber(index, added, thrown) {
+  const add = new Set((added || []).map(Number));
+  if (!add.size || !Number.isInteger(index) || index < 0) return index + 1;
+  const out = new Set((thrown || []).map(Number));
+  const before = (i) => { let n = 0; for (const k of add) if (k < i) n++; return i - n; }; // packet questions before i
+  const replaces = (i) => add.has(i) && i > 0 && out.has(i - 1);
+  const number = (i) => {
+    if (!add.has(i)) return before(i) + 1;
+    if (replaces(i)) return number(i - 1);
+    const p = before(i);
+    let n = p + 1;
+    for (const k of add) if (k < i && !replaces(k) && before(k) === p) n++;
+    return n;
+  };
+  return number(index);
+}
+
 /** A copy of MODAQ's match qbj with every tossup and bonus numbered by
     tbNumbering, for the upload. Pool tiebreakers also carry their pool id
     (qbtd_tiebreaker), so buzzpoints list each one under its own id even

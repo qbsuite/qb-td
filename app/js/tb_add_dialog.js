@@ -27,7 +27,7 @@ import { ModalDialog } from 'modaq/src/components/dialogs/ModalDialog';
 import { PacketState } from 'modaq/src/state/PacketState';
 import { tbBridge } from './tb_bridge.js';
 import { tbSelection, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion,
-  syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop } from './read_core.js';
+  syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, tbState, shownNumber } from './read_core.js';
 
 const h = React.createElement;
 const strip = (s) => String(s || '').replace(/<[^>]*>/g, '');
@@ -213,11 +213,13 @@ function ReplaceDialog({ appState, kind, onClose }) {
   } else {
     const q = ci + 1;
     // a replaced tossup keeps its question's bonus (read_core replaceQuestion)
-    const own = isTu && cycle && cycle.correctBuzz && cycle.bonusAnswer ? cycle.bonusAnswer.bonusIndex + 1 : 0;
+    // numbered as the questions are on the page (shownQuestionNumber)
+    const own = isTu && cycle && cycle.correctBuzz && cycle.bonusAnswer ? shownQuestionNumber(appState, false, cycle.bonusAnswer.bonusIndex) : 0;
+    const shown = shownQuestionNumber(appState, isTu, now - 1);
     body.push(h('div', { key: 'what', style: { marginBottom: 10 } },
-      (isTu ? `Tossup ${now} on question ${q} will be thrown out, and the tossup you pick will be read in its place.`
+      (isTu ? `Tossup ${shown} on question ${q} will be thrown out, and the tossup you pick will be read in its place.`
           + (own ? ` If it is answered, bonus ${own} is read again.` : '')
-        : `Bonus ${now} on question ${q} will be thrown out, and the bonus you pick will be read in its place.`)
+        : `Bonus ${shown} on question ${q} will be thrown out, and the bonus you pick will be read in its place.`)
         + ' To undo it, click the X next to its event in the Event Log.'));
     if (check.retro) {
       body.push(h('div', { key: 'retro', style: { marginBottom: 10, fontSize: 13 } },
@@ -313,12 +315,28 @@ export function undoHandler(cycle, isTossup, index) {
 export function keepsThrownOutHere(isTossup, index) {
   return keepsThrownOut(tbBridge.getTb ? tbBridge.getTb() : null, isTossup, index);
 }
+/** The number before a question's text (read_core shownNumber): MODAQ's
+    own TossupQuestion and BonusQuestion ask here (build_read.mjs). */
+export function shownQuestionNumber(appState, isTossup, index) {
+  try {
+    const st = tbState(tbBridge.getTb ? tbBridge.getTb() : null);
+    if (!st) return index + 1;
+    const thrown = [];
+    for (const c of appState.game.cycles) {
+      for (const x of (isTossup ? c.thrownOutTossups : c.thrownOutBonuses) || []) thrown.push(x.questionIndex);
+    }
+    return shownNumber(index, Object.keys(isTossup ? st.tuAt : st.boAt), thrown);
+  } catch (e) { return index + 1; }
+}
 export function thrownOutText(isTossup, index, text) {
   const tb = tbBridge.getTb ? tbBridge.getTb() : null;
-  if (!isTossup && heldBonusText(tb, index)) return heldBonusText(tb, index);
+  if (!tb) return text;
+  // numbered as the questions are on the page (shownQuestionNumber)
+  const n = shownQuestionNumber(tbBridge.appState, isTossup, index);
+  if (!isTossup && heldBonusText(tb, index)) return `Bonus #${n} held for the replacement tossup`;
   // a replacement's throw-out: deleting the event undoes the replacement
-  if (keepsThrownOut(tb, isTossup, index)) return `Replaced ${isTossup ? 'tossup' : 'bonus'} #${index + 1}`;
-  return text;
+  if (keepsThrownOut(tb, isTossup, index)) return `Replaced ${isTossup ? 'tossup' : 'bonus'} #${n}`;
+  return String(text).replace(/#\d+$/, '#' + n);
 }
 
 export const AddQuestionsDialog = observer(function AddQuestionsDialog() {

@@ -75,11 +75,24 @@ export function catInfo(list, number) {
 // A bonus's difficulty marks from the map ('emh', one letter per part in
 // packet order), or null unless they name each of e/m/h exactly once for
 // a three-part bonus — anything else can't be read as easy/medium/hard.
-function bonusMarks(list, number, nParts) {
-  const info = list[number - 1];
+function marksOf(info, nParts) {
   const d = info && typeof info.d === 'string' ? info.d : '';
   return nParts === 3 && d.length === 3 && [...d].sort().join('') === 'ehm' ? d : null;
 }
+function bonusMarks(list, number, nParts) {
+  return marksOf(list[number - 1], nParts);
+}
+
+// A replacement or tiebreaker question a game read (its qbj names it by
+// pool id, qbtd_tiebreaker): its entry is in the map's `tb` lists,
+// {t: {TU1: {c, s}}, b: {B1: {c, s, d?}}}, which the Worker fills as
+// games report the questions they read. One the map doesn't have (an
+// untagged question, or a game from before the lists) counts nowhere.
+function tbEntry(catmap, kind, id) {
+  const list = catmap && catmap.tb && typeof catmap.tb === 'object' ? catmap.tb[kind] : null;
+  return list && typeof list === 'object' && Object.prototype.hasOwnProperty.call(list, id) ? list[id] : null;
+}
+const tbInfo = (catmap, kind, id) => catOfEntry(tbEntry(catmap, kind, id));
 
 // Which buzzes on one tossup (matchBuzzes order: by position) are
 // bouncebacks: correct, after the other team's wrong buzz.
@@ -114,8 +127,7 @@ export function categoryStats(entries, catmap) {
     const cats = roundCats(catmap, e.round);
     if (!cats) continue;
     for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
-      if (tb) continue; // tiebreakers have no packet category
-      const info = catInfo(cats.t, tossup);
+      const info = tb ? tbInfo(catmap, 't', tb) : catInfo(cats.t, tossup);
       if (!info) continue;
       const bb = bouncebacks(buzzes);
       buzzes.forEach((b, i) => {
@@ -153,8 +165,7 @@ export function categoryTeamStats(entries, catmap) {
     const cats = roundCats(catmap, e.round);
     if (!cats) continue;
     for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
-      if (tb) continue; // tiebreakers have no packet category
-      const info = catInfo(cats.t, tossup);
+      const info = tb ? tbInfo(catmap, 't', tb) : catInfo(cats.t, tossup);
       if (!info) continue;
       const bb = bouncebacks(buzzes);
       buzzes.forEach((b, i) => {
@@ -168,8 +179,8 @@ export function categoryTeamStats(entries, catmap) {
       });
     }
     for (const bn of matchBonuses(e.qbj)) {
-      if (!bn.team || bn.tb) continue;
-      const info = catInfo(cats.b, bn.bonus);
+      if (!bn.team) continue;
+      const info = bn.tb ? tbInfo(catmap, 'b', bn.tb) : catInfo(cats.b, bn.bonus);
       if (!info) continue;
       const r = rowFor(bn.team, info);
       r.bh++;
@@ -300,10 +311,9 @@ export function categoryQuestionStats(entries, catmap, keyOf = (e, kind, n) => e
     const cats = roundCats(catmap, e.round);
     if (!cats) continue;
     for (const { tossup, tb, buzzes } of matchBuzzes(e.qbj)) {
-      if (tb) continue; // tiebreakers have no packet category
-      const info = catInfo(cats.t, tossup);
+      const info = tb ? tbInfo(catmap, 't', tb) : catInfo(cats.t, tossup);
       if (!info) continue;
-      const r = slice(tossups, info, tInit, keyOf(e, 't', tossup));
+      const r = slice(tossups, info, tInit, tb ? 'tb:' + tb : keyOf(e, 't', tossup));
       r.heard++;
       const right = buzzes.find((b) => b.value > 0);
       if (right) {
@@ -314,15 +324,15 @@ export function categoryQuestionStats(entries, catmap, keyOf = (e, kind, n) => e
       if (buzzes.some((b) => b.value < 0)) r.negs++;
     }
     for (const bn of matchBonuses(e.qbj)) {
-      if (!bn.team || bn.tb) continue; // a bonus nobody controlled wasn't read
-      const info = catInfo(cats.b, bn.bonus);
+      if (!bn.team) continue; // a bonus nobody controlled wasn't read
+      const info = bn.tb ? tbInfo(catmap, 'b', bn.tb) : catInfo(cats.b, bn.bonus);
       if (!info) continue;
-      const key = keyOf(e, 'b', bn.bonus);
+      const key = bn.tb ? 'tb:' + bn.tb : keyOf(e, 'b', bn.bonus);
       const r = slice(bonuses, info, bInit, key);
       r.heard++;
       r.pts += bn.total;
       if (bn.parts.length !== 3) continue;
-      const d = bonusMarks(cats.b, bn.bonus, bn.parts.length);
+      const d = bn.tb ? marksOf(tbEntry(catmap, 'b', bn.tb), bn.parts.length) : bonusMarks(cats.b, bn.bonus, bn.parts.length);
       if (d) {
         r.dHeard++;
         bn.parts.forEach((p, i) => { if (p > 0) r[d[i]]++; });
