@@ -69,13 +69,13 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
       if (m.t === 'over') { closed = true; state.live = false; state.over = true; tell('over'); try { ws.close(); } catch (e2) { /* gone */ } return; }
       if (m.t === 'hello') { state.players = m.players; state.buzz = m.buzz; state.list = m.list || []; state.pending = false; }
       else if (m.t === 'players') state.players = m.players;
-      else if (m.t === 'pending') state.pending = true;
+      else if (m.t === 'pending') { state.pending = true; state.first = m.team != null ? { name: m.name, team: m.team } : null; }
       else if (m.t === 'buzz') {
         // 'more': someone joined the order behind a buzz already shown
         if (state.buzz) { state.list = m.list || []; tell('more'); return; }
         state.buzz = { name: m.name, team: m.team }; state.list = m.list || []; state.pending = false;
       }
-      else if (m.t === 'clear') { state.buzz = null; state.list = []; state.pending = false; }
+      else if (m.t === 'clear') { state.buzz = null; state.list = []; state.pending = false; state.first = null; }
       tell(m.t);
     };
     ws.onclose = (e) => {
@@ -131,6 +131,23 @@ export function joinRoom({ slug, room, name = '', team = '', token, on }) {
 }
 
 let audio = null;
+/** How loud this device plays its buzz sounds, 0 to 1 (1 unless turned
+    down), remembered here; every sound goes out through it. */
+export const volume = {
+  get v() { try { const x = Number(localStorage.getItem('qbtdBuzzerVolume') ?? 1); return x >= 0 && x <= 1 ? x : 1; } catch (e) { return 1; } },
+  set v(x) { try { localStorage.setItem('qbtdBuzzerVolume', String(x)); } catch (e) { /* private */ } if (master) master.gain.value = x; },
+};
+let master = null;
+function out() {
+  if (!master) { master = audio.createGain(); master.gain.value = volume.v; master.connect(audio.destination); }
+  return master;
+}
+/** The volume slider; `wireVolume` makes it work, playing `preview()` when let go. */
+export const volumeHtml = () => `<label class="bzvol">Volume <input type="range" min="0" max="100" step="5" value="${Math.round(volume.v * 100)}" data-bzvol aria-label="Buzz sound volume"></label>`;
+function wireVolume(root, preview) {
+  root.addEventListener('input', (e) => { if (e.target.matches('[data-bzvol]')) volume.v = Number(e.target.value) / 100; });
+  root.addEventListener('change', (e) => { if (e.target.matches('[data-bzvol]')) preview(); });
+}
 // Every sound is made here by the browser, so there is no file to load.
 function tone({ type = 'sine', f, f2 = null, at = 0, len = 0.16, vol = 0.18 }) {
   const t = audio.currentTime + at;
@@ -141,7 +158,7 @@ function tone({ type = 'sine', f, f2 = null, at = 0, len = 0.16, vol = 0.18 }) {
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + len);
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + len);
-  o.connect(g).connect(audio.destination);
+  o.connect(g).connect(out());
   o.start(t);
   o.stop(t + len + 0.02);
 }
@@ -153,14 +170,54 @@ const SOUNDS = {
   Blip: () => { tone({ type: 'square', f: 420, f2: 1400, len: 0.12, vol: 0.12 }); },
   Laser: () => { tone({ type: 'sawtooth', f: 1800, f2: 220, len: 0.22, vol: 0.12 }); },
 };
+// Recorded sounds (app/snd): a real buzzer set's two lights, cut to the
+// sound itself with nothing before or after. A file is fetched once, when
+// its sound is chosen or first wanted, and kept decoded, so a buzz plays it
+// at once like the made ones.
+const RECORDED = { 'Anderson (g)': 'snd/anderson-g.wav', 'Anderson (r)': 'snd/anderson-r.wav' };
+const RECORDED_VOL = 0.19; // 10 dB under where it began: a recording is far denser than the made tones
+const loaded = new Map(); // name -> AudioBuffer, or the promise of one
+function loadSound(name) {
+  if (!RECORDED[name]) return null;
+  if (!loaded.has(name)) {
+    loaded.set(name, (async () => {
+      try {
+        audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+        const res = await fetch(new URL(RECORDED[name], document.baseURI));
+        if (!res.ok) throw new Error('sound ' + res.status);
+        const buf = await audio.decodeAudioData(await res.arrayBuffer());
+        loaded.set(name, buf);
+        return buf;
+      } catch (e) { loaded.delete(name); return null; } // no sound this time; the next buzz tries again
+    })());
+  }
+  return loaded.get(name);
+}
+function playBuffer(buf) {
+  const src = audio.createBufferSource();
+  const g = audio.createGain();
+  src.buffer = buf;
+  g.gain.value = RECORDED_VOL;
+  src.connect(g).connect(out());
+  src.start();
+}
+// A browser keeps audio silent when it was made before the person touched
+// the page (as it is when a recorded sound is got ready on load): wake it
+// on the first touch or key, and again whenever a sound is about to play.
+function wake() { try { if (audio && audio.state === 'suspended') audio.resume().catch(() => {}); } catch (e) { /* no sound */ } }
+if (typeof addEventListener === 'function') for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, wake, { capture: true, passive: true });
 /** The sounds to pick from, in the order listed; Off is silence. */
-export const SOUND_NAMES = [...Object.keys(SOUNDS), 'Off'];
+export const SOUND_NAMES = [...Object.keys(RECORDED), ...Object.keys(SOUNDS), 'Off'];
 /** Plays one sound by name (a preview, or the buzz itself). */
 export function playSound(name) {
-  if (!SOUNDS[name]) return;
+  if (!SOUNDS[name] && !RECORDED[name]) return;
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    SOUNDS[name]();
+    wake();
+    if (SOUNDS[name]) { SOUNDS[name](); return; }
+    const buf = loadSound(name);
+    if (buf && typeof buf.then === 'function') buf.then((b) => { if (b) playBuffer(b); });
+    else if (buf) playBuffer(buf);
   } catch (e) { /* no sound */ }
 }
 /** The buzz sound this device chose. */
@@ -203,13 +260,35 @@ export const sound = {
   set name(v) { try { localStorage.setItem('qbtdBuzzerSoundName', v); } catch (e) { /* private */ } },
   get on() { return this.name !== 'Off'; },
 };
+/** The moderator's two sounds, one for each team of the game (0: the first
+    team, 1: the second), remembered on this device: a buzz is heard as its
+    team's before the card is read. */
+const TEAM_SOUNDS = [['qbtdBuzzerSoundTeam1', 'Anderson (g)'], ['qbtdBuzzerSoundTeam2', 'Anderson (r)']];
+export const teamSound = {
+  get(i) { try { const n = localStorage.getItem(TEAM_SOUNDS[i][0]); return SOUND_NAMES.includes(n) ? n : TEAM_SOUNDS[i][1]; } catch (e) { return TEAM_SOUNDS[i][1]; } },
+  set(i, v) { try { localStorage.setItem(TEAM_SOUNDS[i][0], v); } catch (e) { /* private */ } },
+};
+/** The two pickers, each named for its team, with a button to hear it. */
+export function teamSoundsHtml(names) {
+  return `<div class="bzsounds">${[0, 1].map((i) => `<span class="bzsound"><label><span class="bzsname" title="${esc(names[i] || '')}">${esc(names[i] || 'Team ' + (i + 1))}</span>
+    <select data-bzteamsound="${i}" aria-label="Sound for ${esc(names[i] || 'team ' + (i + 1))}">${SOUND_NAMES.map((n) => `<option${n === teamSound.get(i) ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+    <button type="button" class="bzplay" data-bzteamplay="${i}" aria-label="Play sound" title="Play sound">▶</button></span>`).join('')}${volumeHtml()}</div>`;
+}
+export function wireTeamSounds(root) {
+  for (const i of [0, 1]) loadSound(teamSound.get(i)); // ready before the first buzz
+  wireVolume(root, () => playSound(teamSound.get(0)));
+  root.addEventListener('change', (e) => { const i = e.target.dataset && e.target.dataset.bzteamsound; if (i != null) { teamSound.set(Number(i), e.target.value); playSound(e.target.value); } });
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-bzteamplay]'); if (b) playSound(teamSound.get(Number(b.dataset.bzteamplay))); });
+}
 /** The sound picker: the list, and a button to hear the one chosen. */
 export function soundHtml() {
   return `<span class="bzsound"><label>Sound <select data-bzsound>${SOUND_NAMES.map((n) => `<option${n === sound.name ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
-    <button type="button" class="bzplay" data-bzplay aria-label="Play sound" title="Play sound">▶</button></span>`;
+    <button type="button" class="bzplay" data-bzplay aria-label="Play sound" title="Play sound">▶</button></span>${volumeHtml()}`;
 }
 /** Wires a sound picker anywhere under `root`: choosing one plays it. */
 export function wireSound(root) {
+  loadSound(sound.name); // a recorded sound already chosen is ready before the first buzz
+  wireVolume(root, () => playSound(sound.name));
   root.addEventListener('change', (e) => { if (e.target.matches('[data-bzsound]')) { sound.name = e.target.value; playSound(sound.name); } });
   root.addEventListener('click', (e) => { if (e.target.closest('[data-bzplay]')) playSound(sound.name); });
 }

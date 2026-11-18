@@ -1,3 +1,14 @@
+Release Notes for 11/18/2026
+
+[ PUBLIC PAGE ]
+- Buzzer has two recorded sounds, Anderson (g) and Anderson (r), from a buzzer set's green and red lights.
+- Buzzer settings have a Volume slider.
+- Buzzer settings: Button picks the buzz button's shape, Flat, Raised or Dome.
+
+[ READER ]
+- Buzzer card plays a sound for each team of the game, Anderson (g) for the first and Anderson (r) for the second.
+- Buzzer card: a speaker button opens each team's sound and the volume.
+
 Release Notes for 11/17/2026
 
 [ SETUP ]

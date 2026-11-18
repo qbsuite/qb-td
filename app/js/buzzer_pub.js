@@ -183,6 +183,9 @@ function draw() {
   // press reads Buzzed at once, and the first word that anyone has buzzed
   // locks everyone else. The named winner then settles it either way.
   const look = b ? (mine ? 'mine' : 'locked') : pressed ? 'mine' : st.pending ? 'locked' : '';
+  // the button comes back up when the buzzers reopen
+  if (wasLook && !look) rose = Date.now();
+  wasLook = look;
   // the next game is in another room: the Schedule tab is marked, since
   // that is where the way there is
   const next = nextGame(teamRounds(me.team));
@@ -193,6 +196,7 @@ function draw() {
         <button data-when="press" data-how="${k}" aria-pressed="${when[k].v === 'press'}">Press</button><button data-when="release" data-how="${k}" aria-pressed="${when[k].v === 'release'}">Release</button></span>`).join('')}
       ${soundHtml()}
       <label class="bzanim">Animation <select data-bzanim>${ANIMS.map((n) => `<option${n === anim.v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label class="bzanim">Button <select data-bzshape>${SHAPES.map((n) => `<option${n === shape.v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
     </div>`
     : teamsHtml(st.players, label);
   panel.innerHTML = `<div class="bzroom">
@@ -201,10 +205,10 @@ function draw() {
       <span class="bzme" title="${esc(me.name)} · ${esc(me.team)}">${esc(me.name)} · ${esc(me.team)}</span>
       <button class="linkbtn" data-leave>Leave</button>
     </div>
-    <button class="bzbtn${!st.live ? ' off' : look === 'mine' ? ' mine' : look === 'locked' ? ' locked' : ''}">
+    <div class="bzwell s-${shape.v.toLowerCase()}"><button class="bzbtn${!st.live ? ' off' : look === 'mine' ? ' mine' : look === 'locked' ? ' locked' : ''}">
       <span>${!st.live ? (been ? 'Reconnecting' : 'Connecting') : look === 'mine' ? 'Buzzed' : look === 'locked' ? 'Locked' : 'Buzz'}</span>
       ${look || !st.live ? '' : '<kbd>Space</kbd>'}
-    </button>
+    </button></div>
     ${!st.live && been ? '<div class="bzdown" role="status">Disconnected. Press to retry.</div>' : ''}
     ${orderHtml(st.list, label)}
     <div class="bztabs" role="tablist">${['Room', 'Schedule', 'Settings'].map((t) => `<button role="tab" data-tab="${t}" aria-selected="${tab === t}"${
@@ -232,6 +236,13 @@ function press(at = null) {
 // animation is put back on each redraw from where it had got to.
 const ANIMS = ['Ripple', 'Ring', 'Pop', 'Pulse', 'Flash', 'None'];
 const FX_MS = { Ripple: 550, Ring: 600, Pop: 380, Pulse: 1100, Flash: 450 };
+// the button's shape
+const SHAPES = ['Flat', 'Raised', 'Dome'];
+const shape = {
+  get v() { try { const n = localStorage.getItem('qbtdBuzzerShape'); return SHAPES.includes(n) ? n : 'Flat'; } catch (e) { return 'Flat'; } },
+  set v(x) { try { localStorage.setItem('qbtdBuzzerShape', x); } catch (e) { /* private */ } },
+};
+let wasLook = '', rose = 0; // when the button last came back up
 const anim = {
   get v() { try { const n = localStorage.getItem('qbtdBuzzerAnim'); return ANIMS.includes(n) ? n : 'Ripple'; } catch (e) { return 'Ripple'; } },
   set v(x) { try { localStorage.setItem('qbtdBuzzerAnim', x); } catch (e) { /* private */ } },
@@ -239,6 +250,7 @@ const anim = {
 let fx = null; // { name, at, x, y, preview }: the press being animated
 function animate(look) {
   const btn = panel.querySelector('.bzbtn');
+  if (btn && Date.now() - rose < 320) { btn.style.setProperty('--upd', `-${Date.now() - rose}ms`); btn.classList.add('up'); }
   if (!btn || !fx || !FX_MS[fx.name]) return;
   // a press that turned out locked has nothing to celebrate
   if (!fx.preview && look !== 'mine') { fx = null; return; }
@@ -291,6 +303,7 @@ function wirePanel() {
     if (e.target.matches('[data-bzsound]')) return; // wireSound's
     // choosing an animation shows it on the button
     if (e.target.matches('[data-bzanim]')) { anim.v = e.target.value; fx = { name: anim.v, at: Date.now(), x: null, y: null, preview: true }; draw(); return; }
+    if (e.target.matches('[data-bzshape]')) { shape.v = e.target.value; draw(); return; }
     if (e.target.id !== 'bzroomsel') return;
     me.room = Number(e.target.value); keep(); enter();
   });

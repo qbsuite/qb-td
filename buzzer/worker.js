@@ -31,7 +31,9 @@
 //                         (id: the start of the room's object id, to find
 //                         it in Cloudflare's per-room figures)
 //                    {t:'players', players}            someone came or went
-//                    {t:'pending'}    a buzz arrived: stop reading (sound)
+//                    {t:'pending', name, team}    a buzz arrived: stop reading (sound).
+//                         Whose press it was, so a page can tell the teams apart at
+//                         once; who has it is still the buzz frame's to say
 //                    {t:'buzz', name, team, rtt, list}   who has it (lag-equalized;
 //                         rtt: that player's round trip in ms, as in players)
 //                         and, as buzzin.live shows, everyone who has buzzed
@@ -336,7 +338,7 @@ export class BuzzRoom {
     }
     // No await between the check and the lock: one buzz opens the window.
     this.pending = [{ name: a.name, team: a.team, rtt, adj }];
-    this.all({ t: 'pending' });
+    this.all({ t: 'pending', name: a.name, team: a.team });
     const w = this.window();
     if (w) setTimeout(() => this.resolve(), w); else this.resolve();
   }

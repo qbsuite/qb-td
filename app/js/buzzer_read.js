@@ -8,7 +8,7 @@
 // frame goes around the page from the first buzz until Clear. A buzz also
 // readies that player in MODAQ's own menu: click the word they buzzed on
 // and their Correct / Wrong choices are already open.
-import { joinRoom, beep, shortNames, sound, orderHtml, soundHtml, wireSound, teamsHtml } from './buzzer_client.js';
+import { joinRoom, playSound, shortNames, teamSound, teamSoundsHtml, wireTeamSounds, orderHtml, teamsHtml } from './buzzer_client.js';
 
 /* ---------- what a room link remembers for its game links ---------- */
 
@@ -46,11 +46,20 @@ const validInfo = (v) => !!v && typeof v === 'object' && typeof v.slug === 'stri
 /* ---------- the card ---------- */
 
 let mounted = null;
+// the game's two teams, in the reader's order (read_main.js says which): the first has the first sound
+let gameTeams = ['', ''];
+export function buzzerTeams(a, b) {
+  if (gameTeams[0] === (a || '') && gameTeams[1] === (b || '')) return;
+  gameTeams = [a || '', b || ''];
+  if (mounted) mounted.redraw();
+}
 
 /** Puts the card on the page and joins the room as its moderator.
     info: {slug, room, token}; names: the roster's player names (for the
     short labels). Returns {names(list)} to hand the roster over once it
     has loaded; a second call only does that. */
+// a speaker (Feather's "volume-2", MIT): what it opens is the two sounds
+const GEAR = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
 const CORNERS = ['nw', 'ne', 'sw', 'se'].map((c) => `<i class="bzcorner ${c}" data-c="${c}" aria-hidden="true"></i>`).join('');
 
 export function mountBuzzer(info, names) {
@@ -77,13 +86,22 @@ export function mountBuzzer(info, names) {
 
   let st = { live: false, players: [], buzz: null, list: [], pending: false };
   const showList = false;
+  let heard = null; // which team's sound this buzz has had
+  let showSet = false; // the two sounds are open
   let been = false; // this page has been in the room
   const conn = joinRoom({
     slug: info.slug, room: info.room, name: '', team: '', token: async () => info.token,
     on: (s, why) => {
       st = s;
       if (s.live) been = true;
-      if (why === 'pending' && sound.on) beep();
+      // The stop signal, in the sound of the team that pressed (a team that is
+      // not one of the game's two, or a room that does not say, has the
+      // first's). Should the lag evening then give the buzz to the other
+      // team, that team's sound follows, so the ear is never left wrong.
+      const side = (team) => (team === gameTeams[1] ? 1 : 0);
+      if (why === 'pending') { heard = s.first ? side(s.first.team) : 0; playSound(teamSound.get(heard)); }
+      if (why === 'buzz' && s.buzz && heard !== null && side(s.buzz.team) !== heard) { heard = side(s.buzz.team); playSound(teamSound.get(heard)); }
+      if (why === 'clear' || (why === 'hello' && !s.buzz)) heard = null;
       // someone has buzzed: a box around the question being read, until Clear
       document.body.classList.toggle('bz-held', !!(s.buzz || s.pending));
       draw();
@@ -105,10 +123,11 @@ export function mountBuzzer(info, names) {
     // the card: who has it and Clear, the buzzes in order, who is in the room
     box.innerHTML = `<div class="bzhead" title="Drag to move"><span class="bzgrip" aria-hidden="true">⋮⋮</span><span class="bztitle">Buzzer</span>${clear}${count}</div>${down}
     ${orderHtml(st.list, label) || '<div class="bzwho none">No buzz</div>'}${listHtml()}
-    ${soundHtml()}${CORNERS}`;
+    <div class="bzfoot"><button type="button" class="bzgear" data-bzset aria-label="Buzzer sounds" title="Buzzer sounds" aria-expanded="${showSet}">${GEAR}</button></div>
+    ${showSet ? teamSoundsHtml(gameTeams) : ''}${CORNERS}`;
     if (pos) place();
   }
-  wireSound(box);
+  wireTeamSounds(box);
 
   // ---- the card moves: drag it by its top line; it stays where it's put ----
   // Any corner drags the whole card bigger or smaller, words and all, with
@@ -186,6 +205,7 @@ export function mountBuzzer(info, names) {
   addEventListener('resize', () => { if (pos) place(); });
 
   box.addEventListener('click', (e) => {
+    if (e.target.closest('[data-bzset]')) { showSet = !showSet; draw(); return; }
     if (e.target.closest('[data-bzretry]')) { conn.retry(); return; }
     if (e.target.closest('.bzclear')) conn.clear();
   });
@@ -222,6 +242,7 @@ export function mountBuzzer(info, names) {
 
   mounted = {
     names: (list) => { short = shortNames(list || []); draw(); },
+    redraw: () => draw(),
   };
   return mounted;
 }

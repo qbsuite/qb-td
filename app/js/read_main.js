@@ -37,7 +37,7 @@ import { toQBJString } from 'modaq/src/qbj/QBJ.js';
 import { gameForRoom, roomRounds, slotText } from '../engine/schedule.js';
 import { slotLabel } from '../engine/brackets.js';
 import { askWarning, andList } from './warnask.js';
-import { mountBuzzer, rememberBuzzer, recallBuzzer } from './buzzer_read.js';
+import { mountBuzzer, rememberBuzzer, recallBuzzer, buzzerTeams } from './buzzer_read.js';
 
 const YAPP = 'https://www.quizbowlreader.com/yapp/api/parse?modaq=true';
 // worker.js NOT_STARTED: every room route answers this until the TD presses Start
@@ -526,6 +526,7 @@ function renderTeamPick() {
 // dragged onto the other's (or its grip pressed) to swap sides: the left
 // column is the left team in MODAQ.
 function renderStarters() {
+  buzzerTeams($('teama').value, $('teamb').value); // the buzzer card names its two sounds for them
   const names = [$('teama').value, $('teamb').value].filter((n, i, all) => n && all.indexOf(n) === i);
   const picked = names.map((n) => teams.find((t) => t.name === n)).filter(Boolean);
   for (const t of picked) {
@@ -734,6 +735,7 @@ function showTeams() {
     history.replaceState(null, '', gameLink(id));
     $('picker').hidden = true;
     mountMODAQ(id, meta, true);
+    buzzerTeams(meta.a, meta.b);
   };
 }
 
@@ -766,6 +768,7 @@ async function boot() {
     }
     fetchTbPool(); // refresh the Add Questions pool; the game itself is offline
     mountMODAQ(gid, meta, false);
+    buzzerTeams(meta.a, meta.b);
     // the room's buzzer, as its room link left it on this device
     // (buzzer_read.js); the roster's names, else this game's players
     const bz = recallBuzzer(store);
