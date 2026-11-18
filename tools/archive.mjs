@@ -119,12 +119,17 @@ function listTournaments() {
 // string means question text leaked into a file about to be committed
 // and served forever. (A bundle from before the strip may still carry
 // short MODAQ notes like "Tossup thrown out on question N" — fine.)
+// A game's packet name (qbj.packets) gets more room: a packet submitted
+// by several teams is named for all of them ("Packet G - School A,
+// School B, ..."), which runs past 120 and is on the public page already.
+const PACKET_NAME_MAX = 300;
+const longLimit = (path, k) => (k === 'packets' && path.endsWith('.qbj') ? PACKET_NAME_MAX : 120);
 function assertNoQuestionText(bundle) {
   const long = [];
   (function walk(o, path) {
     if (!o || typeof o !== 'object') return;
     for (const [k, v] of Object.entries(o)) {
-      if (typeof v === 'string' && v.length > 120) long.push(path + '.' + k);
+      if (typeof v === 'string' && v.length > longLimit(path, k)) long.push(path + '.' + k);
       else if (typeof v === 'object') walk(v, path + '.' + k);
     }
   })(bundle, 'bundle');

@@ -2997,7 +2997,8 @@ test('archive captures carry no question text', () => {
       if (!o || typeof o !== 'object') return;
       for (const [k, v] of Object.entries(o)) {
         if (k === 'notes') continue;
-        if (typeof v === 'string' && v.length > 120) long.push(path + '.' + k);
+        // a game's packet name lists the teams that wrote it (tools/archive.mjs)
+        if (typeof v === 'string' && v.length > (k === 'packets' && path.endsWith('.qbj') ? 300 : 120)) long.push(path + '.' + k);
         else if (typeof v === 'object') walk(v, path + '.' + k);
       }
     })(data, slug);
