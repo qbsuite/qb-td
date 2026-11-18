@@ -307,3 +307,12 @@ body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); o
 .bzr.down { border-color: var(--bad); }
 .bzr .bzdown { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--bad); color: #fff; font-size: 13px; }
 .bzr .bzdown button { padding: 2px 10px; background: #fff; color: var(--bad); border: none; border-radius: 6px; font-weight: 600; }
+
+/* the two ways of buzzing, each with its own Press or Release, one under the other */
+.bzpane .bzwhen { width: 100%; justify-content: space-between; }
+
+/* teams two to a row: a third team and any after it start a new row, so no column is
+   narrower than half the width; a team alone in the room takes the whole of it */
+.bzteams { display: grid; gap: 14px; width: 100%; }
+.bzcols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bzcols.one { grid-template-columns: minmax(0, 1fr); }

@@ -13,11 +13,21 @@ const TOKEN_FRESH_MS = 10 * 60 * 60 * 1000;
 const TOKEN_LIFE_MS = 12 * 60 * 60 * 1000;
 
 // Buzz when the button goes down, or when it comes back up: the player's
-// choice, remembered on this device
-const when = {
-  get v() { try { return localStorage.getItem('qbtdBuzzerOn') === 'press' ? 'press' : 'release'; } catch (e) { return 'release'; } },
-  set v(x) { try { localStorage.setItem('qbtdBuzzerOn', x); } catch (e) { /* private */ } },
-};
+// choice, remembered on this device, and made apart for the two ways of
+// buzzing. A click or tap buzzes on release unless changed (a finger that
+// lands on the button by accident can slide off); Space buzzes on press
+// (a key has no sliding off, and the way down is the faster half).
+// qbtdBuzzerOn is the single choice of before: it stands for the click.
+const whenOf = (key, dflt, old) => ({
+  get v() {
+    try {
+      const x = localStorage.getItem(key) || (old && localStorage.getItem(old));
+      return x === 'press' || x === 'release' ? x : dflt;
+    } catch (e) { return dflt; }
+  },
+  set v(x) { try { localStorage.setItem(key, x); } catch (e) { /* private */ } },
+});
+const when = { click: whenOf('qbtdBuzzerOnClick', 'release', 'qbtdBuzzerOn'), space: whenOf('qbtdBuzzerOnSpace', 'press') };
 
 // What pubview.js gives (see mountBuzzer); replaced on each of its loads.
 let page = null;
@@ -179,8 +189,8 @@ function draw() {
   const elsewhere = !!(next && hasBuzzer(next.room) && next.room !== me.room);
   const pane = tab === 'Schedule' ? schedHtml()
     : tab === 'Settings' ? `<div class="bzopts">
-      <span class="bzwhen" role="group" aria-label="Buzz on">Buzz on
-        <button data-when="press" aria-pressed="${when.v === 'press'}">Press</button><button data-when="release" aria-pressed="${when.v === 'release'}">Release</button></span>
+      ${[['click', 'Click buzzes on'], ['space', 'Space buzzes on']].map(([k, text]) => `<span class="bzwhen" role="group" aria-label="${text}">${text}
+        <button data-when="press" data-how="${k}" aria-pressed="${when[k].v === 'press'}">Press</button><button data-when="release" data-how="${k}" aria-pressed="${when[k].v === 'release'}">Release</button></span>`).join('')}
       ${soundHtml()}
       <label class="bzanim">Animation <select data-bzanim>${ANIMS.map((n) => `<option${n === anim.v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
     </div>`
@@ -268,14 +278,14 @@ function wirePanel() {
     const t = e.target.closest('button');
     if (!t) return;
     if (t.dataset.leave != null) { me = { pw: me.pw, tk: me.tk, rooms: me.rooms, at: me.at, region: me.region }; keep(); enter(); }
-    else if (t.dataset.when) { when.v = t.dataset.when; draw(); }
+    else if (t.dataset.when) { when[t.dataset.how].v = t.dataset.when; draw(); }
     else if (t.dataset.tab) { tab = t.dataset.tab; draw(); }
     // release: the click. press: only a keyboard's click (Enter on the button)
-    else if (t.classList.contains('bzbtn') && (when.v === 'release' || e.detail === 0)) press(e.detail ? { x: e.clientX, y: e.clientY } : null);
+    else if (t.classList.contains('bzbtn') && (when.click.v === 'release' || e.detail === 0)) press(e.detail ? { x: e.clientX, y: e.clientY } : null);
   });
   // press: the moment a finger or the mouse goes down
   panel.addEventListener('pointerdown', (e) => {
-    if (when.v === 'press' && e.button === 0 && e.target.closest('.bzbtn')) press({ x: e.clientX, y: e.clientY });
+    if (when.click.v === 'press' && e.button === 0 && e.target.closest('.bzbtn')) press({ x: e.clientX, y: e.clientY });
   });
   panel.addEventListener('change', (e) => {
     if (e.target.matches('[data-bzsound]')) return; // wireSound's
@@ -290,7 +300,7 @@ function wirePanel() {
     if (e.code !== 'Space' || e.repeat || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
     if (!panel.isConnected || panel.closest('[hidden]') || !conn) return;
     e.preventDefault();
-    if (e.type === (when.v === 'press' ? 'keydown' : 'keyup')) press();
+    if (e.type === (when.space.v === 'press' ? 'keydown' : 'keyup')) press();
   };
   addEventListener('keydown', spaceBuzz);
   addEventListener('keyup', spaceBuzz);

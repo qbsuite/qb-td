@@ -8,11 +8,15 @@ Release Notes for 11/17/2026
 - Buzzer: joining says what to do, and finds your name with the player search.
 - Buzz order shows each buzzer's ping.
 - Buzzer shows Reconnecting, in red, when its connection is down; a press tries again at once.
+- Buzzer settings: a click and Space each buzz on Press or Release; Space starts on Press.
+- Buzzer lists teams two to a row when a room has more than two.
 
 [ READER ]
 - Buzzer card shows each player's ping.
 - A long team name no longer squeezes "4 starting" or the drag handle beside it.
 - Buzzer card shows a red bar with Reconnect when its connection is down.
+- Buzzer card lists teams two to a row when a room has more than two.
+- Start screen no longer warns of another round when two teams meet twice in one room.
 
 [ MISC ]
 - Buzzer pages that cannot reconnect wait longer between tries, up to 15 seconds.

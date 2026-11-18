@@ -213,16 +213,24 @@ export function wireSound(root) {
   root.addEventListener('change', (e) => { if (e.target.matches('[data-bzsound]')) { sound.name = e.target.value; playSound(sound.name); } });
   root.addEventListener('click', (e) => { if (e.target.closest('[data-bzplay]')) playSound(sound.name); });
 }
-/** Who is in the room: each team a column, its players down the column.
-    The team names share one row of the grid and the players the next, so
-    the lines under the names stay level however long a name is.
+/** Who is in the room: each team a column, its players down the column,
+    two teams to a row. A room is meant to hold two teams; a third (players
+    who have not left yet, someone in the wrong room) and any after it go
+    on rows of their own, so a column is never narrower than half the
+    width. In a row the team names share one line of the grid and the
+    players the next, so the lines under the names stay level however long
+    a name is.
     players: [{name, team}]; label(name) -> what to show. */
 export function teamsHtml(players, label, pings = false) {
   const teams = new Map();
   for (const p of players) teams.set(p.team, [...(teams.get(p.team) || []), p]);
   if (!teams.size) return '';
-  return `<div class="bzcols${pings ? ' pings' : ''}">${[...teams].map(([t, ps]) => `<b title="${esc(t)}">${esc(t)}</b><div>${ps.sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0)).map((p) =>
+  const all = [...teams];
+  const rows = [];
+  for (let i = 0; i < all.length; i += 2) rows.push(all.slice(i, i + 2));
+  const row = (pair) => `<div class="bzcols${pings ? ' pings' : ''}${all.length === 1 ? ' one' : ''}">${pair.map(([t, ps]) => `<b title="${esc(t)}">${esc(t)}</b><div>${ps.sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0)).map((p) =>
     `<span title="${esc(p.name)}">${pings ? `<em>${esc(label(p.name))}</em>${pingHtml(p.rtt)}` : esc(label(p.name))}</span>`).join('')}</div>`).join('')}</div>`;
+  return `<div class="bzteams">${rows.map(row).join('')}</div>`;
 }
 /** A player's round trip to the room, as the room last measured it (the
     figure its lag equalizing uses): small beside a name, coloured once it

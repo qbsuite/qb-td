@@ -469,6 +469,9 @@ const hasPacket = (n) => (state.packets || []).some((p) => p.number === n);
 function roundOfTeams(a, b, round) {
   if (!sched || schedRoom === null || testKey) return null;
   const key = [a, b].sort().join('\n');
+  // the round picked is theirs too (a rematch in the same room): nothing to say
+  const here = gameForRoom(sched, schedRoom, round);
+  if (here && [here.a, here.b].sort().join('\n') === key) return null;
   for (const { round: r } of roomRounds(sched, schedRoom)) {
     const g = gameForRoom(sched, schedRoom, r);
     if (r !== round && g && [g.a, g.b].sort().join('\n') === key) return r;
