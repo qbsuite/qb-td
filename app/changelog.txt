@@ -1,3 +1,8 @@
+Release Notes for 11/19/2026
+
+[ ARCHIVE ]
+- Added 2026 ACF Winter @ UC Berkeley to the 2026 ACF Winter set.
+
 Release Notes for 11/18/2026
 
 [ PUBLIC PAGE ]

@@ -1,6 +1,16 @@
 {
   "tournaments": [
     {
+      "slug": "2026-acf-winter-uc-berkeley",
+      "name": "2026 ACF Winter @ UC Berkeley",
+      "date": "2026-11-14",
+      "host": "Berkeley",
+      "teams": 6,
+      "rounds": 11,
+      "games": 31,
+      "set": "2026 ACF Winter"
+    },
+    {
       "slug": "terrapin-open-stanford",
       "name": "Terrapin Open @ Stanford",
       "date": "2026-11-07",

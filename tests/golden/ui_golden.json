@@ -905,6 +905,117 @@
    ],
    "foreign": []
   },
+  "archive 2026-acf-winter-uc-berkeley": {
+   "header": "2026 ACF Winter @ UC Berkeley",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "704fece7b8b79da1520174be",
+      "chars": 13354
+     },
+     "schedview=all": {
+      "sha256": "704fece7b8b79da1520174be",
+      "chars": 13354
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "be2c42c57b4a9b096716b287",
+      "chars": 468774
+     },
+     "layout=classic": {
+      "sha256": "be2c42c57b4a9b096716b287",
+      "chars": 468774
+     },
+     "layout=new": {
+      "sha256": "5d9450da6725f4ffe7eacb7f",
+      "chars": 4032
+     },
+     "new/standings": {
+      "sha256": "5d9450da6725f4ffe7eacb7f",
+      "chars": 4032
+     },
+     "new/individuals": {
+      "sha256": "b9d6dec6edb6a4a38a5c46f8",
+      "chars": 13726
+     },
+     "new/games": {
+      "sha256": "7f621c1566826f6088d3efb3",
+      "chars": 102828
+     },
+     "new/teams": {
+      "sha256": "4c57d2b47a1e7462e6297f85",
+      "chars": 39454
+     },
+     "new/players": {
+      "sha256": "5a045baa1f9fb8bcb89fd7a1",
+      "chars": 108618
+     },
+     "new/rounds": {
+      "sha256": "3f8be07f6050c2db06764e0a",
+      "chars": 4322
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "8c671b916369336a6f98ff6f",
+      "chars": 7624
+     },
+     "catview=cat": {
+      "sha256": "8c671b916369336a6f98ff6f",
+      "chars": 7624
+     },
+     "catview=team": {
+      "sha256": "aa2689a60bf2b5ca75a8faf7",
+      "chars": 3231
+     },
+     "catview=player": {
+      "sha256": "a352f6fcaca72ad2ab797230",
+      "chars": 3242
+     },
+     "catview=questions": {
+      "sha256": "8865c215b325bed325d36b5d",
+      "chars": 14400
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/2026-acf-winter-uc-berkeley.js",
+    "/archive/index.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/newstats.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive terrapin-open-stanford": {
    "header": "Terrapin Open @ Stanford",
    "tabs": {
