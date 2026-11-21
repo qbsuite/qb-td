@@ -1,3 +1,9 @@
+Release Notes for 11/20/2026
+
+[ PUBLIC PAGE ]
+- Buzzer is green to buzz, red once you have buzzed and grey when locked out, as on buzzin.live.
+- Buzzer settings: Colors picks Green, red, grey, Orange, green, yellow (the old look) or Blue, orange, grey.
+
 Release Notes for 11/19/2026
 
 [ ARCHIVE ]

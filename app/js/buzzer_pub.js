@@ -197,6 +197,8 @@ function draw() {
       ${soundHtml()}
       <label class="bzanim">Animation <select data-bzanim>${ANIMS.map((n) => `<option${n === anim.v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
       <label class="bzanim">Button <select data-bzshape>${SHAPES.map((n) => `<option${n === shape.v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+      <span class="bzcolors"><label class="bzanim">Colors <select data-bzcolors>${COLORS.map(([n]) => `<option${n === colors.v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+        <span class="bzdots" aria-hidden="true"><i class="d-open"></i><i class="d-mine"></i><i class="d-lock"></i></span></span>
     </div>`
     : teamsHtml(st.players, label);
   panel.innerHTML = `<div class="bzroom">
@@ -242,6 +244,18 @@ const shape = {
   get v() { try { const n = localStorage.getItem('qbtdBuzzerShape'); return SHAPES.includes(n) ? n : 'Flat'; } catch (e) { return 'Flat'; } },
   set v(x) { try { localStorage.setItem('qbtdBuzzerShape', x); } catch (e) { /* private */ } },
 };
+// the button's colours: open, Buzzed, Locked. The first is the default, as
+// on buzzin.live; Orange, green, yellow is qb-td's first look and adds no
+// class. The class goes on <html> so the corner button matches.
+const COLORS = [['Green, red, grey', 'grg'], ['Orange, green, yellow', ''], ['Blue, orange, grey', 'bog']];
+const colors = {
+  get v() { try { const n = localStorage.getItem('qbtdBuzzerColors'); return COLORS.some(([x]) => x === n) ? n : COLORS[0][0]; } catch (e) { return COLORS[0][0]; } },
+  set v(x) { try { localStorage.setItem('qbtdBuzzerColors', x); } catch (e) { /* private */ } },
+};
+function paint() {
+  const on = COLORS.find(([n]) => n === colors.v)[1];
+  for (const [, k] of COLORS) if (k) document.documentElement.classList.toggle('bzc-' + k, k === on);
+}
 let wasLook = '', rose = 0; // when the button last came back up
 const anim = {
   get v() { try { const n = localStorage.getItem('qbtdBuzzerAnim'); return ANIMS.includes(n) ? n : 'Ripple'; } catch (e) { return 'Ripple'; } },
@@ -304,6 +318,7 @@ function wirePanel() {
     // choosing an animation shows it on the button
     if (e.target.matches('[data-bzanim]')) { anim.v = e.target.value; fx = { name: anim.v, at: Date.now(), x: null, y: null, preview: true }; draw(); return; }
     if (e.target.matches('[data-bzshape]')) { shape.v = e.target.value; draw(); return; }
+    if (e.target.matches('[data-bzcolors]')) { colors.v = e.target.value; paint(); draw(); return; }
     if (e.target.id !== 'bzroomsel') return;
     me.room = Number(e.target.value); keep(); enter();
   });
@@ -367,6 +382,7 @@ export function mountBuzzer(p) {
     KEY = 'qbtdBuzzer:' + p.slug;
     try { me = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { me = {}; }
     wirePanel();
+    paint();
     outdated();
     // a Buzzer button in the corner: the room opens over the page
     fab = document.createElement('button');

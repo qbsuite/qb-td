@@ -110,7 +110,7 @@
 
 /* ---------- a player's button: pressed, won, lost ---------- */
 .bzp .bzbtn.sent { filter: brightness(.8); transform: scale(.97); }
-.bzp .bzbtn.mine { box-shadow: 0 0 0 10px color-mix(in srgb, var(--ok) 30%, transparent); }
+.bzp .bzbtn.mine { box-shadow: 0 0 0 10px color-mix(in srgb, var(--bz-mine, var(--ok)) 30%, transparent); }
 .bzp .bzbtn.lost { box-shadow: inset 0 0 0 4px var(--bad); }
 .bzp .bzbtn em { font-style: normal; font-size: 15px; font-weight: 600; color: var(--bad); letter-spacing: .02em; }
 .bzp .bzbtn.shake { animation: bzshake .35s; }
@@ -120,7 +120,7 @@
 /* ---------- 11/16: buzzin.live's way of showing a buzz ---------- */
 :root { --bz-lock: #e3b341; --bz-lock-fg: #1a1a1a; }
 /* the player's button: open, yours, locked out */
-.bzp .bzbtn.mine { background: var(--ok); color: var(--bg); box-shadow: none; cursor: default; }
+.bzp .bzbtn.mine { background: var(--bz-mine, var(--ok)); color: var(--bz-mine-fg, var(--bg)); box-shadow: none; cursor: default; }
 .bzp .bzbtn.locked { background: var(--bz-lock); color: var(--bz-lock-fg); }
 .bzp .bzbtn:disabled { cursor: default; }
 /* who has buzzed since Clear, in order: under the buzzer, and in the reader's card */
@@ -204,7 +204,7 @@ body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); o
 .bzplay { padding: 3px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--muted); font-size: 12px; line-height: 1.4; cursor: pointer; }
 .bzp .bzbtn { position: relative; }
 /* each starts from --fxd, a negative delay, so a redraw mid-way carries on */
-.bzp .bzbtn.fx-ring::after, .bzp .bzbtn.fx-pulse::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 6px solid var(--ok); pointer-events: none; animation: bzfxring .6s ease-out var(--fxd, 0ms) forwards; }
+.bzp .bzbtn.fx-ring::after, .bzp .bzbtn.fx-pulse::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 6px solid var(--bz-mine, var(--ok)); pointer-events: none; animation: bzfxring .6s ease-out var(--fxd, 0ms) forwards; }
 .bzp .bzbtn.fx-pulse::after { border-width: 5px; animation: bzfxring 1.1s ease-out var(--fxd, 0ms) infinite; }
 @keyframes bzfxring { from { transform: scale(1); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
 .bzp .bzbtn.fx-pop { animation: bzfxpop .38s cubic-bezier(.2, 1.6, .4, 1) var(--fxd, 0ms); }
@@ -337,7 +337,7 @@ body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); o
 /* ---------- the button's shape (Settings: Button) ---------- */
 .bzp .bzwell { position: relative; border-radius: 50%; }
 .bzp .bzwell .bzbtn { --c: var(--bz); }
-.bzp .bzwell .bzbtn.mine { --c: var(--ok); }
+.bzp .bzwell .bzbtn.mine { --c: var(--bz-mine, var(--ok)); }
 .bzp .bzwell .bzbtn.locked { --c: var(--bz-lock); }
 .bzp .bzwell .bzbtn.off { --c: var(--card); }
 /* Raised: a cap on a base that goes down and stays down until Clear */
@@ -350,8 +350,24 @@ body.bz-held #modaq [class*="tossupContainer"] { outline: 5px solid var(--bz); o
 .bzp .bzwell.s-dome { padding: 16px; background: linear-gradient(160deg, #4a4d54, #24262b); box-shadow: inset 0 3px 8px rgba(0, 0, 0, .6), 0 10px 26px rgba(0, 0, 0, .3); }
 .bzp .s-dome .bzbtn { background: radial-gradient(circle at 34% 26%, color-mix(in srgb, var(--c) 62%, #fff) 0%, var(--c) 42%, color-mix(in srgb, var(--c) 68%, #000) 100%); box-shadow: inset 0 -10px 18px rgba(0, 0, 0, .28), 0 6px 10px rgba(0, 0, 0, .45); transition: transform .05s ease-out, box-shadow .05s ease-out; }
 .bzp .s-dome .bzbtn:active, .bzp .s-dome .bzbtn.mine, .bzp .s-dome .bzbtn.locked { transform: scale(.955); box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .5); }
-.bzp .s-dome .bzbtn.mine { filter: brightness(1.15); box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .2), 0 0 34px color-mix(in srgb, var(--ok) 75%, transparent); }
+.bzp .s-dome .bzbtn.mine { filter: brightness(1.15); box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .2), 0 0 34px color-mix(in srgb, var(--bz-mine, var(--ok)) 75%, transparent); }
 .bzp .s-dome .bzbtn.locked { filter: saturate(.6) brightness(.82); }
 .bzp .s-dome .bzbtn.up { animation: bzupdome .28s cubic-bezier(.2, 1.9, .4, 1) var(--upd, 0ms) backwards; }
 @keyframes bzupdome { from { transform: scale(.955); } }
 @media (prefers-reduced-motion: reduce) { .bzp .bzbtn.up { animation: none; } }
+
+/* ---------- the player's colours (Settings: Colors) ----------
+   buzzer_pub.js puts the class on <html> on the public page only; without
+   one (Orange, green, yellow) everything above stands. --bz is the open
+   button and the sheet's accents, --bz-mine Buzzed, --bz-lock Locked. */
+html.bzc-grg { --bz: #16a34a; --bz-fg: #fff; --bz-mine: #d0263b; --bz-mine-fg: #fff; --bz-lock: #4b5170; --bz-lock-fg: #fff; }
+html.bzc-bog { --bz: #2563eb; --bz-fg: #fff; --bz-mine: #e8590c; --bz-mine-fg: #fff; --bz-lock: #4b5170; --bz-lock-fg: #fff; }
+/* who has the buzz, at the top of the order: in the Buzzed colour */
+html.bzc-grg .bzroom .bzorder li:first-child, html.bzc-bog .bzroom .bzorder li:first-child { background: color-mix(in srgb, var(--bz-mine) 22%, var(--bg)); color: var(--fg); }
+/* the three colours beside the list */
+.bzdots { display: inline-flex; gap: 4px; }
+.bzdots i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
+.bzcolors { display: inline-flex; align-items: center; gap: 8px; }
+.bzdots .d-open { background: var(--bz); }
+.bzdots .d-mine { background: var(--bz-mine, var(--ok)); }
+.bzdots .d-lock { background: var(--bz-lock); }
