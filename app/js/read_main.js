@@ -676,7 +676,7 @@ function renderRounds() {
       <span class="muted">${roundLabel(r.number)}: ${esc(r.game.a)} vs ${esc(r.game.b)} on this device</span>
       <a href="${esc(gameLink(r.game.id))}">Continue</a></div>`).join('')}</div>` : ''}`;
   const sel = rows.find((r) => r.number === selectedRound);
-  // a tiebreaker packet read as a half says which
+  // a packet read as a half (a tiebreaker's, or a round's) says which
   const info = (state.packets || []).find((p) => p.number === selectedRound);
   const half = info && info.part === 'first' ? ' \u00b7 first half' : info && info.part === 'second' ? ' \u00b7 second half' : '';
   $('packetname').textContent = sel && sel.packet ? 'Packet: ' + sel.packet + half : '';
@@ -744,7 +744,9 @@ function showTeams() {
     try { packet = await fetchPacket(round, info.packet_name); }
     catch (e) { say(e.message, true); $('start').disabled = false; return; }
     let off = 0;
-    if (info.tb) {
+    // a decider, or a round the TD set to half its packet
+    const partial = info.tb || info.part === 'first' || info.part === 'second';
+    if (partial) {
       const n = packet.tossups.length, half = Math.floor(n / 2);
       const [from, to] = info.part === 'first' ? [0, half] : info.part === 'second' ? [half, n] : [0, n];
       off = from;
@@ -758,7 +760,7 @@ function showTeams() {
     const meta = {
       a, b, round, packet: info.packet_name,
       // a decider: its game is as long as its part of the packet, whose questions keep their numbers
-      ...(info.tb ? { reg: packet.tossups.length, off, decider: info.decider } : {}),
+      ...(partial ? { reg: packet.tossups.length, off, ...(info.tb ? { decider: info.decider } : {}) } : {}),
       t: state.tournament, room: state.room, started: Date.now(),
       // tiebreakers enter via MODAQ's Add Questions dialog; the mapping
       // starts at the packet's own size and grows as the mod adds them

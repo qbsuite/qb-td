@@ -7049,8 +7049,8 @@ test('the hub ranks as the public page does: pool-mates level on both counts kee
   assert.deepEqual(rep.ties.map((x) => [x.pool, x.record, x.teams.map((t) => t.name), x.level]), [['A', '1–2', [X, Y, Z], [[X, Y, Z]]]]);
   const res = autoFillSaved(s, files, games, null, []);
   assert.deepEqual([slotsFrom(res.schedule, 1).A2, slotsFrom(res.schedule, 1).A3, slotsFrom(res.schedule, 1).A4], [X, Y, Z]);
-  assert.deepEqual(res.schedule.filled, [{ pool: 'A', record: '1–2', teams: [{ name: X, bracket: 'Championship' }, { name: Y, bracket: 'Consolation' },
-    { name: Z, bracket: 'Consolation' }], level: [[X, Y, Z]] }]);
+  assert.deepEqual(res.schedule.filled, [{ pool: 'A', record: '1–2', teams: [{ name: X, bracket: 'Championship', place: 2 }, { name: Y, bracket: 'Consolation', place: 3 },
+    { name: Z, bracket: 'Consolation', place: 4 }], level: [[X, Y, Z]] }]);
   // the Live Hub's note doesn't say points per 20 decided it
   assert.equal(filledNote(res.schedule.filled[0]), 'Pool A: Emory, Tufts and Army were tied at 1–2 with the same points per 20, so they kept their pool order.');
   // the hub's stats table is one table of the whole field, as the public

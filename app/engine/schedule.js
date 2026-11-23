@@ -1058,7 +1058,7 @@ export function fillReport(schedule, agg) {
       while (j < list.length && rec(list[j]) !== null && rec(list[j]) === rec(list[i])) j++;
       if (j - i > 1) {
         const teams = list.slice(i, j).map((name, k) => ({ name, pp20tuh: row.get(name).pp20tuh, ...figure(row.get(name)),
-          bracket: bracketOf.get(pool + (i + k + 1)) || null }));
+          bracket: bracketOf.get(pool + (i + k + 1)) || null, place: i + k + 1 }));
         const rows = list.slice(i, j).map((n) => row.get(n));
         const level = levelRuns(rows, rule).map((run) => run.map((x) => x.name));
         const hh = rule && rule.h2h ? headToHead(rows, rule.h2h) : null;
@@ -1191,15 +1191,23 @@ export function autoFill(schedule, agg, ready, force = [], opts = {}) {
   // (when there are tiebreaker packets to play one on: opts.hold, or the
   // schedule's deciders.hold) or the TD's pick. Without one, as before.
   const packets = opts.hold !== undefined ? opts.hold : !!(schedule.deciders && schedule.deciders.hold);
+  // a tie its deciders are still settling (deciders.js) waits for them, whatever the games so far say
+  const playing = (k) => { const st = schedule.deciders && schedule.deciders.ties && schedule.deciders.ties[k]; return !!st && !st.done; };
   const waits = (x) => (x.order
-    ? (packets && x.needGame.length > 0) || x.needPick.length > 0
+    ? (packets && x.needGame.length > 0) || x.needPick.length > 0 || playing(x.pool)
     : holdTies);
   const held = report.ties.filter((x) => ok.has(x.pool) && !odd.has(x.pool) && !force.includes(x.pool) && waits(x));
   const ranks = {};
   for (const [k, list] of Object.entries(report.ranks)) {
     if (k[0] !== '#' && ok.has(k) && !odd.has(k)) ranks[k] = list.slice();
   }
-  for (const x of held) for (const tm of x.teams) ranks[x.pool][ranks[x.pool].indexOf(tm.name)] = undefined;
+  // the teams that wait: with a tie order, those its game or pick has still
+  // to set apart (or all, while its deciders play); else the whole tie
+  const waiting = (x) => {
+    if (!x.order || playing(x.pool)) return x.teams.map((tm) => tm.name);
+    return [...new Set([...(packets ? x.needGame : []), ...x.needPick].flat())];
+  };
+  for (const x of held) for (const n of waiting(x)) ranks[x.pool][ranks[x.pool].indexOf(n)] = undefined;
   const all = Object.keys(schedule.pools || {}).every((p) => ok.has(p));
   if (all && !odd.size && !held.length) {
     for (const [k, list] of Object.entries(report.ranks)) if (k[0] === '#') ranks[k] = list;

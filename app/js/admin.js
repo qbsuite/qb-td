@@ -25,7 +25,8 @@ import '../engine/plan.js';
 import '../engine/hdwhite.js';
 import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
   carryFormerNames, forfeitQbj, statedRound } from '../engine/qbj.js';
-import { standings, dedupeMatches, tiebreakOf, DEFAULT_TIE_ORDER } from '../engine/stats.js';
+import { standings, dedupeMatches, tiebreakOf, tieOrderOf, DEFAULT_TIE_ORDER } from '../engine/stats.js';
+import { makeTieBox } from './tiebox.js';
 // hubgames.js builds the downloads with these four. They are
 // imported here too, where this file used them before, so a cold load
 // asks for them as early as it did: found one module later, report.js
@@ -1233,6 +1234,7 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
     preview: (round, range) => { const r = lastDetail.tbRounds.find((x) => x.number === round); if (r) openPreview({ number: round - TB_BASE, name: r.packet_name, href: hrefOf(r), range }, 'Tiebreaker', say); },
     staged,
     uploadStaged: (round, sfile) => pub(`${a}/packet?round=${round}&name=${encodeURIComponent(sfile.name)}`, { method: 'POST', body: stagedBlob(sfile) }),
+    move: t.set ? null : (from, to) => pub(`${a}/packets/move`, { method: 'POST', json: { from, to } }),
   });
   const box = $('setupsec');
   box.querySelectorAll('[data-setpacket]').forEach((sel) => {
@@ -2619,6 +2621,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       ${tbTotal ? `<span class="muted">Extras <span class="fg">${tbUsed}/${tbTotal}</span> used</span>` : ''}
     </div>
     ${playoffNoteHtml(files)}
+    ${tieBox.html()}
     ${deciders.html()}
     <div class="livegrid">
       <div class="livemain">
@@ -2766,6 +2769,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   });
   box.querySelectorAll('[data-closecell]').forEach((b) => { b.onclick = () => { cellOpen = null; render(); }; });
   deciders.wire(box);
+  tieBox.wire(box);
   box.querySelectorAll('[data-prevuploads]').forEach((b) => { b.onclick = () => { cellOpen.prev = !cellOpen.prev; render(); }; });
   // Download > Both: the game's two files in one zip, named as MODAQ names them
   box.querySelectorAll('[data-dlboth]').forEach((b) => {
@@ -3681,15 +3685,16 @@ let autoBusy = false;
 let autoWait = { held: [], odd: [], finals: [] }; // what waits for the TD, for the Live Hub
 // Deciders (deciders.js): what the module borrows from the hub
 let decAgg = null; // the prelim standings the last fill ranked on, for a tie's numbers
-const DEC_STAT = { pp20: 'points per 20', ppg: 'points per game', ppb: 'points per bonus' };
+const DEC_STAT = { pp20: 'points per 20', ppg: 'PPG', ppb: 'PPB' };
 const deciders = makeDeciders({
   sched: () => sched,
   setSched: (s, etag) => { sched = s; if (etag) schedEtag = etag; },
   save: (s) => saveSchedule('/a/' + adminSecret, s),
   held: () => autoWait.held,
+  heldFinals: () => autoWait.finals,
   agg: () => decAgg,
   tbRounds: () => (lastDetail && lastDetail.tbRounds) || [],
-  statLabel: () => { let st = {}; try { st = JSON.parse(lastDetail.tournament.settings) || {}; } catch (e) { /* default */ } return DEC_STAT[tiebreakOf(st).stat]; },
+  statLabel: () => { let st = {}; try { st = JSON.parse(lastDetail.tournament.settings) || {}; } catch (e) { /* default */ } return DEC_STAT[tiebreakOf(st).stat] || 'points per game'; },
   render: () => render(),
   say: (text, bad) => say(text, bad),
   goPackets: () => { curView = 'setup'; setupTab = 'packets'; render(); },
@@ -3707,13 +3712,34 @@ const deciders = makeDeciders({
     { cache: autoCache, rank: true, roster: hubNames.rosterFor(lastDetail.tournament) })).matches,
   format: () => gameFormat(lastDetail.tournament),
 });
+// The Live Hub's Ties box (tiebox.js): ties the tie order broke, and those it left for the TD to pick
+const tieSettings = () => { try { return JSON.parse(lastDetail.tournament.settings) || {}; } catch (e) { return {}; } };
+const tieBox = makeTieBox({
+  sched: () => sched,
+  save: async (s) => { const out = await saveSchedule('/a/' + adminSecret, s); sched = s; if (out && out.etag) schedEtag = out.etag; },
+  refill: () => autoFillSlots(true),
+  order: () => tieOrderOf(tieSettings()),
+  packets: (block) => deciders.packets(block),
+  played: (p) => { const ph = sched && sched.phases[p]; if (!ph) return false; const rs = new Set(ph.rounds.map((r) => r.round)); return ((lastDetail && lastDetail.files) || []).some((f) => isGameFile(f) && rs.has(f.round)); },
+  held: () => autoWait.held,
+  heldFinals: () => autoWait.finals,
+  goPackets: () => { curView = 'setup'; setupTab = 'packets'; render(); },
+  goSchedule: () => { curView = 'setup'; setupTab = 'sched'; render(); },
+  render: () => render(),
+  say: (text, bad) => say(text, bad),
+});
 let autoForce = [];           // pools (and 'F:' + a finals bracket) the TD said to fill anyway
 const autoCache = new Map();  // games already read (public copies), shared with Fill
 
 // inEditor: the schedule editor asks, right after Generate saved new
 // placeholders (a phase regenerated after its pools finished)
+// a slot the hub filled itself, in a game not yet played: a change to the
+// tie order, a pick or a tiebreaker game may fill it again (finals.js)
+function refillable(s) {
+  return s.phases.some((ph) => ph.rounds.some((r) => [...r.games.flatMap((g) => [g.a, g.b]), ...(r.byes || [])].some((sl) => sl && sl.team && sl.from && !sl.dec && !sl.forced)));
+}
 async function autoFillSlots(force = false, inEditor = false) {
-  if (autoBusy || !lastDetail || !sched || schedDirty || !hasPlaceholders(sched)) return;
+  if (autoBusy || !lastDetail || !sched || schedDirty || !(hasPlaceholders(sched) || refillable(sched))) return;
   if (!inEditor && shownView === 'setup' && setupTab === 'sched') return; // the editor holds this schedule
   const { tournament: t, buckets } = lastDetail;
   if (!t.started) return;
@@ -3731,7 +3757,8 @@ async function autoFillSlots(force = false, inEditor = false) {
   const prog = fillProgress(mine, files);
   // the renames too: a pool that waited on one this tab hadn't loaded
   // fills once it has, with no new upload
-  const sig = prog.sig + '#' + JSON.stringify(Object.entries(renames).sort());
+  // and the tie order: a change to it fills again
+  const sig = prog.sig + '#' + JSON.stringify(Object.entries(renames).sort()) + '#' + JSON.stringify(tieOrderOf(tieSettings())) + '#' + deciders.hold() + deciders.holdFinals();
   if ((!prog.pools.ready.length && !prog.finals.ready.length) || (sig === autoSig && !force)) return;
   autoBusy = true;
   const a = '/a/' + adminSecret;
@@ -3757,7 +3784,7 @@ async function autoFillSlots(force = false, inEditor = false) {
       const ids = new Set(got.matches.map((m) => m.fileId));
       autoSig = want.files.every((f) => ids.has(f.id)) ? sig : null;
       // with a tiebreaker packet uploaded, ties across a cut wait for their deciders
-      copy.deciders = { ...(copy.deciders || {}), hold: deciders.hold() };
+      copy.deciders = { ...(copy.deciders || {}), hold: deciders.hold(), holdFinals: deciders.holdFinals() };
       decAgg = standings(got.matches, got.roster, gameFormat(t));
       const res = autoFillSaved(copy, files, got.matches, got.roster, autoForce, gameFormat(t));
       const said = [];
@@ -3801,7 +3828,7 @@ async function autoFillSlots(force = false, inEditor = false) {
     }
     if (shownView === 'live' && !inEditor) render();
     // a tie found just now opens on its suggested games
-    if (deciders.hold() && await deciders.init()) calmRender(inEditor);
+    if ((deciders.hold() || deciders.holdFinals()) && await deciders.init()) calmRender(inEditor);
     if (await deciders.autoRelease()) calmRender(inEditor);
   } catch (e) {
     console.error(e);
@@ -3823,12 +3850,12 @@ function playoffNoteHtml(files) {
   const out = [];
   if (![...all].some((n) => !prelim.has(n) && played(new Set([n])))) {
     const lines = [];
-    for (const x of (sched.filled || []).filter((y) => y.pool)) lines.push(esc(filledNote(x)));
+    for (const x of (sched.filled || []).filter((y) => y.pool && !y.order)) lines.push(esc(filledNote(x)));
     for (const x of autoWait.odd) {
       lines.push(`Pool ${esc(x.pool)} has ${x.games.map((g) => `${esc(g.a)} vs ${esc(g.b)} (round ${g.round})`).join(', ')}, which isn&rsquo;t on the schedule.
         <button class="linkbtn" data-fillpool="${esc(x.pool)}">Fill anyway</button>`);
     }
-    for (const x of (deciders.hold() ? [] : autoWait.held)) {
+    for (const x of (deciders.hold() ? [] : autoWait.held.filter((y) => !y.order))) {
       const by = {};
       x.teams.forEach((tm) => { by[tm.bracket] = (by[tm.bracket] || 0) + 1; });
       const spots = Object.entries(by).map(([b, n]) => `${n === 1 ? 'one spot' : n + ' spots'} in ${esc(b)}`);
@@ -3842,8 +3869,8 @@ function playoffNoteHtml(files) {
   if (finalRounds.size && !played(finalRounds)) {
     const lines = [];
     const places = (teams) => andList(teams.map((tm) => ordinal(tm.place)));
-    for (const x of (sched.filled || []).filter((y) => y.bracket)) lines.push(esc(filledNote(x)));
-    for (const x of autoWait.finals) {
+    for (const x of (sched.filled || []).filter((y) => y.bracket && !y.order)) lines.push(esc(filledNote(x)));
+    for (const x of autoWait.finals.filter((y) => !y.order)) {
       const lv = heldLevel(x);
       lines.push(`${esc(x.bracket)}: ${esc(andList(x.teams.map((tm) => tm.name)))} are tied at ${esc(x.record)} for ${places(x.teams)} place.${esc(lv.text)}
         <button class="linkbtn" data-fillpool="${esc('F:' + x.bracket)}">${esc(lv.label)}</button>`);

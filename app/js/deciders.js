@@ -12,9 +12,14 @@
 // Everything is kept in the saved schedule, under `deciders`:
 //   parts   {k: 'whole' | 'first' | 'second'}   which part of tiebreaker
 //           packet k its games read (a full packet as two halves)
-//   slots   how many tiebreaker packet rows Packets shows
+//   roundParts {round: 'first' | 'second'}   a round played on half its packet
+//   slots   how many tiebreaker packet rows Packets shows after the prelims
+//   finalSlots  how many after the last playoff round, for ties for Finals
+//           places: tiebreaker packets slots+1 … slots+finalSlots, so they
+//           are numbered in round order (a row added before them moves them up)
 //   ties    {pool: {tie, positions, games, pp, wins, rooms, placed, done,
-//           filledOrder}}   one per tied pool
+//           filledOrder}}   one per tied pool, and 'F:' + a Finals source
+//           for a tie for Finals places (finals.js finalsFill)
 //   added   [{name, a, b, after, room, packet, res, win, score}]   the TD's
 //           own, on a tiebreaker packet. A side is {team}, a place
 //           ({label: '3rd in Championship'}: res.a / res.b is the team once
@@ -132,16 +137,61 @@ export function makeDeciders(h) {
     const out = await h.save(s);
     h.setSched(s, out && out.etag);
   };
+  /* ---- the two blocks of tiebreaker packets ---- */
+  const isFin = (key) => String(key).startsWith('F:');
+  // the round ties for Finals places follow: the last before the first Finals phase
+  const finAfter = (s) => {
+    const at = s.phases.findIndex((ph) => ph.kind === 'final');
+    const ph = at > 0 ? s.phases[at - 1] : null;
+    return ph && ph.rounds.length ? ph.rounds[ph.rounds.length - 1].round : null;
+  };
+  // one block when the Finals follow the prelims (a round robin straight to a final)
+  const sameCut = (s) => { const f = finAfter(s); return f === null || f === decAfter(s); };
+  function blocks() {
+    const d = D(), s = S();
+    const fin = s && !sameCut(s) ? Number(d.finalSlots) || 0 : 0;
+    const top = Math.max(0, ...h.tbRounds().map((r) => r.number - TB_BASE));
+    return { pre: Math.max(d.slots, top - fin, 0), fin };
+  }
+  const baseOf = (key) => (isFin(key) && S() && !sameCut(S()) ? blocks().pre : 0);
+  const afterOf = (s, key) => (isFin(key) && !sameCut(s) ? finAfter(s) : decAfter(s));
+  const blockOf = (k) => (k > blocks().pre && S() && !sameCut(S()) ? 'fin' : 'pre');
+  // a tiebreaker packet uploaded in the block
+  const packets = (block) => h.tbRounds().some((r) => blockOf(r.number - TB_BASE) === (block === 'fin' && S() && sameCut(S()) ? 'pre' : block));
+
+  // A tie as Deciders plays it. With a tie order (stats.js), only the teams a
+  // tiebreaker game has to set apart, at their places; a tie for Finals places
+  // has each place's slot as its "bracket" (null past the Finals' places).
+  const ordinalOf = (n) => ORD(n);
+  function asTie(x, fin) {
+    if (!x.order) return x;
+    const play = new Set(x.needGame.flat());
+    const teams = x.teams.filter((t) => play.has(t.name));
+    if (!fin) return { ...x, teams };
+    return { ...x, pool: 'F:' + x.bracket, finals: true,
+      teams: teams.map((t) => ({ ...t, bracket: t.place <= x.deepest ? `${ordinalOf(t.place)} in ${x.bracket}` : null })) };
+  }
+  // the ties auto-fill holds for a tiebreaker game now (with packets in their block)
+  const heldNow = () => [
+    ...h.held().filter((x) => (!x.order || (x.needGame && x.needGame.length)) && (!x.order || packets('pre'))).map((x) => asTie(x, false)),
+    ...(h.heldFinals ? h.heldFinals() : []).filter((x) => x.order && x.needGame && x.needGame.length && packets('fin')).map((x) => asTie(x, true)),
+  ];
   // the ties to show: those auto-fill holds now, and those already started
   const ties = () => {
     const out = new Map();
-    for (const x of h.held()) out.set(x.pool, x);
+    for (const x of heldNow()) out.set(x.pool, x);
     for (const [pool, st] of Object.entries(D().ties)) if (st.tie && !out.has(pool)) out.set(pool, st.tie);
     return [...out.values()];
   };
+  // a tie's key as an attribute (a Finals source's name may hold anything)
+  const keys = [];
+  const keyAttr = (k) => { let i = keys.indexOf(k); if (i < 0) { keys.push(k); i = keys.length - 1; } return 'k' + i; };
+  const keyOf = (v) => keys[Number(String(v).slice(1))];
   const roomOf = (s, pool, st, i) => {
     if (st.rooms && st.rooms[i] !== undefined) return Number(st.rooms[i]);
-    const g = s.phases[0].rounds[0].games.find((y) => (s.pools[pool] || []).includes(y.a.team));
+    // a Finals tie: the room of the Finals' first game
+    if (isFin(pool)) { const ph = s.phases.find((p) => p.kind === 'final'); const g = ph && ph.rounds[0] && ph.rounds[0].games[0]; return g ? g.room : 0; }
+    const g = s.phases[0].rounds[0].games.find((y) => ((s.pools || {})[pool] || []).includes(y.a.team));
     return g ? g.room : 0;
   };
   // every game to play, numbered: ties first by the packet they read, then the TD's own
@@ -153,10 +203,10 @@ export function makeDeciders(h) {
       st.games.forEach((y, i) => {
         if (c[i] < 0) return;
         const slot = (r) => { const n = who(x, st, r, st.games); return n ? { team: n } : { label: ref(x, st, r, st.games, true) }; };
-        out.push({ pool, game: i + 1, tb: c[i] + 1, room: roomOf(s, pool, st, i), a: slot(y.a), b: slot(y.b), after: decAfter(s), ...(st.wins[i] ? { done: true } : {}) });
+        out.push({ pool, game: i + 1, tb: baseOf(pool) + c[i] + 1, room: roomOf(s, pool, st, i), a: slot(y.a), b: slot(y.b), after: afterOf(s, pool), ...(st.wins[i] ? { done: true } : {}) });
       });
     }
-    out.sort((p, q) => p.tb - q.tb || pools.indexOf(p.pool) - pools.indexOf(q.pool) || p.game - q.game);
+    out.sort((p, q) => p.tb - q.tb || pools.indexOf(p.pool) - pools.indexOf(q.pool) || String(p.pool).localeCompare(String(q.pool)) || p.game - q.game);
     d.added.forEach((y, i) => out.push({ name: y.name, own: i, tb: /^t\d+$/.test(y.packet) ? Number(y.packet.slice(1)) : 0, packet: y.packet, room: Number(y.room) || 0, a: ownSide(d, y, 'a'), b: ownSide(d, y, 'b'), after: Number(y.after) || decAfter(s), ...(y.win ? { done: true } : {}) }));
     out.forEach((g, i) => { g.n = i + 1; });
     return out;
@@ -190,11 +240,14 @@ export function makeDeciders(h) {
 
   // a tie the hub has just found starts on its suggested games
   async function init() {
-    const fresh = h.held().filter((x) => !D().ties[x.pool]);
-    if (!fresh.length || !S()) return false;
+    if (!S()) return false;
+    const fresh = heldNow().filter((x) => !D().ties[x.pool] && x.teams.length > 1);
+    if (!fresh.length) return false;
     await write((s, d) => {
       for (const x of fresh) {
-        const open = [...new Set((JSON.stringify(s).match(new RegExp(`"label":"${x.pool}\\d+"`, 'g')) || []))].map((l) => Number(l.slice(9 + x.pool.length, -1)));
+        // with a tie order the teams' own places; before, the pool's open slots
+        const open = x.order ? x.teams.map((t) => t.place)
+          : [...new Set((JSON.stringify(s).match(new RegExp(`"label":"${x.pool}\\d+"`, 'g')) || []))].map((l) => Number(l.slice(9 + x.pool.length, -1)));
         d.ties[x.pool] = { tie: x, positions: open.sort((p, q) => p - q).slice(0, x.teams.length), games: suggested(x), pp: {}, wins: {}, rooms: {}, placed: null, done: null, filledOrder: null };
       }
     });
@@ -274,7 +327,7 @@ export function makeDeciders(h) {
         const a = who(x, st, y.a, st.games), b = who(x, st, y.b, st.games);
         if (!a || !b) return;
         const bucket = (S().rooms[roomOf(S(), pool, st, i)] || {}).bucket;
-        const f = files.filter((g) => g.round === TB_BASE + c[i] + 1 && g.bucket === bucket && !g.part
+        const f = files.filter((g) => g.round === TB_BASE + baseOf(pool) + c[i] + 1 && g.bucket === bucket && !g.part
           && [...g.teams].sort().join('\n') === [a, b].sort().join('\n')).sort((p, q) => q.created - p.created)[0];
         const win = f && f.score[0] !== f.score[1] ? ((f.score[f.teams.indexOf(a)] > f.score[f.teams.indexOf(b)]) ? 'a' : 'b') : null;
         if ((st.wins[i] || null) !== win) found.push([pool, i, win, f ? `${Math.max(...f.score)}–${Math.min(...f.score)}` : null]);
@@ -288,10 +341,30 @@ export function makeDeciders(h) {
   }
   // fill (or open again, order null) a tie's slots, in s
   function setSlots(s, x, st, ord) {
+    if (x.finals) {
+      // the Finals' slots for the tie's places: "2nd in 1st–4th place"
+      const at = new Map(st.positions.map((pos, k) => [`${ORD(pos)} in ${x.bracket}`, ord ? ord[k] : null]));
+      const put = (sl) => {
+        const label = sl && (sl.label || (sl.dec && sl.from));
+        if (!label || !at.has(label)) return sl;
+        return ord ? { team: at.get(label), from: label, dec: true } : { label };
+      };
+      for (const ph of s.phases) for (const r of ph.rounds) {
+        for (const y of r.games) { y.a = put(y.a); y.b = put(y.b); }
+        r.byes = r.byes.map(put);
+      }
+      return;
+    }
     if (ord) {
       const ranks = { [x.pool]: [] };
       st.positions.forEach((pos, k) => { ranks[x.pool][pos - 1] = ord[k]; });
       fillPlaceholders(s, ranks);
+      // these slots are the tie's: the hub's refill leaves them (finals.js unfilled)
+      const labels = new Set(st.positions.map((pos) => x.pool + pos));
+      for (const ph of s.phases) for (const r of ph.rounds) {
+        for (const y of r.games) for (const side of ['a', 'b']) if (y[side] && y[side].team && labels.has(y[side].from)) y[side] = { ...y[side], dec: true };
+        r.byes = r.byes.map((z) => (z && z.team && labels.has(z.from) ? { ...z, dec: true } : z));
+      }
     } else {
       const labels = new Set(st.positions.map((pos) => x.pool + pos));
       for (const ph of s.phases) for (const r of ph.rounds) {
@@ -316,7 +389,14 @@ export function makeDeciders(h) {
 
   // the tied teams' numbers: record, points per 20, bonus conversion, and how they did against each other
   function statsHtml(x) {
-    const agg = h.agg(), ns = names(x);
+    const ns = names(x);
+    // with a tie order: the figures it ranks by, as the fill read them
+    if (x.figures) {
+      const f = (n) => x.figures[n] || {};
+      return `<table class="tbstats"><thead><tr><th>Team</th><th class="num">W–L</th><th class="num">PPG</th><th class="num">PPB</th><th class="num">vs tied</th></tr></thead>
+        <tbody>${ns.map((n) => `<tr><td>${esc(n)}</td><td class="num">${esc(x.record)}</td><td class="num">${Number(f(n).ppg || 0).toFixed(2)}</td><td class="num">${Number(f(n).ppb || 0).toFixed(2)}</td><td class="num">${esc(f(n).h2h || '–')}</td></tr>`).join('')}</tbody></table>`;
+    }
+    const agg = h.agg();
     if (!agg) return '';
     const row = (n) => agg.teams.find((t) => t.name === n) || {};
     const h2h = (n) => {
@@ -383,7 +463,7 @@ export function makeDeciders(h) {
     const cards = ties().map((x) => {
       const st = d.ties[x.pool];
       if (!st) return '';
-      const P = esc(x.pool), g = st.games, own = !sameGames(g, suggested(x)), c = chain(st);
+      const P = keyAttr(x.pool), g = st.games, own = !sameGames(g, suggested(x)), c = chain(st), base = baseOf(x.pool);
       total++;
       if (!st.done) open++;
       const left = g.filter((_, i) => !st.pp[i] && !st.wins[i]).length;
@@ -397,8 +477,8 @@ export function makeDeciders(h) {
         return `<select data-decslot="${P}:${i}:${side}" aria-label="Game ${i + 1}">${opts.map(([v, l]) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
       };
       const tag = (i) => (c[i] < 0 ? '<span class="tbtag off">No game</span>'
-        : `<span class="tbtag">Decider ${numOf(x.pool, i) || ''} · Tiebreaker ${c[i] + 1} · ${roomMenu(`data-decroom="${P}:${i}"`, roomOf(s, x.pool, st, i))}</span>`);
-      const out = (i) => (c[i] >= 0 && !st.wins[i] && c[i] + 1 > d.released ? ' <span class="muted">· not released</span>' : '');
+        : `<span class="tbtag">Decider ${numOf(x.pool, i) || ''} · Tiebreaker ${base + c[i] + 1} · ${roomMenu(`data-decroom="${P}:${i}"`, roomOf(s, x.pool, st, i))}</span>`);
+      const out = (i) => (c[i] >= 0 && !st.wins[i] && base + c[i] + 1 > d.released ? ' <span class="muted">· not released</span>' : '');
       const games = g.map((y, i) => {
         const pp = st.pp[i], a = who(x, st, y.a, g), b = who(x, st, y.b, g), w = who(x, st, { w: i }, g);
         const res = pp ? ` <span class="muted">· ${w ? esc(w) + ' ' : ''}by ${esc(h.statLabel())}</span>` : st.wins[i] ? ` <span class="muted">· ${esc(w)} won${st.scores && st.scores[i] ? ' ' + esc(st.scores[i]) : ''}</span>` : '';
@@ -420,13 +500,16 @@ export function makeDeciders(h) {
         ? `<button class="linkbtn" data-decadd="${P}">Add a game</button>${own ? `<button class="linkbtn" data-decsug="${P}">Use the suggested games</button>` : ''}<button class="small" data-decedit="${P}">Done</button>`
         : `<button class="linkbtn" data-decedit="${P}">Change games</button>`;
       const lane = `lane-${Math.max(0, pools.indexOf(x.pool)) % 4}`;
+      const title = x.finals ? esc(x.bracket) : 'Pool ' + esc(x.pool);
+      const why = x.finals ? `${esc(andList(names(x)))} are tied at ${esc(x.record)} for ${esc(ORD(Math.min(...x.teams.map((t) => t.place))))} place.`
+        : `${esc(andList(names(x)))} are tied at ${esc(x.record)} for ${esc(spots(x))}.`;
       if (st.done && !st.open) {
-        return `<section class="tbcard ${lane} done folded"><div class="tbhead"><h3><i></i>Pool ${P}</h3>
+        return `<section class="tbcard ${lane} done folded"><div class="tbhead"><h3><i></i>${title}</h3>
           <span class="tbresult">${esc(st.done)}</span><button class="linkbtn" data-decfold="${P}">Show details</button>${status}</div></section>`;
       }
       return `<section class="tbcard ${lane}${st.done ? ' done' : ''}">
-        <div class="tbhead"><h3><i></i>Pool ${P}</h3>${st.done ? `<button class="linkbtn tbhide" data-decfold="${P}">Hide details</button>` : ''}${status}</div>
-        <p class="tbwhy">${esc(andList(names(x)))} are tied at ${esc(x.record)} for ${esc(spots(x))}.</p>
+        <div class="tbhead"><h3><i></i>${title}</h3>${st.done ? `<button class="linkbtn tbhide" data-decfold="${P}">Hide details</button>` : ''}${status}</div>
+        <p class="tbwhy">${why}</p>
         ${statsHtml(x)}
         ${g.length ? `<ol class="tbgames">${games}</ol>` : '<p class="muted">No games yet.</p>'}${place}
         ${st.done ? `<p class="tbdone">${esc(st.done)}</p>` : ''}
@@ -453,9 +536,16 @@ export function makeDeciders(h) {
       const missing = /^t/.test(key) && !packetOf(Number(key.slice(1)) - 1);
       return `<span class="tbpk on${missing ? ' bad' : ''}">${esc(packetLabel(key))} <span>· Decider${ns.length > 1 ? 's' : ''} ${esc(andList(ns.map(String)))}${missing ? ', not uploaded' : ''}</span></span>`;
     }).join('');
-    const need = Math.max(0, ...d.games.map((g) => g.tb || 0)), have = h.tbRounds().length;
-    const short = [...use.keys()].some((key) => /^t/.test(key) && !packetOf(Number(key.slice(1)) - 1))
-      ? `<div class="warntext">The games need ${need} tiebreaker packet${need === 1 ? '' : 's'}, and ${have} ${have === 1 ? 'is' : 'are'} uploaded. <button class="linkbtn" data-decpackets>Add one in Packets</button></div>` : '';
+    // per block: the games after the prelims, and those after the playoffs
+    const short = ['pre', 'fin'].map((block) => {
+      const b = blocks(), base = block === 'fin' ? b.pre : 0;
+      const ks = d.games.filter((g) => g.tb && blockOf(g.tb) === block).map((g) => g.tb - base);
+      if (!ks.length) return '';
+      const need = Math.max(...ks), size = block === 'fin' ? b.fin : b.pre;
+      const have = h.tbRounds().filter((r) => blockOf(r.number - TB_BASE) === block).length;
+      if (need <= size && ks.every((k) => packetOf(base + k - 1))) return '';
+      return `<div class="warntext">The games need ${need} tiebreaker packet${need === 1 ? '' : 's'}, and ${have} ${have === 1 ? 'is' : 'are'} uploaded. <button class="linkbtn" data-decpackets>Add one in Packets</button></div>`;
+    }).join('');
     const warn = clashes().map((c) => `<div class="warntext">${esc(c)}</div>`).join('');
     const form = adding ? (() => {
       const sides = sideOptions(), pk = packetOptions();
@@ -475,16 +565,16 @@ export function makeDeciders(h) {
 
   function wire(box) {
     const on = (sel, ev, fn) => box.querySelectorAll(sel).forEach((el) => { el[ev] = () => fn(el); });
-    on('[data-decpp]', 'onchange', (el) => { const [pool, i] = el.dataset.decpp.split(':'); change(pool, (st) => { st.pp[i] = el.checked; from(st, i); }); });
-    on('[data-decwin]', 'onchange', (el) => { const [pool, i] = el.dataset.decwin.split(':'); change(pool, (st) => { from(st, i); if (el.value) st.wins[i] = el.value; }); });
-    on('[data-decedit]', 'onclick', (el) => change(el.dataset.decedit, (st) => { st.editing = !st.editing; }));
+    on('[data-decpp]', 'onchange', (el) => { const [k, i] = el.dataset.decpp.split(':'); const pool = keyOf(k); change(pool, (st) => { st.pp[i] = el.checked; from(st, i); }); });
+    on('[data-decwin]', 'onchange', (el) => { const [k, i] = el.dataset.decwin.split(':'); const pool = keyOf(k); change(pool, (st) => { from(st, i); if (el.value) st.wins[i] = el.value; }); });
+    on('[data-decedit]', 'onclick', (el) => change(keyOf(el.dataset.decedit), (st) => { st.editing = !st.editing; }));
     on('[data-decslot]', 'onchange', (el) => {
-      const [pool, i, side] = el.dataset.decslot.split(':');
+      const [k, i, side] = el.dataset.decslot.split(':'); const pool = keyOf(k);
       const v = JSON.parse(el.value);
       change(pool, (st) => { const game = st.games[i]; if (JSON.stringify(v) === JSON.stringify(game[side === 'a' ? 'b' : 'a'])) return; game[side] = v; from(st, i); });
     });
     on('[data-decdel]', 'onclick', (el) => {
-      const [pool, n] = el.dataset.decdel.split(':'); const i = Number(n);
+      const [k, n] = el.dataset.decdel.split(':'); const pool = keyOf(k); const i = Number(n);
       change(pool, (st) => {
         // games that needed this one's result go too; later ones move up a number
         const gone = new Set([i]);
@@ -498,11 +588,11 @@ export function makeDeciders(h) {
         st.wins = {}; st.placed = null;
       });
     });
-    on('[data-decadd]', 'onclick', (el) => change(el.dataset.decadd, (st, x) => { const n = names(x); st.games.push({ a: n[0], b: n[1] }); st.placed = null; }));
-    on('[data-decsug]', 'onclick', (el) => change(el.dataset.decsug, (st, x) => { Object.assign(st, { games: suggested(x), pp: {}, wins: {}, placed: null }); }));
+    on('[data-decadd]', 'onclick', (el) => change(keyOf(el.dataset.decadd), (st, x) => { const n = names(x); st.games.push({ a: n[0], b: n[1] }); st.placed = null; }));
+    on('[data-decsug]', 'onclick', (el) => change(keyOf(el.dataset.decsug), (st, x) => { Object.assign(st, { games: suggested(x), pp: {}, wins: {}, placed: null }); }));
     on('[data-decfill]', 'onclick', (el) => {
-      const pool = el.dataset.decfill;
-      const pick = Object.fromEntries([...box.querySelectorAll(`[data-decplace="${pool}"]`)].map((e) => [e.dataset.team, e.value]));
+      const pool = keyOf(el.dataset.decfill);
+      const pick = Object.fromEntries([...box.querySelectorAll(`[data-decplace="${el.dataset.decfill}"]`)].map((e) => [e.dataset.team, e.value]));
       change(pool, (st, x) => {
         const need = {}, have = {};
         x.teams.forEach((t) => { need[t.bracket] = (need[t.bracket] || 0) + 1; });
@@ -513,8 +603,8 @@ export function makeDeciders(h) {
         st.placed = names(x).sort((p, q) => brs.indexOf(pick[p]) - brs.indexOf(pick[q]));
       });
     });
-    on('[data-decroom]', 'onchange', (el) => { const [pool, i] = el.dataset.decroom.split(':'); change(pool, (st) => { st.rooms = { ...(st.rooms || {}), [i]: Number(el.value) }; }); });
-    on('[data-decfold]', 'onclick', (el) => change(el.dataset.decfold, (st) => { st.open = !st.open; }));
+    on('[data-decroom]', 'onchange', (el) => { const [k, i] = el.dataset.decroom.split(':'); const pool = keyOf(k); change(pool, (st) => { st.rooms = { ...(st.rooms || {}), [i]: Number(el.value) }; }); });
+    on('[data-decfold]', 'onclick', (el) => change(keyOf(el.dataset.decfold), (st) => { st.open = !st.open; }));
     on('[data-decpackets]', 'onclick', () => h.goPackets());
     on('#decrelease', 'onclick', (el) => release(Number(el.dataset.tb)));
     on('[data-decownroom]', 'onchange', (el) => write((s, d) => { d.added[Number(el.dataset.decownroom)].room = Number(el.value); }).then(() => h.render()));
@@ -583,45 +673,112 @@ export function makeDeciders(h) {
     });
   }
 
-  /* ---- Packets: the tiebreaker packets, indented after the round ties follow ---- */
+  /* ---- Packets: the tiebreaker packets, indented after the round their ties follow ---- */
+  // Two blocks: after the prelims' last round (ties for playoff places) and,
+  // when the Finals have places to fill, after the last playoff round (ties
+  // for Finals places). Numbered in round order: a row added to the first
+  // block moves the second's packets up one (POST packets/move), so it can
+  // only be added while none of those has been released or played on.
+  // Each round's own packet gets the same part menu: any round may be
+  // played on half its packet (deciders.roundParts).
   function packetRows(box, o) {
     const s = S();
     const table = box.querySelector('.pktable');
     if (!table) return;
-    const after = s ? decAfter(s) : null;
-    const row = (after && table.querySelector(`tr[data-round="${after}"]`)) || [...table.querySelectorAll('tr.slot')].pop();
-    if (!row) return;
-    const d = D();
-    const slots = Math.max(d.slots, ...h.tbRounds().map((r) => r.number - TB_BASE), 0);
-    const frag = [];
-    for (let k = 0; k < slots; k++) {
-      const r = packetOf(k), part = d.parts[k + 1] || 'whole';
-      frag.push(`<tr class="slot tbpkrow${r ? ' has' : ''}" data-tbslot="${k + 1}">
-        <td class="pkn"><span class="tbpktag">Tiebreaker ${k + 1}</span></td>
-        <td class="pkfile">${r ? `<span class="pkitem"><span class="dot"></span>${esc(r.packet_name)}</span>
-          <select class="tbroom tbpart" data-tbpart="${k + 1}" aria-label="Part of the packet">${PARTS.map(([v, l]) => `<option value="${v}"${v === part ? ' selected' : ''}>${l}</option>`).join('')}</select>`
-          : `<span class="dot"></span><span class="muted">No packet yet${o.staged.length ? ' &middot; drop one here' : ''}</span>`}</td>
-        <td class="pkact">${r ? `<button class="icon" data-tbpreview="${k + 1}" title="Preview" aria-label="Preview ${esc(r.packet_name)}">${o.icons.preview}</button><a class="icon" href="${esc(o.href(r))}" download title="Download" aria-label="Download ${esc(r.packet_name)}">${o.icons.download}</a>` : ''}<button class="icon" data-tbpick="${k + 1}" title="${r ? 'Replace' : 'Upload'}" aria-label="${r ? 'Replace' : 'Upload'} Tiebreaker ${k + 1}">${o.icons.upload}</button></td></tr>`);
+    const d = D(), b = blocks();
+    const select = (attr, on, name) => `<select class="tbroom tbpart" ${attr} aria-label="Part of ${esc(name)}">${PARTS.map(([v, l]) => `<option value="${v}"${v === on ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+    // the round rows' part menus, after the file name
+    if (s) {
+      for (const tr of table.querySelectorAll('tr.slot.has[data-round]')) {
+        const n = Number(tr.dataset.round), item = tr.querySelector('.pkfile .pkitem');
+        if (!item || !Number.isInteger(n)) continue;
+        item.insertAdjacentHTML('afterend', select(`data-rdpart="${n}"`, (d.roundParts || {})[n] || 'whole', 'packet ' + n));
+      }
     }
-    frag.push(`<tr class="tbpkrow tbpkfoot"><td colspan="${row.cells.length}"><button class="linkbtn" data-tbpkadd>Add a tiebreaker packet</button>${slots > h.tbRounds().length || (slots && !packetOf(slots - 1)) ? '<button class="linkbtn muted" data-tbpkdrop>Remove last</button>' : ''}
-      <input type="file" id="tbpkfile" accept=".json,.docx" hidden></td></tr>`);
-    row.insertAdjacentHTML('afterend', frag.join(''));
+    const fileRounds = new Set(h.files().map((f) => f.round));
+    const rowsOf = (from, count, block) => {
+      const out = [];
+      for (let k = from + 1; k <= from + count; k++) {
+        const r = packetOf(k - 1), part = d.parts[k] || 'whole';
+        out.push(`<tr class="slot tbpkrow${r ? ' has' : ''}" data-tbslot="${k}">
+        <td class="pkn"><span class="tbpktag">Tiebreaker ${k}</span></td>
+        <td class="pkfile">${r ? `<span class="pkitem"><span class="dot"></span>${esc(r.packet_name)}</span>
+          ${select(`data-tbpart="${k}"`, part, 'Tiebreaker ' + k)}`
+          : `<span class="dot"></span><span class="muted">No packet yet${o.staged.length ? ' &middot; drop one here' : ''}</span>`}</td>
+        <td class="pkact">${r ? `<button class="icon" data-tbpreview="${k}" title="Preview" aria-label="Preview ${esc(r.packet_name)}">${o.icons.preview}</button><a class="icon" href="${esc(o.href(r))}" download title="Download" aria-label="Download ${esc(r.packet_name)}">${o.icons.download}</a>` : ''}<button class="icon" data-tbpick="${k}" title="${r ? 'Replace' : 'Upload'}" aria-label="${r ? 'Replace' : 'Upload'} Tiebreaker ${k}">${o.icons.upload}</button></td></tr>`);
+      }
+      const last = from + count;
+      // the last row goes only while it is empty
+      const drop = count > 0 && !packetOf(last - 1);
+      // a first-block row moves the second block's packets: only before they are used
+      const later = block === 'pre' ? Array.from({ length: b.fin }, (_, x) => b.pre + x + 1) : [];
+      const movable = later.every((k) => k > d.released && !fileRounds.has(TB_BASE + k)) && (!later.length || !!o.move);
+      out.push(`<tr class="tbpkrow tbpkfoot"><td colspan="3">${movable ? `<button class="linkbtn" data-tbpkadd="${block}">Add a tiebreaker packet</button>` : ''}${drop && movable ? `<button class="linkbtn muted" data-tbpkdrop="${block}">Remove last</button>` : ''}</td></tr>`);
+      return out.join('');
+    };
+    const rowAfter = (n) => (n !== null && table.querySelector(`tr[data-round="${n}"]`)) || [...table.querySelectorAll('tr.slot[data-round]')].pop();
+    const preRow = s ? rowAfter(decAfter(s)) : [...table.querySelectorAll('tr.slot')].pop();
+    if (!preRow) return;
+    const two = s && !sameCut(s);
+    // the second block first, so the first's rows don't move its anchor
+    if (two) { const fr = rowAfter(finAfter(s)); if (fr) fr.insertAdjacentHTML('afterend', rowsOf(b.pre, b.fin, 'fin')); }
+    preRow.insertAdjacentHTML('afterend', rowsOf(0, b.pre, 'pre'));
+    table.insertAdjacentHTML('beforeend', '<tr hidden><td><input type="file" id="tbpkfile" accept=".json,.docx" hidden></td></tr>');
     const q = (sel) => table.querySelector(sel);
-    q('[data-tbpkadd]').onclick = () => write((_, dd) => { dd.slots = slots + 1; }).then(() => h.render());
-    if (q('[data-tbpkdrop]')) q('[data-tbpkdrop]').onclick = () => write((_, dd) => { dd.slots = Math.max(0, slots - 1); }).then(() => h.render());
+    // move the second block's packets by one (up: +1, from the top; down: -1, from the bottom)
+    const shift = async (by) => {
+      const ks = Array.from({ length: b.fin }, (_, x) => b.pre + x + 1);
+      for (const k of by > 0 ? ks.reverse() : ks) if (packetOf(k - 1)) await o.move(TB_BASE + k, TB_BASE + k + by);
+    };
+    const renumber = (dd, by) => {
+      const moved = (k) => (k > b.pre ? k + by : k);
+      dd.parts = Object.fromEntries(Object.entries(dd.parts || {}).map(([k, v]) => [String(moved(Number(k))), v]));
+      for (const y of dd.added || []) if (/^t\d+$/.test(y.packet || '')) y.packet = 't' + moved(Number(y.packet.slice(1)));
+    };
+    table.querySelectorAll('[data-tbpkadd]').forEach((el) => {
+      el.onclick = async () => {
+        try {
+          if (el.dataset.tbpkadd === 'fin') await write((_, dd) => { dd.slots = b.pre; dd.finalSlots = b.fin + 1; });
+          else {
+            if (b.fin) await shift(1);
+            await write((_, dd) => { renumber(dd, 1); dd.slots = b.pre + 1; dd.finalSlots = b.fin; });
+          }
+          await o.refresh();
+        } catch (e) { h.say(e.message, true); }
+      };
+    });
+    table.querySelectorAll('[data-tbpkdrop]').forEach((el) => {
+      el.onclick = async () => {
+        try {
+          if (el.dataset.tbpkdrop === 'fin') await write((_, dd) => { dd.slots = b.pre; dd.finalSlots = Math.max(0, b.fin - 1); });
+          else {
+            if (b.fin) await shift(-1);
+            await write((_, dd) => { renumber(dd, -1); dd.slots = Math.max(0, b.pre - 1); dd.finalSlots = b.fin; });
+          }
+          await o.refresh();
+        } catch (e) { h.say(e.message, true); }
+      };
+    });
     table.querySelectorAll('[data-tbpart]').forEach((el) => { el.onchange = () => write((_, dd) => { dd.parts = { ...dd.parts, [el.dataset.tbpart]: el.value }; }).then(() => h.render()); });
-    table.querySelectorAll('[data-tbpick]').forEach((b) => {
-      b.onclick = () => {
+    table.querySelectorAll('[data-rdpart]').forEach((el) => {
+      el.onchange = () => write((_, dd) => {
+        const rp = { ...(dd.roundParts || {}) };
+        if (el.value === 'whole') delete rp[el.dataset.rdpart]; else rp[el.dataset.rdpart] = el.value;
+        dd.roundParts = rp;
+      }).then(() => h.render());
+    });
+    table.querySelectorAll('[data-tbpick]').forEach((btn) => {
+      btn.onclick = () => {
         const f = q('#tbpkfile');
         f.onchange = async () => {
           if (!f.files[0]) return;
-          const k = Number(b.dataset.tbpick);
+          const k = Number(btn.dataset.tbpick);
           try { await o.upload(TB_BASE + k, f.files[0]); h.say(`Tiebreaker ${k}: ${f.files[0].name}`); await o.refresh(); } catch (e) { h.say(e.message, true); }
         };
         f.click();
       };
     });
-    table.querySelectorAll('[data-tbpreview]').forEach((b) => { b.onclick = () => o.preview(TB_BASE + Number(b.dataset.tbpreview), (n) => partRange(d.parts[b.dataset.tbpreview] || 'whole', n)); });
+    table.querySelectorAll('[data-tbpreview]').forEach((btn) => { btn.onclick = () => o.preview(TB_BASE + Number(btn.dataset.tbpreview), (n) => partRange(d.parts[btn.dataset.tbpreview] || 'whole', n)); });
     table.querySelectorAll('tr[data-tbslot]').forEach((tr) => {
       tr.ondragover = (e) => { e.preventDefault(); tr.classList.add('dragover'); };
       tr.ondragleave = () => tr.classList.remove('dragover');
@@ -654,7 +811,9 @@ export function makeDeciders(h) {
     }).join('');
   }
   const colCount = () => (S() ? new Set(decGames(S()).filter((g) => g.tb).map((g) => g.tb + ':' + g.after)).size : 0);
-  return { html, wire, init, sync, packetRows, gridHeads, gridColsAfter, gridCells, colCount, hold: () => h.tbRounds().length > 0,
+  return { html, wire, init, sync, packetRows, gridHeads, gridColsAfter, gridCells, colCount,
+    // tiebreaker packets after the prelims; after the playoffs (the Finals' ties)
+    hold: () => packets('pre'), holdFinals: () => packets('fin'), packets,
     releaseHtml, chips, pending, autoRelease, tbCount: () => (S() ? tbsInUse().length : 0) };
 }
 

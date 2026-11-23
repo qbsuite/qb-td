@@ -4505,9 +4505,12 @@ async function bucketState(env, secret, url) {
   // join token for its own buzzer instead, when it has one.
   const buzzer = await roomBuzzer(env, b, settings.buzzer);
   delete settings.buzzer;
-  const packets = rounds.results.filter((p) => p.number <= TB_ROUND || test === true);
+  const sched = await roomSchedule(env, b);
+  // a round played on half its packet says which half (the reader reads only that)
+  const halves = roundPartsOf(sched);
+  const packets = rounds.results.filter((p) => p.number <= TB_ROUND || test === true).map((p) => (halves[p.number] ? { ...p, part: halves[p.number] } : p));
   // the tiebreaker packets this room plays a decider on, listed as rounds of their own
-  const decs = test === true ? [] : await roomDeciders(env, b);
+  const decs = test === true ? [] : await roomDeciders(env, b, sched);
   if (decs.length) {
     const { results: tbs } = await env.DB.prepare(
       'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number > ?2 ORDER BY number'
@@ -4629,11 +4632,21 @@ async function bucketUpload(request, url, env, secret) {
 // (deciders.games). A room is handed a tiebreaker packet only while the
 // schedule has it playing a decider on it.
 const TB_ROUND = 900;
-async function roomDeciders(env, b) {
+async function roomSchedule(env, b) {
   const obj = await env.DATA.get(`t/${b.tournament_id}/schedule.json`);
-  if (!obj) return [];
-  let s;
-  try { s = await obj.json(); } catch (e) { return []; }
+  if (!obj) return null;
+  try { return await obj.json(); } catch (e) { return null; }
+}
+// The rounds the TD has played on half their packet (Packets' part menu):
+// {round: 'first' | 'second'}
+function roundPartsOf(s) {
+  const rp = s && s.deciders && s.deciders.roundParts;
+  if (!rp || typeof rp !== 'object') return {};
+  return Object.fromEntries(Object.entries(rp).filter(([k, v]) => /^\d+$/.test(k) && Number(k) <= TB_ROUND && (v === 'first' || v === 'second')));
+}
+async function roomDeciders(env, b, sched) {
+  const s = sched === undefined ? await roomSchedule(env, b) : sched;
+  if (!s) return [];
   const d = s && s.deciders;
   if (!d || !Array.isArray(d.games) || !Array.isArray(s.rooms)) return [];
   const room = s.rooms.findIndex((r) => r && r.bucket === b.id);

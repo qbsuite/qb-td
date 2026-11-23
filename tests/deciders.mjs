@@ -29,7 +29,7 @@ const withGames = () => { const s = sched(); s.deciders = { parts: { 2: 'second'
 test('a schedule without deciders is handed back as it is', () => {
   const s = sched();
   assert.equal(withDeciderPhases(s), s);
-  assert.deepEqual(decOf(s), { parts: {}, slots: 0, ties: {}, added: [], games: [], hold: false, released: 0 });
+  assert.deepEqual(decOf(s), { parts: {}, roundParts: {}, slots: 0, finalSlots: 0, ties: {}, added: [], games: [], hold: false, holdFinals: false, released: 0 });
 });
 test('deciders become a Tiebreakers phase after the round they follow, one round per tiebreaker packet', () => {
   const s = withGames(), w = withDeciderPhases(s);

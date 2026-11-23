@@ -36,7 +36,8 @@ export function withDeciderPhases(schedule) {
 /** The schedule's deciders, always whole (a schedule saved before has none). */
 export function decOf(s) {
   const d = (s && s.deciders) || {};
-  return { parts: d.parts || {}, slots: Number(d.slots) || 0, ties: d.ties || {}, added: Array.isArray(d.added) ? d.added : [], games: Array.isArray(d.games) ? d.games : [], hold: !!d.hold, released: Number(d.released) || 0 };
+  return { parts: d.parts || {}, roundParts: d.roundParts || {}, slots: Number(d.slots) || 0, finalSlots: Number(d.finalSlots) || 0, ties: d.ties || {},
+    added: Array.isArray(d.added) ? d.added : [], games: Array.isArray(d.games) ? d.games : [], hold: !!d.hold, holdFinals: !!d.holdFinals, released: Number(d.released) || 0 };
 }
 /** The round deciders follow when nothing says otherwise: the last before the first playoff slot. */
 export function decAfter(s) {

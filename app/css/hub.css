@@ -839,3 +839,45 @@ body.aboutpage .wrap { max-width: 820px; }
 .dlissue .dlhead { font-weight: 600; }
 .dlissue .dlfoot { color: var(--muted); }
 .dlissue [data-dlclose] { justify-self: start; font-size: 12px; }
+
+/* The Live Hub's Ties box (tiebox.js): each tie as its ladder table, the
+   step that decided it tinted, the steps after it faded */
+.tiebox { background: var(--sel); border-radius: 10px; padding: 14px 16px; margin-top: 14px; font-size: 14px; }
+.tiebox .tieh { font-weight: 600; font-size: 15px; }
+.tiebox .sub, .tiebox .tieorder { color: var(--muted); font-size: 13px; }
+.tiebox .tieorder { margin-top: 10px; }
+.tiebox .tieorder + .tieorder { margin-top: 4px; }
+.tiebox .tienone { margin-top: 6px; }
+.tiecut { margin-top: 12px; }
+.tiecut:first-of-type { margin-top: 8px; }
+.tiecuth { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+.tie { padding: 10px 0; border-top: 1px solid var(--line); }
+.tiecut .tie:first-of-type, .tiecuth + .tiepick { border-top: none; padding-top: 2px; }
+.tiehd { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.tiehd b { font-weight: 600; }
+.tiehd .spacer { flex: 1; }
+.tiehd .small { font-size: 12.5px; padding: 2px 10px; }
+.tie.isdone table, .tie.isdone .tiehd b { opacity: .55; }
+.tiewrap { overflow-x: auto; }
+table.tietable { width: auto; margin-top: 6px; font-variant-numeric: tabular-nums; font-size: 13.5px; border-collapse: collapse; }
+table.tietable th { font-size: 12px; font-weight: 500; color: var(--muted); text-align: right; padding: 0 14px 5px 0; vertical-align: bottom; white-space: nowrap; text-transform: none; letter-spacing: 0; }
+table.tietable th .st { display: block; font-size: 11px; }
+table.tietable td { padding: 5px 14px 5px 0; border-top: 1px solid var(--line); border-bottom: none; text-align: right; white-space: nowrap; }
+table.tietable td.nm span { display: inline-block; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+table.tietable td.pl, table.tietable td.nm, table.tietable td.to { text-align: left; }
+table.tietable td.pl, table.tietable td.to { color: var(--muted); }
+table.tietable td.to b { color: var(--fg); font-weight: 600; }
+table.tietable .dec { background: color-mix(in srgb, var(--ok) 13%, transparent); padding-left: 8px; }
+table.tietable th.dec { color: var(--ok); border-radius: 6px 6px 0 0; }
+table.tietable .win { font-weight: 700; color: var(--ok); }
+table.tietable .unused { opacity: .45; }
+/* a tie left for the TD to pick: who takes each place */
+.tiepick { margin-top: 8px; padding: 12px 16px 14px; border: 1px solid var(--line); border-left: 4px solid var(--lc); border-radius: 10px; background: color-mix(in srgb, var(--lt) 40%, var(--bg)); }
+.tiepick .tiehd b { font-size: 15px; }
+.tiepick .rungs { max-width: 520px; margin-top: 8px; }
+.tiepick .rung { padding: 7px 10px; border: 1px solid var(--ok); border-radius: 8px; background: var(--bg); margin: 3px 0; display: flex; justify-content: space-between; gap: 8px; }
+.tiepick .rung .sd { color: var(--muted); font-size: 12px; }
+.tiepick .pickask { margin-top: 12px; }
+.tiepick .pickbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.tiepick .tieacts { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 12px; }
+@media (max-width: 560px) { table.tietable td.nm span { max-width: 120px; } }

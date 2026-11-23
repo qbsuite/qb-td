@@ -286,7 +286,7 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     // ranked as the public page ranks the bracket's table (stats.js
     // standings), teams level on both in the order it lists them
     // (publicOrder); with no such teams, nothing to look up
-    const agg = standings(games, null, opts.settings, schedule.tiePicks || null);
+    const agg = standings(games, null, opts.settings, picksFor(schedule, src.name));
     // the TD's tiebreak, head-to-head over the games the bracket ranks on
     const rule = agg.rule || null;
     const ranked = agg.teams.filter((t) => members.has(t.name));
@@ -296,6 +296,16 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
     const rows = standingsOrder(pub.order ? pub.order.map((n) => row.get(n)) : [...ranked].sort((x, y) => x.name.localeCompare(y.name)), rule);
     const rec = (t) => t.w + '–' + t.l + (t.t ? '–' + t.t : '');
     const deepest = Math.max(...src.places);
+    // where a place goes: the bracket (or phase) of the game its slot is in
+    const toOf = (place) => {
+      const label = `${place}${['th', 'st', 'nd', 'rd'][(place % 100 > 10 && place % 100 < 14) || place % 10 > 3 ? 0 : place % 10]} in ${src.name}`;
+      for (const [pi, ph] of schedule.phases.entries()) for (const r of ph.rounds || []) for (const g of r.games || []) {
+        if (![g.a, g.b].some((sl) => sl && (sl.label === label || sl.from === label))) continue;
+        const b = (schedule.brackets || []).find((x) => x.key === g.bracket && x.phase === pi);
+        return b ? b.name : ph.name;
+      }
+      return null;
+    };
     let hold = false;
     for (let i = 0; i < rows.length && i < deepest;) {
       let j = i + 1;
@@ -320,12 +330,14 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
         const needGame = ordered ? names(gameRuns(tied, rule)).filter((run) => run.some((n) => placeOf.get(n) <= deepest) && run.some((n) => placeOf.get(n) > deepest)) : [];
         const needPick = ordered ? names(pickRuns(tied, rule)).filter((run) => run.some((n) => placeOf.get(n) <= deepest)) : [];
         const x = { bracket: src.name, record: rec(rows[i]), rankBy,
-          teams: tied.map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, ...fig(t), place: i + k + 1 })),
+          deepest, teams: tied.map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, ...fig(t), place: i + k + 1, to: toOf(i + k + 1) })),
           level, kept, ...(pub.table ? { table: pub.table } : {}),
           ...(rule ? { stat: rule.stat } : {}), ...(hh ? { h2h: { records: hh.records, decided: hh.decided } } : {}),
           ...(ordered ? { order: rule.order, needGame, needPick, decidedBy: decidingStep(tied, rule), figures: tieFigures(tied, rule) } : {}) };
-        const packets = opts.hold !== undefined ? opts.hold : !!(schedule.deciders && schedule.deciders.hold);
-        const waits = ordered ? (packets && needGame.length > 0) || needPick.length > 0 : holdTies;
+        // the Finals' own tiebreaker packets (deciders.js: the block after the last playoff round)
+        const packets = opts.hold !== undefined ? opts.hold : !!(schedule.deciders && schedule.deciders.holdFinals);
+        const dst = schedule.deciders && schedule.deciders.ties && schedule.deciders.ties['F:' + src.name];
+        const waits = ordered ? (packets && needGame.length > 0) || needPick.length > 0 || (!!dst && !dst.done) : holdTies;
         if (waits && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
       }
       i = j;
@@ -410,8 +422,14 @@ const levelOf = (x) => ({
 // after the TD changes the tie order, the Finals' ranking or a pick, or a
 // tiebreaker game comes in. Never a game that has an upload, a slot the
 // TD set by hand (no `from`), or one whose standings aren't complete
-// (ready: the pools and Finals sources fillProgress has ready).
+// (ready: the pools and Finals sources fillProgress has ready), nor a slot
+// a tie's deciders filled (`dec`, deciders.js) or the TD filled anyway
+// (`forced`): those stand until the TD changes them.
 const PLACE_RE = /^([A-Z])(\d+)$/;
+// The TD's picks (schedule.tiePicks: [{at, order}], `at` a pool letter or
+// 'F:' + a Finals source) as stats.js standings takes them, for one cut
+export const picksFor = (schedule, which) => (Array.isArray(schedule.tiePicks) ? schedule.tiePicks : [])
+  .filter((p) => p && Array.isArray(p.order) && (which === 'pools' ? !String(p.at).startsWith('F:') : p.at === 'F:' + which)).map((p) => p.order);
 const COMPARED_RE = /^(Better|Other|Best|(\d+)(?:st|nd|rd|th)-best) (\d+)(?:st|nd|rd|th) place$/;
 function unfilled(saved, files, pools, finals) {
   const played = new Set(files.filter((f) => isGameFile(f) && Number.isInteger(f.round))
@@ -424,7 +442,7 @@ function unfilled(saved, files, pools, finals) {
     const f = FIN_RE.exec(from);
     return !!f && (finals === true || finals.includes(f[2]));
   };
-  const back = (sl) => (sl && sl.team && sl.from && ready(sl.from) ? { label: sl.from } : sl);
+  const back = (sl) => (sl && sl.team && sl.from && !sl.dec && !sl.forced && ready(sl.from) ? { label: sl.from } : sl);
   const copy = JSON.parse(JSON.stringify(saved));
   const sources = new Set();
   for (const ph of copy.phases) for (const r of ph.rounds || []) {
@@ -465,12 +483,12 @@ export function autoFillSaved(saved, files, matches, roster = null, force = [], 
     const unread = new Set(prog.files.filter((f) => !read.has(f.id)).flatMap((f) => summaryTeams(f).map((n) => poolOf.get(n))));
     const ids = new Set(prog.files.map((f) => f.id));
     // the prelims' tiebreaker games too: they settle ties (stats.js), in no record
-    playoffs = autoFill(next, standings(matches.filter((m) => ids.has(m.fileId) || isTbRound(m.round)), roster, settings, next.tiePicks || null),
+    playoffs = autoFill(next, standings(matches.filter((m) => ids.has(m.fileId) || isTbRound(m.round)), roster, settings, picksFor(next, 'pools')),
       prog.ready.filter((p) => !unread.has(p)), force.filter((x) => !x.startsWith('F:')));
     if (playoffs.filled) {
       const had = new Set((next.filled || []).map((x) => x.pool + ' ' + x.record));
       playoffs.schedule.filled = [...(next.filled || []), ...playoffs.ties.filter((x) => !had.has(x.pool + ' ' + x.record))
-        .map((x) => ({ pool: x.pool, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, bracket: tm.bracket })), ...levelOf(x) }))];
+        .map((x) => ({ pool: x.pool, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, bracket: tm.bracket, place: tm.place })), ...levelOf(x) }))];
       next = playoffs.schedule;
     }
   }
@@ -481,8 +499,23 @@ export function autoFillSaved(saved, files, matches, roster = null, force = [], 
     if (finals.filled) {
       const had = new Set((next.filled || []).map((x) => (x.pool || x.bracket) + ' ' + x.record));
       finals.schedule.filled = [...(next.filled || []), ...finals.ties.filter((x) => !had.has(x.bracket + ' ' + x.record))
-        .map((x) => ({ bracket: x.bracket, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, place: tm.place })), ...levelOf(x) }))];
+        .map((x) => ({ bracket: x.bracket, record: x.record, teams: x.teams.map((tm) => ({ name: tm.name, place: tm.place, ...(tm.to ? { to: tm.to } : {}) })), ...levelOf(x) }))];
       next = finals.schedule;
+    }
+  }
+  // a slot filled because the TD said fill anyway stays so (unfilled)
+  const forcedPools = new Set(force.filter((x) => !x.startsWith('F:')));
+  const forcedBrackets = new Set(force.filter((x) => x.startsWith('F:')).map((x) => x.slice(2)));
+  if (force.length && next !== saved) {
+    const mark = (sl) => {
+      if (!sl || !sl.team || !sl.from || sl.forced) return sl;
+      const p = PLACE_RE.exec(sl.from), f = FIN_RE.exec(sl.from);
+      return (p && forcedPools.has(p[1])) || (f && forcedBrackets.has(f[2])) ? { ...sl, forced: true } : sl;
+    };
+    next = JSON.parse(JSON.stringify(next));
+    for (const ph of next.phases) for (const r of ph.rounds || []) {
+      for (const g of r.games || []) { g.a = mark(g.a); g.b = mark(g.b); }
+      r.byes = (r.byes || []).map(mark);
     }
   }
   if (redo) {
