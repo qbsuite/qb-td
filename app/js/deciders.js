@@ -38,7 +38,7 @@
 import { esc } from './api.js';
 import { fillPlaceholders, slotText } from '../engine/schedule.js';
 import { finalsProgress, finalsFill } from '../engine/finals.js';
-import { decOf, decAfter, partRange, decGames, ownSide } from '../engine/deciderphases.js';
+import { decOf, decAfter, partRange, decGames, ownSide, finAfter, tieBlock } from '../engine/deciderphases.js';
 export { decOf, decAfter, partRange, decGames, ownSide };
 
 export const TB_BASE = 900;
@@ -139,12 +139,6 @@ export function makeDeciders(h) {
   };
   /* ---- the two blocks of tiebreaker packets ---- */
   const isFin = (key) => String(key).startsWith('F:');
-  // the round ties for Finals places follow: the last before the first Finals phase
-  const finAfter = (s) => {
-    const at = s.phases.findIndex((ph) => ph.kind === 'final');
-    const ph = at > 0 ? s.phases[at - 1] : null;
-    return ph && ph.rounds.length ? ph.rounds[ph.rounds.length - 1].round : null;
-  };
   // one block when the Finals follow the prelims (a round robin straight to a final)
   const sameCut = (s) => { const f = finAfter(s); return f === null || f === decAfter(s); };
   function blocks() {
@@ -153,8 +147,9 @@ export function makeDeciders(h) {
     const top = Math.max(0, ...h.tbRounds().map((r) => r.number - TB_BASE));
     return { pre: Math.max(d.slots, top - fin, 0), fin };
   }
-  const baseOf = (key) => (isFin(key) && S() && !sameCut(S()) ? blocks().pre : 0);
-  const afterOf = (s, key) => (isFin(key) && !sameCut(s) ? finAfter(s) : decAfter(s));
+  // a tie's packets: the block after the round it follows (deciderphases.js tieBlock)
+  const baseOf = (key) => (S() && tieBlock(S(), key) === 'fin' ? blocks().pre : 0);
+  const afterOf = (s, key) => (tieBlock(s, key) === 'fin' ? finAfter(s) : decAfter(s));
   const blockOf = (k) => (k > blocks().pre && S() && !sameCut(S()) ? 'fin' : 'pre');
   // a tiebreaker packet uploaded in the block
   const packets = (block) => h.tbRounds().some((r) => blockOf(r.number - TB_BASE) === (block === 'fin' && S() && sameCut(S()) ? 'pre' : block));
@@ -162,19 +157,19 @@ export function makeDeciders(h) {
   // A tie as Deciders plays it. With a tie order (stats.js), only the teams a
   // tiebreaker game has to set apart, at their places; a tie for Finals places
   // has each place's slot as its "bracket" (null past the Finals' places).
-  const ordinalOf = (n) => ORD(n);
   function asTie(x, fin) {
     if (!x.order) return x;
     const play = new Set(x.needGame.flat());
     const teams = x.teams.filter((t) => play.has(t.name));
     if (!fin) return { ...x, teams };
     return { ...x, pool: 'F:' + x.bracket, finals: true,
-      teams: teams.map((t) => ({ ...t, bracket: t.place <= x.deepest ? `${ordinalOf(t.place)} in ${x.bracket}` : null })) };
+      // where each place goes: the game its slot is in (the stepladder stops once the rest go the same way)
+      teams: teams.map((t) => ({ ...t, bracket: t.place <= x.deepest ? t.to || x.bracket : null })) };
   }
   // the ties auto-fill holds for a tiebreaker game now (with packets in their block)
   const heldNow = () => [
     ...h.held().filter((x) => (!x.order || (x.needGame && x.needGame.length)) && (!x.order || packets('pre'))).map((x) => asTie(x, false)),
-    ...(h.heldFinals ? h.heldFinals() : []).filter((x) => x.order && x.needGame && x.needGame.length && packets('fin')).map((x) => asTie(x, true)),
+    ...(h.heldFinals ? h.heldFinals() : []).filter((x) => x.order && x.needGame && x.needGame.length && packets(tieBlock(S(), 'F:' + x.bracket))).map((x) => asTie(x, true)),
   ];
   // the ties to show: those auto-fill holds now, and those already started
   const ties = () => {
@@ -493,7 +488,7 @@ export function makeDeciders(h) {
         const used = [...new Set(x.teams.map((t) => t.bracket))];
         const at = Object.fromEntries(o.order.map((t, k) => [t, x.teams[k].bracket]));
         place = `<div class="tbplace"><span class="muted">Places:</span>${x.teams.map((t) => `<label>${esc(t.name)} <select data-decplace="${P}" data-team="${esc(t.name)}">${used.map((b) =>
-          `<option${at[t.name] === b ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select></label>`).join('')}
+          `<option value="${esc(b ?? '')}"${at[t.name] === b ? ' selected' : ''}>${esc(b ?? '—')}</option>`).join('')}</select></label>`).join('')}
           <button class="small primary" data-decfill="${P}">Fill</button></div>${st.bad ? `<div class="warntext">${esc(st.bad)}</div>` : ''}`;
       }
       const tools = st.editing
@@ -596,6 +591,7 @@ export function makeDeciders(h) {
       change(pool, (st, x) => {
         const need = {}, have = {};
         x.teams.forEach((t) => { need[t.bracket] = (need[t.bracket] || 0) + 1; });
+        for (const k of Object.keys(pick)) if (pick[k] === '' && x.teams.some((t) => t.bracket === null)) pick[k] = null;
         Object.values(pick).forEach((v) => { have[v] = (have[v] || 0) + 1; });
         if (Object.keys(need).some((k) => need[k] !== (have[k] || 0))) { st.bad = andList(Object.entries(need).map(([k, n]) => `${ordinal[n] || n} in ${k}`)) + ', please.'; return; }
         st.bad = null;

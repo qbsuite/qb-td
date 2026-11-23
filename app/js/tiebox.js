@@ -14,6 +14,7 @@
 // pool, or 'F:' + the Finals source; order: best first}) and the hub
 // refills from it; Change takes the pick back out.
 import { esc } from './api.js';
+import { tieBlock } from '../engine/deciderphases.js';
 
 const ORD = (n) => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
 const andList = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
@@ -44,8 +45,11 @@ export function makeTieBox(h) {
     }
     const b = (s.brackets || []).find((y) => y.name === x.bracket);
     const from = b ? b.phase : 0;
-    const into = s.phases.findIndex((ph, i) => i > from && ph.kind === 'final');
-    return { key: 'fin:' + from, name: `${s.phases[from].name} → ${(s.phases[into] || s.phases[s.phases.length - 1]).name}`, phase: into, block: 'fin', rank: 1 + from };
+    // the phase whose slots read this bracket's places
+    const end = ' in ' + x.bracket;
+    let into = s.phases.findIndex((ph, i) => i > from && (ph.rounds || []).some((r) => (r.games || []).some((g) => [g.a, g.b].some((sl) => sl && String(sl.label || sl.from || '').endsWith(end)))));
+    if (into < 0) into = Math.min(from + 1, s.phases.length - 1);
+    return { key: 'b:' + from, name: `${s.phases[from].name} → ${s.phases[into].name}`, phase: into, block: tieBlock(s, 'F:' + x.bracket), rank: 1 + from };
   }
   // where a pool's tie is: the pool's bracket name when there are pools to tell apart, else the phase
   function whereOf(s, x) {
@@ -64,14 +68,14 @@ export function makeTieBox(h) {
     return '';
   };
   // the ladder table: the order's columns, the one that decided tinted, the ones after it faded
-  function table(x) {
+  function table(x, finals) {
     const cols = x.order.filter((c) => (c !== 'game' && c !== 'pick') || c === x.decidedBy);
     const at = cols.indexOf(x.decidedBy);
     const cls = (i) => (at < 0 ? '' : i === at ? 'dec' : i > at ? 'unused' : '');
     const head = cols.map((c, i) => `<th class="${cls(i)}">${STEP_LABEL[c]}${i === at ? '<span class="st">✓ decided</span>' : ''}</th>`).join('');
     const rows = x.teams.map((t, k) => `<tr><td class="pl">${ORD(t.place)}</td><td class="nm"><span title="${esc(t.name)}">${esc(t.name)}</span></td><td>${esc(x.record)}</td>
       ${cols.map((c, i) => `<td class="${cls(i)}${i === at && k === 0 ? ' win' : ''}">${esc(cell(x, c, t, k))}</td>`).join('')}
-      <td class="to">${x.pool ? (t.bracket ? '→ ' + esc(t.bracket) : '') : `<b>${ORD(t.place)} place</b>`}</td></tr>`).join('');
+      <td class="to">${finals ? `<b>${ORD(t.place)} place</b>` : (t.bracket || t.to) ? '→ ' + esc(t.bracket || t.to) : ''}</td></tr>`).join('');
     return `<div class="tiewrap"><table class="tietable"><tr><th></th><th></th><th>Record</th>${head}<th></th></tr>${rows}</table></div>`;
   }
   const noteId = (x) => (x.pool ? 'p:' + x.pool : 'b:' + x.bracket) + '|' + x.record + '|' + x.teams.map((t) => t.name).join('|');
@@ -115,7 +119,7 @@ export function makeTieBox(h) {
     if (!s) return '';
     const order = h.order();
     const notes = (s.filled || []).filter((x) => x.order);
-    const waiting = [...h.held(), ...h.heldFinals()].filter((x) => x.order && x.needPick && x.needPick.length && !(x.needGame && x.needGame.length && h.packets(x.pool ? 'pre' : 'fin')));
+    const waiting = [...h.held(), ...h.heldFinals()].filter((x) => x.order && x.needPick && x.needPick.length && !(x.needGame && x.needGame.length && h.packets(tieBlock(s, x.pool || 'F:' + x.bracket))));
     if (!notes.length && !waiting.length) return '';
     const cuts = new Map();
     const cutFor = (x) => { const c = cutOf(s, x); if (!cuts.has(c.key)) cuts.set(c.key, { ...c, picks: [], ties: [] }); return cuts.get(c.key); };
@@ -129,13 +133,17 @@ export function makeTieBox(h) {
       const picked = x.decidedBy === 'pick';
       const act = x.confirmed ? `<span class="sub">Confirmed</span> <button class="linkbtn" data-tieundo="${esc(id)}">Undo</button>`
         : `${picked ? `<button class="linkbtn" data-tiechange="${esc(id)}">Change</button>` : ''}<button class="small" data-tieok="${esc(id)}">Confirm</button>`;
-      const head = x.pool ? `Tie for ${places(x)} in ${esc(whereOf(s, x))}` : `Tie for ${places(x)} place`;
+      // a tie for a bracket's places that fills a Finals names the place; one that fills playoffs, where it was
+      const finals = !x.pool && (s.phases[c.phase] || {}).kind === 'final';
+      const head = finals ? `Tie for ${places(x)} place` : `Tie for ${places(x)} in ${esc(whereOf(s, x))}`;
       c.ties.push(`<div class="tie${x.confirmed ? ' isdone' : ''}"><div class="tiehd"><b>${head}</b><span class="sub">${esc(x.record)}${x.decidedBy ? ' · Decided by: ' + STEP_LABEL[x.decidedBy] : ''}</span>
-        <span class="spacer"></span>${act}</div>${table(x)}</div>`);
+        <span class="spacer"></span>${act}</div>${table(x, finals)}</div>`);
       // a tiebreaker game came before the step that decided it, but none could be played
       const gameFirst = x.order.indexOf('game') >= 0 && x.decidedBy && x.decidedBy !== 'game' && x.order.indexOf('game') < x.order.indexOf(x.decidedBy);
-      if (!x.confirmed && gameFirst && !h.packets(c.block)) {
-        if (h.played(c.phase)) stands = stands || (x.pool ? 'A playoff game is in, so this result stands.' : 'A Finals game is in, so this result stands.');
+      // (only where its teams went different ways: a game would have changed where they play)
+      const apart = new Set(x.teams.map((t) => (finals ? t.to || null : t.bracket || t.to || null))).size > 1;
+      if (!x.confirmed && gameFirst && apart && !h.packets(c.block)) {
+        if (h.played(c.phase)) stands = stands || (finals ? 'A Finals game is in, so this result stands.' : 'A playoff game is in, so this result stands.');
         else noPackets = true;
       }
     }

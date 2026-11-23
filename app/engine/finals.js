@@ -15,7 +15,7 @@
 // public page lists them in (publicOrder).
 
 import { standings, standingsOrder, levelRuns, dedupeMatches, headToHead, statOf, gameRuns, pickRuns, decidingStep, tieFigures } from './stats.js';
-import { isTbRound } from './deciderphases.js';
+import { isTbRound, tieBlock } from './deciderphases.js';
 import { playedMap, teamOf, gameKey, summaryTeams, prelimProgress, autoFill } from './schedule.js';
 import { reportData } from './report.js';
 import { isGameFile } from './games.js';
@@ -307,6 +307,8 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
       return null;
     };
     let hold = false;
+    // with a tie order only the places a waiting tie holds wait (as autoFill's pools)
+    const wait = new Set();
     for (let i = 0; i < rows.length && i < deepest;) {
       let j = i + 1;
       while (j < rows.length && rec(rows[j]) === rec(rows[i])) j++;
@@ -324,25 +326,33 @@ export function finalsFill(schedule, matches, ready, force = [], opts = {}) {
         // TD's pick where a Finals place is among theirs; the step that decided
         // it, and the figures a note shows
         const tied = rows.slice(i, j);
-        const placeOf = new Map(tied.map((t, k) => [t.name, i + k + 1]));
         const ordered = rule && rule.order && (rule.order.includes('game') || rule.order.includes('pick'));
         const names = (runs) => runs.map((run) => run.map((t) => t.name));
-        const needGame = ordered ? names(gameRuns(tied, rule)).filter((run) => run.some((n) => placeOf.get(n) <= deepest) && run.some((n) => placeOf.get(n) > deepest)) : [];
-        const needPick = ordered ? names(pickRuns(tied, rule)).filter((run) => run.some((n) => placeOf.get(n) <= deepest)) : [];
+        // teams heading for different games (a bracket, the Final, or none) are what a tie decides
+        const toAt = new Map(tied.map((t, k) => [t.name, i + k + 1 <= deepest ? toOf(i + k + 1) || 'slot' : null]));
+        const apart = (run) => new Set(run.map((n) => toAt.get(n))).size > 1;
+        const needGame = ordered ? names(gameRuns(tied, rule)).filter(apart) : [];
+        const needPick = ordered ? names(pickRuns(tied, rule)).filter(apart) : [];
         const x = { bracket: src.name, record: rec(rows[i]), rankBy,
           deepest, teams: tied.map((t, k) => ({ name: t.name, pp20tuh: t.pp20tuh, ...fig(t), place: i + k + 1, to: toOf(i + k + 1) })),
           level, kept, ...(pub.table ? { table: pub.table } : {}),
           ...(rule ? { stat: rule.stat } : {}), ...(hh ? { h2h: { records: hh.records, decided: hh.decided } } : {}),
           ...(ordered ? { order: rule.order, needGame, needPick, decidedBy: decidingStep(tied, rule), figures: tieFigures(tied, rule) } : {}) };
-        // the Finals' own tiebreaker packets (deciders.js: the block after the last playoff round)
-        const packets = opts.hold !== undefined ? opts.hold : !!(schedule.deciders && schedule.deciders.holdFinals);
+        // the tiebreaker packets of the block after the round this bracket ends on
+        // (deciders.js: after the prelims, or after the last playoff round)
+        const dd = schedule.deciders || {};
+        const packets = opts.hold !== undefined ? opts.hold : !!(tieBlock(schedule, 'F:' + src.name) === 'fin' ? dd.holdFinals : dd.hold);
         const dst = schedule.deciders && schedule.deciders.ties && schedule.deciders.ties['F:' + src.name];
         const waits = ordered ? (packets && needGame.length > 0) || needPick.length > 0 || (!!dst && !dst.done) : holdTies;
-        if (waits && !force.includes(src.name)) { held.push(x); hold = true; } else ties.push(x);
+        if (waits && !force.includes(src.name)) {
+          held.push(x);
+          if (!ordered) hold = true;
+          else for (const n of (dst && !dst.done) ? tied.map((t) => t.name) : [...(packets ? needGame : []), ...needPick].flat()) wait.add(n);
+        } else ties.push(x);
       }
       i = j;
     }
-    if (!hold) order[src.name] = rows.map((t) => t.name);
+    if (!hold) order[src.name] = rows.map((t) => (wait.has(t.name) ? undefined : t.name));
   }
   let filled = 0;
   const done = new Set();

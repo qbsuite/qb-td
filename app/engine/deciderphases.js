@@ -45,6 +45,25 @@ export function decAfter(s) {
   const ph = s.phases[Math.max(0, first - 1)];
   return ph.rounds[ph.rounds.length - 1].round;
 }
+/** The round ties for the Finals' places follow: the last before the first Finals phase (null with none). */
+export function finAfter(s) {
+  const at = s.phases.findIndex((ph) => ph.kind === 'final');
+  const ph = at > 0 ? s.phases[at - 1] : null;
+  return ph && ph.rounds.length ? ph.rounds[ph.rounds.length - 1].round : null;
+}
+/** Which block of tiebreaker packets a tie plays on: 'pre', after the
+    prelims (decAfter), or 'fin', after the last playoff round (finAfter).
+    key: a pool letter, or 'F:' + the bracket a place is read from (a
+    bracket whose phase ends at the prelims' cut is on 'pre'). */
+export function tieBlock(s, key) {
+  if (!String(key).startsWith('F:')) return 'pre';
+  const f = finAfter(s), pre = decAfter(s);
+  if (f === null || f === pre) return 'pre';
+  const b = (s.brackets || []).find((x) => x.name === String(key).slice(2));
+  const ph = b ? s.phases[b.phase] : null;
+  const last = ph && ph.rounds.length ? ph.rounds[ph.rounds.length - 1].round : null;
+  return last !== null && last <= pre ? 'pre' : 'fin';
+}
 /** The tossups and bonuses a part of a packet holds: [from, to) of its length. */
 export function partRange(part, n) {
   const half = Math.floor(n / 2);
