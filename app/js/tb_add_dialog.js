@@ -27,7 +27,8 @@ import { ModalDialog } from 'modaq/src/components/dialogs/ModalDialog';
 import { PacketState } from 'modaq/src/state/PacketState';
 import { tbBridge } from './tb_bridge.js';
 import { tbSelection, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, replaceQuestion,
-  syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, tbState, shownNumber } from './read_core.js';
+  syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, tbState, shownNumber,
+  readerPrefs } from './read_core.js';
 
 const h = React.createElement;
 const strip = (s) => String(s || '').replace(/<[^>]*>/g, '');
@@ -282,6 +283,12 @@ export function useHeldBonuses(appState) {
       if (tb && tb.reserve) syncReserved({ game: appState.game, tb, act: runInAction });
     },
     { fireImmediately: true }), [appState]);
+  // the moderator's View and Font choices, kept for the next game
+  // (read_core readerPrefs). Not at first: MODAQ's defaults show until the
+  // game's store loads, and those aren't a choice.
+  React.useEffect(() => reaction(
+    () => JSON.stringify(readerPrefs(appState.uiState)),
+    (text) => { if (tbBridge.savePrefs) tbBridge.savePrefs(text); }), [appState]);
 }
 
 /** For MODAQ's event log (ThrowOutQuestionCycleItem, patched by

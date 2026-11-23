@@ -14,4 +14,5 @@ export const tbBridge = {
   appState: null, // MODAQ's app state, once its GameBar renders (tb_add_dialog useHeldBonuses)
   first: 0,       // a decider on the second half of a packet: how many questions come before its first
   noteReached: null, // (n) => the moderator is on question n: keep the furthest in the game meta
+  savePrefs: null, // (text) => keep the moderator's View and Font choices (read_core readerPrefs)
 };

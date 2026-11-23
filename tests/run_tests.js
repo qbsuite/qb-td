@@ -46,7 +46,7 @@ import * as hubgamesMod from '../app/js/hubgames.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, shownNumber, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, exportStatus, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, shownNumber, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, exportStatus, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild, PREF_FIELDS, readerPrefs, parsePrefs, storeWithPrefs } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -1104,6 +1104,42 @@ test('staleGameKeys keeps the newest N games, both keys dropped', () => {
   assert.deepEqual(staleGameKeys(metas, 'sec1', 2),
     [metaKey('sec1', 'g2'), gameKey('sec1', 'g2')]);
   assert.deepEqual(staleGameKeys(metas, 'sec1', 8), []);
+});
+
+test('readerPrefs takes every View and Font field, undefined as null', () => {
+  const ui = { fontFamily: 'Georgia, x', questionFontSize: 22, questionFontColor: undefined,
+    useDarkMode: true, cycleIndex: 7, packetFilename: 'p.json' };
+  const p = readerPrefs(ui);
+  assert.deepEqual(Object.keys(p), PREF_FIELDS);
+  assert.equal(p.questionFontSize, 22);
+  assert.equal(p.useDarkMode, true);
+  assert.equal(p.questionFontColor, null);
+  assert.equal('cycleIndex' in p, false); // game position is the game's own
+});
+
+test('parsePrefs keeps known plain fields only', () => {
+  assert.equal(parsePrefs(null), null);
+  assert.equal(parsePrefs('{oops'), null);
+  assert.equal(parsePrefs('[1]'), null);
+  assert.equal(parsePrefs('{"cycleIndex":3}'), null);
+  assert.deepEqual(parsePrefs(JSON.stringify({ questionFontSize: 20, cycleIndex: 3,
+    questionFontColor: null, fontFamily: { x: 1 } })), { questionFontSize: 20, questionFontColor: null });
+});
+
+test('storeWithPrefs writes settings into a game store, leaving the game alone', () => {
+  const prefs = { questionFontSize: 24, useDarkMode: true, pronunciationGuideColor: null };
+  // a new game: the settings alone
+  assert.deepEqual(JSON.parse(storeWithPrefs(null, prefs)),
+    { uiState: { questionFontSize: 24, useDarkMode: true } });
+  // a resumed game: its own settings replaced, a reset color left to MODAQ
+  const old = { game: { cycles: [1, 2] }, uiState: { cycleIndex: 5, questionFontSize: 16,
+    useDarkMode: false, pronunciationGuideColor: '#ff0000' } };
+  assert.deepEqual(JSON.parse(storeWithPrefs(JSON.stringify(old), prefs)),
+    { game: { cycles: [1, 2] }, uiState: { cycleIndex: 5, questionFontSize: 24, useDarkMode: true } });
+  assert.equal(storeWithPrefs('{oops', prefs), null);
+  // round trip: what a game shows is what the next one opens with
+  const back = parsePrefs(JSON.stringify(readerPrefs({ ...old.uiState, questionFontSize: 30 })));
+  assert.equal(JSON.parse(storeWithPrefs(null, back)).uiState.questionFontSize, 30);
 });
 
 test('roundRows merges packets with newest game per round, live flagged', () => {

@@ -28,7 +28,7 @@ import {
   normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, readerUpload,
   resolveGameFormat, metaKey, gameKey, parseMeta, storeIntact, gameMetas,
   staleGameKeys, roundRows, normalizeTbPool, tbPanelRows,
-  tbRecordAdd, tbAddedIds, tbProtests,
+  tbRecordAdd, tbAddedIds, tbProtests, PREFS_KEY, parsePrefs, storeWithPrefs,
 } from './read_core.js';
 import { gameProgress, exportStatus } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
@@ -341,6 +341,19 @@ function mountMODAQ(id, meta, isNew) {
     const format = resolveGameFormat(state.settings || {}, GameFormats);
     if (format) props.gameFormat = meta.reg ? { ...format, regulationTossupCount: meta.reg } : format;
   }
+  // the moderator's View and Font choices from their last game on this
+  // device, written into this game's store for MODAQ to load with it
+  // (read_core storeWithPrefs); each change is kept for the next game
+  const prefs = parsePrefs(localStorage.getItem(PREFS_KEY));
+  if (prefs) {
+    const withPrefs = storeWithPrefs(localStorage.getItem(gameKey(store, id)), prefs);
+    if (withPrefs) {
+      try { localStorage.setItem(gameKey(store, id), withPrefs); } catch (e) { /* storage full: MODAQ's defaults */ }
+    }
+  }
+  tbBridge.savePrefs = (text) => {
+    try { localStorage.setItem(PREFS_KEY, text); } catch (e) { /* storage full: not kept */ }
+  };
   ReactDOM.render(React.createElement(ModaqControl, props), $('modaq'));
   watchProtests(id, meta, props.gameFormat || null);
 }

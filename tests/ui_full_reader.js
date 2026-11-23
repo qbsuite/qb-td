@@ -2715,6 +2715,62 @@ await section('RP', 'pools with their own rounds, three byes, a packet load that
 
 /* ---------------------------------------------------------------------- */
 
+await section('R34e', 'View and Font choices carry to the next game on this device', async () => {
+  const R2 = room('Room 2');
+  const viewItem = async (name) => { await mq.closeMenus(tab); await mq.cmd(tab, 'View'); await sleep(200); const it = (await mq.menuItems(tab)).find((x) => x.text === name); await mq.closeMenus(tab); return it; };
+  const size = () => tab.js(`parseFloat(getComputedStyle(document.querySelector('#modaq span[data-index="0"]')).fontSize)`);
+  const setSize = async (n) => {
+    await mq.action(tab, 'Options', 'Font...');
+    await mq.waitDialog(tab, 'Font');
+    await tab.type('.ms-Dialog-main input[role="spinbutton"]', String(n));
+    await tab.key('Enter', 'Enter', 13);
+    await mq.dialogButton(tab, 'OK');
+    await mq.noDialog(tab);
+  };
+  // what the TD set for the game, as MODAQ saved it: the game format, the
+  // teams with their starters, the packet
+  const tdSet = () => until(() => tab.js(`(() => { const g = new URLSearchParams(location.search).get('g');
+    const s = JSON.parse(localStorage.getItem('qbtdGame:${R2}-test:' + g) || 'null');
+    if (!s || !s.game || !s.game.packet || !(s.game.players || []).length) return null;
+    return JSON.stringify({ format: s.game.gameFormat, players: s.game.players.map((p) => [p.name, p.teamName, p.isStarter]),
+      packet: s.game.packet.tossups.map((t) => t.question) }); })()`), 'the game saved', 5000);
+  const chosen = async () => ({ dark: (await viewItem('Dark Mode')).checked, clock: (await viewItem('Clock')).checked,
+    vertical: (await viewItem('Vertical Score')).checked, size: await size() });
+  await openRoom(tab, R2, '&test=' + TEST);
+  await tab.js(`localStorage.removeItem('qbtdReaderPrefs'), true`);
+  await startGame(tab);
+  const first = await tab.js('location.href');
+  const plain = await chosen();
+  const td = await tdSet();
+  ok('R34e a game with nothing chosen yet opens with MODAQ\'s own settings', !plain.dark && plain.clock && !plain.vertical && plain.size === 16, plain);
+  await mq.action(tab, 'View', 'Dark Mode');
+  await mq.action(tab, 'View', 'Clock');
+  await mq.action(tab, 'View', 'Vertical Score');
+  await setSize(22);
+  const set = await chosen();
+  ok('R34e the choices show in this game', set.dark && !set.clock && set.vertical && set.size === 22, set);
+  // the next game, as a moderator starts it from the room link
+  await openRoom(tab, R2, '&test=' + TEST);
+  await startGame(tab);
+  const second = await chosen();
+  ok('R34e the next game opens with them: Dark Mode, no Clock, Vertical Score, font size 22', JSON.stringify(second) === JSON.stringify(set), second);
+  ok('R34e the TD\'s game format, teams and packet are as in a game with nothing carried', (await tdSet()) === td);
+  // a change there is what the older game opens with too
+  await mq.action(tab, 'View', 'Dark Mode');
+  await setSize(18);
+  await tab.goto(first);
+  await tab.waitJs(`!!document.querySelector('#modaq .ms-CommandBar')`, 'the first game again');
+  await until(async () => (await size()) === 18, 'font size 18 in the first game', 5000).catch(() => {});
+  const back = await chosen();
+  ok('R34e back in the first game: the latest choices (Dark Mode off, font size 18)', !back.dark && !back.clock && back.vertical && back.size === 18, back);
+  ok('R34e the first game keeps the TD\'s game format, teams and packet', (await tdSet()) === td);
+  // MODAQ's defaults again, for whatever runs next
+  await mq.action(tab, 'View', 'Clock');
+  await mq.action(tab, 'View', 'Vertical Score');
+  await setSize(16);
+  await tab.js(`localStorage.removeItem('qbtdReaderPrefs'), true`);
+});
+
 await section('RZ', 'after the run', async () => {
   const wait = 31000 - (Date.now() - watchFrom);
   if (wait > 0) await sleep(wait);

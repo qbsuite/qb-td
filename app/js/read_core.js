@@ -1013,6 +1013,63 @@ export function storeIntact(text) {
   catch (e) { return false; }
 }
 
+/* ---------- reader settings ----------
+   MODAQ keeps its View menu and Font dialog choices in each game's own
+   store (uiState), so a new game would open with MODAQ's defaults. This
+   device keeps the moderator's latest choices under one key, for every
+   tournament and room, and each game is opened with them. */
+
+export const PREFS_KEY = 'qbtdReaderPrefs';
+// UIState fields set from View and Font... (MODAQ 1.41.1 GameBar.js and
+// FontDialogController.js). null stands for MODAQ's own default where it
+// keeps the field undefined (the theme's colors).
+export const PREF_FIELDS = [
+  'fontFamily', 'questionFontSize', 'questionFontColor', 'pronunciationGuideColor',
+  'isClockHidden', 'isEventLogHidden', 'isPacketNameHidden', 'isCustomExportStatusHidden',
+  'hideBonusOnDeadTossup', 'useDarkMode', 'isScoreVertical', 'noBonusHighlight',
+];
+
+/** The settings in MODAQ's uiState, every field present (undefined as null). */
+export function readerPrefs(uiState) {
+  const out = {};
+  for (const f of PREF_FIELDS) out[f] = uiState[f] === undefined ? null : uiState[f];
+  return out;
+}
+
+/** The saved settings, or null when none are saved or they won't parse.
+    Only known fields with a string, number, boolean or null value. */
+export function parsePrefs(text) {
+  let p = null;
+  try { p = JSON.parse(text); } catch (e) { return null; }
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+  const out = {};
+  for (const f of PREF_FIELDS) {
+    if (!(f in p)) continue;
+    const v = p[f];
+    if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) out[f] = v;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** A game's MODAQ store text with the saved settings written into its
+    uiState, ready for MODAQ to load. A new game (no store) gets a store of
+    the settings alone; MODAQ fills in the rest as it starts. null settings
+    fall back to MODAQ's default (the field left out). Null if the store
+    won't parse, so the caller leaves it alone. */
+export function storeWithPrefs(storeText, prefs) {
+  let s = {};
+  if (storeText) {
+    try { s = JSON.parse(storeText); } catch (e) { return null; }
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
+  }
+  const ui = { ...(s.uiState && typeof s.uiState === 'object' ? s.uiState : {}) };
+  for (const [f, v] of Object.entries(prefs)) {
+    if (v === null) delete ui[f];
+    else ui[f] = v;
+  }
+  return JSON.stringify({ ...s, uiState: ui });
+}
+
 /** This room's games found in storage, newest first: [{id, ...meta}].
     `get` is a (key) => string lookup so tests can fake localStorage. */
 export function gameMetas(allKeys, get, secret) {

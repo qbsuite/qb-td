@@ -19,6 +19,9 @@ Release Notes for 11/22/2026
 - A slot stops changing once a game in it is in. Slots you placed yourself stay.
 - Deciders: Upload the game file adds a tiebreaker game from the hub.
 
+[ READER ]
+- View and Font settings carry over to the next game on the same device.
+
 [ STATS ]
 - Tiebreaker games are listed as their own games and count in no record or stat. Their questions count in category stats and buzzpoints.
 - Standings list tiebreaker games under the bracket they decided and rank its teams by them.
