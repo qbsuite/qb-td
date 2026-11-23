@@ -25,7 +25,7 @@ import { decodeEntities } from '../app/engine/entities.js';
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, questionLines, categoryQuestions, catOfEntry } from '../app/engine/cats.js';
 import { buzzSettings, buzzToken, sha256Hex, sha256HexJs, BUZZ_ITERS } from '../app/js/buzzkey.js';
-import { buildScoresheet, teamInitials, catTag } from '../app/engine/scoresheet.js';
+import { buildScoresheet, teamInitials, catTag, liveRows, liveSheet } from '../app/engine/scoresheet.js';
 import { sheetHtml, exampleSheetHtml } from '../app/js/sheetview.js';
 import { buildSite, siteNames, setStandings, setCategories, setCatLines, setQuestionLines, setQuestionPlays, setBuzzNav, setPacketRows, setEarlierRows, setBuzzSummary, setQuestionTable, setBonusLines } from '../app/engine/setstats.js';
 import { packetQuestions, matchPacket, matchSummary, assignQuestion, ledgerChoices, checkLedger, ledgerProblem } from '../app/engine/qmatch.js';
@@ -46,7 +46,7 @@ import * as hubgamesMod from '../app/js/hubgames.js';
 // roster straight into the embedded MODAQ.
 const { parseRegistration } = createRequire(import.meta.url)('modaq/src/qbj/QBJ.js');
 import { protestReport, protestsFromNotes, protestRows, projectUpheld, rulingKey, swingLines, qLabel, fileSummary } from '../app/js/protests.js';
-import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, shownNumber, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, exportStatus, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild, PREF_FIELDS, readerPrefs, parsePrefs, storeWithPrefs } from '../app/js/read_core.js';
+import { normalizePacket, groupTeams, pickTeams, orderPlayers, matchFilenames, combinedUpload, resolveGameFormat, PRESET_FORMATS, cleanOverrides, effectiveFormat, formatOverridesFrom, formatKey, DEFAULT_FORMAT, GAME_FORMAT_OPTIONS, parsePowersText, powersText, metaKey, gameKey, parseMeta, storeIntact, gameMetas, staleGameKeys, roundRows, normalizeTbPool, tbSelection, tbUsedIds, tbPanelRows, tbState, tbRecordAdd, tbAddedIds, tbNumbering, shownNumber, tbRemapMatch, readerInsertPoint, addCounts, replaceCheck, afterThrowOut, gameProgress, exportStatus, replaceQuestion, syncReserved, keepsThrownOut, heldBonusText, placeholderBonus, undoReplace, undoTop, readerUpload, tbRecord, tbProtests, tbResume, tbRebuild, PREF_FIELDS, readerPrefs, parsePrefs, storeWithPrefs, textHash } from '../app/js/read_core.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -4163,6 +4163,29 @@ test('upload errors: MODAQ adds the closing period, so the status a reader hands
   assert.equal(exportStatus('Round_1.qbtd.json: no match.. '), 'Round_1.qbtd.json: no match');
   assert.equal(exportStatus(new Error('x').message), 'x');
   assert.equal(exportStatus(null), '');
+});
+
+test('live scoresheet: rows by team only, the question being read with its parts not judged yet', () => {
+  const P = (name) => ({ name });
+  const qbj = { match_teams: [{ team: P('B'), lineups: [{ first_question: 1, players: [P('b1')] }] }, { team: P('A'), lineups: [{ first_question: 1, players: [P('a1')] }] }],
+    match_questions: [
+      { question_number: 1, buzzes: [{ team: P('A'), player: P('a1'), result: { value: 15 } }], bonus: { parts: [{ controlled_points: 10 }, { controlled_points: 0 }, { controlled_points: 10 }] } },
+      { question_number: 2, buzzes: [{ team: P('B'), player: P('b1'), result: { value: -5 } }, { team: P('A'), player: P('a1'), result: { value: 10 } }], bonus: { parts: [{ controlled_points: 10 }, { controlled_points: 0 }, { controlled_points: 0 }] } },
+      { question_number: 3, buzzes: [] }] };
+  // A first though the upload has B first; question 2 is being read
+  const rows = liveRows(qbj, ['A', 'B'], 2);
+  assert.deepEqual(rows, [[1, 15, null, '101', null, 35, 0], [2, 10, -5, '1??', null, 55, -5]]);
+  assert.ok(!JSON.stringify(rows).includes('a1') && !JSON.stringify(rows).includes('b1'), 'no player ever');
+  const sh = liveSheet(rows, ['A', 'B']);
+  assert.deepEqual(sh.rows[1].bonus, [[true, null, null], null], 'a part not judged yet is null');
+  assert.deepEqual(sh.final, [55, -5]);
+  assert.deepEqual(liveRows(qbj, ['A', 'B'], 999).map((r) => r[3]), ['101', '100', null], 'once past, unchecked parts are missed');
+});
+
+test('textHash: the same text the same, a change another', () => {
+  assert.equal(textHash('{"a":1}'), textHash('{"a":1}'));
+  assert.notEqual(textHash('{"a":1}'), textHash('{"a":2}'));
+  assert.notEqual(textHash(''), textHash(' '));
 });
 
 test('upload progress: the furthest question reached rides with a reader upload, and the hub reads it', () => {

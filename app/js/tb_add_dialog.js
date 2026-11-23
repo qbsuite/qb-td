@@ -276,6 +276,22 @@ export function useHeldBonuses(appState) {
     () => appState.uiState.cycleIndex,
     (ci) => { if (tbBridge.noteReached) tbBridge.noteReached(ci + 1); },
     { fireImmediately: true }), [appState]);
+  // the running score for the live room (read_main.js watchScore): when
+  // the moderator moves to another question, and when a tossup or a bonus
+  // part is marked on the one being read (a few small frames a question;
+  // if that ever costs too much, the question alone is the cheaper choice)
+  React.useEffect(() => reaction(
+    () => {
+      const ci = appState.uiState.cycleIndex;
+      const cycle = appState.game.cycles[ci];
+      return JSON.stringify([ci, appState.game.finalScore, cycle || null]);
+    },
+    () => {
+      if (!tbBridge.onScore) return;
+      tbBridge.onScore({ n: appState.uiState.cycleIndex + 1, of: appState.game.gameFormat.regulationTossupCount,
+        score: appState.game.finalScore, names: appState.game.teamNames });
+    },
+    { fireImmediately: true }), [appState]);
   React.useEffect(() => reaction(
     () => appState.game.cycles.map((c) => (c.correctBuzz ? 1 : 0)).join(''),
     () => {

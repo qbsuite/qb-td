@@ -2,7 +2,8 @@
 # (app/js/buzzer_client.js). Locally, with the mockups:
 #   cd buzzer && npx wrangler dev --local --port 8789 --ip 0.0.0.0
 # One Durable Object per tournament room: no storage, one alarm (the
-# tournament's close).
+# tournament's close). Also each tournament's live room (LiveRoom: the
+# public page and Live Hub's updates and live scores, README "Live pages").
 name = "qb-td-buzzer"
 main = "worker.js"
 compatibility_date = "2026-07-01"
@@ -11,11 +12,23 @@ compatibility_date = "2026-07-01"
 name = "ROOMS"
 class_name = "BuzzRoom"
 
+# One live room per tournament (worker.js LiveRoom): keeps the public page
+# and the Live Hub up to date and carries live scores. The qb-td Worker
+# reaches the same class through its own LIVEROOM binding (script_name).
+[[durable_objects.bindings]]
+name = "LIVE"
+class_name = "LiveRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["BuzzRoom"]
 
-# No vars. The one secret is BUZZER_SECRET (`npx wrangler secret put
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["LiveRoom"]
+
+# Optional var LIVE_DAILY_CAP: viewer joins per tournament per UTC day
+# (default 20000). The one secret is BUZZER_SECRET (`npx wrangler secret put
 # BUZZER_SECRET`), shared with the qb-td Worker, which signs join tokens
 # with it (token.js). Local runs read .dev.vars instead.
 

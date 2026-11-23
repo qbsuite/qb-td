@@ -28,11 +28,14 @@ function subWords(sh, sub) {
   }
   return `TU ${sub.n}: ${esc(sh.teams[sub.team].name)} ${bits.join(', ')}`;
 }
-export function sheetHtml(sh, regTossups) {
+// `bonusHead`: the bonus columns' heading; a live sheet, with room to
+// spare, spells it out (pubview.js drawLive)
+export function sheetHtml(sh, regTossups, { bonusHead = 'Bon' } = {}) {
   const cat = sh.rows.some((r) => r.cat);
   const lead = cat ? '<th></th><th></th>' : '<th></th>';
   const half = Math.floor(regTossups / 2) + 1;
-  const marks = (parts) => parts.map((y) => (y ? '<span class="y">\u2713</span>' : '<span class="x">\u2717</span>')).join('');
+  // a live sheet's part not judged yet (scoresheet.js liveSheet) is a dot
+  const marks = (parts) => parts.map((y) => (y === null ? '<span class="x">\u00b7</span>' : y ? '<span class="y">\u2713</span>' : '<span class="x">\u2717</span>')).join('');
   const rows = sh.rows.map((r, i) => {
     const here = sh.subs.filter((x) => x.n === r.n);
     const changed = (ti, name) => here.some((x) => x.team === ti && (x.in.includes(name) || x.out.includes(name)));
@@ -50,7 +53,7 @@ export function sheetHtml(sh, regTossups) {
   return `<div class="sxwrap"><div class="tablewrap"><table class="sx">
     <thead><tr>${lead}${sh.teams.map((t) => `<th class="tn t0" colspan="${t.players.length + 1}" title="${esc(t.name)}">${esc(t.name)}</th>`).join('')}<th></th></tr>
     <tr>${lead}${sh.teams.map((t) => t.players.map((p, k) =>
-      `<th class="pl${k ? '' : ' t0'}" title="${esc(p.name)}">${esc(p.initials)}</th>`).join('') + '<th class="bon">Bon</th>').join('')}<th class="qs">Score</th></tr></thead>
+      `<th class="pl${k ? '' : ' t0'}" title="${esc(p.name)}">${esc(p.initials)}</th>`).join('') + `<th class="bon">${esc(bonusHead)}</th>`).join('')}<th class="qs">Score</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr>${cat ? '<td></td><td></td>' : '<td></td>'}${sh.teams.map((t) => t.players.map((p, k) =>
       `<td class="pl${k ? '' : ' t0'}"></td>`).join('') + '<td class="bon"></td>').join('')}<td class="qs">${scoreText(sh.final)}</td></tr></tfoot>

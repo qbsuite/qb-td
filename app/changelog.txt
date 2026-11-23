@@ -18,13 +18,22 @@ Release Notes for 11/22/2026
 - Playoff and Finals slots fill again when the tie order, a pick, the ranking or a tiebreaker game changes them.
 - A slot stops changing once a game in it is in. Slots you placed yourself stay.
 - Deciders: Upload the game file adds a tiebreaker game from the hub.
+- Updates as soon as a room starts, uploads or lodges a protest, or another tab makes a change.
+- A game being played shows its running score and the question it is on.
 
 [ READER ]
 - View and Font settings carry over to the next game on the same device.
+- Sends the score to the public page and the hub as each tossup and bonus part is marked.
+- On the last question, a reminder to press Export… when the game is over; leaving a game not exported asks first.
+- A finished game that is changed says so until it is exported again.
 
 [ PUBLIC PAGE ]
 - qb-td before the tournament's name leads to the home page. The question set page has it too.
 - On a phone, a long tournament name no longer squeezes the round and Refresh beside it.
+- Updates by itself: new games and stats appear without Refresh.
+- A game being played shows its running score and a bar for how far in it is.
+- Tap a game for its scoresheet by team: tossups, bonuses and score, question by question, filling in while it is played.
+- A finished game's scoresheet links to its box score; an arrow marks the games that open.
 
 [ STATS ]
 - Tiebreaker games are listed as their own games and count in no record or stat. Their questions count in category stats and buzzpoints.

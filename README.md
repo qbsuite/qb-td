@@ -516,13 +516,16 @@ dashboard shows which invites are still unused, and revokes them.
 - **Request economics** (Cloudflare free tier): the public page reads
   one materialized blob per round (`t/<tid>/round/<n>.json`, rebuilt by
   the cron, TO-rebuildable) instead of fetching every game file, and
-  **no public or room page polls on a timer.** Those fetch on load, on
+  **no public or room page polls the Worker on a timer.** Those fetch on load, on
   an explicit refresh, and (for the two moderator pages) when the tab
   regains focus — so cost is per *view*, never per open-tab-minute, and an
-  idle tab costs exactly nothing. That is what makes many simultaneous
+  idle tab costs exactly nothing. (With live rooms, "Live pages" below, the
+  public page also reads its free static file when told a deploy went out,
+  or every minute while the room can't be reached; never the Worker.) That is what makes many simultaneous
   tournaments affordable: 240 live rooms on a 60 s poll would have spent
   the entire daily budget on polling alone. The one timer is the TD's
-  Live Hub, one tab per tournament, and it is built to cost almost
+  Live Hub, one tab per tournament (every 10 minutes while its live room
+  is reachable, which tells it when to look instead), and it is built to cost almost
   nothing when idle: each check sends the `rev` it holds
   (`GET /a/:secret?rev=`) and the Worker answers `{unchanged}` from the
   admin lookup alone when nothing has moved — `tournaments.rev` is bumped
@@ -1526,50 +1529,77 @@ What would make it viable on the free plan, roughly in order of payoff:
 3. Move the room's expiry alarm off the per-message path (re-arm at most
    once an hour).
 
-## Potential: live scores during games (not built)
+## Live pages
 
-An idea for later, written down 10/3/2026 with the reasoning so far.
-Today stats are semi-live: a game shows on the public page once its room
-uploads it. Live scores would show each room's score while the game is
-still being played.
+The public page and the Live Hub update themselves, and show each room's
+score while a game is played. Each tournament has a live room, a Durable
+Object in the buzzer's Worker (buzzer/worker.js `LiveRoom`), and the pages
+hold one WebSocket to it (app/js/live_client.js).
 
-**Rooms to the Worker (cheap).** The reader already sends the protest
-list whenever it changes (`read_main.js` `watchProtests`); a live score
-would ride the same way. Send only when the moderator moves to the next
-question, not on every buzz or bonus part, since a bonus alone could be
-four score changes. That is at most one small request per tossup: about
-5 rooms x 10 games x 24 tossups = 1,200 a day for a Terrapin-sized
-tournament, each one Worker request and one small write, around 1% of
-the free daily allowances.
-
-**The Worker to viewers (where the cost is).** Three ways, priced for
-100 viewers over a 9-hour day:
-
-| Option | Cost | How fresh |
-|---|---|---|
-| A. The page polls `/pub/:slug` | ~108k Worker requests at 30 s, over the free 100k/day; ~54k at 60 s | 30-60 s |
-| B. The cron writes the scores to qb-td-live; the page re-reads that static file while open | Viewers free (static assets, see "Public state on qb-td-live"); ~540 publishes a day | ~1-2 min |
-| C. A Durable Object per tournament pushes to viewers over WebSockets | ~1,200 pushes in + a few hundred connections; likely within the free allowance | Instant |
-
-**Chosen direction: B.** It keeps the no-polling-the-Worker rule, costs
-nothing per viewer, and a minute is fine for a scoreboard. To do it well:
-
-- Keep live scores in their own small file on qb-td-live, separate from
-  the full public rebuild, so the tournament doesn't rebuild its shards
-  and commit to the GitHub snapshot every minute all day.
-- Send only teams, scores and the tossup number: never question text,
-  answers, protest reasons or notes (the public-copy rule).
-- The page polls the static file only while the tab is visible and a
-  round is live.
-
-**Open question to test before relying on it.** Publishing about once a
-minute means about 540 qb-td-live deploys a day per active tournament.
-The static reads are known to be free (measured 9/30/2026, and `LIVE=1
-tests/sim_day.js`), but each deploy stores a version, and there is no
-delete endpoint and no documented cap (see "Watching it" above), and the
-Cloudflare API has rate limits. Try it during a low-stakes event and
-watch `node tools/cf_watch.mjs` for the version count and any refused
-deploys; if it is a problem, publish every few minutes or move to C.
+- **Who joins.** The qb-td Worker signs a token per role
+  (buzzer/token.js `signLiveToken`, under `BUZZER_SECRET`): viewers get
+  theirs in the public state (it proves only that the tournament is
+  published), the TD in the hub's detail, and each room's reader in its
+  room state, kept with the game so a resumed game still has it. A buzzer
+  token never opens a live room, nor the other way round.
+- **What it carries.** The Worker tells the room when something moved
+  (its `LIVEROOM` binding): `pub` after a qb-td-live deploy that changed
+  the tournament's file, and `rev` (to the hub only) after an upload, a
+  room starting a round, a protest, or any TD change. The public page then
+  reads the free static file; the hub runs its usual refresh. Readers send
+  the score each time the moderator moves to another question or marks a
+  tossup or a bonus part (about 4-5 a question; one a question would be
+  the cheaper choice if this ever costs too much), with the questions so
+  far by team (app/engine/scoresheet.js `liveRows`:
+  each team's tossup points, its bonus parts and the score after it; never
+  players, categories or question text); a finished game's upload ends it.
+- **On the pages.** A game in play shows its running score and a bar that
+  fills as the questions go by, on the Now view, All rounds and a team's
+  schedule; the whole game (an arrow on the Now view says so, since a
+  phone has no hover; a finished game opens its box score the same way)
+  opens the game's scoresheet by team, for anyone,
+  filling in as the room moves on (unlike the finished game's scoresheet,
+  which waits for the round and the buzzpoints password: this one has no
+  players or categories). The hub shows the score and the question number.
+- **What it costs.** A connection is one Worker request plus a room
+  request, and its close another room request; messages out are free,
+  heartbeats are answered by Cloudflare without waking the room, and a
+  reader's score frame bills at 1/20 of a request. The room stores
+  nothing (scores live on the reader sockets' attachments) and never
+  hangs up on a socket itself, so it is awake only while it works.
+  Simulated before it was built (qbtd-soak/livesim_1122): 628 sockets in
+  one room for an hour cost 0.98 GB-s; 1,000 viewers and a reroute wave,
+  see "Measured" below.
+- **The end of a game.** Games never export by themselves: the moderator
+  presses Export… (MODAQ's Next becomes it on the last question). From
+  the last question until the game is exported, the reader reminds them
+  (a strip across the top, and a ring on Export…), and leaving the page
+  asks first (the browser's own "Leave site?"). An upload at or past the
+  last regulation question finishes the game: its live score ends and it
+  sends nothing live again. A finished game that is changed afterwards
+  (the moderator going back to it, or the TD's Edit in MODAQ, which opens
+  finished) shows "Changes are unsaved" with an Export button ("Upload to
+  qb-td" does the same) until it is exported, and leaving asks first
+  (read_main.js watchUnsaved compares the game's export with the last one
+  uploaded).
+- **Keeping connections few.** Tabs of one browser share one socket (a Web
+  Lock picks the tab that holds it). A connection that drops while no tab
+  of the tournament is visible is reopened only when one is. Rejoins wait
+  1-5 s at random, so a Cloudflare reroute that cuts every socket at once
+  doesn't bring them back in the same instant, and back off to 30 s while
+  refused.
+- **The cap.** Viewer joins are capped per tournament per UTC day
+  (`LIVE_DAILY_CAP`, default 20,000, on the buzzer Worker). Past it, and
+  whenever the room can't be reached, the public page reads the static
+  file every minute while visible. The hub and readers are never refused.
+  The hub keeps a 10-minute timed refresh as a backstop, and retries a
+  notice it couldn't act on (the TD typing, a dialog open) every 15 s.
+- **Turning it on.** Deploy qb-td-buzzer first (its `v2` migration adds
+  the class), then qb-td with `LIVE_ROOMS = "1"` (worker/wrangler.toml).
+  Without it no page gets a token, and every page behaves as before.
+- **Locally.** Run both Workers with the same `BUZZER_SECRET` in their
+  `.dev.vars`; pages take `?server=` and `?buzzerws=`. `tests/e2e_live.js`
+  checks the tokens, notices, scores, refusals and the cap against them.
 
 ## Reopening a tournament (operator runbook)
 

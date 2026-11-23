@@ -12,7 +12,7 @@
 // the cron has published them and the file has deployed (a minute or
 // so behind a moderator's upload).
 
-import { pub, esc, usingStaticData, usingArchive, LIVE, download } from './api.js';
+import { pub, esc, usingStaticData, usingArchive, LIVE, download, API } from './api.js';
 import { parseRoster, rosterNameMap, resultOf } from '../engine/qbj.js';
 import { readGames } from '../engine/games.js';
 import { dedupeMatches } from '../engine/stats.js';
@@ -30,14 +30,18 @@ import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, re
 import { categoryStats, categoryTeamStats, catPlayerLines, catTeamLines, catBreakdown, catCompare,
   categoryQuestionStats, categoryQuestions } from '../engine/cats.js';
 import { buzzToken } from './buzzkey.js';
-import { buildScoresheet } from '../engine/scoresheet.js';
+import { buildScoresheet, liveSheet, liveRows } from '../engine/scoresheet.js';
 import { sheetHtml } from './sheetview.js';
 import { effectiveFormat, rankFormat } from './read_core.js';
+import { watchLive } from './live_client.js';
 
 const $ = (id) => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get('t') || '';
 
 let state = null;
+// The live room (live_client.js): each room's running score, room id
+// (bucket) -> {round, a, b, sa, sb, tu, of}; empty without a live room
+let liveScores = new Map();
 let lastVersion = null;    // stats bundle stamp
 let lastSched = undefined; // schedule stamp (null = none)
 let matches = [];
@@ -310,11 +314,27 @@ function nameHtml(name, short) {
 // One team's line of a game: the winner's line is bold, the loser's
 // muted, a playoff placeholder italic. A played game's scores (`game`
 // set) open its box score in Stats.
-function lineHtml(slot, name, pts, won, lost, { short = false, game = null } = {}) {
-  const score = pts === null ? ''
-    : game ? `<a href="#" class="s" data-game="${esc(game)}" title="Box score">${pts}</a>` : `<span class="s">${pts}</span>`;
-  return `<div class="gl${won ? ' won' : ''}${lost ? ' lost' : ''}${slot && slot.label ? ' ph' : ''}">`
+// A played game's lines open its box score, the whole game and not only
+// its score; the first line is the one a keyboard stops on (`lead`).
+function lineHtml(slot, name, pts, won, lost, { short = false, game = null, lead = false } = {}) {
+  const score = pts === null ? '' : `<span class="s">${pts}</span>`;
+  const open = game ? ` data-game="${esc(game)}"${lead ? ' tabindex="0" role="button" title="Box score"' : ''}` : '';
+  return `<div class="gl${won ? ' won' : ''}${lost ? ' lost' : ''}${slot && slot.label ? ' ph' : ''}"${open}>`
     + `<span class="t">${name ? nameHtml(name, short) : '—'}</span>${score}</div>`;
+}
+
+// A game still being played: its room's live score, as [points of a,
+// points of b, the score], when the room is reading this round with these
+// two teams. null once the game is in (its result shows instead), or
+// when there is no live room.
+function liveScoreOf(g, round, a, b) {
+  if (!liveScores.size || !a || !b || !schedule) return null;
+  const room = schedule.rooms[g.room];
+  const s = room && room.bucket != null ? liveScores.get(room.bucket) : null;
+  if (!s || s.round !== round.round) return null;
+  if (s.a === a && s.b === b) return [s.sa, s.sb, s];
+  if (s.a === b && s.b === a) return [s.sb, s.sa, s];
+  return null;
 }
 
 // A game's two team lines, as [first, second]; `short` cuts long names.
@@ -322,16 +342,31 @@ function gameLines(g, round, results, short = false) {
   const a = slotText(g.a);
   const b = slotText(g.b);
   const m = a && b && g.a.team && g.b.team ? resultFor(results, round, a, b) : null;
-  if (!m) return [lineHtml(g.a, a, null, false, false, { short }), lineHtml(g.b, b, null, false, false, { short })];
+  if (!m) {
+    const lv = liveScoreOf(g, round, a, b);
+    if (lv) return liveLines(g, a, b, lv, short);
+    return [lineHtml(g.a, a, null, false, false, { short }), lineHtml(g.b, b, null, false, false, { short })];
+  }
   const ma = m.teams.find((t) => t.name === a);
   const mb = m.teams.find((t) => t.name === b);
   // a forfeit: W for the winner, FF for the team that forfeited
   const shown = (x, y) => (m.forfeit ? (resultOf(x, y) === 'W' ? 'W' : 'FF') : x.points);
   const game = [round.round, a, b].map((x) => encodeURIComponent(x)).join('|');
-  return [lineHtml(g.a, a, shown(ma, mb), resultOf(ma, mb) === 'W', resultOf(ma, mb) === 'L', { short, game }),
+  return [lineHtml(g.a, a, shown(ma, mb), resultOf(ma, mb) === 'W', resultOf(ma, mb) === 'L', { short, game, lead: true }),
     lineHtml(g.b, b, shown(mb, ma), resultOf(mb, ma) === 'W', resultOf(mb, ma) === 'L', { short, game })];
 }
 const gameCell = (g, round, results) => gameLines(g, round, results).join('');
+
+// A game in play: the running score where the final one goes, marked
+// live, and a bar under it that fills as the questions go by.
+function liveLines(g, a, b, [pa, pb, s], short) {
+  // the whole game opens its live scoresheet (openLive)
+  const line = (slot, name, pts, lead = false) => `<div class="gl live${lead ? ' lead' : ''}${slot && slot.label ? ' ph' : ''}" data-live="${s.room}"${
+    lead ? ' tabindex="0" role="button" title="Scoresheet"' : ''}>`
+    + `<span class="t">${name ? nameHtml(name, short) : '—'}</span><span class="s">${pts}</span></div>`;
+  const bar = s.tu && s.of ? `<div class="gbar" data-live="${s.room}"><i style="width:${Math.round(100 * Math.min(1, s.tu / s.of))}%"></i></div>` : '';
+  return [line(g.a, a, pa, true), line(g.b, b, pb) + bar];
+}
 
 function renderScheduleGrid(box) {
   const results = resultMap();
@@ -425,9 +460,15 @@ function renderNow(box) {
     return `<section class="nowblock">
       <div class="nowhead"><h3>${roundLabel(b.n)}</h3><span class="nowtag ${b.cls}">${b.tag}</span></div>
       ${order.map((k) => `${named && !isTbRound(b.n) ? `<div class="poolname">${esc(k || 'Other games')}</div>` : ''}
-        <div class="gcard">${groups.get(k).map((g) => `<div class="gg">
+        <div class="gcard">${groups.get(k).map((g) => {
+          // a game that opens (box score, or live scoresheet) says so at
+          // rest, with an arrow: a phone has no hover to tell it
+          const cell = gameCell(g, b.r, results);
+          const open = /data-(game|live)=/.test(cell);
+          return `<div class="gg${open ? ' open' : ''}">
           ${roomName(g) ? `<div class="groom">${esc(roomName(g))}</div>` : ''}
-          ${gameCell(g, b.r, results)}</div>`).join('')}</div>`).join('') || '<div class="muted">No games</div>'}
+          ${cell}${open ? '<span class="gopen" aria-hidden="true">\u203a</span>' : ''}</div>`;
+        }).join('')}</div>`).join('') || '<div class="muted">No games</div>'}
       ${!poolSel && b.r.byes.length ? `<div class="byes muted">Bye: ${b.r.byes.map((s) => esc(slotText(s))).join(', ')}</div>` : ''}
     </section>`;
   };
@@ -447,6 +488,11 @@ function renderTeamView(box, team) {
         const room = roomName(g);
         const m = g.a && g.a.team && g.b && g.b.team ? resultFor(results, round, g.a.team, g.b.team) : null;
         let result = '<span class="muted">–</span>';
+        const lv = !m ? liveScoreOf(g, round, slotText(g.a), slotText(g.b)) : null;
+        if (lv) {
+          const [pa, pb] = slotText(g.a) === team ? lv : [lv[1], lv[0]];
+          result = `<a href="#" class="livescore" data-live="${lv[2].room}" title="Scoresheet">${pa}–${pb}</a>`;
+        }
         if (m) {
           const mine = m.teams.find((t) => t.name === team);
           const theirs = m.teams.find((t) => t.name === opp);
@@ -541,6 +587,17 @@ function finished() {
   return finishedFor.value;
 }
 
+// The games under the schedule's controls; a live score redraws only
+// these, so an open team picker isn't closed under the viewer.
+function renderSchedOut() {
+  const out = $('schedout');
+  if (!out || !schedule) return;
+  if (teamFilter && scheduleTeams().includes(teamFilter)) renderTeamView(out, teamFilter);
+  else if (schedView === 'now') renderNow(out);
+  else renderScheduleGrid(out);
+  wireNameTips(out);
+}
+
 function renderSchedule(box) {
   if (!schedule) {
     box.innerHTML = '<div class="muted">No schedule</div>';
@@ -580,15 +637,25 @@ function renderSchedule(box) {
     teamFilter = $('teamsel').value;
     render();
   };
-  if (teamFilter && teams.includes(teamFilter)) renderTeamView($('schedout'), teamFilter);
-  else if (schedView === 'now') renderNow($('schedout'));
-  else renderScheduleGrid($('schedout'));
-  wireNameTips($('schedout'));
+  renderSchedOut();
+  // a game opened from the keyboard, as a click would
+  $('schedout').addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-live][tabindex], [data-game][tabindex]')) {
+      e.preventDefault();
+      e.target.click();
+    }
+  });
   $('schedout').addEventListener('click', (e) => {
+    // anywhere on a game that opens: its room name and arrow too
+    const gg = e.target.closest('.gg.open');
+    const t = e.target.closest('[data-live], [data-game]') || (gg && gg.querySelector('[data-live], [data-game]'));
+    if (t && !t.contains(e.target)) { e.preventDefault(); t.click(); return; }
+    const lv = e.target.closest('[data-live]');
+    if (lv) { e.preventDefault(); openLive(Number(lv.dataset.live), lv); return; }
     const a = e.target.closest('[data-game]');
     if (!a) return;
     e.preventDefault();
-    openGame(a.dataset.game);
+    openDone(a.dataset.game, a);
   });
 }
 
@@ -627,9 +694,12 @@ function wireNameTips(box) {
 // was left (scroll, and how far each table was scrolled sideways).
 let schedPlace = null;
 let pendingGame = null; // New layout: {round, a, b} to open at
-function openGame(key) {
+// `at`: where the schedule was when the game was picked (its scoresheet
+// popup keeps it), for Back to Schedule
+const schedAt = () => ({ y: window.scrollY, x: [...document.querySelectorAll('#schedout .tablewrap')].map((w) => w.scrollLeft) });
+function openGame(key, at = null) {
   const [round, a, b] = key.split('|').map((x) => decodeURIComponent(x));
-  schedPlace = { y: window.scrollY, x: [...document.querySelectorAll('#schedout .tablewrap')].map((w) => w.scrollLeft) };
+  schedPlace = at || schedAt();
   if (!statsLayout) statsLayout = readPref(STATS_LAYOUT_KEY) === 'new' ? 'new' : 'classic';
   const game = { round: Number(round), a, b };
   if (statsLayout === 'new') {
@@ -1795,6 +1865,7 @@ async function load() {
       say('');
       if (dropped && tab !== null) { sheetAsk = false; render(); }
       mountBuzzer();
+      ensureLive();
       return;
     }
     say('Loading');
@@ -1839,7 +1910,120 @@ async function load() {
     } else render();
     say('');
     mountBuzzer();
+    ensureLive();
   } catch (e) { say(e.message, true); }
+}
+
+/* ---------- live room ---------- */
+// With a live room (state.rt: worker.js "live rooms") the page needs no
+// refresh: the room says when a deploy carrying this tournament went out,
+// and the page reads the new file then. That file is the free static one
+// on qb-td-live, so an automatic read costs nothing; when the page is
+// reading the Worker instead (no qb-td-live, or it failed), it never reads
+// on its own and the refresh button stays the way. Scores redraw just the
+// games. When the room can't be joined (full for the day, or down), the
+// static file is read every minute while the tab is visible.
+const LIVE_POLL_MS = 60 * 1000;
+const LOCAL_API = /^(localhost|127\.0\.0\.1)$/.test(new URL(API).hostname);
+let liveStop = null;
+let livePoll = null;
+let loading = null;
+let loadAgain = false;
+// (a local dev Worker costs nothing either: it reads like the file there)
+const freeReads = () => !usingStaticData() && ((Boolean(LIVE) && !liveLatched()) || LOCAL_API);
+function autoLoad() {
+  if (!freeReads()) return;
+  if (loading) { loadAgain = true; return; }
+  loading = load().finally(() => { loading = null; if (loadAgain) { loadAgain = false; autoLoad(); } });
+}
+function onLive(why, scores) {
+  if (why === 'scores') {
+    liveScores = scores;
+    if (tab === 'schedule') renderSchedOut();
+    if (liveOpen) drawLive();
+    return;
+  }
+  if (why === 'pub' || why === 'back') autoLoad();
+  if (why === 'fallback' && !livePoll) {
+    livePoll = setInterval(() => { if (document.visibilityState === 'visible') autoLoad(); }, LIVE_POLL_MS);
+  }
+  if ((why === 'live' || why === 'back' || why === 'over') && livePoll) { clearInterval(livePoll); livePoll = null; }
+  if (why === 'over') { liveScores = new Map(); if (tab === 'schedule') renderSchedOut(); }
+}
+// A game's scoresheet by team (scoresheet.js liveRows: no players, no
+// categories), over the page. A game in play fills in as the room moves
+// on, and when it ends with the sheet open the last one seen stays; a
+// finished game's comes from its upload, with the way to its box score.
+let liveOpen = null; // { room, s: the last score seen } | { key: a finished game }, and back: where focus returns
+function openLive(room, from) {
+  const s = liveScores.get(room);
+  if (!s) return;
+  liveOpen = { room, s, back: from || null };
+  drawLive();
+}
+function openDone(key, from) {
+  liveOpen = { key, back: from || null, at: schedAt() };
+  drawLive();
+}
+// a finished game, by its schedule key (round|a|b): its sheet's
+// {round, room, a, b, sh, of}, or null when its file isn't loaded
+function doneSheet(key) {
+  const [round, a, b] = key.split('|').map((x) => decodeURIComponent(x));
+  const m = resultMap().get(round + '|' + [a, b].sort().join('|'));
+  const e = m && rawEntries.find((x) => x.id === m.fileId);
+  if (!e) return null;
+  const of = (effectiveFormat(state.format) || {}).regulationTossupCount || 20;
+  // the upload's own team order; the roster may have renamed its teams since
+  let sh = liveRows(e.qbj, [], 999);
+  if (m.teams[0] && m.teams[0].name === b) sh = sh.map(([n, x, y, bx, by, sx, sy]) => [n, y, x, by, bx, sy, sx]);
+  const g = findRound(Number(round));
+  const sg = g && g.games.find((x) => slotText(x.a) === a && slotText(x.b) === b);
+  return { round: Number(round), room: sg && schedule.rooms[sg.room] ? schedule.rooms[sg.room].bucket : null, a, b, sh, of };
+}
+function closeLive(refocus = true) {
+  const back = refocus && liveOpen && liveOpen.back;
+  liveOpen = null;
+  const el = $('livesheet');
+  if (el) el.remove();
+  document.removeEventListener('keydown', liveKey);
+  if (back && back.isConnected) back.focus({ preventScroll: true });
+}
+const liveKey = (e) => { if (e.key === 'Escape') closeLive(); };
+function drawLive() {
+  if (!liveOpen.key) {
+    const now = liveScores.get(liveOpen.room);
+    // the same game only: another game the room starts (a rematch) isn't this one
+    if (now && now.round === liveOpen.s.round && now.a === liveOpen.s.a && now.b === liveOpen.s.b) liveOpen.s = now;
+  }
+  const s = liveOpen.key ? doneSheet(liveOpen.key) : liveOpen.s;
+  if (!s) { closeLive(); return; }
+  const room = schedule && schedule.rooms.find((r) => r.bucket === (liveOpen.key ? s.room : liveOpen.room));
+  let back = $('livesheet');
+  const first = !back;
+  if (first) {
+    back = document.createElement('div');
+    back.id = 'livesheet';
+    back.className = 'modalback livesheet';
+    back.addEventListener('click', (e) => {
+      if (e.target.closest('[data-boxscore]')) { const { key, at } = liveOpen; closeLive(false); openGame(key, at); return; }
+      if (e.target === back || e.target.closest('[data-close]')) closeLive();
+    });
+    document.body.appendChild(back);
+    document.addEventListener('keydown', liveKey);
+  }
+  const of = s.of || 20;
+  back.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="livesheethead">
+    <div class="lshead"><h2 id="livesheethead">Round ${s.round}${room ? ' · ' + esc(room.name) : ''}</h2>
+      <button class="linkbtn" data-close aria-label="Close">&times;</button></div>
+    ${sheetHtml(liveSheet(s.sh || [], [s.a, s.b], of), of, { bonusHead: 'Bonuses' })}
+    ${liveOpen.key ? '<div class="lsfoot"><button class="linkbtn" data-boxscore>Box score</button></div>' : ''}
+  </div>`;
+  if (first) back.querySelector('[data-close]').focus({ preventScroll: true });
+}
+
+function ensureLive() {
+  if (liveStop || !state || !state.rt || usingStaticData() || usingArchive()) return;
+  liveStop = watchLive({ slug, rt: state.rt, role: 'viewer', on: onLive });
 }
 
 document.querySelectorAll('.tab').forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });

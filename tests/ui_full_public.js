@@ -391,6 +391,9 @@ class Browser {
     const { sessionId } = await this.send('Target.attachToTarget', { targetId, flatten: true });
     const tab = new Tab(this, targetId, sessionId);
     await tab.init();
+    // light unless a check asks for dark: headless Chrome otherwise
+    // follows the machine's own appearance, and the light checks fail at night
+    await tab.dark(false);
     return tab;
   }
 }
@@ -884,8 +887,26 @@ function schedGames(sched) {
   return out;
 }
 const byesOf = (sched, round) => sched.phases.flatMap((ph) => ph.rounds).find((r) => r.round === round).byes.map((s) => s.team || s.label);
-// a played game's score link on the schedule (pubview.js gameLines: round|a|b in schedule order)
-const scoreSel = (sg) => `a.s[data-game="${[sg.round, sg.a, sg.b].map(encodeURIComponent).join('|')}"]`;
+// a played game on the schedule, which opens its box score (pubview.js gameLines:
+// round|a|b in schedule order; the whole game opens it, its first line is the stop)
+const scoreSel = (sg) => `.gl[tabindex][data-game="${[sg.round, sg.a, sg.b].map(encodeURIComponent).join('|')}"]`;
+// a played game opens its scoresheet by team over the page (pubview.js
+// drawLive), whose Box score goes on to the box score; the first time,
+// the popup itself is checked
+let boxSeen = false;
+async function openBox(tab, sg) {
+  await tab.click(scoreSel(sg));
+  await tab.wait(`!!document.querySelector('#livesheet [data-boxscore]')`, 'the scoresheet popup');
+  if (!boxSeen) {
+    boxSeen = true;
+    await check('sch-06b a played game opens its scoresheet by team: its two teams, a row per question, no players', async () => {
+      const x = await tab.js(`({ teams: [...document.querySelectorAll('#livesheet th.tn')].map((e) => e.textContent),
+        rows: document.querySelectorAll('#livesheet tbody tr').length, cols: [...document.querySelectorAll('#livesheet thead tr:last-child th')].map((e) => e.textContent) })`);
+      return (q(x.teams.slice().sort()) === q([sg.a, sg.b].sort()) && x.rows >= 20 && q(x.cols) === q(['', 'TU', 'Bonuses', 'TU', 'Bonuses', 'Score'])) || x;
+    });
+  }
+  await tab.click('#livesheet [data-boxscore]');
+}
 
 // The tables of the report page shown in the Classic frame:
 // [{heads, rows}] with each row's cell texts.
@@ -1263,7 +1284,7 @@ async function sectionMain(br) {
   await settle(T);
   await refresh(tab);
   // a score opens its box score (Classic, the default layout)
-  await tab.click(scoreSel(sgOf(2, 'Alder', 'Elm')));
+  await openBox(tab, sgOf(2, 'Alder', 'Elm'));
   await tab.wait(`document.querySelector('#tab-stats').classList.contains('active') && !!document.querySelector('iframe.report')`, 'the box score');
   await check('sch-06 score link: opens Stats (Classic) at the game\'s box score, marked, with "← Back to Schedule"', async () => {
     const x = await tab.fwait(`(() => { const m = document.querySelector('.qt-mark'); return m && { page: ${SHOWN_PAGE}, text: m.textContent,
@@ -1281,7 +1302,7 @@ async function sectionMain(br) {
   await tab.wait(`!!document.querySelector('#newstats')`, 'New');
   await tabTo(tab, 'schedule');
   const errs = tab.errors.length;
-  await tab.click(scoreSel(sgOf(2, UIUC, 'Fir')));
+  await openBox(tab, sgOf(2, UIUC, 'Fir'));
   await bug('sch-06 score link: in New, while only the prelims are played, it lands on the game in Scoreboard', async () => {
     const x = await tab.wait(`!!document.querySelector('.nsec.nmark')`, 'the marked game', 3000).catch(() => false);
     return (x && tab.errors.length === errs) || { errors: tab.errors.slice(errs), newstats: await tab.js(`(document.querySelector('#newstats') || {}).innerHTML.length`) };
@@ -1821,7 +1842,7 @@ async function sectionMain(br) {
   await tab.click('[data-statstage="Playoffs"]');
   await tabTo(tab, 'schedule');
   await tab.click('[data-schedview="all"]');
-  await tab.click(scoreSel(sgOf(2, 'Alder', 'Elm')));
+  await openBox(tab, sgOf(2, 'Alder', 'Elm'));
   await check('st-11 stages: a game opened from the schedule switches to the stage that owns its round', async () => {
     const x = await tab.wait(`(() => { const m = document.querySelector('.nsec.nmark'); return m && [m.querySelector('.nhead span').textContent,
       (document.querySelector('#newstats [data-statstage].on') || {}).textContent]; })()`, 'the round-2 game');
@@ -1832,7 +1853,7 @@ async function sectionMain(br) {
   await tab.js(`localStorage.setItem('qbtdStatsLayout', 'new'); true`);
   await openPub(tab, T.slug, { hash: '#schedule' });
   await tab.click('[data-schedview="all"]');
-  await tab.click(scoreSel(sgOf(4, 'Cedar', 'Dogwood')));
+  await openBox(tab, sgOf(4, 'Cedar', 'Dogwood'));
   await check('sch-06 score link: in New it lands on the game in Scoreboard, marked, with "← Back to Schedule"', async () => {
     const x = await tab.wait(`(() => { const m = document.querySelector('.nsec.nmark'); return m && { sec: (document.querySelector('[data-statssec].on') || {}).textContent,
       head: m.querySelector('.nhead span').textContent, back: (m.querySelector('a.nback') || {}).textContent, top: m.getBoundingClientRect().top,
@@ -1847,7 +1868,7 @@ async function sectionMain(br) {
   await tab.wait(`!!document.querySelector('table.sched')`, 'All rounds on a phone');
   await tab.js(`(() => { for (const w of document.querySelectorAll('#schedout .tablewrap')) w.scrollLeft = Math.floor((w.scrollWidth - w.clientWidth) / 2); window.scrollTo(0, 140); return true; })()`);
   const before = await tab.js(`[window.scrollY, ...[...document.querySelectorAll('#schedout .tablewrap')].map((w) => w.scrollLeft)]`);
-  await tab.click(scoreSel(sgOf(4, 'Alder', UIUC)));
+  await openBox(tab, sgOf(4, 'Alder', UIUC));
   await tab.wait(`!!document.querySelector('.nsec.nmark a.nback')`, 'the game in New');
   await tab.click('a.nback');
   await check('sch-06 back: the schedule comes back at the same page scroll and the same sideways scroll of each table', async () => {
@@ -2305,7 +2326,7 @@ async function sectionAux(br) {
   await openPub(tab, T.slug, { hash: '#schedule' });
   await tab.click('[data-schedview="all"]');
   await check(`pub-15 filed round: the schedule shows its score in round 2, where it was filed ${filedTag}`, async () => {
-    const s = await tab.js(`[...document.querySelectorAll('a.s[data-game]')].map((a) => [a.dataset.game, a.textContent])`);
+    const s = await tab.js(`[...document.querySelectorAll('.gl[data-game]')].map((g) => [g.dataset.game, g.querySelector('.s').textContent])`);
     const key = [2, s22.a, s22.b].map(encodeURIComponent).join('|');
     const mine = s.filter(([k]) => k === key).map(([, v]) => v);
     return q(mine) === q([String(misfiled.exp[0].points), String(misfiled.exp[1].points)]) || s;
@@ -2345,7 +2366,7 @@ async function sectionAux(br) {
   await refresh(tab);
   await check(`pub-13 rebuild: Refresh shows the rebuilt game's score ${rebuildTag}`, async () => {
     const key = [1, s12.a, s12.b].map(encodeURIComponent).join('|');
-    const s = await tab.js(`[...document.querySelectorAll('a.s[data-game="${key}"]')].map((a) => a.textContent)`);
+    const s = await tab.js(`[...document.querySelectorAll('.gl[data-game="${key}"] .s')].map((a) => a.textContent)`);
     return q(s) === q([String(g12.exp[0].points + 30), String(g12.exp[1].points)]) || s;
   });
   const other = 'Room C'; // uploaded from the wrong room's link, say: the TD moves it to the spare room

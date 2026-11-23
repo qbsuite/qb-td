@@ -2771,6 +2771,55 @@ await section('R34e', 'View and Font choices carry to the next game on this devi
   await tab.js(`localStorage.removeItem('qbtdReaderPrefs'), true`);
 });
 
+await section('RX', 'the end of a game: a reminder to export, a check before leaving, and the strip for later changes', async () => {
+  await annexGame('Alpha', 'Beta');
+  const strip = (id) => tab.js(`(() => { const s = document.querySelector('#${id}'); return s && !s.hidden ? s.textContent.replace(/\\s+/g, ' ').trim() : ''; })()`);
+  // the ringed button: the one room.css rings while body.qbtd-exportnow is on
+  const ringed = () => tab.js(`[...document.querySelectorAll('body.qbtd-exportnow #modaq button[aria-describedby="Export"]')].map((b) => b.textContent)`);
+  const posts = (m) => tab.worker(m).filter((x) => x.startsWith('POST /b/:s/upload')).length;
+  await mq.buzz(tab, POWER_WORD, pl('Alpha', 1), 'correct');
+  ok('RX mid-game, no reminder', (await strip('endcue')) === '' && !(await ringed()).length, [await strip('endcue'), await ringed()]);
+  const m = tab.mark();
+  await mq.goTo(tab, 20);
+  await until(async () => (await strip('endcue')) !== '', 'the reminder', 5000).catch(() => null);
+  ok('RX on the last question: "Last question: press Export… when the game is over." and a ring on Export…',
+    (await strip('endcue')) === 'Last question: press Export… when the game is over.' && (await ringed()).some((t) => t.startsWith('Export')), [await strip('endcue'), await ringed()]);
+  await sleep(3000);
+  ok('RX nothing exports by itself', posts(m) === 0, tab.worker(m));
+  // New game asks first, in the page's own words; Cancel stays in the game
+  const here = await tab.js('location.href');
+  await tab.js(`document.querySelector('#newgame').click(), true`);
+  const ask = await until(() => tab.js(`(() => { const m = document.querySelector('.warnask .modal'); return m ? m.innerText.replace(/\\s+/g, ' ').trim() : ''; })()`), 'the leave question', 5000).catch(() => '');
+  ok('RX New game on a game not exported asks: "Leave site? Game has not been exported yet."', ask.startsWith('Leave site? Game has not been exported yet.') && ask.includes('Leave'), ask);
+  await tab.js(`[...document.querySelectorAll('.warnask button')].find((b) => b.textContent === 'Cancel').click(), true`);
+  await sleep(500);
+  ok('RX and Cancel stays in the game', (await tab.js('location.href')) === here && !(await tab.exists('.warnask')), await tab.js('location.href'));
+  // closing or reloading gets the browser's own question (the suite answers it)
+  const d0 = tab.dialogs.length;
+  await tab.reload();
+  ok('RX reloading it asks first too (the browser\'s "Leave site?")', tab.dialogs.slice(d0).some((d) => d.type === 'beforeunload'), tab.dialogs.slice(d0));
+  await tab.waitJs(`!!document.querySelector('#modaq .ms-CommandBar')`, 'the game again', 15000);
+  await until(async () => (await mq.at(tab)) === 20, 'question 20', 5000);
+  await tab.js(`[...document.querySelectorAll('#modaq button')].find((b) => b.textContent.startsWith('Export')).click(), true`);
+  await mq.waitDialog(tab, 'Export Succeeded', 30000);
+  await mq.dialogButton(tab, 'OK');
+  await mq.noDialog(tab);
+  ok('RX Export… uploads it, and the reminder and ring go', posts(m) === 1 && (await strip('endcue')) === '' && !(await ringed()).length, [tab.worker(m), await strip('endcue'), await ringed()]);
+  // the moderator goes back and changes it: a reopen
+  await mq.goTo(tab, 3);
+  await mq.buzz(tab, 5, pl('Beta', 1), 'wrong');
+  const text = await until(async () => strip('unsaved'), 'the unsaved strip', 6000).catch(() => '');
+  ok('RX a change after the game finished: "Changes are unsaved. Press Export or “Upload to qb-td” at the top to export to qb-td."',
+    text === 'Changes are unsaved. Press Export or “Upload to qb-td” at the top to export to qb-td.', text);
+  await mq.goTo(tab, 20);
+  ok('RX and no reminder for a finished game', (await strip('endcue')) === '' && !(await ringed()).length, [await strip('endcue'), await ringed()]);
+  await tab.click('#unsavedbtn');
+  await mq.waitDialog(tab, 'Export Succeeded', 30000);
+  await mq.dialogButton(tab, 'OK');
+  await mq.noDialog(tab);
+  ok('RX Export uploads it and the strip goes', posts(m) === 2 && (await until(async () => (await strip('unsaved')) === '', 'the strip gone', 4000).then(() => true, () => false)), tab.worker(m));
+});
+
 await section('RZ', 'after the run', async () => {
   const wait = 31000 - (Date.now() - watchFrom);
   if (wait > 0) await sleep(wait);

@@ -811,5 +811,60 @@ const addNoPubstate = (w, fields = {}) => w.add({ ...fields, noPubstate: true })
   ok('buzz files: buzzpoints off takes them down', paths().length === 0, paths());
 }
 
+// 18. Live rooms (worker.js "live rooms"): a deploy tells the live room
+// of each tournament it changed ({k:'pub'}), so open pages read the new
+// file; a rider (a restamp) and a failed deploy tell nothing; the file
+// carries the room's viewer token; with the switch off, neither.
+{
+  clock = realNow();
+  const w = world();
+  const notes = [];
+  Object.assign(w.env, { LIVE_ROOMS: '1', BUZZER_SECRET: 'live-secret', LIVEROOM: {
+    idFromName: (n) => n,
+    get: (id) => ({ fetch: async (u, o) => { notes.push({ id, url: String(u), body: JSON.parse(o.body) }); return new Response(null, { status: 204 }); } }),
+  } });
+  const a = w.add();
+  const b = w.add();
+  await w.tick();
+  ok('live rooms: the first deploy tells both rooms',
+    JSON.stringify(notes.map((n) => n.id).sort()) === JSON.stringify(['live:tour-1', 'live:tour-2'])
+    && notes.every((n) => n.body.k === 'pub' && n.url === 'https://live/notify'), notes);
+  const { checkLiveToken } = await import('../buzzer/token.js');
+  const f = w.live('tour-1');
+  const who = f && f.rt ? await checkLiveToken('live-secret', f.rt.token, { slug: 'tour-1' }) : null;
+  ok('live rooms: the file carries a viewer token for its tournament', who && who.role === 'viewer' && f.rt.slug === 'tour-1', f && f.rt);
+  // six minutes on, b changes: only b's room is told
+  notes.length = 0;
+  const t0 = clock;
+  clock = t0 + 6 * MIN;
+  w.DB.raw.prepare('UPDATE tournaments SET name = ? WHERE id = ?').run('Changed', b);
+  const res = await (await LivePublish.fetch(new Request('https://live/?ids=' + b), w.env)).json();
+  ok('live rooms: a change tells only its own room',
+    res.deployed && JSON.stringify(notes.map((n) => n.id)) === JSON.stringify(['live:tour-2']), { notes, res });
+  // at twelve, a's heartbeat deploys and b (due within half an interval)
+  // rides it as a restamp: a's room is told (its file is new), b's isn't
+  notes.length = 0;
+  clock = t0 + 12 * MIN;
+  await w.tick();
+  ok('live rooms: a rider\'s room is not told',
+    w.live('tour-2').at === clock && JSON.stringify(notes.map((n) => n.id)) === JSON.stringify(['live:tour-1']), notes);
+  notes.length = 0;
+  w.cf.failPut = true;
+  w.DB.raw.prepare('UPDATE tournaments SET name = ? WHERE id = ?').run('Changed again', a);
+  await LivePublish.fetch(new Request('https://live/?ids=' + a), w.env);
+  ok('live rooms: a failed deploy tells nobody', notes.length === 0, notes);
+  w.cf.failPut = false;
+  void b;
+}
+{
+  clock = realNow();
+  const w = world();
+  const notes = [];
+  Object.assign(w.env, { BUZZER_SECRET: 'live-secret', LIVEROOM: { idFromName: (n) => n, get: () => ({ fetch: async () => { notes.push(1); return new Response(null, { status: 204 }); } }) } });
+  w.add();
+  await w.tick();
+  ok('live rooms off: no token in the file, no notices', !('rt' in w.live('tour-1')) && notes.length === 0);
+}
+
 Date.now = realNow;
 print(passed + ' tests passed');

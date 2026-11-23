@@ -1006,6 +1006,15 @@ export function parseMeta(text) {
   return m;
 }
 
+/** A short fingerprint of a text (FNV-1a and its length): the reader
+    compares its game's export with the one at the last upload, to know
+    whether there are changes the stats don't have (read_main.js). */
+export function textHash(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36) + ':' + text.length;
+}
+
 /** True when a game's MODAQ store survived as intact JSON — resuming
     without it would mount MODAQ with no packet and no New Game button. */
 export function storeIntact(text) {

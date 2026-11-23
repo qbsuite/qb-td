@@ -30,8 +30,10 @@ import {
   staleGameKeys, roundRows, normalizeTbPool, tbPanelRows,
   tbRecordAdd, tbAddedIds, tbProtests, PREFS_KEY, parsePrefs, storeWithPrefs,
 } from './read_core.js';
-import { gameProgress, exportStatus } from './read_core.js';
+import { gameProgress, exportStatus, textHash } from './read_core.js';
 import { tbBridge } from './tb_bridge.js';
+import { scoreLive } from './live_client.js';
+import { liveRows } from '../engine/scoresheet.js';
 import { protestReport } from './protests.js';
 import { Tossup } from 'modaq/src/state/PacketState.js';
 import { toQBJString } from 'modaq/src/qbj/QBJ.js';
@@ -318,6 +320,18 @@ function mountMODAQ(id, meta, isNew) {
         clearTimeout(timer);
       }
       if (out && out.error) return { isError: true, status: exportStatus(name + ': ' + out.error) };
+      // what the stats now have; a game uploaded at or past its last
+      // regulation question is finished: its live score ends, and later
+      // changes wait for an export (watchUnsaved)
+      const sent = gameExport(meta);
+      if (sent !== null) meta.upHash = textHash(sent);
+      if (!(progress && progress.at < progress.of)) {
+        meta.fin = true;
+        showEndCue(false);
+        if (scorer) { scorer.done(meta.round); scorer.stop(); scorer = null; }
+      }
+      saveMeta(id, meta);
+      $('unsaved').hidden = true;
       return { isError: false, status: 'uploaded ' + name };
     } catch (e) {
       if (e && e.name === 'AbortError') {
@@ -356,6 +370,112 @@ function mountMODAQ(id, meta, isNew) {
   };
   ReactDOM.render(React.createElement(ModaqControl, props), $('modaq'));
   watchProtests(id, meta, props.gameFormat || null);
+  watchScore(id, meta);
+  if (!testKey) watchUnsaved(id, meta);
+}
+
+// The game as it uploads (MODAQ's QBJ), and its fingerprint: what tells a
+// change the stats don't have from moving about the game.
+function gameExport(meta) {
+  const app = tbBridge.appState;
+  return app ? toQBJString(app.game, app.game.packet.name ?? app.uiState.packetFilename, meta.round) : null;
+}
+const saveMeta = (id, meta) => localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
+
+// A game is finished once an upload of it at or past its last regulation
+// question has gone in (meta.fin), or when it is a correction opened from
+// the hub. From then on nothing is live, so any change shows a strip until
+// it is exported (meta.upHash: the export's fingerprint at the last
+// upload, or as a correction opened).
+// Leaving the page asks first while there is something to export: a
+// finished game with changes, or a game that reached its last question and
+// hasn't been exported as it stands. New game asks in the page's own words;
+// closing or reloading the tab gets the browser's "Leave site?", whose
+// words no page can set.
+let exportOwed = false;
+window.addEventListener('beforeunload', (ev) => {
+  if (!exportOwed) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+});
+function watchUnsaved(id, meta) {
+  const strip = $('unsaved');
+  $('unsavedbtn').onclick = () => {
+    const app = tbBridge.appState;
+    // MODAQ's own export, with its dialog: 0 is StatusDisplayType.MessageDialog
+    if (app) app.handleCustomExport(0, 'Menu');
+  };
+  const check = () => {
+    const app = tbBridge.appState;
+    const text = gameExport(meta);
+    if (text === null || !app) return;
+    const h = textHash(text);
+    if (!meta.fin) {
+      strip.hidden = true;
+      exportOwed = (meta.reached || 0) >= app.game.playableCycles.length && h !== meta.upHash;
+      return;
+    }
+    if (!meta.upHash) { meta.upHash = h; saveMeta(id, meta); }
+    strip.hidden = h === meta.upHash;
+    exportOwed = !strip.hidden;
+  };
+  setInterval(check, 2000);
+  $('newgame').addEventListener('click', async (ev) => {
+    check();
+    if (!exportOwed) return;
+    ev.preventDefault();
+    const k = await askWarning({ title: 'Leave site?', lines: ['Game has not been exported yet.'], choices: [{ key: 'leave', label: 'Leave' }] });
+    if (k === 'leave') { exportOwed = false; location.href = $('newgame').href; }
+  });
+}
+
+// The game's running score to the tournament's live room, so the public
+// page and the hub show it while the game is played: at each new question
+// and each tossup or bonus part marked (tb_add_dialog.js onScore), marks
+// made within LIVE_GATHER_MS going together. Teams and points, and the
+// questions so far by team, the one being read included (scoresheet.js
+// liveRows: no players, no categories), for the public page's live
+// scoresheet. A game begun before live rooms, or without one, sends nothing.
+const LIVE_GATHER_MS = 300;
+let scorer = null;
+// (localStorage qbtdAutoExportMs shortens it for tests/ui_full_reader.js)
+// Games don't export by themselves, and moderators forget to: on the last
+// question, until the game is exported, a strip says to press Export…
+// and MODAQ's Export… button is ringed. on: that is now.
+function showEndCue(on) {
+  $('endcue').hidden = !on;
+  // the ring is room.css's, on MODAQ's own Export… button (which MODAQ
+  // marks aria-describedby="Export"), so MODAQ redrawing it keeps it
+  document.body.classList.toggle('qbtd-exportnow', on);
+}
+function watchScore(id, meta) {
+  if (scorer) scorer.stop();
+  scorer = meta.rt && !meta.fin ? scoreLive({ slug: meta.rt.slug, rt: meta.rt }) : null;
+  let wait = null;
+  let next = null;
+  const send = () => {
+    wait = null;
+    const { n, of, score, names } = next;
+    if (!Array.isArray(score) || score.length < 2) return;
+    // MODAQ's teams are the game's two, in either order
+    const ia = Array.isArray(names) && names[1] === meta.a ? 1 : 0;
+    let sh = null;
+    try {
+      const app = tbBridge.appState;
+      if (app) sh = liveRows(JSON.parse(toQBJString(app.game, app.game.packet.name ?? app.uiState.packetFilename, meta.round)), [meta.a, meta.b], n);
+    } catch (e) { sh = null; } // the score still goes
+    scorer.score({ round: meta.round, a: meta.a, b: meta.b, sa: score[ia], sb: score[1 - ia], tu: n, of, ...(sh ? { sh } : {}) });
+  };
+  tbBridge.onScore = (x) => {
+    if (meta.fin || testKey) return;
+    // on the last question (MODAQ's Next reads Export…), and until the
+    // game is exported, the reader says to export it
+    const app = tbBridge.appState;
+    showEndCue(Boolean(app && app.uiState.cycleIndex + 1 >= app.game.playableCycles.length));
+    if (!scorer) return;
+    next = x;
+    if (!wait) wait = setTimeout(send, LIVE_GATHER_MS);
+  };
 }
 
 /* ---------- schedule defaults (bare-link path) ---------- */
@@ -780,6 +900,9 @@ function showTeams() {
       tb: { t: packet.tossups.length, b: (packet.bonuses || []).length, tu: [], bo: [] },
       starters: { [a]: [...starterSel.get(a)], [b]: [...starterSel.get(b)] },
       order: { [a]: orderSel.get(a), [b]: orderSel.get(b) },
+      // the live room's scorer token (worker.js bucketState rt): kept with
+      // the game, since a game link resumes without asking the Worker
+      ...(state.rt && !testKey ? { rt: state.rt } : {}),
     };
     // the room has started this round (auto-advance); nothing waits on it
     if (!testKey) pub('/b/' + secret + '/start?round=' + round, { method: 'POST' }).catch(() => {});

@@ -34,6 +34,19 @@ binding = "LIVE"
 service = "qb-td"
 entrypoint = "LivePublish"
 
+# Live rooms (worker.js "live rooms"): the public page and the Live Hub
+# hold a socket to their tournament's room in the buzzer's Worker and are
+# told when something moved; readers send live scores there. This binding
+# is how this Worker sends a room its notices. The class lives in
+# qb-td-buzzer, so deploy that Worker first (buzzer/wrangler.toml, the v2
+# migration). Also needs BUZZER_SECRET (already set for the buzzer) and
+# LIVE_ROOMS = "1" below; without either, no page gets a token and the
+# pages behave as before.
+[[durable_objects.bindings]]
+name = "LIVEROOM"
+class_name = "LiveRoom"
+script_name = "qb-td-buzzer"
+
 # Attempt cap on the buzzpoints password route (worker.js pubQPacket).
 # Cloudflare's rate limiter needs no provisioning and costs nothing, but it
 # counts per colo rather than globally. Period must be 10 or 60.
@@ -85,6 +98,9 @@ GITHUB_INSTALLATION_ID = "153087044"
 # qb-td-live").
 LIVE_SCRIPT = "qb-td-live"
 LIVE_ACCOUNT_ID = "905b6a6cd745425d70d3c4d9612ba2d8"
+
+# Live rooms on ("1") or off (anything else): see LIVEROOM above.
+LIVE_ROOMS = "1"
 
 # New-activity alerts (worker.js "new-activity alerts"): a Discord webhook
 # pinged when someone creates a tournament or set here, when a TD presses

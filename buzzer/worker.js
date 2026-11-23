@@ -53,7 +53,7 @@
 // used, so a phone can't earn credit by answering probes slowly now and
 // then, and a few ms of slack absorb jitter on the buzz itself.
 
-import { checkToken, signToken, PLAYER_TOKEN_MS } from './token.js';
+import { checkToken, signToken, PLAYER_TOKEN_MS, checkLiveToken, liveRoomName } from './token.js';
 
 const CORS = { 'Access-Control-Allow-Origin': '*' };
 const MAX_COMP_MS = 100;    // most a buzz is backdated
@@ -82,6 +82,8 @@ export default {
       });
       return Response.json({ token }, { headers: CORS });
     }
+    const lv = url.pathname.match(/^\/t\/([\w-]{1,60})\/live$/);
+    if (lv) return liveJoin(request, env, lv[1], url);
     const m = url.pathname.match(/^\/t\/([\w-]{1,60})\/r\/(\d{1,6})\/ws$/);
     if (!m) return new Response('qb-td buzzer', { headers: CORS });
     const who = await checkToken(env.BUZZER_SECRET, url.searchParams.get('token'), { slug: m[1], room: Number(m[2]) });
@@ -357,4 +359,199 @@ export class BuzzRoom {
     this.log('error', { msg: String(err && err.message || err), role: a.role });
     this.webSocketClose(ws);
   }
+}
+
+// ------------------------------------------------------------ live rooms
+// One room per tournament that keeps qb-td's public page and Live Hub up
+// to date, and carries each room's running score while a game is played
+// (README "Live pages"). Simulated at size before it was built
+// (qbtd-soak/livesim_1122): 628 sockets in one room, under 1 GB-s an hour.
+//
+//   GET /t/:slug/live?token=     (a live token: buzzer/token.js signLiveToken)
+//
+// Sockets, by tag: 'v' viewers, 't' the TD's hub, 's' a room's scorer
+// (its reader page, one game at a time).
+//   scorer -> room : {t:'score', round, a, b, sa, sb, tu, of, sh?}   at each new question and
+//                    each tossup or bonus part marked; sh: the questions so far, by team
+//                    (app/engine/scoresheet.js liveRows)
+//                    {t:'done', round}                          the game was uploaded
+//   any -> Cloudflare : 'hb' -> 'hb' (auto-response: never wakes the room)
+//   room -> v, t   : {t:'hello', scores}   on joining: [{room, round, a, b, sa, sb, tu, of}]
+//                    {t:'score', room, ...}   {t:'end', room, round}
+//                    {t:'pub'}   a qb-td-live deploy carrying this tournament went out
+//   room -> t      : {t:'rev', room?, round?}   something the hub shows moved
+//   room -> all    : {t:'over'}   the tournament's links closed
+//   qb-td Worker -> room (its LIVEROOM binding, never the public URL):
+//                    POST {k:'pub'} | {k:'rev', room?, round?}
+//
+// Scores are only ever teams and points: no question text, players or
+// categories, ever. The latest score of each room lives on its scorer's
+// socket attachment (free, and kept through hibernation); a long game's
+// sheet that won't fit the attachment's 2 KB is kept in memory instead,
+// and comes back with the next question if the room slept. A scorer whose
+// connection drops sends it all again on rejoining. The room writes no rows and, like the
+// buzzer rooms, never hangs up on a socket itself: closing on a dead peer
+// is what kept buzzer rooms awake (billed) for minutes (11/16).
+//
+// Viewer joins are capped per tournament per UTC day (LIVE_DAILY_CAP,
+// default 20,000): past it a viewer is refused with 503, and the page
+// reads the free static file on a timer instead. The count lives in memory
+// and is saved every 50 joins, so a room that slept forgets at most that many.
+
+const LIVE_ROLE_TAG = { viewer: 'v', td: 't', scorer: 's' };
+const LIVE_CAP = 20000;
+const LIVE_SAVE_EVERY = 50;
+
+async function liveJoin(request, env, slug, url) {
+  if (request.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426, headers: CORS });
+  const who = await checkLiveToken(env.BUZZER_SECRET, url.searchParams.get('token'), { slug });
+  if (who.error) return new Response(who.error, { status: who.error === 'not configured' ? 500 : 403, headers: CORS });
+  const stub = env.LIVE.get(env.LIVE.idFromName(liveRoomName(slug, who.region)), { locationHint: who.region });
+  // fresh headers: nothing the visitor sent reaches the room but the upgrade
+  const headers = new Headers({ Upgrade: 'websocket' });
+  for (const h of ['Sec-WebSocket-Key', 'Sec-WebSocket-Version', 'Sec-WebSocket-Extensions']) { const v = request.headers.get(h); if (v) headers.set(h, v); }
+  headers.set('x-live-role', who.role);
+  headers.set('x-live-closes', String(who.closes));
+  if (who.role === 'scorer') headers.set('x-live-room', String(who.room));
+  return stub.fetch(new Request('https://live/join', { headers }));
+}
+
+const int = (v, lo, hi) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null; };
+// A live sheet as scoresheet.js liveRows makes it, checked field by field
+// (anything else is dropped): [n, a, b, bonusA, bonusB, scoreA, scoreB].
+function liveRowsOf(sh) {
+  if (!Array.isArray(sh) || sh.length > 60) return null;
+  const pts = (v) => (v === null ? null : int(v, -999, 999));
+  const bon = (v) => (typeof v === 'string' && /^[01?]{1,6}$/.test(v) ? v : null);
+  const out = [];
+  for (const r of sh) {
+    if (!Array.isArray(r) || r.length !== 7) return null;
+    const n = int(r[0], 1, 999); const sa = int(r[5], -9999, 99999); const sb = int(r[6], -9999, 99999);
+    if (!n || sa === null || sb === null) return null;
+    out.push([n, pts(r[1]), pts(r[2]), bon(r[3]), bon(r[4]), sa, sb]);
+  }
+  return out;
+}
+const name60 = (v) => (typeof v === 'string' ? v.slice(0, 60) : '');
+
+export class LiveRoom {
+  constructor(ctx, env) {
+    this.ctx = ctx;
+    this.env = env;
+    this.sheets = new Map(); // room -> sh too big for its attachment
+    this.closes = undefined;
+    this.day = null;      // UTC day the join count is for
+    this.joins = null;    // viewer joins that day
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('hb', 'hb'));
+  }
+
+  att(ws) { try { return ws.deserializeAttachment() || {}; } catch (e) { return {}; } }
+  open(tag) { return this.ctx.getWebSockets(tag).filter((ws) => ws.readyState === 1); }
+  send(ws, obj) { try { ws.send(JSON.stringify(obj)); } catch (e) { /* closing */ } }
+  fan(obj, tags = ['v', 't']) {
+    const msg = JSON.stringify(obj);
+    for (const tag of tags) for (const ws of this.open(tag)) { try { ws.send(msg); } catch (e) { /* closing */ } }
+  }
+  scores() {
+    const out = [];
+    for (const ws of this.open('s')) {
+      const a = this.att(ws);
+      if (!a.score) continue;
+      const sh = a.score.sh || (this.sheets.get(a.room) || {})[a.score.round];
+      out.push({ room: a.room, ...a.score, ...(sh ? { sh } : {}) });
+    }
+    return out;
+  }
+
+  // the day's viewer joins, read back once after a sleep
+  async countJoin() {
+    const cap = Number(this.env.LIVE_DAILY_CAP) || LIVE_CAP;
+    const day = new Date().toISOString().slice(0, 10);
+    if (this.day !== day) {
+      const saved = await this.ctx.storage.get('joins');
+      this.day = day;
+      this.joins = saved && saved.day === day ? saved.n : 0;
+    }
+    if (this.joins >= cap) return false;
+    this.joins++;
+    if (this.joins % LIVE_SAVE_EVERY === 0) await this.ctx.storage.put('joins', { day, n: this.joins });
+    return true;
+  }
+
+  async closeAt(closes) {
+    if (!closes) return;
+    if (this.closes === undefined) this.closes = (await this.ctx.storage.getAlarm()) ?? null;
+    if (this.closes === closes) return;
+    this.closes = closes;
+    await this.ctx.storage.setAlarm(closes);
+  }
+
+  alarm() {
+    this.closes = null;
+    this.fan({ t: 'over' }, ['v', 't', 's']);
+    for (const ws of this.ctx.getWebSockets()) { try { ws.close(4001, 'tournament closed'); } catch (e) { /* gone */ } }
+  }
+
+  async fetch(request) {
+    // the qb-td Worker's notices (its LIVEROOM binding; the public route
+    // above never sends a body or this path)
+    if (new URL(request.url).pathname === '/notify') {
+      const b = await request.json().catch(() => ({}));
+      if (b.k === 'pub') this.fan({ t: 'pub' });
+      else if (b.k === 'rev') {
+        const room = int(b.room, 0, 1e9); const round = int(b.round, 0, 999);
+        // an upload ends that room's live score: the result is in the stats now
+        if (b.upload && room) this.endScore(room, round);
+        this.fan({ t: 'rev', ...(room ? { room } : {}), ...(round ? { round } : {}) }, ['t']);
+      }
+      return new Response(null, { status: 204 });
+    }
+    const role = request.headers.get('x-live-role');
+    const tag = LIVE_ROLE_TAG[role];
+    if (!tag) return new Response('bad role', { status: 400 });
+    if (tag === 'v' && !(await this.countJoin())) return new Response('busy', { status: 503 });
+    await this.closeAt(Number(request.headers.get('x-live-closes')));
+    const room = tag === 's' ? int(request.headers.get('x-live-room'), 1, 1e9) : null;
+    const [client, server] = Object.values(new WebSocketPair());
+    this.ctx.acceptWebSocket(server, [tag]);
+    server.serializeAttachment({ role: tag, room, at: Date.now() });
+    if (tag !== 's') this.send(server, { t: 'hello', scores: this.scores() });
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  endScore(room, round) {
+    for (const ws of this.open('s')) {
+      const a = this.att(ws);
+      if (a.room === room && a.score && (!round || a.score.round === round)) { delete a.score; try { ws.serializeAttachment(a); } catch (e) { /* closing */ } }
+    }
+    this.sheets.delete(room);
+    this.fan({ t: 'end', room, ...(round ? { round } : {}) });
+  }
+
+  webSocketMessage(ws, raw) {
+    const a = this.att(ws);
+    if (a.role !== 's' || typeof raw !== 'string' || raw.length > 8000) return;
+    let m;
+    try { m = JSON.parse(raw); } catch (e) { return; }
+    if (m.t === 'done') { this.endScore(a.room, int(m.round, 1, 999)); return; }
+    if (m.t !== 'score') return;
+    const score = { round: int(m.round, 1, 999), a: name60(m.a), b: name60(m.b), sa: int(m.sa, -9999, 99999), sb: int(m.sb, -9999, 99999), tu: int(m.tu, 0, 999), of: int(m.of, 0, 999) };
+    if (!score.round || score.sa === null || score.sb === null) return;
+    const sh = liveRowsOf(m.sh);
+    a.score = sh ? { ...score, sh } : score;
+    this.sheets.delete(a.room);
+    try { ws.serializeAttachment(a); } catch (e) {
+      // too big with the sheet: the sheet waits in memory
+      a.score = score;
+      try { ws.serializeAttachment(a); } catch (e2) { return; }
+      if (sh) this.sheets.set(a.room, { [score.round]: sh });
+    }
+    this.fan({ t: 'score', room: a.room, ...score, ...(sh ? { sh } : {}) });
+  }
+
+  webSocketClose(ws, code, reason) {
+    // finish the close handshake (see BuzzRoom.webSocketClose)
+    if (code !== undefined) { try { ws.close(code === 1005 || code === 1006 ? 1000 : code, reason || ''); } catch (e) { /* closed */ } }
+  }
+  webSocketError(ws) { this.webSocketClose(ws); }
 }

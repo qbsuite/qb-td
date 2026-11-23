@@ -3,8 +3,8 @@
   "hub demo": {
    "label": "as shipped",
    "live": {
-    "sha256": "adab8b14f3469a9b1574bdf1",
-    "chars": 12684
+    "sha256": "710f098b2ad7c6c928d6c0c6",
+    "chars": 12762
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -267,6 +267,7 @@
     "/js/admin.js",
     "/js/api.js",
     "/js/busy.js",
+    "/js/buzzer_client.js",
     "/js/buzzer_hub.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
@@ -275,6 +276,7 @@
     "/js/formatui.js",
     "/js/icons.js",
     "/js/limit.js",
+    "/js/live_client.js",
     "/js/packetsui.js",
     "/js/protests.js",
     "/js/read_core.js",
@@ -292,16 +294,16 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "390f9dd10667bb5b3ac1c0c3",
-      "chars": 1709
+      "sha256": "833ded819048cf3255dfe458",
+      "chars": 1764
      },
      "schedview=now": {
-      "sha256": "390f9dd10667bb5b3ac1c0c3",
-      "chars": 1709
+      "sha256": "833ded819048cf3255dfe458",
+      "chars": 1764
      },
      "schedview=all": {
-      "sha256": "1e1f2241641b9602fb1a5984",
-      "chars": 6630
+      "sha256": "e361f8794887885800c37416",
+      "chars": 6669
      }
     },
     "stats": {
@@ -440,9 +442,11 @@
     "/engine/stats.js",
     "/engine/yft.js",
     "/js/api.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
     "/js/demo.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/protests.js",
@@ -728,6 +732,7 @@
     "/js/admin.js",
     "/js/api.js",
     "/js/busy.js",
+    "/js/buzzer_client.js",
     "/js/buzzer_hub.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
@@ -736,6 +741,7 @@
     "/js/formatui.js",
     "/js/icons.js",
     "/js/limit.js",
+    "/js/live_client.js",
     "/js/packetsui.js",
     "/js/protests.js",
     "/js/read_core.js",
@@ -753,16 +759,16 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "c40d65d0bac4c04f42f8f757",
-      "chars": 6797
+      "sha256": "9dfb5d6517de1b2c82c79ce8",
+      "chars": 6839
      },
      "schedview=now": {
-      "sha256": "5984848065d17b4950d3042c",
-      "chars": 1876
+      "sha256": "74152d0d7018424f1b05fe0f",
+      "chars": 1986
      },
      "schedview=all": {
-      "sha256": "c40d65d0bac4c04f42f8f757",
-      "chars": 6797
+      "sha256": "9dfb5d6517de1b2c82c79ce8",
+      "chars": 6839
      }
     },
     "stats": {
@@ -905,9 +911,11 @@
     "/engine/stats.js",
     "/engine/yft.js",
     "/js/api.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
     "/js/demo.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/protests.js",
@@ -924,12 +932,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "704fece7b8b79da1520174be",
-      "chars": 13354
+      "sha256": "bf1caf38f01943020844a694",
+      "chars": 13447
      },
      "schedview=all": {
-      "sha256": "704fece7b8b79da1520174be",
-      "chars": 13354
+      "sha256": "bf1caf38f01943020844a694",
+      "chars": 13447
      }
     },
     "stats": {
@@ -1019,8 +1027,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1036,12 +1046,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "dbde3ec6cae1c82647dedcaa",
-      "chars": 14257
+      "sha256": "9c811c65e9aae3556abfa46b",
+      "chars": 14350
      },
      "schedview=all": {
-      "sha256": "dbde3ec6cae1c82647dedcaa",
-      "chars": 14257
+      "sha256": "9c811c65e9aae3556abfa46b",
+      "chars": 14350
      }
     },
     "stats": {
@@ -1131,8 +1141,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1148,12 +1160,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "df2203df8f3e1c9ccc6d1820",
-      "chars": 33633
+      "sha256": "17735e188c497fa977f2ab88",
+      "chars": 33834
      },
      "schedview=all": {
-      "sha256": "df2203df8f3e1c9ccc6d1820",
-      "chars": 33633
+      "sha256": "17735e188c497fa977f2ab88",
+      "chars": 33834
      }
     },
     "stats": {
@@ -1243,8 +1255,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1260,12 +1274,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "bbc1c5935856be2f14eeeba1",
-      "chars": 23660
+      "sha256": "e1b2c7b7d0119b39d17b4696",
+      "chars": 23858
      },
      "schedview=all": {
-      "sha256": "bbc1c5935856be2f14eeeba1",
-      "chars": 23660
+      "sha256": "e1b2c7b7d0119b39d17b4696",
+      "chars": 23858
      }
     },
     "stats": {
@@ -1332,8 +1346,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1349,12 +1365,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "ff10b1d7f379b0f061f38af1",
-      "chars": 11675
+      "sha256": "35e660b86e0df7a0c94bee18",
+      "chars": 11747
      },
      "schedview=all": {
-      "sha256": "ff10b1d7f379b0f061f38af1",
-      "chars": 11675
+      "sha256": "35e660b86e0df7a0c94bee18",
+      "chars": 11747
      }
     },
     "stats": {
@@ -1444,8 +1460,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1461,12 +1479,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "93df973fbd93bd11505582be",
-      "chars": 19840
+      "sha256": "5b8f3508e1c36ee6aaa0751e",
+      "chars": 19930
      },
      "schedview=all": {
-      "sha256": "93df973fbd93bd11505582be",
-      "chars": 19840
+      "sha256": "5b8f3508e1c36ee6aaa0751e",
+      "chars": 19930
      }
     },
     "stats": {
@@ -1556,8 +1574,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1573,22 +1593,22 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "bad41e2689561488d51aca4c",
-      "chars": 43386
+      "sha256": "e7530d8087286eff5eecbbce",
+      "chars": 43725
      },
      "schedview=all": {
-      "sha256": "bad41e2689561488d51aca4c",
-      "chars": 43386
+      "sha256": "e7530d8087286eff5eecbbce",
+      "chars": 43725
      }
     },
     "stats": {
      "first": {
-      "sha256": "0b894b892dfc81eb157751c5",
-      "chars": 3809811
+      "sha256": "403fedb0046d0f7c9846d34b",
+      "chars": 3810386
      },
      "layout=classic": {
-      "sha256": "0b894b892dfc81eb157751c5",
-      "chars": 3809811
+      "sha256": "403fedb0046d0f7c9846d34b",
+      "chars": 3810386
      },
      "layout=new": {
       "sha256": "5bfa654df528752423a1cb56",
@@ -1760,8 +1780,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1777,12 +1799,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "a9f96cd2c02b3b791013de35",
-      "chars": 24332
+      "sha256": "ab07588c535d6a8182b14f3e",
+      "chars": 24509
      },
      "schedview=all": {
-      "sha256": "a9f96cd2c02b3b791013de35",
-      "chars": 24332
+      "sha256": "ab07588c535d6a8182b14f3e",
+      "chars": 24509
      }
     },
     "stats": {
@@ -1872,8 +1894,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -1889,12 +1913,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "54eaa7fa20f9602321e82cb4",
-      "chars": 24056
+      "sha256": "e77eb136823f11dfd4a72c34",
+      "chars": 24206
      },
      "schedview=all": {
-      "sha256": "54eaa7fa20f9602321e82cb4",
-      "chars": 24056
+      "sha256": "e77eb136823f11dfd4a72c34",
+      "chars": 24206
      }
     },
     "stats": {
@@ -1984,8 +2008,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -2001,12 +2027,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "a9cfc97ebaca23642604d650",
-      "chars": 9329
+      "sha256": "d3d250fa8626d87760617733",
+      "chars": 9389
      },
      "schedview=all": {
-      "sha256": "a9cfc97ebaca23642604d650",
-      "chars": 9329
+      "sha256": "d3d250fa8626d87760617733",
+      "chars": 9389
      }
     },
     "stats": {
@@ -2096,8 +2122,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",
@@ -2113,12 +2141,12 @@
    "tabs": {
     "schedule": {
      "first": {
-      "sha256": "75ca0c7aa82034d997a9e2e8",
-      "chars": 20076
+      "sha256": "38f460a9b717e709b41c4751",
+      "chars": 20148
      },
      "schedview=all": {
-      "sha256": "75ca0c7aa82034d997a9e2e8",
-      "chars": 20076
+      "sha256": "38f460a9b717e709b41c4751",
+      "chars": 20148
      }
     },
     "stats": {
@@ -2208,8 +2236,10 @@
     "/engine/yft.js",
     "/js/api.js",
     "/js/archive.js",
+    "/js/buzzer_client.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/live_client.js",
     "/js/newstats.js",
     "/js/place.js",
     "/js/pubview.js",

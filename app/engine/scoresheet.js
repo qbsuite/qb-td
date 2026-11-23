@@ -200,3 +200,39 @@ export function buildScoresheet(json, cats = null, regTossups = 20) {
     final: [...score],
   };
 }
+
+/**
+ * A game in play as the live room carries it (read_main.js watchScore,
+ * buzzer/worker.js LiveRoom): one row per question read, by team
+ * only, [n, a, b, bonusA, bonusB, scoreA, scoreB]. a and b are the
+ * team's tossup points on that question (null: it didn't buzz), its bonus
+ * parts as '1'/'0' (null: not its bonus), and the score after it. No
+ * players and no categories: it is shown to everyone while other rooms may
+ * still be reading the packet. `teams`: [a, b], the order wanted; `upTo`:
+ * the question being read (its row fills in as it is marked). On that row
+ * an unchecked bonus part is '?', not '0': MODAQ can't tell a part missed
+ * from one not judged yet until the moderator moves on.
+ */
+export function liveRows(json, teams, upTo) {
+  const sh = buildScoresheet(json, null, 999);
+  if (!sh) return [];
+  const o = sh.teams[0].name === teams[1] && sh.teams[1].name === teams[0] ? [1, 0] : [0, 1];
+  const tu = (r, ti) => { const v = r.cells[ti].filter((x) => x !== null); return v.length ? v.reduce((s, x) => s + x, 0) : null; };
+  const bo = (r, ti) => (r.bonus[ti] ? r.bonus[ti].map((y) => (y ? '1' : r.n === upTo ? '?' : '0')).join('') : null);
+  return sh.rows.filter((r) => r.n <= upTo)
+    .map((r) => [r.n, tu(r, o[0]), tu(r, o[1]), bo(r, o[0]), bo(r, o[1]), r.score[o[0]], r.score[o[1]]]);
+}
+
+/** liveRows as a scoresheet sheetview.js draws: one column per team. */
+export function liveSheet(rows, [a, b], regTossups = 20) {
+  // true got, false missed, null not judged yet
+  const parts = (s) => (s ? [...s].map((c) => (c === '?' ? null : c === '1')) : null);
+  const last = rows[rows.length - 1];
+  return {
+    teams: [a, b].map((name) => ({ name, players: [{ name, initials: 'TU' }] })),
+    rows: rows.map(([n, ta, tb, ba, bb, sa, sb]) => ({ n, ot: n > regTossups, cat: null, cells: [[ta], [tb]],
+      bonus: [parts(ba), parts(bb)], out: [[false], [false]], subs: [], score: [sa, sb] })),
+    subs: [],
+    final: last ? [last[5], last[6]] : [0, 0],
+  };
+}

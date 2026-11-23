@@ -60,6 +60,7 @@ import { askWarning, warningOpen } from './warnask.js';
 import { readTagged, settingsBody, rulingsBody, postSchedule, postRoster, FORMAT_KEYS,
   SCHED_CONFLICT, SCHED_KEPT, ROSTER_CONFLICT, ROSTER_KEPT } from './saves.js';
 import { buzzerOf, buzzerSetHtml, buzzerCellHtml, wireBuzzer, buzzerThHtml, BUZZER_BLANK } from './buzzer_hub.js';
+import { watchLive } from './live_client.js';
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -429,7 +430,50 @@ async function showDetail(quiet = false, held = null) {
     if (moved) { calmRender(); if (await deciders.sync()) calmRender(); }
     if (await deciders.autoRelease()) calmRender();
   }).catch((e) => console.error(e));
+  ensureHubLive(t);
   return true;
+}
+
+/* ---------- live room ---------- */
+// With a live room (t.rt: worker.js "live rooms") the hub is told when
+// something it shows moved (an upload, a room starting, a protest, another
+// tab's change, a deploy) and refreshes then, and it shows each room's
+// running score while a game is played. The timed refresh stays as the
+// backstop, every 10 minutes while the room is reachable.
+let hubLive = new Map(); // room id (bucket) -> {round, a, b, sa, sb, tu, of}
+let hubLiveUp = false;
+let hubLiveStop = null;
+let hubKick = null;      // the boot block's refresh, run now
+function ensureHubLive(t) {
+  if (hubLiveStop || !t.rt) return;
+  hubLiveStop = watchLive({ slug: t.slug, rt: t.rt, role: 'td', on: (why, scores) => {
+    if (why === 'scores') { hubLive = scores; patchLiveScores(); return; }
+    if (why === 'live' || why === 'back') hubLiveUp = true;
+    if (why === 'down' || why === 'fallback' || why === 'over') hubLiveUp = false;
+    if ((why === 'rev' || why === 'pub' || why === 'back') && hubKick) hubKick();
+  } });
+}
+// A planned game's line on the Live view: its two teams, or, while its
+// room reads it, the running score and how far in it is.
+function plannedHtml(bid, round, [ta, tb]) {
+  const s = hubLive.get(bid);
+  const at = `data-lp="${bid}" data-lpr="${round}" data-lpa="${esc(ta)}" data-lpb="${esc(tb)}"`;
+  if (!s || s.round !== round) return `<span ${at}>${esc(ta)} <span class="muted">v</span> ${esc(tb)}</span>`;
+  // the planned teams, either way round; a room reading another matchup
+  // (or a placeholder still in the schedule) shows the teams it reads
+  const [na, pa, nb, pb] = s.a === ta && s.b === tb ? [ta, s.sa, tb, s.sb]
+    : s.a === tb && s.b === ta ? [ta, s.sb, tb, s.sa] : [s.a, s.sa, s.b, s.sb];
+  const prog = s.tu ? ` <span class="muted small">${s.tu}${s.of ? '/' + s.of : ''}</span>` : '';
+  return `<span ${at} class="lplay">${esc(na)} <b>${pa}</b> <span class="muted">v</span> <b>${pb}</b> ${esc(nb)}${prog}</span>`;
+}
+// a score arrived: redraw only the planned lines, never the page under the TD
+function patchLiveScores() {
+  for (const el of document.querySelectorAll('[data-lp]')) {
+    const html = plannedHtml(Number(el.dataset.lp), Number(el.dataset.lpr), [el.dataset.lpa, el.dataset.lpb]);
+    const tmp = document.createElement('span');
+    tmp.innerHTML = html;
+    el.replaceWith(tmp.firstChild);
+  }
 }
 
 // The mark beside Open public page: whether viewers see the latest
@@ -2272,7 +2316,8 @@ function liveBracketsHtml(bk, fileLinks) {
   const row = (r) => {
     const game = r.sum
       ? gameLine(r.sum, r.file) + unfinishedNote(r.sum)
-      : r.game ? `${esc(slotLabel(r.game.a))} <span class="muted">v</span> ${esc(slotLabel(r.game.b))}`
+      // the room's own round (its bracket's): live score while it reads it
+      : r.game ? plannedHtml(r.b.id, r.rr, [slotLabel(r.game.a), slotLabel(r.game.b)])
       : '<span class="muted">No game this round</span>';
     const acts = r.file
       ? fileLinks(r.file) + (r.file.kind === 'combined' && r.sum ? ` <button class="linkbtn" data-editfile="${r.file.id}">Edit</button>` : '')
@@ -2630,7 +2675,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
             <span class="lgame">${r.sum
               ? gameLine(r.sum, r.file) + unfinishedNote(r.sum)
               : r.bye ? '<span class="muted">No game this round</span>'
-              : r.planned ? `${esc(r.planned[0])} <span class="muted">v</span> ${esc(r.planned[1])}`
+              : r.planned ? plannedHtml(r.b.id, t.current_round, r.planned)
               : '<span class="muted">No game yet</span>'}
               ${r.openProt ? `<button class="linkbtn warntext" data-goto="protdrawer">protest</button>` : ''}
               ${r.file && r.file.error ? `<span class="warntext">${esc(r.file.error)}</span>` : ''}</span>
@@ -3131,6 +3176,10 @@ async function editGame(a, buckets, files, fileId) {
     localStorage.setItem(gameKey(room.secret, gid), storeText);
     localStorage.setItem(metaKey(room.secret, gid), JSON.stringify({
       a: aName, b: bName, round: f.round, t: '', room: room.room_name, started: Date.now(),
+      // a correction of an uploaded game: never live, never uploaded by
+      // itself; the reader says when it has changes to export (read_main
+      // watchUnsaved), measured from the game as it opens
+      fin: true,
       // how far it had got, so the corrected upload says so too
       ...(sum.progress ? { reached: sum.progress.at } : {}),
       // where questions were added or replaced, so the correction numbers
@@ -4212,8 +4261,14 @@ if (adminSecret) {
   let timer = null;
   // while the public page mark reads Updating, check at least once a
   // minute, so it turns to Up to date without a reload
-  const nextCheck = () => Math.min(quietChecks >= 4 ? 120 : quietChecks >= 2 ? 60 : 30,
-    lastDetail && pubWaiting(lastDetail.tournament) ? 60 : 120) * 1000;
+  // with the live room reachable it tells the hub when to look, and this
+  // is only the backstop
+  // a notice the refresh couldn't act on yet (the TD typing, a dialog
+  // open, the Setup view) is retried every 15 s until it has
+  let kickOwed = false;
+  const waiting = () => lastDetail && pubWaiting(lastDetail.tournament);
+  const nextCheck = () => (kickOwed ? 15 : hubLiveUp ? (waiting() ? 60 : 600) : Math.min(quietChecks >= 4 ? 120 : quietChecks >= 2 ? 60 : 30,
+    waiting() ? 60 : 120)) * 1000;
   const liveRefresh = async () => {
     clearTimeout(timer);
     try {
@@ -4235,12 +4290,16 @@ if (adminSecret) {
       // files picked in Add a game, or an open Download menu, would be wiped
       if (addOpen || ($('dlpanel') && !$('dlpanel').hidden)) return;
       const moved = await showDetail(true, lastDetail.tournament.rev);
+      kickOwed = false;
       quietChecks = moved ? 0 : quietChecks + 1;
     } finally {
       timer = setTimeout(liveRefresh, nextCheck());
     }
   };
   timer = setTimeout(liveRefresh, nextCheck());
+  // the live room said something moved: look now (liveRefresh still
+  // leaves the page alone under typing or an open dialog)
+  hubKick = () => { quietChecks = 0; kickOwed = true; liveRefresh(); };
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     quietChecks = 0;

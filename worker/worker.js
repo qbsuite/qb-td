@@ -50,7 +50,7 @@ import { qbjTextWithRound } from '../app/engine/modaqfile.js';
 import { withRound } from '../app/engine/qbj.js';
 import { packetHalf } from '../app/engine/deciderphases.js';
 import { rosterNamesFromText } from '../app/engine/games.js';
-import { signToken, PLAYER_TOKEN_MS, regionOf } from '../buzzer/token.js';
+import { signToken, PLAYER_TOKEN_MS, regionOf, signLiveToken, liveRoomName } from '../buzzer/token.js';
 import { storedFileText, rosterExportBody, publicQbjName, publicQbjText } from '../app/engine/exportfile.js';
 import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, followRoomRename, autoAdvance,
   advanceAll, advanceBracket, bracketInfo } from '../app/engine/brackets.js';
@@ -1671,7 +1671,8 @@ async function liveCandidates(env, now, limit) {
 async function liveBody(env, t, now) {
   const built = await env.DATA.get(PUBSTATE_KEY(t.id));
   if (!built) return null;
-  const body = { ...(await built.json()), ...pubOverlay(env, t), at: now,
+  const rt = await liveToken(env, { slug: t.slug, settings: t.settings, closes: closesAt(t) }, 'viewer');
+  const body = { ...(await built.json()), ...pubOverlay(env, t), ...(rt ? { rt } : {}), at: now,
     hb_ms: LIVE_HEARTBEAT_MS,
     hb_until: Math.min((t.pub_built || now) + LIVE_ACTIVE_MS, closesAt(t)) };
   delete body.final;
@@ -1775,7 +1776,7 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
       if (text === null) { if (!ride) unbuildable.push(t.id); continue; }
       const file = await liveAsset(text, 'json');
       b64s.set(file.hash, file.b64);
-      built.set(t.id, { slug: t.slug, hash: file.hash, size: file.size, at: now, ...(ride ? { was: t.live_hash } : {}) });
+      built.set(t.id, { slug: t.slug, settings: t.settings, hash: file.hash, size: file.size, at: now, ...(ride ? { was: t.live_hash } : {}) });
     }
   };
   const rowsFor = async (list) => (await env.DB.prepare(TICK_ROW_SELECT + `WHERE t.id IN (${inList(list.length)})`)
@@ -1935,6 +1936,10 @@ async function livePublish(env, tickIds = [], dirChanged = false) {
     if (dirChanged && dir) {
       await env.DATA.put(DIR_LIVE_KEY, dir.hash).catch((e) => console.log('directory.live:', e.message));
     }
+    // the live rooms of the tournaments this deploy changed: their pages
+    // read the new file now (a rider is only a restamp, nothing to read)
+    await Promise.all([...built.values()].filter((b) => !b.remove && !isRider(b))
+      .map((b) => liveTell(env, null, b.slug, b.settings, { k: 'pub' })));
     return { deployed: true, files: deployed.length, built: built.size };
   } catch (e) {
     console.log('live publish failed:', e.message);
@@ -2596,6 +2601,8 @@ async function getTournament(env, t, ctx) {
     // set_packets lets the TD put any of the set's packets on any round.
     tournament: {
       ...pub_t, closes: closesAt(t), live: liveMark(env, t),
+      // the live room's TD token: the hub is told when something moved
+      rt: await liveToken(env, { slug: t.slug, settings: t.settings, closes: closesAt(t) }, 'td'),
       // when the roster was last saved: the hub reloads its renames when
       // this moves, so another tab's rename reaches it (admin.js hubNames)
       roster_at: rosterHead ? rosterHead.uploaded.getTime() : null,
@@ -4517,6 +4524,10 @@ async function bucketState(env, secret, url) {
   // join token for its own buzzer instead, when it has one.
   const buzzer = await roomBuzzer(env, b, settings.buzzer);
   delete settings.buzzer;
+  // the live room's scorer token: the reader sends this room's score as a
+  // game is played (not for a TD's test, nor the bye room, which upload nothing)
+  const rt = test || isByeRoom(b) ? null
+    : await liveToken(env, { slug: b.slug, settings: b.settings, closes: closesAt({ created: b.t_created, started: b.started, closes_at: b.closes_at }) }, 'scorer', b.id);
   const sched = await roomSchedule(env, b);
   // a round played on half its packet says which half (the reader reads only that)
   const halves = roundPartsOf(sched);
@@ -4547,13 +4558,14 @@ async function bucketState(env, secret, url) {
     roster: !!b.roster_r2_key,
     settings,
     ...(buzzer ? { buzzer } : {}),
+    ...(rt ? { rt } : {}),
     uploads: uploads.results,
     upload_count: count.results[0].n,
     started_rounds: starts.results.map((x) => x.round),
   });
 }
 
-async function bucketUpload(request, url, env, secret) {
+async function bucketUpload(request, url, env, secret, ctx = null) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
@@ -4636,6 +4648,11 @@ async function bucketUpload(request, url, env, secret) {
       if (t && buzzConfig(t) && await roundDone(env, t, round)) await publishBuzzRounds(env, t, b.ckey, [round]);
     } catch (e) { console.log('buzzpoints file:', e.message); }
   }
+  // the hub shows it at once; a good upload of a finished game also ends
+  // the room's live score (a timed export mid-game leaves it running)
+  let unfinished = false;
+  try { const p = summary && JSON.parse(summary).progress; unfinished = !!(p && p.at < p.of); } catch (e) { /* finished */ }
+  liveTell(env, ctx, b.slug, b.settings, { k: 'rev', room: b.id, round, upload: !error && !unfinished });
   return json(env, { id: fileId, filename, round, kind, error });
 }
 
@@ -4669,7 +4686,7 @@ async function roomDeciders(env, b, sched) {
     .map((g) => ({ tb: g.tb, decider: g.n, after: Number.isInteger(g.after) ? g.after : null, part: ['first', 'second'].includes((d.parts || {})[g.tb]) ? d.parts[g.tb] : 'whole', done: !!g.done }));
 }
 
-async function bucketPacket(env, secret, url) {
+async function bucketPacket(env, secret, url, ctx = null) {
   const b = await getBucketRow(env, secret);
   const test = await testAccess(env, b, url);
   const gate = bucketGate(env, b, test);
@@ -4702,7 +4719,9 @@ async function bucketPacket(env, secret, url) {
   // really starts (bucketStartRound); any other fetch is a room taking the
   // packet to read — the uploads page's download link.
   // (a decider is no round of the schedule: it starts nothing for auto-advance)
-  if (url.searchParams.get('warm') !== '1' && !test && !tb) await noteRoomStart(env, b, round, place);
+  if (url.searchParams.get('warm') !== '1' && !test && !tb && await noteRoomStart(env, b, round, place)) {
+    liveTell(env, ctx, b.slug, b.settings, { k: 'rev', room: b.id, round });
+  }
   // the reader asks for the questions (parsed=1); the download link, the file
   const rawKey = await blobKey(b, results[0].packet_r2_key);
   if (url.searchParams.get('parsed') === '1') {
@@ -4712,7 +4731,7 @@ async function bucketPacket(env, secret, url) {
 }
 
 // POST /b/:secret/start?round=n — the reader started a game on round n.
-async function bucketStartRound(env, secret, url) {
+async function bucketStartRound(env, secret, url, ctx = null) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
@@ -4721,7 +4740,7 @@ async function bucketStartRound(env, secret, url) {
   const round = Number(url.searchParams.get('round'));
   if (Number.isInteger(round) && round > TB_ROUND && (await roomDeciders(env, b)).some((g) => TB_ROUND + g.tb === round)) return json(env, { ok: true });
   if (!Number.isInteger(round) || round < 1 || round > place.round) return err(env, 400, 'bad round');
-  await noteRoomStart(env, b, round, place);
+  if (await noteRoomStart(env, b, round, place)) liveTell(env, ctx, b.slug, b.settings, { k: 'rev', room: b.id, round });
   return json(env, { ok: true });
 }
 
@@ -4731,7 +4750,7 @@ async function bucketStartRound(env, secret, url) {
 // Body {teams: [a, b], protests: [...]} (protests.js protestReport); an
 // empty list clears the game's row. The uploaded game replaces these on
 // the hub (protests.js protestRows).
-async function bucketLiveProtests(request, url, env, secret) {
+async function bucketLiveProtests(request, url, env, secret, ctx = null) {
   const b = await getBucketRow(env, secret);
   const gate = bucketGate(env, b);
   if (gate) return gate;
@@ -4749,6 +4768,7 @@ async function bucketLiveProtests(request, url, env, secret) {
   if (!protests || teams.length !== 2 || !teams[0] || !teams[1]) return err(env, 400, 'bad protests');
   if (!protests.length) {
     await env.DB.prepare('DELETE FROM live_protests WHERE bucket_id = ?1 AND game = ?2').bind(b.id, game).run();
+    liveTell(env, ctx, b.slug, b.settings, { k: 'rev', room: b.id, round });
     return json(env, { ok: true });
   }
   const { results } = await env.DB.prepare(
@@ -4758,6 +4778,7 @@ async function bucketLiveProtests(request, url, env, secret) {
   await env.DB.prepare(
     'INSERT OR REPLACE INTO live_protests (bucket_id, tournament_id, round, game, summary, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
   ).bind(b.id, b.tournament_id, round, game, JSON.stringify({ teams, protests }), Date.now()).run();
+  liveTell(env, ctx, b.slug, b.settings, { k: 'rev', room: b.id, round });
   return json(env, { ok: true });
 }
 
@@ -4819,6 +4840,7 @@ async function noteRoomStart(env, b, round, place) {
   if (out.meta.changes && round === at) {
     await maybeAdvance(env, b.tournament_id, place && place.bracket ? place.bracket.key : null);
   }
+  return !!out.meta.changes;
 }
 
 async function maybeAdvance(env, tid, onlyBracket = null) {
@@ -5230,6 +5252,41 @@ async function pubBuzzer(request, env, slug) {
   const rooms = results.map((r) => r.id).filter((id) => !bye.includes(id) && (c.online || c.rooms.includes(id)));
   const token = await signToken(env.BUZZER_SECRET, { slug, role: 'player', rooms, expires: Math.min(closes, Date.now() + PLAYER_TOKEN_MS), closes, region: c.region });
   return json(env, { token, rooms, closes, region: c.region });
+}
+
+// ------------------------------------------------------------ live rooms
+// A tournament's live room (buzzer/worker.js LiveRoom, in the buzzer's
+// Worker): the public page and the Live Hub hold a socket to it and are
+// told when something moved, instead of waiting for a reload or a poll,
+// and each room's reader sends its running score there while a game is
+// played. This Worker signs who may join (buzzer/token.js signLiveToken,
+// under BUZZER_SECRET) and sends the room its notices through the
+// LIVEROOM binding; the room never calls back. On only with LIVE_ROOMS
+// set to "1" (wrangler.toml); off, no page gets a token and every page
+// behaves as before.
+function liveRoomsOn(env) { return env.LIVE_ROOMS === '1' && !!env.BUZZER_SECRET; }
+// the tournament's region: the buzzer's (settings.buzzer.region), else enam
+function liveRegion(settingsText) { const c = buzzerConfig(settingsText); return c ? c.region : 'enam'; }
+// { token, g? } for one role, or null. `closes`: when the links close.
+async function liveToken(env, { slug, settings, closes }, role, room = null) {
+  if (!liveRoomsOn(env) || !slug || !(Date.now() < closes)) return null;
+  const region = liveRegion(settings);
+  const token = await signLiveToken(env.BUZZER_SECRET, { slug, role, room, expires: closes, closes, region });
+  // the slug rides along: a reader's game keeps this, and its page knows
+  // the tournament only by name
+  return region === 'enam' ? { token, slug } : { token, slug, g: region };
+}
+// Tell the room something moved: {k:'pub'} a deploy carrying it went out,
+// {k:'rev', room?, round?, upload?} something the hub shows. Never fails
+// the request that caused it; with a ctx it outlives the response.
+function liveTell(env, ctx, slug, settings, msg) {
+  if (!liveRoomsOn(env) || !env.LIVEROOM || !slug) return null;
+  const region = liveRegion(settings);
+  const stub = env.LIVEROOM.get(env.LIVEROOM.idFromName(liveRoomName(slug, region)), { locationHint: region });
+  const p = stub.fetch('https://live/notify', { method: 'POST', body: JSON.stringify(msg) })
+    .then((r) => { if (r.body) return r.body.cancel(); }, (e) => console.log('live notice:', e.message));
+  if (ctx && ctx.waitUntil) ctx.waitUntil(p);
+  return p;
 }
 
 async function ipLimit(request, env, scope) {
@@ -5730,15 +5787,18 @@ async function pubState(env, slug, ctx, fb = null) {
   if (!t) return err(env, 404, 'not found');
   const { pub } = pubOverlay(env, t);
   const built = await env.DATA.get(PUBSTATE_KEY(t.id));
+  // the live room's viewer token (public, like the page; it only proves
+  // the tournament is published, and stops at the close)
+  const rt = await liveToken(env, { slug: t.slug, settings: t.settings, closes: closesAt(t) }, 'viewer');
   if (built) {
-    const body = { ...(await built.json()), ...pubOverlay(env, t), final: tournamentFinal(t) };
+    const body = { ...(await built.json()), ...pubOverlay(env, t), ...(rt ? { rt } : {}), final: tournamentFinal(t) };
     return json(env, body, 200, pubCache(t));
   }
   // not built yet (published before this existed, or the first tick
   // hasn't run): derive it live, and have the next tick build it
   if (ctx) ctx.waitUntil(markPub(env, t.id));
   const body = await pubStateBody(env, t, pub);
-  Object.assign(body, pubBuzzerMark(t));
+  Object.assign(body, pubBuzzerMark(t), rt ? { rt } : {});
   // Games but no shards to serve them from: a tournament published
   // before the round shards existed. Flag it so the next tick
   // materializes it — otherwise
@@ -7159,10 +7219,10 @@ async function route(request, env, ctx, url) {
   let m;
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})$/)) && method === 'GET') return bucketState(env, m[1], url);
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/load$/)) && method === 'GET') return bucketLoad(env, m[1], url);
-  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1]);
-  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url);
-  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url);
-  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/protests$/)) && method === 'POST') return bucketLiveProtests(request, url, env, m[1]);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/upload$/)) && method === 'POST') return bucketUpload(request, url, env, m[1], ctx);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/packet$/)) && method === 'GET') return bucketPacket(env, m[1], url, ctx);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/start$/)) && method === 'POST') return bucketStartRound(env, m[1], url, ctx);
+  if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/protests$/)) && method === 'POST') return bucketLiveProtests(request, url, env, m[1], ctx);
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/roster$/)) && method === 'GET') return bucketRoster(env, m[1], url);
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/schedule$/)) && method === 'GET') return bucketSchedule(env, m[1], url);
   if ((m = path.match(/^\/b\/([a-z0-9]{10,40})\/tiebreakers$/)) && method === 'GET') return bucketTiebreakers(env, m[1], url);
@@ -7231,50 +7291,59 @@ async function route(request, env, ctx, url) {
     const t = await getAdminTournament(env, m[1]);
     if (!t) return err(env, 404, 'bad link');
     if (adminClosed(t)) return err(env, 410, 'tournament closed');
-    const sub = m[2] || '';
-    let mm;
-    if (sub === '' && method === 'GET') {
-      // The Live Hub's refresh sends the rev of the detail it holds; when
-      // nothing has moved (tournaments.rev, bumped by triggers — see
-      // migrate-rev.sql) the answer is the admin lookup already paid for,
-      // not the rooms + files + starts reads of a full detail.
-      const held = url.searchParams.get('rev');
-      if (held !== null && /^\d+$/.test(held) && Number(held) === t.rev) {
-        // the public page mark rides along: the cron's columns don't move rev
-        return json(env, { unchanged: true, rev: t.rev, pub_dirty: t.pub_dirty, pub_built: t.pub_built ?? null,
-          live: liveMark(env, t) });
-      }
-      return getTournament(env, t, ctx);
-    }
-    if (sub === '' && method === 'POST') return updateTournament(request, env, t);
-    if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
-    if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
-    if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
-    if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
-    if (sub === '/start' && method === 'POST') return startTournament(env, t, ctx);
-    if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
-    if (sub === '/tiebreakers' && method === 'POST') return bumpRev(env, t.id, await uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey));
-    if (sub === '/tiebreakers' && method === 'DELETE') {
-      const one = url.searchParams.get('id');
-      return bumpRev(env, t.id, one ? await removeTiebreaker(env, TB_KEY(t.id), t.ckey, one) : await deleteTiebreakers(env, TB_KEY(t.id)));
-    }
-    if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
-    if (sub === '/packets/move' && method === 'POST') return movePacket(request, env, t);
-    if (sub === '/buzzfiles' && method === 'POST') return remakeBuzzFiles(env, t);
-    if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
-    if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
-    if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
-    if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
-    if (sub === '/games' && method === 'GET') return adminGames(url, env, t);
-    if (sub === '/uploads' && method === 'GET') return adminUploads(url, env, t);
-    if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
-    if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'POST') return moveFile(request, env, t, Number(mm[1]));
-    if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);
-    if (sub === '/setpacket' && method === 'POST') return chooseSetPacket(request, env, t);
-    if (sub === '/join' && method === 'POST') return joinSet(request, env, t);
+    const res = await adminRoute(request, env, ctx, url, t, m[2] || '', method);
+    // a TD's change reaches the tournament's other hub tabs at once
+    if (res && method !== 'GET' && res.status < 300) liveTell(env, ctx, t.slug, t.settings, { k: 'rev' });
+    if (res) return res;
   }
 
   return err(env, 404, 'not found');
+}
+
+// The admin routes for a tournament the link opened (route above); null
+// when none matches.
+async function adminRoute(request, env, ctx, url, t, sub, method) {
+  let mm;
+  if (sub === '' && method === 'GET') {
+    // The Live Hub's refresh sends the rev of the detail it holds; when
+    // nothing has moved (tournaments.rev, bumped by triggers — see
+    // migrate-rev.sql) the answer is the admin lookup already paid for,
+    // not the rooms + files + starts reads of a full detail.
+    const held = url.searchParams.get('rev');
+    if (held !== null && /^\d+$/.test(held) && Number(held) === t.rev) {
+      // the public page mark rides along: the cron's columns don't move rev
+      return json(env, { unchanged: true, rev: t.rev, pub_dirty: t.pub_dirty, pub_built: t.pub_built ?? null,
+        live: liveMark(env, t) });
+    }
+    return getTournament(env, t, ctx);
+  }
+  if (sub === '' && method === 'POST') return updateTournament(request, env, t);
+  if (sub === '/rotate' && method === 'POST') return rotateAdmin(env, t);
+  if (sub === '/buckets' && method === 'POST') return createBucket(request, env, t);
+  if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'DELETE') return deleteBucket(env, t, Number(mm[1]));
+  if ((mm = sub.match(/^\/buckets\/(\d+)$/)) && method === 'POST') return renameBucket(request, env, t, Number(mm[1]));
+  if (sub === '/start' && method === 'POST') return startTournament(env, t, ctx);
+  if (sub === '/tiebreakers' && method === 'GET') return adminTiebreakers(env, t);
+  if (sub === '/tiebreakers' && method === 'POST') return bumpRev(env, t.id, await uploadTiebreakers(request, url, env, TB_KEY(t.id), t.ckey));
+  if (sub === '/tiebreakers' && method === 'DELETE') {
+    const one = url.searchParams.get('id');
+    return bumpRev(env, t.id, one ? await removeTiebreaker(env, TB_KEY(t.id), t.ckey, one) : await deleteTiebreakers(env, TB_KEY(t.id)));
+  }
+  if (sub === '/packet' && method === 'POST') return uploadPacket(request, url, env, t);
+  if (sub === '/packets/move' && method === 'POST') return movePacket(request, env, t);
+  if (sub === '/buzzfiles' && method === 'POST') return remakeBuzzFiles(env, t);
+  if (sub === '/roster' && method === 'POST') return uploadRoster(request, url, env, t);
+  if (sub === '/schedule' && method === 'POST') return putSchedule(request, env, t);
+  if (sub === '/schedule' && method === 'DELETE') return deleteSchedule(env, t);
+  if (sub === '/file' && method === 'GET') return adminDownload(url, env, t);
+  if (sub === '/games' && method === 'GET') return adminGames(url, env, t);
+  if (sub === '/uploads' && method === 'GET') return adminUploads(url, env, t);
+  if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'DELETE') return deleteFile(env, t, Number(mm[1]));
+  if ((mm = sub.match(/^\/files\/(\d+)$/)) && method === 'POST') return moveFile(request, env, t, Number(mm[1]));
+  if (sub === '/bundle' && method === 'POST') return putBundle(request, env, t);
+  if (sub === '/setpacket' && method === 'POST') return chooseSetPacket(request, env, t);
+  if (sub === '/join' && method === 'POST') return joinSet(request, env, t);
+  return null;
 }
 
 // A credential in a route's path, kept out of the logs.
