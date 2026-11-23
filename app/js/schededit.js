@@ -3,8 +3,11 @@
 // columns into bracket lanes (Pool A, Championship, 1st place…), keeps
 // the round column and room headers pinned while the grid scrolls, and
 // lets a TD drag teams (swap, bench) and whole games (trade, move), or
-// click the same things through the side panel. Checks run on every
-// edit; nothing is stored until Save (Generate saves at once, as before).
+// click the same things and act on them in a popover at what was
+// clicked. Checks run on every edit and show as a count on the toolbar's
+// warning sign; nothing is stored until Save (Generate saves at once, as
+// before). Between two phases a line shows the tie order (the tournament
+// setting, stats.js tieOrderOf) and, before Finals, what they rank on.
 //
 // admin.js owns the working schedule (the Live Hub reads it too); this
 // module owns only the editor's view state, reached through `env`.
@@ -14,24 +17,26 @@ import { ICON as ICONS, named } from './icons.js';
 import { busy } from './busy.js';
 import {
   allFormats, poolSizes, validateSchedule, slotText, insertRound, removeRound,
-  addRound, swapCells, removeRoomCol, hasPlaceholders, fillPlaceholders,
+  addRound, swapCells, removeRoomCol, hasPlaceholders,
   tagBrackets, bracketRooms, phaseLanes, scheduleChecks, renameTeams, removeTeam,
   poolOf, tradePools, tradesLocked, regenPart,
 } from '../engine/schedule.js';
 import { buildPlan, planPreview, planGroups, rebracketChecks, addFinals, handOk } from '../engine/plan.js';
 import HDWHITE from '../engine/hdwhite.js';
-import { h2hSaid } from '../engine/finals.js';
+import { finalsSources } from '../engine/finals.js';
+import { DEFAULT_TIE_ORDER, isTieOrder } from '../engine/stats.js';
 
 /* ---------- view state (per page load) ---------- */
 
 const ui = {
-  view: 'grid',          // grid | teams | brackets
+  view: 'grid',          // grid | teams
   filter: '',            // '' = every bracket, else a bracket key
   closed: new Set(),     // collapsed phase indexes
-  sel: null,             // {kind: slot|game|empty|room|round, ...}
+  sel: null,             // {kind: slot|game|empty|room|round|lane, ...}: the popover's
   mode: null,            // swapSlot | moveGame | trade
-  tradePick: null,       // Brackets view: the team picked to trade pools
-  renaming: null,        // Brackets view: 'key@phase' of the bracket being renamed
+  renaming: null,        // the popover's Rename: 'room' | 'lane'
+  menu: null,            // the toolbar's open menu: 'plus' | 'more'
+  probsOpen: false,      // the problem list under the toolbar
   past: [], future: [],  // JSON snapshots for Undo / Redo
   note: '',
   baseline: { obj: null, json: '' }, // the schedule as saved
@@ -39,28 +44,26 @@ const ui = {
   full: false,           // the editor fills the screen
   zoom: null,            // full screen: null = fit to the screen, else the TD's own zoom (1 = 100%)
   zoomNow: 1,            // the zoom last applied (what minus and plus step from)
-  sideOpen: false,       // full screen: the panel was opened for its checks
   colW: {},              // 'laneKey@phase' -> px: room columns the TD dragged to a width of their own
   byeW: null,            // the Byes column, likewise
   opts: { seed: 1 + Math.floor(Math.random() * 9999) }, // the picker's seed (rounds are always shuffled)
   plan: null,            // the picker's plan (plan.js phases); null: from the schedule, or the default
   regen: 'all',          // what Generate replaces: 'all' or 'p<phase>'
   addPhase: false,       // the editor's Add phase form is open
-  fillCheck: null,       // fillReport() with something to look at before filling
 };
 
-/** Escape: drop the selection or a half-done swap, then leave full
-    screen. True if it did. */
+/** Escape: close a menu, the popover or a half-done swap, then leave
+    full screen. True if it did. */
 export function schedEscape() {
-  if (ui.tradePick) { ui.tradePick = null; return true; }
+  if (ui.menu) { ui.menu = null; return true; }
   if (!ui.sel && !ui.mode) {
     if (!ui.full) return false;
-    if (ui.sideOpen) { ui.sideOpen = false; return true; }
     setFull(false);
     return true;
   }
   ui.sel = null;
   ui.mode = null;
+  ui.renaming = null;
   return true;
 }
 
@@ -173,6 +176,77 @@ if (typeof document !== 'undefined') {
 }
 
 const COLORS = 8; // lane tints cycle (td.css .lane-0..7)
+
+// the toolbar's own symbols, drawn as icons.js draws the rest
+const svg16 = (d) => `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC_PLUS = svg16('<path d="M8 3v10M3 8h10"/>');
+const IC_WARN = '<svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M10 2.8 18 16.5H2z"/><path d="M10 8v4" stroke-linecap="round"/><circle cx="10" cy="14.2" r=".5" fill="currentColor"/></svg>';
+const IC_CHECK = '<svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="m6.8 10.2 2.2 2.2 4.2-4.6"/></svg>';
+
+/* ---------- the tie order: one line of steps, each movable ---------- */
+
+// The tournament's order (env.tieOrder(): stats.js tieOrderOf). One from
+// before the order existed (its old tiebreak, mapped) shows its own steps,
+// then the steps it never reaches, faded; moving any step saves a full
+// order (env.saveTieOrder), PP20 becoming PPG. Steps after You pick are
+// never reached either, and fade the same way.
+const TIE_NAME = { game: 'Tiebreaker game', ppg: 'Points per game', h2h: 'Head-to-head', ppb: 'Points per bonus', pick: 'You pick', pp20: 'Points per 20' };
+const TIE_SHORT = { game: 'Tiebreaker game (if exists)', ppg: 'PPG', h2h: 'Head-to-head', ppb: 'PPB', pick: 'You pick', pp20: 'PP20' };
+function tieLine(env) {
+  const cur = env.tieOrder ? env.tieOrder() : [...DEFAULT_TIE_ORDER];
+  if (isTieOrder(cur)) return { steps: cur, reach: cur.indexOf('pick') + 1, legacy: false };
+  const rest = DEFAULT_TIE_ORDER.filter((x) => !cur.includes(x) && !(x === 'ppg' && cur.includes('pp20')));
+  return { steps: [...cur, ...rest], reach: cur.length, legacy: true };
+}
+function tieChips(env) {
+  const { steps, reach, legacy } = tieLine(env);
+  return `<span class="sgtline">${steps.map((c, i) => `${i ? '<span class="sgtarr">→</span>' : ''}<span class="sgtchip${i >= reach ? ' after' : ''}${c === 'pick' ? ' pick' : ''}" draggable="true" data-tchip="${i}"
+    title="${esc(TIE_NAME[c])}${i >= reach && !legacy ? ' (not reached: you pick first)' : ''}">${i > 0 ? `<button class="tl" data-tcl="${i}" aria-label="Earlier">‹</button>` : ''}${
+    esc(TIE_SHORT[c])}${i < steps.length - 1 ? `<button class="tr" data-tcr="${i}" aria-label="Later">›</button>` : ''}</span>`).join('')}</span>`;
+}
+// the arrows and dragging; each move is saved at once (a setting, not a schedule edit)
+function wireTieChips(root, env, redraw) {
+  const move = async (from, to) => {
+    const steps = [...tieLine(env).steps];
+    const [c] = steps.splice(from, 1);
+    steps.splice(to, 0, c);
+    const next = steps.map((x) => (x === 'pp20' ? 'ppg' : x));
+    if (!isTieOrder(next) || !env.saveTieOrder) return;
+    try { await env.saveTieOrder(next); } catch (e) { env.say(e.message, true); }
+    redraw();
+  };
+  root.querySelectorAll('[data-tcl]').forEach((b) => { b.onclick = (ev) => { ev.stopPropagation(); const i = Number(b.dataset.tcl); move(i, i - 1); }; });
+  root.querySelectorAll('[data-tcr]').forEach((b) => { b.onclick = (ev) => { ev.stopPropagation(); const i = Number(b.dataset.tcr); move(i, i + 1); }; });
+  let from = null;
+  const done = () => { from = null; root.querySelectorAll('.sgtchip.dragging, .sgtchip.dropat').forEach((x) => x.classList.remove('dragging', 'dropat')); };
+  root.querySelectorAll('[data-tchip]').forEach((ch) => {
+    ch.ondragstart = (ev) => {
+      ev.stopPropagation();
+      from = Number(ch.dataset.tchip);
+      ch.classList.add('dragging');
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', 'tie order');
+    };
+    ch.ondragover = (ev) => {
+      if (from === null) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      root.querySelectorAll('.sgtchip.dropat').forEach((x) => { if (x !== ch) x.classList.remove('dropat'); });
+      ch.classList.add('dropat');
+    };
+    ch.ondrop = (ev) => {
+      if (from === null) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const f = from;
+      const to = Number(ch.dataset.tchip);
+      done();
+      if (f !== to) move(f, to);
+    };
+    ch.ondragend = done;
+  });
+}
+
 const refKey = (x) => x.bye !== undefined ? `${x.p}.${x.r}.b${x.bye}` : `${x.p}.${x.r}.${x.room}.${x.side}`;
 const cellKey = (x) => `${x.p}.${x.r}.${x.room}`;
 const slotShow = (s) => {
@@ -542,6 +616,8 @@ function renderCreator(box, env) {
       out.push(`<span class="pkl">Who plays</span><span class="pkrow">The top <input type="number" class="pkcount" min="1" max="${full}" value="${ph.top || full}" data-top="${p}"> <span class="muted">from each pool</span></span>`);
       if (type === 'double') out.push(`<span></span><label class="pkcheck"><input type="checkbox" data-reset="${p}" ${ph.reset ? 'checked' : ''}> A second final if the unbeaten team loses</label>`);
     }
+    // how ties for a place go: the tournament's tie order, the editor's line between phases
+    out.push(`<span class="pkl">Ties for a place</span><span>${tieChips(env)}</span>`);
     for (const c of rebracketChecks(groupsBy, P, p)) if (!c.ok) warnings.push(c.text);
     out.push(warn(warnings));
     roomRows(p, out, 'pools');
@@ -592,6 +668,7 @@ function renderCreator(box, env) {
         <span class="sgseed">Seed <b>${ui.opts.seed}</b> <button id="optreroll" class="small">Reroll</button></span></div>
     </div>`;
   wireBack();
+  wireTieChips(box, env, again);
 
   // each change redraws; a change to the structure turns Format to Custom
   // (seeding, ties and rooms don't)
@@ -801,60 +878,7 @@ function renderCreator(box, env) {
   };
 }
 
-// The notes shown before filling playoff slots: prelim games with no
-// file, uploads the schedule doesn't have, and tied records that decide
-// a bracket. Filling still works; the TD decides. r: fillReport's result,
-// with `game` when ties are settled by a tiebreaker game.
 const andList = (xs) => (xs.length < 3 ? xs.join(' and ') : xs.slice(0, -1).join(', ') + ', and ' + xs.at(-1));
-export function fillCheckHtml(r) {
-  // the figure a tie goes by (t.stat: the TD's tiebreak) and each team's value
-  const FIGN = { pp20: 'points per 20 tossups heard', ppg: 'points per game', ppb: 'points per bonus' };
-  const nm = (t) => FIGN[t.stat] || FIGN.pp20;
-  const Nm = (t) => nm(t)[0].toUpperCase() + nm(t).slice(1);
-  const pp = (x) => (Math.round((x.val ?? x.pp20tuh) * 100) / 100).toFixed(2);
-  // r.game: the schedule breaks rebracketing ties with a tiebreaker game
-  const items = [
-    ...r.missing.map((m) => `Round ${m.round}, ${esc(m.room)}: there is no game file for ${esc(m.a)} vs ${esc(m.b)}.`),
-    ...r.extra.map((m) => `Round ${m.round}: a game file for ${esc(m.a)} vs ${esc(m.b)} was uploaded, but that game is not on the schedule.`),
-    ...r.ties.map((t) => {
-      const head = `Pool ${esc(t.pool)}: ${andList(t.teams.map((x) => esc(x.name)))} are tied at ${t.record}. `
-        + (r.game ? 'Please play a tiebreaker game, then place the teams by hand. ' : '')
-        + (t.h2h ? esc(h2hSaid(t, false).trim()) + ' ' : '');
-      const goes = (withPp) => t.teams.map((x) => `${esc(x.name)}${withPp ? ` (${pp(x)})` : ''} goes to ${esc(x.bracket || 'no bracket')}`).join(', ');
-      // teams level on points per 20 too keep their pool order (t.level)
-      const level = t.level || [];
-      // head-to-head on and it separated them (t.h2h): filling goes by it
-      if (t.h2h && t.h2h.decided !== 'none') {
-        return head + `Filling${r.game ? ' now' : ''} goes by that: ${goes(t.h2h.decided === 'some')}.`
-          + level.map((g) => ` ${andList(g.map(esc))} have the same ${nm(t)}, so they keep their pool order.`).join('');
-      }
-      if (level.length === 1 && level[0].length === t.teams.length) {
-        return head + `They have the same ${nm(t)}, so filling${r.game ? ' now' : ''} keeps their pool order: ${goes(false)}.`;
-      }
-      return head + (r.game ? `Filling now orders them by ${nm(t)}: ` : `${Nm(t)} breaks the tie: `)
-        + goes(true) + '.'
-        + level.map((g) => ` ${andList(g.map(esc))} have the same ${nm(t)}, so they keep their pool order.`).join('');
-    }),
-    ...(r.compared || []).map((c) => {
-      const head = `${ORDN(c.place)} places ${andList(c.teams.map((x) => `${esc(x.name)} (Pool ${esc(x.pool)}, ${x.record})`))} `
-        + `have the same winning percentage. ${r.game ? 'Please play a tiebreaker game, then place them by hand. ' : ''}`;
-      // teams level on points per 20 too go in pool order (c.level)
-      const level = c.level || [];
-      if (level.length === 1 && level[0].length === c.teams.length) {
-        return head + `They also have the same ${nm(c)} (${pp(c.teams[0])}), so filling${r.game ? ' now' : ''} puts them in pool order.`;
-      }
-      return head + `${r.game ? 'Filling now goes by' : 'They go up by'} ${nm(c)}: `
-        + c.teams.map((x) => `${esc(x.name)} ${pp(x)}`).join(', ') + '.'
-        + level.map((g) => ` ${andList(g.map(esc))} have the same ${nm(c)}, so they go in pool order.`).join('');
-    }),
-  ];
-  return `<div class="sgnotice sgfillcheck">
-    <div><b>Before filling playoff slots</b>
-      <ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>
-      <div class="muted small">${r.missing.length ? 'Standings only count the games that have been uploaded. ' : ''}You can fill now, or fix these first and fill again.</div></div>
-    <div class="row"><button id="schedfillgo" class="small">Fill anyway</button><button id="schedfillno" class="small">Cancel</button></div>
-  </div>`;
-}
 
 function roomList(env, n) {
   const out = [];
@@ -865,24 +889,26 @@ function roomList(env, n) {
   return out;
 }
 
-// The three checks every schedule passes, and which problems fall under each
-const CHECKS = [
-  ['Each team plays once a round', (c) => c.kind === 'twice' || c.kind === 'missing'],
-  ['No repeat pairings', (c) => c.kind === 'again'],
-  ['No half-empty games', (c) => c.kind === 'half'],
-];
-
 function resetEditor() {
   ui.sel = null;
   ui.mode = null;
-  ui.tradePick = null;
-  ui.fillCheck = null;
+  ui.renaming = null;
+  ui.menu = null;
+  ui.probsOpen = false;
   ui.past = [];
   ui.future = [];
   ui.filter = '';
   ui.closed = new Set();
   ui.note = '';
 }
+
+// What Finals may rank on (schedule.finalsRankBy, finals.js finalsFill)
+const RANK_BY = [['bracket', 'Playoff games'], ['carry', 'Playoff games + prelim games between them'], ['all', 'All games']];
+
+// A click away from the popover (or an open menu) closes it; the editor
+// on screen sets what that means (renderEditor)
+let closeOutside = null;
+if (typeof document !== 'undefined') document.addEventListener('click', (ev) => { if (closeOutside) closeOutside(ev); });
 
 /* ================= editor ================= */
 
@@ -891,8 +917,9 @@ function renderEditor(box, env) {
   const phases = s.phases;
   const brackets = bracketRooms(s);
   if (ui.filter && !brackets.some((b) => b.key === ui.filter)) ui.filter = '';
+  if (ui.view !== 'teams') ui.view = 'grid';
   const again = () => renderEditor(box, env);
-  // every edit: snapshot for Undo, mutate, mark dirty, redraw
+  // every edit: snapshot for Undo, mutate, mark dirty, redraw; the popover closes
   const edit = (note, fn) => {
     ui.past.push(JSON.stringify(s));
     if (ui.past.length > 100) ui.past.shift();
@@ -900,6 +927,9 @@ function renderEditor(box, env) {
     fn(s);
     ui.note = note;
     ui.mode = null;
+    ui.sel = null;
+    ui.renaming = null;
+    ui.menu = null;
     env.setDirty(JSON.stringify(s) !== ui.baseline.json);
     again();
   };
@@ -914,7 +944,7 @@ function renderEditor(box, env) {
     renderEditor(box, env);
   };
 
-  /* -- facts the grid, checks and panel share -- */
+  /* -- facts the grid, checks and popover share -- */
   const roundNo = phases.map((ph) => ph.rounds.map((r) => r.round));
   const checks = scheduleChecks(s);
   // a team the roster no longer has (renamed or dropped after the
@@ -944,6 +974,8 @@ function renderEditor(box, env) {
     }
   }
   const againCells = new Set(checks.filter((c) => c.kind === 'again').map((c) => cellKey(c)));
+  // the games a problem sits in: outlined, with a mark
+  const flagCells = new Set(checks.filter((c) => Number.isInteger(c.room)).map((c) => cellKey(c)));
   const bracketName = (k) => (brackets.find((b) => b.key === k) || {}).name || '';
   const colorOf = new Map();
   phases.forEach((_, p) => brackets.filter((b) => b.phase === p).forEach((b, i) => colorOf.set(b.key + '@' + p, i % COLORS)));
@@ -967,6 +999,26 @@ function renderEditor(box, env) {
     : (allFormats(env.teams.length).find((f) => f.key === s.format) || {}).name;
   const unsaved = env.dirty();
 
+
+  /* -- between two phases: how ties for a place go, and what Finals rank on -- */
+  // (a filled Final's slots still say where they came from)
+  const srcs = phases.some((ph) => ph.kind === 'final') ? finalsSources(s, { filled: true }) : [];
+  const rankDefault = srcs.some((x) => x.carry) ? 'carry' : 'bracket';
+  const fromPlaces = (ph) => ph.rounds.some((r) => [...r.games.flatMap((g) => [g.a, g.b]), ...r.byes].some((x) => x && (x.label || x.from)));
+  const cutHtml = (p) => {
+    const ph = phases[p];
+    if (!p || ph.kind === 'tiebreak' || !fromPlaces(ph)) return '';
+    const prev = phases.slice(0, p).reverse().find((x) => x.kind !== 'tiebreak');
+    if (!prev) return '';
+    if (ph.kind === 'final' && srcs.some((x) => x.phase > 0)) {
+      const on = RANK_BY.some(([k]) => k === s.finalsRankBy) ? s.finalsRankBy : rankDefault;
+      return `<div class="sgcx two"><div><b>${esc(prev.name)} → ${esc(ph.name)}</b>
+        <label class="sgcxl">Ranked by <select data-rankby aria-label="Ranked by">${RANK_BY.map(([k, l]) => `<option value="${k}"${k === on ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label></div>
+        <div><span class="sgcxl">Ties</span>${tieChips(env)}</div></div>`;
+    }
+    return `<div class="sgcx"><span class="sgcxl">${esc(prev.name)} → ${esc(ph.name)} ties</span>${tieChips(env)}</div>`;
+  };
+
   /* -- the grid, one section per phase -- */
   const w = 122;
   const gridHtml = phases.map((ph, p) => {
@@ -984,7 +1036,7 @@ function renderEditor(box, env) {
     const tmpl = `${LEAD}px ${lanes.flatMap((l) => l.rooms.map(() => (ui.colW[l.key + '@' + p] || w) + 'px')).join(' ')} ${ui.byeW || byeW}px`;
     const grip = (id, n) => `<span class="sgresize" data-resize="${esc(id)}" data-n="${n}" title="Drag to change the width. Double-click to reset it."></span>`;
     return `
-    <section class="sgphase">
+    <section class="sgphase">${cutHtml(p)}
       <button class="sgphasehead" data-phase="${p}"><span class="caret">${open ? '▾' : '▸'}</span>
         <b>${esc(ph.name)}</b><span class="muted">${ph.rounds.length ? (first === last ? `round ${first}` : `rounds ${first}–${last}`) : 'no rounds'}${
         (ph.meet || 1) > 1 && ph.kind !== 'final' ? ` · pairs meet ${ph.meet} times` : ''}${ph.kind === 'tiebreak' ? ' · if needed' : ''}</span></button>
@@ -992,26 +1044,21 @@ function renderEditor(box, env) {
       <div class="sggrid" style="grid-template-columns:${tmpl}" data-col="${w}" data-auto="${w}" data-bye="${byeW}"
         data-lanes="${esc(lanes.map((l) => l.key + '@' + p + ':' + l.rooms.length).join(','))}">
         <div class="sgcorner"></div>
-        ${lanes.map((l) => `<div class="sglane lane-${colorOf.get(l.key + '@' + p) ?? 'x'}" style="grid-column:span ${l.rooms.length}"><i></i>${esc(l.name)}${grip(l.key + '@' + p, l.rooms.length)}</div>`).join('')}
+        ${lanes.map((l) => `<div class="sglane lane-${colorOf.get(l.key + '@' + p) ?? 'x'}${l.key ? ' named' : ''}${isSel({ kind: 'lane', key: l.key, p }) ? ' on' : ''}" style="grid-column:span ${l.rooms.length}"${
+          l.key ? ` data-lanehd="${esc(l.key)}@${p}"` : ''}><i></i>${esc(l.name)}${grip(l.key + '@' + p, l.rooms.length)}</div>`).join('')}
         <div class="sglane sglane-byes">Byes${grip('bye', 1)}</div>
         <div class="sgcorner sgcorner2"></div>
-        ${colList.map((room) => `<button class="sgroom${isSel({ kind: 'room', room }) ? ' on' : ''}" data-room="${room}" title="${esc((s.rooms[room] || {}).name || '')}">${esc((s.rooms[room] || {}).name || 'Room ' + (room + 1))}</button>`).join('')}
+        ${colList.map((room) => `<button class="sgroom${isSel({ kind: 'room', room, p }) ? ' on' : ''}" data-room="${room}" data-roomp="${p}" title=""${esc((s.rooms[room] || {}).name || '')}">${esc((s.rooms[room] || {}).name || 'Room ' + (room + 1))}</button>`).join('')}
         <div class="sgroom sgroom-byes"></div>
         ${ph.rounds.map((round, r) => `
-          <div class="sgrnd${sel && sel.kind === 'round' && sel.p === p && sel.r === r ? ' on' : ''}">
-            <span>${round.round}</span>
-            <span class="rowtools">
-              <button class="xbtn" data-insround="${p}.${r}" title="Insert a round after round ${round.round}" aria-label="Insert a round after round ${round.round}">+</button>
-              <button class="xbtn" data-delround="${p}.${r}" title="Delete round ${round.round}" aria-label="Delete round ${round.round}">&times;</button>
-            </span>
-          </div>
+          <div class="sgrnd${sel && sel.kind === 'round' && sel.p === p && sel.r === r ? ' on' : ''}" data-rnd="${p}.${r}" role="button" tabindex="0" title="Round ${round.round}"><span>${round.round}</span></div>
           ${colList.map((room) => {
             const g = round.games.find((x) => x.room === room);
             const cell = { p, r, room };
             const csel = isSel({ kind: 'game', ...cell }) || isSel({ kind: 'empty', ...cell });
             if (!g || (!g.a && !g.b)) {
-              return `<div class="sgcell empty${csel ? ' on' : ''}" data-cell='${JSON.stringify(cell)}' data-empty="1">
-                <button class="sgadd" data-emptycell='${JSON.stringify(cell)}' aria-label="Empty room: add or move a game here">${ui.mode === 'moveGame' ? 'Move here' : ''}</button></div>`;
+              return `<div class="sgcell empty${csel ? ' on' : ''}${ui.mode === 'moveGame' ? ' target' : ''}" data-cell='${JSON.stringify(cell)}' data-empty="1">
+                <button class="sgadd" data-emptycell='${JSON.stringify(cell)}' aria-label="Empty room: add or move a game here">${ui.mode === 'moveGame' ? '+' : ''}</button></div>`;
             }
             const off = g.bracket && lanes.length && !lanes.some((l) => l.key === g.bracket && l.rooms.includes(room));
             // in the Shared rooms lane each game wears its bracket's color;
@@ -1019,8 +1066,9 @@ function renderEditor(box, env) {
             const sharedLane = lanes.some((l) => l.shared && l.rooms.includes(room));
             const tint = off && sharedLane && colorOf.has(g.bracket + '@' + p) ? ` mx lane-${colorOf.get(g.bracket + '@' + p)}` : '';
             const dim = sharedLane && ui.filter && g.bracket !== ui.filter ? ' dim' : '';
-            return `<div class="sgcell${csel ? ' on' : ''}${againCells.has(cellKey(cell)) ? ' again' : ''}${tint}${dim}" draggable="true" data-cell='${JSON.stringify(cell)}'>
-              <button class="sgh" data-gh='${JSON.stringify(cell)}' title="Move or swap this whole game (or drag the card)" aria-label="Game options">&#8943;</button>
+            const flag = flagCells.has(cellKey(cell));
+            return `<div class="sgcell${csel ? ' on' : ''}${againCells.has(cellKey(cell)) ? ' again' : ''}${flag ? ' flag' : ''}${ui.mode === 'moveGame' ? ' target' : ''}${tint}${dim}" draggable="true" data-cell='${JSON.stringify(cell)}'>
+              ${flag ? '<span class="sgbadge" aria-hidden="true">!</span>' : ''}<button class="sgh" data-gh='${JSON.stringify(cell)}' title="Move or swap this whole game (or drag the card)" aria-label="Game options">&#8943;</button>
               ${g.ifNeeded ? `<span class="sgtag sgifneeded" title="Played ${esc(typeof g.ifNeeded === 'string' ? g.ifNeeded : 'if needed')}">If needed</span>` : ''}
               ${off ? `<span class="sgtag" title="${esc(bracketName(g.bracket))}">${esc(bracketName(g.bracket))}</span>` : ''}
               ${['a', 'b'].map((side) => {
@@ -1039,6 +1087,7 @@ function renderEditor(box, env) {
       </div>` : ''}
     </section>`;
   }).join('');
+
 
   /* -- by team -- */
   const flat = [];
@@ -1071,40 +1120,22 @@ function renderEditor(box, env) {
           }).join('')}`).join('')}`).join('')}
     </div>`;
 
-  /* -- brackets -- */
-  // under each card: Rename, or the name being typed
-  const renameHtml = (b) => (ui.renaming === b.key + '@' + b.phase
-    ? `<div class="row sgrename"><input data-brname="${esc(b.key)}@${b.phase}" value="${esc(b.name)}" aria-label="Bracket name" size="18">
-        <button class="small primary" data-brsave="${esc(b.key)}@${b.phase}">Save</button><button class="small" data-brcancel="1">Cancel</button></div>`
-    : `<button class="linkbtn small sgrenamebtn" data-brename="${esc(b.key)}@${b.phase}">Rename</button>`);
-  const mapHtml = `
-    <div class="sgmap">
-      <div class="sgmapcol"><div class="sgmapcard static"><b>${env.teams.length} teams</b><span class="muted">${
-        s.pools ? 'seeded into pools' : 'one field'}</span></div></div>
-      ${phases.map((ph, p) => `
-        <span class="sgarrow">→</span>
-        <div class="sgmapcol">
-          <div class="muted sgmaphead">${esc(ph.name)} · ${ph.rounds.length ? `rounds ${roundNo[p][0]}–${roundNo[p][roundNo[p].length - 1]}` : 'no rounds'}</div>
-          ${p === 0 && pooled ? `<div class="small sgmapnote">${locked ? 'Pool trades close once prelims start.' : 'Select two teams in different pools to trade them.'}</div>` : ''}
-          ${brackets.filter((b) => b.phase === p).map((b, i) => p === 0 && s.pools && s.pools[b.key] ? `
-            <div class="sgmapcard sgmappool">
-              <button class="sgmaphd" data-filter="${esc(b.key)}"><i class="lane-${i % COLORS}"></i><b>${esc(b.name)}</b></button>
-              <div class="sgmaprows">${s.pools[b.key].map((t) => {
-                const picked = ui.tradePick === t;
-                const can = !locked && ui.tradePick && !picked && poolOf(s, ui.tradePick) !== b.key;
-                return locked ? `<span class="sgmaprow">${esc(t)}</span>`
-                  : `<button class="sgmaprow${picked ? ' on' : ''}" data-tradepick="${esc(t)}">${esc(t)}${picked ? '<span class="muted small">picked</span>' : can ? '<span class="small sgtradehint">Trade</span>' : ''}</button>`;
-              }).join('')}</div>
-              <span class="muted small">${b.rooms.map((i2) => esc((s.rooms[i2] || {}).name || '')).join(' · ') || 'no rooms yet'}</span>
-            </div>${renameHtml(b)}` : `
-            <button class="sgmapcard" data-filter="${esc(b.key)}"><span><i class="lane-${i % COLORS}"></i><b>${esc(b.name)}</b></span>
-              <span class="muted">${esc(s.pools && s.pools[b.key] ? s.pools[b.key].join(', ') : b.key === 'CH' ? 'Top half of each pool' : b.key === 'CO' ? 'Bottom half of each pool' : /^F\d+$/.test(b.key) ? 'Each pool’s ' + b.name.replace(' place', '') : '')}</span>
-              <span class="muted small">${b.rooms.map((i2) => esc((s.rooms[i2] || {}).name || '')).join(' · ') || 'no rooms yet'}</span></button>${renameHtml(b)}`).join('')}
-        </div>`).join('')}
-    </div>`;
 
-  /* -- side panel for the selection -- */
-  const panel = sidePanel(s, env, { roundNo, bracketName, edit, trade, pooled, locked });
+  /* -- the popover at what was clicked -- */
+  const pop = popPanel(s, env, { bracketName, edit, trade, pooled, locked });
+
+  // the problems: each as a sentence, with Show (and a roster name's fixes)
+  const probsHtml = `<div class="sgprobs">${allChecks.map((c, i) => `<div class="sgprob"><span class="ic">!</span><span class="tx">${esc(c.text)}</span>${
+    c.kind === 'roster' ? `<span class="sgfix">${unplaced.length ? `<select data-fixto="${i}" aria-label="Replace ${esc(c.team)} with">
+      <option value="">Replace with…</option>${unplaced.map((x) => `<option>${esc(x)}</option>`).join('')}</select>` : ''}
+      <button class="linkbtn" data-fixdel="${i}">Remove from schedule</button></span>` : ''}${
+    c.p !== undefined ? `<button class="linkbtn" data-check="${i}">Show</button>` : ''}</div>`).join('')}</div>`;
+  const nProb = allChecks.length;
+  // while a swap or a move waits for its other end, the popover steps aside
+  const hint = ui.mode === 'swapSlot' && sel && sel.kind === 'slot'
+    ? `Swap ${esc(slotShow(getSlot(s, sel)) || 'the empty slot')}: click the other team or a bye`
+    : ui.mode === 'moveGame' && sel && sel.kind === 'game'
+      ? `Move round ${phases[sel.p].rounds[sel.r].round}’s game: click another game to trade places, or an empty room (+)` : '';
 
   box.innerHTML = `
     ${ui.full ? `<span class="sgzoom"><button id="schedfit" class="fit${ui.zoom ? '' : ' on'}" title="Size the grid to fit the screen">Fit</button><i></i>
@@ -1115,7 +1146,7 @@ function renderEditor(box, env) {
       <button id="schedregen" class="linkbtn">Regenerate…</button>
       <span class="spacer" style="flex:1"></span>
       <div class="views sgviews">
-        ${[['grid', 'Grid'], ['teams', 'By team'], ['brackets', 'Brackets']].map(([k, l]) =>
+        ${[['grid', 'Grid'], ['teams', 'By team']].map(([k, l]) =>
           `<button class="view${ui.view === k ? ' on' : ''}" data-view2="${k}">${l}</button>`).join('')}
       </div>
     </div>
@@ -1127,92 +1158,85 @@ function renderEditor(box, env) {
         return (phases.length > 1 ? `<span class="sgchipphase">${esc(ph.name)}</span>` : '')
           + bs.map((b) => `<button class="chip${ui.filter === b.key ? ' on' : ''}" data-filter="${esc(b.key)}"><i class="lane-${colorOf.get(b.key + '@' + b.phase)}"></i>${esc(b.name)}</button>`).join('');
       }).join('')}
-      <span class="spacer" style="flex:1"></span>
     </div>
     <div class="sgbar${unsaved ? ' unsaved' : ''}">
       <b>${unsaved ? (ui.past.length ? ui.past.length + ' unsaved change' + (ui.past.length === 1 ? '' : 's') : 'Unsaved changes') : 'Saved'}</b>
-      <span class="muted">${esc(ui.note)}</span>
-      ${!ui.full ? '' : allChecks.length
-        ? `<button id="schedchecksbtn" class="linkbtn warntext">${allChecks.length} ${allChecks.length === 1 ? 'check' : 'checks'} to look at</button>`
-        : '<span class="sgclear">Checks all clear</span>'}
+      ${nProb
+        ? `<button id="schedprobs" class="sgwarn${ui.probsOpen ? ' on' : ''}" ${named(nProb + (nProb === 1 ? ' problem' : ' problems'))}>${IC_WARN}<span class="cnt">${nProb}</span></button>`
+        : `<span class="sgwarn none" ${named('No problems')}>${IC_CHECK}</span>`}
+      <span class="muted sgnote">${esc(ui.note)}</span>
       <span class="spacer" style="flex:1"></span>
-      <button id="schedaddround" class="small">Add round</button>
-      <button id="schedaddphase" class="small">Add phase</button>
-      ${s.pools && hasPlaceholders(s) ? '<button id="schedfill" class="small">Fill playoff slots from standings</button>' : ''}
+      <span class="sgmenu"><button id="schedplus" class="small icosm${ui.menu === 'plus' ? ' on' : ''}" ${named('Add')}>${IC_PLUS}</button>${ui.menu === 'plus' ? `<div class="sgdd">
+        <button id="schedaddround">Add a round</button><button id="schedaddphase">Add a phase</button><button id="schedaddroom">Add a room</button></div>` : ''}</span>
       <button id="schedundo" class="small icosm" ${named('Undo')} ${ui.past.length ? '' : 'disabled'}>${ICONS.undo}</button>
       <button id="schedredo" class="small icosm" ${named('Redo')} ${ui.future.length ? '' : 'disabled'}>${ICONS.redo}</button>
       <button id="scheddiscard" class="small" ${unsaved ? '' : 'disabled'}>Discard</button>
       <button id="schedsave" class="primary" ${unsaved ? '' : 'disabled'}>Save schedule</button>
-      <button id="scheddel" class="small sgdel">Delete</button>
+      <span class="sgmenu"><button id="schedmore" class="small icosm${ui.menu === 'more' ? ' on' : ''}" ${named('More')}>${ICONS.more}</button>${ui.menu === 'more' ? `<div class="sgdd">
+        <button id="scheddel" class="danger">Delete schedule</button></div>` : ''}</span>
     </div>
-    ${ui.fillCheck ? fillCheckHtml(ui.fillCheck) : ''}
+    ${hint ? `<div class="sghint"><span>${hint}</span><button class="linkbtn" id="schedmodeno">Cancel</button></div>` : ''}
+    ${ui.probsOpen && nProb ? probsHtml : ''}
     ${ui.addPhase ? addPhaseForm(s) : ''}
     <div class="sgbody">
-      <div class="sgscroll" id="sgscroll">${ui.view === 'teams' ? teamHtml : ui.view === 'brackets' ? mapHtml : gridHtml}</div>
-      <aside class="sgside${ui.mode === 'trade' ? ' trading' : ''}"${ui.full && !ui.sel && !ui.mode && !ui.sideOpen ? ' hidden' : ''}>
-        ${ui.full ? '<button class="linkbtn muted sgsidehide" id="schedsidehide">Hide this panel</button>' : ''}
-        ${panel.html}
-        <div class="sgchecks">
-          <div class="sgchecktitle"><b>Checks</b> <span class="${allChecks.length ? 'bad' : 'muted'}">${allChecks.length ? allChecks.length + ' to fix' : 'all clear'}</span></div>
-          ${CHECKS.map(([label, test]) => {
-            const items = checks.filter(test);
-            const mark = !items.length ? '<span class="ok">✓</span>' : items.some((c) => !c.sev) ? '<span class="bad">✕</span>' : '<span class="warnc">!</span>';
-            return `<div class="sgcheck${items.length ? ' off' : ' ok'}">${mark}<span>${label}</span></div>`
-              + items.slice(0, 8).map((c) => `<button class="sgcheckitem" data-check="${allChecks.indexOf(c)}">${esc(c.text)}</button>`).join('')
-              + (items.length > 8 ? `<div class="muted small sgcheckitem">${items.length - 8} more</div>` : '');
-          }).join('')}
-          ${[...rosterWarn, ...warn].map((c) => {
-            const i = allChecks.indexOf(c);
-            return `<button class="sgcheck" data-check="${i}"><span class="warnc">!</span><span>${esc(c.text)}</span></button>${
-              c.kind === 'roster' ? `<div class="sgfix">${unplaced.length ? `<select data-fixto="${i}" aria-label="Replace ${esc(c.team)} with">
-                <option value="">Replace with…</option>${unplaced.map((x) => `<option>${esc(x)}</option>`).join('')}</select>` : ''}
-              <button class="linkbtn" data-fixdel="${i}">Remove from schedule</button></div>` : ''}`;
-          }).join('')}
-        </div>
-        <div class="muted small sghelp">Drag a team onto another to swap them, or onto Byes. Drag a game card (or ⋯) onto another game to trade places, or onto an empty room to move it. Or click, then use this panel.</div>
-      </aside>
-    </div>`;
+      <div class="sgscroll" id="sgscroll">${ui.view === 'teams' ? teamHtml : gridHtml}</div>
+    </div>
+    ${pop.html}`;
 
   /* ---------- wiring ---------- */
   const $$ = (sel2) => box.querySelectorAll(sel2);
   const q = (id) => box.querySelector('#' + id);
   const parse = (x) => JSON.parse(x);
-  const setSel = (x) => { ui.sel = x; ui.mode = null; again(); };
+  const setSel = (x) => { ui.sel = x; ui.mode = null; ui.renaming = null; ui.menu = null; again(); };
   const scroll = q('sgscroll');
   if (ui.scrollPos) { scroll.scrollLeft = ui.scrollPos[0]; scroll.scrollTop = ui.scrollPos[1]; }
-  scroll.onscroll = () => { ui.scrollPos = [scroll.scrollLeft, scroll.scrollTop]; };
 
-  $$('[data-view2]').forEach((b) => { b.onclick = () => { ui.view = b.dataset.view2; again(); }; });
-  // Renaming a bracket: its name in the schedule, and in any slot that
-  // names it ("1st in 1st–6th place"), as one undoable edit
-  $$('[data-brename]').forEach((b) => { b.onclick = () => { ui.renaming = b.dataset.brename; again(); const f = box.querySelector('[data-brname]'); if (f) { f.focus(); f.select(); } }; });
-  $$('[data-brcancel]').forEach((b) => { b.onclick = () => { ui.renaming = null; again(); }; });
-  const renameBracket = (id) => {
-    const [key, ph] = id.split('@');
-    const field = box.querySelector(`[data-brname="${CSS.escape(id)}"]`);
-    const name = field ? field.value.trim() : '';
-    const cur = (s.brackets || []).find((x) => x.key === key && String(x.phase) === ph);
-    if (!cur) return;
-    if (!name) { env.say('Please give the bracket a name.', true); return; }
-    if (name !== cur.name && (s.brackets || []).some((x) => x.name === name)) { env.say(`Another bracket is already called ${name}.`, true); return; }
-    ui.renaming = null;
-    if (name === cur.name) { again(); return; }
-    const old = cur.name;
-    edit(`Renamed ${old} to ${name}`, (ss) => {
-      for (const x of ss.brackets || []) if (x.key === key && String(x.phase) === ph) x.name = name;
-      for (const p2 of ss.phases) for (const r of p2.rounds) {
-        for (const g of r.games) for (const side of ['a', 'b']) {
-          const x = g[side];
-          if (x && typeof x.label === 'string' && x.label.endsWith(' in ' + old)) x.label = x.label.slice(0, -old.length) + name;
-        }
-        for (const x of r.byes || []) if (x && typeof x.label === 'string' && x.label.endsWith(' in ' + old)) x.label = x.label.slice(0, -old.length) + name;
-      }
-    });
+  // the popover sits under what was clicked, and follows it as the grid scrolls
+  const anchor = () => {
+    const x = ui.sel;
+    if (!x) return null;
+    if (x.kind === 'slot') return [...$$('.sgslot[data-ref]')].find((el) => refKey(parse(el.dataset.ref)) === refKey(x)) || null;
+    if (x.kind === 'game' || x.kind === 'empty') return [...$$('.sgcell[data-cell]')].find((el) => cellKey(parse(el.dataset.cell)) === cellKey(x)) || null;
+    if (x.kind === 'room') return box.querySelector(`.sgroom[data-room="${x.room}"][data-roomp="${x.p}"]`) || box.querySelector(`.sgroom[data-room="${x.room}"]`);
+    if (x.kind === 'round') return box.querySelector(`.sgrnd[data-rnd="${x.p}.${x.r}"]`);
+    if (x.kind === 'lane') return [...$$('[data-lanehd]')].find((el) => el.dataset.lanehd === x.key + '@' + x.p) || null;
+    return null;
   };
-  $$('[data-brsave]').forEach((b) => { b.onclick = () => renameBracket(b.dataset.brsave); });
-  $$('[data-brname]').forEach((f) => { f.onkeydown = (e) => { if (e.key === 'Enter') renameBracket(f.dataset.brname); if (e.key === 'Escape') { ui.renaming = null; again(); } }; });
-  $$('[data-filter]').forEach((b) => { b.onclick = () => { ui.filter = b.dataset.filter; if (ui.view === 'brackets') ui.view = 'grid'; ui.scrollPos = null; again(); }; });
+  const place = () => {
+    const el = q('schedpop');
+    if (!el) return;
+    const at = anchor();
+    if (!at) { el.hidden = true; return; }
+    el.hidden = false;
+    const r = at.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    el.style.left = Math.max(0, Math.min(r.left - b.left + box.scrollLeft, box.clientWidth - el.offsetWidth - 4)) + 'px';
+    el.style.top = (r.bottom - b.top + box.scrollTop + 6) + 'px';
+  };
+  scroll.onscroll = () => { ui.scrollPos = [scroll.scrollLeft, scroll.scrollTop]; place(); };
+  closeOutside = (ev) => {
+    if (!box.isConnected || (!ui.sel && !ui.menu) || ui.mode === 'swapSlot' || ui.mode === 'moveGame') return;
+    const t = ev.target;
+    if (ui.menu && !(t.closest && t.closest('.sgmenu'))) { ui.menu = null; again(); return; }
+    if (!ui.sel || !t.closest) return;
+    if (t.closest('.sgpop, .sgslot, [data-gh], [data-emptycell], .sgroom, .sgrnd, [data-lanehd], [data-jump], .sgmenu')) return;
+    ui.sel = null;
+    ui.mode = null;
+    ui.renaming = null;
+    again();
+  };
+
+  $$('[data-view2]').forEach((b) => { b.onclick = () => { ui.view = b.dataset.view2; ui.sel = null; again(); }; });
+  $$('[data-filter]').forEach((b) => { b.onclick = () => { ui.filter = b.dataset.filter; ui.scrollPos = null; again(); }; });
   $$('[data-phase]').forEach((b) => { b.onclick = () => { const p = Number(b.dataset.phase); if (ui.closed.has(p)) ui.closed.delete(p); else ui.closed.add(p); again(); }; });
+  // the tie order (saved as a setting), and what Finals rank on (a schedule edit)
+  wireTieChips(box, env, again);
+  $$('[data-rankby]').forEach((el) => {
+    el.onchange = () => {
+      const v = el.value;
+      edit('Ranked by ' + RANK_BY.find(([k]) => k === v)[1], (ss) => { ss.finalsRankBy = v; });
+    };
+  });
   // Drag the right edge of a pool's heading (or of Byes) to set the width
   // of its columns; the drag is spread over the lane's rooms. Widths live
   // in ui.colW / ui.byeW until the page is reloaded.
@@ -1248,13 +1272,10 @@ function renderEditor(box, env) {
     fb.innerHTML = ICON_FULL;
     fb.title = 'Full screen';
     fb.setAttribute('aria-label', 'Full screen');
-    fb.onclick = () => { setFull(true); again(); };
+    fb.onclick = () => { ui.sel = null; ui.mode = null; setFull(true); again(); };
   }
   if (q('schedexit')) q('schedexit').onclick = () => { setFull(false); again(); };
   if (ui.full) {
-    // tucked away until something is selected, or opened for its checks
-    if (q('schedchecksbtn')) q('schedchecksbtn').onclick = () => { ui.sideOpen = true; again(); };
-    q('schedsidehide').onclick = () => { ui.sideOpen = false; ui.sel = null; ui.mode = null; again(); };
     ui.zoomNow = fitFull(box);
     q('schedzpct').textContent = Math.round(ui.zoomNow * 100) + '%';
     const step = (by) => {
@@ -1266,7 +1287,7 @@ function renderEditor(box, env) {
     q('schedzout').onclick = () => step(-0.1);
     q('schedzin').onclick = () => step(0.1);
   }
-  $$('[data-jump]').forEach((b) => { b.onclick = () => { ui.view = 'grid'; ui.filter = ''; setSel(parse(b.dataset.jump)); scrollToSel(box); }; });
+  $$('[data-jump]').forEach((b) => { b.onclick = (ev) => { ev.stopPropagation(); ui.view = 'grid'; ui.filter = ''; setSel(parse(b.dataset.jump)); scrollToSel(box); }; });
   $$('[data-fixto]').forEach((el) => {
     el.onchange = () => {
       const c = allChecks[Number(el.dataset.fixto)];
@@ -1281,6 +1302,7 @@ function renderEditor(box, env) {
       edit(`${c.team} removed from the schedule. Please fill the open slots and save the schedule.`, (ss) => removeTeam(ss, c.team));
     };
   });
+  // Show: the problem's game (or round) scrolled into view and flashed
   $$('[data-check]').forEach((b) => {
     b.onclick = () => {
       const c = allChecks[Number(b.dataset.check)];
@@ -1288,12 +1310,21 @@ function renderEditor(box, env) {
       ui.view = 'grid';
       ui.filter = '';
       ui.closed.delete(c.p);
-      setSel(c.room !== undefined && c.room !== 'bye' ? { kind: 'game', p: c.p, r: c.r, room: c.room } : { kind: 'round', p: c.p, r: c.r });
-      scrollToSel(box);
+      ui.sel = null;
+      ui.mode = null;
+      again();
+      const at = Number.isInteger(c.room)
+        ? [...box.querySelectorAll('.sgcell[data-cell]')].find((el) => cellKey(JSON.parse(el.dataset.cell)) === cellKey(c))
+        : box.querySelector(`.sgrnd[data-rnd="${c.p}.${c.r}"]`);
+      if (!at) return;
+      at.scrollIntoView({ block: 'center', inline: 'center' });
+      at.classList.remove('sgflash');
+      void at.offsetWidth;
+      at.classList.add('sgflash');
     };
   });
 
-  // slots: click selects (or finishes a swap / game move); the panel acts
+  // slots: click opens the popover (or finishes a swap / game move)
   $$('.sgslot').forEach((el) => {
     el.onclick = (ev) => {
       ev.stopPropagation();
@@ -1302,8 +1333,6 @@ function renderEditor(box, env) {
         if (refKey(sel) === refKey(ref)) { ui.mode = null; again(); return; }
         const a = { ...sel };
         edit(`Swapped ${slotShow(getSlot(s, a)) || 'an empty slot'} and ${slotShow(getSlot(s, ref)) || 'an empty slot'}`, (ss) => swapSlotsAt(ss, a, ref));
-        ui.sel = null;
-        again();
         return;
       }
       if (ui.mode === 'moveGame' && sel && sel.kind === 'game' && ref.bye === undefined) {
@@ -1323,8 +1352,6 @@ function renderEditor(box, env) {
       if (tg && !tg.a && !tg.b) tr.games.splice(tr.games.indexOf(tg), 1);
       swapCells(ss, from, to);
     });
-    ui.sel = { kind: 'game', ...to };
-    again();
   };
   $$('[data-gh]').forEach((el) => {
     el.onclick = (ev) => {
@@ -1342,8 +1369,6 @@ function renderEditor(box, env) {
       if (ui.mode === 'swapSlot' && sel && sel.kind === 'slot') {
         const a = { ...sel };
         edit('Moved ' + slotShow(getSlot(s, a)), (ss) => swapSlotsAt(ss, a, { ...cell, side: 'a' }));
-        ui.sel = null;
-        again();
         return;
       }
       setSel({ kind: 'empty', ...cell });
@@ -1356,72 +1381,39 @@ function renderEditor(box, env) {
       if (ui.mode === 'moveGame' && sel && sel.kind === 'game') moveGameTo(sel, cell);
     };
   });
-  $$('[data-room]').forEach((el) => { el.onclick = () => setSel({ kind: 'room', room: Number(el.dataset.room) }); });
-  $$('[data-insround]').forEach((b) => {
-    b.onclick = () => {
-      const [p, r] = b.dataset.insround.split('.').map(Number);
-      edit(`Inserted a round after round ${phases[p].rounds[r].round}`, (ss) => insertRound(ss, p, r));
-    };
+  $$('[data-room]').forEach((el) => { el.onclick = () => setSel({ kind: 'room', room: Number(el.dataset.room), p: Number(el.dataset.roomp) }); });
+  $$('.sgrnd[data-rnd]').forEach((el) => {
+    const open = () => { const [p, r] = el.dataset.rnd.split('.').map(Number); setSel({ kind: 'round', p, r }); };
+    el.onclick = open;
+    el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
   });
-  $$('[data-delround]').forEach((b) => {
-    b.onclick = () => {
-      const [p, r] = b.dataset.delround.split('.').map(Number);
-      const round = phases[p].rounds[r];
-      const filled = round.games.some((g) => g.a || g.b) || round.byes.length;
-      if (filled && !confirm(`Delete round ${round.round}? Its games go too (Undo brings them back).`)) return;
-      edit(`Deleted round ${round.round}`, (ss) => {
-        removeRound(ss, p, r);
-        if (!ss.phases[p].rounds.length && ss.phases.length > 1) ss.phases.splice(p, 1);
-      });
-    };
-  });
-
-  // Brackets view: pick a team, then a team in another pool
-  $$('[data-tradepick]').forEach((b) => {
-    b.onclick = () => {
-      const t = b.dataset.tradepick;
-      const picked = ui.tradePick;
-      if (picked && picked !== t && poolOf(s, picked) !== poolOf(s, t)) { ui.tradePick = null; trade(picked, t); return; }
-      ui.tradePick = picked === t ? null : t;
-      again();
-    };
+  $$('[data-lanehd]').forEach((el) => {
+    el.onclick = () => { const at = el.dataset.lanehd.lastIndexOf('@'); setSel({ kind: 'lane', key: el.dataset.lanehd.slice(0, at), p: Number(el.dataset.lanehd.slice(at + 1)) }); };
   });
 
   /* -- drag and drop -- */
   wireDrag(box, s, { edit, moveGameTo, again, trade });
 
-  /* -- panel actions -- */
-  panel.wire(box);
+  /* -- the popover's actions -- */
+  pop.wire(box);
+  place();
 
   /* -- toolbar -- */
-  q('schedaddround').onclick = () => edit('Added a round', (ss) => addRound(ss, ss.phases.length - 1));
-  q('schedaddphase').onclick = () => { ui.addPhase = !ui.addPhase; again(); };
-  wireAddPhase(box, s, edit, again);
-  if (q('schedfill')) {
-    q('schedfill').onclick = async () => {
-      env.say('Computing standings…');
-      try {
-        const report = await env.fill();
-        if (!report) { env.say('No game files uploaded yet — nothing to rank', true); return; }
-        report.game = !!(s.options && s.options.plan && s.options.plan.ties === 'game');
-        if (report.missing.length || report.extra.length || report.ties.length || (report.compared || []).length) {
-          ui.fillCheck = report;
-          env.say('Please look over the notes above the grid before filling.');
-          again();
-          return;
-        }
-        fill(report);
-      } catch (e) { env.say(e.message, true); }
+  if (q('schedprobs')) q('schedprobs').onclick = () => { ui.probsOpen = !ui.probsOpen; again(); };
+  if (q('schedmodeno')) q('schedmodeno').onclick = () => { ui.mode = null; ui.sel = null; again(); };
+  q('schedplus').onclick = () => { ui.menu = ui.menu === 'plus' ? null : 'plus'; again(); };
+  q('schedmore').onclick = () => { ui.menu = ui.menu === 'more' ? null : 'more'; again(); };
+  if (q('schedaddround')) q('schedaddround').onclick = () => edit('Added a round', (ss) => addRound(ss, ss.phases.length - 1));
+  if (q('schedaddphase')) q('schedaddphase').onclick = () => { ui.menu = null; ui.addPhase = !ui.addPhase; again(); };
+  if (q('schedaddroom')) {
+    q('schedaddroom').onclick = () => {
+      const taken = new Set(s.rooms.map((r) => r.name));
+      let k = s.rooms.length + 1;
+      while (taken.has('Room ' + k)) k++;
+      edit('Added a room', (ss) => { ss.rooms.push({ name: 'Room ' + k, bucket: null }); });
     };
   }
-  const fill = (report) => {
-    let n = 0;
-    ui.fillCheck = null;
-    edit('Filled playoff slots from standings', (ss) => { n = fillPlaceholders(ss, report.ranks); });
-    env.say(n + ' playoff slots filled from standings — check the grid, then Save');
-  };
-  if (q('schedfillgo')) q('schedfillgo').onclick = () => fill(ui.fillCheck);
-  if (q('schedfillno')) q('schedfillno').onclick = () => { ui.fillCheck = null; env.say(''); again(); };
+  wireAddPhase(box, s, edit, again);
   q('schedundo').onclick = () => {
     if (!ui.past.length) return;
     const prev = ui.past.pop();
@@ -1468,22 +1460,28 @@ function renderEditor(box, env) {
       again();
     } catch (e) { run.end(); env.say(e.message, true); }
   };
-  q('scheddel').onclick = async () => {
-    if (!confirm('Delete the schedule? Rooms stop preselecting teams and the player page shows no schedule.')) return;
-    try {
-      await env.del();
-      env.setSched(null);
-      env.setDirty(false);
-      ui.baseline = { obj: null, json: '' };
-      resetEditor();
-      env.say('Schedule deleted');
-      env.refresh();
-    } catch (e) { env.say(e.message, true); }
-  };
+  if (q('scheddel')) {
+    q('scheddel').onclick = async () => {
+      ui.menu = null;
+      if (!confirm('Delete the schedule? Rooms stop preselecting teams and the player page shows no schedule.')) { again(); return; }
+      try {
+        await env.del();
+        env.setSched(null);
+        env.setDirty(false);
+        ui.baseline = { obj: null, json: '' };
+        resetEditor();
+        env.say('Schedule deleted');
+        env.refresh();
+      } catch (e) { env.say(e.message, true); }
+    };
+  }
   // the format picker, replacing the whole schedule unless a part is picked there
   const openPicker = (regen) => {
     if (env.dirty() && !confirm('You have unsaved edits. Pick a new format anyway? (Nothing changes until you press Generate.)')) return;
     ui.creator = true;
+    ui.sel = null;
+    ui.mode = null;
+    ui.menu = null;
     ui.plan = null; // the picker starts from the schedule's plan, or the default
     ui.regen = regen;
     if (s.options && s.options.seed) ui.opts.seed = s.options.seed;
@@ -1491,6 +1489,7 @@ function renderEditor(box, env) {
   };
   q('schedregen').onclick = () => openPicker('all');
 }
+
 
 /* ---------- Add phase (a finals phase after the last one) ---------- */
 
@@ -1593,39 +1592,57 @@ function swapSlotsAt(s, r1, r2) {
   }
 }
 
-/* ---------- the side panel ---------- */
+/* ---------- the popover ---------- */
 
-function sidePanel(s, env, { roundNo, bracketName, edit, trade, pooled, locked }) {
+// What can be done with what was clicked: a team (its game too), a game,
+// an empty room, a room, a round or a bracket's heading. Closed while a
+// swap or a move waits for its other end (the toolbar's hint says so).
+function popPanel(s, env, { bracketName, edit, trade, pooled, locked }) {
   const sel = ui.sel;
-  // actions read as a line of links
-  const link = (id, label) => `<button class="linkbtn" data-act="${id}">${esc(label)}</button>`;
-  const links = (...items) => `<div class="sglinks">${items.filter(Boolean).join('<span class="dot">·</span>')}</div>`;
+  const link = (id, label, cls = '') => `<button class="linkbtn${cls ? ' ' + cls : ''}" data-act="${id}">${esc(label)}</button>`;
+  const acts = (...items) => `<div class="sgacts">${items.filter(Boolean).join('')}</div>`;
   const head = (title, sub) => `<b class="sgptitle">${esc(title)}</b>${sub ? `<span class="muted small">${esc(sub)}</span>` : ''}`;
-  const acts = {};
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const A = {};
   let html = '';
-  if (ui.mode === 'swapSlot' && sel) {
-    html = head('Swap: pick the other team', `Click any team or a bye. ${slotShow(getSlot(s, sel)) || 'This slot'} goes there.`) + links(link('cancel', 'Cancel'));
-    acts.cancel = () => { ui.mode = null; };
-  } else if (ui.mode === 'moveGame' && sel) {
-    html = head('Pick where this game goes', 'Click another game to trade places, or an empty room to move it.') + links(link('cancel', 'Cancel'));
-    acts.cancel = () => { ui.mode = null; };
-  } else if (ui.mode === 'trade' && sel && sel.kind === 'slot') {
-    // the trade box: every other pool as a list, Find when they are long
+  // a game's own actions, for its popover and under a team's
+  const gameActs = (cell) => {
+    const g = gameAt(s, cell.p, cell.r, cell.room);
+    const round = s.phases[cell.p].rounds[cell.r];
+    const brs = bracketRooms(s).filter((b) => b.phase === cell.p);
+    A.move = () => { ui.sel = { kind: 'game', p: cell.p, r: cell.r, room: cell.room }; ui.mode = 'moveGame'; };
+    A.flip = () => edit('Flipped sides', (ss) => { const gg = gameAt(ss, cell.p, cell.r, cell.room); [gg.a, gg.b] = [gg.b, gg.a]; });
+    A.remove = () => {
+      edit(`Round ${round.round}: removed a game`, (ss) => {
+        const rr = ss.phases[cell.p].rounds[cell.r];
+        const gg = gameAt(ss, cell.p, cell.r, cell.room);
+        rr.games.splice(rr.games.indexOf(gg), 1);
+        for (const v of [gg.a, gg.b]) if (v) rr.byes.push(v);
+      });
+    };
+    A.__bracket = (key) => edit('Moved a game to ' + bracketName(key), (ss) => { gameAt(ss, cell.p, cell.r, cell.room).bracket = key; });
+    return acts(link('move', 'Move or swap…'), link('flip', 'Flip sides'), link('remove', 'Remove game', 'danger'))
+      + (brs.length > 1 ? `<label class="sgrow">Bracket <select data-act-br="1">${brs.map((b) => `<option value="${esc(b.key)}" ${b.key === g.bracket ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : '');
+  };
+  if (!sel || ui.mode === 'swapSlot' || ui.mode === 'moveGame') {
+    html = '';
+  } else if (ui.mode === 'trade' && sel.kind === 'slot') {
+    // every other pool as a list, Find when they are long
     const team = slotText(getSlot(s, sel));
     const mine = poolOf(s, team);
     const keys = Object.keys(s.pools).sort();
     const others = keys.filter((k) => k !== mine);
     const total = others.reduce((n, k) => n + s.pools[k].length, 0);
     html = `<div class="tp">
-      ${head(`Trade ${team} into another pool`, 'Select a team from another pool to trade prelim positions.')}
+      ${head(`Trade ${team} with…`, `Pool ${mine}. The two teams swap pools and every prelim game.`)}
       ${total > 12 ? '<input class="tp-find" data-tpfind="1" placeholder="Find a team" aria-label="Find a team">' : ''}
       <div class="tp-pools">${others.map((k) => `<div class="tp-pool"><div class="tp-ph lane-${keys.indexOf(k) % COLORS}"><i></i>Pool ${esc(k)}<span class="n">${s.pools[k].length}</span></div>${
         s.pools[k].map((t) => `<button class="tp-t" data-tpteam="${esc(t)}">${esc(t)}</button>`).join('')}</div>`).join('')}
         <div class="tp-none muted small" hidden>No team in another pool matches.</div></div>
-      <div class="tp-foot"><span class="muted">Pool ${esc(mine)} · ${s.pools[mine].length} teams</span>${link('cancel', 'Cancel')}</div></div>`;
-    acts.cancel = () => { ui.mode = null; };
-    acts.__trade = (other) => { ui.mode = null; trade(team, other); };
-  } else if (sel && sel.kind === 'slot') {
+      ${acts(link('cancel', 'Cancel'))}</div>`;
+    A.cancel = () => { ui.mode = null; };
+    A.__trade = (other) => { ui.mode = null; trade(team, other); };
+  } else if (sel.kind === 'slot') {
     const cur = getSlot(s, sel);
     const round = s.phases[sel.p].rounds[sel.r];
     const n = round.round;
@@ -1641,19 +1658,21 @@ function sidePanel(s, env, { roundNo, bracketName, edit, trade, pooled, locked }
     const free = [...everyone].filter(([k]) => !inRound.has(k));
     const onBye = [...inRound].filter(([, ref]) => ref.bye !== undefined && refKey(ref) !== refKey(sel));
     const playing = [...everyone].filter(([k]) => inRound.has(k) && inRound.get(k).bye === undefined && k !== slotText(cur));
-    const where = sel.bye !== undefined ? 'Byes' : (s.rooms[sel.room] || {}).name;
+    const where = sel.bye !== undefined ? 'bye' : (s.rooms[sel.room] || {}).name;
     const opt = ([k, v]) => `<option value="${esc(k)}">${esc(slotShow(v))}</option>`;
     const group = (label, list) => (list.length ? `<optgroup label="${esc(label)}">${list.map(opt).join('')}</optgroup>` : '');
     // the team's pool, and the trade, in pool play only
     const pool = cur && cur.team && sel.p === 0 && pooled ? poolOf(s, cur.team) : null;
     const lane = pool ? Object.keys(s.pools).sort().indexOf(pool) % COLORS : 0;
+    const g = sel.bye === undefined ? gameAt(s, sel.p, sel.r, sel.room) : null;
     html = head(cur ? slotShow(cur) : 'Empty slot', `Round ${n} · ${where}`)
-      + links(link('swap', 'Swap with…'), cur && sel.bye === undefined && link('bench', 'Give a bye'), cur && link('clear', 'Clear'))
-      + `<label class="sgrow">Replace with <select class="slotsel" data-act-sel="1"><option value="">Choose a team</option>${
+      + acts(link('swap', 'Swap with…'), cur && sel.bye === undefined && link('bench', 'Give a bye'), cur && link('clear', 'Clear'))
+      + `<label class="sgrow sgcol">Replace with <select class="slotsel" data-act-sel="1"><option value="">Choose a team</option>${
         group('No game this round', free)}${group('On a bye', onBye.map(([k]) => [k, everyone.get(k) || { team: k }]))}${
         group('Playing this round (swaps)', playing)}${cur ? '<option value="__clear">Clear this slot</option>' : ''}</select></label>`
-      + (pool ? `<div class="sgpool"><span class="lane-${lane}"><i></i>Pool ${esc(pool)}</span>${
-        locked ? '<span class="muted small">Trades close once prelims start</span>' : link('trade', 'Trade pools…')}</div>` : '');
+      + (pool ? `<div class="sgpool lane-${lane}"><span><i></i>Pool ${esc(pool)}</span>${
+        locked ? '<span class="muted small">Trades close once prelims start</span>' : link('trade', 'Trade pools…')}</div>` : '')
+      + (g && (g.a || g.b) ? `<div class="sgsub"><span class="muted small">This game: ${esc(slotShow(g.a) || '—')} v ${esc(slotShow(g.b) || '—')}</span>${gameActs(sel)}</div>` : '');
     const put = (k) => {
       const v = everyone.get(k) || { team: k };
       const other = inRound.get(k);
@@ -1663,79 +1682,110 @@ function sidePanel(s, env, { roundNo, bracketName, edit, trade, pooled, locked }
         edit(`Round ${n}: ${cur ? slotShow(cur) + ' → ' : ''}${slotShow(v)}`, (ss) => setSlotAt(ss, sel, v));
       }
     };
-    acts.swap = () => { ui.mode = 'swapSlot'; };
-    acts.trade = () => { ui.mode = 'trade'; };
-    acts.bench = () => { edit(`Round ${n}: ${slotShow(cur)} on a bye`, (ss) => { setSlotAt(ss, sel, null); ss.phases[sel.p].rounds[sel.r].byes.push(cur); }); ui.sel = null; };
-    acts.clear = () => { edit('Cleared a slot', (ss) => setSlotAt(ss, sel, null)); };
-    acts.__select = (value) => {
+    A.swap = () => { ui.mode = 'swapSlot'; };
+    A.trade = () => { ui.mode = 'trade'; };
+    A.bench = () => { edit(`Round ${n}: ${slotShow(cur)} on a bye`, (ss) => { setSlotAt(ss, sel, null); ss.phases[sel.p].rounds[sel.r].byes.push(cur); }); };
+    A.clear = () => { edit('Cleared a slot', (ss) => setSlotAt(ss, sel, null)); };
+    A.__select = (value) => {
       if (!value) return;
-      if (value === '__clear') acts.clear(); else put(value);
+      if (value === '__clear') A.clear(); else put(value);
     };
-  } else if (sel && sel.kind === 'game') {
+  } else if (sel.kind === 'game') {
     const g = gameAt(s, sel.p, sel.r, sel.room);
     if (g && (g.a || g.b)) {
       const round = s.phases[sel.p].rounds[sel.r];
-      const brs = bracketRooms(s).filter((b) => b.phase === sel.p);
-      html = head(`${slotShow(g.a) || '—'} v ${slotShow(g.b) || '—'}`, `Round ${round.round} · ${(s.rooms[sel.room] || {}).name || ''}`)
-        + links(link('move', 'Move or swap…'), link('flip', 'Flip sides'), link('remove', 'Remove'))
-        + (brs.length > 1 ? `<label class="sgrow">Bracket <select data-act-br="1">${brs.map((b) => `<option value="${esc(b.key)}" ${b.key === g.bracket ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : '');
-      acts.move = () => { ui.mode = 'moveGame'; };
-      acts.flip = () => edit('Flipped sides', (ss) => { const gg = gameAt(ss, sel.p, sel.r, sel.room); [gg.a, gg.b] = [gg.b, gg.a]; });
-      acts.remove = () => {
-        edit(`Round ${round.round}: removed a game`, (ss) => {
-          const rr = ss.phases[sel.p].rounds[sel.r];
-          const gg = gameAt(ss, sel.p, sel.r, sel.room);
-          rr.games.splice(rr.games.indexOf(gg), 1);
-          for (const v of [gg.a, gg.b]) if (v) rr.byes.push(v);
-        });
-        ui.sel = null;
-      };
-      acts.__bracket = (key) => edit('Moved a game to ' + bracketName(key), (ss) => { gameAt(ss, sel.p, sel.r, sel.room).bracket = key; });
+      html = head(`${slotShow(g.a) || '—'} v ${slotShow(g.b) || '—'}`, `Round ${round.round} · ${(s.rooms[sel.room] || {}).name || ''}`) + gameActs(sel);
     }
-  } else if (sel && sel.kind === 'empty') {
+  } else if (sel.kind === 'empty') {
     const round = s.phases[sel.p].rounds[sel.r];
-    html = head('Empty room', `Round ${round.round} · ${(s.rooms[sel.room] || {}).name || ''}`) + links(link('add', 'Add a game here'));
-    acts.add = () => { ui.sel = { kind: 'slot', p: sel.p, r: sel.r, room: sel.room, side: 'a' }; };
-  } else if (sel && sel.kind === 'room') {
+    html = head('Empty room', `Round ${round.round} · ${(s.rooms[sel.room] || {}).name || ''}`) + acts(link('add', 'Add a game here'));
+    A.add = () => { ui.sel = { kind: 'slot', p: sel.p, r: sel.r, room: sel.room, side: 'a' }; };
+  } else if (sel.kind === 'room') {
     const room = s.rooms[sel.room];
     if (room) {
-      html = head(room.name, bracketRooms(s).filter((b) => b.rooms.includes(sel.room)).map((b) => b.name).join(', ') || 'No bracket')
-        + `<label class="sgrow">Name <input data-act-name="1" value="${esc(room.name)}"></label>
-        <label class="sgrow">Room page <select data-act-bucket="1"><option value="">Not linked</option>${env.buckets.map((b) =>
-          `<option value="${b.id}" ${b.id === room.bucket ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}</select></label>`
-        + links(link('droproom', 'Remove room'));
-      acts.droproom = () => {
+      const games = s.phases.reduce((k, ph) => k + ph.rounds.filter((r) => r.games.some((g) => g.room === sel.room && (g.a || g.b))).length, 0);
+      html = ui.renaming === 'room'
+        ? head('Rename room') + `<input class="sgpopin" data-act-name="1" value="${esc(room.name)}" aria-label="Room name">` + acts(link('namego', 'Save'), link('nameno', 'Cancel'))
+        : head(room.name, plural(games, 'game')) + acts(link('rename', 'Rename'), link('droproom', 'Remove room', 'danger'))
+          + `<label class="sgrow sgcol">Room page <select data-act-bucket="1"><option value="">Not linked</option>${env.buckets.map((b) =>
+            `<option value="${b.id}" ${b.id === room.bucket ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}</select></label>`;
+      A.rename = () => { ui.renaming = 'room'; };
+      A.nameno = () => { ui.renaming = null; };
+      A.namego = (box) => {
+        const v = box.querySelector('[data-act-name]').value.trim();
+        ui.renaming = null;
+        if (!v || v === room.name) return;
+        edit('Renamed a room', (ss) => { ss.rooms[sel.room].name = v; });
+      };
+      A.droproom = () => {
         const filled = s.phases.some((ph) => ph.rounds.some((r) => r.games.some((g) => g.room === sel.room && (g.a || g.b))));
         if (filled && !confirm(`Remove ${room.name}? Its teams drop to Byes (Undo brings them back).`)) return 'stay';
         edit('Removed ' + room.name, (ss) => {
           removeRoomCol(ss, sel.room);
           if (ss.brackets) ss.brackets.forEach((b) => { if (b.rooms) b.rooms = b.rooms.filter((i) => i !== sel.room).map((i) => (i > sel.room ? i - 1 : i)); });
         });
-        ui.sel = null;
       };
-      acts.__name = (v) => edit('Renamed a room', (ss) => { ss.rooms[sel.room].name = v.trim() || v; });
-      acts.__bucket = (v) => edit('Linked a room', (ss) => { ss.rooms[sel.room].bucket = v ? Number(v) : null; });
+      A.__bucket = (v) => edit('Linked a room', (ss) => { ss.rooms[sel.room].bucket = v ? Number(v) : null; });
     }
-  } else if (sel && sel.kind === 'round') {
-    html = head(`Round ${s.phases[sel.p].rounds[sel.r].round}`, 'Problems in this round are outlined in red. Click a team to fix it.');
-  }
-  if (!html) {
-    html = head('Nothing selected', ui.note || 'Click a team, a game’s ⋯, an empty room or a room name.');
+  } else if (sel.kind === 'round') {
+    const round = s.phases[sel.p].rounds[sel.r];
+    const games = round.games.filter((g) => g.a || g.b).length;
+    html = head(`Round ${round.round}`, `${s.phases[sel.p].name} · ${plural(games, 'game')}`)
+      + acts(link('insround', 'Insert a round after this one'), link('delround', 'Delete this round', 'danger'));
+    A.insround = () => edit(`Inserted a round after round ${round.round}`, (ss) => insertRound(ss, sel.p, sel.r));
+    A.delround = () => {
+      const filled = round.games.some((g) => g.a || g.b) || round.byes.length;
+      if (filled && !confirm(`Delete round ${round.round}? Its games go too (Undo brings them back).`)) return 'stay';
+      edit(`Deleted round ${round.round}`, (ss) => {
+        removeRound(ss, sel.p, sel.r);
+        if (!ss.phases[sel.p].rounds.length && ss.phases.length > 1) ss.phases.splice(sel.p, 1);
+      });
+    };
+  } else if (sel.kind === 'lane') {
+    // a bracket's heading: its name, here and in every slot that names it
+    // ("1st in 1st–6th place"), as one undoable edit
+    const cur = (s.brackets || []).find((x) => x.key === sel.key && x.phase === sel.p);
+    if (cur) {
+      const rooms = (bracketRooms(s).find((b) => b.key === sel.key && b.phase === sel.p) || { rooms: [] }).rooms;
+      html = ui.renaming === 'lane'
+        ? head('Rename bracket') + `<input class="sgpopin" data-act-name="1" value="${esc(cur.name)}" aria-label="Bracket name">` + acts(link('namego', 'Save'), link('nameno', 'Cancel'))
+        : head(cur.name, rooms.map((i) => (s.rooms[i] || {}).name || '').join(' · ') || 'no rooms yet') + acts(link('rename', 'Rename'));
+      A.rename = () => { ui.renaming = 'lane'; };
+      A.nameno = () => { ui.renaming = null; };
+      A.namego = (box) => {
+        const name = box.querySelector('[data-act-name]').value.trim();
+        if (!name) { env.say('Please give the bracket a name.', true); return 'stay'; }
+        if (name !== cur.name && (s.brackets || []).some((x) => x.name === name)) { env.say(`Another bracket is already called ${name}.`, true); return 'stay'; }
+        ui.renaming = null;
+        if (name === cur.name) return;
+        const old = cur.name;
+        edit(`Renamed ${old} to ${name}`, (ss) => {
+          for (const x of ss.brackets || []) if (x.key === sel.key && x.phase === sel.p) x.name = name;
+          for (const p2 of ss.phases) for (const r of p2.rounds) {
+            for (const g of r.games) for (const side of ['a', 'b']) {
+              const x = g[side];
+              if (x && typeof x.label === 'string' && x.label.endsWith(' in ' + old)) x.label = x.label.slice(0, -old.length) + name;
+            }
+            for (const x of r.byes || []) if (x && typeof x.label === 'string' && x.label.endsWith(' in ' + old)) x.label = x.label.slice(0, -old.length) + name;
+          }
+        });
+      };
+    }
   }
   return {
-    html: `<div class="sgpanel">${html}</div>`,
+    html: html ? `<div class="sgpop" id="schedpop" role="dialog">${html}</div>` : '',
     wire(box) {
       const redraw = () => renderSchedStep(box, env);
-      box.querySelectorAll('[data-act]').forEach((b) => {
+      box.querySelectorAll('.sgpop [data-act]').forEach((b) => {
         b.onclick = () => {
-          const fn = acts[b.dataset.act];
+          const fn = A[b.dataset.act];
           if (!fn) return;
-          if (fn() === 'stay') return;
+          if (fn(box) === 'stay') return;
           redraw();
         };
       });
       box.querySelectorAll('[data-tpteam]').forEach((b) => {
-        b.onclick = () => { acts.__trade(b.dataset.tpteam); redraw(); };
+        b.onclick = () => { A.__trade(b.dataset.tpteam); redraw(); };
       });
       // Find filters the lists in place, so typing keeps its focus
       const find = box.querySelector('[data-tpfind]');
@@ -1757,17 +1807,25 @@ function sidePanel(s, env, { roundNo, bracketName, edit, trade, pooled, locked }
         };
         find.focus();
       }
-      const sl = box.querySelector('[data-act-sel]');
-      if (sl) sl.onchange = () => { acts.__select(sl.value); redraw(); };
-      const br = box.querySelector('[data-act-br]');
-      if (br) br.onchange = () => { acts.__bracket(br.value); redraw(); };
-      const nm = box.querySelector('[data-act-name]');
-      if (nm) nm.onchange = () => { acts.__name(nm.value); redraw(); };
-      const bk = box.querySelector('[data-act-bucket]');
-      if (bk) bk.onchange = () => { acts.__bucket(bk.value); redraw(); };
+      const sl = box.querySelector('.sgpop [data-act-sel]');
+      if (sl) sl.onchange = () => { A.__select(sl.value); redraw(); };
+      const br = box.querySelector('.sgpop [data-act-br]');
+      if (br) br.onchange = () => { A.__bracket(br.value); redraw(); };
+      const nm = box.querySelector('.sgpop [data-act-name]');
+      if (nm) {
+        nm.focus();
+        nm.select();
+        nm.onkeydown = (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); if (A.namego(box) !== 'stay') redraw(); }
+          if (e.key === 'Escape') { e.stopPropagation(); ui.renaming = null; redraw(); }
+        };
+      }
+      const bk = box.querySelector('.sgpop [data-act-bucket]');
+      if (bk) bk.onchange = () => { A.__bucket(bk.value); redraw(); };
     },
   };
 }
+
 
 /* ---------- drag and drop ---------- */
 
@@ -1779,6 +1837,16 @@ function wireDrag(box, s, { edit, moveGameTo, trade }) {
     box.classList.remove('sg-drag-slot', 'sg-drag-game', 'sg-drag-team');
     box.querySelectorAll('.drop-ok').forEach((x) => x.classList.remove('drop-ok'));
     box.querySelectorAll('.dragging').forEach((x) => x.classList.remove('dragging'));
+    document.querySelectorAll('.sgghost').forEach((x) => x.remove());
+  };
+  // what follows the pointer: a card with the team, or with the game's two
+  // teams and where it is played
+  const ghost = (ev, html, cls) => {
+    const el = document.createElement('div');
+    el.className = 'sgghost ' + cls;
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    try { ev.dataTransfer.setDragImage(el, 14, 16); } catch (e) { /* the browser's own picture */ }
   };
   const targetOf = (el) => {
     if (!drag) return null;
@@ -1806,17 +1874,26 @@ function wireDrag(box, s, { edit, moveGameTo, trade }) {
       drag = { team: row.dataset.team, pool: row.dataset.pool };
       row.classList.add('dragging');
       box.classList.add('sg-drag-team');
+      ghost(ev, esc(row.dataset.team), 'team');
     } else if (slot && slot.draggable) {
       drag = { slot: JSON.parse(slot.dataset.ref) };
       slot.classList.add('dragging');
       box.classList.add('sg-drag-slot');
+      ghost(ev, esc(slotShow(getSlot(s, drag.slot))), 'team');
     } else {
       const cell = ev.target.closest && ev.target.closest('.sgcell:not(.empty)');
       if (!cell) return;
       drag = { cell: JSON.parse(cell.dataset.cell) };
       cell.classList.add('dragging');
       box.classList.add('sg-drag-game');
+      const g = gameAt(s, drag.cell.p, drag.cell.r, drag.cell.room) || {};
+      ghost(ev, `<span>${esc(slotShow(g.a) || '—')}</span><span>${esc(slotShow(g.b) || '—')}</span><span class="w">Round ${s.phases[drag.cell.p].rounds[drag.cell.r].round} · ${esc((s.rooms[drag.cell.room] || {}).name || '')}</span>`, 'game');
     }
+    // the popover steps aside (the drop redraws without it)
+    ui.sel = null;
+    ui.mode = null;
+    const pop = box.querySelector('#schedpop');
+    if (pop) pop.hidden = true;
     ev.dataTransfer.effectAllowed = 'move';
     ev.dataTransfer.setData('text/plain', JSON.stringify(drag));
   });

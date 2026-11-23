@@ -26,6 +26,7 @@ import '../engine/hdwhite.js';
 import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
   carryFormerNames, forfeitQbj, statedRound } from '../engine/qbj.js';
 import { standings, dedupeMatches, tiebreakOf, DEFAULT_TIE_ORDER } from '../engine/stats.js';
+import { tieOrderOf } from '../engine/stats.js';
 // hubgames.js builds the downloads with these four. They are
 // imported here too, where this file used them before, so a cold load
 // asks for them as early as it did: found one module later, report.js
@@ -42,7 +43,7 @@ import { formatHtml, wireFormat } from './formatui.js';
 import { rankFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import '../engine/modaqfile.js'; // asked for as early as before (see above)
 import { applyBuzzFix, buzzFixView, lineupGaps, lineupView, applyLineupFix } from '../engine/buzzfix.js';
-import { slotText, roundIntake, fillReport, roundRooms, flatRounds, renameTeams, rosterRenames,
+import { slotText, roundIntake, roundRooms, flatRounds, renameTeams, rosterRenames,
   hasPlaceholders, prelimRounds, finishedThrough, summaryTeams, namedFiles } from '../engine/schedule.js';
 import { fillProgress, autoFillSaved, filledNote, heldLevel } from '../engine/finals.js';
 import { renderSchedStep, schedEscape } from './schededit.js';
@@ -665,10 +666,6 @@ function renderModaqSec(a, t, settings) {
 // the Change password field, the scoresheet example, and what's typed
 const statsUi = { slug: null, want: null, changing: false, showExample: false, typed: '' };
 
-// Setup -> Stats, Break ties in standings by: [value, label]
-const TIEBREAK_MENU = [['pp20', 'Points per 20 (default)'], ['ppg', 'Points per game'], ['ppb', 'Points per bonus'],
-  ['h2h', 'Head-to-head, then PP20'], ['h2h-ppg', 'Head-to-head, then PPG'], ['h2h-ppb', 'Head-to-head, then PPB']];
-
 function renderStatsSec(a, t, settings) {
   const box = $('setupsec');
   // Opening this tab is the decision the checklist wants: the page starts
@@ -739,12 +736,6 @@ function renderStatsSec(a, t, settings) {
       <a class="mono" href="${esc(statsLink(t.slug))}" target="_blank">${esc(statsLink(t.slug))}</a>
       <button class="ico" onclick="qtd.copy('${esc(statsLink(t.slug))}', 'player link')" ${named('Copy player link')}>${ICON.copy}</button>
     </div>` : ''}
-    <div class="row" style="margin-top:10px">
-      <label class="row">Break ties in standings by
-        <select id="tiebreak">${TIEBREAK_MENU.map(([v, l]) =>
-          `<option value="${v}" ${(settings.tiebreak || 'pp20') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      </label>
-    </div>
     <h2>Category stats</h2>
     <div class="row">
       <label class="row">Category stats
@@ -854,18 +845,6 @@ function renderStatsSec(a, t, settings) {
         if (on) delete next.catStats; else next.catStats = false;
         await saveSettings(next);
         say(on ? 'Category stats on' : 'Category stats off');
-        showDetail();
-      } catch (e) { say(e.message, true); }
-    };
-    // how ties in record rank (stats.js tiebreakOf); points per 20 is
-    // stored as no setting
-    $('tiebreak').onchange = async () => {
-      const v = $('tiebreak').value;
-      try {
-        const next = { ...settings };
-        if (v === 'pp20') delete next.tiebreak; else next.tiebreak = v;
-        await saveSettings(next);
-        say('Tiebreak saved');
         showDetail();
       } catch (e) { say(e.message, true); }
     };
@@ -2060,16 +2039,28 @@ function renderSchedule(a, t, buckets, files) {
     setRoomsN: (n) => { schedRoomsN = n; },
     save: (s) => saveSchedule(a, s),
     del: () => pub(a + '/schedule', { method: 'DELETE' }).then((out) => { schedEtag = null; return out; }),
-    fill: async () => {
-      const { matches, roster } = await collectMatches(pub, a, t, buckets, files, () => {}, { cache: autoCache, rank: true, roster: hubNames.rosterFor(t) });
-      if (!matches.length) return null;
-      return fillReport(sched, standings(matches, roster, gameFormat(t)));
-    },
     // fill the slots Generate just saved, as the hub would on its own
     refill: () => autoFillSlots(true, true),
+    // the tie order (stats.js tieOrderOf), a tournament setting: saved at
+    // once, then the hub fills again on it
+    tieOrder: () => tieOrderOf(tourSettings(t)),
+    saveTieOrder: async (order) => {
+      const was = tourSettings(t);
+      const next = { ...was, tieOrder: order };
+      delete next.tiebreak;
+      await pub(a, { method: 'POST', json: settingsBody(was, next, {}, ['tieOrder', 'tiebreak']) });
+      t.settings = JSON.stringify(next);
+      say('Tie order saved');
+      autoFillSlots(true, true);
+    },
     say,
     refresh: () => render(),
   });
+}
+
+// a tournament's settings, as its detail holds them (a JSON string)
+function tourSettings(t) {
+  try { return JSON.parse(t.settings || '{}') || {}; } catch (e) { return {}; }
 }
 
 // Leaving the schedule step (or the page) with unsaved edits asks first.

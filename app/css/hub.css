@@ -378,7 +378,7 @@ table.fxteam { width: 100%; font-variant-numeric: tabular-nums; }
 
 /* ================= Schedule step (schededit.js) ================= */
 /* .lane-0..3 / .lane-x colors live in td.css (the room pages use them too) */
-i.lane-x, .sglane > i, .sgtgroup > i, .sgmapcard i {
+i.lane-x, .sglane > i, .sgtgroup > i {
   display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--lc); flex: none;
 }
 .sgchips .chip i { margin-right: 6px; }
@@ -439,10 +439,6 @@ select.pkhandsel { width: auto; padding: 2px 6px; font-size: 13px; }
 }
 /* picker */
 .sgnotice { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--sel); margin-bottom: 12px; font-size: 14px; }
-.sgfillcheck { align-items: flex-start; justify-content: space-between; margin: 8px 0; }
-.sgfillcheck ul { margin: 6px 0; padding-left: 20px; }
-.sgfillcheck li { margin: 2px 0; }
-.sgfillcheck .row { flex-shrink: 0; }
 .sgcreatorhead { margin-bottom: 8px; }
 .sgfmts { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .sgfmt { display: flex; gap: 10px; align-items: baseline; padding: 10px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
@@ -461,9 +457,76 @@ select.pkhandsel { width: auto; padding: 2px 6px; font-size: 13px; }
 .sgbar.unsaved > b { color: var(--warn); }
 .sgbar .primary { padding: 4px 14px; }
 .sgdel { color: var(--bad); }
+/* the popover sits over the step, under what was clicked */
+#schedsec { position: relative; }
+/* the problems: a warning sign with its count (a check sign when there are none) */
+.sgwarn { position: relative; display: inline-grid; place-items: center; width: 30px; height: 28px; border: none; background: none; padding: 0;
+  color: var(--warn); cursor: pointer; border-radius: 7px; }
+button.sgwarn:hover, .sgwarn.on { background: var(--hover-bg); }
+.sgwarn .cnt { position: absolute; top: 0; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px;
+  background: var(--bad); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center; }
+.sgwarn.none { color: var(--ok); cursor: default; }
+.sgnote { font-size: 13px; }
+.sgbar .icosm.on { background: var(--hover-bg); }
+/* the toolbar's + and ⋯ menus */
+.sgmenu { position: relative; display: inline-flex; }
+.sgdd { position: absolute; right: 0; top: calc(100% + 4px); z-index: 25; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px;
+  min-width: 170px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14); display: flex; flex-direction: column; }
+.sgdd button { border: none; background: none; text-align: left; padding: 6px 9px; font: inherit; font-size: 13px; border-radius: 6px; color: var(--fg); cursor: pointer; white-space: nowrap; }
+.sgdd button:hover { background: var(--hover-bg); }
+.sgdd button.danger { color: var(--bad); }
+/* a swap or a move waiting for its other end */
+.sghint { position: sticky; top: 8px; z-index: 15; display: flex; gap: 12px; align-items: center; margin-bottom: 10px; padding: 7px 12px; border-radius: 8px;
+  background: var(--fg); color: var(--bg); font-size: 13px; }
+.sghint .linkbtn { color: inherit; text-decoration: underline; font-size: 13px; }
+.sgprobs { margin-bottom: 10px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); border-radius: 10px; padding: 2px 12px; font-size: 13px; }
+.sgprob { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; padding: 6px 0; }
+.sgprob + .sgprob { border-top: 1px solid var(--line); }
+.sgprob .ic { color: var(--warn); font-weight: 700; }
+.sgprob .tx { flex: 1; min-width: 200px; }
+.sgprob .linkbtn { font-size: 13px; }
+/* the popover */
+.sgpop { position: absolute; z-index: 30; width: 260px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16); font-size: 13px; }
+.sgpop[hidden] { display: none; }
+.sgpop .sgptitle { font-size: 14px; overflow-wrap: anywhere; }
+.sgacts { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; }
+.sgacts .linkbtn { font-size: 13px; text-align: left; }
+.sgacts .linkbtn.danger { color: var(--bad); }
+.sgpop .sgrow { margin-top: 6px; }
+.sgpop .sgcol { flex-direction: column; align-items: stretch; gap: 3px; }
+.sgpop .sgrow select, .sgpop .sgrow input { font-size: 13px; }
+.sgpopin { width: 100%; box-sizing: border-box; margin-top: 6px; font: inherit; font-size: 13px; padding: 4px 6px; }
+.sgsub { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sgpop .sgpool { margin-top: 8px; font-size: 13px; }
+.sgpop .sgpool .linkbtn { font-size: 13px; }
+.sgpop .tp-pools { grid-template-columns: minmax(0, 1fr); max-height: 240px; overflow: auto; }
+.sgpop .tp-t { font-size: 13px; }
+@media (max-width: 600px) { .sgpop { position: fixed; left: 8px !important; right: 8px; bottom: 8px; top: auto !important; width: auto; } }
+/* between two phases: what a cut ranks on, and the tie order on one line */
+.sgcx { position: sticky; left: 0; width: max-content; box-sizing: border-box; margin: 14px 12px 0; padding: 8px 12px; border-radius: 10px;
+  background: var(--sel); font-size: 13px; display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.sgcx.two { flex-direction: column; align-items: flex-start; gap: 8px; }
+.sgcx.two > div { display: flex; align-items: center; gap: 12px; }
+.sgcx select { font-size: 13px; }
+.sgcxl { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.sgtline { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.sgtarr { color: var(--muted); font-size: 12px; }
+.sgtchip { position: relative; display: inline-flex; align-items: center; padding: 3px 10px; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--bg); color: var(--fg); font-size: 12.5px; cursor: grab; }
+.sgtchip button { position: absolute; top: 50%; transform: translateY(-50%); width: 15px; height: 19px; padding: 0; border: none; border-radius: 4px;
+  background: var(--fg); color: var(--bg); font-size: 12px; line-height: 19px; opacity: 0; cursor: pointer; }
+.sgtchip button.tl { left: -7px; }
+.sgtchip button.tr { right: -7px; }
+.sgtchip:hover button, .sgtchip:focus-within button { opacity: 1; }
+.sgtchip:hover { border-color: var(--fg); z-index: 1; }
+.sgtchip.pick { border-style: dashed; }
+.sgtchip.after { opacity: 0.4; }
+.sgtchip.dragging { opacity: 0.3; }
+.sgtchip.dropat { box-shadow: 0 0 0 2px var(--link); }
+.pkgrid .sgtline { flex-wrap: nowrap; }
 .sgroomspanel { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--hover-bg); margin-bottom: 10px; }
 .sgroomspanel[hidden] { display: none; }
-.sgbody { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: start; }
 /* the Schedule heading, with the Full screen symbol in its corner */
 .schedhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--fg); margin: 0 0 12px; }
 #setupsec .schedhead h2 { border: none; margin: 0; }
@@ -495,17 +558,9 @@ select.pkhandsel { width: auto; padding: 2px 6px; font-size: 13px; }
 .sgzoom i { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
 .sgclear { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .sgclear::before { content: "\2713"; color: var(--ok); font-weight: 700; }
-/* the grid takes the whole width; the panel floats over its corner when it is wanted */
-#schedsec.sgfull > .sgbody { flex: 1; min-height: 0; position: relative; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
-#schedsec.sgfull .sgscroll { max-height: none; height: 100%; }
-#schedsec.sgfull .sgside {
-  position: absolute; top: 10px; right: 10px; z-index: 6; width: 280px; max-height: calc(100% - 20px); overflow: auto;
-  display: flex; flex-direction: column; gap: 12px; order: 0;
-  padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
-}
-#schedsec.sgfull .sgside[hidden] { display: none; }
-.sgsidehide { align-self: flex-end; font-size: 13px; }
-@media (max-width: 1100px) { .sgbody { grid-template-columns: minmax(0, 1fr); } }
+/* full screen: the grid takes all the height left */
+#schedsec.sgfull > .sgbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#schedsec.sgfull .sgscroll { max-height: none; flex: 1; min-height: 0; }
 .sgscroll { overflow: auto; max-height: min(78vh, 1100px); border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overscroll-behavior: contain; }
 
 /* the grid: sticky round column and header rows */
@@ -531,15 +586,25 @@ select.pkhandsel { width: auto; padding: 2px 6px; font-size: 13px; }
 .sgroom-byes { cursor: default; }
 .sgrnd { position: sticky; left: 0; z-index: 2; background: var(--bg); border-top: 1px solid var(--line); padding: 6px 4px 6px 12px;
   display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
-.sgrnd.on { color: var(--bad); font-weight: 600; }
-.sgrnd .rowtools { visibility: hidden; display: flex; gap: 2px; margin: 0; }
-.sgrnd:hover .rowtools, .sgrnd:focus-within .rowtools { visibility: visible; }
+.sgrnd { cursor: pointer; }
+.sgrnd:hover { color: var(--fg); }
+.sgrnd.on { color: var(--fg); font-weight: 600; box-shadow: inset 2px 0 0 var(--link); }
+.sglane.named { cursor: pointer; }
+.sglane.named:hover, .sglane.on { box-shadow: inset 0 -2px 0 var(--lc); }
 .sgcell { position: relative; border-top: 1px solid var(--line); padding: 5px 22px 5px 6px; border-radius: 6px; min-width: 0;
   display: flex; flex-direction: column; gap: 1px; cursor: grab; }
 .sggrid.dense .sgcell { flex-direction: row; align-items: center; gap: 3px; padding: 3px 20px 3px 5px; }
 .sgcell:hover { background: var(--hover-bg); }
 .sgcell.on { background: var(--sel); box-shadow: inset 0 0 0 2px var(--link); }
-.sgcell.again { box-shadow: inset 0 0 0 1.5px var(--warn); }
+.sgcell.again, .sgcell.flag { box-shadow: inset 0 0 0 2px var(--warn); }
+.sgbadge { position: absolute; top: 3px; right: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--warn); color: var(--bg);
+  font-size: 10px; font-weight: 700; display: grid; place-items: center; pointer-events: none; }
+.sgcell.flag .sgh { top: 20px; }
+.sgcell.target { outline: 2px dashed var(--link); outline-offset: -3px; }
+.sgcell.empty.target .sgadd { border-color: transparent; color: var(--link); font-size: 14px; }
+.sgflash { animation: sgflash 1.2s ease 2; }
+@keyframes sgflash { 50% { background: color-mix(in srgb, var(--warn) 25%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .sgflash { animation: none; outline: 2px solid var(--warn); } }
 .sgcell.empty { cursor: default; padding: 4px; }
 .sgcell.empty:hover { background: none; }
 .sgadd { width: 100%; height: 100%; min-height: 24px; border: 1px dashed transparent; border-radius: 6px; background: none;
@@ -576,6 +641,14 @@ select.pkhandsel { width: auto; padding: 2px 6px; font-size: 13px; }
 .sg-drag-game .sgcell:not(.dragging) { outline: 1px dashed color-mix(in srgb, var(--link) 45%, transparent); outline-offset: -2px; }
 .sg-drag-game .sgbyes, .sg-drag-game .sgrnd { opacity: .4; }
 .dragging { opacity: .45; }
+.sgslot.dragging, .sgcell.dragging, .sgtname.dragging { opacity: .3; }
+/* the card that follows the pointer (schededit.js wireDrag): a team, or a game */
+.sgghost { position: fixed; top: -1000px; left: -1000px; z-index: 100; pointer-events: none; padding: 6px 10px; border-radius: 8px;
+  background: var(--bg); border: 1.5px solid var(--link); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22); font-size: 13px; color: var(--fg); white-space: nowrap; }
+.sgghost.team { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.sgghost.team::before { content: '⠿'; color: var(--muted); font-weight: 400; }
+.sgghost.game { display: flex; flex-direction: column; gap: 1px; min-width: 150px; }
+.sgghost.game .w { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
 .drop-ok, .sg-drag-slot .drop-ok, .sg-drag-game .drop-ok { outline: 2px solid var(--link) !important; outline-offset: -2px; background: var(--sel); }
 
 /* by team */
@@ -593,46 +666,12 @@ select.pkhandsel { width: auto; padding: 2px 6px; font-size: 13px; }
 .sgtc.later { background: var(--hover-bg); color: var(--muted); font-style: italic; }
 .sgtc.muted { color: var(--muted); font-style: italic; }
 
-/* brackets */
-.sgmap { display: flex; gap: 16px; padding: 18px; align-items: flex-start; width: max-content; }
-.sgmapcol { display: flex; flex-direction: column; gap: 8px; width: 250px; }
-.sgmaphead { font-size: 12px; }
-.sgarrow { align-self: center; color: var(--muted); font-size: 20px; }
-.sgmapcard { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--bg); font: inherit; font-size: 13px; color: var(--fg); cursor: pointer; }
-.sgmapcard > span:first-child { display: flex; gap: 8px; align-items: center; }
-.sgmapcard .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 224px; }
-.sgmapcard:hover { border-color: var(--link); }
-.sgmapcard.static { cursor: default; }
-/* Brackets view: a pool card lists its teams; pick two in different pools to trade */
-.sgmapnote { max-width: 250px; margin-bottom: 2px; }
-.sgmappool:hover { border-color: var(--line); }
-.sgmaphd { display: flex; gap: 8px; align-items: center; font: inherit; color: var(--fg); background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
-.sgmaphd:hover b { color: var(--link); }
-.sgmaprows { display: flex; flex-direction: column; margin: 4px 0 2px; min-width: 224px; }
-.sgmaprow { display: flex; justify-content: space-between; align-items: center; gap: 8px; font: inherit; font-size: 14px; color: var(--fg);
-  background: none; border: none; border-radius: 6px; padding: 3px 8px; margin: 0 -8px; text-align: left; line-height: 1.35; }
-button.sgmaprow { cursor: pointer; }
-button.sgmaprow:hover { background: var(--sel); }
-.sgmaprow.on { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--link); }
-.sgtradehint { color: var(--link); }
 /* By team: a team row drags onto another pool's team to trade them */
 .sgtname[draggable="true"] { cursor: grab; }
 .sgtname[draggable="true"]::before { content: "⋮⋮"; color: var(--muted); margin-right: 6px; letter-spacing: -2px; }
 .sgtname.dragging { opacity: 0.4; }
 .sgtname.drop-ok { box-shadow: inset 0 0 0 2px var(--link); background: var(--sel); }
 
-/* side panel + checks */
-.sgside { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 12px; font-size: 14px; }
-.sgpanel { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
-.sglabel { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); padding-top: 4px; }
-.sglabel select, .sglabel input { font-size: 13px; }
-.sgpick { display: flex; flex-wrap: wrap; gap: 4px; }
-.sgpick button.on { border-color: var(--link); }
-.sgptitle { font-size: 15px; font-weight: 600; line-height: 1.3; }
-/* the panel's actions: a line of links */
-.sglinks { display: flex; flex-wrap: wrap; align-items: center; font-size: 14px; }
-.sglinks .dot { color: var(--muted); margin: 0 8px; }
 .sgrow { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .sgrow select, .sgrow input { flex: 1; min-width: 0; font-size: 14px; }
 .sgpool { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 14px; }
@@ -649,34 +688,9 @@ button.sgmaprow:hover { background: var(--sel); }
 .tp-t:hover, .tp-t:focus-visible { background: var(--sel); color: var(--link); }
 .tp-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
 .tp-pool[hidden], .tp-t[hidden] { display: none; }
-.sgchecktitle { padding-bottom: 6px; border-bottom: 1px solid var(--fg); }
-.sgcheck { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 6px; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line);
-  background: none; padding: 6px 0; font: inherit; font-size: 13px; color: var(--fg); cursor: pointer; }
-.sgcheck.ok, .sgcheck.off { cursor: default; }
-.sgcheck.off > span:last-child { font-weight: 600; }
-/* a problem under its check: a link to where it is */
-.sgcheckitem { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--link); background: none;
-  border: none; padding: 2px 0 2px 22px; cursor: pointer; }
-.sgcheckitem.muted { color: var(--muted); cursor: default; }
-.sgcheck .bad, .sgcheck .warnc, .sgcheck .ok { font-weight: 700; }
-.sgfix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0 8px 22px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.sgfix { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
 .sgfix select { font-size: 13px; }
 .warnc { color: var(--warn); }
-.sghelp { line-height: 1.45; }
-/* narrow (the usual Setup width): the panel and checks sit in a band
-   above the grid, so the grid gets the whole width */
-#schedsec { container-type: inline-size; }
-@container (max-width: 1150px) {
-  .sgbody { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .sgside { order: -1; position: static; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px;
-    max-height: 210px; }
-  .sgside .sgpanel { overflow: auto; }
-  .sgside .sgchecks { overflow: auto; max-height: 210px; }
-  .sghelp { display: none; }
-  /* while trading, the band grows to hold the lists and the checks step aside */
-  .sgside.trading { max-height: none; grid-template-columns: minmax(0, 1fr); }
-  .sgside.trading .sgpanel { overflow: visible; }
-  .sgside.trading .sgchecks { display: none; }
 }
 #schedsec.sgfull .tp-pools { grid-template-columns: minmax(0, 1fr); }
 .sgchipphase { font-size: 12px; color: var(--muted); margin: 0 2px 0 8px; }

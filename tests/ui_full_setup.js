@@ -1217,8 +1217,9 @@ await runSection('SCHEDULE GUARD', async () => {
   await sayIs('Schedule saved');
   const sched = await until(async () => { const x = await call(`${T1.A}/file?key=${E(`t/${T1.id}/schedule.json`)}`); return x.status === 200 && x.body; }, 'the saved schedule');
   schedRounds = Math.max(...sched.phases.flatMap((p) => p.rounds.map((x) => x.round)));
-  await waitJs(`!!document.querySelector('#schedaddround')`, 'the editor');
+  await waitJs(`!!document.querySelector('#schedplus')`, 'the editor');
   // HUB-08: unsaved edits ask before leaving
+  await click('#schedplus');
   await click('#schedaddround');
   await waitJs(`!document.querySelector('#schedsave').disabled`, 'an unsaved edit');
   let asked = await withDialogs([false], () => click('[data-step="rooms"]'));
@@ -1265,6 +1266,7 @@ await runSection('ROOM RENAME ON THE SCHEDULE', async () => {
   await openStep('sched');
   await waitJs(`!!document.querySelector('.sgroom[data-room="${i}"]')`, 'the schedule rooms');
   ok('ROOMS-04 rename: this tab\'s schedule shows the new name ' + CH.rename, (await text(`.sgroom[data-room="${i}"]`)) === 'Hall Nine', await text(`.sgroom[data-room="${i}"]`));
+  await click('#schedplus');
   await click('#schedaddround');
   await waitJs(`!document.querySelector('#schedsave').disabled`, 'an edit');
   const n0 = dialogs.length;

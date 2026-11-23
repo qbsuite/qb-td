@@ -7082,22 +7082,7 @@ test('the hub ranks as the public page does: pool-mates level on both counts kee
   assert.equal(keptOrder({ pool: 'A' }), 'their pool order');
 });
 
-test('the hub ranks as the public page does: Fill playoff slots says when tied teams keep their pool order', () => {
-  const { fillCheckHtml } = schedEdit;
-  const items = (r) => [...fillCheckHtml(r).matchAll(/<li>(.*?)<\/li>/gs)].map((m) => m[1].replace(/\s+/g, ' '));
-  const level = levelPool();
-  const rep = fillReport(level.s, standings(level.games));
-  assert.deepEqual(items({ ...rep, game: false }), ['Pool A: Emory, Tufts, and Army are tied at 1–2. They have the same points per 20 tossups heard, '
-    + 'so filling keeps their pool order: Emory goes to Championship, Tufts goes to Consolation, Army goes to Consolation.']);
-  assert.deepEqual(items({ ...rep, game: true }), ['Pool A: Emory, Tufts, and Army are tied at 1–2. Please play a tiebreaker game, then place the teams by hand. '
-    + 'They have the same points per 20 tossups heard, so filling now keeps their pool order: Emory goes to Championship, Tufts goes to Consolation, Army goes to Consolation.']);
-  const part = levelPool(['Army', 'Emory', 320]);
-  assert.deepEqual(items({ ...fillReport(part.s, standings(part.games)), game: false }), ['Pool A: Army, Emory, and Tufts are tied at 1–2. '
-    + 'Points per 20 tossups heard breaks the tie: Army (173.33) goes to Championship, Emory (166.67) goes to Consolation, Tufts (166.67) goes to Consolation. '
-    + 'Emory and Tufts have the same points per 20 tossups heard, so they keep their pool order.']);
-  // a place compared across pools: the same winning percentage and the same
-  // points per 20 go in pool order, and the note says so instead of that
-  // points per 20 decided
+test('the hub ranks as the public page does: a place compared across pools with the same winning percentage and points per 20 goes in pool order', () => {
   const P = [planPhase('Prelims', { sizes: [7, 6], groups: 2 }), planPhase('Playoffs', { sizes: [7, 6] })];
   const s = buildPlan(planTeams(13), planRooms(7), P, 'snake', 1);
   const row = (name, w, l, pp) => ({ name, w, l, t: 0, regPoints: pp, regTuh: 20, pp20tuh: pp });
@@ -7108,22 +7093,11 @@ test('the hub ranks as the public page does: Fill playoff slots says when tied t
   const cmp = fillReport(s, agg);
   assert.deepEqual([cmp.ranks['#4'], cmp.compared], [[A4, B4], [{ place: 4, teams: [{ name: A4, pool: 'A', pp20tuh: 100, record: '9–4' },
     { name: B4, pool: 'B', pp20tuh: 100, record: '9–4' }], level: [[A4, B4]] }]]);
-  assert.deepEqual(items({ ...cmp, missing: [], game: false }), [`4th places ${A4} (Pool A, 9–4) and ${B4} (Pool B, 9–4) have the same winning percentage. `
-    + 'They also have the same points per 20 tossups heard (100.00), so filling puts them in pool order.']);
-  assert.deepEqual(items({ ...cmp, missing: [], game: true }), [`4th places ${A4} (Pool A, 9–4) and ${B4} (Pool B, 9–4) have the same winning percentage. `
-    + 'Please play a tiebreaker game, then place them by hand. They also have the same points per 20 tossups heard (100.00), so filling now puts them in pool order.']);
   // points per 20 apart: as before
   agg.teams.find((x) => x.name === B4).regPoints = 150;
   agg.teams.find((x) => x.name === B4).pp20tuh = 150;
   const apart = fillReport(s, agg);
   assert.deepEqual([apart.ranks['#4'], apart.compared[0].level], [[B4, A4], []]);
-  assert.deepEqual(items({ ...apart, missing: [], game: false }), [`4th places ${B4} (Pool B, 9–4) and ${A4} (Pool A, 9–4) have the same winning percentage. `
-    + `They go up by points per 20 tossups heard: ${B4} 150.00, ${A4} 100.00.`]);
-  // two of three level: points per 20 decides, and the two go in pool order
-  const three = { missing: [], extra: [], ties: [], compared: [{ place: 2, teams: [{ name: 'Yale', pool: 'C', pp20tuh: 160, record: '4–2' },
-    { name: 'Duke', pool: 'A', pp20tuh: 150, record: '4–2' }, { name: 'Rice', pool: 'B', pp20tuh: 150, record: '4–2' }], level: [['Duke', 'Rice']] }] };
-  assert.deepEqual(items(three), ['2nd places Yale (Pool C, 4–2), Duke (Pool A, 4–2), and Rice (Pool B, 4–2) have the same winning percentage. '
-    + 'They go up by points per 20 tossups heard: Yale 160.00, Duke 150.00, Rice 150.00. Duke and Rice have the same points per 20 tossups heard, so they go in pool order.']);
 });
 
 test('the hub ranks as the public page does: a tie waiting for the TD says when its teams have the same points per 20, and its button says what filling does', () => {
