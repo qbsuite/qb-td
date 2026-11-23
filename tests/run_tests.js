@@ -6600,6 +6600,55 @@ test('finals: the hub fills the Finals only with all the games they rank on read
   }
 });
 
+test('tie order: You pick holds a pool tie across a cut; the pick (schedule.tiePicks, its pool only) fills it; the refill leaves a decider\'s and a fill-anyway slot alone', () => {
+  const settings = { tieOrder: ['pick', 'game', 'ppg', 'h2h', 'ppb'] };
+  let found = null;
+  for (let seed = 1; seed < 300 && !found; seed++) {
+    const day = finalsDay(seed);
+    // the prelims only, the playoff slots open
+    const s = JSON.parse(JSON.stringify(day.s));
+    for (const ph of s.phases.slice(1)) for (const r of ph.rounds) for (const g of r.games) for (const k of ['a', 'b']) if (g[k] && g[k].from) g[k] = { label: g[k].from };
+    const pre = new Set(prelimRounds(s).map((r) => r.round));
+    const files = day.files.filter((f) => pre.has(f.round));
+    const byId = new Map(day.games.map((m, i) => [day.files[i].id, { ...m, fileId: day.files[i].id }]));
+    const read = files.map((f) => byId.get(f.id));
+    const res = autoFillSaved(s, files, read, null, [], settings);
+    const x = res.playoffs && res.playoffs.held.find((y) => y.needPick && y.needPick.length);
+    if (x) found = { s, files, read, res, x };
+  }
+  assert.ok(found, 'a day with a tie across a cut');
+  const { s, files, read, x } = found;
+  const run = x.needPick[0];
+  const open = (sch) => sch.phases.flatMap((ph) => ph.rounds.flatMap((r) => r.games.flatMap((g) => [g.a, g.b]))).filter((sl) => sl && sl.label).map((sl) => sl.label);
+  const held = found.res.schedule;
+  for (const t of x.teams.filter((tm) => run.includes(tm.name))) assert.ok(open(held).includes(x.pool + t.place), 'its places wait: ' + x.pool + t.place);
+  // the TD picks the last of them first
+  const pick = [...run].reverse();
+  const picked = autoFillSaved({ ...held, tiePicks: [{ at: x.pool, order: pick }] }, files, read, null, [], settings);
+  const where = (sch, label) => { for (const ph of sch.phases) for (const r of ph.rounds) for (const g of r.games) for (const k of ['a', 'b']) if (g[k] && g[k].from === label) return g[k].team; return null; };
+  const first = Math.min(...x.teams.filter((tm) => run.includes(tm.name)).map((tm) => tm.place));
+  assert.equal(where(picked.schedule, x.pool + first), pick[0], 'the pick takes the first place');
+  const note = picked.schedule.filled.find((y) => y.pool === x.pool && y.record === x.record);
+  assert.equal(note.decidedBy, 'pick');
+  // a pick for another pool changes nothing here
+  const other = Object.keys(s.pools).find((p) => p !== x.pool);
+  const elsewhere = autoFillSaved({ ...held, tiePicks: [{ at: other, order: s.pools[other].slice(0, 2) }] }, files, read, null, [], settings);
+  for (const t of run) assert.ok(open(elsewhere.schedule).includes(x.pool + x.teams.find((tm) => tm.name === t).place), 'still waits');
+  // the pick taken back: the hub's own slots open again, a decider's and a fill-anyway one stay
+  const marked = JSON.parse(JSON.stringify(picked.schedule));
+  // (as deciders.js and a fill-anyway mark them: each slot that reads the place)
+  const labels = x.teams.filter((tm) => run.includes(tm.name)).map((tm) => x.pool + tm.place);
+  const [dec, forced] = labels;
+  for (const ph of marked.phases) for (const r of ph.rounds) for (const g of r.games) for (const k of ['a', 'b']) {
+    const sl = g[k];
+    if (sl && sl.from === dec) sl.dec = true;
+    if (sl && sl.from === forced) sl.forced = true;
+  }
+  delete marked.tiePicks;
+  const back = autoFillSaved(marked, files, read, null, [], settings);
+  assert.ok(!open(back.schedule).includes(dec) && !open(back.schedule).includes(forced), 'a decider\'s and a fill-anyway slot stay');
+});
+
 test('finals: Ranked by (schedule.finalsRankBy): all games ranks the Final on every game its teams played; the hub refills an unplayed Final when it changes, never one with a game in or a slot set by hand', () => {
   let changed = 0;
   for (const seed of [5, 9, 13, 21, 34, 55]) {
