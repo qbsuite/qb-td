@@ -57,9 +57,6 @@ import { bracketModel, bracketRounds, roomRound, roomBracket, roomIndexOf, follo
 
 const SETUP_TTL = 7 * 24 * 3600 * 1000;
 const RUN_TTL = 72 * 3600 * 1000;
-// How long a started tournament shows under "Live now" (the directory):
-// the event itself, not the extra day its links stay open for fixes.
-const LIVE_LIST_TTL = 48 * 3600 * 1000;
 // The latest any tournament can still be open: started at the last
 // moment of setup. Queries for "tournaments that might be open" use it.
 const MAX_LIFE = SETUP_TTL + RUN_TTL;
@@ -1426,9 +1423,13 @@ async function tickTournaments(env) {
    A tournament is listed by use, not by merely existing, so a row
    somebody made to see what the thing does never shows: it has started,
    and DIR_LIVE_ROOMS rooms have each uploaded a game. An entry carries
-   the name, when it started, and when it leaves the list, LIVE_LIST_TTL
-   after Start (the page drops it then; the hourly sweep then takes it
-   out of the file). The slug — the
+   the name, when it started, and when it leaves the list: when its links
+   close (closesAt), the same moment the hourly wrap-up posts "Finished"
+   to Discord (alertWrapUps), so nothing goes quiet in between. The page
+   drops it then; the hourly sweep then takes it out of the file. The
+   leave time is worked out each time the file is built, not stored, so a
+   change to the clocks or an operator's reopening (closes_at) reaches
+   tournaments already listed. The slug — the
    link — is only there while the TD has the public page on; with it off
    the tournament is listed by name alone. A URL name starting
    DIR_HIDE_PREFIX is never listed: the operator's test runs on
@@ -1470,7 +1471,7 @@ async function dirCountsOf(env, tid) {
 // A tournament's line in the directory, or null when it isn't listed.
 function dirEntry(t, counts) {
   if (!t.started || counts.rooms < DIR_LIVE_ROOMS || String(t.slug).startsWith(DIR_HIDE_PREFIX)) return null;
-  return JSON.stringify({ n: t.name, s: t.published ? t.slug : null, d: t.started, c: t.started + LIVE_LIST_TTL });
+  return JSON.stringify({ n: t.name, s: t.published ? t.slug : null, d: t.started });
 }
 
 // Record t's entry if it moved; true when it did (the file is then stale).
@@ -1481,15 +1482,26 @@ async function dirNote(env, t, counts) {
   return true;
 }
 
-// Rebuild directory.json from the listed rows still inside LIVE_LIST_TTL.
-// Answers { changed, text }; R2 is only written when the text differs
-// from what is there.
+// Rebuild directory.json from the listed rows whose links are still open,
+// each with its leave time (c) put in from closesAt. Answers { changed,
+// text }; R2 is only written when the text differs from what is there.
 async function dirBuild(env) {
+  const now = Date.now();
+  // started > ?1 keeps to the partial index (idx_tournaments_dir): no
+  // tournament is open longer than MAX_LIFE after it could have started
   const { results } = await env.DB.prepare(
-    'SELECT dir_entry FROM tournaments WHERE dir_entry IS NOT NULL AND started > ?1 ' +
-    `ORDER BY started DESC, id DESC LIMIT ${DIR_MAX}`
-  ).bind(Date.now() - LIVE_LIST_TTL).all();
-  const text = '{"v":1,"t":[' + results.map((r) => r.dir_entry).join(',') + ']}';
+    'SELECT dir_entry, started, closes_at FROM tournaments WHERE dir_entry IS NOT NULL AND started > ?1 ' +
+    `AND ${closesSql()} > ?2 ORDER BY started DESC, id DESC LIMIT ${DIR_MAX}`
+  ).bind(now - MAX_LIFE, now).all();
+  const entries = [];
+  for (const r of results) {
+    let e;
+    try { e = JSON.parse(r.dir_entry); } catch (err) { continue; }
+    // entries written before the leave time was worked out here carry
+    // their own c; this one replaces it in place
+    entries.push(JSON.stringify({ ...e, c: closesAt(r) }));
+  }
+  const text = '{"v":1,"t":[' + entries.join(',') + ']}';
   const cur = await env.DATA.get(DIR_KEY);
   if (cur ? (await cur.text()) === text : text === DIR_EMPTY) return { changed: false, text };
   await env.DATA.put(DIR_KEY, text, { httpMetadata: { contentType: 'application/json' } });

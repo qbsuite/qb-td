@@ -76,7 +76,7 @@ let e = entryOf(d, nameA);
 ok('two rooms reporting lists it', Boolean(e), d.body);
 ok('with its link, the public page being on', e && e.s === a.slug, e);
 const row = d1row(`SELECT started FROM tournaments WHERE id = ${a.id}`);
-ok('and when it started and closes', e && e.d === row.started && e.c === row.started + 48 * 3600 * 1000, e);
+ok('and when it started and leaves the list: when its links close, 72 hours after Start', e && e.d === row.started && e.c === row.started + 72 * 3600 * 1000, e);
 
 /* ----- the operator's production test runs: never listed ----- */
 
@@ -152,13 +152,29 @@ ok('an entry is name, link and the two dates, nothing more',
 
 // Nothing happens on the backend when a tournament closes, so nothing
 // marks it dirty: the sweep is what takes it out of the file. (It is also
-// what repairs a row removed by hand.) Its 48 hours ran out an hour ago:
+// what repairs a row removed by hand.)
 const full = nameA + ' II';
+const sweep = async () => { const x = await fetch(BASE + '/__scheduled?cron=' + encodeURIComponent('0 * * * *')); await x.text(); };
+// the day after the event, links still open: still listed (it used to
+// leave at 48 hours, a day before its links closed)
 d1exec(`UPDATE tournaments SET started = ${Date.now() - 49 * 3600 * 1000} WHERE id = ${a.id}`);
+await sweep();
+e = entryOf(await directory(), full);
+const late = d1row(`SELECT started FROM tournaments WHERE id = ${a.id}`).started;
+ok('49 hours after Start, links still open: still listed, leaving when they close',
+  Boolean(e) && e.c === late + 72 * 3600 * 1000, e);
+// the operator reopens it (README "Reopening a tournament"): it leaves when the reopened links close
+const reopened = Date.now() + 5 * 24 * 3600 * 1000;
+d1exec(`UPDATE tournaments SET closes_at = ${reopened} WHERE id = ${a.id}`);
+await sweep();
+e = entryOf(await directory(), full);
+ok('reopened by the operator: it leaves when the reopened links close', Boolean(e) && e.c === reopened, e);
+d1exec(`UPDATE tournaments SET closes_at = NULL WHERE id = ${a.id}`);
+// its 72 hours ran out an hour ago:
+d1exec(`UPDATE tournaments SET started = ${Date.now() - 73 * 3600 * 1000} WHERE id = ${a.id}`);
 await tick();
 ok('a tournament that has closed is still in the file until the sweep', Boolean(entryOf(await directory(), full)));
-const res = await fetch(BASE + '/__scheduled?cron=' + encodeURIComponent('0 * * * *'));
-await res.text();
+await sweep();
 let gone = false;
 for (let i = 0; i < 40 && !gone; i++) {
   gone = !entryOf(await directory(), full);

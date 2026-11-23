@@ -8146,7 +8146,7 @@
    "r2 put t/2/pubstate.json",
    "d1 run UPDATE tournaments SET pub_built = ?2 WHERE id = ?1",
    "d1 all SELECT id, slug, name, published, started, dir_entry FROM tournaments WHERE pub_dirty = 1 AND published = 0 AND pub_snapshot IS NULL AND set_id IS NULL ORDER BY pub_dirty_at LIMIT 4",
-   "d1 all SELECT dir_entry FROM tournaments WHERE dir_entry IS NOT NULL AND started > ?1 ORDER BY started DESC, id DESC LIMIT 200",
+   "d1 all SELECT dir_entry, started, closes_at FROM tournaments WHERE dir_entry IS NOT NULL AND started > ?1 AND COALESCE(closes_at, CASE WHEN started IS NULL THEN created + 604800000 ELSE started + 259200000 END) > ?2 ORDER BY started DESC, id DESC LIMIT 200",
    "r2 get directory.json",
    "r2 put directory.json",
    "d1 all SELECT id FROM sets WHERE state_dirty = 1 ORDER BY id LIMIT 8"

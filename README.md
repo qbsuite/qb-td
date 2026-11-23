@@ -1236,8 +1236,9 @@ instance now and, under them, the ones that have run on it.
 **Live now** is automatic, and decided by use, never by a tournament
 merely existing — so the rows people make to see what the thing does stay
 out. A tournament is listed once it has started and two rooms have each
-uploaded a game, and drops off 48 hours after Start (`LIVE_LIST_TTL`),
-a day before its links close. It is linked while
+uploaded a game, and drops off when its links close, 72 hours after
+Start (or when you reopened it to), the hour the Discord "Finished"
+message posts. It is linked while
 its TD has the public page on; with it off it is still listed, by name
 only, in grey. That is a choice this instance makes for every TD:
 switching the public page off hides the results, not the fact that the
