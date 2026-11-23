@@ -3291,9 +3291,7 @@ function fixPanelHtml() {
     let form = '';
     if (add) {
       const on = luAt(lu.segs, add.q);
-      // Q1 too: the most common slip is a substitution made before the game that MODAQ never heard
-      // about. One on Q1 changes who started, and the starters above show it
-      const qs = Array.from({ length: Math.max(lu.questions, 0) }, (_, i) => i + 1);
+      const qs = Array.from({ length: Math.max(lu.questions - 1, 0) }, (_, i) => i + 2);
       form = `<div class="luadd">
         <select id="luaq" aria-label="Question">${qs.map((q) => `<option value="${q}" ${q === add.q ? 'selected' : ''}>Q${q}</option>`).join('')}</select>
         <select id="luain" aria-label="In"><option value="">Nobody</option>${pool.filter((p) => !on.includes(p)).map((p) =>

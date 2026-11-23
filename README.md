@@ -55,9 +55,23 @@ Part of [qbsuite](https://qbsuite.github.io/).
   whole matches between any two cells, insert or delete rounds from any
   row, add or drop room columns (a dropped column's teams land in the
   bye tray), and link each schedule room to a bucket. Playoff slots are
-  placeholders ("A1" = pool A's 1st) — **Fill playoff slots from
-  standings** resolves them from the collected games' standings once
-  prelims are in, and hand-editing stays the override). The **Live Hub**
+  placeholders ("A1" = pool A's 1st) the hub fills from the standings
+  once a pool's games are in, and hand-editing stays the override.
+  Actions open in a popover at the clicked cell; problems show as a
+  count that opens their list.) **Ties for a place** go by one
+  tournament-wide order of five movable steps — Tiebreaker game (if
+  exists), PPG, Head-to-head, PPB, You pick (`settings.tieOrder`,
+  stats.js; tournaments from before keep their `tiebreak`) — shown
+  between each pair of phases; the Finals' **Ranked by** (playoff games,
+  with the prelim games between them, or all games:
+  `schedule.finalsRankBy`) sits on the line before them. A tie that
+  reaches the tiebreaker game with tiebreaker packets in its block, or
+  You pick, waits; the rest fill. The Live Hub's **Ties** box shows how
+  each was broken (Confirm hides one), and asks You pick one place at a
+  time (`schedule.tiePicks`). Slots the hub filled itself fill again when
+  the order, a pick, the ranking or a tiebreaker game changes them,
+  until a game in them is in; slots the TD placed, a decider's
+  (`dec`) and a fill-anyway (`forced`) stay. The **Live Hub**
   is the day-of page, carrying a notice until setup is complete: a
   status strip tracks the live round (packet up, games in vs scheduled,
   which rooms are still out, extras used vs unused) with one-click
@@ -88,8 +102,11 @@ Part of [qbsuite](https://qbsuite.github.io/).
   the room it was actually played in.
 - **Deciders** (tiebreaker games): with a tiebreaker packet uploaded
   (Packets + Extras: rows "Tiebreaker 1", "Tiebreaker 2", each a whole
-  packet or its first or second half), a tie across a playoff cut waits
-  instead of going by the tie-break figure. The Live view's **Deciders**
+  packet or its first or second half, in two blocks — after the
+  prelims, and after the last playoff round for ties for Finals places,
+  numbered in round order), a tie across a cut waits when the tie order
+  reaches its tiebreaker game. Any round's own packet can be played as
+  its first or second half too (`deciders.roundParts`). The Live view's **Deciders**
   section opens on the suggested games (the two lowest play, the winner
   plays the next one up), each with a room; any game can go by the
   figure instead. A tiebreaker packet is handed to the rooms like a
@@ -98,6 +115,8 @@ Part of [qbsuite](https://qbsuite.github.io/).
   room's reader opens on the decider, a half packet as a ten-tossup
   game that keeps the packet's question numbers, and its upload sets the
   winner: the next game's teams and then the playoff slots follow.
+  **Upload the game file** puts one in from the hub, through the room's
+  own upload.
   **Add a decider** makes one by hand between teams, places ("3rd in
   Championship") or an earlier one's winner or loser: on a tiebreaker
   packet, or on the next round packet as a round of its own (a
@@ -1445,7 +1464,7 @@ That part scales. What breaks first:
    fallback), so it stays its own function.
 
 5. ~~**The TD's hub read games one request each.**~~ Fixed 10/18/2026.
-   Auto-fill, Fill playoff slots and Compute stats read every game
+   Auto-fill, Fill playoff slots (since removed) and Compute stats read every game
    through `GET /a/:secret/file`, one Worker request and one ~64KB
    upload (packet text included) per game, again on each press or
    reload. On 10/17/2026 (ACF Fall @ UIUC, ~170 games, plus SF) that was

@@ -1,3 +1,25 @@
+Release Notes for 11/22/2026
+
+[ SETUP ]
+- Schedule: ties for a place are broken in an order you set, between each pair of phases: Tiebreaker game (if exists), PPG, Head-to-head, PPB, You pick. Drag a step or use its arrows to move it.
+- Schedule: Finals can be ranked by playoff games, playoff games plus the prelim games between them, or all games.
+- Schedule: game and team actions open where you click. Problems show as a count; click it for the list and Show.
+- Schedule: Add a round, phase or room are under +. Fill playoff slots and the Brackets view are gone; playoff slots fill on their own.
+- Schedule: Full screen has zoom.
+- Packets: tiebreaker packets can follow the last playoff round too, for Finals ties.
+- Packets: any round can be played on the first or second half of its packet.
+- Player page: Break ties in standings by is replaced by the tie order.
+
+[ LIVE HUB ]
+- Ties: each tie for a place shows how it was broken, newest first. Confirm hides one.
+- Ties: when the order reaches You pick, pick who takes each place, one at a time.
+- Ties wait for tiebreaker games once a tiebreaker packet is uploaded, Finals ties included.
+- Playoff and Finals slots fill again when the tie order, a pick, the Finals ranking or a tiebreaker game changes them, until a game in them is in. Slots you placed yourself stay.
+- Deciders: Upload the game file adds a tiebreaker game from the hub.
+
+[ STATS ]
+- Tiebreaker games are listed as their own games and count in no record or stat. Their questions count in category stats and buzzpoints.
+
 Release Notes for 11/20/2026
 
 [ PUBLIC PAGE ]
