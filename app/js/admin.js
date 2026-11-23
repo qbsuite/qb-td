@@ -2650,8 +2650,9 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
             <div class="row">
               <label>Room <select id="addroom">${buckets.map((b) =>
                 `<option value="${b.id}" ${addOpen && addOpen.bid === b.id ? 'selected' : ''}>${esc(b.room_name)}</option>`).join('')}</select></label>
-              <label>Round <input id="addround" type="number" min="1" max="999"
-                value="${addOpen && addOpen.round ? addOpen.round : t.current_round}" style="width:64px"></label>
+              ${addOpen && isTbRound(addOpen.round) ? `<span>Tiebreaker ${addOpen.round - TB_BASE}<input id="addround" type="hidden" value="${addOpen.round}"></span>`
+                : `<label>Round <input id="addround" type="number" min="1" max="999"
+                value="${addOpen && addOpen.round ? addOpen.round : t.current_round}" style="width:64px"></label>`}
               <input id="addfile" type="file" multiple accept=".json,.qbj" aria-label="Game files">
             </div>
             <div id="addlist" class="addlist"></div>
@@ -3594,7 +3595,7 @@ async function addGame(a, buckets) {
     }
     run.end();
     if (bad.length) say(bad.join('; '), true);
-    else say(`${picked.length === 1 ? picked[0].name : picked.length + ' files'} added to ${room.room_name}, round ${round}`);
+    else say(`${picked.length === 1 ? picked[0].name : picked.length + ' files'} added to ${room.room_name}, ${isTbRound(round) ? 'Tiebreaker ' + (round - TB_BASE) : 'round ' + round}`);
     addOpen = null;
     cellOpen = { bid: room.id, round };
     showDetail();
@@ -3701,6 +3702,13 @@ const deciders = makeDeciders({
   matches: async (files) => (await collectMatches(pub, '/a/' + adminSecret, lastDetail.tournament, lastDetail.buckets, files, () => {},
     { cache: autoCache, rank: true, roster: hubNames.rosterFor(lastDetail.tournament) })).matches,
   format: () => gameFormat(lastDetail.tournament),
+  // a decider's game file from the hub: the Add a game panel, on its room and tiebreaker packet
+  addFor: (bid, round) => {
+    addOpen = { bid, round, picked: true };
+    render();
+    $('addpanel').scrollIntoView({ block: 'nearest' });
+    $('addfile').focus();
+  },
 });
 // The Live Hub's Ties box (tiebox.js): ties the tie order broke, and those it left for the TD to pick
 const tieSettings = () => { try { return JSON.parse(lastDetail.tournament.settings) || {}; } catch (e) { return {}; } };

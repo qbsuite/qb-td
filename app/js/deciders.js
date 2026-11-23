@@ -480,7 +480,11 @@ export function makeDeciders(h) {
         const box = `<label class="tbpp"><input type="checkbox" data-decpp="${P}:${i}"${pp ? ' checked' : ''}> Use ${esc(h.statLabel())}</label>`;
         const won = '';
         if (st.editing) return `<li class="tbedit">${tag(i)}${menu(i, 'a')} vs ${menu(i, 'b')}${box}<button class="linkbtn muted" data-decdel="${P}:${i}">Remove</button></li>`;
-        return `<li>${tag(i)}<span class="${pp ? 'muted' : ''}">${esc(ref(x, st, y.a, g))} vs ${esc(ref(x, st, y.b, g))}</span>${res}${out(i)}${won}${box}</li>`;
+        // its file from the hub, as the room would send it (only a room's upload decides it)
+        const bucket = (s.rooms[roomOf(s, x.pool, st, i)] || {}).bucket;
+        const up = c[i] >= 0 && !pp && !st.wins[i] && a && b && bucket && h.addFor
+          ? ` <button class="linkbtn" data-decup="${bucket}:${TB_BASE + base + c[i] + 1}">Upload the game file</button>` : '';
+        return `<li>${tag(i)}<span class="${pp ? 'muted' : ''}">${esc(ref(x, st, y.a, g))} vs ${esc(ref(x, st, y.b, g))}</span>${res}${out(i)}${won}${up}${box}</li>`;
       }).join('');
       let place = '';
       const o = order(x, st, own);
@@ -602,6 +606,7 @@ export function makeDeciders(h) {
     on('[data-decroom]', 'onchange', (el) => { const [k, i] = el.dataset.decroom.split(':'); const pool = keyOf(k); change(pool, (st) => { st.rooms = { ...(st.rooms || {}), [i]: Number(el.value) }; }); });
     on('[data-decfold]', 'onclick', (el) => change(keyOf(el.dataset.decfold), (st) => { st.open = !st.open; }));
     on('[data-decpackets]', 'onclick', () => h.goPackets());
+    on('[data-decup]', 'onclick', (el) => { const [bid, round] = el.dataset.decup.split(':').map(Number); h.addFor(bid, round); });
     on('#decrelease', 'onclick', (el) => release(Number(el.dataset.tb)));
     on('[data-decownroom]', 'onchange', (el) => write((s, d) => { d.added[Number(el.dataset.decownroom)].room = Number(el.value); }).then(() => h.render()));
     on('[data-decownrm]', 'onclick', (el) => write((s, d) => {

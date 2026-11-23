@@ -529,6 +529,24 @@ export function autoFillSaved(saved, files, matches, roster = null, force = [], 
     }
   }
   if (redo) {
+    // what the fill says it did: only the slots whose team changed from the
+    // saved schedule (a refilled slot that came out the same is no news)
+    const changed = [];
+    saved.phases.forEach((ph, pi) => (ph.rounds || []).forEach((r, ri) => {
+      const r2 = next.phases[pi] && next.phases[pi].rounds[ri];
+      if (!r2) return;
+      const pairs = [...(r.games || []).flatMap((g, gi) => [[g.a, r2.games[gi] && r2.games[gi].a], [g.b, r2.games[gi] && r2.games[gi].b]]),
+        ...(r.byes || []).map((b, bi) => [b, (r2.byes || [])[bi]])];
+      for (const [x, y] of pairs) if (y && y.team && y.from && (!x || x.team !== y.team)) changed.push(y.from);
+    }));
+    if (playoffs) {
+      const ps = [...new Set(changed.map((f) => PLACE_RE.exec(f)).filter(Boolean).map((m) => m[1]))].sort();
+      playoffs = { ...playoffs, filled: changed.filter((f) => PLACE_RE.test(f) || COMPARED_RE.test(f)).length, pools: ps };
+    }
+    if (finals) {
+      const bs = [...new Set(changed.map((f) => FIN_RE.exec(f)).filter(Boolean).map((m) => m[2]))];
+      finals = { ...finals, filled: changed.filter((f) => FIN_RE.test(f)).length, brackets: bs };
+    }
     const same = (x, y) => (x.pool || x.bracket) === (y.pool || y.bracket) && x.record === y.record
       && JSON.stringify(x.teams.map((t) => t.name)) === JSON.stringify(y.teams.map((t) => t.name)) && x.decidedBy === y.decidedBy;
     next = { ...next, filled: (next.filled || []).map((x) => { const was = before.find((y) => same(x, y)); return was && was.confirmed ? { ...x, confirmed: true, at: was.at } : was ? { ...x, at: was.at } : x; }) };
