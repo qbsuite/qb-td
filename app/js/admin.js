@@ -25,7 +25,7 @@ import '../engine/plan.js';
 import '../engine/hdwhite.js';
 import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
   carryFormerNames, forfeitQbj, statedRound } from '../engine/qbj.js';
-import { standings, dedupeMatches, tiebreakOf } from '../engine/stats.js';
+import { standings, dedupeMatches, tiebreakOf, DEFAULT_TIE_ORDER } from '../engine/stats.js';
 // hubgames.js builds the downloads with these four. They are
 // imported here too, where this file used them before, so a cold load
 // asks for them as early as it did: found one module later, report.js
@@ -213,8 +213,9 @@ function showList() {
     try {
       const out = await pub('/api/tournaments', { method: 'POST', json: {
         name: $('newname').value, slug: $('newslug').value,
-        // rounds open themselves unless the TD switches it off (Live Hub)
-        settings: { autoAdvance: true },
+        // rounds open themselves unless the TD switches it off (Live Hub);
+        // ties break in the default order (stats.js DEFAULT_TIE_ORDER)
+        settings: { autoAdvance: true, tieOrder: [...DEFAULT_TIE_ORDER] },
       } });
       run.end();
       saveLink({ secret: out.admin_secret, slug: out.slug, name: out.name,

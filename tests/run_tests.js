@@ -7,7 +7,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLines, buildRosterQbj, teamMarks,
   rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound, matchPayload } from '../app/engine/qbj.js';
-import { aggregate, dedupeMatches, standings, headToHead, levelRuns, standingsOrder, tiebreakOf, ruleOf } from '../app/engine/stats.js';
+import { aggregate, dedupeMatches, standings, headToHead, levelRuns, standingsOrder, tiebreakOf, ruleOf, tieOrderOf, tieKeys, DEFAULT_TIE_ORDER } from '../app/engine/stats.js';
 import { rankFormat } from '../app/js/read_core.js';
 import { pasteGrid } from '../app/engine/rosterpaste.js';
 import { buildYft, yfStages, repeatedPhases } from '../app/engine/yft.js';
@@ -8478,6 +8478,64 @@ test('hubgames.js: passes on exportfile.js, so the hub imports its downloads fro
     assert.deepEqual(levelRuns(same).map((r) => r.map((t) => t.name)), [['A', 'B', 'C']]);
   });
 
+  test('tie order: the default goes PPG, head-to-head, PPB, then waits for the TD; each step only on what the ones before left level', () => {
+    const row = (name, points, bonusPoints) => ({ name, w: 2, l: 2, t: 0, regPoints: points, regTuh: 80, points, gp: 4, bonusPoints, bonusesHeard: 20 });
+    const rule = (games = [], extra = {}, order = DEFAULT_TIE_ORDER) => ruleOf(tiebreakOf({ tieOrder: order }), games, extra);
+    const names = (rows) => rows.map((t) => t.name).join('');
+    // PPG first: 1200 > 1100 > 1000
+    assert.equal(names(standingsOrder([row('A', 1000, 300), row('B', 1100, 300), row('C', 1200, 300)], rule())), 'CBA');
+    // PPG level: head-to-head (B beat A)
+    const AB = [row('A', 1000, 300), row('B', 1000, 300)];
+    assert.equal(names(standingsOrder(AB, rule([beat('B', 'A')]))), 'BA');
+    // head-to-head even too (they split): PPB
+    assert.equal(names(standingsOrder([row('A', 1000, 300), row('B', 1000, 320)], rule([beat('A', 'B'), beat('B', 'A')]))), 'BA');
+    // level on all three: they stay as they came, as one level run, until the TD picks
+    const same = [row('A', 1000, 300), row('B', 1000, 300)];
+    assert.deepEqual(levelRuns(standingsOrder(same, rule()), rule()).map(names), ['AB']);
+    const picked = rule([], { picks: [['B', 'A']] });
+    assert.equal(names(standingsOrder(same, picked)), 'BA');
+    assert.deepEqual(levelRuns(standingsOrder(same, picked), picked), []);
+    // You pick earlier in the order: nothing after it is reached
+    const early = ['game', 'pick', 'ppg', 'h2h', 'ppb'];
+    const differ = [row('A', 1000, 300), row('B', 1200, 300)];
+    assert.deepEqual(levelRuns(differ, rule([], {}, early)).map(names), ['AB'], 'PPG never reached before the pick');
+    // a tie order of the wrong shape falls back to the old setting
+    assert.deepEqual(tieOrderOf({ tieOrder: ['ppg', 'h2h'], tiebreak: 'h2h-ppb' }), ['h2h', 'ppb']);
+    assert.deepEqual(tieOrderOf({}), ['pp20'], 'none set: points per 20, as before');
+  });
+
+  test('tie order: a tiebreaker game decides the teams that played it (a stepladder), the rest by the steps after it; it counts in no record', () => {
+    // three teams 1–1 in the games that count; a stepladder on tiebreaker packets 1 and 2
+    const m = (round, w, l, pw = 300, pl = 200) => ({ round, tossupsRead: 20, teams: [
+      { name: w, points: pw, bonusPoints: 100, players: [] }, { name: l, points: pl, bonusPoints: 50, players: [] }] });
+    const counted = [m(1, 'Ann', 'Bo', 300, 200), m(2, 'Bo', 'Cy', 310, 200), m(3, 'Cy', 'Ann', 320, 200)];
+    const tb = [m(901, 'Cy', 'Bo'), m(902, 'Cy', 'Ann')];
+    const s = standings([...counted, ...tb], null, { tieOrder: DEFAULT_TIE_ORDER });
+    const rows = new Map(s.teams.map((t) => [t.name, t]));
+    assert.deepEqual(['Ann', 'Bo', 'Cy'].map((n) => `${rows.get(n).w}-${rows.get(n).l}`), ['1-1', '1-1', '1-1'], 'the tiebreaker games count in no record');
+    assert.equal(rows.get('Cy').gp, 2);
+    // Cy won the last game, Ann lost it, Bo lost the first
+    assert.deepEqual(s.teams.map((t) => t.name), ['Cy', 'Ann', 'Bo']);
+    // they rank apart, as head-to-head would: the game set them apart
+    const keys = tieKeys(s.teams, s.rule);
+    assert.equal(new Set(s.teams.map((t) => keys.get(t.name))).size, 3);
+    // without the tiebreaker games: PPG (Cy 260, Bo 255, Ann 250)
+    assert.deepEqual(standings(counted, null, { tieOrder: DEFAULT_TIE_ORDER }).teams.map((t) => t.name), ['Cy', 'Bo', 'Ann']);
+    // a figure split shares the rank, as YF shows a tie in record
+    const k2 = tieKeys(standings(counted, null, { tieOrder: DEFAULT_TIE_ORDER }).teams, standings(counted, null, { tieOrder: DEFAULT_TIE_ORDER }).rule);
+    assert.equal(new Set([...k2.values()]).size, 1);
+  });
+
+  test('tie order: the public report lists a tiebreaker game but counts it in no record or stat, and ranks the teams it separated apart', () => {
+    const m = (round, w, l) => ({ round, tossupsRead: 20, teams: [
+      { name: w, points: 300, bonusPoints: 100, players: [{ name: w + ' 1', tossupsHeard: 20, counts: [{ value: 10, n: 20 }] }] },
+      { name: l, points: 200, bonusPoints: 50, players: [{ name: l + ' 1', tossupsHeard: 20, counts: [{ value: 10, n: 15 }] }] }] });
+    const r = reportData({ name: 'T', matches: [m(1, 'A', 'B'), m(2, 'B', 'A'), m(901, 'A', 'B')], roster: null, settings: { tieOrder: DEFAULT_TIE_ORDER } });
+    assert.deepEqual(r.games.map((g) => g.round), [1, 2, 901], 'the tiebreaker game is listed');
+    assert.deepEqual(r.teams.map((t) => [t.name, t.w, t.rank]), [['A', 1, '1'], ['B', 1, '2']], 'records without it; the game ranks them apart');
+    assert.deepEqual(r.players.map((p) => [p.gp, p.tuh]), [[2, 40], [2, 40]], 'no game played or tossup heard for it');
+  });
+
   test('tiebreak: points per game or per bonus break a tie in record, with or without head-to-head first', () => {
     // A: more per tossup; B: more per game (fewer tossups a game); C: more per bonus
     const A = { name: 'A', w: 2, l: 2, t: 0, regPoints: 1000, regTuh: 60, points: 1000, gp: 4, bonusPoints: 300, bonusesHeard: 30 };
@@ -8495,7 +8553,7 @@ test('hubgames.js: passes on exportfile.js, so the hub imports its downloads fro
     const cyc = [beat('A', 'B'), beat('B', 'C'), beat('C', 'A')];
     assert.equal(by('h2h-ppb', cyc), 'CAB');
     assert.equal(by('h2h-ppg', cyc), 'BAC');
-    assert.deepEqual(tiebreakOf({ tiebreak: 'bogus' }), { stat: 'pp20', h2h: false });
+    assert.deepEqual(tiebreakOf({ tiebreak: 'bogus' }), { order: ['pp20'], stat: 'pp20', h2h: false });
   });
 
   test('rankFormat: the ranking rule rides on the game format, never into MODAQ\'s', () => {

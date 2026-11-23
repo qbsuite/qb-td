@@ -6,6 +6,7 @@
 // counts, bonuses heard (= positive buzzes), PPB, PP20TUH.
 
 import { resultOf } from './qbj.js';
+import { isTbRound } from './deciderphases.js';
 import { answerTypes, overtimeOf, REGULATION_TOSSUPS } from './yft.js';
 
 function round2(x) {
@@ -237,30 +238,60 @@ export function standingsCompare(a, b, stat = 'pp20') {
 }
 
 /* ---------- the TD's tiebreak ----------
-   settings.tiebreak (read_core.js rankFormat) says how teams with the
-   same winning percentage rank: by points per 20 (none set: YF's order),
-   points per game or points per bonus, each with or without head-to-head
-   first. Head-to-head is the tied teams' games against each other. It
-   counts only when every pair of them met the same number of times, as a
-   round robin has them meet: each team's winning percentage in those
-   games orders them, and it runs again on any smaller group still level.
-   What it leaves level goes by the figure.
+   How teams with the same winning percentage rank. A tournament's
+   settings.tieOrder is the order of five steps, any order, each used on
+   whatever the steps before it left level:
+     game  a tiebreaker game, when one was played (tiebreaker packets:
+           deciderphases.js): the teams that played rank by its results,
+           the others by the steps after it
+     ppg   points per game          ppb   points per bonus
+     h2h   head-to-head (below)
+     pick  the TD's pick; until there is one the teams stay level, and
+           no step after it is reached
+   A tournament without tieOrder keeps its old setting, settings.tiebreak,
+   read as the same order it always ranked by: points per 20 (YF's order,
+   none set), points per game or per bonus, each with or without
+   head-to-head first.
 
-   A rule, as standingsOrder and the rest take it: {stat, h2h}, stat as
-   statOf takes it and h2h the games to go by (aggregate()'s games), or
-   null for none; a null rule is YF's order. */
+   Head-to-head is the tied teams' games against each other. It counts
+   only when every pair of them met the same number of times, as a round
+   robin has them meet: each team's winning percentage in those games
+   orders them, and it runs again on any smaller group still level.
+
+   A rule, as standingsOrder and the rest take it: {order, stat, h2h, tb,
+   picks}: order the steps; stat the first figure in it (for notes that
+   name one); h2h the games to go by (aggregate()'s games), or null; tb
+   the tiebreaker games played (aggregate()'s games of tiebreaker rounds),
+   or null; picks the TD's picks, [[names, best first]…], or null. A null
+   rule is YF's order (points per 20). */
 
 export const TIEBREAKS = ['pp20', 'ppg', 'ppb', 'h2h', 'h2h-ppg', 'h2h-ppb'];
+export const TIE_STEPS = ['game', 'ppg', 'h2h', 'ppb', 'pick'];
+export const DEFAULT_TIE_ORDER = ['game', 'ppg', 'h2h', 'ppb', 'pick'];
+const STAT_STEPS = ['pp20', 'ppg', 'ppb'];
+// the order each old setting always ranked by
+const LEGACY_ORDER = { pp20: ['pp20'], ppg: ['ppg'], ppb: ['ppb'], h2h: ['h2h', 'pp20'], 'h2h-ppg': ['h2h', 'ppg'], 'h2h-ppb': ['h2h', 'ppb'] };
 
-/** The tiebreak a game format (rankFormat) carries: {stat, h2h: boolean}. */
-export function tiebreakOf(settings) {
+/** A tie order as settings.tieOrder may hold it: the five steps, each once. */
+export const isTieOrder = (o) => Array.isArray(o) && o.length === TIE_STEPS.length && TIE_STEPS.every((x) => o.includes(x));
+
+/** The steps ties go by, from a game format (rankFormat). */
+export function tieOrderOf(settings) {
+  if (settings && isTieOrder(settings.tieOrder)) return [...settings.tieOrder];
   const v = settings && TIEBREAKS.includes(settings.tiebreak) ? settings.tiebreak : 'pp20';
-  return { stat: v.endsWith('ppg') ? 'ppg' : v.endsWith('ppb') ? 'ppb' : 'pp20', h2h: v.startsWith('h2h') };
+  return LEGACY_ORDER[v];
 }
 
-/** The rule for the tiebreak `tb` (tiebreakOf) over `games`, or null for
-    YF's order. */
-export const ruleOf = (tb, games) => (tb && (tb.h2h || tb.stat !== 'pp20') ? { stat: tb.stat, h2h: tb.h2h ? games : null } : null);
+/** The tiebreak a game format carries: {order, stat, h2h: boolean}. */
+export function tiebreakOf(settings) {
+  const order = tieOrderOf(settings);
+  return { order, stat: order.find((x) => STAT_STEPS.includes(x)) || 'pp20', h2h: order.includes('h2h') };
+}
+
+/** The rule for the tiebreak `tb` (tiebreakOf) over `games` (and the
+    tiebreaker games and picks in `extra`), or null for YF's order. */
+export const ruleOf = (tb, games, extra = {}) => (tb && !(tb.order.length === 1 && tb.order[0] === 'pp20')
+  ? { order: tb.order, stat: tb.stat, h2h: tb.h2h ? games : null, tb: extra.tb || null, picks: extra.picks || null } : null);
 
 const samePct = (a, b) => {
   const x = winPct(a); const y = winPct(b);
@@ -342,12 +373,101 @@ function h2hPass(rows, games) {
     did not separate have the same tier. */
 export const h2hTiers = (rows, games) => h2hPass([...rows], games);
 
-/** YF standings order (standingsCompare). A stable sort: teams level on
-    both keep their order in `teams`. rule: the TD's tiebreak (see above),
-    or null. */
+// consecutive rows `same` puts together
+function runsBy(rows, same) {
+  const out = [];
+  for (const t of rows) {
+    const last = out[out.length - 1];
+    if (last && same(last[last.length - 1], t)) last.push(t); else out.push([t]);
+  }
+  return out;
+}
+const figure = (t, stat) => { const v = statOf(t, stat); return Number.isNaN(v) ? -9999999 : v; };
+
+// The tiebreaker games among `rows`: the teams that played rank by them,
+// the way a stepladder ends (the last game's winner first, then each
+// game's loser from the last game back); the others keep the places the
+// steps after this one give them. null when none was played among them.
+function gameStep(rows, rest, rule, key) {
+  const names = new Set(rows.map((t) => t.name));
+  const played = (rule.tb || []).filter((g) => g.teams.length === 2 && g.teams.every((x) => names.has(x.name)) && resultOf(g.teams[0], g.teams[1]));
+  if (!played.length) return null;
+  const order = [...played].sort((x, y) => x.round - y.round);
+  const last = new Map();
+  order.forEach((g, i) => {
+    const res = resultOf(g.teams[0], g.teams[1]);
+    g.teams.forEach((x, s) => last.set(x.name, { i, won: (res === 'W') === (s === 0) && res !== 'T' }));
+  });
+  const seeded = walk(rows, rest, rule, key);
+  const slots = seeded.map((p, i) => (last.has(p.row.name) ? i : -1)).filter((i) => i >= 0);
+  const players = slots.map((i) => seeded[i]).sort((x, y) => {
+    const a = last.get(x.row.name), b = last.get(y.row.name);
+    return b.i - a.i || Number(b.won) - Number(a.won);
+  });
+  const out = [...seeded];
+  slots.forEach((at, k) => { out[at] = { row: players[k].row, key: key + 'g' + k + '.' }; });
+  return out;
+}
+
+// rows level on everything before `steps`, as [{row, key}] in order: two
+// rows with the same key were not separated by a step that isn't a figure
+// (a figure splits them but they share a rank, as YF shows ties in record)
+// (`grp` marks the rows a step left level together)
+let grpSeq = 0;
+const leaf = (rows, key) => { const grp = ++grpSeq; return rows.map((row) => ({ row, key, level: rows.length > 1, grp })); };
+function walk(rows, steps, rule, key) {
+  if (rows.length < 2 || !steps.length) return leaf(rows, key);
+  const [c, ...rest] = steps;
+  if (STAT_STEPS.includes(c)) {
+    const sorted = [...rows].sort((a, b) => figure(b, c) - figure(a, c));
+    return runsBy(sorted, (a, b) => figure(a, c) === figure(b, c)).flatMap((run) => walk(run, rest, rule, key));
+  }
+  if (c === 'h2h') {
+    if (!rule.h2h) return walk(rows, rest, rule, key);
+    const h = headToHead(rows, rule.h2h);
+    return runsBy(h.rows, (a, b) => h.tier.get(a.name) === h.tier.get(b.name)).flatMap((run, i) => walk(run, rest, rule, key + 'h' + i + '.'));
+  }
+  if (c === 'game') return gameStep(rows, rest, rule, key) || walk(rows, rest, rule, key);
+  if (c === 'pick') {
+    // the TD's pick for these teams, best first; until then they stay level
+    const pick = (rule.picks || []).find((p) => rows.every((t) => p.includes(t.name)));
+    if (!pick) return leaf(rows, key);
+    return [...rows].sort((a, b) => pick.indexOf(a.name) - pick.indexOf(b.name)).map((row, i) => ({ row, key: key + 'p' + i + '.' }));
+  }
+  return walk(rows, rest, rule, key);
+}
+
+// rows by winning percentage (no games at the bottom), each run of the same
+// percentage walked through the rule's steps: [[{row, key, level}]…], a run each
+function pctRuns(teams, rule) {
+  const pct = (t) => { const v = winPct(t); return Number.isNaN(v) ? -1 : v; };
+  const sorted = [...teams].sort((a, b) => pct(b) - pct(a));
+  return runsBy(sorted, (a, b) => pct(a) === pct(b)).map((run, i) => walk(run, rule.order, rule, i + ':'));
+}
+
+/** YF standings order: winning percentage, then the TD's tie order (see
+    above). A stable sort: teams level on everything keep their order in
+    `teams`. rule: as ruleOf makes it, or null for YF's order. */
 export function standingsOrder(teams, rule = null) {
-  const out = [...teams].sort((a, b) => standingsCompare(a, b, rule ? rule.stat : 'pp20'));
-  if (rule && rule.h2h) h2hPass(out, rule.h2h);
+  if (!rule || !rule.order) {
+    const out = [...teams].sort((a, b) => standingsCompare(a, b, rule ? rule.stat : 'pp20'));
+    if (rule && rule.h2h) h2hPass(out, rule.h2h);
+    return out;
+  }
+  return pctRuns(teams, rule).flat().map((p) => p.row);
+}
+
+/** Each row's tie key, rows in standingsOrder: two rows share a rank
+    ("N=") when they have the same key, i.e. the same winning percentage
+    and no step but a figure set them apart. */
+export function tieKeys(rows, rule = null) {
+  const out = new Map();
+  if (!rule || !rule.order) {
+    const tier = rule && rule.h2h ? h2hTiers(rows, rule.h2h) : null;
+    rows.forEach((t) => out.set(t.name, String(winPct(t)) + '|' + (tier ? tier.get(t.name) : '')));
+    return out;
+  }
+  for (const run of pctRuns(rows, rule)) for (const p of run) out.set(p.row.name, p.key);
   return out;
 }
 
@@ -356,11 +476,20 @@ export function standingsOrder(teams, rule = null) {
 export const levelOn = (a, b, stat = 'pp20') => !!a && !!b && standingsCompare(a, b, stat) === 0;
 
 /**
- * Runs of rows level on both counts (levelOn), in order: [[rows…]], each
- * of two or more. rows: in standingsOrder. rule: as standingsOrder takes
- * it; rows head-to-head separated are not level.
+ * Runs of rows nothing in the rule separates, in order: [[rows…]], each of
+ * two or more. rows: in standingsOrder. rule: as standingsOrder takes it.
+ * For the old settings, rows level on both counts (levelOn), apart from
+ * rows head-to-head separated.
  */
 export function levelRuns(rows, rule = null) {
+  if (rule && rule.order) {
+    const out = [];
+    for (const run of pctRuns(rows, rule)) {
+      // consecutive rows left level by the same steps
+      for (const g of runsBy(run, (a, b) => a.level && b.level && a.grp === b.grp)) if (g.length > 1) out.push(g.map((p) => p.row));
+    }
+    return out;
+  }
   const tier = rule && rule.h2h ? h2hPass([...rows], rule.h2h) : null;
   const stat = rule ? rule.stat : 'pp20';
   const level = (a, b) => levelOn(a, b, stat) && (!tier || tier.get(a.name) === tier.get(b.name));
@@ -384,9 +513,12 @@ export function levelRuns(rows, rule = null) {
  * game format, as regulationFigures takes it, with its tiebreak
  * (tiebreakOf; kept as agg.rule, head-to-head over agg.games).
  */
-export function standings(matches, roster = null, settings = null) {
-  const agg = regulationFigures(aggregate(matches, roster), matches, settings);
-  agg.rule = ruleOf(tiebreakOf(settings), agg.games);
+export function standings(matches, roster = null, settings = null, picks = null) {
+  // tiebreaker games settle ties but count in no record or figure
+  const counted = matches.filter((m) => !isTbRound(m.round));
+  const tbGames = counted.length < matches.length ? aggregate(matches.filter((m) => isTbRound(m.round)), roster).games : null;
+  const agg = regulationFigures(aggregate(counted, roster), counted, settings);
+  agg.rule = ruleOf(tiebreakOf(settings), agg.games, { tb: tbGames, picks });
   agg.teams = standingsOrder(agg.teams, agg.rule).map((t) => ({
     ...t,
     pp20tuh: t.regTuh ? round2((t.regPoints / t.regTuh) * 20) : 0,

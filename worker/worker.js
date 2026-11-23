@@ -5017,6 +5017,12 @@ function unlockKey(t) {
 // Deliberately a whitelist, not a delete-list: settings is the TO's own
 // JSON and gains keys over time, and the buzzpoints password hash lives
 // in it.
+// The tie order (stats.js tieOrderOf; kept apart: stats.js stays out of the
+// Worker): the five steps, each once, in the TD's order.
+const TIE_STEPS = ['game', 'ppg', 'h2h', 'ppb', 'pick'];
+const DEFAULT_TIE_ORDER = ['game', 'ppg', 'h2h', 'ppb', 'pick'];
+const isTieOrder = (o) => Array.isArray(o) && o.length === TIE_STEPS.length && TIE_STEPS.every((x) => o.includes(x));
+
 function pubFormat(t) {
   try {
     const s = JSON.parse(t.settings) || {};
@@ -5025,8 +5031,10 @@ function pubFormat(t) {
     if (s.formatOverrides && typeof s.formatOverrides === 'object') {
       out.formatOverrides = s.formatOverrides;
     }
-    // how ties in record are ranked (read_core.js rankFormat)
-    if (['ppg', 'ppb', 'h2h', 'h2h-ppg', 'h2h-ppb'].includes(s.tiebreak)) out.tiebreak = s.tiebreak;
+    // how ties in record are ranked (read_core.js rankFormat): the tie
+    // order, or the old setting a tournament made before it keeps
+    if (isTieOrder(s.tieOrder)) out.tieOrder = s.tieOrder;
+    else if (['ppg', 'ppb', 'h2h', 'h2h-ppg', 'h2h-ppb'].includes(s.tiebreak)) out.tiebreak = s.tiebreak;
     return out;
   } catch (e) { return {}; }
 }
@@ -6643,6 +6651,8 @@ async function startInvite(request, env, secret, ctx) {
     for (const k of ['gameFormat', 'formatOverrides']) {
       if (setSettings[k] !== undefined) settings[k] = setSettings[k];
     }
+    // a new tournament breaks ties in the default order (stats.js DEFAULT_TIE_ORDER)
+    settings.tieOrder = [...DEFAULT_TIE_ORDER];
     await env.DB.prepare('UPDATE tournaments SET settings = ?2 WHERE id = ?1')
       .bind(made.id, JSON.stringify(settings)).run();
   } catch (e) {

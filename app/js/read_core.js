@@ -921,8 +921,12 @@ export function effectiveFormat(settings) {
     teams: the standings, the fills, the public page. Never MODAQ's: it
     has no such field. */
 const TIEBREAK_KEYS = ['ppg', 'ppb', 'h2h', 'h2h-ppg', 'h2h-ppb'];
+const TIE_STEP_KEYS = ['game', 'ppg', 'h2h', 'ppb', 'pick'];
 export function rankFormat(settings) {
   const f = effectiveFormat(settings);
+  // the tie order (stats.js tieOrderOf), or the old setting it replaces
+  const o = settings && settings.tieOrder;
+  if (Array.isArray(o) && o.length === TIE_STEP_KEYS.length && TIE_STEP_KEYS.every((x) => o.includes(x))) return { ...f, tieOrder: [...o] };
   return settings && TIEBREAK_KEYS.includes(settings.tiebreak) ? { ...f, tiebreak: settings.tiebreak } : f;
 }
 

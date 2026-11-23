@@ -17,7 +17,7 @@
 import { roundLabel, isTbRound, TB_ROUND } from './deciderphases.js';
 // a Round column's cell: the number, or T1, T2 for a tiebreaker packet's games
 const roundShort = (r) => (isTbRound(r) ? 'T' + (r - TB_ROUND) : String(r));
-import { aggregate, regulationFigures, standingsOrder, winPct, pptuh, teamGets, tiebreakOf, ruleOf, statOf, h2hTiers } from './stats.js';
+import { aggregate, regulationFigures, standingsOrder, winPct, pptuh, teamGets, tiebreakOf, ruleOf, statOf, tieKeys } from './stats.js';
 import { rosterTracking, resultOf } from './qbj.js';
 import { answerTypes, importOrder, matchId, schoolAndLetter, PHASE_NAME, yfStages, buildYft,
   REGULATION_TOSSUPS } from './yft.js';
@@ -107,13 +107,14 @@ const fmtPpb = (pts, heard) => (heard ? (pts / heard).toFixed(2) : MDASH);
 // separated rank apart.
 function rankTeams(sorted, rule = null) {
   const ranks = [];
-  const tier = rule && rule.h2h ? h2hTiers(sorted, rule.h2h) : null;
+  // the same key: the same winning percentage, and nothing but a figure set them apart
+  const key = tieKeys(sorted, rule);
   let prevPct = 2;
   let prevRank = 0;
   sorted.forEach((t, i) => {
     const pct = winPct(t);
     const tied = (pct === prevPct || (Number.isNaN(pct) && Number.isNaN(prevPct)))
-      && (!tier || tier.get(t.name) === tier.get(sorted[i - 1].name));
+      && key.get(t.name) === key.get(sorted[i - 1].name);
     if (tied) {
       ranks[i] = `${prevRank}=`;
       ranks[i - 1] = `${prevRank}=`;
@@ -343,21 +344,27 @@ function tally(games, names) {
 function reportModel({ name, matches, roster, prefix, settings, schedule }) {
   const rules = settings || {};
   const regTossups = rules.regulationTossupCount ?? REGULATION_TOSSUPS;
-  const agg = aggregate(matches, roster);
+  // tiebreaker games (deciderphases.js) show with the rest but count in no
+  // record or stat: the standings and stats come from the others
+  const counted = matches.filter((mm) => !isTbRound(mm.round));
+  const agg = aggregate(counted, roster);
+  const tbGames = counted.length < matches.length ? aggregate(matches.filter((mm) => isTbRound(mm.round)), roster).games : null;
   // the columns, game order and match ids of the .yft YF would hold
   const vals = answerTypes(matches, rules).values;
-  const games = importOrder(agg.games);
+  // the games listed: every game, tiebreakers too, each with its overtime figured
+  const listed = tbGames ? regulationFigures(aggregate(matches, roster), matches, rules) : agg;
+  const games = importOrder(listed.games);
   games.forEach((g, i) => { g.id = matchId(g, i); });
   const anyTies = agg.teams.some((t) => t.t > 0);
 
   // overtime out of the rate stats (each game's `overtime`, regulation
   // points, TUH and bonuses heard), as the hub's standings take it too
-  regulationFigures(agg, matches, rules);
+  regulationFigures(agg, counted, rules);
 
   // the TD's tiebreak (stats.js tiebreakOf), head-to-head over the games
   // each table counts
   const tb = tiebreakOf(rules);
-  const rule = ruleOf(tb, agg.games);
+  const rule = ruleOf(tb, agg.games, { tb: tbGames });
   const teams = standingsOrder(agg.teams, rule);
   const teamRanks = rankTeams(teams, rule);
   // The stages the .yft gives YF (yft.js yfStages), from the schedule. With
@@ -391,7 +398,8 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
         const key = mt.name + '\n' + mp.name;
         if (!perPlayer.has(key)) perPlayer.set(key, { gp: 0, games: [] });
         const entry = perPlayer.get(key);
-        entry.gp += mp.tossupsHeard / g.tossupsRead;
+        // a tiebreaker game is listed but adds no game played
+        if (!isTbRound(g.round)) entry.gp += mp.tossupsHeard / g.tossupsRead;
         entry.games.push({ g, mt, opp, mp });
       }
     }
@@ -440,7 +448,7 @@ function reportModel({ name, matches, roster, prefix, settings, schedule }) {
 
   return {
     name, filePrefix: prefix ? `${prefix}_` : '', vals, anyTies, teams, teamRanks, players, playerRanks, phaseName, pools, stages, schedule,
-    games, rounds, perTeam, hasPowers, hasNegs, regTossups, trackUG, trackDiv2, tb,
+    games, rounds, perTeam, hasPowers, hasNegs, regTossups, trackUG, trackDiv2, tb, tbGames,
   };
 }
 
@@ -558,10 +566,13 @@ function stageSections(m) {
   const S = m.stages;
   const gamesOf = (st) => st.rounds.flatMap((rd) => rd.games);
   const forStage = (st, extra) => {
-    const games = [...gamesOf(st), ...extra];
+    const all = [...gamesOf(st), ...extra];
+    // a stage's tiebreaker games settle its ties but count in no record
+    const games = all.filter((g) => !isTbRound(g.round));
+    const tbs = all.filter((g) => isTbRound(g.round));
     return st.pools.map((pl) => {
       const stats = tally(games, pl.teams);
-      const rule = ruleOf(m.tb, games);
+      const rule = ruleOf(m.tb, games, { tb: tbs.length ? tbs : null });
       const teams = standingsOrder(pl.teams.map((n) => stats.get(n)), rule);
       return { pl, teams, ranks: rankTeams(teams, rule) };
     });
