@@ -819,18 +819,20 @@ export function makeDeciders(h) {
 }
 
 /** The schedule editor's and the player page's block: deciders after their round, read-only. */
-export function decEditorHtml(s) {
+export function decEditorHtml(s, parts = false) {
   const all = decGames(s);
-  if (!all.length) return '';
+  if (!all.length) return parts ? [] : '';
   const slot = (x) => `<div class="sgslot${x && x.label ? ' ph' : ''}">${esc(slotText(x) || (x && x.label) || '—')}</div>`;
-  return [...new Set(all.map((g) => g.after))].sort((x, y) => x - y).map((after) => {
+  const out = [...new Set(all.map((g) => g.after))].sort((x, y) => x - y).map((after) => {
     const games = all.filter((g) => g.after === after);
     const used = [...new Set(games.map((g) => g.room))].sort((x, y) => x - y);
-    return `<section class="sgphase tbedphase">
+    const html = `<section class="sgphase tbedphase">
     <div class="sgphasehead"><span class="caret">▾</span><b>Deciders</b><span class="muted">after round ${after} · changed in the Live Hub</span></div>
     <div class="sggrid" style="grid-template-columns:40px ${used.map(() => '230px').join(' ')}">
       <div class="sgcorner"></div>${used.map((i) => `<div class="sgroom">${esc(s.rooms[i].name)}</div>`).join('')}
       ${games.map((g) => `<div class="sgrnd"><span>D${g.n}</span></div>${used.map((i) => (g.room === i ? `<div class="sgcell">${slot(g.a)}${slot(g.b)}</div>` : '<div class="sgcell empty"></div>')).join('')}`).join('')}
     </div></section>`;
-  }).join('');
+    return { after, html };
+  });
+  return parts ? out : out.map((x) => x.html).join('');
 }

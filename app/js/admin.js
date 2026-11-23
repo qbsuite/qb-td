@@ -2016,14 +2016,17 @@ function renderSchedule(a, t, buckets, files) {
     return;
   }
   if (schedRoomsN === null) schedRoomsN = Math.max(1, buckets.length);
-  // deciders show after the first phase, read-only (they change in the Live Hub)
+  // deciders show after the phase of the round they follow, read-only (they change in the Live Hub)
   if (!box.dataset.dechook) {
     box.dataset.dechook = '1';
     const put = () => {
       if (box.querySelector('.tbedphase') || !sched) return;
-      const html = decEditorHtml(sched);
-      const first = box.querySelector('.sgphase');
-      if (html && first) first.insertAdjacentHTML('afterend', html);
+      const phases = [...box.querySelectorAll('.sgphase:not(.tbedphase)')].filter((el) => el.querySelector('[data-phase]'));
+      for (const part of decEditorHtml(sched, true)) {
+        const p = sched.phases.findIndex((ph) => ph.rounds.some((r) => r.round === part.after));
+        const at = phases.find((el) => Number(el.querySelector('[data-phase]').dataset.phase) === p) || phases[0];
+        if (at) at.insertAdjacentHTML('afterend', part.html);
+      }
     };
     new MutationObserver(put).observe(box, { childList: true, subtree: true });
   }
