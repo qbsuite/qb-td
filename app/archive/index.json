@@ -1,6 +1,17 @@
 {
   "tournaments": [
     {
+      "slug": "2026-to-online",
+      "name": "2026 TO Online",
+      "date": "2026-11-20",
+      "host": "",
+      "teams": 8,
+      "rounds": 10,
+      "games": 40,
+      "set": "2026 Terrapin",
+      "site": "Online"
+    },
+    {
       "slug": "2026-acf-winter-uc-berkeley",
       "name": "2026 ACF Winter @ UC Berkeley",
       "date": "2026-11-14",

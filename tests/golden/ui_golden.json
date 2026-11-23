@@ -927,6 +927,121 @@
    ],
    "foreign": []
   },
+  "archive 2026-to-online": {
+   "header": "2026 TO Online",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "2cd1545af6591243e10010b1",
+      "chars": 25564
+     },
+     "schedview=all": {
+      "sha256": "2cd1545af6591243e10010b1",
+      "chars": 25564
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "ccd3254b98bd6063f7d79a4d",
+      "chars": 687527
+     },
+     "layout=classic": {
+      "sha256": "ccd3254b98bd6063f7d79a4d",
+      "chars": 687527
+     },
+     "layout=new": {
+      "sha256": "5a099791c7433b6eb1f05801",
+      "chars": 5414
+     },
+     "new/standings": {
+      "sha256": "5a099791c7433b6eb1f05801",
+      "chars": 5414
+     },
+     "new/individuals": {
+      "sha256": "b69771220a1a9cc9132f9168",
+      "chars": 18505
+     },
+     "new/games": {
+      "sha256": "63a7a8a0e9db50b17f8443fd",
+      "chars": 147277
+     },
+     "new/teams": {
+      "sha256": "3097040311c2df3dcaeb1b71",
+      "chars": 55311
+     },
+     "new/players": {
+      "sha256": "0f7d1e24ab4e910199cc6140",
+      "chars": 154216
+     },
+     "new/rounds": {
+      "sha256": "7de5353f000b20797791f820",
+      "chars": 4531
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "7fbb9afe3230050918518840",
+      "chars": 10784
+     },
+     "catview=cat": {
+      "sha256": "7fbb9afe3230050918518840",
+      "chars": 10784
+     },
+     "catview=team": {
+      "sha256": "500023e930496475a8a5a966",
+      "chars": 3984
+     },
+     "catview=player": {
+      "sha256": "56cef05da717c4c33f7410c3",
+      "chars": 3510
+     },
+     "catview=questions": {
+      "sha256": "2686f6809343fc73c6b7780e",
+      "chars": 14854
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/2026-to-online.js",
+    "/archive/index.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/deciderphases.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzer_client.js",
+    "/js/buzzer_pub.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/live_client.js",
+    "/js/newstats.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive 2026-acf-winter-uc-berkeley": {
    "header": "2026 ACF Winter @ UC Berkeley",
    "tabs": {
