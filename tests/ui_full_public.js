@@ -375,6 +375,8 @@ class Browser {
         if (m.error) p.rej(new Error(p.method + ': ' + m.error.message)); else p.res(m.result);
       } else if (m.method) for (const fn of [...this.listeners]) fn(m);
     };
+    // a page's download lands in this run's scratch folder, never the user's Downloads
+    await this.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: path.join(SCRATCH, 'downloads') });
   }
   send(method, params = {}, sessionId) {
     const id = ++this.id;
@@ -447,6 +449,8 @@ class Tab {
     await this.S('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
     await this.S('Emulation.setFocusEmulationEnabled', { enabled: true });
     await this.view('desktop');
+    // a light page whatever this machine's appearance is (the colour checks below expect it)
+    await this.dark(false);
   }
   view(kind) {
     return kind === 'phone'

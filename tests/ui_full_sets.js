@@ -1359,18 +1359,18 @@ const tb4 = fx('tb/tb4.json', { tossups: [{ question: 'Fourth spare.', answer: '
 const tbBad = fx('tb/bad.json', { foo: 1 });
 const tbTxt = fx('tb/notes.txt', 'not a packet');
 const tb5 = fx('tb/tb5.json', { tossups: [{ question: 'Chip spare.', answer: 'Spare Five' }] });
-const tbRows = () => js(`(() => { const sec = [...document.querySelectorAll('h2')].find((h) => /tiebreakers/i.test(h.textContent));
+const tbRows = () => js(`(() => { const sec = [...document.querySelectorAll('h2')].find((h) => /^Extras/.test(h.textContent));
   let el = sec; const out = { heads: null, rows: [], none: false };
   while ((el = el.nextElementSibling)) {
     if (el.classList.contains('tablewrap')) { const trs = [...el.querySelectorAll('tr')];
       out.heads = [...trs[0].querySelectorAll('th')].map((t) => t.textContent);
       out.rows = trs.slice(1).map((tr) => ({ id: tr.querySelector('td').textContent, cells: [...tr.querySelectorAll('td')].map((td) => td.textContent.replace(/\\s+/g, ' ').trim()),
         remove: !!tr.querySelector('[data-tbremove]') })); }
-    if (el.classList.contains('muted') && el.textContent === 'No tiebreaker questions yet') out.none = true;
+    if (el.classList.contains('muted') && el.textContent === 'No extra questions yet') out.none = true;
   } return out; })()`);
 await section('SET-30/SET-31 the set\'s backup questions and tiebreakers', async () => {
-  ok('SET-31: with no questions it reads "No tiebreaker questions yet", with no Delete pool', (await tbRows()).none && !(await exists('#tbclear')));
-  ok('SET-30: the section is "Backup questions + tiebreakers"', await js(`[...document.querySelectorAll('#setbody h2')].some((h) => h.textContent === 'Backup questions + tiebreakers')`));
+  ok('SET-31: with no questions it reads "No extra questions yet", with no Delete pool', (await tbRows()).none && !(await exists('#tbclear')));
+  ok('SET-30: the section is "Extras"', await js(`[...document.querySelectorAll('#setbody h2')].some((h) => h.textContent === 'Extras')`));
   await clearMsg();
   await pick('#picktb', [tb1]);
   await waitMsg(/split into/);
@@ -1395,8 +1395,8 @@ await section('SET-30/SET-31 the set\'s backup questions and tiebreakers', async
   await clearMsg();
   await pick('#picktb', [tbTxt]);
   await waitMsg(/./);
-  ok('SET-30: another kind of file says "Tiebreaker packets need to be .json or .docx files."',
-    (await msgText()) === 'Tiebreaker packets need to be .json or .docx files.' && await msgBad(), await msgText());
+  ok('SET-30: another kind of file says "Extras packets need to be .json or .docx files."',
+    (await msgText()) === 'Extras packets need to be .json or .docx files.' && await msgBad(), await msgText());
   await waitJs(`document.querySelectorAll('[data-tbremove]').length === 6`, 'six questions');
   await stage([tb5]);
   await clearMsg();
@@ -1425,10 +1425,10 @@ await section('SET-30/SET-31 the set\'s backup questions and tiebreakers', async
   await until(() => dialogs.length > n, 'the delete question');
   dialogAccept = true;
   await settle();
-  ok('SET-31: Delete pool asks "Delete the tiebreaker pool?"; Cancel keeps it', dialogs[n] === 'Delete the tiebreaker pool?' && (await tbRows()).rows.length === 6);
+  ok('SET-31: Delete pool asks "Delete the extras pool?"; Cancel keeps it', dialogs[n] === 'Delete the extras pool?' && (await tbRows()).rows.length === 6);
   await click('#tbclear');
   await waitJs(`!document.querySelector('#tbclear')`, 'the pool emptied');
-  ok('SET-31: OK empties it: "No tiebreaker questions yet"', (await tbRows()).none);
+  ok('SET-31: OK empties it: "No extra questions yet"', (await tbRows()).none);
   await clearMsg();
   await pick('#picktb', [tb2]);
   await waitMsg(/split into/);
@@ -1900,7 +1900,7 @@ await section('SET-32 the set\'s pool reaches the mirror', async () => {
   const n = dialogs.length;
   await click('#tbclear');
   await waitJs(`document.querySelectorAll('[data-tbremove]').length === 0 && !!document.querySelector('#tbclear')`, 'the own pool deleted');
-  ok('SET-32: the mirror\'s Delete pool removes only its own questions', dialogs[n] === 'Delete the tiebreaker pool? The usage log goes with it.'
+  ok('SET-32: the mirror\'s Delete pool removes only its own questions', dialogs[n] === 'Delete the extras pool? The usage log goes with it.'
     && JSON.stringify((await tbRows()).rows.map((r) => r.id)) === JSON.stringify(['S-TU1', 'S-TU2']), (await tbRows()).rows);
   const roomPool = await call(`/b/${northRoom}/tiebreakers`);
   ok('SET-32: the rooms read the merged pool (what MODAQ offers under Actions → Add questions)',

@@ -12,5 +12,6 @@ export const tbBridge = {
   getTb: null,    // () => the game meta's tb (read_core tbState), or null
   setTb: null,    // (tb) => save it in the game meta
   appState: null, // MODAQ's app state, once its GameBar renders (tb_add_dialog useHeldBonuses)
+  first: 0,       // a decider on the second half of a packet: how many questions come before its first
   noteReached: null, // (n) => the moderator is on question n: keep the furthest in the game meta
 };

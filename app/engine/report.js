@@ -14,6 +14,9 @@
 // YellowFruit saves a report to disk and what the hsquizbowl.org tournament
 // database expects to be handed; the bare names are YF's in-app preview.
 
+import { roundLabel, isTbRound, TB_ROUND } from './deciderphases.js';
+// a Round column's cell: the number, or T1, T2 for a tiebreaker packet's games
+const roundShort = (r) => (isTbRound(r) ? 'T' + (r - TB_ROUND) : String(r));
 import { aggregate, regulationFigures, standingsOrder, winPct, pptuh, teamGets, tiebreakOf, ruleOf, statOf, h2hTiers } from './stats.js';
 import { rosterTracking, resultOf } from './qbj.js';
 import { answerTypes, importOrder, matchId, schoolAndLetter, PHASE_NAME, yfStages, buildYft,
@@ -238,15 +241,23 @@ function stagesOf(file, games) {
   const stages = file.phases.map((ph) => {
     const type = ph.YfData.phaseType;
     const full = type === 'Prelim' || type === 'Playoff';
+    // deciders on tiebreaker packets are one half-numbered round in the file (yft.js yfPhases):
+    // here each tiebreaker packet's games are a round again, "Tiebreaker 1", "Tiebreaker 2"
+    const rounds = ph.rounds.flatMap((rd) => {
+      const games = rd.matches.map((mm) => byId.get(mm.id)).filter(Boolean);
+      if (Number.isInteger(rd.YfData.number)) return [{ number: rd.YfData.number, games }];
+      return [...new Set(games.map((g) => g.round))].sort((x, y) => x - y).map((n) => ({ number: n, games: games.filter((g) => g.round === n) }));
+    });
+    const deciders = ph.rounds.some((rd) => !Number.isInteger(rd.YfData.number));
     return {
       name: ph.name, type, full,
-      numeric: full || !!ph.YfData.forceNumericRounds,
+      numeric: full || !!ph.YfData.forceNumericRounds || deciders,
       color: full ? (STAGE_COLORS[colored++] ?? '') : '',
       pools: ph.pools.map((pl) => ({
         name: pl.name, carry: !!pl.YfData.hasCarryover, rr: pl.YfData.roundRobins,
         teams: (pl.pool_teams || pl.poolTeams).map((pt) => pt.team.$ref.slice('Team_'.length)),
       })),
-      rounds: ph.rounds.map((rd) => ({ number: rd.YfData.number, games: rd.matches.map((mm) => byId.get(mm.id)).filter(Boolean) })),
+      rounds,
       carriedIn: [],
     };
   });
@@ -802,12 +813,12 @@ function scoreboardHtml(m) {
     rounds: st.rounds.filter((rd) => rd.games.length).map((rd) => rd.number) }))
     : [{ name: m.phaseName, full: true, numeric: true, rounds: m.rounds }];
   const toc = tagWithAttrs('div', [cls('floatingTOC')], genericTag('ul', stages.filter((st) => st.rounds.length).flatMap((st) => (st.numeric
-    ? [esc(st.name), ...st.rounds.map((r) => `${NBSP}${NBSP}${roundLink(m, r, `Round ${r}`)}`)]
+    ? [esc(st.name), ...st.rounds.map((r) => `${NBSP}${NBSP}${roundLink(m, r, roundLabel(r))}`)]
     : [roundLink(m, st.rounds[0], esc(st.name))])).map((item) => genericTag('li', item)).join('\n')));
   const sections = stages.flatMap((st) => st.rounds.map((r) => genericTag('div', [
     ...(r !== 1 ? ['<br /><br />'] : []),
     tagWithAttrs('div', [`id=Round-${r}`]),
-    headerWithDivider(m, `Round ${r}${st.full ? ` - ${st.name}` : ''}`, 'games.html', { noTopLink: r === 1, sticky: true }),
+    headerWithDivider(m, `${roundLabel(r)}${st.full ? ` - ${st.name}` : ''}`, 'games.html', { noTopLink: r === 1, sticky: true }),
     ...m.games.filter((g) => g.round === r).map((g) => boxScore(m, g)),
   ].join('\n'))));
   return `${toc}\n${sections.join('\n')}`;
@@ -843,7 +854,7 @@ function teamDetailMatchTable(m, t) {
   for (const { g, mt, opp } of m.perTeam.get(t.name) || []) {
     const heard = teamBonusesHeard(mt);
     rows.push(trTag([
-      textCell(String(g.round)),
+      textCell(roundShort(g.round)),
       ...(S ? [stageCell([S.stageOf.get(g)].filter(Boolean))] : []),
       ...(S && S.anyCarry ? [stageCell(S.carryOf.get(g) || [])] : []),
       textCell(teamLink(m, opp.name)),
@@ -941,7 +952,7 @@ function playerDetailTable(m, p) {
   for (const { g, mt, opp, mp } of p.games) {
     const counts = Object.fromEntries(mp.counts.map((c) => [c.value, c.n]));
     rows.push(trTag([
-      textCell(String(g.round)),
+      textCell(roundShort(g.round)),
       ...(S ? [stageCell([S.stageOf.get(g)].filter(Boolean))] : []),
       textCell(teamLink(m, opp.name)),
       textCell(resultLetter(mt, opp)),
@@ -1035,7 +1046,7 @@ function roundReportHtml(m) {
     const games = played.filter((g) => g.round === r);
     if (!games.length) continue;
     rows.push(trTag([
-      textCell(roundLink(m, r, String(r))),
+      textCell(roundLink(m, r, roundShort(r))),
       ...(S ? [stageCell([S.stageOf.get(games[0])].filter(Boolean))] : []),
       ...statCells(roundTotals(games), asNum),
     ]));

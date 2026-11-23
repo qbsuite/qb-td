@@ -528,8 +528,10 @@ button.advance:disabled { background: var(--hover-bg); border-color: var(--line)
 .pkcount { color: var(--fg); }
 .secnote { color: var(--muted); font-size: 14px; margin: 6px 0 12px; }
 .pkbar { margin-bottom: 10px; }
-.pkstaged { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-.pkstaged .chip { cursor: grab; }
+/* staged files: the label and its buttons on one line, then one file a line */
+.pkstaged { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.pkstagedhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; }
+.pkstaged .chip { cursor: grab; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 table.pktable { margin-top: 4px; border-top: 1px solid var(--line); }
 .pktable td { vertical-align: middle; }
 .pktable .pkn { width: 110px; white-space: nowrap; color: var(--muted); }
@@ -648,3 +650,90 @@ table.sx th { font-size: 9px; font-weight: 600; text-transform: none; letter-spa
 .warnask .modal h2 { margin-top: 0; font-size: 18px; text-transform: none; letter-spacing: normal; color: var(--fg); }
 .warnask .modal p { margin: 8px 0 0; }
 .warnask .modalbtns { gap: 8px; flex-wrap: wrap; }
+
+/* ---- deciders (deciders.js) ---- */
+
+/* the proposal: a Tiebreakers section, one panel per tied pool in its pool's color */
+/* the section stands out while a tie is open */
+.tbsec { margin-top: 24px; padding: 0 0 4px; }
+.tbsec.tbopen { padding: 14px 16px 16px; border: 2px solid var(--warn); border-radius: 12px;
+  background: color-mix(in srgb, var(--warn) 9%, var(--bg)); }
+.tbsechead { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.tbsec.tbopen .tbsechead { border-bottom-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.tbsechead h2 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+.tbsec.tbopen .tbsechead h2 { color: var(--warn); }
+.tbalert { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--warn); color: var(--bg); font-size: 14px; font-weight: 700; }
+.tbcount { margin-left: auto; font-weight: 600; color: var(--warn); }
+.tbsechead .muted { margin-left: auto; }
+/* one panel per tied pool, in the pool's color */
+.tbcard { margin-top: 14px; padding: 12px 16px 12px 18px; border: 1px solid var(--line); border-left: 4px solid var(--lc);
+  border-radius: 10px; background: color-mix(in srgb, var(--lt) 40%, var(--bg)); font-size: 14px; }
+.tbhead { display: flex; gap: 12px; align-items: center; }
+.tbhead h3 { margin: 0; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.tbhead h3 i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--lc); }
+.tbstatus { margin-left: auto; color: var(--warn); font-weight: 600; font-size: 13px; }
+.tbstatus.ok { color: var(--ok); }
+.tbwhy { margin: 6px 0 0; }
+.tbstats { width: auto; min-width: 0; margin: 10px 0 4px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tbstats th { font-weight: 500; color: var(--muted); text-align: left; padding: 2px 18px 2px 0; border-bottom: 1px solid var(--line); }
+.tbstats td { padding: 3px 18px 3px 0; }
+.tbstats .num { text-align: right; }
+.tbgames { margin: 10px 0 2px; padding-left: 22px; }
+.tbgames li { margin: 4px 0; }
+.tbpp { display: inline-flex; gap: 5px; align-items: center; margin-left: 14px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.tbpp input { margin: 0; }
+.tbedit [data-decdel] { margin-left: 14px; }
+.tbhow { display: flex; gap: 14px; margin-top: 8px; align-items: center; }
+.tbplace { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.tbdone { margin: 8px 0 0; font-weight: 500; }
+.tbedit select { width: auto; max-width: 220px; }
+/* each game's tiebreaker round and room */
+.tbtag { display: inline-block; min-width: 200px; margin-right: 10px; font-size: 12px; color: var(--muted); }
+.tbtag.off { opacity: .6; }
+/* which tiebreaker packets the games read */
+.tbpks { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0 2px; font-size: 13px; }
+.tbpk { padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+.tbpk.on { border-color: var(--warn); color: var(--fg); }
+.tbpk span { color: var(--muted); }
+.tbpk.bad, .tbpk.bad span { color: var(--warn); }
+/* the Packets step: tiebreaker packets indented under the round they follow */
+.tbpkrow td.pkn { padding-left: 28px; }
+.tbpktag { display: inline-block; padding: 1px 8px; border-radius: 6px; background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tbpkfoot td { padding-left: 28px; font-size: 13px; }
+.tbpkfoot .linkbtn { margin-left: 12px; font-size: 13px; }
+/* the Uploads grid: tiebreaker columns, set off from the rounds */
+.ugrid th.tbcol, .ugrid td.tbcol { background: color-mix(in srgb, var(--warn) 8%, transparent); font-size: 12px; }
+.ugrid th.tbcol { color: var(--warn); }
+/* a game's room */
+.tbroom { width: auto; font-size: 12px; padding: 1px 4px; margin-left: 2px; }
+/* a resolved tie, folded to its result */
+.tbcard.folded { padding-top: 10px; padding-bottom: 10px; }
+.tbcard.folded .tbhead { flex-wrap: wrap; }
+.tbcard.folded h3 { font-size: 16px; }
+.tbresult { color: var(--fg); margin-left: 4px; }
+.tbhead .linkbtn { font-size: 13px; }
+.tbhide { margin-left: auto; }
+.tbhide + .tbstatus { margin-left: 12px; }
+/* the editor's read-only Tiebreakers block */
+.tbedphase .sgphasehead { cursor: default; }
+
+.tbtag { min-width: 290px; }
+.tbpart { margin-left: 10px; }
+.dcadd { margin-top: 14px; padding: 12px 16px; border: 1px dashed var(--line); border-radius: 10px; background: var(--bg); font-size: 14px; }
+.dcadd h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.dcgrid { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; align-items: center; }
+.dcgrid .l { color: var(--muted); font-size: 13px; }
+.dcgrid select, .dcgrid input { width: auto; max-width: 260px; font-size: 14px; }
+.dcrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dctools { display: flex; gap: 14px; align-items: center; margin-top: 12px; }
+.tbcard.dcplain { border-left-color: var(--line); background: var(--bg); }
+.dcwhen { color: var(--muted); }
+.dcown { list-style: none; padding-left: 0; }
+@media (max-width: 640px) { .tbtag { min-width: 0; display: block; margin-bottom: 2px; } .tbpp { margin-left: 0; display: flex; } .dcgrid { grid-template-columns: 1fr; } }
+
+.pkchips span.tbchip { color: var(--warn); }
+.pkchips span.tbchip.on { background: var(--warn); color: var(--bg); box-shadow: none; font-weight: 600; }
+#decrelease { margin-bottom: 8px; }
+
+/* the round's own release, while a tiebreaker's is the next thing to do */
+button.advance.advsecond { background: none; color: var(--link); border: 1px solid var(--line); font-weight: 500; }

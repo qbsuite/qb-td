@@ -48,6 +48,7 @@
 // Per-bracket rounds: the same rules the pages apply (app/engine/brackets.js)
 import { qbjTextWithRound } from '../app/engine/modaqfile.js';
 import { withRound } from '../app/engine/qbj.js';
+import { packetHalf } from '../app/engine/deciderphases.js';
 import { rosterNamesFromText } from '../app/engine/games.js';
 import { signToken, PLAYER_TOKEN_MS, regionOf } from '../buzzer/token.js';
 import { storedFileText, rosterExportBody, publicQbjName, publicQbjText } from '../app/engine/exportfile.js';
@@ -4205,7 +4206,7 @@ async function writeTbPool(env, key, rawKey, mutate) {
 async function uploadTiebreakers(request, url, env, poolKey, rawKey) {
   const name = cleanFilename(url.searchParams.get('name') || 'tiebreakers.json');
   if (!/\.json$/i.test(name)) {
-    return err(env, 400, 'tiebreaker packets must be .json (docx cannot be split server-side)');
+    return err(env, 400, 'extras packets must be .json (docx cannot be split server-side)');
   }
   const body = await request.arrayBuffer();
   if (!body.byteLength) return err(env, 400, 'empty body');
@@ -4504,7 +4505,18 @@ async function bucketState(env, secret, url) {
   // join token for its own buzzer instead, when it has one.
   const buzzer = await roomBuzzer(env, b, settings.buzzer);
   delete settings.buzzer;
-  const packets = rounds.results;
+  const packets = rounds.results.filter((p) => p.number <= TB_ROUND || test === true);
+  // the tiebreaker packets this room plays a decider on, listed as rounds of their own
+  const decs = test === true ? [] : await roomDeciders(env, b);
+  if (decs.length) {
+    const { results: tbs } = await env.DB.prepare(
+      'SELECT number, packet_name FROM rounds WHERE tournament_id = ?1 AND number > ?2 ORDER BY number'
+    ).bind(b.tournament_id, TB_ROUND).all();
+    for (const g of decs) {
+      const p = tbs.find((x) => x.number === TB_ROUND + g.tb);
+      if (p && !packets.some((x) => x.number === p.number)) packets.push({ ...p, tb: g.tb, decider: g.decider, after: g.after, part: g.part, done: g.done });
+    }
+  }
   return json(env, {
     tournament: b.tournament_name,
     room: b.room_name,
@@ -4612,6 +4624,26 @@ async function bucketUpload(request, url, env, secret) {
   return json(env, { id: fileId, filename, round, kind, error });
 }
 
+// Deciders (app/js/deciders.js): tiebreaker packet k is stored as round
+// TB_ROUND + k, and the saved schedule lists the games that read it
+// (deciders.games). A room is handed a tiebreaker packet only while the
+// schedule has it playing a decider on it.
+const TB_ROUND = 900;
+async function roomDeciders(env, b) {
+  const obj = await env.DATA.get(`t/${b.tournament_id}/schedule.json`);
+  if (!obj) return [];
+  let s;
+  try { s = await obj.json(); } catch (e) { return []; }
+  const d = s && s.deciders;
+  if (!d || !Array.isArray(d.games) || !Array.isArray(s.rooms)) return [];
+  const room = s.rooms.findIndex((r) => r && r.bucket === b.id);
+  if (room < 0) return [];
+  // only the tiebreaker packets the TD has released (Moderator packets)
+  const released = Number(d.released) || 0;
+  return d.games.filter((g) => g && g.room === room && Number.isInteger(g.tb) && g.tb >= 1 && g.tb <= 99 && g.tb <= released)
+    .map((g) => ({ tb: g.tb, decider: g.n, after: Number.isInteger(g.after) ? g.after : null, part: ['first', 'second'].includes((d.parts || {})[g.tb]) ? d.parts[g.tb] : 'whole', done: !!g.done }));
+}
+
 async function bucketPacket(env, secret, url) {
   const b = await getBucketRow(env, secret);
   const test = await testAccess(env, b, url);
@@ -4622,7 +4654,9 @@ async function bucketPacket(env, secret, url) {
   const place = await roomPlace(env, b);
   let round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) round = place.round;
-  if (round > place.round && test !== true) return err(env, 403, 'not the live round yet');
+  // a tiebreaker packet: only for a room playing a decider on it
+  const tb = round > TB_ROUND && test !== true ? (await roomDeciders(env, b)).some((g) => TB_ROUND + g.tb === round) : false;
+  if (round > place.round && test !== true && !tb) return err(env, 403, 'not the live round yet');
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
   ).bind(b.tournament_id, round).all();
@@ -4642,7 +4676,8 @@ async function bucketPacket(env, secret, url) {
   // The reader warms its cache on page load (warm=1) and says when a game
   // really starts (bucketStartRound); any other fetch is a room taking the
   // packet to read — the uploads page's download link.
-  if (url.searchParams.get('warm') !== '1' && !test) await noteRoomStart(env, b, round, place);
+  // (a decider is no round of the schedule: it starts nothing for auto-advance)
+  if (url.searchParams.get('warm') !== '1' && !test && !tb) await noteRoomStart(env, b, round, place);
   // the reader asks for the questions (parsed=1); the download link, the file
   const rawKey = await blobKey(b, results[0].packet_r2_key);
   if (url.searchParams.get('parsed') === '1') {
@@ -4659,6 +4694,7 @@ async function bucketStartRound(env, secret, url) {
   if (isByeRoom(b)) return byeRefusal(env);
   const place = await roomPlace(env, b);
   const round = Number(url.searchParams.get('round'));
+  if (Number.isInteger(round) && round > TB_ROUND && (await roomDeciders(env, b)).some((g) => TB_ROUND + g.tb === round)) return json(env, { ok: true });
   if (!Number.isInteger(round) || round < 1 || round > place.round) return err(env, 400, 'bad round');
   await noteRoomStart(env, b, round, place);
   return json(env, { ok: true });
@@ -5040,6 +5076,12 @@ const UNFINISHED_SQL = "CASE WHEN json_valid(summary) THEN COALESCE(json_extract
 // Scheduled games with both slots filled for a round; null when the
 // schedule doesn't cover it.
 function scheduledGames(sched, round) {
+  // a tiebreaker packet's round: the deciders the schedule has reading it (deciders.js)
+  if (round > 900) {
+    const games = sched && sched.deciders && Array.isArray(sched.deciders.games) ? sched.deciders.games : [];
+    const n = games.filter((g) => g && g.tb === round - 900).length;
+    return n || null;
+  }
   for (const ph of (sched && sched.phases) || []) {
     for (const r of ph.rounds || []) {
       if (r.round === round) return (r.games || []).filter((g) => g.a && g.b).length;
@@ -5203,7 +5245,7 @@ async function buzzGate(request, env, b) {
 // that key into blobKey's holder. A missing or mismatched wrap means the
 // password was set by a client that never sent the token — setting it
 // again repairs it.
-async function gatedPacket(request, env, obj, key, name, wrap, holderOf, open = null) {
+async function gatedPacket(request, env, obj, key, name, wrap, holderOf, open = null, half = null) {
   let rawKey = null;
   // no password (statsOpen): the key the TD left for it opens the packet
   if (open && blobEnc(obj)) {
@@ -5220,7 +5262,13 @@ async function gatedPacket(request, env, obj, key, name, wrap, holderOf, open = 
     }
   }
   // only ever read for its questions: a .docx as YAPP's kept parse
-  const res = await packetQuestionsResponse(env, obj, key, rawKey, name);
+  let res = await packetQuestionsResponse(env, obj, key, rawKey, name);
+  if (res.ok && half) {
+    // half a tiebreaker packet (deciders.js): the other half is left out, as in its finished file
+    const cut = isDocx(name) && !/json/.test(res.headers.get('Content-Type') || '') ? null : packetHalf(await res.text(), half);
+    if (!cut) return err(env, 403, 'half a packet');
+    res = new Response(cut, { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(env) } });
+  }
   if (res.ok) res.headers.set('Cache-Control', 'private, max-age=60');
   return res;
 }
@@ -5297,6 +5345,15 @@ async function buzzDoneRounds(env, t) {
 // refused stays the file (x). A file from before these marks is made
 // again when its packet is a .docx, and only marked when it is JSON.
 const BUZZ_PARSE_RETRY_MS = 30 * 60 * 1000;
+// Which part of its packet a tiebreaker round's decider reads (deciders.js: 'first', 'second' or
+// 'whole'), from the saved schedule. Ordinary rounds read all of theirs.
+async function tbParts(env, t, rounds) {
+  if (!rounds.some((n) => n > TB_ROUND)) return {};
+  const obj = await env.DATA.get(`t/${t.id}/schedule.json`);
+  const sched = obj ? await obj.json().catch(() => null) : null;
+  return (sched && sched.deciders && sched.deciders.parts) || {};
+}
+
 async function publishBuzzRounds(env, t, ckey, rounds) {
   if (!ckey || !buzzConfig(t)) return 0;
   const bkey = await contentKey(await buzzReadKey(env, t, ckey));
@@ -5312,10 +5369,12 @@ async function publishBuzzRounds(env, t, ckey, rounds) {
   const mark = (n, field, value) => env.DB.prepare(
     `UPDATE tournaments SET buzz_pub = json_set(buzz_pub, '$."' || ?2 || '".' || ?3, ?4) WHERE id = ?1 AND buzz_key_enc IS ?5`
   ).bind(t.id, String(n), field, value, t.buzz_key_enc).run();
+  const parts = await tbParts(env, t, todo);
   let made = 0;
   for (const row of results) {
     const old = have[String(row.number)];
     const docx = isDocx(row.packet_name);
+    const half = row.number > TB_ROUND && ['first', 'second'].includes(parts[row.number - TB_ROUND]) ? parts[row.number - TB_ROUND] : null;
     // a JSON packet's file from before the marks already holds JSON
     if (old && !docx) { await mark(row.number, 'p', 1); continue; }
     const holder = { ckey, set_key_enc: t.set_key_enc };
@@ -5335,6 +5394,12 @@ async function publishBuzzRounds(env, t, ckey, rounds) {
       const obj = await env.DATA.get(row.packet_r2_key);
       if (!obj) continue;
       plain = new Uint8Array(await readBlob(obj, rawKey));
+    }
+    if (half) {
+      // a .docx that could not be parsed can't be cut: its other half stays unpublished with it
+      const cut = docx && !json ? null : packetHalf(new TextDecoder().decode(plain), half);
+      if (!cut) { await mark(row.number, 'd', now); continue; }
+      plain = new TextEncoder().encode(cut);
     }
     const body = await aesEncrypt(bkey, plain);
     const entry = { h: await liveB64Hash(b64bytes(body), 'bin'), s: body.byteLength, live: 0,
@@ -5386,8 +5451,9 @@ async function pubQPacket(request, url, env, slug) {
   if (denied) return denied;
   const round = Number(url.searchParams.get('round'));
   if (!Number.isInteger(round) || round < 1) return err(env, 400, 'bad round');
-  if (round > t.current_round) return err(env, 403, 'not the live round yet');
+  if (round > t.current_round && round <= TB_ROUND) return err(env, 403, 'not the live round yet');
   if (!(await roundDone(env, t, round))) return err(env, 403, 'round in progress');
+  const part = round > TB_ROUND ? (await tbParts(env, t, [round]))[round - TB_ROUND] : null;
   const { results } = await env.DB.prepare(
     'SELECT packet_r2_key, packet_name FROM rounds WHERE tournament_id = ?1 AND number = ?2'
   ).bind(t.id, round).all();
@@ -5396,7 +5462,8 @@ async function pubQPacket(request, url, env, slug) {
   if (!obj) return err(env, 404, 'packet missing');
   // the token opens the tournament's key; on a mirror that opens the set's
   return gatedPacket(request, env, obj, results[0].packet_r2_key, results[0].packet_name,
-    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }), b.open ? t : null);
+    t.buzz_wrap, (ckey) => ({ ckey, set_key_enc: t.set_key_enc }), b.open ? t : null,
+    ['first', 'second'].includes(part) ? part : null);
 }
 
 // Checks a viewer's stats password, nothing more: the public page asks
@@ -5466,7 +5533,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
     // its upload time (the tab's stamp) is all this needs
     key ? env.DATA.get(`t/${t.id}/schedule.json`) : env.DATA.head(`t/${t.id}/schedule.json`),
     env.DB.prepare(
-      'SELECT number FROM rounds WHERE tournament_id = ?1 AND number <= ?2 ORDER BY number'
+      'SELECT number FROM rounds WHERE tournament_id = ?1 AND (number <= ?2 OR number > 900) ORDER BY number'
     ).bind(t.id, t.current_round).all(),
     env.DATA.head(`t/${t.id}/catmap.json`),
     loaded && loaded.manifest ? loaded.manifest : readManifest(env, t.id),
@@ -5482,11 +5549,23 @@ async function pubStateBody(env, t, pub, loaded = null) {
   // the scoresheets show
   let buzzDone = [];
   let buzzV = null;
+  // the round packets released so far, then (below) the tiebreaker packets whose games are all in
+  let packetList = packetRounds.results.map((r) => r.number).filter((n) => n <= TB_ROUND);
+  const tbPacketRounds = { results: packetRounds.results.filter((r) => r.number > TB_ROUND) };
   if (key) {
     buzzV = key.open ? 'open' : await buzzStamp(key);
     const sched = schedObj ? await schedObj.json().catch(() => null) : null;
-    buzzDone = doneRounds(rows, playingRooms(buckets.results, t.settings).length, sched,
-      packetRounds.results.map((r) => r.number));
+    buzzDone = doneRounds(rows, playingRooms(buckets.results, t.settings).length, sched, packetList);
+    // each after the round its deciders follow
+    const games = sched && sched.deciders && Array.isArray(sched.deciders.games) ? sched.deciders.games : [];
+    const tbs = buzzDone.filter((n) => n > TB_ROUND && tbPacketRounds.results.some((r) => r.number === n));
+    for (const n of tbs) {
+      const g = games.find((x) => x && x.tb === n - TB_ROUND);
+      const after = g && Number.isInteger(g.after) ? g.after : null;
+      let at = packetList.length;
+      if (after !== null) { at = 0; packetList.forEach((m, i) => { if (m <= after || (m > TB_ROUND && m < n)) at = Math.max(at, i + 1); }); }
+      packetList = [...packetList.slice(0, at), n, ...packetList.slice(at)];
+    }
   }
   // finished rounds' packets as static files on qb-td-live (buzzpoints
   // packets as static files): round -> hash. With No password the key
@@ -5523,7 +5602,7 @@ async function pubStateBody(env, t, pub, loaded = null) {
     buzz_done: buzzDone,
     buzz_files: buzzFiles,
     ...(buzzKey ? { buzz_key: buzzKey } : {}),
-    packet_rounds: buzz ? packetRounds.results.map((r) => r.number) : [],
+    packet_rounds: buzz ? packetList : [],
     // categories tab: refetch the (text-free) category map when this moves
     cats: catsStamp,
     // the TD's Category stats switch: it shows or hides the Categories

@@ -31,11 +31,13 @@ Part of [qbsuite](https://qbsuite.github.io/).
   switch and password):
   **Rooms** (create N at once — Room 1…N, renamed inline in the table —
   each room a bucket whose private reader/bucket links go to its
-  moderator), **Packets + Tiebreakers** (every upload is one button that
+  moderator), **Packets + Extras** (every upload is one button that
   opens the picker — a whole zip staged as chips dragged onto round
   slots, filenames carrying a round number auto-assigned without ever
-  overwriting an uploaded round, or loose files the same way; a
-  tiebreaker packet is split into individually tracked questions — see
+  overwriting an uploaded round, or loose files the same way; staged
+  files sit one to a line and **Sort alphabetically** orders them; an
+  extras packet is split into individually tracked questions, and
+  tiebreaker packets for deciders have rows of their own — see
   below), **Roster** (structured editor: one card per team, one field
   per name — so commas in *Smith, Jr.* and quotes in *St. John's "A"*
   can never split a name, verified against MODAQ's and YellowFruit's own
@@ -58,7 +60,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   prelims are in, and hand-editing stays the override). The **Live Hub**
   is the day-of page, carrying a notice until setup is complete: a
   status strip tracks the live round (packet up, games in vs scheduled,
-  which rooms are still out, tiebreakers used vs unused) with one-click
+  which rooms are still out, extras used vs unused) with one-click
   advance next to the free set-any-round control, and under it the
   **Open the next round automatically** switch (off by default, one
   switch for the whole tournament): the Worker opens the next round once
@@ -84,7 +86,28 @@ Part of [qbsuite](https://qbsuite.github.io/).
   group (current round open by default) — each upload's room is a
   dropdown, so a game sent from the wrong room's link can be moved to
   the room it was actually played in.
-- **Tiebreakers**: a tiebreaker packet uploads once and is split into
+- **Deciders** (tiebreaker games): with a tiebreaker packet uploaded
+  (Packets + Extras: rows "Tiebreaker 1", "Tiebreaker 2", each a whole
+  packet or its first or second half), a tie across a playoff cut waits
+  instead of going by the tie-break figure. The Live view's **Deciders**
+  section opens on the suggested games (the two lowest play, the winner
+  plays the next one up), each with a room; any game can go by the
+  figure instead. A tiebreaker packet is handed to the rooms like a
+  round's: **Release Tiebreaker N** in Moderator packets (by itself with
+  Auto-advance on), its chip between the rounds it falls between. The
+  room's reader opens on the decider, a half packet as a ten-tossup
+  game that keeps the packet's question numbers, and its upload sets the
+  winner: the next game's teams and then the playoff slots follow.
+  **Add a decider** makes one by hand between teams, places ("3rd in
+  Championship") or an earlier one's winner or loser: on a tiebreaker
+  packet, or on the next round packet as a round of its own (a
+  third-place game, a final; two can share the round in different
+  rooms). Decider games stay out of the stage's standings and are listed
+  under them; the player page, scoresheets, buzzpoints, the HTML report
+  and the YellowFruit file (a Tiebreaker stage, as YF writes its own)
+  show them as "Tiebreaker N". The state lives in the saved schedule
+  (`deciders`); tiebreaker packet N is stored as round 900 + N.
+- **Extras**: an extras packet uploads once and is split into
   individually tracked questions (TU1, TU2, … B1, …), answerlines shown
   on the dashboard. In every room's MODAQ, **Actions → Add questions…**
   lists the pool — each question with who has already heard it — and
@@ -117,7 +140,7 @@ Part of [qbsuite](https://qbsuite.github.io/).
   the matchup the mod ticks each team's **starters** — every player
   listed, the roster's first four ticked, any number at least one — and
   MODAQ starts the game with them. The room's schedule line shows above
-  the round list; a tiebreaker pool
+  the round list; the extras pool
   shows beside it with each question's heard-by state, and during a game
   the pool lives in MODAQ's Actions → Add questions dialog (qb-td's own
   selector, swapped in at bundle time — the stock file picker stays as

@@ -23,6 +23,7 @@ import { viewsHtml, chipsHtml, pickerHtml, wirePicker, catChipsHtml, fx, newIds,
   newIndividuals, secHead, newTeams, newPlayers, newRounds, fitTables, catHead, lineCells,
   questionsHtml, sortTables } from './newstats.js';
 import { slotText } from '../engine/schedule.js';
+import { withDeciderPhases, roundLabel, isTbRound, TB_ROUND } from '../engine/deciderphases.js';
 import { scheduleFinished } from '../engine/finals.js';
 import { roundTossupBuzzes, roundBonuses, buzzSummary, dedupeEntries, tiebreakerBuzzes, sideRounds } from '../engine/buzz.js';
 import { roundHtml, replacementsHtml, tossupHtml, bonusHtml, buzzSummaryHtml, readPacket, setWordFormat } from './buzzview.js';
@@ -334,7 +335,7 @@ const gameCell = (g, round, results) => gameLines(g, round, results).join('');
 
 function renderScheduleGrid(box) {
   const results = resultMap();
-  const cur = nowRound();
+  const cur = liveShown();
   box.innerHTML = schedule.phases.map((phase) => {
     if (!phase.rounds.some((r) => r.games.some(keepGame))) return '';
     // byes aren't in any pool: shown only when the whole schedule is
@@ -362,7 +363,7 @@ function renderScheduleGrid(box) {
         }).filter(Boolean);
         return `
       <tr>
-        <td class="roundcell${now}" rowspan="2">${round.round}</td>
+        <td class="roundcell${now}" rowspan="2">${isTbRound(round.round) ? 'T' + (round.round - TB_ROUND) : round.round}</td>
         ${lines.map(([a]) => `<td class="la${now}">${a}</td>`).join('')}
         ${hasByes ? `<td class="la bye${now}">${byeLine(round.byes.slice(0, half))}</td>` : ''}
       </tr>
@@ -374,15 +375,46 @@ function renderScheduleGrid(box) {
   }).join('') || '<div class="muted">No games</div>';
 }
 
-// Now: the current round (Live now) and the next (Up next), side by side
+// What is being played and what comes after it: the current round and the next, unless
+// tiebreaker deciders (deciderphases.js) are due. Those are played one after the other between
+// the round they follow and the next, so the first of them not yet played is live and what
+// follows it is up next, also once the next round's packet is out (its slots wait on them).
+// [{n, r, tag, cls}]
+function nowBlocks(results = resultMap()) {
+  const cur = liveRound();
+  let blocks = [[cur, 'Live now', 'live'], [cur + 1, 'Up next', '']]
+    .map(([n, tag, cls]) => ({ n, tag, cls, r: findRound(n) })).filter((b) => b.r);
+  const played = (r) => r.games.length > 0 && r.games.every((g) => g.a && g.a.team && g.b && g.b.team && resultFor(results, r, g.a.team, g.b.team));
+  const tbsAfter = (n) => schedule.phases.filter((x) => x.deciders && x.after === n).flatMap((ph) => ph.rounds);
+  const base = tbsAfter(cur - 1).some((r) => !played(r)) ? cur - 1 : cur;
+  const tbs = tbsAfter(base);
+  if (tbs.length) {
+    const order = [findRound(base), ...tbs, findRound(base + 1)].filter(Boolean);
+    const at = order.findIndex((r) => !played(r));
+    if (at >= 0 && isTbRound(order[at].round)) {
+      blocks = [{ n: order[at].round, r: order[at], tag: 'Live now', cls: 'live' },
+        ...(order[at + 1] ? [{ n: order[at + 1].round, r: order[at + 1], tag: 'Up next', cls: '' }] : [])];
+    } else if (at === 0) {
+      // the round itself is still being played: its first tiebreaker is next
+      blocks = [blocks[0], { n: tbs[0].round, r: tbs[0], tag: 'Up next', cls: '' }];
+    }
+  }
+  return blocks;
+}
+// the round (or tiebreaker) shown as being played, or none once the tournament is over
+function liveShown() {
+  if (finished() || !schedule) return null;
+  const live = nowBlocks().find((b) => b.cls === 'live');
+  return live ? live.n : liveRound();
+}
+
+// Now: what is live (Live now) and what follows (Up next), side by side
 // on a wide screen, stacked on a phone.
 function renderNow(box) {
   const results = resultMap();
-  const cur = liveRound();
-  const blocks = [[cur, 'Live now', 'live'], [cur + 1, 'Up next', '']]
-    .map(([n, tag, cls]) => ({ n, tag, cls, r: findRound(n) })).filter((b) => b.r);
+  const blocks = nowBlocks(results);
   const named = poolsIn(blocks.map((b) => b.r)).length > 1;
-  box.innerHTML = `<div class="nowgrid">${blocks.map((b) => {
+  const section = (b) => {
     const groups = new Map();
     for (const g of b.r.games.filter(keepGame)) {
       const k = poolOf(g);
@@ -391,18 +423,20 @@ function renderNow(box) {
     }
     const order = [...groups.keys()].sort(groupOrder);
     return `<section class="nowblock">
-      <div class="nowhead"><h3>Round ${b.n}</h3><span class="nowtag ${b.cls}">${b.tag}</span></div>
-      ${order.map((k) => `${named ? `<div class="poolname">${esc(k || 'Other games')}</div>` : ''}
+      <div class="nowhead"><h3>${roundLabel(b.n)}</h3><span class="nowtag ${b.cls}">${b.tag}</span></div>
+      ${order.map((k) => `${named && !isTbRound(b.n) ? `<div class="poolname">${esc(k || 'Other games')}</div>` : ''}
         <div class="gcard">${groups.get(k).map((g) => `<div class="gg">
           ${roomName(g) ? `<div class="groom">${esc(roomName(g))}</div>` : ''}
           ${gameCell(g, b.r, results)}</div>`).join('')}</div>`).join('') || '<div class="muted">No games</div>'}
       ${!poolSel && b.r.byes.length ? `<div class="byes muted">Bye: ${b.r.byes.map((s) => esc(slotText(s))).join(', ')}</div>` : ''}
     </section>`;
-  }).join('')}</div>`;
+  };
+  box.innerHTML = `<div class="nowgrid">${blocks.map(section).join('')}</div>`;
 }
 
 function renderTeamView(box, team) {
   const results = resultMap();
+  const live = liveShown();
   const rows = [];
   for (const phase of schedule.phases) {
     for (const round of phase.rounds) {
@@ -422,11 +456,11 @@ function renderTeamView(box, team) {
             result = won ? `<span class="wtag">W ${score}</span>` : `<span class="muted">L ${score}</span>`;
           }
         }
-        rows.push(`<tr${round.round === nowRound() ? ' class="nowrow"' : ''}><td class="roundcell">${round.round}</td>
+        rows.push(`<tr${round.round === live ? ' class="nowrow"' : ''}><td class="roundcell">${isTbRound(round.round) ? 'T' + (round.round - TB_ROUND) : round.round}</td>
           <td class="name${oppSlot && oppSlot.label ? ' ph' : ''}">${esc(opp) || '—'}</td>
           <td class="muted">${esc(room)}</td><td class="num">${result}</td></tr>`);
       } else if (round.byes.some((s) => slotText(s) === team)) {
-        rows.push(`<tr><td class="roundcell">${round.round}</td>
+        rows.push(`<tr><td class="roundcell">${isTbRound(round.round) ? 'T' + (round.round - TB_ROUND) : round.round}</td>
           <td class="muted">Bye</td><td></td><td></td></tr>`);
       }
     }
@@ -506,8 +540,6 @@ function finished() {
   }
   return finishedFor.value;
 }
-// the round shown as being played, or none once the tournament is over
-const nowRound = () => (finished() ? null : liveRound());
 
 function renderSchedule(box) {
   if (!schedule) {
@@ -883,7 +915,7 @@ async function renderBuzzSide(box, rounds, byPlayer) {
   const out = box.querySelector('#buzzsideout');
   if (!out) return;
   out.innerHTML = side.map((r, i) => `
-    <div class="rhead"${i ? ' style="margin-top:18px"' : ''}>Round ${r.round}</div>
+    <div class="rhead"${i ? ' style="margin-top:18px"' : ''}>${roundLabel(r.round)}</div>
     ${roundHtml(r.tossups, r.bonuses, packets.get(r.round))}`).join('')
     || '<div class="muted">No buzzes yet</div>';
 }
@@ -931,8 +963,8 @@ function renderBuzz(box) {
       ...(anyReplacements ? [{ v: 'replacements', label: 'Replacements' }] : []),
       { grow: true }, { v: 'summary', label: 'Summary' }], buzzMode, 'buzzmode')}
     ${buzzMode === 'round' ? `<div class="chipstack">${chipsHtml([
-      ...rounds.map((n) => ({ v: String(n), label: 'Round ' + n })),
-      ...pending.map((n) => ({ off: true, label: `Round ${n} in progress` })),
+      ...rounds.map((n) => ({ v: String(n), label: roundLabel(n) })),
+      ...pending.map((n) => ({ off: true, label: `${roundLabel(n)} in progress` })),
     ], String(buzzView), 'buzzround')}</div>` : ''}
     <div id="buzzout"></div>`;
   wire(box, 'buzzmode', (v) => { buzzMode = v; });
@@ -1275,7 +1307,7 @@ function sheetOf(g, regTossups) {
   const cr = catmap && catmap.rounds && catmap.rounds[String(g.round)];
   return (e && buildScoresheet(e.qbj, cr ? cr.t : null, regTossups)) || null;
 }
-const sheetWait = (g) => `<p class="muted sxwait">The scoresheet will appear when all round ${g.round} games finish.</p>`;
+const sheetWait = (g) => `<p class="muted sxwait">The scoresheet will appear when all ${isTbRound(g.round) ? roundLabel(g.round) : 'round ' + g.round} games finish.</p>`;
 // the switch and, while locked and asked, the password field beside it
 function sheetToggle() {
   if (!state.scoresheets) return '';
@@ -1401,8 +1433,8 @@ function newGames(rd, ids, vals) {
   const rounds = [...new Set(rd.games.map((g) => g.round))];
   const box = (g) => {
     // a forfeit is its result: no box score, no scoresheet
-    if (g.forfeit) return `${secHead(ids.game(g.id), `${esc(g.winner)} defeats ${esc(g.loser)} by forfeit`, `Round ${g.round}`, g.anchor)}</div>`;
-    const head = `Round ${g.round} · Tossups read: ${g.tossupsRead}${g.otTossups ? ` (${g.otTossups} in OT)` : ''}`;
+    if (g.forfeit) return `${secHead(ids.game(g.id), `${esc(g.winner)} defeats ${esc(g.loser)} by forfeit`, roundLabel(g.round), g.anchor)}</div>`;
+    const head = `${roundLabel(g.round)} · Tossups read: ${g.tossupsRead}${g.otTossups ? ` (${g.otTossups} in OT)` : ''}`;
     const w = g.teams.find((t) => t.name === g.winner);
     const l = g.teams.find((t) => t.name === g.loser);
     const title = `${esc(w.name)} ${w.points}, ${esc(l.name)} ${l.points}${g.otTossups ? ' (OT)' : ''}`;
@@ -1427,8 +1459,8 @@ function newGames(rd, ids, vals) {
   };
   // the Scoresheets toggle, at the end of the round links: locked, it
   // opens a password field beside it; unlocked, it shows or hides them
-  return `<div class="chips njump">${rounds.map((r) => `<a href="#" class="chip" data-go="games|${ids.round(r)}">Round ${r}</a>`).join('')}${sheetToggle()}</div>`
-    + rounds.map((r) => `<h3 class="poolhead" id="${ids.round(r)}" data-at="games-Round-${r}">Round ${r}</h3>${
+  return `<div class="chips njump">${rounds.map((r) => `<a href="#" class="chip" data-go="games|${ids.round(r)}">${roundLabel(r)}</a>`).join('')}${sheetToggle()}</div>`
+    + rounds.map((r) => `<h3 class="poolhead" id="${ids.round(r)}" data-at="games-Round-${r}">${roundLabel(r)}</h3>${
       rd.games.filter((g) => g.round === r).map(box).join('')}`).join('');
 }
 
@@ -1783,8 +1815,9 @@ async function load() {
     }
     if (schedMoved) {
       jobs.push((async () => {
-        schedule = await fetchStamped(
-          state.schedule !== null, snap && snap.schedule !== null, 'schedule.json', '/schedule');
+        // (tiebreaker deciders show as a phase of their own: deciderphases.js)
+        schedule = withDeciderPhases(await fetchStamped(
+          state.schedule !== null, snap && snap.schedule !== null, 'schedule.json', '/schedule'));
         lastSched = schedStamp;
       })());
     }

@@ -21,6 +21,7 @@
 // never sees it in a MODAQ file: `ottu` and each team's overtime powers,
 // tens and negs are filled in from the per-tossup record.
 
+import { isTbRound } from './deciderphases.js';
 import { answerTypes, importOrder, overtimeOf, REGULATION_TOSSUPS } from './yft.js';
 import { rosterTracking } from './qbj.js';
 
@@ -106,7 +107,7 @@ export function buildYft3(opts) {
         bbPts1: 0, bbPts2: 0, forfeit: true, invalid: false, lightningPts1: 0, lightningPts2: 0, notes: m.notes ?? '',
         otNeg1: 0, otNeg2: 0, otPwr1: 0, otPwr2: 0, otTen1: 0, otTen2: 0, ottu: 0, phases: [],
         players1: null, players2: null, round: m.round, score1: 0, score2: 0, team1: win.name, team2: lose.name,
-        tiebreaker: false, tuhtot: 0, validationMsg: '',
+        tiebreaker: isTbRound(m.round), tuhtot: 0, validationMsg: '',
       };
     }
     const ot = overtimeOf(m, regulation);
@@ -133,7 +134,8 @@ export function buildYft3(opts) {
       score2: b.points,
       team1: a.name,
       team2: b.name,
-      tiebreaker: false,
+      // a decider on a tiebreaker packet (deciderphases.js) is YF 3's tiebreaker game
+      tiebreaker: isTbRound(m.round),
       tuhtot: m.tossupsRead,
       validationMsg: '',
       invalid: false,

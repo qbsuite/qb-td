@@ -867,7 +867,7 @@ section('mirror', '02 09: the mirror line and a mirror\'s tiebreaker pool', asyn
   await check('02 mirror: the header says "Mirror of <set name>", with no set page link while the set page is off', async () =>
     ((await line()) === 'Mirror of Spring Set' && !(await pg.js(`[...document.querySelectorAll('.hubhead a')].some((a) => a.textContent === 'set page')`))) || await line());
   await check('09 mirror: the tiebreaker count holds the set\'s backup questions and the tournament\'s own', async () =>
-    (await pg.js(`[...document.querySelectorAll('.roundline .muted')].map((x) => x.textContent.replace(/\\s+/g, ' ').trim()).find((x) => /^Tiebreakers/.test(x)) || ''`)) === 'Tiebreakers 0/3 used');
+    (await pg.js(`[...document.querySelectorAll('.roundline .muted')].map((x) => x.textContent.replace(/\\s+/g, ' ').trim()).find((x) => /^Extras/.test(x)) || ''`)) === 'Extras 0/3 used');
   await call(SS, { method: 'POST', json: { published: true } });
   const setSlug = (await call(SS)).body.set.slug;
   await pg.reload();
@@ -2169,8 +2169,8 @@ section('edit', '09 29: Edit in MODAQ, through a real reader: the game reopens, 
     JSON.stringify(tuNums(origBody)[0]) === JSON.stringify([21, 'TU1']) || tuNums(origBody).slice(0, 2));
 
   await openLive(pg, T);
-  await check('09 tiebreakers: once a game reads one, "Tiebreakers 1/2 used"', async () =>
-    (await pg.js(`[...document.querySelectorAll('.roundline .muted')].map((x) => x.textContent.replace(/\\s+/g, ' ').trim()).find((x) => /^Tiebreakers/.test(x)) || ''`)) === 'Tiebreakers 1/2 used');
+  await check('09 tiebreakers: once a game reads one, "Extras 1/2 used"', async () =>
+    (await pg.js(`[...document.querySelectorAll('.roundline .muted')].map((x) => x.textContent.replace(/\\s+/g, ' ').trim()).find((x) => /^Extras/.test(x)) || ''`)) === 'Extras 1/2 used');
   await check('10 live now: the reader\'s upload, unfinished, shows its score and "· on question 1 of 20"', async () => {
     const r = (await liveRows(pg))[0];
     return (r.game === 'Ants 10 – 0 Bees · on question 1 of 20' && r.pie && JSON.stringify(r.acts) === '["qbj","game","Edit"]') || r;
@@ -2265,7 +2265,7 @@ section('refresh', '05 09 50: the refresh timing, what holds off a redraw, a fai
     body: JSON.stringify({ tossups: [{ question: 'Late tiebreaker.', answer: 'Late' }] }) });
   await pg.refresh();
   await check('09 tiebreakers: a question added elsewhere is fetched once, on the next refresh ' + CHG.tbOnce, async () => {
-    await pg.waitJs(`[...document.querySelectorAll('.roundline .muted')].some((x) => x.textContent.replace(/\\s+/g, ' ').trim() === 'Tiebreakers 0/4 used')`, 'the new count');
+    await pg.waitJs(`[...document.querySelectorAll('.roundline .muted')].some((x) => x.textContent.replace(/\\s+/g, ' ').trim() === 'Extras 0/4 used')`, 'the new count');
     return tbGets() === tb0 + 1 || [tb0, tbGets()];
   });
 

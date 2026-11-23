@@ -16,6 +16,7 @@
 // teams the generator seeded into each pool, so placeholders can later
 // be filled from standings (fillPlaceholders).
 
+import { withDeciderPhases } from './deciderphases.js';
 import { standingsOrder, winPct, levelRuns, headToHead, statOf } from './stats.js';
 
 function slotEq(a, b) {
@@ -1175,7 +1176,9 @@ export function autoFill(schedule, agg, ready, force = [], opts = {}) {
       if (p && ok.has(p) && !force.includes(p)) odd.set(p, [...(odd.get(p) || []), g]);
     }
   }
-  const holdTies = opts.holdTies !== undefined ? opts.holdTies : schedule.phases.some((ph) => ph.kind === 'tiebreak');
+  // ties wait when the schedule has a Tiebreakers round, or tiebreaker packets to play deciders on (deciders.js)
+  const holdTies = opts.holdTies !== undefined ? opts.holdTies
+    : schedule.phases.some((ph) => ph.kind === 'tiebreak') || !!(schedule.deciders && schedule.deciders.hold);
   const held = holdTies ? report.ties.filter((x) => ok.has(x.pool) && !odd.has(x.pool) && !force.includes(x.pool)) : [];
   const ranks = {};
   for (const [k, list] of Object.entries(report.ranks)) {
@@ -1444,7 +1447,7 @@ export function roomRounds(schedule, roomIndex) {
  * placeholder/empty (nothing to preselect).
  */
 export function gameForRoom(schedule, roomIndex, roundNumber) {
-  for (const ph of schedule.phases) {
+  for (const ph of withDeciderPhases(schedule).phases) {
     for (const round of ph.rounds) {
       if (round.round !== roundNumber) continue;
       const g = round.games.find((x) => x.room === roomIndex);

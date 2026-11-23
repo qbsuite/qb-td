@@ -437,7 +437,8 @@ await flow('1. create a tournament');
 
 d1exec("UPDATE tournaments SET creator_ip = 'earlier-run'");
 await goto(`${PAGES}/index.html?server=${encodeURIComponent(PAGE_BASE)}`);
-await js(`localStorage.setItem('qbtdServer', ${q(PAGE_BASE)}); true`);
+// the first tournament made here would open the tutorial over the hub
+await js(`localStorage.setItem('qbtdServer', ${q(PAGE_BASE)}); localStorage.setItem('qbtdTutorial', '{"seen":true}'); true`);
 await goto(`${PAGES}/index.html`);
 await waitJs(`!!document.querySelector('#newname')`, 'the new-tournament form');
 const slug = 'ui-e2e-' + Math.random().toString(36).slice(2, 7);
@@ -488,9 +489,9 @@ await flow('2. setup steps');
 
 await goto(`${PAGES}/index.html?a=${secret}`);
 await waitJs(`document.querySelectorAll('.stepbtn').length === 6`, 'the step list');
-ok('2 steps: in order Rooms, Roster, Schedule, Packets + Tiebreakers, MODAQ Settings, Player page',
+ok('2 steps: in order Rooms, Roster, Schedule, Packets + Extras, MODAQ Settings, Player page',
   JSON.stringify(await js(`[...document.querySelectorAll('.stepbtn')].map((b) => b.dataset.step + ':' + b.querySelector('.slabel').textContent)`))
-  === JSON.stringify(['rooms:Rooms', 'roster:Roster', 'sched:Schedule', 'packets:Packets + Tiebreakers',
+  === JSON.stringify(['rooms:Rooms', 'roster:Roster', 'sched:Schedule', 'packets:Packets + Extras',
     'modaq:MODAQ Settings', 'stats:Player page']));
 for (const [step, heading] of [['roster', 'Roster'], ['sched', 'Schedule'], ['packets', 'Packets'],
   ['modaq', 'MODAQ settings'], ['stats', 'Player page'], ['rooms', 'Rooms']]) {
@@ -529,7 +530,8 @@ ok('3 rooms: every room has its reader link and its Test link, and no other', aw
   ok('3 rooms: a Test link reads its room before Start', r.status === 200 && r.body.test === true, r.body);
 }
 ok('3 rooms: a Copy button for the link on every row',
-  await js(`document.querySelectorAll('.roomtable .linkpair button').length === 6`));
+  // (the table's foot has one more: Copy all)
+  await js(`document.querySelectorAll('.roomtable .linkpair button.ico').length === 6`));
 await click('.roomtable tr:nth-child(2) .linkpair button');
 await waitJs(`/Copied/.test(document.querySelector('#msg').textContent)`, 'room link copied');
 ok('3 rooms: Copy puts the room\'s reader link on the clipboard',
@@ -774,7 +776,7 @@ await flow('5. schedule');
 await click('[data-step="sched"]');
 await waitJs(`!!document.querySelector('select[data-fmt]')`, 'the format picker');
 ok('5 schedule: the picker takes the six rooms from the Rooms step', (await text('#schedsec')).includes('6 rooms for 12 teams'), (await text('#schedsec')).slice(0, 120));
-ok('5 schedule: and starts on hdwhite\'s 12-team crossover', /^6\/6 → 6\/6, crossover · 8 rounds$/.test(await js(`document.querySelector('[data-fmt]').selectedOptions[0].textContent`)),
+ok('5 schedule: and starts on hdwhite\'s 12-team crossover', /^Two brackets of six into two playoff brackets of six \(no repeat matches\) · 8 rounds$/.test(await js(`document.querySelector('[data-fmt]').selectedOptions[0].textContent`)),
   await js(`document.querySelector('[data-fmt]').selectedOptions[0].textContent`));
 ok('5 schedule: the round count is shown big', /^8 rounds/.test(await text('.pktotal')), await text('.pktotal'));
 // Custom stays Custom; changing the pools is a custom format
@@ -1324,19 +1326,19 @@ await flow("18b. the Live Hub's tiebreaker count follows the pool");
    The hub refetches the pool only when the detail's tb_stamp moves; a
    change made elsewhere must still show on its next refresh. */
 const hubRefresh = () => js(`document.dispatchEvent(new Event('visibilitychange')); true`);
-const tbLine = () => js(`[...document.querySelectorAll('.muted')].map((x) => x.textContent).find((x) => /^Tiebreakers /.test(x)) || ''`);
-await waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Tiebreakers 0/3 used')`, 'tiebreaker count');
-ok('18b tiebreakers: the hub counts the pool', (await tbLine()) === 'Tiebreakers 0/3 used', await tbLine());
+const tbLine = () => js(`[...document.querySelectorAll('.muted')].map((x) => x.textContent).find((x) => /^Extras /.test(x)) || ''`);
+await waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Extras 0/3 used')`, 'tiebreaker count');
+ok('18b tiebreakers: the hub counts the pool', (await tbLine()) === 'Extras 0/3 used', await tbLine());
 const late = await call(`${A}/tiebreakers?name=late.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ tossups: [{ question: 'Late tiebreaker text.', answer: 'Congress of Vienna' }] }) });
 ok('18b tiebreakers: a question added from elsewhere', late.status === 200 && late.body.tossups === 3, late.body);
 await hubRefresh();
 await check('18b tiebreakers: the hub shows it on its next refresh', () =>
-  waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Tiebreakers 0/4 used')`, 'count 0/4', 10000));
+  waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Extras 0/4 used')`, 'count 0/4', 10000));
 await call(`${A}/tiebreakers?id=TU3`, { method: 'DELETE' });
 await hubRefresh();
 await check('18b tiebreakers: and drops it when it is removed', () =>
-  waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Tiebreakers 0/3 used')`, 'count 0/3', 10000));
+  waitJs(`[...document.querySelectorAll('.muted')].some((x) => x.textContent === 'Extras 0/3 used')`, 'count 0/3', 10000));
 
 await flow('12–14. round 2: started, missing, the wrong room, Add a game');
 /* ---------- 12–14. round 2: started, missing, the wrong room, Add a game ---------- */
@@ -2403,9 +2405,12 @@ await flow('24f. Fix buzzes on a game whose file says another round');
       /^(Edit in MODAQ\|)?Fix stats\|Download( ▾)?\|Delete$/.test(acts), acts);
   }
   await click(`[data-fixbuzz="${orig.id}"]`);
-  await waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'the Fix stats panel');
-  ok('24f fix stats: tabs for swapping, all buzzes and lineups, and a TUH column per team',
-    /^Swap player buzzes\|(All buzzes\|)?Lineups$/.test(await js(`[...document.querySelectorAll('.fxtabs .fxtab')].map((e) => e.textContent).join('|')`))
+  // (it opens on Lineups: the swaps are the next tab)
+  await waitJs(`!!document.querySelector('[data-fixtab="swap"]')`, 'the Fix stats panel');
+  await click('[data-fixtab="swap"]');
+  await waitJs(`!!document.querySelector('[data-fswap="0:0"]')`, 'the Fix stats swaps');
+  ok('24f fix stats: tabs for lineups, swapping and all buzzes, and a TUH column per team',
+    /^Lineups\|Swap player buzzes(\|All buzzes)?$/.test(await js(`[...document.querySelectorAll('[data-fixtab]')].map((e) => e.textContent).join('|')`))
       && await js(`[...document.querySelectorAll('.fxteam')].length === 2 && [...document.querySelectorAll('.fxteam')].every((tb) => [...tb.rows[0].cells].some((c) => c.textContent === 'TUH'))`));
   // the name of a roster player the moderator never entered
   await fill('[data-fswap="0:0"]', await js(`document.querySelector('[data-fswap="0:0"] optgroup option').value`), ['change']);

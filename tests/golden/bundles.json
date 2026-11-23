@@ -1,20 +1,21 @@
 {
  "worker": {
-  "gzip": 68281,
-  "bytes": 276259,
+  "gzip": 69430,
+  "bytes": 280904,
   "inputs": {
    "app/engine/qbj.js": 7965,
    "app/engine/modaqfile.js": 4039,
+   "app/engine/deciderphases.js": 631,
    "app/engine/games.js": 222,
    "../buzzer/token.js": 1035,
    "app/engine/exportfile.js": 1270,
    "app/engine/schedule.js": 2703,
    "app/engine/brackets.js": 6476,
-   "worker/worker.js": 251923
+   "worker/worker.js": 255902
   }
  },
  "read": {
-  "sha256": "714d606518be03b7116043409025793c3f1d72068570c74a6db31491a692e2b3",
-  "bytes": 2354409
+  "sha256": "7dbf409654204ceaf19c981ee2340b7f89e11c042e1184f4212f3c9390d036d4",
+  "bytes": 2356513
  }
 }

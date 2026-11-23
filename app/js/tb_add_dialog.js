@@ -318,15 +318,17 @@ export function keepsThrownOutHere(isTossup, index) {
 /** The number before a question's text (read_core shownNumber): MODAQ's
     own TossupQuestion and BonusQuestion ask here (build_read.mjs). */
 export function shownQuestionNumber(appState, isTossup, index) {
+  // (a decider on the second half of a packet shows the packet's own numbers)
+  const first = Number(tbBridge.first) || 0;
   try {
     const st = tbState(tbBridge.getTb ? tbBridge.getTb() : null);
-    if (!st) return index + 1;
+    if (!st) return first + index + 1;
     const thrown = [];
     for (const c of appState.game.cycles) {
       for (const x of (isTossup ? c.thrownOutTossups : c.thrownOutBonuses) || []) thrown.push(x.questionIndex);
     }
-    return shownNumber(index, Object.keys(isTossup ? st.tuAt : st.boAt), thrown);
-  } catch (e) { return index + 1; }
+    return first + shownNumber(index, Object.keys(isTossup ? st.tuAt : st.boAt), thrown);
+  } catch (e) { return first + index + 1; }
 }
 export function thrownOutText(isTossup, index, text) {
   const tb = tbBridge.getTb ? tbBridge.getTb() : null;
@@ -430,7 +432,7 @@ const AddDialog = observer(function AddDialog({ appState }) {
   if (rows.length) {
     body.push(
       h('div', { key: 'hint', style: { marginBottom: 8 } },
-        'Tiebreaker questions from the tournament director. Check with the TD which one to read.'),
+        'Extra questions from the tournament director. Check with the TD which one to read.'),
       ...rows.map((row) => {
         const already = added.has(row.id);
         const heard = row.uses.map((u) =>
@@ -451,7 +453,7 @@ const AddDialog = observer(function AddDialog({ appState }) {
         'Or load more questions from a packet file:'));
   } else {
     body.push(h('div', { key: 'none', style: { marginBottom: 8 } },
-      'No tiebreaker pool from the tournament director — load a packet file instead.'),
+      'No extra questions from the tournament director — load a packet file instead.'),
       ...whereEls);
   }
   body.push(h(PacketLoader, {

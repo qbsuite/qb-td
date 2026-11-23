@@ -19,6 +19,7 @@
 // the browser send the .docx to YAPP itself (CORS *); JSON packets load
 // directly.
 
+import { roundLabel, isTbRound, withDeciderPhases } from '../engine/deciderphases.js';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { ModaqControl, GameFormats, parseQbjRegistration } from 'modaq';
@@ -147,7 +148,7 @@ async function fetchTeams() {
 function setHeader(t, room, round, game, bracket) {
   document.title = (testKey === 'bye' ? 'BYE - ' : testKey ? 'TEST - ' : '') + t + ' - ' + room;
   $('tname').textContent = t;
-  $('room').textContent = room + ' · Round ' + round;
+  $('room').textContent = room + ' · ' + roundLabel(round);
   if (bracket) {
     $('room').insertAdjacentHTML('beforeend',
       ` · <span class="bname"><i class="lane-${Number(bracket.color) || 0}"></i>${esc(bracket.name)}</span>`);
@@ -230,6 +231,7 @@ function mountMODAQ(id, meta, isNew) {
     meta.reached = n;
     localStorage.setItem(metaKey(store, id), JSON.stringify(meta));
   };
+  tbBridge.first = meta.off || 0;
   tbBridge.getTb = () => meta.tb || null;
   tbBridge.setTb = (tb) => {
     meta.tb = tb;
@@ -289,7 +291,21 @@ function mountMODAQ(id, meta, isNew) {
       // numbers them as if appended, so stats keyed on packet numbers line
       // up, says which tiebreakers were read, so the TD's usage log stays
       // exact (worker logTbUses), and keeps the record for Edit in MODAQ
-      const body = readerUpload(match, meta, storeText, protests, progress, modaq);
+      let body = readerUpload(match, meta, storeText, protests, progress, modaq);
+      // a decider on the second half of a packet: its questions keep the
+      // packet's own numbers, so buzzpoints and categories find them
+      if (meta.off) {
+        try {
+          const up = JSON.parse(body);
+          const shift = (q) => { if (q && Number.isInteger(q.question_number) && q.question_number <= meta.reg && !q.qbtd_tiebreaker) q.question_number += meta.off; };
+          for (const mq of (up.qbj && up.qbj.match_questions) || []) {
+            const packetQ = Number.isInteger(mq.question_number) && mq.question_number <= meta.reg;
+            shift(mq.tossup_question); if (mq.bonus) shift(mq.bonus.question);
+            if (packetQ) mq.question_number += meta.off;
+          }
+          body = JSON.stringify(up);
+        } catch (e) { /* sent as it was */ }
+      }
       // a stalled connection gives up rather than leave "Uploading" up
       const stop = new AbortController();
       const timer = setTimeout(() => stop.abort(), UPLOAD_WAIT_MS);
@@ -323,7 +339,7 @@ function mountMODAQ(id, meta, isNew) {
         isStarter: (meta.starters[pl.teamName] || []).includes(pl.name) }))
       : players;
     const format = resolveGameFormat(state.settings || {}, GameFormats);
-    if (format) props.gameFormat = format;
+    if (format) props.gameFormat = meta.reg ? { ...format, regulationTossupCount: meta.reg } : format;
   }
   ReactDOM.render(React.createElement(ModaqControl, props), $('modaq'));
   watchProtests(id, meta, props.gameFormat || null);
@@ -363,8 +379,8 @@ function renderSchedPanel() {
   if (!rows.length) return;
   $('schedpanel').hidden = false;
   const row = (r) => `
-    <tr${r.round === state.current_round ? ' class="now"' : ' class="muted"'}>
-      <td class="roundcell">${r.round}</td>
+    <tr${r.round === nowRound() ? ' class="now"' : ' class="muted"'}>
+      <td class="roundcell">${isTbRound(r.round) ? 'T' + (r.round - 900) : r.round}</td>
       <td class="name">${schedBrackets
         ? `${esc(slotLabel(r.a) || '—')} v ${esc(slotLabel(r.b) || '—')}`
         : `${esc(slotText(r.a) || '—')} v ${esc(slotText(r.b) || '—')}`}</td>
@@ -487,7 +503,7 @@ function goToRound(n) {
 // Above the teams: earlier rounds of this room's schedule not played yet
 function renderRoundWarn() {
   const el = $('roundwarn');
-  const left = unplayedBefore(selectedRound);
+  const left = isTbRound(selectedRound) ? [] : unplayedBefore(selectedRound);
   el.hidden = !left.length;
   if (!left.length) return;
   const first = left[0];
@@ -508,8 +524,8 @@ function renderTeamPick() {
   if (schedGame) {
     const br = bracketAt(selectedRound);
     $('schedfrom').innerHTML = byeGame ? esc(`On a bye in round ${selectedRound}`) : br
-      ? `From the schedule \u00b7 <i class="lane-${Number(br.color) || 0}"></i>${esc(br.name)} \u00b7 Round ${selectedRound} in ${esc(state.room)}`
-      : esc(`From the schedule \u00b7 Round ${selectedRound} in ${state.room}`);
+      ? `From the schedule \u00b7 <i class="lane-${Number(br.color) || 0}"></i>${esc(br.name)} \u00b7 ${roundLabel(selectedRound)} in ${esc(state.room)}`
+      : esc(`From the schedule \u00b7 ${roundLabel(selectedRound)} in ${state.room}`);
     $('mteama').textContent = schedGame.a;
     $('mteamb').textContent = schedGame.b;
     // long names: smaller, and each team keeps to its own lines (room.css)
@@ -632,6 +648,12 @@ function swapSides() {
 /* ---------- round + team picker (bare-link path) ---------- */
 
 let selectedRound = 0;
+// Where this room is in the day: a tiebreaker it has yet to play comes
+// before the round the hub has open.
+function nowRound() {
+  const dec = (state.packets || []).find((p) => p.tb && !p.done);
+  return dec ? dec.number : state.current_round;
+}
 
 function deviceMetas() {
   return gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), store)
@@ -642,17 +664,22 @@ function deviceMetas() {
 // selected); a round with no packet is shown but can't be picked. Games
 // this device already has are listed under them, each with Continue.
 function renderRounds() {
-  const rows = roundRows(state.packets || [], deviceMetas(), state.current_round);
+  // a tiebreaker's place is after the round it follows, T1 before T2
+  const place = (n) => { const p = (state.packets || []).find((x) => x.number === n); return p && p.tb ? (p.after || 0) + p.tb / 100 : isTbRound(n) ? 899 + n / 1000 : n; };
+  const rows = roundRows(state.packets || [], deviceMetas(), nowRound()).sort((x, y) => place(x.number) - place(y.number));
   const games = rows.filter((r) => r.game);
   $('roundrows').innerHTML = `<div class="rounds">${rows.map((r) => r.packet
     ? `<a href="#" class="rnd${r.live ? ' live' : ''}${r.number === selectedRound ? ' sel' : ''}"
-        data-round="${r.number}" title="${r.live ? 'The live round' : 'Round ' + r.number}">${r.number}</a>`
+        data-round="${r.number}" title="${r.live ? 'The live round' : roundLabel(r.number)}">${isTbRound(r.number) ? 'T' + (r.number - 900) : r.number}</a>`
     : `<span class="rnd off" title="No packet for round ${r.number}">${r.number}</span>`).join('')}</div>
     ${games.length ? `<div class="devgames">${games.map((r) => `<div>
-      <span class="muted">Round ${r.number}: ${esc(r.game.a)} vs ${esc(r.game.b)} on this device</span>
+      <span class="muted">${roundLabel(r.number)}: ${esc(r.game.a)} vs ${esc(r.game.b)} on this device</span>
       <a href="${esc(gameLink(r.game.id))}">Continue</a></div>`).join('')}</div>` : ''}`;
   const sel = rows.find((r) => r.number === selectedRound);
-  $('packetname').textContent = sel && sel.packet ? 'Packet: ' + sel.packet : '';
+  // a tiebreaker packet read as a half says which
+  const info = (state.packets || []).find((p) => p.number === selectedRound);
+  const half = info && info.part === 'first' ? ' \u00b7 first half' : info && info.part === 'second' ? ' \u00b7 second half' : '';
+  $('packetname').textContent = sel && sel.packet ? 'Packet: ' + sel.packet + half : '';
 }
 
 function showTeams() {
@@ -684,8 +711,9 @@ function showTeams() {
     if (!info) { say('no packet for round ' + round, true); return; }
     // Another round's teams, or a round of this room's schedule not played
     // yet: say so, with the way to that round
-    const other = roundOfTeams(a, b, round);
-    const left = unplayedBefore(round);
+    // (a decider follows the rounds: nothing earlier waits on it)
+    const other = isTbRound(round) ? null : roundOfTeams(a, b, round);
+    const left = isTbRound(round) ? [] : unplayedBefore(round);
     const back = other || (left.length ? left[0].round : null);
     let asked = false;
     if (back) {
@@ -715,6 +743,13 @@ function showTeams() {
     $('start').disabled = true;
     try { packet = await fetchPacket(round, info.packet_name); }
     catch (e) { say(e.message, true); $('start').disabled = false; return; }
+    let off = 0;
+    if (info.tb) {
+      const n = packet.tossups.length, half = Math.floor(n / 2);
+      const [from, to] = info.part === 'first' ? [0, half] : info.part === 'second' ? [half, n] : [0, n];
+      off = from;
+      packet = { ...packet, tossups: packet.tossups.slice(from, to), bonuses: (packet.bonuses || []).slice(from, to) };
+    }
     $('start').disabled = false;
     say('');
     const metas = gameMetas(Object.keys(localStorage), (k) => localStorage.getItem(k), store);
@@ -722,6 +757,8 @@ function showTeams() {
     const id = randId();
     const meta = {
       a, b, round, packet: info.packet_name,
+      // a decider: its game is as long as its part of the packet, whose questions keep their numbers
+      ...(info.tb ? { reg: packet.tossups.length, off, decider: info.decider } : {}),
       t: state.tournament, room: state.room, started: Date.now(),
       // tiebreakers enter via MODAQ's Add Questions dialog; the mapping
       // starts at the packet's own size and grows as the mod adds them
@@ -808,6 +845,9 @@ async function boot() {
   selectedRound = packets.some((p) => p.number === state.current_round)
     ? state.current_round
     : (packets.length ? packets[packets.length - 1].number : 0);
+  const dec = packets.find((p) => p.tb && !p.done && !deviceMetas().some((m) => m.round === p.number));
+  if (dec) selectedRound = dec.number;
+  if (nowRound() !== state.current_round) setHeader(state.tournament, state.room, nowRound(), '');
   $('picker').hidden = false;
   $('roundrows').onclick = (e) => {
     const round = Number(e.target.dataset && e.target.dataset.round);
@@ -837,7 +877,7 @@ async function boot() {
   }
   const sr = await schedP;
   if (sr && sr.room !== null && sr.schedule) {
-    sched = sr.schedule;
+    sched = withDeciderPhases(sr.schedule); // tiebreaker deciders as rounds of their own
     schedRoom = sr.room;
     schedBrackets = sr.multi && Array.isArray(sr.brackets) ? sr.brackets : null;
     renderSchedPanel();

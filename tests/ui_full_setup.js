@@ -924,7 +924,7 @@ await runSection('INVITE', async () => {
   await withDialogs([true], () => click('#tbclear'));
   await waitJs(`!document.querySelector('#setupsec').textContent.includes('MirrorOwn')`, 'own questions gone');
   ok('TB-05 mirror: Delete pool removes only the tournament\'s own questions',
-    (await text('#setupsec')).includes('SetBackup TB answer 1') && !(await text('#setupsec')).includes('No tiebreaker questions yet'));
+    (await text('#setupsec')).includes('SetBackup TB answer 1') && !(await text('#setupsec')).includes('No extra questions yet'));
   // HUB-05: with the set page published, a link to it
   await call(SET.S, { method: 'POST', json: { published: true } });
   await openHub(MIRROR);
@@ -1315,7 +1315,7 @@ await runSection('PACKETS', async () => {
     tr.querySelector('.pkfile').textContent.replace(/\\s+/g, ' ').trim() === 'No packet yet · drop one here'
       && !tr.querySelector('[data-preview]') && !tr.querySelector('a[download]') && tr.querySelector('[data-pickround]').title === 'Upload')`));
   // TB-03: no pool yet
-  ok('TB-03 list: with no pool, "No tiebreaker questions yet" and no Delete pool', (await text('#setupsec')).includes('No tiebreaker questions yet') && !(await exists('#tbclear')));
+  ok('TB-03 list: with no pool, "No extra questions yet" and no Delete pool', (await text('#setupsec')).includes('No extra questions yet') && !(await exists('#tbclear')));
 
   // PK-03 zip staging
   const zip = (name, entries) => writeFx(name, Buffer.from(makeZip(entries.map(([n, data]) => ({ name: n, data })))));
@@ -1535,7 +1535,7 @@ await runSection('PACKETS', async () => {
   const tp0 = tbPosts();
   await clearMsg();
   await setFiles('#tbfile', [writeFx('tb notes.txt', 'plain text')]);
-  await check('TB-01 upload: another file type gives "Tiebreaker packets need to be .json or .docx files."', () => sayIs('Tiebreaker packets need to be .json or .docx files.', true));
+  await check('TB-01 upload: another file type gives "Extras packets need to be .json or .docx files."', () => sayIs('Extras packets need to be .json or .docx files.', true));
   ok('TB-01 upload: and sends nothing', tbPosts() === tp0);
   await clearMsg();
   await setFiles('#tbfile', [writeFx('tb two.json', tbJson('Two', 1)), writeFx('tb three.json', tbJson('Three', 1))]);
@@ -1581,10 +1581,10 @@ await runSection('PACKETS', async () => {
 
   // TB-05: Delete pool
   asked = await withDialogs([false], () => click('#tbclear'));
-  ok('TB-05 delete: asks "Delete the tiebreaker pool? The usage log goes with it."', asked[0] === 'Delete the tiebreaker pool? The usage log goes with it.', asked);
+  ok('TB-05 delete: asks "Delete the extras pool? The usage log goes with it."', asked[0] === 'Delete the extras pool? The usage log goes with it.', asked);
   ok('TB-05 delete: Cancel keeps it', await exists('[data-tbremove="TU1"]'));
   await withDialogs([true], () => click('#tbclear'));
-  await waitJs(`document.querySelector('#setupsec').textContent.includes('No tiebreaker questions yet')`, 'the empty pool');
+  await waitJs(`document.querySelector('#setupsec').textContent.includes('No extra questions yet')`, 'the empty pool');
   ok('TB-05 delete: OK empties it, and Delete pool is gone', !(await exists('#tbclear')) && !(await exists('[data-tbremove]')));
   // back to a small pool for the day
   await setFiles('#tbfile', [writeFx('tb day.json', tbJson('Day', 2))]);
@@ -2113,13 +2113,14 @@ await runSection('HOME RAIL + CLOSED ENTRIES', async () => {
     const sets = ${q([...new Set(index.tournaments.filter((t) => t.set && setSites(t.set).length > 1).map((t) => t.set))]
       .map((n) => [n, setSites(n).sort((a, b) => b.date.localeCompare(a.date)
         || (a.site || a.host || a.name).localeCompare(b.site || b.host || b.name)).map((t) => t.site || t.host || t.name)]))};
-    const days = ${q(Object.fromEntries(index.tournaments.filter((t) => t.set).map((t) => [t.site || t.host || t.name, t.date])))};
+    // (by set and site: one host may run two sets)
+    const days = ${q(Object.fromEntries(index.tournaments.filter((t) => t.set).map((t) => [t.set + '|' + (t.site || t.host || t.name), t.date])))};
     const day = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
     const rows = [...document.querySelectorAll('#tside .itset')];
     return rows.length === sets.length && sets.every(([n, sites]) => rows.some((r) =>
       r.querySelector('.sethead > span').textContent === n
       && JSON.stringify([...r.querySelectorAll('.sites a.it')].map((a) => a.querySelector('span').textContent + '|' + a.querySelector('small').textContent))
-        === JSON.stringify(sites.map((x) => x + '|' + day(days[x]))))); })()`));
+        === JSON.stringify(sites.map((x) => x + '|' + day(days[n + '|' + x]))))); })()`));
   // more than one year: a label above each
   const twoYears = answer((r) => r.method === 'GET' && r.url === `${PAGES}/archive/index.json`, () => ({ status: 200,
     body: JSON.stringify({ ...index, named: [...(index.named || []), { name: 'Old Fall Open', date: '2025-10-04' }] }) }));
@@ -2154,10 +2155,12 @@ await runSection('HOME RAIL + CLOSED ENTRIES', async () => {
   try {
     await home();
     await waitJs(`!!document.querySelector('details[data-fold="yours"] .trow')`, 'the list a week on');
-    ok('HOME-07 closed: a closed tournament shows its name muted with no link, "closed", and a Player page link', await js(`(() => {
+    // (still a link: only opening the hub tells this device a tournament was reopened — 11/11)
+    ok('HOME-07 closed: a closed tournament shows its name muted, still linked to its admin page, "closed", and a Player page link', await js(`(() => {
       const r = [...document.querySelectorAll('details[data-fold="yours"] .trow')].find((x) => x.querySelector('.nm').textContent === ${q(e.name)});
       const pub = r && [...r.querySelectorAll('a')].find((a) => a.textContent === 'Player page');
-      return !!r && r.querySelector('.nm').tagName === 'SPAN' && r.querySelector('.nm').classList.contains('muted') && r.querySelector('.st').textContent === 'closed'
+      return !!r && r.querySelector('.nm').tagName === 'A' && r.querySelector('.nm').href === ${q(`${PAGES}/index.html?a=${e.secret}`)}
+        && r.querySelector('.nm').classList.contains('muted') && r.querySelector('.st').textContent === 'closed'
         && !!pub && pub.href === ${q(`${PAGES}/t.html?t=${T1.slug}`)}; })()`));
     const asked = await withDialogs([false], () => click(`[data-forget="${e.secret}"]`));
     ok('HOME-08 remove: for a closed one, the question says there is nothing left to manage', asked[0] === `Remove "${e.name}" from this device?\n\n`

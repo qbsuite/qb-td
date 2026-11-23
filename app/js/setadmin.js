@@ -380,8 +380,8 @@ function renderPackets() {
           }).join('')}
         </table></div>
       </details>` : '',
-    tbTitle: 'Backup questions + tiebreakers',
-    tbNote: `Replacement and tiebreaker questions for every mirror, split into individual questions. Each
+    tbTitle: 'Extras',
+    tbNote: `Extra questions for every mirror, split into individual questions. Each
       mirror&rsquo;s rooms see this pool live in MODAQ under <b>Actions &rarr; Add questions&hellip;</b> — what you add here
       mid-season reaches mirrors already running — alongside any questions the mirror&rsquo;s own director adds.`,
     say, rerender: render, refresh: showDetail,

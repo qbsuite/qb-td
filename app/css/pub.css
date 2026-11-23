@@ -45,6 +45,8 @@ tr.nowrow td { background: var(--sel); }
 
 /* Now: current round and the next, a card per pool */
 .nowgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 36px; margin-top: 4px; }
+/* tiebreakers, one under the other, where Up next would be */
+.nowstack { display: grid; gap: 24px; align-content: start; }
 .nowhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .nowhead h3 { font-size: 17px; font-weight: 600; }
 .nowtag { font-size: 13px; font-weight: 600; color: var(--muted); }

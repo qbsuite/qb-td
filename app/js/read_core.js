@@ -78,7 +78,8 @@ export function orderPlayers(players, order) {
     when splitting it back apart. */
 export function matchFilenames(round, nameA, nameB) {
   const clean = (s) => String(s).replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'Team';
-  const base = `Round_${round}_${clean(nameA)}_${clean(nameB)}`;
+  // (a decider's round is its tiebreaker packet's: deciderphases.js)
+  const base = `${round > 900 ? 'Tiebreaker_' + (round - 900) : 'Round_' + round}_${clean(nameA)}_${clean(nameB)}`;
   return { combined: base + '.qbtd.json', qbj: base + '.qbj', game: base + '_Game.json' };
 }
 

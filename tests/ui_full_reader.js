@@ -1119,7 +1119,7 @@ await section('R25', 'the tiebreakers panel', async () => {
   await openRoom(tab, room('Room 2'));
   await tab.waitJs(`!document.querySelector('#tbpanel').hidden`, 'the tiebreakers panel');
   const rows = await tab.js(`[...document.querySelectorAll('#tbrows tr')].map((r) => [...r.cells].map((c) => c.textContent.replace(/\\s+/g, ' ').trim()))`);
-  ok('R25 "Tiebreakers": one row per question with its kind, "unused"', (await tab.text('#tbpanel h2')) === 'Tiebreakers'
+  ok('R25 "Extras": one row per question with its kind, "unused"', (await tab.text('#tbpanel h2')) === 'Extras'
     && JSON.stringify(rows) === JSON.stringify([['TU1', 'Tossup', 'unused'], ['TU2', 'Tossup', 'unused'], ['TU3', 'Tossup', 'unused'],
       ['B1', 'Bonus', 'unused'], ['B2', 'Bonus', 'unused']]), rows);
   ok('R25 "unused" in green', await green(tab, '#tbrows .ok'));
@@ -1564,8 +1564,12 @@ await section('R47', 're-exporting replaces the game', async () => {
   await openHub();
   await hub.click(`[data-cell="${R2.id}:3"]`);
   await hub.waitJs(`!!document.querySelector('.cellpanel')`, 'the cell panel');
+  // the panel opens on the upload that counts; the earlier ones wait behind Show previous uploads (10/21)
+  const first = await hub.js(`[...document.querySelectorAll('.cellpanel .pfile')].length`);
+  await hub.click('.cellpanel [data-prevuploads]');
+  await hub.waitJs(`document.querySelectorAll('.cellpanel .pfile').length > 1`, 'the previous uploads');
   const rows = await hub.js(`[...document.querySelectorAll('.cellpanel .pfile')].map((p) => ({ old: p.classList.contains('old'), text: p.querySelector('.pline').innerText }))`);
-  ok('R47 the hub lists every upload of the game, all but the newest marked "superseded"', rows.length === files.length && files.length >= 5 && !rows[0].old
+  ok('R47 the hub shows the newest upload, and every earlier one behind Show previous uploads, marked "superseded"', first === 1 && rows.length === files.length && files.length >= 5 && !rows[0].old
     && rows.slice(1).every((r) => r.old && r.text.includes('superseded')), rows);
   await hub.click('[data-closecell]');
   const drawer = await drawerText();
@@ -1961,8 +1965,8 @@ await section('R37', 'Add questions: the tiebreaker pool', async () => {
   const d = await mq.waitDialog(tab, 'Add Questions');
   ok('R37 "Add Questions", with the note to use Replace for the question being read',
     d.includes('To replace the question being read, please use Replace tossup or Replace bonus in the Actions menu instead.'), d.slice(0, 300));
-  ok('R37 the pool: "Tiebreaker questions from the tournament director. Check with the TD which one to read."',
-    d.includes('Tiebreaker questions from the tournament director. Check with the TD which one to read.'));
+  ok('R37 the pool: "Extra questions from the tournament director. Check with the TD which one to read."',
+    d.includes('Extra questions from the tournament director. Check with the TD which one to read.'));
   const checks = await dlgChecks(tab);
   ok('R37 one checkbox per question: "TU1 · Tossup — <answer>"', JSON.stringify(checks.map((c) => c.label)) === JSON.stringify(['TU1 · Tossup — Treaty of Ghent',
     'TU2 · Tossup — Peace of Utrecht', 'TU3 · Tossup — Congress of Vienna', 'B1 · Bonus — tbx / tby / tbz', 'B2 · Bonus — tbu / tbv / tbw']) && checks.every((c) => !c.disabled), checks);
@@ -2479,7 +2483,7 @@ await section('R37b', 'Add questions and Replace with no pool', async () => {
   await tab.waitJs(`!!document.querySelector('#modaq .ms-CommandBar')`, 'the Aux game');
   await mq.action(tab, 'Actions', 'Add questions...');
   const d = await mq.waitDialog(tab, 'Add Questions');
-  ok('R37 no pool: "No tiebreaker pool from the tournament director — load a packet file instead."', d.includes('No tiebreaker pool from the tournament director — load a packet file instead.')
+  ok('R37 no pool: "No extra questions from the tournament director — load a packet file instead."', d.includes('No extra questions from the tournament director — load a packet file instead.')
     && d.includes('Where should they go?') && (await tab.exists('.ms-Dialog-main input[type=file]')), d);
   ok('R37 no pool: Load file is the main button, and there is no Add selected', (await mq.dialogButtonState(tab, 'Load file')).primary === true && !(await mq.dialogButtonState(tab, 'Add selected')));
   await setFiles(tab, '.ms-Dialog-main input[type=file]', [fileFx()]);

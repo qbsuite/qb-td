@@ -28,6 +28,7 @@
 // code against this output and fails on any difference; run it after
 // every change here.
 
+import { withDeciderPhases, isTbRound } from './deciderphases.js';
 import { rosterTracking } from './qbj.js';
 
 const YF_VERSION = '4.0.18';
@@ -252,6 +253,7 @@ export function repeatedPhases(schedule) {
 
 export function yfStages(schedule, matches) {
   if (!schedule || !Array.isArray(schedule.phases)) return null;
+  schedule = withDeciderPhases(schedule); // tiebreaker deciders are a stage of their own
   const nameOf = (x) => (x && typeof x.team === 'string' ? x.team : null);
   const brackets = schedule.brackets || [];
   const stages = [];
@@ -375,15 +377,21 @@ function yfPhases(plan, roundNumbers, roundOf) {
     const rounds = st.rounds.filter((n) => roundNumbers.includes(n)).sort((a, b) => a - b);
     if (!rounds.length) continue;
     const minor = !st.full;
+    // Deciders on tiebreaker packets (deciderphases.js) have no round of the schedule's: as YF's
+    // own addTiebreakerAfter makes them, one round numbered half past the stage's last round and
+    // named after the stage, holding every game.
+    const deciders = rounds.every(isTbRound);
+    const last = out.length ? Math.max(...out[out.length - 1].rounds.map((r) => Math.floor(r.YfData.number))) : 0;
     out.push({
       YfData: {
         phaseType: st.type, code: st.type === 'Tiebreaker' ? `${code}T` : String(code++),
         wildCardAdvancementRules: [], wildCardRankingMethod: 'RankThenPPB',
         // finals and tiebreakers keep their round numbers
-        ...(minor ? { forceNumericRounds: true } : {}),
+        ...(minor && !deciders ? { forceNumericRounds: true } : {}),
       },
       name: st.name,
-      rounds: rounds.map(roundOf),
+      rounds: deciders ? [{ YfData: { number: last + 0.5 }, name: st.name, matches: rounds.flatMap((n) => roundOf(n).matches) }]
+        : rounds.map(roundOf),
       pools: minor ? [] : st.pools.map((pl, i) => ({
         YfData: { size: pl.teams.length, roundRobins: st.meet, seeds: [], hasCarryover: pl.carry, autoAdvanceRules: [] },
         name: pl.name,
@@ -512,7 +520,8 @@ export function buildYft(opts) {
     name: String(n), // YF Round.name is number.toString() unless non-numeric
     matches: matches.filter((m) => m.round === n).map((m) => [m, overtimeOf(m, regulation)]).map(([m, ot]) => ({
       YfData: { otherValidation: [], importedFile: m.filename },
-      tiebreaker: false,
+      // (YF asks no full count of tossups from a tiebreaker: a decider may be half a packet)
+      tiebreaker: isTbRound(m.round),
       id: matchIds.get(m),
       tossupsRead: m.tossupsRead,
       overtimeTossupsRead: ot.tossups || undefined,

@@ -40,6 +40,7 @@ const ICON = {
   close: svg('<path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>'),
   undo: svg('<path d="M5.5 3 2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/>'),
 };
+export const PK_ICONS = ICON;
 const GRIP = '<span class="grip" aria-hidden="true">\u2807\u2807</span>';
 
 // the last move, for its Undo: {from, to, swapped}
@@ -49,6 +50,13 @@ function stripTags(s) { return String(s || '').replace(/<[^>]*>/g, ''); }
 
 const PACKET_TYPE = (name) => /\.json$/i.test(name) ? 'application/json'
   : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/** Staged packets by name, as a person would order them: "Packet 2"
+    before "Packet 10", case and accents aside. A new array. */
+export function alphaOrder(staged) {
+  const by = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  return [...staged].sort((a, b) => by.compare(a.name, b.name));
+}
 
 /** A staged packet as the Blob an upload route takes. */
 export function stagedBlob(s) {
@@ -125,12 +133,15 @@ export function renderPacketsUi(box, o) {
     </div>
     ${staged.length ? `
     <div class="pkstaged">
-      <span class="muted">Staged</span>
+      <div class="pkstagedhead">
+        <span class="muted">Staged</span>
+        <span class="spacer" style="flex:1"></span>
+        <button id="zipsort" class="small">Sort alphabetically</button>
+        <button id="zipauto" class="small">Assign by filename</button>
+        <button id="zipclear" class="small">Clear</button>
+      </div>
       ${staged.map((s, i) => `<span class="chip" draggable="true" data-chip="${i}">${esc(s.name)}${
         s.guess ? ` <span class="muted">&rarr; ${noun} ${s.guess}</span>` : ''}</span>`).join('')}
-      <span class="spacer" style="flex:1"></span>
-      <button id="zipauto" class="small">Assign by filename</button>
-      <button id="zipclear" class="small">Clear</button>
     </div>` : ''}
     ${lastMove ? `<div class="pkundo"><span>${lastMove.swapped
       ? `Swapped ${nounPl} ${lastMove.from} and ${lastMove.to}.`
@@ -154,10 +165,10 @@ export function renderPacketsUi(box, o) {
     ${o.packetsNote ? `<div class="muted" style="font-size:13px;margin-top:6px">${o.packetsNote}</div>` : ''}
     ${o.afterPackets || ''}
 
-    <h2>${o.tbTitle || 'Tiebreakers'}</h2>
+    <h2>${o.tbTitle || 'Extras'}</h2>
     <p class="secnote">${o.tbNote}</p>
     <div class="row" style="margin-bottom:8px">
-      <button id="picktb" class="primary">Upload tiebreaker packet</button>
+      <button id="picktb" class="primary">Upload extras packet</button>
       <input id="tbfile" type="file" accept=".json,.docx" multiple hidden>
       <span class="slotdrop" id="tbdrop">Or drop a staged .json packet chip here to split it</span>
       ${tbQuestions.length ? '<span class="spacer" style="flex:1"></span><button id="tbclear" class="small">Delete pool</button>' : ''}
@@ -179,7 +190,7 @@ export function renderPacketsUi(box, o) {
           ${o.removeTb ? `<td class="num">${q.set ? '' : `<button class="linkbtn muted" data-tbremove="${esc(q.id)}">Remove</button>`}</td>` : ''}
         </tr>`;
       }).join('')}
-    </table></div>` : '<div class="muted">No tiebreaker questions yet</div>'}`;
+    </table></div>` : '<div class="muted">No extra questions yet</div>'}`;
 
   const $ = (id) => box.querySelector('#' + id);
   const stageFiles = async (fileList) => {
@@ -264,7 +275,7 @@ export function renderPacketsUi(box, o) {
       }
       return o.uploadTb(name.replace(/\.docx$/i, '.json'), JSON.stringify(packet));
     }
-    if (!/\.json$/i.test(name)) { o.say('Tiebreaker packets need to be .json or .docx files.', true); return false; }
+    if (!/\.json$/i.test(name)) { o.say('Extras packets need to be .json or .docx files.', true); return false; }
     return o.uploadTb(name, data);
   };
   $('tbfile').onchange = async () => {
@@ -303,8 +314,8 @@ export function renderPacketsUi(box, o) {
   });
   if ($('tbclear')) {
     $('tbclear').onclick = async () => {
-      if (!confirm(o.showUses ? 'Delete the tiebreaker pool? The usage log goes with it.'
-        : 'Delete the tiebreaker pool?')) return;
+      if (!confirm(o.showUses ? 'Delete the extras pool? The usage log goes with it.'
+        : 'Delete the extras pool?')) return;
       try {
         await o.clearTb();
         o.refresh();
@@ -354,6 +365,8 @@ export function renderPacketsUi(box, o) {
       o.refresh();
     };
     $('zipclear').onclick = () => { staged.splice(0, staged.length); o.rerender(); };
+    // the staged list by name, in place (the caller's array keeps the order)
+    $('zipsort').onclick = () => { staged.splice(0, staged.length, ...alphaOrder(staged)); o.rerender(); };
     box.querySelectorAll('[data-chip]').forEach((c) => {
       c.ondragstart = (e) => e.dataTransfer.setData('text/plain', 'chip:' + c.dataset.chip);
     });
@@ -460,7 +473,7 @@ export function renderPacketsUi(box, o) {
    The packet as a document: each tossup followed by its bonus, page by
    page, read through the same parser the reader uses (a .docx as the
    Worker's kept YAPP parse of it). */
-async function openPreview(r, noun, say) {
+export async function openPreview(r, noun, say) {
   const view = document.createElement('div');
   view.className = 'pkview';
   view.setAttribute('role', 'dialog');
@@ -483,7 +496,15 @@ async function openPreview(r, noun, say) {
     // (a .docx as the Worker's kept parse of it)
     const res = await fetch(r.href.replace(/&dl=[^&]*/, '') + '&parsed=1');
     if (!res.ok) throw new Error('could not load the packet (' + res.status + ')');
-    page.outerHTML = packetPagesHtml(await readPacket(res, r.name), r.name);
+    let packet = await readPacket(res, r.name);
+    // a tiebreaker packet read as a half shows that half, under the packet's own numbers (deciders.js)
+    let first = 0;
+    if (r.range) {
+      const [from, to] = r.range((packet.tossups || []).length);
+      first = from;
+      packet = { ...packet, tossups: (packet.tossups || []).slice(from, to), bonuses: (packet.bonuses || []).slice(from, to) };
+    }
+    page.outerHTML = packetPagesHtml(packet, r.name, first);
   } catch (e) {
     page.innerHTML = `<div class="bad">${esc(e.message)}</div>`;
     if (say) say(e.message, true);
@@ -494,7 +515,7 @@ const answerLine = (a) => `<p class="pka">ANSWER: ${sanitizeHtml(String(a || '')
 const metaLine = (q) => q && q.metadata ? `<p class="pkm">&lt;${esc(String(q.metadata).replace(/^<|>$/g, ''))}&gt;</p>` : '';
 
 /** A packet's pages: tossup 1, bonus 1, tossup 2, … as the packet pairs them. */
-export function packetPagesHtml(packet, name) {
+export function packetPagesHtml(packet, name, first = 0) {
   const tus = packet.tossups || [];
   const bns = packet.bonuses || [];
   const n = Math.max(tus.length, bns.length);
@@ -503,9 +524,9 @@ export function packetPagesHtml(packet, name) {
     const tu = tus[i];
     const bz = bns[i];
     pairs.push(`<section class="pkpair">${tu ? `
-      <p class="pkq"><span class="pkno">${i + 1}.</span> ${sanitizeHtml(tu.question)}</p>
+      <p class="pkq"><span class="pkno">${first + i + 1}.</span> ${sanitizeHtml(tu.question)}</p>
       ${answerLine(tu.answer)}${metaLine(tu)}` : ''}${bz ? `
-      <p class="pkq pkbonus"><span class="pkno">B${i + 1}.</span> ${sanitizeHtml(bz.leadin || '')}</p>
+      <p class="pkq pkbonus"><span class="pkno">B${first + i + 1}.</span> ${sanitizeHtml(bz.leadin || '')}</p>
       ${(bz.parts || []).map((part, p) => `
         <p class="pkq pkpart"><span class="pkno">${esc(partMarker(bz, p) || '[10]')}</span> ${sanitizeHtml(part)}</p>
         ${answerLine((bz.answers || [])[p])}`).join('')}${metaLine(bz)}` : ''}

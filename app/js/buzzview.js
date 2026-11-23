@@ -157,7 +157,7 @@ export function tossupHtml(tossup, buzzes, packet, heard, label, tb, dead) {
   return `
     <details class="qd">
       <summary><span class="roundcell">${esc(label || tb || 'T' + tossup)}</span>
-        ${tu ? mainAnswerHtml(tu.answer) : `<span class="muted">${tb ? 'Tiebreaker' : '(No packet text)'}</span>`}
+        ${tu ? mainAnswerHtml(tu.answer) : `<span class="muted">${tb ? 'Extra' : '(No packet text)'}</span>`}
         <span class="qdmeta${heard ? '' : ' track'}">${meta}</span></summary>
       <div class="qdbody">
         ${tossupTextHtml(tu, buzzes)}
@@ -224,7 +224,7 @@ export function bonusAnswersHtml(bz, tb) {
   const answers = bz && Array.isArray(bz.answers) ? bz.answers : [];
   return answers.length
     ? answers.map((a) => mainAnswerHtml(a)).join(' <span class="muted">/</span> ')
-    : `<span class="muted">${tb ? 'Tiebreaker' : '(No packet text)'}</span>`;
+    : `<span class="muted">${tb ? 'Extra' : '(No packet text)'}</span>`;
 }
 
 /** One bonus, collapsed to its answerlines. It sits indented under the

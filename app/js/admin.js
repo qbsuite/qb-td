@@ -25,7 +25,7 @@ import '../engine/plan.js';
 import '../engine/hdwhite.js';
 import { parseMatch, parseRoster, buildRosterQbj, rosterTracking, teamMarks,
   carryFormerNames, forfeitQbj, statedRound } from '../engine/qbj.js';
-import { standings, dedupeMatches } from '../engine/stats.js';
+import { standings, dedupeMatches, tiebreakOf } from '../engine/stats.js';
 // hubgames.js builds the downloads with these four. They are
 // imported here too, where this file used them before, so a cold load
 // asks for them as early as it did: found one module later, report.js
@@ -36,7 +36,8 @@ import '../engine/report.js';
 import { makeZip } from '../engine/zip.js';
 import { renderStats } from './statsview.js';
 import { pasteGrid } from '../engine/rosterpaste.js';
-import { renderPacketsUi, stagedBlob, endSentence, tbSplitNote } from './packetsui.js';
+import { renderPacketsUi, stagedBlob, endSentence, tbSplitNote, openPreview, PK_ICONS } from './packetsui.js';
+import { makeDeciders, decEditorHtml, decGames, isTbRound, TB_BASE } from './deciders.js';
 import { formatHtml, wireFormat } from './formatui.js';
 import { rankFormat, metaKey, gameKey, storeIntact, tbResume, formatKey, GAME_FORMAT_OPTIONS } from './read_core.js';
 import '../engine/modaqfile.js'; // asked for as early as before (see above)
@@ -325,6 +326,15 @@ let rosterUpload = null;
 let uploadsOpen = null;  // Set of expanded upload rounds; null = current round only
 let cellOpen = null;     // uploads grid: {bid, round} whose files show under its row
 let addOpen = null;      // Add a game panel: {bid, round, picked: the TD chose that round}, or null when closed
+// A redraw that follows something the hub did by itself (a decider's result read, a tiebreaker
+// released): never over what the TD has open, as the refresh never is. The next refresh draws it.
+function calmRender(inEditor = false) {
+  if (shownView !== 'live' || inEditor) return;
+  const el = document.activeElement;
+  if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+  if (!$('linkmodal').hidden || warningOpen() || addOpen || ($('dlpanel') && !$('dlpanel').hidden)) return;
+  render();
+}
 let ffOpen = null;       // Record a forfeit panel: {bid, round, win, lose}, or null when closed
 let fixOpen = null;      // Fix buzzes panel (fixPanelHtml): the file, its upload, the fix so far
 let protOpen = null;     // Protests drawer; null = auto: open when a protest is unruled
@@ -404,11 +414,19 @@ async function showDetail(quiet = false, held = null) {
   }
   testToken = await testTokenReq;
   await hubNames.ensure(pub, a, t);
+  // tiebreaker packets are stored as rounds no schedule reaches (deciders.js): kept apart from the rounds
+  detail.tbRounds = (detail.rounds || []).filter((r) => isTbRound(r.number));
+  detail.rounds = (detail.rounds || []).filter((r) => !isTbRound(r.number));
   lastDetail = detail;
   render();
   // the header isn't redrawn when the view stays put: its mark is
   notePub({});
   autoFillSlots();
+  // a decider a room has sent in sets its winner
+  deciders.sync().then(async (moved) => {
+    if (moved) { calmRender(); if (await deciders.sync()) calmRender(); }
+    if (await deciders.autoRelease()) calmRender();
+  }).catch((e) => console.error(e));
   return true;
 }
 
@@ -582,7 +600,7 @@ function renderSetup(a, t, buckets, rounds, files, settings, steps) {
   const box = $('viewbody');
   // the step list is the checklist and the tabs at once: one line per
   // step, its done state and a word on where it stands
-  const LABEL = { packets: 'Packets + Tiebreakers', stats: 'Player page' };
+  const LABEL = { packets: 'Packets + Extras', stats: 'Player page' };
   box.innerHTML = `
     <div class="setupgrid">
       <aside class="steplist">
@@ -1196,13 +1214,24 @@ function renderPacketsSec(a, t, buckets, rounds, settings) {
       editors upload reaches every round no room here has opened yet. A packet you
       upload yourself replaces that round for good — the set stops updating it, and its
       games drop out of the set&rsquo;s category stats and buzzpoints.` : '',
-    tbTitle: t.set ? 'Backup questions + tiebreakers' : 'Tiebreakers',
+    tbTitle: 'Extras',
     tbNote: (t.set ? `The set&rsquo;s own backup questions are listed first, and its editors may add to them
       during the day; anything you upload here is added after them, for this tournament only, and Delete pool
-      removes only yours. ` : '') + `Upload a tiebreaker packet to split individual questions. Tiebreaker
+      removes only yours. ` : '') + `Upload an extras packet to split individual questions. Extra
       questions will appear in every room&rsquo;s MODAQ via
       <b>Actions &rarr; Add questions</b>.`,
     say, rerender: render, refresh: showDetail,
+  });
+  const hrefOf = (r) => `${API}${a}/file?key=${encodeURIComponent(r.packet_r2_key)}&dl=${encodeURIComponent(r.packet_name)}`;
+  deciders.packetRows($('setupsec'), {
+    icons: PK_ICONS,
+    href: hrefOf,
+    upload: async (round, file) => pub(`${a}/packet?round=${round}&name=${encodeURIComponent(file.name)}`,
+      { method: 'POST', body: stagedBlob({ name: file.name, data: await file.arrayBuffer() }) }),
+    refresh: showDetail,
+    preview: (round, range) => { const r = lastDetail.tbRounds.find((x) => x.number === round); if (r) openPreview({ number: round - TB_BASE, name: r.packet_name, href: hrefOf(r), range }, 'Tiebreaker', say); },
+    staged,
+    uploadStaged: (round, sfile) => pub(`${a}/packet?round=${round}&name=${encodeURIComponent(sfile.name)}`, { method: 'POST', body: stagedBlob(sfile) }),
   });
   const box = $('setupsec');
   box.querySelectorAll('[data-setpacket]').forEach((sel) => {
@@ -2006,6 +2035,17 @@ function renderSchedule(a, t, buckets, files) {
     return;
   }
   if (schedRoomsN === null) schedRoomsN = Math.max(1, buckets.length);
+  // deciders show after the first phase, read-only (they change in the Live Hub)
+  if (!box.dataset.dechook) {
+    box.dataset.dechook = '1';
+    const put = () => {
+      if (box.querySelector('.tbedphase') || !sched) return;
+      const html = decEditorHtml(sched);
+      const first = box.querySelector('.sgphase');
+      if (html && first) first.insertAdjacentHTML('afterend', html);
+    };
+    new MutationObserver(put).observe(box, { childList: true, subtree: true });
+  }
   renderSchedStep(box, {
     sched: () => sched,
     setSched: (s) => { sched = s; },
@@ -2187,7 +2227,7 @@ function liveBrackets(t, buckets, files) {
     const game = g && g.a && g.b ? g : null;
     // an upload for a round this room hasn't reached; a round it left
     // without its game coming in
-    const ahead = files.filter((f) => f.bucket_id === b.id && early.has(f.id)).sort((x, y) => x.round - y.round)[0];
+    const ahead = files.filter((f) => f.bucket_id === b.id && early.has(f.id) && !isTbRound(f.round)).sort((x, y) => x.round - y.round)[0];
     const prev = idx === null ? null : gameIn(bm, idx, rr - 1);
     const behind = prev && prev.a && prev.b && !goodIn(b.id, rr - 1) && startedAt(b.id, rr);
     const note = ahead ? `Also uploaded a round ${ahead.round} game before round ${ahead.round} opened. Check its round number.`
@@ -2270,6 +2310,9 @@ function phaseSpans(bk, cols) {
     const last = segs[segs.length - 1];
     if (last && last.ph === ph) last.n++;
     else segs.push({ ph, n: 1 });
+    // tiebreaker deciders' columns after this round: a heading of their own (deciders.js)
+    const tb = deciders.gridColsAfter(n);
+    if (tb) segs.push({ ph: { name: 'Tiebreakers' }, n: tb });
   }
   return `<tr class="uphase"><th></th>${segs.map((x) =>
     `<th colspan="${x.n}">${x.ph ? `<span>${esc(x.ph.name || '')}</span>` : ''}</th>`).join('')}</tr>`;
@@ -2306,8 +2349,9 @@ function autoHelp(pools) {
 // Moderator packets: a chip per round, dark for the packets moderators can
 // open. With brackets, a round only some brackets have reached is lighter.
 function packetChips(total, open, low) {
-  return `<div class="pkchips" style="--n:${Math.min(total, 14)}">${Array.from({ length: total }, (_, i) => i + 1).map((n) =>
-    `<span class="${n <= open ? 'on' : ''} ${n <= open && n > low ? 'some' : ''}" title="Round ${n}">${n}</span>`).join('')}</div>`;
+  // (a tiebreaker packet's chip follows its round: deciders.js)
+  return `<div class="pkchips" style="--n:${Math.min(total + deciders.tbCount(), 14)}">${Array.from({ length: total }, (_, i) => i + 1).map((n) =>
+    `<span class="${n <= open ? 'on' : ''} ${n <= open && n > low ? 'some' : ''}" title="Round ${n}">${n}</span>` + deciders.chips(n)).join('')}</div>`;
 }
 
 // Auto-advance with brackets: each bracket's round and starts, and its
@@ -2341,9 +2385,13 @@ function releaseWarning(to, idle, pool) {
   return { title: `Release packet ${to}${pool ? ' to ' + pool : ''}?`, line, go: `Release packet ${to}` };
 }
 async function releaseOk(to, idle, pool = '') {
-  if (!idle.length) return true;
+  // tiebreakers that come before this round and haven't been played
+  const waiting = deciders.pending(to);
+  if (!idle.length && !waiting.length) return true;
   const w = releaseWarning(to, idle, pool);
-  return (await askWarning({ title: w.title, lines: [w.line], choices: [{ key: 'go', label: w.go, primary: true }] })) === 'go';
+  const lines = [...(idle.length ? [w.line] : []),
+    ...(waiting.length ? [`${andList(waiting)} ${waiting.length === 1 ? "hasn't" : "haven't"} been played yet.`] : [])];
+  return (await askWarning({ title: w.title, lines, choices: [{ key: 'go', label: w.go, primary: true }] })) === 'go';
 }
 
 function renderLive(a, t, buckets, rounds, files, settings, missing) {
@@ -2354,7 +2402,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
   const intake = roundIntake(sched, t.current_round, buckets, files);
   const uploadRounds = [...new Set([
     ...Array.from({ length: t.current_round }, (_, i) => i + 1),
-    ...files.map((f) => f.round).filter((n) => Number.isInteger(n) && n > 0),
+    ...files.map((f) => f.round).filter((n) => Number.isInteger(n) && n > 0 && !isTbRound(n)),
   ])].sort((x, y) => y - x);
   const tbUsed = tbPool
     ? [...(tbPool.tossups || []), ...(tbPool.bonuses || [])]
@@ -2567,9 +2615,10 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       ${bk ? `<span class="muted">${phaseLine(bk)}</span>` : ''}
       ${rounds.length && !rounds.some((r) => r.number === topRound)
         ? '<span class="warntext">No packet for this round</span>' : ''}
-      ${tbTotal ? `<span class="muted">Tiebreakers <span class="fg">${tbUsed}/${tbTotal}</span> used</span>` : ''}
+      ${tbTotal ? `<span class="muted">Extras <span class="fg">${tbUsed}/${tbTotal}</span> used</span>` : ''}
     </div>
     ${playoffNoteHtml(files)}
+    ${deciders.html()}
     <div class="livegrid">
       <div class="livemain">
         <section>
@@ -2622,12 +2671,12 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
           ${buckets.length ? `<div class="ugridbox"><div class="tablewrap"><table class="ugrid">
             ${bk ? phaseSpans(bk, roundCols) : ''}
             <tr><th class="uroom">Room</th>${roundCols.map((n) =>
-              `<th class="${(bk ? Object.values(bk.st.rounds).includes(n) : n === t.current_round) ? 'now' : ''}">${n}</th>`).join('')}</tr>
+              `<th class="${(bk ? Object.values(bk.st.rounds).includes(n) : n === t.current_round) ? 'now' : ''}">${n}</th>` + deciders.gridHeads(n)).join('')}</tr>
             ${gridGroups(bk, buckets).map(({ head, rows }) => (head
-              ? `<tr class="ugroup"><td colspan="${roundCols.length + 1}"><i class="lane-${head.color}"></i><b>${esc(head.name)}</b>
+              ? `<tr class="ugroup"><td colspan="${roundCols.length + 1 + deciders.colCount()}"><i class="lane-${head.color}"></i><b>${esc(head.name)}</b>
                   <span class="muted">this round</span></td></tr>` : '')
               + rows.map((b) => `<tr data-urow="${b.id}"><td class="uroom" title="${esc(b.room_name)}">${esc(b.room_name)}</td>${
-                roundCols.map((n) => gridCell(b, n)).join('')}</tr>`).join('')).join('')}
+                roundCols.map((n) => gridCell(b, n) + deciders.gridCells(b.id, n, (rn) => gridCell(b, rn))).join('')}</tr>`).join('')).join('')}
           </table></div>${cellOpen && buckets.some((b) => b.id === cellOpen.bid) ? cellPanel() : ''}</div>
           <div class="muted legend">&#10003; in &middot;
             <span class="upie" style="--p:40%"></span> in progress &middot; &#9675; started &middot; &ndash; missing &middot; ! can&rsquo;t read &middot;
@@ -2645,13 +2694,14 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
       <aside class="liverail">
         <div class="railblock">
           <div class="railhead"><b>Moderator packets</b></div>
+          ${deciders.releaseHtml()}
           ${pastSched(bk ? bk.advTo : t.current_round + 1)
           ? `<button class="primary advance" disabled>Release</button>
           <div class="muted small">Round ${schedRoundCount()} is the last round in the schedule.</div>`
-          : bk ? `<button id="advall" class="primary advance">Release packet ${bk.advTo}</button>
+          : bk ? `<button id="advall" class="${deciders.releaseHtml() ? 'advance advsecond' : 'primary advance'}">Release packet ${bk.advTo}</button>
           ${advNote(bk) ? `<div class="muted small">${advNote(bk)}</div>` : ''}
           ${rounds.some((r) => r.number === bk.advTo) || !rounds.length ? '' : `<div class="warntext small">No packet for round ${bk.advTo} yet</div>`}`
-          : `<button id="advround" class="primary advance">Release packet ${t.current_round + 1}</button>
+          : `<button id="advround" class="${deciders.releaseHtml() ? 'advance advsecond' : 'primary advance'}">Release packet ${t.current_round + 1}</button>
           ${nextHasPacket || !rounds.length ? '' : `<div class="warntext small">No packet for round ${t.current_round + 1} yet</div>`}`}
           ${packetChips(totalRounds, topRound, bk ? Math.min(...Object.values(bk.st.rounds)) : topRound)}
           <label class="setround">Set round
@@ -2714,6 +2764,7 @@ function renderLive(a, t, buckets, rounds, files, settings, missing) {
     };
   });
   box.querySelectorAll('[data-closecell]').forEach((b) => { b.onclick = () => { cellOpen = null; render(); }; });
+  deciders.wire(box);
   box.querySelectorAll('[data-prevuploads]').forEach((b) => { b.onclick = () => { cellOpen.prev = !cellOpen.prev; render(); }; });
   // Download > Both: the game's two files in one zip, named as MODAQ names them
   box.querySelectorAll('[data-dlboth]').forEach((b) => {
@@ -3244,7 +3295,9 @@ function fixPanelHtml() {
     let form = '';
     if (add) {
       const on = luAt(lu.segs, add.q);
-      const qs = Array.from({ length: Math.max(lu.questions - 1, 0) }, (_, i) => i + 2);
+      // Q1 too: the most common slip is a substitution made before the game that MODAQ never heard
+      // about. One on Q1 changes who started, and the starters above show it
+      const qs = Array.from({ length: Math.max(lu.questions, 0) }, (_, i) => i + 1);
       form = `<div class="luadd">
         <select id="luaq" aria-label="Question">${qs.map((q) => `<option value="${q}" ${q === add.q ? 'selected' : ''}>Q${q}</option>`).join('')}</select>
         <select id="luain" aria-label="In"><option value="">Nobody</option>${pool.filter((p) => !on.includes(p)).map((p) =>
@@ -3382,7 +3435,7 @@ function wireFix(box, a, t, buckets, files) {
   box.querySelectorAll('[data-luaddopen]').forEach((b) => {
     b.onclick = () => {
       const ti = Number(b.dataset.luaddopen);
-      x.luAdd = x.luAdd && x.luAdd.ti === ti ? null : { ti, q: 2, in: '', out: '' };
+      x.luAdd = x.luAdd && x.luAdd.ti === ti ? null : { ti, q: 1, in: '', out: '' };
       render();
     };
   });
@@ -3625,6 +3678,34 @@ function renderProtests(rows, open, isOpen) {
 let autoSig = null;           // uploads last looked at
 let autoBusy = false;
 let autoWait = { held: [], odd: [], finals: [] }; // what waits for the TD, for the Live Hub
+// Deciders (deciders.js): what the module borrows from the hub
+let decAgg = null; // the prelim standings the last fill ranked on, for a tie's numbers
+const DEC_STAT = { pp20: 'points per 20', ppg: 'points per game', ppb: 'points per bonus' };
+const deciders = makeDeciders({
+  sched: () => sched,
+  setSched: (s, etag) => { sched = s; if (etag) schedEtag = etag; },
+  save: (s) => saveSchedule('/a/' + adminSecret, s),
+  held: () => autoWait.held,
+  agg: () => decAgg,
+  tbRounds: () => (lastDetail && lastDetail.tbRounds) || [],
+  statLabel: () => { let st = {}; try { st = JSON.parse(lastDetail.tournament.settings) || {}; } catch (e) { /* default */ } return DEC_STAT[tiebreakOf(st).stat]; },
+  render: () => render(),
+  say: (text, bad) => say(text, bad),
+  goPackets: () => { curView = 'setup'; setupTab = 'packets'; render(); },
+  auto: () => { try { return !!(JSON.parse(lastDetail.tournament.settings) || {}).autoAdvance; } catch (e) { return false; } },
+  // the games rooms sent on tiebreaker packets: [{bucket, round, teams, score, part, created}]
+  files: () => ((lastDetail && lastDetail.files) || []).filter((f) => isGameFile(f) && isTbRound(f.round)).map((f) => {
+    const sm = fileSummary(f);
+    return sm && Array.isArray(sm.teams) && Array.isArray(sm.score) ? { bucket: f.bucket_id, round: f.round, teams: sm.teams, score: sm.score, part: unfinishedOf(sm), created: f.created } : null;
+  }).filter(Boolean),
+  anyFile: (bid, round) => ((lastDetail && lastDetail.files) || []).some((f) => f.bucket_id === bid && f.round === round),
+  // for a place in a bracket (a decider of the TD's own): the uploads under the teams' current
+  // names, their games read, and the game format the standings count by
+  rawFiles: () => namedFiles((lastDetail && lastDetail.files) || [], hubNames.map),
+  matches: async (files) => (await collectMatches(pub, '/a/' + adminSecret, lastDetail.tournament, lastDetail.buckets, files, () => {},
+    { cache: autoCache, rank: true, roster: hubNames.rosterFor(lastDetail.tournament) })).matches,
+  format: () => gameFormat(lastDetail.tournament),
+});
 let autoForce = [];           // pools (and 'F:' + a finals bracket) the TD said to fill anyway
 const autoCache = new Map();  // games already read (public copies), shared with Fill
 
@@ -3674,6 +3755,9 @@ async function autoFillSlots(force = false, inEditor = false) {
       // a game that couldn't be read holds its pool: look again on the next refresh
       const ids = new Set(got.matches.map((m) => m.fileId));
       autoSig = want.files.every((f) => ids.has(f.id)) ? sig : null;
+      // with a tiebreaker packet uploaded, ties across a cut wait for their deciders
+      copy.deciders = { ...(copy.deciders || {}), hold: deciders.hold() };
+      decAgg = standings(got.matches, got.roster, gameFormat(t));
       const res = autoFillSaved(copy, files, got.matches, got.roster, autoForce, gameFormat(t));
       const said = [];
       if (res.playoffs) {
@@ -3715,7 +3799,11 @@ async function autoFillSlots(force = false, inEditor = false) {
       schedEtag = etag;
     }
     if (shownView === 'live' && !inEditor) render();
+    // a tie found just now opens on its suggested games
+    if (deciders.hold() && await deciders.init()) calmRender(inEditor);
+    if (await deciders.autoRelease()) calmRender(inEditor);
   } catch (e) {
+    console.error(e);
     autoSig = null; // try again on the next refresh
   } finally { autoBusy = false; }
 }
@@ -3739,7 +3827,7 @@ function playoffNoteHtml(files) {
       lines.push(`Pool ${esc(x.pool)} has ${x.games.map((g) => `${esc(g.a)} vs ${esc(g.b)} (round ${g.round})`).join(', ')}, which isn&rsquo;t on the schedule.
         <button class="linkbtn" data-fillpool="${esc(x.pool)}">Fill anyway</button>`);
     }
-    for (const x of autoWait.held) {
+    for (const x of (deciders.hold() ? [] : autoWait.held)) {
       const by = {};
       x.teams.forEach((tm) => { by[tm.bracket] = (by[tm.bracket] || 0) + 1; });
       const spots = Object.entries(by).map(([b, n]) => `${n === 1 ? 'one spot' : n + ' spots'} in ${esc(b)}`);

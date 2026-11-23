@@ -9,6 +9,7 @@
 // (it's implied by TUH); the ties column only appears if a tie was played.
 // Standings and individuals side by side, the games below by round.
 
+import { roundLabel } from '../engine/deciderphases.js';
 import { esc } from './api.js';
 
 const playerPts = (p) => p.counts.reduce((s, c) => s + c.value * c.n, 0);
@@ -88,7 +89,7 @@ export function renderStats(out, agg, errors = [], opts = {}) {
       </tr>`).join('')}
     </table></div>`;
   const gamesHtml = `<div class="hgames">${rounds.map((rn) => `<div class="hround">
-      <div class="rhead">Round ${rn}</div>
+      <div class="rhead">${roundLabel(rn)}</div>
       ${agg.games.filter((g) => g.round === rn).map((g) => gameRow(g, vals)).join('')}
     </div>`).join('')}</div>`;
   const errs = errors.map((e) => `<div class="bad">${esc(e)}</div>`).join('');
