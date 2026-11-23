@@ -254,6 +254,18 @@ export function repeatedPhases(schedule) {
 export function yfStages(schedule, matches) {
   if (!schedule || !Array.isArray(schedule.phases)) return null;
   schedule = withDeciderPhases(schedule); // tiebreaker deciders are a stage of their own
+  // tiebreaker games no decider lists (uploaded to a tiebreaker packet's round
+  // straight from a room or the hub) are a Tiebreakers stage too, before the
+  // Finals: without one their rounds belong to no stage
+  const known = new Set(schedule.phases.flatMap((ph) => (ph.rounds || []).map((r) => r.round)));
+  const loose = [...new Set((matches || []).map((m) => m.round).filter((n) => isTbRound(n) && !known.has(n)))].sort((x, y) => x - y);
+  if (loose.length) {
+    const fin = schedule.phases.findIndex((ph) => ph.kind === 'final');
+    const at = fin < 0 ? schedule.phases.length : fin;
+    const phase = { name: 'Tiebreakers', kind: 'tiebreak', meet: 1, rounds: loose.map((n) => ({ round: n, games: [], byes: [] })) };
+    schedule = { ...schedule, phases: [...schedule.phases.slice(0, at), phase, ...schedule.phases.slice(at)],
+      brackets: (schedule.brackets || []).map((x) => (x.phase >= at ? { ...x, phase: x.phase + 1 } : x)) };
+  }
   const nameOf = (x) => (x && typeof x.team === 'string' ? x.team : null);
   const brackets = schedule.brackets || [];
   const stages = [];

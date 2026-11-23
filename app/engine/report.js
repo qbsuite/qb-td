@@ -565,8 +565,17 @@ function resultList(m, games) {
 function stageSections(m) {
   const S = m.stages;
   const gamesOf = (st) => st.rounds.flatMap((rd) => rd.games);
+  // the tiebreaker games played after a stage, before the next one (a
+  // Tiebreakers stage of their own): they settle its tables' ties too
+  const tbAfter = (st) => {
+    const out = [];
+    for (let k = S.list.indexOf(st) + 1; k > 0 && k < S.list.length && !S.list[k].full; k++) {
+      for (const rd of S.list[k].rounds || []) for (const g of (rd && rd.games) || []) if (g && isTbRound(g.round)) out.push(g);
+    }
+    return out;
+  };
   const forStage = (st, extra) => {
-    const all = [...gamesOf(st), ...extra];
+    const all = [...gamesOf(st), ...extra, ...tbAfter(st)];
     // a stage's tiebreaker games settle its ties but count in no record
     const games = all.filter((g) => !isTbRound(g.round));
     const tbs = all.filter((g) => isTbRound(g.round));

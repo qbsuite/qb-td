@@ -8593,6 +8593,19 @@ test('hubgames.js: passes on exportfile.js, so the hub imports its downloads fro
     assert.deepEqual(r.players.map((p) => [p.gp, p.tuh]), [[2, 40], [2, 40]], 'no game played or tossup heard for it');
   });
 
+  test('tie order: tiebreaker games no decider lists (uploaded straight to a tiebreaker round) are a Tiebreakers stage before the Finals, not a reason to drop the stages', () => {
+    const g = (round, a, b) => ({ round, tossupsRead: 20, teams: [{ name: a, points: 300, bonusPoints: 100, players: [] }, { name: b, points: 200, bonusPoints: 50, players: [] }] });
+    const s = { rooms: [{ name: 'R1' }, { name: 'R2' }], brackets: [{ key: 'RR', name: 'Prelims', phase: 0 }, { key: 'FN', name: 'Final', phase: 1 }],
+      phases: [{ name: 'Prelims', meet: 1, rounds: [
+        { round: 1, games: [{ room: 0, a: { team: 'A' }, b: { team: 'B' }, bracket: 'RR' }, { room: 1, a: { team: 'C' }, b: { team: 'D' }, bracket: 'RR' }], byes: [] },
+        { round: 2, games: [{ room: 0, a: { team: 'A' }, b: { team: 'C' }, bracket: 'RR' }, { room: 1, a: { team: 'B' }, b: { team: 'D' }, bracket: 'RR' }], byes: [] }] },
+      { name: 'Finals', kind: 'final', meet: 1, rounds: [{ round: 3, games: [{ room: 0, a: { team: 'A', from: '1st in Prelims' }, b: { team: 'B', from: '2nd in Prelims' }, bracket: 'FN' }], byes: [] }] }] };
+    const ms = [g(1, 'A', 'B'), g(1, 'C', 'D'), g(2, 'A', 'C'), g(2, 'B', 'D'), g(901, 'B', 'C'), g(3, 'A', 'B')];
+    const st = yfStages(s, ms);
+    assert.ok(st, 'the stages stay');
+    assert.deepEqual(st.stages.map((x) => x.name), ['Prelims', 'Tiebreakers', 'Finals']);
+  });
+
   test('tiebreak: points per game or per bonus break a tie in record, with or without head-to-head first', () => {
     // A: more per tossup; B: more per game (fewer tossups a game); C: more per bonus
     const A = { name: 'A', w: 2, l: 2, t: 0, regPoints: 1000, regTuh: 60, points: 1000, gp: 4, bonusPoints: 300, bonusesHeard: 30 };
