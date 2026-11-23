@@ -952,6 +952,28 @@ async function sectionMain(br) {
         edge: hr.right - br.right, labelLeftOfButton: document.querySelector('#round').getBoundingClientRect().right <= br.left + 1 }; })()`);
     return (x.label === 'Round 1' && x.btn === 'Refresh' && x.rightmost && x.edge < 40 && x.labelLeftOfButton) || x;
   });
+  await check('pub-01 header: "qb-td /" before the name leads to the home page', async () => {
+    const x = await tab.js(`(() => { const a = document.querySelector('header a.homemark'); const n = document.querySelector('#tname');
+      if (!a) return 'no link'; const ar = a.getBoundingClientRect(); const nr = n.getBoundingClientRect();
+      return { text: a.textContent, href: a.href, sep: (a.nextElementSibling || {}).textContent, before: ar.right <= nr.left, line: ar.bottom > nr.top && ar.top < nr.bottom }; })()`);
+    return (x.text === 'qb-td' && x.href === PAGES + '/index.html' && x.sep === '/' && x.before && x.line) || x;
+  });
+  // on a phone: qb-td on a line of its own; a long name wraps and the
+  // round and Refresh beside it stay whole
+  await tab.view('phone');
+  await tab.js(`document.querySelector('#tname').textContent = 'ACF Fall 2026 at the University of Illinois Urbana-Champaign', true`);
+  await check('pub-01 header on a phone: qb-td above the name; a long name wraps, "Round 1" and Refresh stay on one line', async () => {
+    const x = await tab.js(`(() => { const r = (s) => document.querySelector(s).getBoundingClientRect();
+      const one = (s) => { const e = document.querySelector(s); return e.getClientRects().length === 1 && r(s).height < 2 * parseFloat(getComputedStyle(e).lineHeight || 20); };
+      return { above: r('a.homemark').bottom <= r('#tname').top + 1, sepHidden: getComputedStyle(document.querySelector('.homesep')).display === 'none',
+        nameWraps: r('#tname').height > 40, round: one('#round'), refresh: r('#refresh').height < 50, fits: document.documentElement.scrollWidth <= innerWidth }; })()`);
+    return (x.above && x.sepHidden && x.nameWraps && x.round && x.refresh && x.fits) || x;
+  });
+  await tab.view('desktop');
+  await tab.click('header a.homemark');
+  await tab.wait(`location.pathname.endsWith('/index.html') && !!document.querySelector('header.sitehead')`, 'the home page');
+  await check('pub-01 header: clicking qb-td opens the home page', async () => (await tab.js('location.pathname')).endsWith('/index.html'));
+  await openPub(tab, T.slug);
   await check('pub-03 opening tab: a live tournament with a schedule opens on Schedule, its hash left alone', async () => {
     const x = await tab.js(`[document.querySelector('.tab.active').id, location.hash, !!document.querySelector('#out .schedviews')]`);
     return (x[0] === 'tab-schedule' && x[1] === '' && x[2]) || x;

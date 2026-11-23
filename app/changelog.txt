@@ -22,6 +22,10 @@ Release Notes for 11/22/2026
 [ READER ]
 - View and Font settings carry over to the next game on the same device.
 
+[ PUBLIC PAGE ]
+- qb-td before the tournament's name leads to the home page. The question set page has it too.
+- On a phone, a long tournament name no longer squeezes the round and Refresh beside it.
+
 [ STATS ]
 - Tiebreaker games are listed as their own games and count in no record or stat. Their questions count in category stats and buzzpoints.
 - Standings list tiebreaker games under the bracket they decided and rank its teams by them.

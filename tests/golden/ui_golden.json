@@ -3,8 +3,8 @@
   "hub demo": {
    "label": "as shipped",
    "live": {
-    "sha256": "6471b62c30605b410ba8a98c",
-    "chars": 12663
+    "sha256": "adab8b14f3469a9b1574bdf1",
+    "chars": 12684
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -240,12 +240,14 @@
     ]
    },
    "statics": [
+    "/css/buzzer.css",
     "/css/hub.css",
     "/css/td.css",
     "/demo/fixture.js",
     "/engine/brackets.js",
     "/engine/buzz.js",
     "/engine/buzzfix.js",
+    "/engine/deciderphases.js",
     "/engine/docxq.js",
     "/engine/entities.js",
     "/engine/finals.js",
@@ -265,8 +267,10 @@
     "/js/admin.js",
     "/js/api.js",
     "/js/busy.js",
+    "/js/buzzer_hub.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/deciders.js",
     "/js/demo.js",
     "/js/formatui.js",
     "/js/icons.js",
@@ -277,13 +281,14 @@
     "/js/schededit.js",
     "/js/sheetview.js",
     "/js/statsview.js",
+    "/js/tiebox.js",
     "/js/warnask.js"
    ],
    "foreign": [],
    "backend": []
   },
   "public demo": {
-   "header": "Demo Tournament\nRound 7\nRefresh",
+   "header": "qb-td\n/\nDemo Tournament\nRound 7\nRefresh",
    "tabs": {
     "schedule": {
      "first": {
@@ -419,11 +424,13 @@
    "firstTab": null,
    "errors": "",
    "statics": [
+    "/css/buzzer.css",
     "/css/pub.css",
     "/css/td.css",
     "/demo/fixture.js",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -450,8 +457,8 @@
   "hub demo after uploads": {
    "label": "after uploads",
    "live": {
-    "sha256": "8fadb723e9714a52359e4a1b",
-    "chars": 14828
+    "sha256": "d3d52709e4594b6e44aad501",
+    "chars": 14849
    },
    "grid": [
     "1:1 umark Game in ✓",
@@ -694,12 +701,14 @@
     ]
    },
    "statics": [
+    "/css/buzzer.css",
     "/css/hub.css",
     "/css/td.css",
     "/demo/fixture.js",
     "/engine/brackets.js",
     "/engine/buzz.js",
     "/engine/buzzfix.js",
+    "/engine/deciderphases.js",
     "/engine/docxq.js",
     "/engine/entities.js",
     "/engine/finals.js",
@@ -719,8 +728,10 @@
     "/js/admin.js",
     "/js/api.js",
     "/js/busy.js",
+    "/js/buzzer_hub.js",
     "/js/buzzkey.js",
     "/js/buzzview.js",
+    "/js/deciders.js",
     "/js/demo.js",
     "/js/formatui.js",
     "/js/icons.js",
@@ -731,13 +742,14 @@
     "/js/schededit.js",
     "/js/sheetview.js",
     "/js/statsview.js",
+    "/js/tiebox.js",
     "/js/warnask.js"
    ],
    "foreign": [],
    "backend": []
   },
   "public demo after uploads": {
-   "header": "Demo Tournament\nRound 7\nRefresh",
+   "header": "qb-td\n/\nDemo Tournament\nRound 7\nRefresh",
    "tabs": {
     "schedule": {
      "first": {
@@ -877,11 +889,13 @@
    "firstTab": null,
    "errors": "",
    "statics": [
+    "/css/buzzer.css",
     "/css/pub.css",
     "/css/td.css",
     "/demo/fixture.js",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -920,11 +934,11 @@
     },
     "stats": {
      "first": {
-      "sha256": "be2c42c57b4a9b096716b287",
+      "sha256": "d8e1d77295014fd86c74b1e0",
       "chars": 468774
      },
      "layout=classic": {
-      "sha256": "be2c42c57b4a9b096716b287",
+      "sha256": "d8e1d77295014fd86c74b1e0",
       "chars": 468774
      },
      "layout=new": {
@@ -994,6 +1008,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1105,6 +1120,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1216,6 +1232,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1304,6 +1321,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1415,6 +1433,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1526,6 +1545,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1563,11 +1583,11 @@
     },
     "stats": {
      "first": {
-      "sha256": "528e4f7b1bc7312581cdc0b8",
+      "sha256": "0b894b892dfc81eb157751c5",
       "chars": 3809811
      },
      "layout=classic": {
-      "sha256": "528e4f7b1bc7312581cdc0b8",
+      "sha256": "0b894b892dfc81eb157751c5",
       "chars": 3809811
      },
      "layout=new": {
@@ -1729,6 +1749,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1840,6 +1861,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -1951,6 +1973,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -2062,6 +2085,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",
@@ -2173,6 +2197,7 @@
     "/css/td.css",
     "/engine/buzz.js",
     "/engine/cats.js",
+    "/engine/deciderphases.js",
     "/engine/entities.js",
     "/engine/finals.js",
     "/engine/qbj.js",

@@ -1459,6 +1459,9 @@ await section('SET-39 the public set page switch (and SET-05: the header link an
   await open('s.html', { s: A.slug });
   await waitJs(`document.querySelector('#sname').textContent === 'Sets UI Main'`, 'the public set page');
   ok('SET-39: s.html now serves the set', (await text('#sites')) === '0 sites', await text('#sites'));
+  ok('SET-39: the set page has "qb-td /" before its name, leading to the home page',
+    await js(`(() => { const a = document.querySelector('header a.homemark'); return !!a && a.textContent === 'qb-td'
+      && new URL(a.href).pathname.endsWith('/index.html') && a.nextElementSibling.nextElementSibling === document.querySelector('#sname'); })()`));
   await openSet(A.secret, 'settings');
   await clearMsg();
   await click('#pub');

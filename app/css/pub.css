@@ -273,3 +273,18 @@ details.qd .qdmeta.track { line-height: 20px; }
 .sitetable input:disabled { cursor: default; }
 .sitetable tr.off td { color: var(--muted); }
 .sitetable tr.off td a { color: var(--muted); }
+
+/* the way home (t.html, s.html): qb-td before the page's name, as a path;
+   on a phone, a line of its own above the name. A long name wraps; the
+   round and Refresh beside it stay whole. */
+.wrap > header h1 { min-width: 0; }
+.wrap > header .sub, .wrap > header button { flex: none; white-space: nowrap; }
+.homemark, .homesep { flex: none; white-space: nowrap; }
+.homemark { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--muted); text-decoration: none; }
+.homemark:hover { color: var(--fg); }
+.homesep { font-size: 22px; color: var(--line); margin: 0 -4px; }
+@media (max-width: 640px) {
+  .wrap > header:has(.homemark) { flex-wrap: wrap; row-gap: 2px; }
+  .homemark { flex-basis: 100%; font-size: 14px; font-weight: 600; letter-spacing: 0; }
+  .homesep { display: none; }
+}
