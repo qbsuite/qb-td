@@ -6600,6 +6600,40 @@ test('finals: the hub fills the Finals only with all the games they rank on read
   }
 });
 
+test('finals: Ranked by (schedule.finalsRankBy): all games ranks the Final on every game its teams played; the hub refills an unplayed Final when it changes, never one with a game in or a slot set by hand', () => {
+  let changed = 0;
+  for (const seed of [5, 9, 13, 21, 34, 55]) {
+    const day = finalsDay(seed);
+    const byId = new Map(day.games.map((m, i) => [day.files[i].id, { ...m, fileId: day.files[i].id }]));
+    const fill = (s) => { const plan = fillProgress(s, day.files); return autoFillSaved(s, day.files, plan.files.map((f) => byId.get(f.id))); };
+    const filled = fill(day.s).schedule;
+    // all games: the source's teams by their record over every game up to the Finals
+    const src = finalsSources(day.s)[0];
+    const members = new Set(src.teams);
+    const lastRound = Math.max(...src.games.map((g) => g.round));
+    const want = standings(day.games.filter((m) => m.round <= lastRound)).teams.filter((t) => members.has(t.name)).map((t) => t.name);
+    const res = fill({ ...filled, finalsRankBy: 'all' });
+    const top = finalTeams(res.schedule)[0][0];
+    assert.deepEqual([...top].sort(), want.slice(0, 2).sort(), `seed ${seed}: the Final's pair from all games`);
+    if (JSON.stringify(top) !== JSON.stringify(finalTeams(filled)[0][0])) changed++;
+    // a Final game in: that game stays as it is
+    const fin = day.s.phases.find((ph) => ph.kind === 'final').rounds[0];
+    const [a, b] = finalTeams(filled)[0][0];
+    const played = [...day.files, { id: 9999, kind: 'qbj', round: fin.round, summary: JSON.stringify({ teams: [a, b] }) }];
+    const plan2 = fillProgress({ ...filled, finalsRankBy: 'all' }, played);
+    const kept = autoFillSaved({ ...filled, finalsRankBy: 'all' }, played, plan2.files.map((f) => byId.get(f.id)).filter(Boolean));
+    assert.deepEqual(finalTeams(kept.schedule)[0][0], [a, b], `seed ${seed}: a game in, no refill`);
+    // a slot the TD set by hand (no from) stays
+    const hand = JSON.parse(JSON.stringify(filled));
+    hand.phases.find((ph) => ph.kind === 'final').rounds[0].games[0].a = { team: 'Hand Placed' };
+    const h = fill({ ...hand, finalsRankBy: 'all' });
+    assert.equal(finalTeams(h.schedule)[0][0][0], 'Hand Placed', `seed ${seed}: the hand-set slot stays`);
+    // nothing changed: the saved schedule itself (nothing to save)
+    assert.equal(fill(filled).schedule, filled, `seed ${seed}: an unchanged refill is no save`);
+  }
+  assert.ok(changed > 0, 'some days the Final changes with all games');
+});
+
 test('finals: a tie for a finals place is settled by points per 20 and noted; with a Tiebreakers phase it waits', () => {
   // a seed whose top bracket has a tie reaching a finals place
   let found = null;

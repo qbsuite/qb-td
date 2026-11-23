@@ -17,7 +17,7 @@
 // be filled from standings (fillPlaceholders).
 
 import { withDeciderPhases } from './deciderphases.js';
-import { standingsOrder, winPct, levelRuns, headToHead, statOf } from './stats.js';
+import { standingsOrder, winPct, levelRuns, headToHead, statOf, gameRuns, pickRuns, decidingStep, tieFigures } from './stats.js';
 
 function slotEq(a, b) {
   if (!a || !b) return false;
@@ -1063,8 +1063,16 @@ export function fillReport(schedule, agg) {
         const level = levelRuns(rows, rule).map((run) => run.map((x) => x.name));
         const hh = rule && rule.h2h ? headToHead(rows, rule.h2h) : null;
         if (new Set(teams.map((x) => x.bracket)).size > 1) {
+          // with a tie order (stats.js): the teams a tiebreaker game or the
+          // TD's pick would still have to set apart, where they head for
+          // different brackets; the step that decided it; the figures a note shows
+          const bracketOfTeam = new Map(teams.map((x) => [x.name, x.bracket]));
+          const crossing = (runs) => runs.map((run) => run.map((x) => x.name)).filter((run) => new Set(run.map((n) => bracketOfTeam.get(n))).size > 1);
+          const order = rule && rule.order && (rule.order.includes('game') || rule.order.includes('pick'));
           ties.push({ pool, record: rec(list[i]), teams, level, ...(rule ? { stat: rule.stat } : {}),
-            ...(hh ? { h2h: { records: hh.records, decided: hh.decided } } : {}) });
+            ...(hh ? { h2h: { records: hh.records, decided: hh.decided } } : {}),
+            ...(order ? { order: rule.order, needGame: crossing(gameRuns(rows, rule)), needPick: crossing(pickRuns(rows, rule)),
+              decidedBy: decidingStep(rows, rule), figures: tieFigures(rows, rule) } : {}) });
         }
       }
       i = j;
@@ -1179,7 +1187,14 @@ export function autoFill(schedule, agg, ready, force = [], opts = {}) {
   // ties wait when the schedule has a Tiebreakers round, or tiebreaker packets to play deciders on (deciders.js)
   const holdTies = opts.holdTies !== undefined ? opts.holdTies
     : schedule.phases.some((ph) => ph.kind === 'tiebreak') || !!(schedule.deciders && schedule.deciders.hold);
-  const held = holdTies ? report.ties.filter((x) => ok.has(x.pool) && !odd.has(x.pool) && !force.includes(x.pool)) : [];
+  // With a tie order a tie waits only for what it asks: a tiebreaker game
+  // (when there are tiebreaker packets to play one on: opts.hold, or the
+  // schedule's deciders.hold) or the TD's pick. Without one, as before.
+  const packets = opts.hold !== undefined ? opts.hold : !!(schedule.deciders && schedule.deciders.hold);
+  const waits = (x) => (x.order
+    ? (packets && x.needGame.length > 0) || x.needPick.length > 0
+    : holdTies);
+  const held = report.ties.filter((x) => ok.has(x.pool) && !odd.has(x.pool) && !force.includes(x.pool) && waits(x));
   const ranks = {};
   for (const [k, list] of Object.entries(report.ranks)) {
     if (k[0] !== '#' && ok.has(k) && !odd.has(k)) ranks[k] = list.slice();

@@ -439,10 +439,52 @@ function walk(rows, steps, rule, key) {
 
 // rows by winning percentage (no games at the bottom), each run of the same
 // percentage walked through the rule's steps: [[{row, key, level}]…], a run each
-function pctRuns(teams, rule) {
+function pctRuns(teams, rule, steps = rule.order) {
   const pct = (t) => { const v = winPct(t); return Number.isNaN(v) ? -1 : v; };
   const sorted = [...teams].sort((a, b) => pct(b) - pct(a));
-  return runsBy(sorted, (a, b) => pct(a) === pct(b)).map((run, i) => walk(run, rule.order, rule, i + ':'));
+  return runsBy(sorted, (a, b) => pct(a) === pct(b)).map((run, i) => walk(run, steps, rule, i + ':'));
+}
+const leveled = (runs) => runs.flatMap((run) => runsBy(run, (a, b) => a.level && b.level && a.grp === b.grp)).filter((g) => g.length > 1).map((g) => g.map((p) => p.row));
+
+/** Runs of rows still level when the tie order reaches its tiebreaker game
+    step and no tiebreaker game was played among them: the ties a
+    tiebreaker game would decide. [] when the order has no such step. */
+export function gameRuns(rows, rule) {
+  if (!rule || !rule.order || !rule.order.includes('game')) return [];
+  const upto = rule.order.slice(0, rule.order.indexOf('game'));
+  return leveled(pctRuns(rows, rule, upto))
+    .filter((g) => !(rule.tb || []).some((x) => x.teams.every((t) => g.some((r) => r.name === t.name))));
+}
+
+/** Runs of rows the order leaves for the TD to pick (its pick step reached,
+    no pick made): [] when the order has no pick step. */
+export function pickRuns(rows, rule) {
+  if (!rule || !rule.order || !rule.order.includes('pick')) return [];
+  return levelRuns(rows, rule);
+}
+
+/** The step that decided a tie among `rows` (all with one record): the
+    first in the order that set any of them apart; 'pick' once the TD has
+    picked; null while it is still open. */
+export function decidingStep(rows, rule) {
+  if (!rule || !rule.order) return rule && rule.h2h ? 'h2h' : (rule ? rule.stat : 'pp20');
+  for (let k = 1; k <= rule.order.length; k++) {
+    const runs = pctRuns(rows, rule, rule.order.slice(0, k));
+    const keys = new Set(runs.flat().map((p) => (p.level ? 'L' + p.grp : 'S' + p.key + p.row.name)));
+    const split = runs.flat().length > 1 && !(runs.length === 1 && runs[0].every((p) => p.level) && new Set(runs[0].map((p) => p.grp)).size === 1);
+    if (split) return rule.order[k - 1];
+    if (!keys.size) break;
+  }
+  return null;
+}
+
+/** What each tied team stood at on the figures a tie note shows: {name:
+    {ppg, ppb, h2h}} (h2h: its record against the others, or null when
+    they had not all met evenly). */
+export function tieFigures(rows, rule) {
+  const h = headToHead(rows, (rule && rule.h2h) || []);
+  return Object.fromEntries(rows.map((t) => [t.name, {
+    ppg: round2(statOf(t, 'ppg') || 0), ppb: round2(statOf(t, 'ppb') || 0), h2h: h.records ? h.records[t.name] : null }]));
 }
 
 /** YF standings order: winning percentage, then the TD's tie order (see
