@@ -13,7 +13,9 @@
   <header class="sitehead">
     <h1><a href="index.html">qb-td</a></h1>
     <span class="spacer"></span>
-    <a href="about.html" class="muted">About</a>
+    <a href="index.html" class="muted">Home</a>
+    <a href="about.html" class="muted" aria-current="page">About</a>
+    <a href="tutorials.html" class="muted">Tutorials</a>
     <a href="changelog.html" class="muted">Changelog</a>
   </header>
   <div id="msg"></div>
@@ -22,14 +24,6 @@
   <div class="about">
     <p>qb-td consolidates the logistics of a tournament by allowing tournament directors to set up rooms, packets, a roster and a schedule before the start of a tournament. Each moderator is given a room link that automatically chooses team and packet for the round number the tournament is on. When moderators are done reading a game in MODAQ, they click on an export button that is sent to the TD and automatically processed. Players are given a page which contains schedule and detailed stats that are updated as games are exported.</p>
     <p>Importantly, qb-td is compatible with all the standard procedures for holding MODAQ tournaments. TDs can export to yellowfruit, directly to the html stat reports, and download QBJ files to send to set editors.</p>
-
-    <!-- A walkthrough video of each part belongs here when there is one. -->
-
-    <div class="sechead" id="demo"><h2>Example Tournament</h2><button class="linkbtn muted" id="demoreset">Reset demo data</button></div>
-    <p class="muted" style="margin:10px 0 2px">Below is an example tournament on a simulated tournament.</p>
-    <a class="arow" href="index.html?a=demo"><b>Tournament director</b><span>The TD can set up the tournament, set the round number, watch games arrive, rule on protests, and export stats.</span></a>
-    <a class="arow" href="read.html?b=demo"><b>Moderator</b><span>Moderators are shown their room's schedule and are provided links to MODAQ pages with teams and packet loaded in.</span></a>
-    <a class="arow" href="t.html?t=demo"><b>Player or spectator</b><span>Players and the public can view schedules, stats, category stats, and buzzpoints if the TD chooses to enable them.</span></a>
 
     <div class="sechead" id="credits"><h2>Credits</h2></div>
     <p class="muted" style="margin:10px 0 2px">qb-td is built on or directly uses these projects.</p>
@@ -42,14 +36,5 @@
     </div>
   </div>
 </div>
-<script type="module">
-const $ = (id) => document.getElementById(id);
-$('demoreset').onclick = async () => {
-  // demo.js carries the whole fixture: only fetched when asked for
-  const { reset } = await import('./js/demo.js');
-  reset();
-  $('msg').textContent = 'Demo data cleared';
-};
-</script>
 </body>
 </html>

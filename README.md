@@ -633,10 +633,22 @@ dashboard shows which invites are still unused, and revokes them.
   (see "YellowFruit fidelity").
 - `app/js/sidebar.js` — the tournaments running on this instance ("The
   directory", below) and the approved past ones (the archive): the home
-  page's sidebar and the archive list.
-- `app/about.html` — what qb-td is, and the way into the demo.
+  page's sidebar, with a search over the past ones (`searchPast`: each
+  word somewhere in a name, host, set or site).
+- `app/about.html` — what qb-td is, and the credits.
+- `app/tutorials.html` + `js/tutorials.js` + `tutorials.json` — the
+  tutorial videos (a player, the list under it) and the way into the
+  demo; the home page has a line of links to the videos under the create
+  form. `tutorials.json` is the YouTube playlist's videos, written by
+  `node tools/tutorials.mjs <playlist URL>`, which reads the playlist's
+  page (its feed leaves out unlisted videos): a video already in the file
+  keeps its place and title, so reorder or shorten them there; a new one
+  is added at the end. Empty, the page shows only the demo and
+  the home page no line. Nothing loads from YouTube until a video is
+  played; the player's frame sends the origin as its referrer, which
+  YouTube's player needs and the pages otherwise don't send.
 - `js/demo.js` + `demo/fixture.js` — the demo tournament, reached from
-  the About page (`demo.html` only redirects there). Opening any page with `?t=demo`, `?a=demo`, or
+  the Tutorials page (`demo.html` only redirects there). Opening any page with `?t=demo`, `?a=demo`, or
   `?b=demo` / `?b=demo-b` (the slug is reserved; real bucket secrets are
   long random tokens) makes `api.js` serve every `pub()` call from
   `demo.js` in the browser: the committed fixture holds a 4-team triple

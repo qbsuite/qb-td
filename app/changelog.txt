@@ -4,6 +4,12 @@ Release Notes for 11/24/2026
 - Added Delta Burke 2026.
 - Added CLOPEN @ UChicago.
 
+[ HUB ]
+- Past tournaments can be searched by name, host, set or site.
+- New Tutorials page with the tutorial videos. The demo tournament moved there from About.
+- The home page links each tutorial video under the create form.
+- Every page has Home, About, Tutorials and Changelog at the top, Changelog included.
+
 Release Notes for 11/23/2026
 
 [ ARCHIVE ]

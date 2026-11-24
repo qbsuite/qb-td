@@ -700,7 +700,6 @@ button.sgwarn:hover, .sgwarn.on { background: var(--hover-bg); }
    Left, the create form and this device's tournaments as a tight list
    that folds. Right, the rail (sidebar.js): what is live, and the past
    tournaments — a blue name is a link, a grey one has nothing to open. */
-body.homepage .sitehead a[href="index.html"].muted { display: none; } /* "All tournaments": already here */
 .homegrid { padding-top: 0; }
 /* the one thing the page is for: labelled fields a size up, and the hub's
    filled button */
@@ -895,3 +894,53 @@ table.tietable .unused { opacity: .45; }
 .tiepick .pickbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .tiepick .tieacts { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 12px; }
 @media (max-width: 560px) { table.tietable td.nm span { max-width: 120px; } }
+
+/* ---------- the tutorial videos (tutorials.js) ----------
+   A video is its thumbnail until it is played, then YouTube's player in
+   the same 16:9 box. */
+.sitehead a[aria-current="page"] { color: var(--fg); }
+/* Home, About, Tutorials, Changelog: on a phone, closer together, never broken mid-word */
+.sitehead > * { white-space: nowrap; }
+@media (max-width: 560px) { .sitehead { gap: 8px 14px; flex-wrap: wrap; } }
+.vthumb {
+  position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 0;
+  border-radius: 8px; overflow: hidden; background: var(--card); box-shadow: inset 0 0 0 1px var(--line);
+}
+button.vthumb { cursor: pointer; }
+.vthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vplay { position: absolute; inset: 0; display: grid; place-items: center; }
+.vplay svg { width: 48px; height: 34px; }
+.vplay rect { fill: color-mix(in srgb, var(--fg) 78%, transparent); }
+.vplay path { fill: var(--bg); }
+button.vthumb:hover .vplay rect, button.vthumb:focus-visible .vplay rect, .vrow:hover .vplay rect { fill: #e11d1d; }
+button.vthumb:hover .vplay path, button.vthumb:focus-visible .vplay path, .vrow:hover .vplay path { fill: #fff; }
+.vframe { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; }
+.vframe iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.vframe .vplay rect { fill: #3f3f46; }
+.vframe .vplay path { fill: #fff; }
+/* tutorials.html: the player up top, the list under it */
+.vpage { margin-bottom: 8px; }
+.vpage .vmaintitle { font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--fg); margin: 12px 0 18px; }
+.vlist { list-style: none; display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
+.vrow {
+  display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 14px; align-items: center; width: 100%;
+  padding: 6px; border: 0; border-radius: 8px; background: none; text-align: left; color: var(--fg); cursor: pointer;
+}
+.vrow:hover { background: var(--hover-bg); }
+.vrow.on { background: var(--sel); }
+.vrow .vplay svg { width: 28px; height: 20px; }
+.vtitle { font-size: 14px; font-weight: 600; line-height: 1.35; }
+@media (max-width: 560px) { .vrow { grid-template-columns: 104px minmax(0, 1fr); gap: 10px; } }
+/* the home page's line under the create form */
+.vline { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; font-size: 14px; margin: -12px 0 22px; }
+.vline a:first-child { color: var(--fg); }
+.vline a:first-child::before { content: "\25B6"; font-size: 10px; margin-right: 6px; position: relative; top: -1px; }
+
+/* the past tournaments' search: an icon beside the heading opens the
+   field in its place; the heading stays put while the list scrolls */
+.pastblock > .pasthead { align-items: center; gap: 10px; min-height: 32px; position: sticky; top: 0; z-index: 1; background: var(--bg); }
+.searchbtn { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; }
+.searchbtn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.railsearch { width: 100%; height: 32px; font-size: 14px; padding: 0 10px; min-width: 0; }
+.pastblock.searching .pasthead b, .pastblock.searching .searchbtn { display: none; }
+.tlist .none { font-size: 14px; }

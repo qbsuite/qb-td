@@ -132,8 +132,8 @@ function showLinkModal(link, onDone) {
    Laid out like a tournament's Live tab (hub.css): the create form, then
    this device's tournaments as a tight list that folds (the choice kept
    per device), and on the right the rail — the tournaments running here
-   and the ones that have (sidebar.js). What qb-td is, and the demo, are
-   on about.html. */
+   and the ones that have (sidebar.js). What qb-td is is on about.html,
+   the tutorial videos and the demo on tutorials.html. */
 
 const FOLDS_KEY = 'qbtdHomeFolds';
 function foldState() {
@@ -155,6 +155,8 @@ const shortDay = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'sh
 function showList() {
   const links = savedLinks();
   document.body.classList.add('hubpage', 'homepage');
+  const home = document.querySelector('.sitehead a[href="index.html"]');
+  if (home) home.setAttribute('aria-current', 'page');
   view.innerHTML = `
     <div class="livegrid homegrid">
       <div>
@@ -177,7 +179,7 @@ function showList() {
             ${live ? '' : `<a href="${esc(statsLink(e.slug))}">Player page</a>`}
             <button class="linkbtn muted" data-forget="${esc(e.secret)}" title="Remove from this device's list">Remove</button>
           </div>`;
-          }).join('') || `<div class="trow none">None yet. Create one above, or see <a href="about.html#demo">how it works</a> first.</div>`}
+          }).join('') || `<div class="trow none">None yet. Create one above, or see <a href="tutorials.html#demo">how it works</a> first.</div>`}
         </details>
       </div>
       <nav id="tside" class="liverail tside" aria-label="Tournaments on qb-td" hidden></nav>
@@ -187,6 +189,11 @@ function showList() {
   });
   // the rail is a nicety: the page is complete without it
   import('./sidebar.js').then((m) => m.renderSidebar($('tside'))).catch(() => {});
+  // the tutorials, a line under the create form (tutorials.js)
+  import('./tutorials.js').then(async (m) => {
+    const html = m.lineHtml(await m.loadVideos());
+    if (html) view.querySelector('.newrow').insertAdjacentHTML('afterend', html);
+  }).catch(() => {});
   view.querySelectorAll('[data-forget]').forEach((b) => {
     b.onclick = () => {
       const e = links.find((x) => x.secret === b.dataset.forget);

@@ -2121,6 +2121,48 @@ test('categoryQuestions: one category across rounds, oldest first, with its cate
 globalThis.location = globalThis.location || { search: '' };
 globalThis.localStorage = globalThis.localStorage || {};
 
+/* ---------- the home page's search, and the tutorials ---------- */
+
+await testA('searchPast: every word somewhere in a name, host, set or site; case and accents ignored', async () => {
+  const { searchPast } = await import('../app/js/sidebar.js');
+  const past = [
+    { name: 'Terrapin Open @ Stanford', host: 'Stanford', set: '2026 Terrapin Open', site: 'Stanford' },
+    { name: '2026 TO Online', host: '', set: '2026 Terrapin Open', site: 'Online' },
+    { name: 'CLOPEN @ UChicago', host: 'UChicago', set: '', site: '' },
+    { name: 'Québec Open', host: '', set: '', site: '' },
+  ];
+  const names = (q) => searchPast(past, q).map((t) => t.name);
+  assert.deepEqual(names(''), past.map((t) => t.name), 'no words: all of them');
+  assert.deepEqual(names('   '), past.map((t) => t.name));
+  assert.deepEqual(names('terrapin'), ['Terrapin Open @ Stanford', '2026 TO Online'], "a set's name keeps its sites");
+  assert.deepEqual(names('online'), ['2026 TO Online'], "a site's label");
+  assert.deepEqual(names('STANFORD open'), ['Terrapin Open @ Stanford'], 'each word, any case');
+  assert.deepEqual(names('quebec'), ['Québec Open'], 'accents folded');
+  assert.deepEqual(names('uchicago terrapin'), [], 'every word must match');
+});
+
+await testA('tutorials: the playlist page, its id, a rerun keeping order and titles, and the home page line', async () => {
+  const { playlistVideos, playlistId, mergeVideos } = await import('../tools/tutorials.mjs');
+  const { lineHtml } = await import('../app/js/tutorials.js');
+  const page = '"watchEndpoint":{"videoId":"bbbbbbbbbbb","playlistId":"PLx1234567","index":1}'
+    + '"watchEndpoint":{"videoId":"aaaaaaaaaaa","playlistId":"PLx1234567","index":0}'
+    + '"watchEndpoint":{"videoId":"bbbbbbbbbbb","playlistId":"PLx1234567","index":1}'
+    + '"watchEndpoint":{"videoId":"zzzzzzzzzzz","playlistId":"PLother0000","index":0}';
+  assert.deepEqual(playlistVideos(page, 'PLx1234567'), ['aaaaaaaaaaa', 'bbbbbbbbbbb'], "in the playlist's order, other lists left out");
+  assert.equal(playlistId('https://www.youtube.com/playlist?list=PLabc123_-xyz'), 'PLabc123_-xyz');
+  assert.equal(playlistId('https://youtu.be/x?si=1&list=PLqq9988776655'), 'PLqq9988776655');
+  assert.equal(playlistId('PLabc123_-xyz'), 'PLabc123_-xyz');
+  assert.equal(playlistId('not a list'), null);
+  const old = [{ id: 'b', title: 'Moderator' }, { id: 'a', title: 'Tournament director' }, { id: 'gone', title: 'Old' }];
+  const found = [{ id: 'a', title: 'qb td TD tutorial' }, { id: 'b', title: 'QB-TD Moderator Tutorial' }, { id: 'c', title: 'New one' }];
+  assert.deepEqual(mergeVideos(old, found), [{ id: 'b', title: 'Moderator' }, { id: 'a', title: 'Tournament director' }, { id: 'c', title: 'New one' }],
+    "the file's order and titles kept, a new video at the end, one gone dropped");
+  assert.equal(lineHtml([]), '', 'no videos: no line');
+  const line = lineHtml([{ id: 'a', title: 'TD <one>' }, { id: 'b', title: 'Moderator' }]);
+  assert.ok(line.includes('href="tutorials.html?v=1">TD &lt;one&gt;</a>') && line.includes('href="tutorials.html?v=2">Moderator</a>'), line);
+  assert.ok(line.includes('<a href="tutorials.html"><b>Tutorials</b></a>'), line);
+});
+
 /* ---------- buzzpoints markup ---------- */
 
 const { replacementsHtml } = await import('../app/js/buzzview.js');

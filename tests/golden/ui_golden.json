@@ -1170,11 +1170,11 @@
     },
     "stats": {
      "first": {
-      "sha256": "ccd3254b98bd6063f7d79a4d",
+      "sha256": "35534db9310f0a1f0c8388fd",
       "chars": 687527
      },
      "layout=classic": {
-      "sha256": "ccd3254b98bd6063f7d79a4d",
+      "sha256": "35534db9310f0a1f0c8388fd",
       "chars": 687527
      },
      "layout=new": {
@@ -1946,11 +1946,11 @@
     },
     "stats": {
      "first": {
-      "sha256": "403fedb0046d0f7c9846d34b",
+      "sha256": "fcfce951419da1f2db8bbbdf",
       "chars": 3810386
      },
      "layout=classic": {
-      "sha256": "403fedb0046d0f7c9846d34b",
+      "sha256": "fcfce951419da1f2db8bbbdf",
       "chars": 3810386
      },
      "layout=new": {

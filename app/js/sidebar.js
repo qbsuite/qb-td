@@ -87,24 +87,62 @@ const pastItems = (past) => {
   }).filter(Boolean);
 };
 
+// For the search: lower case, accents folded, one space between words.
+const fold = (x) => String(x || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** The past tournaments a search keeps: each word somewhere in a
+    tournament's name, host, set or site. A set's name keeps all its
+    sites; a site's own name keeps just that one. */
+export function searchPast(past, query) {
+  const words = fold(query).split(' ').filter(Boolean);
+  if (!words.length) return past;
+  return past.filter((t) => {
+    const hay = fold([t.name, t.host, t.set, t.site].join(' '));
+    return words.every((w) => hay.includes(w));
+  });
+}
+
+const SEARCH_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4.5 4.5"/></svg>';
+
+// the past list, a year label above each year once there is more than one
+function pastHtml(past) {
+  const items = pastItems(past);
+  if (!items.length) return '<div class="none muted">No matches</div>';
+  const years = [...new Set(items.map((t) => new Date(t.at).getFullYear()))];
+  return years.map((y) =>
+    (years.length > 1 ? `<div class="yr">${y}</div>` : '')
+    + items.filter((t) => new Date(t.at).getFullYear() === y).map((t) => t.html).join('')).join('');
+}
+
 /** Fill `el` with the rail (hub.css .railblock): what is live now, then
-    the past tournaments (a set's sites as one entry), a year label above
-    each year once there is more than one. Hidden when there is nothing
-    to list. */
+    the past tournaments (a set's sites as one entry), which a search
+    narrows (searchPast). Hidden when there is nothing to list. */
 export async function renderSidebar(el) {
   const { live, past } = await tournamentLists();
   if (!live.length && !past.length) { el.hidden = true; return; }
-  const items = pastItems(past);
-  const years = [...new Set(items.map((t) => new Date(t.at).getFullYear()))];
-  const pastHtml = years.map((y) =>
-    (years.length > 1 ? `<div class="yr">${y}</div>` : '')
-    + items.filter((t) => new Date(t.at).getFullYear() === y).map((t) => t.html).join('')).join('');
+  // the search: an icon beside the heading that opens the field in its place
+  const head = `<div class="railhead pasthead"><b>Past tournaments</b><button class="linkbtn muted searchbtn" aria-label="Search past tournaments" title="Search">${SEARCH_ICON}</button>
+    <input type="search" class="railsearch" placeholder="Search" aria-label="Search past tournaments" autocomplete="off" spellcheck="false" hidden></div>`;
   el.innerHTML =
     (live.length ? `<div class="railblock">
       <div class="railhead"><b>Live now</b><span class="muted">${live.length}</span></div>
       <div class="tlist">${live.map((t) => itemHtml(t, { dot: true })).join('')}</div></div>` : '')
-    + (past.length ? `<div class="railblock">
-      <div class="railhead"><b>Past tournaments</b></div>
-      <div class="tlist">${pastHtml}</div></div>` : '');
+    + (past.length ? `<div class="railblock pastblock">${head}
+      <div class="tlist" id="pastlist">${pastHtml(past)}</div></div>` : '');
   el.hidden = false;
+  const input = el.querySelector('.railsearch');
+  if (!input) return;
+  const list = el.querySelector('#pastlist');
+  const blk = el.querySelector('.pastblock');
+  const btn = el.querySelector('.searchbtn');
+  const close = () => { blk.classList.remove('searching'); input.hidden = true; };
+  btn.onclick = () => { blk.classList.add('searching'); input.hidden = false; input.focus(); };
+  input.addEventListener('input', () => { list.innerHTML = pastHtml(searchPast(past, input.value)); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    // Esc clears the search, and a second one puts the heading back
+    if (input.value) { input.value = ''; input.dispatchEvent(new Event('input')); } else { close(); btn.focus(); }
+  });
+  input.addEventListener('blur', () => { if (!input.value) close(); });
 }

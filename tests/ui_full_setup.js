@@ -620,7 +620,7 @@ await runSection('HOME', async () => {
     const f = document.querySelector('details[data-fold="yours"]');
     const n = f.querySelector('.trow.none'); const a = n && n.querySelector('a');
     return !!n && n.textContent.replace(/\\s+/g, ' ').trim() === 'None yet. Create one above, or see how it works first.'
-      && a.getAttribute('href') === 'about.html#demo' && f.querySelector('summary h2').textContent === 'Your tournaments'
+      && a.getAttribute('href') === 'tutorials.html#demo' && f.querySelector('summary h2').textContent === 'Your tournaments'
       && f.querySelector('summary .muted').textContent === '0 on this device'; })()`));
 
   // HOME-01 / HOME-02: the URL name follows the name, and says where the public page will be
