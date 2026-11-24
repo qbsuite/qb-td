@@ -927,6 +927,234 @@
    ],
    "foreign": []
   },
+  "archive delta-burke-2026": {
+   "header": "Delta Burke 2026",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "46a82add9457e2e7b434c28c",
+      "chars": 48545
+     },
+     "schedview=all": {
+      "sha256": "46a82add9457e2e7b434c28c",
+      "chars": 48545
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "3efbaac73bd1f4bf7cb5c7e0",
+      "chars": 1625483
+     },
+     "layout=classic": {
+      "sha256": "3efbaac73bd1f4bf7cb5c7e0",
+      "chars": 1625483
+     },
+     "layout=new": {
+      "sha256": "54d4c4c3d10a8e55ec26da2d",
+      "chars": 14348
+     },
+     "new/standings": {
+      "sha256": "54d4c4c3d10a8e55ec26da2d",
+      "chars": 14348
+     },
+     "new/individuals": {
+      "sha256": "5a9c10887b7404587754c6c1",
+      "chars": 48960
+     },
+     "new/games": {
+      "sha256": "43e0cef6813c3239bf143e63",
+      "chars": 399858
+     },
+     "new/teams": {
+      "sha256": "69e9e7bf49170d5d630b0227",
+      "chars": 159628
+     },
+     "new/players": {
+      "sha256": "9ad695afeb40398ca5dfc34e",
+      "chars": 408910
+     },
+     "new/rounds": {
+      "sha256": "351982beb558edd3debf0d3a",
+      "chars": 4279
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "690ad11f659473dba9fc8335",
+      "chars": 24882
+     },
+     "catview=cat": {
+      "sha256": "690ad11f659473dba9fc8335",
+      "chars": 24882
+     },
+     "catview=team": {
+      "sha256": "8102bc0b23db59c6b1caaae2",
+      "chars": 7868
+     },
+     "catview=player": {
+      "sha256": "3e639797ea6f60b76353adb3",
+      "chars": 5469
+     },
+     "catview=questions": {
+      "sha256": "ced54f7a1d8518e0149998cc",
+      "chars": 14905
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/delta-burke-2026.js",
+    "/archive/index.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/deciderphases.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzer_client.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/live_client.js",
+    "/js/newstats.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
+  "archive clopen-uchicago": {
+   "header": "CLOPEN @ UChicago",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "a8e9016ddd46c6479c12d57c",
+      "chars": 26067
+     },
+     "schedview=all": {
+      "sha256": "a8e9016ddd46c6479c12d57c",
+      "chars": 26067
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "959c21b2b45e8536665e20c3",
+      "chars": 726381
+     },
+     "layout=classic": {
+      "sha256": "959c21b2b45e8536665e20c3",
+      "chars": 726381
+     },
+     "layout=new": {
+      "sha256": "a401d55959d7dc6992e4e7e6",
+      "chars": 5406
+     },
+     "new/standings": {
+      "sha256": "a401d55959d7dc6992e4e7e6",
+      "chars": 5406
+     },
+     "new/individuals": {
+      "sha256": "99550742cafff8d3e7c097fc",
+      "chars": 17389
+     },
+     "new/games": {
+      "sha256": "028a15b5abedd740ba96836c",
+      "chars": 159704
+     },
+     "new/teams": {
+      "sha256": "c471e805c97795e81ee181c7",
+      "chars": 58263
+     },
+     "new/players": {
+      "sha256": "6890b902b5aa7d16c5564b2c",
+      "chars": 159700
+     },
+     "new/rounds": {
+      "sha256": "a75479efdee20e1739478071",
+      "chars": 5027
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "93fc7d358d2135da832461d4",
+      "chars": 10157
+     },
+     "catview=cat": {
+      "sha256": "93fc7d358d2135da832461d4",
+      "chars": 10157
+     },
+     "catview=team": {
+      "sha256": "c6123a2df436f85714b9c59c",
+      "chars": 3980
+     },
+     "catview=player": {
+      "sha256": "ad33123cb0de8b96b5fe73d7",
+      "chars": 3984
+     },
+     "catview=questions": {
+      "sha256": "68378061ac5e03b6423e63ea",
+      "chars": 13923
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/clopen-uchicago.js",
+    "/archive/index.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/deciderphases.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzer_client.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/live_client.js",
+    "/js/newstats.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
   "archive 2026-to-online": {
    "header": "2026 TO Online",
    "tabs": {

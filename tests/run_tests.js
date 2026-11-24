@@ -9,6 +9,7 @@ import { parseMatch, parseRoster, roundFromFilename, guessRound, parseRosterLine
   rosterNameMap, renameMatch, carryFormerNames, forfeitQbj, resultOf, rosterForExport, withRound, statedRound, matchPayload } from '../app/engine/qbj.js';
 import { aggregate, dedupeMatches, standings, headToHead, levelRuns, standingsOrder, tiebreakOf, ruleOf, tieOrderOf, tieKeys, DEFAULT_TIE_ORDER } from '../app/engine/stats.js';
 import { rankFormat } from '../app/js/read_core.js';
+import { isTbRound } from '../app/engine/deciderphases.js';
 import { pasteGrid } from '../app/engine/rosterpaste.js';
 import { buildYft, yfStages, repeatedPhases } from '../app/engine/yft.js';
 import { buildReport, reportData } from '../app/engine/report.js';
@@ -3016,7 +3017,8 @@ test('archive captures agree with their manifest counts', () => {
       .map((e) => ({ ...parseMatch(e.qbj, { filename: e.filename }), fileId: e.id }));
     const games = dedupeMatches(matches);
     assert.equal(games.length, t.games, t.slug + ' games');
-    assert.equal(Math.max(...games.map((m) => m.round)), t.rounds, t.slug + ' rounds');
+    // tiebreaker games (rounds 901 on) are not rounds of the schedule
+    assert.equal(Math.max(0, ...games.map((m) => m.round).filter((n) => !isTbRound(n))), t.rounds, t.slug + ' rounds');
     assert.equal(data[`/pub/${t.slug}`].name, t.name, t.slug + ' name');
   }
 });
@@ -3120,7 +3122,8 @@ test('archive captures leave out a resent game\'s first copy when the shards lac
 test('archive reports take the captured game format and schedule', () => {
   for (const [slug, data] of captures) {
     const { opts } = captureReport(slug, data);
-    const format = effectiveFormat(data[`/pub/${slug}`].format);
+    // ranked as the public page ranks it: the format with its tie order
+    const format = rankFormat(data[`/pub/${slug}`].format);
     assert.deepEqual(opts.settings, format, slug + ' format');
     assert.equal(opts.schedule, data[`/pub/${slug}/schedule`] || null, slug + ' schedule');
     const standings = readFileSync(new URL(slug + '/standings.html', ARCHIVE_DIR), 'utf8');

@@ -51,6 +51,7 @@ import { readGames } from '../app/engine/games.js';
 import { dedupeMatches } from '../app/engine/stats.js';
 import { buildReport } from '../app/engine/report.js';
 import { rankFormat } from '../app/js/read_core.js';
+import { isTbRound } from '../app/engine/deciderphases.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ARCHIVE = join(ROOT, 'app', 'archive');
@@ -391,7 +392,8 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
     date,
     host: opts.host || (existing && existing.host) || '',
     teams: report.roster ? report.roster.length : teams.size,
-    rounds: Math.max(...games.map((m) => m.round)),
+    // tiebreaker games are played as rounds 901 on (deciderphases.js): not rounds of the schedule
+    rounds: Math.max(0, ...games.map((m) => m.round).filter((n) => !isTbRound(n))),
     games: games.length,
   };
   // the set and site stick across a refresh; an empty one is left out

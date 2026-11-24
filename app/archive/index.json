@@ -1,6 +1,24 @@
 {
   "tournaments": [
     {
+      "slug": "delta-burke-2026",
+      "name": "Delta Burke 2026",
+      "date": "2026-11-21",
+      "host": "",
+      "teams": 24,
+      "rounds": 10,
+      "games": 120
+    },
+    {
+      "slug": "clopen-uchicago",
+      "name": "CLOPEN @ UChicago",
+      "date": "2026-11-21",
+      "host": "UChicago",
+      "teams": 8,
+      "rounds": 12,
+      "games": 44
+    },
+    {
       "slug": "2026-to-online",
       "name": "2026 TO Online",
       "date": "2026-11-20",
@@ -8,7 +26,7 @@
       "teams": 8,
       "rounds": 10,
       "games": 40,
-      "set": "2026 Terrapin",
+      "set": "2026 Terrapin Open",
       "site": "Online"
     },
     {
