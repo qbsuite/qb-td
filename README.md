@@ -296,9 +296,10 @@ Part of [qbsuite](https://qbsuite.github.io/).
   (`app/archive/<slug>.js`) instead of the Worker, so the schedule, stats,
   and categories tabs work with no server and no tournament of your own,
   and keep working if the backend ever goes away. Each entry also ships its
-  six-page stat report as static HTML. Buzzpoints is switched off in a
-  capture: that tab needs the gated packet-text route, which isn't
-  archived. See "Archiving a tournament" below.
+  six-page stat report as static HTML. Buzzpoints behind a password
+  aren't archived (that tab needs the gated packet-text route); the
+  archived page's Buzzpoints tab links to the live page instead. See
+  "Archiving a tournament" below.
 
 ## Question sets
 
@@ -1817,7 +1818,12 @@ capture lists those files under `__text`; the archived page fetches one
 only when a viewer opens buzzpoints or a scoresheet. Every other capture
 still carries no question text, which `npm test` checks, and has its
 buzzpoints and scoresheets switched off, since an archived page could
-never open them.
+never open them. Its questions are still on the live player page behind
+the TD's password, though (nothing deletes a tournament's packets), so
+when the live page had buzzpoints with rounds done, `add` marks the entry
+`buzz: "live"` and the archived page's **Buzzpoints ↗** tab opens the live
+page on its Buzzpoints tab (`archive.js` `liveBuzzTab`). A `refresh`
+checks again.
 
 The gate is deliberately outside the Worker. An `archived` column plus an
 owner-only route would mean the first real account in a system whose whole

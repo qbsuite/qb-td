@@ -1006,6 +1006,9 @@
     "stats",
     "cats"
    ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=delta-burke-2026#buzz"
+   ],
    "firstTab": null,
    "errors": "",
    "statics": [
@@ -1120,12 +1123,132 @@
     "stats",
     "cats"
    ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=clopen-uchicago#buzz"
+   ],
    "firstTab": null,
    "errors": "",
    "statics": [
     "/archive.html",
     "/archive/clopen-uchicago.js",
     "/archive/index.json",
+    "/css/pub.css",
+    "/css/td.css",
+    "/engine/buzz.js",
+    "/engine/cats.js",
+    "/engine/deciderphases.js",
+    "/engine/entities.js",
+    "/engine/finals.js",
+    "/engine/qbj.js",
+    "/engine/report.js",
+    "/engine/schedule.js",
+    "/engine/scoresheet.js",
+    "/engine/stats.js",
+    "/engine/yft.js",
+    "/js/api.js",
+    "/js/archive.js",
+    "/js/buzzer_client.js",
+    "/js/buzzkey.js",
+    "/js/buzzview.js",
+    "/js/live_client.js",
+    "/js/newstats.js",
+    "/js/place.js",
+    "/js/pubview.js",
+    "/js/read_core.js",
+    "/js/reportframe.js",
+    "/js/sheetview.js",
+    "/js/sidebar.js"
+   ],
+   "foreign": []
+  },
+  "archive lancelot-ii": {
+   "header": "LANCELOT II",
+   "tabs": {
+    "schedule": {
+     "first": {
+      "sha256": "8fb620a8ffab1ffea30be028",
+      "chars": 18312
+     },
+     "schedview=all": {
+      "sha256": "8fb620a8ffab1ffea30be028",
+      "chars": 18312
+     }
+    },
+    "stats": {
+     "first": {
+      "sha256": "796431e45999441040d2f12e",
+      "chars": 654561
+     },
+     "layout=classic": {
+      "sha256": "796431e45999441040d2f12e",
+      "chars": 654561
+     },
+     "layout=new": {
+      "sha256": "723e008b1c1e3607251fe650",
+      "chars": 5644
+     },
+     "new/standings": {
+      "sha256": "723e008b1c1e3607251fe650",
+      "chars": 5644
+     },
+     "new/individuals": {
+      "sha256": "d64109b1674cd1fd4a08dc33",
+      "chars": 20278
+     },
+     "new/games": {
+      "sha256": "083903e2ffde76b798ec4aad",
+      "chars": 155860
+     },
+     "new/teams": {
+      "sha256": "8c983116b0949c6bbec034e6",
+      "chars": 62076
+     },
+     "new/players": {
+      "sha256": "447f7e8eaf3ebabcd0cd985e",
+      "chars": 160409
+     },
+     "new/rounds": {
+      "sha256": "b0fead37211f70386519da70",
+      "chars": 4021
+     }
+    },
+    "cats": {
+     "first": {
+      "sha256": "606d01b8af6175ecceb45b11",
+      "chars": 11526
+     },
+     "catview=cat": {
+      "sha256": "606d01b8af6175ecceb45b11",
+      "chars": 11526
+     },
+     "catview=team": {
+      "sha256": "27e56f00c9c02fd022bdac27",
+      "chars": 4503
+     },
+     "catview=player": {
+      "sha256": "2c1bdbe1b074ceb3716c4fc6",
+      "chars": 3897
+     },
+     "catview=questions": {
+      "sha256": "59806c0f3d2c603c16828df0",
+      "chars": 11092
+     }
+    }
+   },
+   "tabsShown": [
+    "schedule",
+    "stats",
+    "cats"
+   ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=lancelot-ii#buzz"
+   ],
+   "firstTab": null,
+   "errors": "",
+   "statics": [
+    "/archive.html",
+    "/archive/index.json",
+    "/archive/lancelot-ii.js",
     "/css/pub.css",
     "/css/td.css",
     "/engine/buzz.js",
@@ -1577,6 +1700,9 @@
     "stats",
     "cats"
    ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=2026-penn-bowl-queens#buzz"
+   ],
    "firstTab": null,
    "errors": "",
    "statics": [
@@ -1782,6 +1908,9 @@
     "stats",
     "cats"
    ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=2026-penn-bowl-at-stanford#buzz"
+   ],
    "firstTab": null,
    "errors": "",
    "statics": [
@@ -1895,6 +2024,9 @@
     "schedule",
     "stats",
     "cats"
+   ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=socal-penn-bowl#buzz"
    ],
    "firstTab": null,
    "errors": "",
@@ -2444,6 +2576,9 @@
     "stats",
     "cats"
    ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=pbplaytest-19sep#buzz"
+   ],
    "firstTab": null,
    "errors": "",
    "statics": [
@@ -2557,6 +2692,9 @@
     "schedule",
     "stats",
     "cats"
+   ],
+   "tabLinks": [
+    "Buzzpoints ↗ t.html?t=ug-nats-stanford#buzz"
    ],
    "firstTab": null,
    "errors": "",

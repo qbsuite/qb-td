@@ -18,6 +18,19 @@ const params = new URLSearchParams(location.search);
 const slug = params.get('t') || '';
 const setName = params.get('set') || '';
 
+// A tournament whose questions stayed behind the TD's password keeps its
+// buzzpoints on the live player page, password and all; the archive has
+// no packet text to show them with. The index marks those (`buzz:
+// 'live'`, tools/archive.mjs), and their Buzzpoints tab links there.
+function liveBuzzTab(entry) {
+  if (entry.buzz !== 'live') return;
+  const tab = document.createElement('a');
+  tab.className = 'tab';
+  tab.href = 't.html?t=' + encodeURIComponent(entry.slug) + '#buzz';
+  tab.innerHTML = 'Buzzpoints <span aria-hidden="true">↗</span>';
+  $('tabs').append(tab);
+}
+
 function say(text, bad) {
   $('msg').textContent = text || '';
   $('msg').className = bad ? 'bad' : '';
@@ -57,12 +70,14 @@ async function openTournament(entry) {
   }
   useFrozenData(data);
 
-  // From here down it is the public page as it was on the day (minus
-  // buzzpoints, which need the packet password and are never archived).
+  // From here down it is the public page as it was on the day, minus
+  // buzzpoints behind a password, which link to the live page instead.
   archivedStrip(entry);
   $('tabs').hidden = false;
 
   await import('./pubview.js');
+  // after pubview.js has wired its own tabs, which this one is not
+  liveBuzzTab(entry);
 }
 
 /* ---------- a set's sites ---------- */

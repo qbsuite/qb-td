@@ -337,3 +337,7 @@ a.livescore:hover, a.livescore:focus-visible { text-decoration: underline; }
   font-size: 18px; line-height: 1; color: var(--muted);
 }
 .sched .gl[tabindex]:hover::after { color: var(--act); }
+
+/* an archived tournament's Buzzpoints tab: a link to its live page (archive.js) */
+a.tab:hover { text-decoration: none; color: var(--fg); }
+a.tab span { font-size: .85em; }

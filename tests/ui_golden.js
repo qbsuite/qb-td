@@ -135,8 +135,11 @@ const outHtml = () => c.js(`document.getElementById('out').innerHTML + (() => { 
 async function publicPage(url) {
   const page = await load(url);
   const out = { header: norm(await c.js(`document.querySelector('header').innerText`)), tabs: {} };
-  const tabs = await c.js(`[...document.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.dataset.tab)`);
+  const tabs = await c.js(`[...document.querySelectorAll('.tab[data-tab]')].filter((b) => !b.hidden).map((b) => b.dataset.tab)`);
   out.tabsShown = tabs;
+  // a tab that is a link to another page (an archive's live Buzzpoints, archive.js)
+  const links = await c.js(`[...document.querySelectorAll('a.tab')].map((a) => a.textContent.trim() + ' ' + a.getAttribute('href'))`);
+  if (links.length) out.tabLinks = links;
   out.firstTab = await c.js(`(document.querySelector('.tab.on') || {}).dataset?.tab || null`);
   for (const tab of tabs) {
     await c.click(`.tab[data-tab="${tab}"]`);

@@ -396,6 +396,12 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
     rounds: Math.max(0, ...games.map((m) => m.round).filter((n) => !isTbRound(n))),
     games: games.length,
   };
+  // buzzpoints behind the TD's password stay on the live player page, which
+  // the archived page's Buzzpoints tab links to (archive.js); released ones
+  // are in the capture itself
+  const liveBuzz = Boolean(state.buzz) && state.buzz_v !== 'open' && (state.buzz_done || []).length > 0;
+  if (existing) delete existing.buzz;
+  if (liveBuzz) entry.buzz = 'live';
   // the set and site stick across a refresh; an empty one is left out
   const set = opts.set != null ? opts.set : (existing && existing.set) || '';
   const site = opts.site != null ? opts.site : (existing && existing.site) || '';
@@ -411,6 +417,7 @@ async function cmdAdd(slug, opts, { refresh = false } = {}) {
   console.log(`  app/archive/${slug}.js  (${(JSON.stringify(data).length / 1024).toFixed(0)} KB)`);
   console.log(`  app/archive/${slug}/  (${pages.length} report pages)`);
   if (texts && texts.length) console.log(`  app/archive/packets/${slug}/  (${texts.length} released question files)`);
+  if (liveBuzz) console.log('  buzzpoints: behind the password, linked to the live page');
   if (!opts.date && !existing) console.log(`  date defaulted to today; set the real one with --date`);
   // written all the same: nothing is approved until it is committed
   const problems = captureProblems(data[`/pub/${slug}`], data[`/pub/${slug}/bundle`]);

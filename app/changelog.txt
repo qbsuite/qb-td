@@ -1,3 +1,9 @@
+Release Notes for 11/25/2026
+
+[ ARCHIVE ]
+- Added LANCELOT II.
+- Archived tournaments with password-protected buzzpoints have a Buzzpoints tab that opens them on the live page.
+
 Release Notes for 11/24/2026
 
 [ ARCHIVE ]

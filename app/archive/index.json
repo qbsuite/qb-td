@@ -7,7 +7,8 @@
       "host": "",
       "teams": 24,
       "rounds": 10,
-      "games": 120
+      "games": 120,
+      "buzz": "live"
     },
     {
       "slug": "clopen-uchicago",
@@ -16,7 +17,18 @@
       "host": "UChicago",
       "teams": 8,
       "rounds": 12,
-      "games": 44
+      "games": 44,
+      "buzz": "live"
+    },
+    {
+      "slug": "lancelot-ii",
+      "name": "LANCELOT II",
+      "date": "2026-11-21",
+      "host": "",
+      "teams": 10,
+      "rounds": 9,
+      "games": 45,
+      "buzz": "live"
     },
     {
       "slug": "2026-to-online",
@@ -58,6 +70,7 @@
       "teams": 12,
       "rounds": 12,
       "games": 67,
+      "buzz": "live",
       "set": "2026 Penn Bowl",
       "site": "Queen's"
     },
@@ -78,6 +91,7 @@
       "teams": 6,
       "rounds": 10,
       "games": 30,
+      "buzz": "live",
       "set": "2026 Penn Bowl",
       "site": "Stanford"
     },
@@ -89,6 +103,7 @@
       "teams": 6,
       "rounds": 10,
       "games": 30,
+      "buzz": "live",
       "set": "2026 Penn Bowl",
       "site": "UCSD"
     },
@@ -129,6 +144,7 @@
       "teams": 4,
       "rounds": 10,
       "games": 20,
+      "buzz": "live",
       "set": "2026 Penn Bowl",
       "site": "Playtest"
     },
@@ -139,7 +155,8 @@
       "host": "Stanford",
       "teams": 4,
       "rounds": 12,
-      "games": 24
+      "games": 24,
+      "buzz": "live"
     }
   ],
   "named": [

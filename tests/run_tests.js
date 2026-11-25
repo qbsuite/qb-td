@@ -3005,6 +3005,13 @@ test('archive manifest entries are well formed', () => {
     slugs.add(t.slug);
     assert.ok(t.name, t.slug + ' has a name');
     assert.match(t.date, /^\d{4}-\d{2}-\d{2}$/, t.slug + ' date');
+    // buzzpoints on the live page (archive.js liveBuzzTab): only for one
+    // whose questions stayed behind the password; released ones are archived
+    if ('buzz' in t) {
+      assert.equal(t.buzz, 'live', t.slug + ' buzz');
+      const st = (captures.get(t.slug) || {})[`/pub/${t.slug}`];
+      assert.ok(st && st.buzz_v !== 'open', t.slug + ' links buzzpoints it already has');
+    }
   }
   // newest first: the order the archive page lists them in
   const dates = archiveIndex.tournaments.map((t) => t.date);
